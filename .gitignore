@@ -1,0 +1,29 @@
+# Xcode user-specific state
+xcuserdata/
+*.xcuserstate
+
+# Xcode build artifacts
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# CocoaPods (unused but kept for safety)
+Pods/
+
+# macOS junk
+.DS_Store
+
+# IDE / editor
+.vscode/
+.idea/
+
+# fastlane
+fastlane/report.xml
+fastlane/screenshots/
+fastlane/test_output/
