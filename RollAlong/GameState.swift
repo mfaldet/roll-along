@@ -17,6 +17,15 @@ final class GameState: ObservableObject {
         didSet { UserDefaults.standard.set(ballStartsAtTop, forKey: "ra_startAtTop") }
     }
 
+    // One-time UX moments — survive resetProgress() so a returning player
+    // who resets level progress isn't shown the intro/welcome again.
+    @Published var seenOnboarding: Bool {
+        didSet { UserDefaults.standard.set(seenOnboarding, forKey: "ra_seenOnboarding") }
+    }
+    @Published var seenWelcomeMoment: Bool {
+        didSet { UserDefaults.standard.set(seenWelcomeMoment, forKey: "ra_seenWelcomeMoment") }
+    }
+
     init() {
         let saved = UserDefaults.standard.integer(forKey: "ra_level")
         currentLevel = saved > 0 ? saved : 1
@@ -24,6 +33,8 @@ final class GameState: ObservableObject {
         playerName = UserDefaults.standard.string(forKey: "ra_name") ?? ""
         hapticsEnabled = UserDefaults.standard.object(forKey: "ra_haptics") as? Bool ?? true
         ballStartsAtTop = UserDefaults.standard.object(forKey: "ra_startAtTop") as? Bool ?? true
+        seenOnboarding = UserDefaults.standard.bool(forKey: "ra_seenOnboarding")
+        seenWelcomeMoment = UserDefaults.standard.bool(forKey: "ra_seenWelcomeMoment")
     }
 
     func advanceLevel() {

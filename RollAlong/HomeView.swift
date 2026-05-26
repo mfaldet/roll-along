@@ -76,11 +76,78 @@ struct HomeView: View {
 
                     Spacer().frame(height: 48)
                 }
+
+                // First-launch onboarding overlay
+                if !gameState.seenOnboarding {
+                    onboardingOverlay
+                        .transition(.opacity)
+                }
             }
             .onReceive(clock.$tickCount) { _ in tickBall() }
             .onAppear    { motion.start(); clock.start() }
             .onDisappear { motion.stop();  clock.stop()  }
             .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    // MARK: - Onboarding overlay
+
+    private var onboardingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.72).ignoresSafeArea()
+
+            VStack(spacing: 32) {
+                Spacer()
+
+                // Tilting-phone visual cue
+                Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                    .font(.system(size: 72, weight: .light))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, Color(white: 0.78)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    )
+                    .symbolEffect(.pulse, options: .repeating)
+
+                VStack(spacing: 14) {
+                    Text("Tilt to roll")
+                        .font(.system(size: 38, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("Tilt your phone in any direction\nto roll the ball.\nReach the rainbow to clear the level.")
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .foregroundStyle(Color(white: 0.78))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.32)) {
+                        gameState.seenOnboarding = true
+                    }
+                } label: {
+                    Text("Got it")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 56)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color.white)
+                        )
+                }
+                .padding(.bottom, 60)
+            }
+            .padding(.horizontal, 32)
+        }
+        // Tap anywhere also dismisses, for users who skip the button
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.32)) {
+                gameState.seenOnboarding = true
+            }
         }
     }
 
