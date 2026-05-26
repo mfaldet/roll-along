@@ -38,7 +38,7 @@ struct SettingsView: View {
             Button("Reset", role: .destructive) { gameState.resetProgress() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will return you to Level 1. Your skin selection will be kept.")
+            Text("This wipes all level progress — stars, coins, and best times. Your skin, name, and settings will be kept.")
         }
     }
 
