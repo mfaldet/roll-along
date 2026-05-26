@@ -13,6 +13,9 @@ final class GameState: ObservableObject {
     @Published var hapticsEnabled: Bool {
         didSet { UserDefaults.standard.set(hapticsEnabled, forKey: "ra_haptics") }
     }
+    @Published var soundEnabled: Bool {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: "ra_sound") }
+    }
     @Published var ballStartsAtTop: Bool {
         didSet { UserDefaults.standard.set(ballStartsAtTop, forKey: "ra_startAtTop") }
     }
@@ -32,6 +35,7 @@ final class GameState: ObservableObject {
         activeSkin = BallSkin(rawValue: UserDefaults.standard.string(forKey: "ra_skin") ?? "") ?? .red
         playerName = UserDefaults.standard.string(forKey: "ra_name") ?? ""
         hapticsEnabled = UserDefaults.standard.object(forKey: "ra_haptics") as? Bool ?? true
+        soundEnabled = UserDefaults.standard.object(forKey: "ra_sound") as? Bool ?? true
         ballStartsAtTop = UserDefaults.standard.object(forKey: "ra_startAtTop") as? Bool ?? true
         seenOnboarding = UserDefaults.standard.bool(forKey: "ra_seenOnboarding")
         seenWelcomeMoment = UserDefaults.standard.bool(forKey: "ra_seenWelcomeMoment")
