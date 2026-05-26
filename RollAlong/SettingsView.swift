@@ -117,6 +117,21 @@ struct SettingsView: View {
                 }
                 .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
                 .padding()
+
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+
+                Toggle(isOn: $gameState.soundEnabled) {
+                    Label {
+                        Text("Sound Effects")
+                            .font(.system(size: 15, design: .rounded))
+                            .foregroundStyle(Color(white: 0.75))
+                    } icon: {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
+                .padding()
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
         }

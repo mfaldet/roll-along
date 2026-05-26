@@ -2,6 +2,7 @@ import SwiftUI
 import CoreMotion
 import Combine
 import UIKit
+import AudioToolbox
 
 // ---------------------------------------------------------------------------
 // BallGameView — tilt-driven marble game.
@@ -52,6 +53,11 @@ struct BallGameView: View {
     @State private var arenaSize:          CGSize    = .zero
     @State private var showWelcomeMoment:  Bool      = false
 
+    // Animation-polish triggers (keyframe animators key off these)
+    @State private var squashTrigger:      Int       = 0   // on wall bounce
+    @State private var shakeTrigger:       Int       = 0   // on .fell
+    @State private var goalBurst:          GoalBurstEvent? = nil
+
     private let ballRadius: CGFloat = 18
     private let tickRate            = 1.0 / 60.0
 
@@ -98,10 +104,33 @@ struct BallGameView: View {
                 if let ball {
                     marbleView
                         .frame(width: ballRadius * 2, height: ballRadius * 2)
+                        .keyframeAnimator(
+                            initialValue: BallSquash.identity,
+                            trigger: squashTrigger
+                        ) { content, value in
+                            content.scaleEffect(x: value.scaleX, y: value.scaleY)
+                        } keyframes: { _ in
+                            // Pinch on impact, spring back with a tiny overshoot.
+                            KeyframeTrack(\.scaleX) {
+                                LinearKeyframe(1.18, duration: 0.06)
+                                SpringKeyframe(1.0,  duration: 0.32, spring: .bouncy)
+                            }
+                            KeyframeTrack(\.scaleY) {
+                                LinearKeyframe(0.78, duration: 0.06)
+                                SpringKeyframe(1.0,  duration: 0.32, spring: .bouncy)
+                            }
+                        }
                         .position(ball.position)
                         .scaleEffect(phase == .playing ? 1.0 : 0.05)
                         .opacity(phase == .playing ? 1.0 : 0.0)
                         .animation(.easeIn(duration: 0.28), value: phase)
+                }
+
+                // Goal burst — one-shot particle blast on goal reach
+                if let burst = goalBurst {
+                    GoalBurstView(event: burst)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
                 }
 
                 // HUD
@@ -114,6 +143,20 @@ struct BallGameView: View {
 
                 // Screen border — always on top, colour reacts to game state
                 screenBorder
+            }
+            // Quick screen-shake when the ball falls.
+            .keyframeAnimator(
+                initialValue: CGFloat(0),
+                trigger: shakeTrigger
+            ) { content, value in
+                content.offset(x: value)
+            } keyframes: { _ in
+                LinearKeyframe(-5, duration: 0.04)
+                LinearKeyframe( 5, duration: 0.05)
+                LinearKeyframe(-4, duration: 0.05)
+                LinearKeyframe( 4, duration: 0.05)
+                LinearKeyframe(-2, duration: 0.05)
+                LinearKeyframe( 0, duration: 0.04)
             }
             .onAppear {
                 arenaSize = geo.size
@@ -518,6 +561,7 @@ struct BallGameView: View {
 
     private func spawnBall(in size: CGSize) {
         ball = Ball(position: startPoint(in: size), velocity: .zero)
+        goalBurst = nil  // clear any leftover burst from previous level
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
 
@@ -541,19 +585,25 @@ struct BallGameView: View {
 
         // Top and bottom wall bounce
         let r = ballRadius
+        let bounceVelocityThreshold: CGFloat = 180  // below this, no feedback
         if b.position.y < r {
             b.position.y = r
+            let incoming = abs(b.velocity.dy)
             b.velocity.dy = -b.velocity.dy * 0.55
+            if incoming > bounceVelocityThreshold { fireWallHit(axis: .vertical, force: incoming) }
         }
         if b.position.y > geoSize.height - r {
             b.position.y = geoSize.height - r
+            let incoming = abs(b.velocity.dy)
             b.velocity.dy = -b.velocity.dy * 0.55
+            if incoming > bounceVelocityThreshold { fireWallHit(axis: .vertical, force: incoming) }
         }
 
         // Goal check
         let gp = goalPoint(in: geoSize)
         if hypot(b.position.x - gp.x, b.position.y - gp.y) < ballRadius * 1.7 {
             ball = b
+            fireGoalReached(at: gp)
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
@@ -561,11 +611,34 @@ struct BallGameView: View {
         // Hole check
         if isInHole(position: b.position, size: geoSize) || b.position.x < -r || b.position.x > geoSize.width + r {
             ball = b
+            fireFell()
             withAnimation(.easeIn(duration: 0.22)) { phase = .fell }
             return
         }
 
         ball = b
+    }
+
+    // MARK: - Feedback fan-out
+
+    private enum BounceAxis { case horizontal, vertical }
+
+    private func fireWallHit(axis: BounceAxis, force: CGFloat) {
+        if gameState.hapticsEnabled { Haptics.light() }
+        SFX.bounce(enabled: gameState.soundEnabled)
+        squashTrigger &+= 1
+    }
+
+    private func fireGoalReached(at center: CGPoint) {
+        if gameState.hapticsEnabled { Haptics.success() }
+        SFX.goal(enabled: gameState.soundEnabled)
+        goalBurst = GoalBurstEvent(center: center, start: .now)
+    }
+
+    private func fireFell() {
+        if gameState.hapticsEnabled { Haptics.heavy() }
+        SFX.drop(enabled: gameState.soundEnabled)
+        shakeTrigger &+= 1
     }
 
     private func isInHole(position: CGPoint, size: CGSize) -> Bool {
@@ -586,6 +659,20 @@ struct BallGameView: View {
 private struct Ball {
     var position: CGPoint
     var velocity: CGVector
+}
+
+// ---------------------------------------------------------------------------
+// GoalBurstEvent — one-shot particle burst when ball reaches the goal.
+// Holds the centre + start time so a TimelineView+Canvas can animate it.
+// ---------------------------------------------------------------------------
+struct GoalBurstEvent: Equatable {
+    let center: CGPoint
+    let start:  Date
+    let tint:   Color = .white   // particles tinted along their own hue, white is unused fallback
+
+    static func == (lhs: GoalBurstEvent, rhs: GoalBurstEvent) -> Bool {
+        lhs.start == rhs.start && lhs.center == rhs.center
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -640,5 +727,142 @@ final class PhysicsClock: NSObject, ObservableObject {
 
     @objc private func fire(_ link: CADisplayLink) {
         tickCount &+= 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Haptics — thin wrapper around UIKit's feedback generators.
+// All calls are no-ops when gameState.hapticsEnabled is false (the caller is
+// responsible for that check; this keeps the helper stateless).
+// ---------------------------------------------------------------------------
+enum Haptics {
+    static func light()   { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    static func medium()  { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+    static func heavy()   { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
+    static func soft()    { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
+    static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+    static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+    static func error()   { UINotificationFeedbackGenerator().notificationOccurred(.error) }
+}
+
+// ---------------------------------------------------------------------------
+// SFX — MVP sound layer using AudioToolbox SystemSoundIDs.
+//
+// NOTE: these are iOS built-in placeholders so the game has audible feedback
+// from day one without bundling audio assets.  Replace with proper royalty-
+// free or commissioned .wav files in a follow-up pass (see Sprint 1 notes).
+// To swap a sound, drop a .wav into the bundle and call .playFile("name").
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// BallSquash — animatable scale pair used by the squash-on-bounce
+// keyframeAnimator.  Both axes are independently driven via KeyframeTrack
+// so a horizontal pinch reads correctly even mid-bounce.
+// ---------------------------------------------------------------------------
+struct BallSquash: Animatable {
+    var scaleX: CGFloat
+    var scaleY: CGFloat
+    static let identity = BallSquash(scaleX: 1, scaleY: 1)
+
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(scaleX, scaleY) }
+        set { scaleX = newValue.first; scaleY = newValue.second }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GoalBurstView — one-shot rainbow burst at the goal location.
+// Renders for ~0.75s after the event start, then draws nothing.
+// ---------------------------------------------------------------------------
+struct GoalBurstView: View {
+    let event: GoalBurstEvent
+    private let lifetime: TimeInterval = 0.75
+    private let particleCount = 26
+
+    var body: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let elapsed = tl.date.timeIntervalSince(event.start)
+                guard elapsed >= 0, elapsed <= lifetime else { return }
+                let t      = CGFloat(elapsed)
+                let life   = CGFloat(lifetime)
+                let progress = t / life           // 0…1
+                let easedOut = 1 - pow(1 - progress, 2.5)  // ease-out
+
+                for i in 0..<particleCount {
+                    let seed  = Double(i)
+                    let phase = seed / Double(particleCount)
+                    let angle = phase * 2 * .pi + seed * 0.13
+
+                    // Per-particle reach varies — adds organic spread
+                    let reach = CGFloat(220 + (seed.truncatingRemainder(dividingBy: 5)) * 22)
+                    let r = reach * easedOut
+                    let px = event.center.x + cos(angle) * r
+                    let py = event.center.y + sin(angle) * r
+
+                    let alpha = Double(1.0 - progress)
+                    let pR    = CGFloat(7.0 * (1.0 - progress) + 2.0)
+                    let hue   = (phase + Double(t) * 0.4).truncatingRemainder(dividingBy: 1.0)
+                    let color = Color(hue: hue, saturation: 1.0, brightness: 1.0)
+
+                    // Glow
+                    let gR = pR * 3.0
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: px - gR, y: py - gR, width: gR*2, height: gR*2)),
+                        with: .radialGradient(
+                            Gradient(colors: [color.opacity(alpha * 0.45), .clear]),
+                            center: CGPoint(x: px, y: py),
+                            startRadius: 0, endRadius: gR
+                        )
+                    )
+
+                    // Core
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: px - pR, y: py - pR, width: pR*2, height: pR*2)),
+                        with: .radialGradient(
+                            Gradient(stops: [
+                                .init(color: Color.white.opacity(alpha), location: 0.0),
+                                .init(color: color.opacity(alpha),       location: 0.5),
+                                .init(color: color.opacity(0),           location: 1.0),
+                            ]),
+                            center: CGPoint(x: px, y: py),
+                            startRadius: 0, endRadius: pR
+                        )
+                    )
+                }
+
+                // Central flash ring — bright at start, fades out fast
+                if progress < 0.35 {
+                    let ringR  = 24 + 80 * progress
+                    let ringAlpha = (0.55 * (1 - progress / 0.35))
+                    ctx.stroke(
+                        Path(ellipseIn: CGRect(x: event.center.x - ringR,
+                                                y: event.center.y - ringR,
+                                                width: ringR*2, height: ringR*2)),
+                        with: .color(Color.white.opacity(Double(ringAlpha))),
+                        lineWidth: 2.5
+                    )
+                }
+            }
+        }
+    }
+}
+
+enum SFX {
+    // System sound IDs — see https://github.com/TUNER88/iOSSystemSoundsLibrary
+    private static let bounceID:  SystemSoundID = 1104  // light "tick"
+    private static let dropID:    SystemSoundID = 1073  // low "thud"
+    private static let goalID:    SystemSoundID = 1025  // bright "ding"
+    private static let coinID:    SystemSoundID = 1306  // sharp pickup tick
+    private static let tapID:     SystemSoundID = 1306  // UI tap
+
+    static func bounce(enabled: Bool) { play(bounceID, enabled: enabled) }
+    static func drop  (enabled: Bool) { play(dropID,   enabled: enabled) }
+    static func goal  (enabled: Bool) { play(goalID,   enabled: enabled) }
+    static func coin  (enabled: Bool) { play(coinID,   enabled: enabled) }
+    static func tap   (enabled: Bool) { play(tapID,    enabled: enabled) }
+
+    private static func play(_ id: SystemSoundID, enabled: Bool) {
+        guard enabled else { return }
+        AudioServicesPlaySystemSound(id)
     }
 }
