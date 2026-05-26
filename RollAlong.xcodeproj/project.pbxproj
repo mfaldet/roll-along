@@ -10,6 +10,12 @@
 		AA000001000000000000AA01 /* RollAlongApp.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA000001000000000000AA00 /* RollAlongApp.swift */; };
 		AA000002000000000000AA01 /* ContentView.swift in Sources */     = {isa = PBXBuildFile; fileRef = AA000002000000000000AA00 /* ContentView.swift */; };
 		AA000003000000000000AA01 /* BallGameView.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA000003000000000000AA00 /* BallGameView.swift */; };
+		AA000006000000000000AA01 /* BallSkin.swift in Sources */        = {isa = PBXBuildFile; fileRef = AA000006000000000000AA00 /* BallSkin.swift */; };
+		AA000007000000000000AA01 /* GameState.swift in Sources */       = {isa = PBXBuildFile; fileRef = AA000007000000000000AA00 /* GameState.swift */; };
+		AA000008000000000000AA01 /* LevelLayout.swift in Sources */     = {isa = PBXBuildFile; fileRef = AA000008000000000000AA00 /* LevelLayout.swift */; };
+		AA000009000000000000AA01 /* HomeView.swift in Sources */        = {isa = PBXBuildFile; fileRef = AA000009000000000000AA00 /* HomeView.swift */; };
+		AA00000A000000000000AA01 /* SettingsView.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA00000A000000000000AA00 /* SettingsView.swift */; };
+		AA00000B000000000000AA02 /* Assets.xcassets in Resources */     = {isa = PBXBuildFile; fileRef = AA00000B000000000000AA00 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,6 +24,12 @@
 		AA000003000000000000AA00 /* BallGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallGameView.swift; sourceTree = "<group>"; };
 		AA000004000000000000AA00 /* Info.plist */         = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AA000005000000000000AA00 /* RollAlong.app */      = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000006000000000000AA00 /* BallSkin.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkin.swift;     sourceTree = "<group>"; };
+		AA000007000000000000AA00 /* GameState.swift */    = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift;    sourceTree = "<group>"; };
+		AA000008000000000000AA00 /* LevelLayout.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelLayout.swift;  sourceTree = "<group>"; };
+		AA000009000000000000AA00 /* HomeView.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift;     sourceTree = "<group>"; };
+		AA00000A000000000000AA00 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA00000B000000000000AA00 /* Assets.xcassets */   = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets;  sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -35,6 +47,12 @@
 				AA000001000000000000AA00 /* RollAlongApp.swift */,
 				AA000002000000000000AA00 /* ContentView.swift */,
 				AA000003000000000000AA00 /* BallGameView.swift */,
+				AA000006000000000000AA00 /* BallSkin.swift */,
+				AA000007000000000000AA00 /* GameState.swift */,
+				AA000008000000000000AA00 /* LevelLayout.swift */,
+				AA000009000000000000AA00 /* HomeView.swift */,
+				AA00000A000000000000AA00 /* SettingsView.swift */,
+				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 			);
 			path = RollAlong;
@@ -56,6 +74,7 @@
 			buildConfigurationList = AA000031000000000000AA00 /* Build configuration list for PBXNativeTarget "RollAlong" */;
 			buildPhases = (
 				AA000021000000000000AA00 /* Sources */,
+				AA000022000000000000AA00 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -96,6 +115,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		AA000022000000000000AA00 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA00000B000000000000AA02 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		AA000021000000000000AA00 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -104,6 +134,11 @@
 				AA000001000000000000AA01 /* RollAlongApp.swift in Sources */,
 				AA000002000000000000AA01 /* ContentView.swift in Sources */,
 				AA000003000000000000AA01 /* BallGameView.swift in Sources */,
+				AA000006000000000000AA01 /* BallSkin.swift in Sources */,
+				AA000007000000000000AA01 /* GameState.swift in Sources */,
+				AA000008000000000000AA01 /* LevelLayout.swift in Sources */,
+				AA000009000000000000AA01 /* HomeView.swift in Sources */,
+				AA00000A000000000000AA01 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
