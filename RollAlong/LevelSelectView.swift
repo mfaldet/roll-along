@@ -108,7 +108,7 @@ struct LevelSelectView: View {
         let stars    = gameState.stars(for: level)
         let coins    = gameState.coinsCollected(for: level)
         let theme    = Theme.forLevel(level)
-        let isDesigned = level <= 10   // PR 2a ships 10 hand-crafted
+        let isDesigned = level <= LevelLayout.handCrafted.count
 
         if unlocked && isDesigned {
             NavigationLink(destination: BallGameView()) {

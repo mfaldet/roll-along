@@ -107,6 +107,13 @@ struct BallGameView: View {
                 // Themed floor
                 theme.floorColor.ignoresSafeArea()
 
+                // Aurora theme: animated shimmer overlay on top of the base
+                if theme.id == .aurora {
+                    auroraShimmerOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 // Hole zones (themed)
                 holeLayer(geo: geo)
 
@@ -279,6 +286,42 @@ struct BallGameView: View {
                 )
                 .scaleEffect(pulse)
                 .opacity(banked ? 0.45 : 1.0)
+        }
+    }
+
+    /// Aurora-theme floor shimmer.  Renders a slow drift of soft green/blue/
+    /// purple gradient blobs on top of the floor base color.  Drawn at 30Hz
+    /// (minimumInterval) to keep CPU cost modest — physics still runs at 60Hz
+    /// via the CADisplayLink.
+    private var auroraShimmerOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t = tl.date.timeIntervalSinceReferenceDate
+
+                // 4 large soft blobs in the aurora palette
+                let blobs: [(Double, Double, Double, Double)] = [
+                    (0.0, 0.0, 0.42, 0.08),   // teal-green
+                    (1.7, 2.4, 0.62, 0.10),   // blue
+                    (3.5, 1.1, 0.75, 0.07),   // purple
+                    (5.2, 4.0, 0.50, 0.09),   // cyan
+                ]
+                let r = size.width * 0.85
+                for (xSeed, ySeed, hueSeed, speed) in blobs {
+                    let bx = size.width  * CGFloat(0.5 + 0.55 * sin(t * speed       + xSeed))
+                    let by = size.height * CGFloat(0.5 + 0.45 * sin(t * speed * 1.3 + ySeed))
+                    let hue = (hueSeed + t * 0.012).truncatingRemainder(dividingBy: 1.0)
+                    let color = Color(hue: hue, saturation: 0.55, brightness: 0.92)
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: bx - r, y: by - r,
+                                                width: r * 2, height: r * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [color.opacity(0.32), .clear]),
+                            center: CGPoint(x: bx, y: by),
+                            startRadius: 0, endRadius: r
+                        )
+                    )
+                }
+            }
         }
     }
 
