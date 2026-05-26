@@ -309,7 +309,8 @@ struct BallGameView: View {
                     Spacer()
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.leading, 22)
+            .padding(.trailing, 16)
             .padding(.bottom, max(safeBottom, 12) + 8)
         }
     }
