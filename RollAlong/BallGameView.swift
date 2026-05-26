@@ -1343,32 +1343,47 @@ struct BankedCoinView: View {
 }
 
 // ---------------------------------------------------------------------------
-// SpinningCoinView — animated 2D-illusion-of-3D spinning gold coin.
+// SpinningCoinView — animated 3D-illusion spinning gold coin.
 //
-// Three layered animations:
-//   1. Spin   — scaleX oscillates 0.18…1.0 so the coin alternates between
-//               edge-on (thin line) and face-on (full circle).
-//   2. Edge   — when nearly edge-on, the face tints to a darker rim shade,
-//               selling the "side of the disc" read.
-//   3. Bob    — gentle vertical oscillation so it floats above the floor.
+// Built from two layered shapes that together fake a coin with real physical
+// thickness:
 //
-// Phased per coin so adjacent coins are never all flat at once.
+//   • Rim  — a vertical Capsule rendered BEHIND the face. Constant width
+//            (~18% of the coin diameter), constant height (same as the
+//            coin).  This is the "thickness" of the disc — the side you'd
+//            see if you held a real coin edge-on.
+//   • Face — a gold Ellipse on top of the rim, scaled in X by |sin(t)| so
+//            it foreshortens from a full circle (face-on) to a thin sliver
+//            and eventually disappears (edge-on).
+//
+// When the face shrinks below the rim's width, the rim becomes visible
+// poking out from behind — that's the "edge revealed" moment of the spin.
+// Combined with a gentle vertical bob, the coin reads as 3D.
+//
+// Phased per coin so adjacent coins are never all edge-on at the same time.
 // ---------------------------------------------------------------------------
 struct SpinningCoinView: View {
     let size:  CGFloat
     let phase: Double
 
+    /// Rim width as a fraction of the coin diameter.  ~18% gives a chunky,
+    /// readable thickness without looking like a hockey puck.
+    private var rimWidth: CGFloat { size * 0.20 }
+
     private static let goldenFace = LinearGradient(
         colors: [
-            Color(red: 1.00, green: 0.88, blue: 0.40),
+            Color(red: 1.00, green: 0.92, blue: 0.48),
             Color(red: 0.93, green: 0.65, blue: 0.10),
         ],
         startPoint: .top, endPoint: .bottom
     )
-    private static let edgeShade = LinearGradient(
-        colors: [
-            Color(red: 0.62, green: 0.42, blue: 0.05),
-            Color(red: 0.35, green: 0.22, blue: 0.02),
+    /// Rim gradient: mid-gold at top + bottom, darker in the middle band.
+    /// Mimics the light/shadow on a cylinder side lit from above and below.
+    private static let rimGradient = LinearGradient(
+        stops: [
+            .init(color: Color(red: 0.68, green: 0.48, blue: 0.08), location: 0.00),
+            .init(color: Color(red: 0.42, green: 0.27, blue: 0.04), location: 0.50),
+            .init(color: Color(red: 0.66, green: 0.46, blue: 0.07), location: 1.00),
         ],
         startPoint: .top, endPoint: .bottom
     )
@@ -1376,39 +1391,73 @@ struct SpinningCoinView: View {
     var body: some View {
         TimelineView(.animation) { tl in
             let t       = tl.date.timeIntervalSinceReferenceDate
-            let spinRaw = abs(sin(t * 2.6 + phase))         // 0…1
-            let spinX   = max(0.18, spinRaw)                // never fully zero
-            let edgeMix = 1.0 - spinRaw                      // 0 face-on, 1 edge-on
-            let bob     = sin(t * 2.2 + phase * 0.7) * 1.6   // ±1.6pt
+            let spinRaw = abs(sin(t * 2.6 + phase))          // 0…1 (no clamp)
+            let bob     = sin(t * 2.2 + phase * 0.7) * 1.6    // ±1.6pt
 
-            coinFace(spinRaw: spinRaw, edgeMix: edgeMix)
-                .frame(width: size, height: size)
-                .scaleEffect(x: spinX, y: 1.0)
+            coinBody(spinRaw: spinRaw)
                 .offset(y: bob)
         }
     }
 
-    private func coinFace(spinRaw: Double, edgeMix: Double) -> some View {
+    private func coinBody(spinRaw: Double) -> some View {
         ZStack {
-            // Base gold face
-            Circle().fill(Self.goldenFace)
+            // RIM — the visible thickness.  Behind everything.  Constant size.
+            // Slightly tapered ends via Capsule's rounded caps so the rim
+            // reads as a cylindrical edge rather than a flat strip.
+            Capsule()
+                .fill(Self.rimGradient)
+                .overlay(
+                    Capsule()
+                        .stroke(Color.black.opacity(0.45), lineWidth: 0.8)
+                )
+                // Subtle horizontal "milled" lines on the rim — adds metallic
+                // texture.  Faint enough not to distract.
+                .overlay(milledTexture)
+                .frame(width: rimWidth, height: size * 0.96)
 
-            // Crossfade in the edge shading near edge-on
-            Circle()
-                .fill(Self.edgeShade)
-                .opacity(edgeMix * 0.85)
+            // FACE — gold ellipse on top, scales in X with the spin.
+            // Goes all the way to zero so the rim shows through fully at
+            // edge-on.  Drop-shadow gives a hint of depth above the rim.
+            faceLayer(spinRaw: spinRaw)
+                .frame(width: size, height: size)
+                .scaleEffect(x: CGFloat(spinRaw), y: 1.0)
+        }
+    }
 
-            // Rim
-            Circle().stroke(Color.black.opacity(0.40), lineWidth: 1)
+    /// Tiny darker hatch marks running across the rim — fakes the milled
+    /// edge of a coin.  Rendered with low opacity so it's only readable
+    /// at intermediate spin angles, not distracting at face-on.
+    private var milledTexture: some View {
+        GeometryReader { geo in
+            let count = 14
+            ForEach(0..<count, id: \.self) { i in
+                Rectangle()
+                    .fill(Color.black.opacity(0.18))
+                    .frame(width: geo.size.width, height: 0.6)
+                    .offset(y: geo.size.height * CGFloat(i) / CGFloat(count - 1))
+            }
+        }
+        .clipShape(Capsule())
+        .allowsHitTesting(false)
+    }
 
-            // Inner highlight, brighter when face-on
-            Circle()
-                .stroke(Color.white.opacity(0.55 * spinRaw), lineWidth: 0.9)
+    private func faceLayer(spinRaw: Double) -> some View {
+        ZStack {
+            // Base face
+            Ellipse().fill(Self.goldenFace)
+
+            // Rim outline on the face itself
+            Ellipse().stroke(Color.black.opacity(0.40), lineWidth: 1)
+
+            // Inner highlight — brighter when face-on, fades as it rotates
+            Ellipse()
+                .stroke(Color.white.opacity(0.55 * spinRaw), lineWidth: 1.0)
                 .scaleEffect(0.62)
                 .offset(x: -size * 0.09, y: -size * 0.09)
 
-            // Rim shine sweep — soft white stripe that travels across the face
-            // as the spin rotates (only visible when face-on).
+            // Specular shine sweep — soft white vertical stripe that
+            // travels across the face as it rotates.  Most prominent
+            // when face-on, gone by edge-on.
             shine(spinRaw: spinRaw)
         }
     }
@@ -1418,14 +1467,14 @@ struct SpinningCoinView: View {
             .fill(
                 LinearGradient(
                     colors: [.clear,
-                             Color.white.opacity(0.45 * spinRaw),
+                             Color.white.opacity(0.50 * spinRaw),
                              .clear],
                     startPoint: .leading, endPoint: .trailing
                 )
             )
             .frame(width: size * 0.35, height: size)
             .offset(x: CGFloat(spinRaw - 0.5) * size * 0.7)
-            .clipShape(Circle())
+            .clipShape(Ellipse())
             .blendMode(.plusLighter)
             .allowsHitTesting(false)
     }
