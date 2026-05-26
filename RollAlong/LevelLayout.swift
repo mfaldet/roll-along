@@ -183,174 +183,254 @@ extension LevelLayout {
     /// Difficulty climbs gradually so new players learn tilt control.
     static let handCrafted: [LevelLayout] = [
 
-        // ── L1: Intro corridor ─────────────────────────────────────────────
-        // No interior holes. Just tilt forward.  Coins along the centre.
+        // ═══════════════════════════════════════════════════════════════════
+        // TUTORIAL — levels 1-10
+        //
+        // Each level is a concept introduction.  They follow the universal
+        // tier pattern E E E E V H H H H V:
+        //
+        //   L1  Easy       roll straight down
+        //   L2  Easy       curve around one obstacle
+        //   L3  Easy       diagonal navigation
+        //   L4  Easy       zigzag
+        //   L5  Very Hard  precision threading (narrow gaps in series)
+        //   L6  Hard       tighter spaces
+        //   L7  Hard       multiple scattered obstacles
+        //   L8  Hard       circles — loop around a central feature
+        //   L9  Hard       maze — multiple corridors with dead ends
+        //   L10 Very Hard  finale combining every concept above
+        //
+        // All ten are marked `verified: true` — they are intentional,
+        // hand-crafted, do-not-auto-modify.
+        // ═══════════════════════════════════════════════════════════════════
+
+        // ── L1 Easy — Roll straight down ───────────────────────────────────
+        // The simplest possible level.  No interior holes.  Just tilt the
+        // phone forward; the ball rolls down past three coins to the goal.
+        // This is where the player learns the basic tilt mechanic.
         make(
             holes: [],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
             coins: [
-                UnitPoint(x: 0.5, y: 0.70),
+                UnitPoint(x: 0.5, y: 0.72),
                 UnitPoint(x: 0.5, y: 0.50),
                 UnitPoint(x: 0.5, y: 0.28),
-            ]
+            ],
+            verified: true
         ),
 
-        // ── L2: First obstacle ─────────────────────────────────────────────
-        // One hole in the middle, go around either side.
+        // ── L2 Easy — Curve around one obstacle ────────────────────────────
+        // Wide single hole in the middle.  Player learns to tilt sideways
+        // mid-roll.  Coins on both routes incentivise either choice.
         make(
             holes: [
-                CGRect(x: 0.32, y: 0.45, width: 0.36, height: 0.13),
+                CGRect(x: 0.30, y: 0.42, width: 0.40, height: 0.16),
             ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
             coins: [
-                UnitPoint(x: 0.22, y: 0.50),  // left detour
-                UnitPoint(x: 0.78, y: 0.50),  // right detour
-                UnitPoint(x: 0.5,  y: 0.25),  // centre after the hole
-            ]
+                UnitPoint(x: 0.20, y: 0.50),   // left route
+                UnitPoint(x: 0.80, y: 0.50),   // right route
+                UnitPoint(x: 0.50, y: 0.24),   // centre after rejoin
+            ],
+            verified: true
         ),
 
-        // ── L3: Split routes ───────────────────────────────────────────────
+        // ── L3 Easy — Diagonal navigation ──────────────────────────────────
+        // Start bottom-left, goal top-right.  One staircase pair of bars
+        // forces the player to roll diagonally rather than straight.
+        // Coins arc along the diagonal path.
         make(
             holes: [
-                CGRect(x: 0.25, y: 0.40, width: 0.20, height: 0.12),
-                CGRect(x: 0.55, y: 0.55, width: 0.20, height: 0.12),
+                CGRect(x: 0.36, y: 0.55, width: 0.50, height: 0.08),
+                CGRect(x: 0.14, y: 0.30, width: 0.50, height: 0.08),
             ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
+            start: UnitPoint(x: 0.18, y: 0.92),
+            goal:  UnitPoint(x: 0.82, y: 0.10),
             coins: [
-                UnitPoint(x: 0.50, y: 0.48),  // squeeze between
-                UnitPoint(x: 0.20, y: 0.65),
-                UnitPoint(x: 0.80, y: 0.45),
-            ]
+                UnitPoint(x: 0.22, y: 0.75),
+                UnitPoint(x: 0.78, y: 0.45),
+                UnitPoint(x: 0.82, y: 0.20),
+            ],
+            verified: true
         ),
 
-        // ── L4: Three-step zigzag ──────────────────────────────────────────
+        // ── L4 Easy — Zigzag ───────────────────────────────────────────────
+        // Three alternating bars.  Player weaves left-right-left through
+        // the openings.  Classic zigzag teaches rhythmic tilt control.
         make(
             holes: [
-                CGRect(x: 0.18, y: 0.30, width: 0.30, height: 0.09),
-                CGRect(x: 0.52, y: 0.48, width: 0.30, height: 0.09),
-                CGRect(x: 0.18, y: 0.66, width: 0.30, height: 0.09),
+                CGRect(x: 0.18, y: 0.28, width: 0.40, height: 0.08),
+                CGRect(x: 0.42, y: 0.48, width: 0.40, height: 0.08),
+                CGRect(x: 0.18, y: 0.68, width: 0.40, height: 0.08),
             ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
-            coins: [
-                UnitPoint(x: 0.75, y: 0.72),
-                UnitPoint(x: 0.30, y: 0.55),
-                UnitPoint(x: 0.78, y: 0.38),
-            ]
-        ),
-
-        // ── L5: Diamond gate ───────────────────────────────────────────────
-        make(
-            holes: [
-                CGRect(x: 0.42, y: 0.32, width: 0.18, height: 0.10),  // top
-                CGRect(x: 0.20, y: 0.48, width: 0.18, height: 0.10),  // left
-                CGRect(x: 0.62, y: 0.48, width: 0.18, height: 0.10),  // right
-                CGRect(x: 0.42, y: 0.64, width: 0.18, height: 0.10),  // bottom
-            ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
-            coins: [
-                UnitPoint(x: 0.50, y: 0.55),   // dead centre — risky
-                UnitPoint(x: 0.18, y: 0.30),
-                UnitPoint(x: 0.82, y: 0.72),
-            ]
-        ),
-
-        // ── L6: Narrow corridor ────────────────────────────────────────────
-        // Pinches in the middle — requires controlled descent.
-        make(
-            holes: [
-                CGRect(x: 0.12, y: 0.30, width: 0.30, height: 0.08),
-                CGRect(x: 0.58, y: 0.30, width: 0.30, height: 0.08),
-                CGRect(x: 0.12, y: 0.55, width: 0.30, height: 0.08),
-                CGRect(x: 0.58, y: 0.55, width: 0.30, height: 0.08),
-            ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
-            coins: [
-                UnitPoint(x: 0.50, y: 0.42),
-                UnitPoint(x: 0.50, y: 0.68),
-                UnitPoint(x: 0.50, y: 0.20),
-            ]
-        ),
-
-        // ── L7: S-curve ────────────────────────────────────────────────────
-        make(
-            holes: [
-                CGRect(x: 0.12, y: 0.25, width: 0.50, height: 0.08),
-                CGRect(x: 0.38, y: 0.45, width: 0.50, height: 0.08),
-                CGRect(x: 0.12, y: 0.65, width: 0.50, height: 0.08),
-            ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
             coins: [
                 UnitPoint(x: 0.78, y: 0.78),
-                UnitPoint(x: 0.20, y: 0.55),
-                UnitPoint(x: 0.78, y: 0.36),
-            ]
+                UnitPoint(x: 0.22, y: 0.58),
+                UnitPoint(x: 0.78, y: 0.38),
+            ],
+            verified: true
         ),
 
-        // ── L8: Sniper alley ───────────────────────────────────────────────
-        // Tight gap straight through; rewards staying centred.
+        // ── L5 Very Hard — Precision threading ─────────────────────────────
+        // Three rows of paired narrow gaps.  Each row requires the player
+        // to slow down, line up, and pass through the gap before moving
+        // to the next.  Teaches deliberate, paced movement.  The tier
+        // multiplier (1.6x) gives 60% more time on star thresholds since
+        // this level takes longer by design — never punishing.
         make(
             holes: [
-                CGRect(x: 0.12, y: 0.25, width: 0.32, height: 0.10),
-                CGRect(x: 0.56, y: 0.25, width: 0.32, height: 0.10),
-                CGRect(x: 0.12, y: 0.45, width: 0.32, height: 0.10),
-                CGRect(x: 0.56, y: 0.45, width: 0.32, height: 0.10),
-                CGRect(x: 0.12, y: 0.65, width: 0.32, height: 0.10),
-                CGRect(x: 0.56, y: 0.65, width: 0.32, height: 0.10),
+                CGRect(x: 0.12, y: 0.24, width: 0.32, height: 0.09),
+                CGRect(x: 0.56, y: 0.24, width: 0.32, height: 0.09),
+                CGRect(x: 0.12, y: 0.46, width: 0.32, height: 0.09),
+                CGRect(x: 0.56, y: 0.46, width: 0.32, height: 0.09),
+                CGRect(x: 0.12, y: 0.68, width: 0.32, height: 0.09),
+                CGRect(x: 0.56, y: 0.68, width: 0.32, height: 0.09),
             ],
-            start: UnitPoint(x: 0.5,  y: 0.88),
-            goal:  UnitPoint(x: 0.5,  y: 0.12),
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
             coins: [
-                UnitPoint(x: 0.50, y: 0.55),
-                UnitPoint(x: 0.50, y: 0.35),
-                UnitPoint(x: 0.50, y: 0.18),
-            ]
+                UnitPoint(x: 0.5, y: 0.80),   // before first gap
+                UnitPoint(x: 0.5, y: 0.57),   // between gaps
+                UnitPoint(x: 0.5, y: 0.16),   // after final gap
+            ],
+            verified: true
         ),
 
-        // ── L9: Peninsula ──────────────────────────────────────────────────
-        // Holes carve out a one-way passage along the right side.
+        // ── L6 Hard — Tighter spaces ───────────────────────────────────────
+        // Wider hole pairs leaving a narrower vertical corridor.  Forces
+        // more controlled, centred descent than L4's zigzag.
         make(
             holes: [
-                CGRect(x: 0.12, y: 0.20, width: 0.55, height: 0.10),
-                CGRect(x: 0.12, y: 0.40, width: 0.40, height: 0.10),
-                CGRect(x: 0.12, y: 0.60, width: 0.55, height: 0.10),
-                CGRect(x: 0.30, y: 0.78, width: 0.40, height: 0.08),
+                CGRect(x: 0.12, y: 0.22, width: 0.32, height: 0.18),
+                CGRect(x: 0.56, y: 0.22, width: 0.32, height: 0.18),
+                CGRect(x: 0.12, y: 0.60, width: 0.32, height: 0.18),
+                CGRect(x: 0.56, y: 0.60, width: 0.32, height: 0.18),
             ],
-            start: UnitPoint(x: 0.18, y: 0.90),
-            goal:  UnitPoint(x: 0.18, y: 0.10),
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
             coins: [
-                UnitPoint(x: 0.80, y: 0.50),   // tip of peninsula
-                UnitPoint(x: 0.62, y: 0.32),
-                UnitPoint(x: 0.20, y: 0.30),
-            ]
+                UnitPoint(x: 0.50, y: 0.84),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.16),
+            ],
+            verified: true
         ),
 
-        // ── L10: Classic finale ────────────────────────────────────────────
-        // Combines split routes, zigzag, and a tight finish.
+        // ── L7 Hard — Scattered obstacles ──────────────────────────────────
+        // Many small holes spread across the arena.  No single forced path
+        // — the player must look at the board and pick a route.  Teaches
+        // strategic route-finding rather than reactive dodging.
         make(
             holes: [
-                CGRect(x: 0.20, y: 0.20, width: 0.18, height: 0.08),
-                CGRect(x: 0.62, y: 0.20, width: 0.18, height: 0.08),
-                CGRect(x: 0.40, y: 0.36, width: 0.20, height: 0.08),
-                CGRect(x: 0.15, y: 0.50, width: 0.22, height: 0.08),
-                CGRect(x: 0.63, y: 0.50, width: 0.22, height: 0.08),
-                CGRect(x: 0.40, y: 0.64, width: 0.20, height: 0.08),
-                CGRect(x: 0.20, y: 0.78, width: 0.18, height: 0.06),
-                CGRect(x: 0.62, y: 0.78, width: 0.18, height: 0.06),
+                CGRect(x: 0.20, y: 0.22, width: 0.12, height: 0.08),
+                CGRect(x: 0.46, y: 0.22, width: 0.12, height: 0.08),
+                CGRect(x: 0.68, y: 0.30, width: 0.12, height: 0.08),
+                CGRect(x: 0.30, y: 0.38, width: 0.12, height: 0.08),
+                CGRect(x: 0.56, y: 0.46, width: 0.12, height: 0.08),
+                CGRect(x: 0.18, y: 0.50, width: 0.12, height: 0.08),
+                CGRect(x: 0.40, y: 0.58, width: 0.12, height: 0.08),
+                CGRect(x: 0.66, y: 0.62, width: 0.12, height: 0.08),
+                CGRect(x: 0.22, y: 0.70, width: 0.12, height: 0.08),
+                CGRect(x: 0.50, y: 0.76, width: 0.12, height: 0.08),
             ],
-            start: UnitPoint(x: 0.5,  y: 0.92),
-            goal:  UnitPoint(x: 0.5,  y: 0.08),
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
             coins: [
-                UnitPoint(x: 0.50, y: 0.28),
-                UnitPoint(x: 0.18, y: 0.42),
-                UnitPoint(x: 0.82, y: 0.58),
-            ]
+                UnitPoint(x: 0.80, y: 0.80),
+                UnitPoint(x: 0.18, y: 0.40),
+                UnitPoint(x: 0.82, y: 0.18),
+            ],
+            verified: true
+        ),
+
+        // ── L8 Hard — Circles ──────────────────────────────────────────────
+        // A ring of holes around a central safe area.  Player can loop
+        // around the outside, OR thread through one of the gaps and
+        // traverse the centre.  Teaches that the obvious "straight line"
+        // isn't always the answer.
+        make(
+            holes: [
+                // Top arc
+                CGRect(x: 0.28, y: 0.26, width: 0.12, height: 0.08),
+                CGRect(x: 0.44, y: 0.22, width: 0.12, height: 0.08),
+                CGRect(x: 0.60, y: 0.26, width: 0.12, height: 0.08),
+                // Sides
+                CGRect(x: 0.18, y: 0.42, width: 0.10, height: 0.16),
+                CGRect(x: 0.72, y: 0.42, width: 0.10, height: 0.16),
+                // Bottom arc
+                CGRect(x: 0.28, y: 0.66, width: 0.12, height: 0.08),
+                CGRect(x: 0.44, y: 0.70, width: 0.12, height: 0.08),
+                CGRect(x: 0.60, y: 0.66, width: 0.12, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.48),   // dead centre of the ring
+                UnitPoint(x: 0.36, y: 0.46),
+                UnitPoint(x: 0.64, y: 0.50),
+            ],
+            verified: true
+        ),
+
+        // ── L9 Hard — Maze intro ───────────────────────────────────────────
+        // Connected corridors with dead ends.  The clear path snakes through
+        // the layout.  Teaches the player to look ahead and avoid traps.
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.50, height: 0.07),
+                CGRect(x: 0.30, y: 0.36, width: 0.58, height: 0.07),
+                CGRect(x: 0.12, y: 0.50, width: 0.30, height: 0.07),
+                CGRect(x: 0.50, y: 0.50, width: 0.38, height: 0.07),
+                CGRect(x: 0.30, y: 0.64, width: 0.40, height: 0.07),
+                CGRect(x: 0.12, y: 0.78, width: 0.50, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.85),
+                UnitPoint(x: 0.20, y: 0.43),
+                UnitPoint(x: 0.78, y: 0.15),
+            ],
+            verified: true
+        ),
+
+        // ── L10 Very Hard — Combine concepts (Tutorial finale) ─────────────
+        // The graduation level.  Includes a zigzag opener, a tight corridor
+        // mid-section, scattered obstacles, and a final pinch before goal.
+        // Tier multiplier gives generous time so the achievement of clearing
+        // it feels great rather than punishing.
+        //
+        // FUTURE: clearing this level for the first time should trigger
+        // the "Pick a free cosmetic per category" reward modal.  That
+        // modal arrives with PR 4f when the cosmetic shop is in place.
+        make(
+            holes: [
+                // Zigzag opener (top)
+                CGRect(x: 0.16, y: 0.22, width: 0.40, height: 0.07),
+                CGRect(x: 0.44, y: 0.36, width: 0.40, height: 0.07),
+                // Narrow corridor mid
+                CGRect(x: 0.12, y: 0.50, width: 0.28, height: 0.10),
+                CGRect(x: 0.60, y: 0.50, width: 0.28, height: 0.10),
+                // Scattered field
+                CGRect(x: 0.22, y: 0.66, width: 0.12, height: 0.07),
+                CGRect(x: 0.44, y: 0.66, width: 0.12, height: 0.07),
+                CGRect(x: 0.66, y: 0.66, width: 0.12, height: 0.07),
+                // Final pinch
+                CGRect(x: 0.18, y: 0.80, width: 0.24, height: 0.07),
+                CGRect(x: 0.58, y: 0.80, width: 0.24, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.94),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.88),
+                UnitPoint(x: 0.50, y: 0.43),
+                UnitPoint(x: 0.50, y: 0.16),
+            ],
+            verified: true
         ),
 
         // ═══════════════════════════════════════════════════════════════════
