@@ -62,16 +62,27 @@ struct HomeView: View {
 
                     playButton
                         .padding(.horizontal, 40)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 14)
 
-                    NavigationLink(destination: SettingsView()) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 14))
-                            Text("Settings")
-                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                    HStack(spacing: 28) {
+                        NavigationLink(destination: LevelSelectView()) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.grid.3x3.fill")
+                                    .font(.system(size: 14))
+                                Text("Levels")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                            }
+                            .foregroundStyle(Color(white: 0.5))
                         }
-                        .foregroundStyle(Color(white: 0.5))
+                        NavigationLink(destination: SettingsView()) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 14))
+                                Text("Settings")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                            }
+                            .foregroundStyle(Color(white: 0.5))
+                        }
                     }
 
                     Spacer().frame(height: 48)

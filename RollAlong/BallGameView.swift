@@ -53,17 +53,32 @@ struct BallGameView: View {
     @State private var arenaSize:          CGSize    = .zero
     @State private var showWelcomeMoment:  Bool      = false
 
+    // Per-attempt progression state
+    @State private var levelStartTime:        Date?    = nil
+    @State private var coinPickedThisAttempt: Int?     = nil    // coin index 0…2
+
+    // Last-completion results (for the win overlay)
+    @State private var lastClearedTime:    TimeInterval = 0
+    @State private var lastClearedStars:   Int          = 0
+    @State private var lastClearedCoinIdx: Int?         = nil
+    @State private var lastClearedIsNewBestStars: Bool  = false
+
     // Animation-polish triggers (keyframe animators key off these)
     @State private var squashTrigger:      Int       = 0   // on wall bounce
     @State private var shakeTrigger:       Int       = 0   // on .fell
     @State private var goalBurst:          GoalBurstEvent? = nil
 
-    private let ballRadius: CGFloat = 18
-    private let tickRate            = 1.0 / 60.0
+    private let ballRadius:  CGFloat = 18
+    private let coinRadius:  CGFloat = 9
+    private let tickRate              = 1.0 / 60.0
 
     private var layout: LevelLayout {
         let base = LevelLayout.layout(for: gameState.currentLevel)
         return gameState.ballStartsAtTop ? base.flipped() : base
+    }
+
+    private var theme: Theme {
+        Theme.forLevel(gameState.currentLevel)
     }
 
     // MARK: - Border state
@@ -89,11 +104,14 @@ struct BallGameView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // White platform
-                Color(white: 0.94).ignoresSafeArea()
+                // Themed floor
+                theme.floorColor.ignoresSafeArea()
 
-                // Hole zones (black)
+                // Hole zones (themed)
                 holeLayer(geo: geo)
+
+                // Coins (not-yet-collected this attempt, not-yet-banked overall)
+                coinLayer(geo: geo)
 
                 // Rainbow goal
                 rainbowHole
@@ -204,9 +222,63 @@ struct BallGameView: View {
             let x = (norm.origin.x + norm.width  / 2) * geo.size.width
             let y = (norm.origin.y + norm.height / 2) * geo.size.height
             Rectangle()
-                .fill(Color.black)
+                .fill(theme.holeColor)
                 .frame(width: w, height: h)
                 .position(x: x, y: y)
+        }
+    }
+
+    /// Renders coins for this level that haven't been picked up THIS attempt.
+    /// Coins already banked overall (across past attempts) render dimmed.
+    private func coinLayer(geo: GeometryProxy) -> some View {
+        let banked = gameState.coinsCollected(for: gameState.currentLevel)
+        return ForEach(Array(layout.coins.enumerated()), id: \.offset) { idx, norm in
+            // Hide a coin if it's the one just picked up this attempt.
+            let pickedThisAttempt = (coinPickedThisAttempt == idx)
+            let isBanked = banked.contains(idx)
+            if !pickedThisAttempt {
+                coinView(banked: isBanked)
+                    .position(
+                        x: norm.x * geo.size.width,
+                        y: norm.y * geo.size.height
+                    )
+            }
+        }
+    }
+
+    private func coinView(banked: Bool) -> some View {
+        // Gold gradient coin.  Already-banked coins render greyed.
+        let golden = LinearGradient(
+            colors: [
+                Color(red: 1.00, green: 0.84, blue: 0.30),
+                Color(red: 0.93, green: 0.65, blue: 0.10),
+            ],
+            startPoint: .top, endPoint: .bottom
+        )
+        let dimmed = LinearGradient(
+            colors: [Color(white: 0.55), Color(white: 0.35)],
+            startPoint: .top, endPoint: .bottom
+        )
+        return TimelineView(.animation) { tl in
+            // Subtle pulse for ungrabbed coins only — dimmed coins sit still.
+            let t = tl.date.timeIntervalSinceReferenceDate
+            let pulse = banked ? 1.0 : 1.0 + 0.10 * sin(t * 3.4)
+            Circle()
+                .fill(banked ? dimmed : golden)
+                .frame(width: coinRadius * 2, height: coinRadius * 2)
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(banked ? 0.20 : 0.40), lineWidth: 1)
+                )
+                .overlay(
+                    // Subtle inner highlight
+                    Circle()
+                        .stroke(Color.white.opacity(banked ? 0.0 : 0.45), lineWidth: 0.8)
+                        .scaleEffect(0.6)
+                        .offset(x: -coinRadius * 0.18, y: -coinRadius * 0.18)
+                )
+                .scaleEffect(pulse)
+                .opacity(banked ? 0.45 : 1.0)
         }
     }
 
@@ -380,30 +452,105 @@ struct BallGameView: View {
 
     private var winOverlay: some View {
         ZStack {
-            Color.black.opacity(0.55).ignoresSafeArea()
-            VStack(spacing: 28) {
-                VStack(spacing: 8) {
+            Color.black.opacity(0.62).ignoresSafeArea()
+
+            VStack(spacing: 26) {
+                VStack(spacing: 6) {
                     Text("Level Clear!")
-                        .font(.system(size: 48, weight: .black, design: .rounded))
+                        .font(.system(size: 44, weight: .black, design: .rounded))
                         .foregroundStyle(Color(red: 0.25, green: 0.90, blue: 0.45))
-                    Text("Level \(gameState.currentLevel) complete")
-                        .font(.system(size: 16, weight: .regular, design: .rounded))
-                        .foregroundStyle(Color(red: 0.60, green: 0.95, blue: 0.68))
+                    if lastClearedIsNewBestStars && lastClearedStars > 1 {
+                        Text("New best!")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                            .padding(.top, 2)
+                    }
                 }
-                Button {
-                    advanceFromLevelClear()
-                } label: {
-                    Text("Next Level")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 44)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(Color(red: 0.20, green: 0.78, blue: 0.38))
-                        )
+
+                // Stars
+                HStack(spacing: 14) {
+                    ForEach(0..<3) { i in
+                        Image(systemName: i < lastClearedStars ? "star.fill" : "star")
+                            .font(.system(size: 38, weight: .bold))
+                            .foregroundStyle(
+                                i < lastClearedStars
+                                    ? Color(red: 1.00, green: 0.84, blue: 0.30)
+                                    : Color(white: 0.30)
+                            )
+                            .shadow(color: i < lastClearedStars
+                                    ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.5)
+                                    : .clear,
+                                    radius: 8)
+                    }
                 }
+
+                // Time
+                Text(String(format: "%.2fs", lastClearedTime))
+                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color(white: 0.85))
+
+                // Coin
+                if let idx = lastClearedCoinIdx {
+                    HStack(spacing: 8) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.84, blue: 0.30),
+                                        Color(red: 0.93, green: 0.65, blue: 0.10),
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                        Text("Coin \(idx + 1) collected")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 1.00, green: 0.88, blue: 0.55))
+                    }
+                }
+
+                // Actions
+                VStack(spacing: 12) {
+                    Button { advanceFromLevelClear() } label: {
+                        Text("Next Level")
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .fill(Color(red: 0.20, green: 0.78, blue: 0.38))
+                            )
+                    }
+                    HStack(spacing: 12) {
+                        Button { spawnBall(in: arenaSize) } label: {
+                            Text("Replay")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color(white: 0.85))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(white: 0.20))
+                                )
+                        }
+                        Button { dismiss() } label: {
+                            Text("Levels")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color(white: 0.85))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(white: 0.20))
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 6)
             }
+            .padding(.horizontal, 24)
         }
         .transition(.opacity)
     }
@@ -562,6 +709,8 @@ struct BallGameView: View {
     private func spawnBall(in size: CGSize) {
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level
+        coinPickedThisAttempt = nil
+        levelStartTime = .now
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
 
@@ -599,12 +748,27 @@ struct BallGameView: View {
             if incoming > bounceVelocityThreshold { fireWallHit(axis: .vertical, force: incoming) }
         }
 
+        // Coin pickup (only one per attempt, and only if not already banked)
+        if coinPickedThisAttempt == nil {
+            let banked = gameState.coinsCollected(for: gameState.currentLevel)
+            for (idx, c) in layout.coins.enumerated() {
+                if banked.contains(idx) { continue }
+                let cx = c.x * geoSize.width
+                let cy = c.y * geoSize.height
+                let dist = hypot(b.position.x - cx, b.position.y - cy)
+                if dist < ballRadius + coinRadius {
+                    coinPickedThisAttempt = idx
+                    fireCoinPickup()
+                    break
+                }
+            }
+        }
+
         // Goal check
         let gp = goalPoint(in: geoSize)
         if hypot(b.position.x - gp.x, b.position.y - gp.y) < ballRadius * 1.7 {
             ball = b
-            fireGoalReached(at: gp)
-            withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
+            handleLevelClear(at: gp)
             return
         }
 
@@ -639,6 +803,45 @@ struct BallGameView: View {
         if gameState.hapticsEnabled { Haptics.heavy() }
         SFX.drop(enabled: gameState.soundEnabled)
         shakeTrigger &+= 1
+    }
+
+    private func fireCoinPickup() {
+        if gameState.hapticsEnabled { Haptics.soft() }
+        SFX.coin(enabled: gameState.soundEnabled)
+    }
+
+    // MARK: - Level clear handler
+
+    /// Called when the ball reaches the goal.  Records the result, computes
+    /// stars, persists to GameState, then transitions to .levelComplete.
+    private func handleLevelClear(at center: CGPoint) {
+        fireGoalReached(at: center)
+
+        let elapsed = levelStartTime.map { Date.now.timeIntervalSince($0) } ?? 0
+        let stars   = computeStars(elapsed: elapsed)
+        let level   = gameState.currentLevel
+        let prevStars = gameState.stars(for: level)
+
+        lastClearedTime    = elapsed
+        lastClearedStars   = stars
+        lastClearedCoinIdx = coinPickedThisAttempt
+        lastClearedIsNewBestStars = stars > prevStars
+
+        gameState.recordResult(
+            level: level,
+            stars: stars,
+            time:  elapsed,
+            coinIndex: coinPickedThisAttempt
+        )
+
+        withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
+    }
+
+    /// 1 star for clearing, 2 if under target, 3 if under gold.
+    private func computeStars(elapsed: TimeInterval) -> Int {
+        if elapsed <= layout.goldTime   { return 3 }
+        if elapsed <= layout.targetTime { return 2 }
+        return 1
     }
 
     private func isInHole(position: CGPoint, size: CGSize) -> Bool {
