@@ -47,9 +47,10 @@ struct BallGameView: View {
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
-    @State private var ball:      Ball?     = nil
-    @State private var phase:    GamePhase = .playing
-    @State private var arenaSize: CGSize  = .zero
+    @State private var ball:               Ball?     = nil
+    @State private var phase:              GamePhase = .playing
+    @State private var arenaSize:          CGSize    = .zero
+    @State private var showWelcomeMoment:  Bool      = false
 
     private let ballRadius: CGFloat = 18
     private let tickRate            = 1.0 / 60.0
@@ -109,6 +110,7 @@ struct BallGameView: View {
                 // Overlays
                 if phase == .fell          { oopsOverlay }
                 if phase == .levelComplete { winOverlay }
+                if showWelcomeMoment       { welcomeMomentOverlay }
 
                 // Screen border — always on top, colour reacts to game state
                 screenBorder
@@ -346,8 +348,7 @@ struct BallGameView: View {
                         .foregroundStyle(Color(red: 0.60, green: 0.95, blue: 0.68))
                 }
                 Button {
-                    gameState.advanceLevel()
-                    spawnBall(in: arenaSize)
+                    advanceFromLevelClear()
                 } label: {
                     Text("Next Level")
                         .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -362,6 +363,155 @@ struct BallGameView: View {
             }
         }
         .transition(.opacity)
+    }
+
+    // MARK: - Welcome moment (one-time, after first L1 clear)
+
+    private var welcomeMomentOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.88).ignoresSafeArea()
+
+            // Continuous sparkle burst behind the text
+            TimelineView(.animation) { tl in
+                Canvas { ctx, size in
+                    drawWelcomeSparkles(ctx: ctx, size: size,
+                                        t: tl.date.timeIntervalSinceReferenceDate)
+                }
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            VStack(spacing: 16) {
+                Spacer()
+
+                Text("Roll Along friend!")
+                    .font(.system(size: 46, weight: .black, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, Color(white: 0.82)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: .black.opacity(0.55), radius: 14, y: 6)
+                    .multilineTextAlignment(.center)
+
+                Text("Welcome to your journey.\nReady for level 2?")
+                    .font(.system(size: 17, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.80))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.top, 4)
+
+                Spacer()
+
+                Button {
+                    dismissWelcomeMoment()
+                } label: {
+                    Text("Let's go")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 56)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color.white)
+                        )
+                }
+                .padding(.bottom, 80)
+            }
+            .padding(.horizontal, 32)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { dismissWelcomeMoment() }
+        .transition(.opacity)
+    }
+
+    /// Rainbow particle burst — drifting + twinkling, full-screen.
+    /// Shares the visual language of the rainbow goal and AI play button.
+    private func drawWelcomeSparkles(ctx: GraphicsContext, size: CGSize, t: Double) {
+        let cx = size.width / 2
+        let cy = size.height / 2
+        let count = 56
+
+        for i in 0..<count {
+            let seed  = Double(i)
+            let phase = seed / Double(count)
+
+            // Position: drift around centre with two overlaid orbits
+            let angle  = phase * 2 * .pi + seed * 1.3
+            let radius = size.width * (0.15 + 0.55 * (0.5 + 0.5 * sin(t * 0.32 + seed * 1.7)))
+            let px = cx + cos(angle + t * 0.10) * radius
+            let py = cy + sin(angle + t * 0.10) * radius
+            let pCtr = CGPoint(x: px, y: py)
+
+            // Twinkle pulse
+            let twinkFreq = 2.4 + (seed.truncatingRemainder(dividingBy: 7)) * 0.55
+            let raw       = (sin(t * twinkFreq + phase * .pi * 4) + 1) / 2
+            let twinkle   = pow(raw, 2.2)
+
+            let hue   = (phase + t * 0.075).truncatingRemainder(dividingBy: 1.0)
+            let alpha = 0.30 + twinkle * 0.70
+            let pR    = CGFloat(2.5 + twinkle * 7.0)
+            let color = Color(hue: hue, saturation: 1.0, brightness: 0.65 + twinkle * 0.35)
+
+            // Glow
+            let gR = pR * 4.0
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: px-gR, y: py-gR, width: gR*2, height: gR*2)),
+                with: .radialGradient(
+                    Gradient(colors: [color.opacity(alpha * 0.40), .clear]),
+                    center: pCtr, startRadius: 0, endRadius: gR
+                )
+            )
+
+            // Core
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: px-pR, y: py-pR, width: pR*2, height: pR*2)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color.white.opacity(alpha),       location: 0.00),
+                        .init(color: color.opacity(alpha),             location: 0.45),
+                        .init(color: color.opacity(alpha * 0.15),      location: 1.00),
+                    ]),
+                    center: pCtr, startRadius: 0, endRadius: pR
+                )
+            )
+
+            // Sparkle cross at peak brightness
+            if twinkle > 0.62 {
+                let intensity = CGFloat((twinkle - 0.62) / 0.38)
+                let arm  = pR * 2.4 * intensity
+                let stem = CGFloat(0.9)
+                ctx.fill(Path(CGRect(x: px-arm,    y: py-stem/2, width: arm*2, height: stem)),
+                         with: .color(Color.white.opacity(Double(intensity) * 0.90)))
+                ctx.fill(Path(CGRect(x: px-stem/2, y: py-arm,    width: stem,  height: arm*2)),
+                         with: .color(Color.white.opacity(Double(intensity) * 0.90)))
+            }
+        }
+    }
+
+    /// Tapped from the "Next Level" button on the win overlay.
+    /// If the player just cleared Level 1 for the very first time, route
+    /// through the one-time "Roll Along friend" welcome moment before
+    /// advancing.  Otherwise advance immediately.
+    private func advanceFromLevelClear() {
+        if gameState.currentLevel == 1 && !gameState.seenWelcomeMoment {
+            withAnimation(.easeInOut(duration: 0.32)) {
+                showWelcomeMoment = true
+            }
+        } else {
+            gameState.advanceLevel()
+            spawnBall(in: arenaSize)
+        }
+    }
+
+    private func dismissWelcomeMoment() {
+        gameState.seenWelcomeMoment = true
+        gameState.advanceLevel()
+        spawnBall(in: arenaSize)
+        withAnimation(.easeInOut(duration: 0.32)) {
+            showWelcomeMoment = false
+        }
     }
 
     // MARK: - Game logic
