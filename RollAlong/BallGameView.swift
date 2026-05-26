@@ -44,6 +44,7 @@ private enum BorderPhase: Equatable {
 struct BallGameView: View {
     @EnvironmentObject var gameState: GameState
     @Environment(\.dismiss) var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
@@ -113,8 +114,9 @@ struct BallGameView: View {
                 // Themed floor
                 theme.floorColor.ignoresSafeArea()
 
-                // Aurora theme: animated shimmer overlay on top of the base
-                if theme.id == .aurora {
+                // Aurora theme: animated shimmer overlay on top of the base.
+                // Skipped under Reduce Motion to avoid continuous background drift.
+                if theme.id == .aurora && !reduceMotion {
                     auroraShimmerOverlay
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
@@ -655,6 +657,8 @@ struct BallGameView: View {
                                     .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
                             )
                     }
+                    .accessibilityLabel("Quit to home screen")
+                    .accessibilityHint("Returns to the main menu. No level progress is lost.")
                     Spacer()
                 }
             }
@@ -715,11 +719,14 @@ struct BallGameView: View {
                                     radius: 8)
                     }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(lastClearedStars) of 3 stars earned")
 
                 // Time
                 Text(String(format: "%.2fs", lastClearedTime))
                     .font(.system(size: 18, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color(white: 0.85))
+                    .accessibilityLabel(String(format: "Completed in %.2f seconds", lastClearedTime))
 
                 // Coin
                 if let idx = lastClearedCoinIdx {
@@ -951,7 +958,9 @@ struct BallGameView: View {
         guard phase == .playing, var b = ball else { return }
         let dt = CGFloat(tickRate)
 
-        let accelScale: CGFloat = 1800
+        // Reduce Motion: dampen tilt acceleration so the ball is easier to
+        // control for players sensitive to fast motion.
+        let accelScale: CGFloat = reduceMotion ? 1080 : 1800
         b.velocity.dx += CGFloat(motion.gravity.x) * accelScale * dt
         b.velocity.dy += CGFloat(motion.gravity.y) * accelScale * dt
 
@@ -1039,7 +1048,9 @@ struct BallGameView: View {
     private func fireWallHit(axis: BounceAxis, force: CGFloat) {
         if gameState.hapticsEnabled { Haptics.light() }
         SFX.bounce(enabled: gameState.soundEnabled)
-        squashTrigger &+= 1
+        // Skip squash animation under Reduce Motion — scale changes can feel
+        // jarring for motion-sensitive users.
+        if !reduceMotion { squashTrigger &+= 1 }
     }
 
     private func fireGoalReached(at center: CGPoint) {
@@ -1051,7 +1062,9 @@ struct BallGameView: View {
     private func fireFell() {
         if gameState.hapticsEnabled { Haptics.heavy() }
         SFX.drop(enabled: gameState.soundEnabled)
-        shakeTrigger &+= 1
+        // Skip screen shake under Reduce Motion — sharp translation can
+        // trigger discomfort for motion-sensitive users.
+        if !reduceMotion { shakeTrigger &+= 1 }
     }
 
     private func fireCoinPickup() {

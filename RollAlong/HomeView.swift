@@ -241,30 +241,36 @@ struct HomeView: View {
     // ── AI gradient Play button ─────────────────────────────────────────────
     private var playButton: some View {
         NavigationLink(destination: BallGameView()) {
-            ZStack {
-                // Shifting AI gradient background
-                TimelineView(.animation) { tl in
-                    Canvas { ctx, size in
-                        aiButtonBackground(ctx: ctx, size: size,
-                                           t: tl.date.timeIntervalSinceReferenceDate)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-
-                // Bold black label
-                VStack(spacing: 2) {
-                    Text("Play")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                    Text("Level \(gameState.currentLevel)")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .opacity(0.65)
-                }
-                .foregroundStyle(.black)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .shadow(color: .white.opacity(0.22), radius: 12, y: 4)
+            playButtonBody
         }
+        .accessibilityLabel("Play Level \(gameState.currentLevel)")
+        .accessibilityHint("Starts the next unlocked level.")
+    }
+
+    private var playButtonBody: some View {
+        ZStack {
+            // Shifting AI gradient background
+            TimelineView(.animation) { tl in
+                Canvas { ctx, size in
+                    aiButtonBackground(ctx: ctx, size: size,
+                                       t: tl.date.timeIntervalSinceReferenceDate)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+
+            // Bold black label
+            VStack(spacing: 2) {
+                Text("Play")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                Text("Level \(gameState.currentLevel)")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .opacity(0.65)
+            }
+            .foregroundStyle(.black)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .shadow(color: .white.opacity(0.22), radius: 12, y: 4)
     }
 
     // Shifting colour blobs + white sparkle accents — liquid "AI" gradient
