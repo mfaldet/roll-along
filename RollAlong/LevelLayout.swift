@@ -1,27 +1,114 @@
 import SwiftUI
 
+// ---------------------------------------------------------------------------
+// DifficultyTier — what kind of level is this?
+//
+// CORE DESIGN RULE (applies levels 1 … 1,000,000+):
+//   • Last digit 1 / 2 / 3 / 4 → .easy
+//   • Last digit 6 / 7 / 8 / 9 → .hard
+//   • Last digit 0 / 5         → .veryHard
+//
+// Per group of 10:  E E E E V H H H H V    (Easy / VeryHard / Hard / VeryHard)
+//
+// IMPORTANT: "Hard" never means tightrope-precision frustrating.  All players
+// of all ages must be able to pass every level eventually.  Hard / Very Hard
+// simply means a longer path or more obstacles — slower star goals because
+// the level inherently takes longer to complete.  True precision content is
+// reserved for separate "Challenge" events shipped later.
+// ---------------------------------------------------------------------------
+enum DifficultyTier: String, Codable {
+    case easy
+    case hard
+    case veryHard
+
+    /// Derive the tier for a level from its number, per the core design rule.
+    /// Works for any positive level number.
+    static func tier(for level: Int) -> DifficultyTier {
+        let lastDigit = abs(level) % 10
+        switch lastDigit {
+        case 1, 2, 3, 4: return .easy
+        case 6, 7, 8, 9: return .hard
+        case 0, 5:       return .veryHard
+        default:         return .easy   // mathematically unreachable
+        }
+    }
+
+    /// Multiplier applied to formula-based star times.  Harder levels get
+    /// more time before docking stars because the path is longer, not because
+    /// the player is being punished.
+    var timeMultiplier: Double {
+        switch self {
+        case .easy:     return 1.0
+        case .hard:     return 1.3
+        case .veryHard: return 1.6
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .easy:     return "Easy"
+        case .hard:     return "Hard"
+        case .veryHard: return "Very Hard"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .easy:     return Color(red: 0.25, green: 0.78, blue: 0.40)
+        case .hard:     return Color(red: 0.95, green: 0.65, blue: 0.20)
+        case .veryHard: return Color(red: 0.90, green: 0.28, blue: 0.32)
+        }
+    }
+}
+
 /// One playable course.
 ///
 /// All positions are normalised to 0…1 in each axis so the layout adapts to
 /// any device size.  The renderer in `BallGameView` multiplies by the actual
 /// arena dimensions at draw time.
 struct LevelLayout {
-    let holeRects: [CGRect]      // hazards
-    let start:    UnitPoint      // ball spawn
-    let goal:     UnitPoint      // goal centre
-    let coins:    [UnitPoint]    // up to 3 collectibles
-    let targetTime: TimeInterval // 2-star threshold (seconds)
-    let goldTime:   TimeInterval // 3-star threshold (seconds)
+    let holeRects:  [CGRect]      // hazards
+    let start:      UnitPoint     // ball spawn
+    let goal:       UnitPoint     // goal centre
+    let coins:      [UnitPoint]   // up to 3 collectibles
+    let targetTime: TimeInterval  // 2-star threshold (seconds) — BEFORE tier multiplier
+    let goldTime:   TimeInterval  // 3-star threshold (seconds) — BEFORE tier multiplier
+    let tier:       DifficultyTier
+    let verified:   Bool          // true = hand-reviewed, do not auto-modify
+
+    /// Per-level explicit tier overrides — when a designed layout doesn't
+    /// fit the position-derived tier, list it here.  Empty by default; the
+    /// last-digit rule covers all 100 currently-shipped levels well.
+    static let tierOverrides: [Int: DifficultyTier] = [:]
+
+    /// Per-level explicit "verified" flag — set true once a level has been
+    /// hand-reviewed and should be considered locked.  Listed externally
+    /// so we can mark levels verified without re-editing every layout.
+    static let verifiedLevels: Set<Int> = []
 
     static func layout(for level: Int) -> LevelLayout {
+        let base: LevelLayout
         if level >= 1 && level <= handCrafted.count {
-            return handCrafted[level - 1]
+            base = handCrafted[level - 1]
+        } else {
+            base = generated(for: level)
         }
-        return generated(for: level)
+        let tier = tierOverrides[level] ?? DifficultyTier.tier(for: level)
+        let mult = tier.timeMultiplier
+        return LevelLayout(
+            holeRects:  base.holeRects,
+            start:      base.start,
+            goal:       base.goal,
+            coins:      base.coins,
+            targetTime: base.targetTime * mult,
+            goldTime:   base.goldTime * mult,
+            tier:       tier,
+            verified:   base.verified || verifiedLevels.contains(level)
+        )
     }
 
     // Flip the course vertically: ball ↔ goal swap, obstacle rects mirrored,
-    // and coin positions mirrored as well.
+    // and coin positions mirrored as well.  Tier + verified preserved.
     func flipped() -> LevelLayout {
         LevelLayout(
             holeRects: holeRects.map { r in
@@ -32,7 +119,9 @@ struct LevelLayout {
             goal:       UnitPoint(x: goal.x,  y: 1 - goal.y),
             coins:      coins.map { UnitPoint(x: $0.x, y: 1 - $0.y) },
             targetTime: targetTime,
-            goldTime:   goldTime
+            goldTime:   goldTime,
+            tier:       tier,
+            verified:   verified
         )
     }
 }
@@ -61,23 +150,32 @@ extension LevelLayout {
     }
 
     /// Convenience initialiser that auto-computes times unless overridden.
+    ///
+    /// Note: `tier` and `verified` are placeholders here.  The real values
+    /// are injected by `LevelLayout.layout(for:)` based on level number +
+    /// the optional override maps.  This keeps the per-level definitions
+    /// concise — designers only specify holes, start, goal, coins, and
+    /// optional time overrides.
     private static func make(
         holes: [CGRect],
         start: UnitPoint,
         goal: UnitPoint,
         coins: [UnitPoint],
         target: TimeInterval? = nil,
-        gold: TimeInterval? = nil
+        gold: TimeInterval? = nil,
+        verified: Bool = false
     ) -> LevelLayout {
         let allHoles = sideWalls + holes
         let times = defaultTimes(start: start, goal: goal, holeCount: holes.count)
         return LevelLayout(
-            holeRects: allHoles,
-            start: start,
-            goal: goal,
-            coins: coins,
+            holeRects:  allHoles,
+            start:      start,
+            goal:       goal,
+            coins:      coins,
             targetTime: target ?? times.target,
-            goldTime:   gold   ?? times.gold
+            goldTime:   gold   ?? times.gold,
+            tier:       .easy,    // placeholder; overridden in layout(for:)
+            verified:   verified
         )
     }
 
@@ -2045,12 +2143,14 @@ extension LevelLayout {
         let goal  = UnitPoint(x: 0.5, y: 0.10)
         let times = defaultTimes(start: start, goal: goal, holeCount: count)
         return LevelLayout(
-            holeRects: holes,
-            start: start,
-            goal: goal,
-            coins: [],
+            holeRects:  holes,
+            start:      start,
+            goal:       goal,
+            coins:      [],
             targetTime: times.target,
-            goldTime:   times.gold
+            goldTime:   times.gold,
+            tier:       .easy,    // placeholder; overridden in layout(for:)
+            verified:   false
         )
     }
 }

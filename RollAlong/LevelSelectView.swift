@@ -137,12 +137,14 @@ struct LevelSelectView: View {
     private func accessibilityLabel(level: Int, stars: Int, coins: Int, locked: Bool, designed: Bool) -> String {
         if locked  { return "Level \(level), locked" }
         if !designed { return "Level \(level), coming soon" }
-        return "Level \(level), \(stars) of 3 stars, \(coins) of 3 coins collected"
+        let tier = DifficultyTier.tier(for: level).displayName
+        return "Level \(level), \(tier), \(stars) of 3 stars, \(coins) of 3 coins collected"
     }
 
     private func cellContent(level: Int, stars: Int, coins: Set<Int>,
                              theme: Theme, unlocked: Bool, designed: Bool) -> some View {
         let canPlay = unlocked && designed
+        let tier = DifficultyTier.tier(for: level)
         return VStack(spacing: 6) {
             ZStack {
                 // Theme color swatch as background hint
@@ -173,6 +175,22 @@ struct LevelSelectView: View {
                     Text("\(level)")
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundStyle(theme.holeColor)
+
+                    // Tier badge — small colored dot in the top-right of the cell
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Circle()
+                                .fill(tier.color)
+                                .frame(width: 8, height: 8)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.black.opacity(0.25), lineWidth: 0.5)
+                                )
+                                .padding(5)
+                        }
+                        Spacer()
+                    }
                 }
             }
             .frame(height: 70)
