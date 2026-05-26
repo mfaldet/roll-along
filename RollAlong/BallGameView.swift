@@ -57,6 +57,12 @@ struct BallGameView: View {
     @State private var levelStartTime:        Date?    = nil
     @State private var coinPickedThisAttempt: Int?     = nil    // coin index 0…2
 
+    // Graphite trail (Paper world).  Holds recent ball positions so we can
+    // render a fading lead streak behind the ball.  Cleared each spawn.
+    @State private var trailPoints:           [CGPoint] = []
+    private let trailMaxLength = 90        // ~1.5s of trail at 60fps
+    private let trailMinStep:  CGFloat = 1.5
+
     // Last-completion results (for the win overlay)
     @State private var lastClearedTime:    TimeInterval = 0
     @State private var lastClearedStars:   Int          = 0
@@ -111,6 +117,18 @@ struct BallGameView: View {
                 if theme.id == .aurora {
                     auroraShimmerOverlay
                         .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
+                // Paper-world floor overlays (ruled lines, grids, fold shadows…)
+                paperFloorOverlay(geo: geo)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                // Graphite trail (Paper world): drawn over the floor, UNDER the
+                // holes — the streak should appear cut by the page tear.
+                if theme.trailEnabled && trailPoints.count >= 2 {
+                    trailOverlay(geo: geo)
                         .allowsHitTesting(false)
                 }
 
@@ -321,6 +339,177 @@ struct BallGameView: View {
                         )
                     )
                 }
+            }
+        }
+    }
+
+    /// Graphite trail — drawn as a sequence of short line segments with
+    /// increasing opacity from oldest (tail) to newest (head).  This gives
+    /// the streak a natural fade without needing a gradient-stroke API.
+    private func trailOverlay(geo: GeometryProxy) -> some View {
+        Canvas { ctx, _ in
+            let n = trailPoints.count
+            guard n >= 2 else { return }
+            for i in 1..<n {
+                let prev = trailPoints[i - 1]
+                let curr = trailPoints[i]
+                // Fade from 0.10 (tail) → 1.0 (head)
+                let age = Double(i) / Double(n - 1)
+                let opacity = 0.10 + 0.90 * age
+                var path = Path()
+                path.move(to: prev)
+                path.addLine(to: curr)
+                ctx.stroke(
+                    path,
+                    with: .color(theme.trailColor.opacity(opacity)),
+                    style: StrokeStyle(lineWidth: 3.2, lineCap: .round, lineJoin: .round)
+                )
+            }
+        }
+    }
+
+    /// Sub-theme floor overlays for the Paper world (L51-100).
+    /// Returns an empty view for non-paper themes so the call site can
+    /// stay simple.
+    @ViewBuilder
+    private func paperFloorOverlay(geo: GeometryProxy) -> some View {
+        switch theme.id {
+        case .notebook:  notebookRules(geo: geo)
+        case .graph:     graphGrid(geo: geo)
+        case .parchment: parchmentTexture(geo: geo)
+        case .sketch:    sketchGrain(geo: geo)
+        case .origami:   origamiFolds(geo: geo)
+        default:         EmptyView()
+        }
+    }
+
+    // ── Notebook: horizontal pale-blue ruled lines + red margin ─────────
+    private func notebookRules(geo: GeometryProxy) -> some View {
+        Canvas { ctx, size in
+            let lineColor = Color(red: 0.66, green: 0.78, blue: 0.92).opacity(0.70)
+            let marginColor = Color(red: 0.90, green: 0.42, blue: 0.42).opacity(0.55)
+            let spacing: CGFloat = 26
+            var y: CGFloat = spacing
+            while y < size.height {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                ctx.stroke(path, with: .color(lineColor), lineWidth: 0.8)
+                y += spacing
+            }
+            // Red left margin
+            var margin = Path()
+            margin.move(to: CGPoint(x: size.width * 0.15, y: 0))
+            margin.addLine(to: CGPoint(x: size.width * 0.15, y: size.height))
+            ctx.stroke(margin, with: .color(marginColor), lineWidth: 1.2)
+        }
+    }
+
+    // ── Graph: pale green grid ───────────────────────────────────────────
+    private func graphGrid(geo: GeometryProxy) -> some View {
+        Canvas { ctx, size in
+            let color = Color(red: 0.55, green: 0.78, blue: 0.65).opacity(0.55)
+            let step: CGFloat = 18
+            var x: CGFloat = 0
+            while x < size.width {
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+                ctx.stroke(path, with: .color(color), lineWidth: 0.5)
+                x += step
+            }
+            var y: CGFloat = 0
+            while y < size.height {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                ctx.stroke(path, with: .color(color), lineWidth: 0.5)
+                y += step
+            }
+        }
+    }
+
+    // ── Parchment: warm vignette + scattered subtle specks ──────────────
+    private func parchmentTexture(geo: GeometryProxy) -> some View {
+        Canvas { ctx, size in
+            // Warm vignette toward edges
+            ctx.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .clear, location: 0.40),
+                        .init(color: Color(red: 0.55, green: 0.40, blue: 0.20).opacity(0.20), location: 1.00),
+                    ]),
+                    center: CGPoint(x: size.width / 2, y: size.height / 2),
+                    startRadius: 0,
+                    endRadius: max(size.width, size.height) * 0.65
+                )
+            )
+            // Specks of aged ink
+            var rng = SeededRNG(seed: 4242)
+            let speckColor = Color(red: 0.42, green: 0.30, blue: 0.18).opacity(0.18)
+            for _ in 0..<60 {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let r = 0.5 + CGFloat(rng.nextUnit()) * 1.2
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                    with: .color(speckColor)
+                )
+            }
+        }
+    }
+
+    // ── Sketch: light cross-hatch grain ─────────────────────────────────
+    private func sketchGrain(geo: GeometryProxy) -> some View {
+        Canvas { ctx, size in
+            let color = Color(red: 0.20, green: 0.20, blue: 0.22).opacity(0.08)
+            var rng = SeededRNG(seed: 1337)
+            // Short pencil strokes at random positions
+            for _ in 0..<140 {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let len = CGFloat(rng.nextUnit()) * 6 + 4
+                let angleSel = rng.nextUnit()
+                // Pick from a small set of pencil angles
+                let angle: Double = angleSel < 0.33 ? .pi / 4
+                                  : angleSel < 0.66 ? -.pi / 4
+                                  : .pi / 6
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: y))
+                path.addLine(to: CGPoint(x: x + cos(angle) * Double(len),
+                                          y: y + sin(angle) * Double(len)))
+                ctx.stroke(path, with: .color(color), lineWidth: 0.6)
+            }
+        }
+    }
+
+    // ── Origami: diagonal fold shadows ──────────────────────────────────
+    private func origamiFolds(geo: GeometryProxy) -> some View {
+        Canvas { ctx, size in
+            let shadow = Color(red: 0.25, green: 0.20, blue: 0.15).opacity(0.10)
+            // Two soft diagonal "fold" gradient stripes
+            for i in 0...3 {
+                let frac = CGFloat(i) * 0.27 - 0.15
+                let cx = size.width * frac
+                ctx.fill(
+                    Path(CGRect(x: cx, y: 0, width: 8, height: size.height * 2)
+                            .applying(.init(rotationAngle: .pi / 5))),
+                    with: .linearGradient(
+                        Gradient(colors: [.clear, shadow, .clear]),
+                        startPoint: CGPoint(x: cx, y: 0),
+                        endPoint:   CGPoint(x: cx + 8, y: 0)
+                    )
+                )
+            }
+            // Subtle simple straight fold lines for clarity
+            let fold = Color(red: 0.20, green: 0.16, blue: 0.10).opacity(0.18)
+            for i in 1...3 {
+                let y = size.height * CGFloat(i) / 4
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y - 6))
+                ctx.stroke(path, with: .color(fold), lineWidth: 0.6)
             }
         }
     }
@@ -753,6 +942,7 @@ struct BallGameView: View {
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level
         coinPickedThisAttempt = nil
+        trailPoints.removeAll(keepingCapacity: true)
         levelStartTime = .now
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
@@ -774,6 +964,22 @@ struct BallGameView: View {
 
         b.position.x += b.velocity.dx * dt
         b.position.y += b.velocity.dy * dt
+
+        // Graphite trail (Paper world) — accumulate position points so we
+        // can render the streak behind the ball.  Skip if too close to the
+        // previous point (the ball is nearly stationary).
+        if theme.trailEnabled {
+            if let last = trailPoints.last {
+                if hypot(b.position.x - last.x, b.position.y - last.y) > trailMinStep {
+                    trailPoints.append(b.position)
+                }
+            } else {
+                trailPoints.append(b.position)
+            }
+            if trailPoints.count > trailMaxLength {
+                trailPoints.removeFirst(trailPoints.count - trailMaxLength)
+            }
+        }
 
         // Top and bottom wall bounce
         let r = ballRadius
@@ -896,6 +1102,24 @@ struct BallGameView: View {
                 height: norm.height * size.height
             ).contains(position)
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SeededRNG — tiny deterministic generator (LCG) used by paper-texture
+// overlays so specks/strokes land in the same place every redraw.
+// ---------------------------------------------------------------------------
+struct SeededRNG {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed | 1 }
+    mutating func next() -> UInt64 {
+        state &*= 6364136223846793005
+        state &+= 1442695040888963407
+        return state
+    }
+    /// Returns a Double in [0, 1)
+    mutating func nextUnit() -> Double {
+        Double(next() >> 11) / Double(1 << 53)
     }
 }
 

@@ -1011,6 +1011,1021 @@ extension LevelLayout {
                 UnitPoint(x: 0.50, y: 0.78),   // near start
             ]
         ),
+
+        // ═══════════════════════════════════════════════════════════════════
+        // WORLD 2 — PAPER (levels 51-100)
+        // The ball now leaves a graphite trail behind it.
+        // ═══════════════════════════════════════════════════════════════════
+
+        // ── NOTEBOOK (L51-60) — ruled paper, gentle introduction to World 2 ─
+
+        // L51 — Fresh page intro
+        make(
+            holes: [
+                CGRect(x: 0.36, y: 0.42, width: 0.28, height: 0.16),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.88),
+            goal:  UnitPoint(x: 0.5, y: 0.12),
+            coins: [
+                UnitPoint(x: 0.18, y: 0.50),
+                UnitPoint(x: 0.82, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.75),
+            ]
+        ),
+
+        // L52 — Bar gates
+        make(
+            holes: [
+                CGRect(x: 0.15, y: 0.30, width: 0.55, height: 0.07),
+                CGRect(x: 0.30, y: 0.55, width: 0.55, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.88),
+            goal:  UnitPoint(x: 0.5, y: 0.12),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.42),
+                UnitPoint(x: 0.22, y: 0.66),
+                UnitPoint(x: 0.50, y: 0.22),
+            ]
+        ),
+
+        // L53 — Zigzag
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.30, width: 0.32, height: 0.08),
+                CGRect(x: 0.50, y: 0.48, width: 0.32, height: 0.08),
+                CGRect(x: 0.18, y: 0.66, width: 0.32, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.88),
+            goal:  UnitPoint(x: 0.5, y: 0.12),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.72),
+                UnitPoint(x: 0.30, y: 0.55),
+                UnitPoint(x: 0.78, y: 0.38),
+            ]
+        ),
+
+        // L54 — Three-row gauntlet
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.26, width: 0.16, height: 0.08),
+                CGRect(x: 0.42, y: 0.26, width: 0.16, height: 0.08),
+                CGRect(x: 0.66, y: 0.26, width: 0.16, height: 0.08),
+                CGRect(x: 0.30, y: 0.48, width: 0.16, height: 0.08),
+                CGRect(x: 0.54, y: 0.48, width: 0.16, height: 0.08),
+                CGRect(x: 0.18, y: 0.70, width: 0.16, height: 0.08),
+                CGRect(x: 0.42, y: 0.70, width: 0.16, height: 0.08),
+                CGRect(x: 0.66, y: 0.70, width: 0.16, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.84),
+                UnitPoint(x: 0.50, y: 0.38),
+                UnitPoint(x: 0.50, y: 0.60),
+            ]
+        ),
+
+        // L55 — Pinch point
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.35, width: 0.36, height: 0.10),
+                CGRect(x: 0.52, y: 0.35, width: 0.36, height: 0.10),
+                CGRect(x: 0.20, y: 0.55, width: 0.28, height: 0.10),
+                CGRect(x: 0.52, y: 0.55, width: 0.28, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.78),
+                UnitPoint(x: 0.50, y: 0.22),
+            ]
+        ),
+
+        // L56 — Dual route around centre block
+        make(
+            holes: [
+                CGRect(x: 0.36, y: 0.25, width: 0.28, height: 0.50),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.50),
+                UnitPoint(x: 0.80, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.88),
+            ]
+        ),
+
+        // L57 — Tight maze
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.40, height: 0.07),
+                CGRect(x: 0.60, y: 0.22, width: 0.28, height: 0.07),
+                CGRect(x: 0.30, y: 0.36, width: 0.40, height: 0.07),
+                CGRect(x: 0.12, y: 0.50, width: 0.30, height: 0.07),
+                CGRect(x: 0.50, y: 0.50, width: 0.38, height: 0.07),
+                CGRect(x: 0.30, y: 0.64, width: 0.40, height: 0.07),
+                CGRect(x: 0.12, y: 0.78, width: 0.40, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.82),
+                UnitPoint(x: 0.20, y: 0.43),
+                UnitPoint(x: 0.78, y: 0.18),
+            ]
+        ),
+
+        // L58 — Scattered ink-blot holes
+        make(
+            holes: [
+                CGRect(x: 0.22, y: 0.22, width: 0.10, height: 0.07),
+                CGRect(x: 0.50, y: 0.24, width: 0.10, height: 0.07),
+                CGRect(x: 0.72, y: 0.30, width: 0.10, height: 0.07),
+                CGRect(x: 0.34, y: 0.38, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.44, width: 0.10, height: 0.07),
+                CGRect(x: 0.22, y: 0.50, width: 0.10, height: 0.07),
+                CGRect(x: 0.68, y: 0.58, width: 0.10, height: 0.07),
+                CGRect(x: 0.40, y: 0.62, width: 0.10, height: 0.07),
+                CGRect(x: 0.22, y: 0.70, width: 0.10, height: 0.07),
+                CGRect(x: 0.62, y: 0.74, width: 0.10, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.82),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.20),
+            ]
+        ),
+
+        // L59 — Hourglass
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.32, width: 0.30, height: 0.10),
+                CGRect(x: 0.58, y: 0.32, width: 0.30, height: 0.10),
+                CGRect(x: 0.18, y: 0.54, width: 0.26, height: 0.10),
+                CGRect(x: 0.56, y: 0.54, width: 0.26, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.48),
+                UnitPoint(x: 0.50, y: 0.76),
+                UnitPoint(x: 0.50, y: 0.20),
+            ]
+        ),
+
+        // L60 — Notebook finale
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.18, width: 0.20, height: 0.08),
+                CGRect(x: 0.62, y: 0.18, width: 0.20, height: 0.08),
+                CGRect(x: 0.40, y: 0.30, width: 0.20, height: 0.08),
+                CGRect(x: 0.16, y: 0.44, width: 0.22, height: 0.08),
+                CGRect(x: 0.62, y: 0.44, width: 0.22, height: 0.08),
+                CGRect(x: 0.40, y: 0.58, width: 0.20, height: 0.08),
+                CGRect(x: 0.18, y: 0.72, width: 0.20, height: 0.08),
+                CGRect(x: 0.62, y: 0.72, width: 0.20, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.22),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.80),
+            ]
+        ),
+
+        // ── GRAPH (L61-70) — green grid, sharper geometric layouts ─────────
+
+        // L61 — Plus
+        make(
+            holes: [
+                CGRect(x: 0.40, y: 0.24, width: 0.20, height: 0.12),
+                CGRect(x: 0.18, y: 0.44, width: 0.20, height: 0.12),
+                CGRect(x: 0.62, y: 0.44, width: 0.20, height: 0.12),
+                CGRect(x: 0.40, y: 0.64, width: 0.20, height: 0.12),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.18, y: 0.30),
+                UnitPoint(x: 0.82, y: 0.70),
+            ]
+        ),
+
+        // L62 — Lattice maze
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.24, width: 0.08, height: 0.45),
+                CGRect(x: 0.36, y: 0.36, width: 0.08, height: 0.45),
+                CGRect(x: 0.54, y: 0.24, width: 0.08, height: 0.45),
+                CGRect(x: 0.72, y: 0.36, width: 0.08, height: 0.45),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.45, y: 0.78),
+                UnitPoint(x: 0.63, y: 0.20),
+                UnitPoint(x: 0.27, y: 0.30),
+            ]
+        ),
+
+        // L63 — Grid intersection
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.30, width: 0.64, height: 0.08),
+                CGRect(x: 0.18, y: 0.62, width: 0.64, height: 0.08),
+                CGRect(x: 0.42, y: 0.18, width: 0.08, height: 0.62),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.48),
+                UnitPoint(x: 0.80, y: 0.48),
+                UnitPoint(x: 0.50, y: 0.84),
+            ]
+        ),
+
+        // L64 — Stair right
+        make(
+            holes: [
+                CGRect(x: 0.15, y: 0.20, width: 0.20, height: 0.06),
+                CGRect(x: 0.30, y: 0.34, width: 0.20, height: 0.06),
+                CGRect(x: 0.45, y: 0.48, width: 0.20, height: 0.06),
+                CGRect(x: 0.60, y: 0.62, width: 0.20, height: 0.06),
+                CGRect(x: 0.45, y: 0.76, width: 0.20, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.18, y: 0.90),
+            goal:  UnitPoint(x: 0.82, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.78),
+                UnitPoint(x: 0.20, y: 0.50),
+                UnitPoint(x: 0.78, y: 0.42),
+            ]
+        ),
+
+        // L65 — Branching corridors
+        make(
+            holes: [
+                CGRect(x: 0.30, y: 0.25, width: 0.10, height: 0.50),
+                CGRect(x: 0.60, y: 0.25, width: 0.10, height: 0.50),
+                CGRect(x: 0.42, y: 0.45, width: 0.18, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.50),
+                UnitPoint(x: 0.80, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.28),
+            ]
+        ),
+
+        // L66 — Dense maze
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.30, height: 0.05),
+                CGRect(x: 0.50, y: 0.22, width: 0.38, height: 0.05),
+                CGRect(x: 0.30, y: 0.32, width: 0.40, height: 0.05),
+                CGRect(x: 0.12, y: 0.42, width: 0.20, height: 0.05),
+                CGRect(x: 0.40, y: 0.42, width: 0.20, height: 0.05),
+                CGRect(x: 0.68, y: 0.42, width: 0.20, height: 0.05),
+                CGRect(x: 0.30, y: 0.52, width: 0.40, height: 0.05),
+                CGRect(x: 0.12, y: 0.62, width: 0.38, height: 0.05),
+                CGRect(x: 0.58, y: 0.62, width: 0.30, height: 0.05),
+                CGRect(x: 0.30, y: 0.72, width: 0.40, height: 0.05),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.80),
+                UnitPoint(x: 0.50, y: 0.47),
+                UnitPoint(x: 0.80, y: 0.18),
+            ]
+        ),
+
+        // L67 — Tight gap rows
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.36, height: 0.06),
+                CGRect(x: 0.56, y: 0.22, width: 0.32, height: 0.06),
+                CGRect(x: 0.20, y: 0.36, width: 0.32, height: 0.06),
+                CGRect(x: 0.60, y: 0.36, width: 0.28, height: 0.06),
+                CGRect(x: 0.12, y: 0.50, width: 0.32, height: 0.06),
+                CGRect(x: 0.56, y: 0.50, width: 0.32, height: 0.06),
+                CGRect(x: 0.20, y: 0.64, width: 0.32, height: 0.06),
+                CGRect(x: 0.60, y: 0.64, width: 0.28, height: 0.06),
+                CGRect(x: 0.12, y: 0.78, width: 0.32, height: 0.06),
+                CGRect(x: 0.56, y: 0.78, width: 0.32, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.86),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.14),
+            ]
+        ),
+
+        // L68 — Boxed spiral
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.20, width: 0.64, height: 0.06),
+                CGRect(x: 0.74, y: 0.26, width: 0.08, height: 0.45),
+                CGRect(x: 0.32, y: 0.65, width: 0.50, height: 0.06),
+                CGRect(x: 0.32, y: 0.36, width: 0.08, height: 0.29),
+                CGRect(x: 0.40, y: 0.36, width: 0.32, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.88),
+            goal:  UnitPoint(x: 0.5, y: 0.50),  // centre of spiral
+            coins: [
+                UnitPoint(x: 0.84, y: 0.80),
+                UnitPoint(x: 0.20, y: 0.50),
+                UnitPoint(x: 0.20, y: 0.30),
+            ]
+        ),
+
+        // L69 — Precision threading
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.32, height: 0.16),
+                CGRect(x: 0.56, y: 0.22, width: 0.32, height: 0.16),
+                CGRect(x: 0.32, y: 0.44, width: 0.36, height: 0.10),
+                CGRect(x: 0.12, y: 0.60, width: 0.32, height: 0.16),
+                CGRect(x: 0.56, y: 0.60, width: 0.32, height: 0.16),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.82),
+                UnitPoint(x: 0.50, y: 0.30),
+                UnitPoint(x: 0.50, y: 0.16),
+            ]
+        ),
+
+        // L70 — Graph finale
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.16, width: 0.14, height: 0.08),
+                CGRect(x: 0.40, y: 0.16, width: 0.14, height: 0.08),
+                CGRect(x: 0.62, y: 0.16, width: 0.14, height: 0.08),
+                CGRect(x: 0.30, y: 0.30, width: 0.14, height: 0.08),
+                CGRect(x: 0.54, y: 0.30, width: 0.14, height: 0.08),
+                CGRect(x: 0.18, y: 0.44, width: 0.14, height: 0.08),
+                CGRect(x: 0.40, y: 0.44, width: 0.14, height: 0.08),
+                CGRect(x: 0.62, y: 0.44, width: 0.14, height: 0.08),
+                CGRect(x: 0.30, y: 0.58, width: 0.14, height: 0.08),
+                CGRect(x: 0.54, y: 0.58, width: 0.14, height: 0.08),
+                CGRect(x: 0.18, y: 0.72, width: 0.14, height: 0.08),
+                CGRect(x: 0.40, y: 0.72, width: 0.14, height: 0.08),
+                CGRect(x: 0.62, y: 0.72, width: 0.14, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.24),
+                UnitPoint(x: 0.50, y: 0.52),
+                UnitPoint(x: 0.50, y: 0.80),
+            ]
+        ),
+
+        // ── PARCHMENT (L71-80) — aged ink, slightly harder, mysterious ────
+
+        // L71 — Open with single large blot
+        make(
+            holes: [
+                CGRect(x: 0.30, y: 0.36, width: 0.40, height: 0.28),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.90),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.18, y: 0.50),
+                UnitPoint(x: 0.82, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.78),
+            ]
+        ),
+
+        // L72 — Scattered blots
+        make(
+            holes: [
+                CGRect(x: 0.20, y: 0.22, width: 0.16, height: 0.10),
+                CGRect(x: 0.62, y: 0.20, width: 0.18, height: 0.10),
+                CGRect(x: 0.42, y: 0.36, width: 0.16, height: 0.10),
+                CGRect(x: 0.18, y: 0.50, width: 0.18, height: 0.10),
+                CGRect(x: 0.62, y: 0.52, width: 0.18, height: 0.10),
+                CGRect(x: 0.40, y: 0.66, width: 0.18, height: 0.10),
+                CGRect(x: 0.22, y: 0.78, width: 0.18, height: 0.08),
+                CGRect(x: 0.62, y: 0.78, width: 0.18, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.86),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.16),
+            ]
+        ),
+
+        // L73 — Zigzag bars
+        make(
+            holes: [
+                CGRect(x: 0.15, y: 0.25, width: 0.45, height: 0.08),
+                CGRect(x: 0.40, y: 0.42, width: 0.45, height: 0.08),
+                CGRect(x: 0.15, y: 0.59, width: 0.45, height: 0.08),
+                CGRect(x: 0.40, y: 0.76, width: 0.45, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.85),
+                UnitPoint(x: 0.78, y: 0.51),
+                UnitPoint(x: 0.20, y: 0.34),
+            ]
+        ),
+
+        // L74 — Tight hourglass
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.28, width: 0.36, height: 0.10),
+                CGRect(x: 0.52, y: 0.28, width: 0.36, height: 0.10),
+                CGRect(x: 0.20, y: 0.46, width: 0.24, height: 0.10),
+                CGRect(x: 0.56, y: 0.46, width: 0.24, height: 0.10),
+                CGRect(x: 0.12, y: 0.64, width: 0.36, height: 0.10),
+                CGRect(x: 0.52, y: 0.64, width: 0.36, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.82),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.18),
+            ]
+        ),
+
+        // L75 — Forced corridor
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.20, width: 0.34, height: 0.60),
+                CGRect(x: 0.54, y: 0.20, width: 0.34, height: 0.60),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.80),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.20),
+            ]
+        ),
+
+        // L76 — Dense scatter
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.18, width: 0.12, height: 0.08),
+                CGRect(x: 0.42, y: 0.22, width: 0.12, height: 0.08),
+                CGRect(x: 0.66, y: 0.18, width: 0.12, height: 0.08),
+                CGRect(x: 0.28, y: 0.34, width: 0.12, height: 0.08),
+                CGRect(x: 0.54, y: 0.36, width: 0.12, height: 0.08),
+                CGRect(x: 0.18, y: 0.48, width: 0.12, height: 0.08),
+                CGRect(x: 0.66, y: 0.50, width: 0.12, height: 0.08),
+                CGRect(x: 0.42, y: 0.56, width: 0.12, height: 0.08),
+                CGRect(x: 0.28, y: 0.70, width: 0.12, height: 0.08),
+                CGRect(x: 0.54, y: 0.72, width: 0.12, height: 0.08),
+                CGRect(x: 0.18, y: 0.82, width: 0.12, height: 0.07),
+                CGRect(x: 0.66, y: 0.82, width: 0.12, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.95),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.92),
+                UnitPoint(x: 0.50, y: 0.55),
+                UnitPoint(x: 0.50, y: 0.20),
+            ]
+        ),
+
+        // L77 — Weaving path
+        make(
+            holes: [
+                CGRect(x: 0.30, y: 0.22, width: 0.55, height: 0.06),
+                CGRect(x: 0.15, y: 0.36, width: 0.55, height: 0.06),
+                CGRect(x: 0.30, y: 0.50, width: 0.55, height: 0.06),
+                CGRect(x: 0.15, y: 0.64, width: 0.55, height: 0.06),
+                CGRect(x: 0.30, y: 0.78, width: 0.55, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.18, y: 0.92),
+            goal:  UnitPoint(x: 0.82, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.71),
+                UnitPoint(x: 0.80, y: 0.57),
+                UnitPoint(x: 0.20, y: 0.29),
+            ]
+        ),
+
+        // L78 — Maze
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.20, width: 0.50, height: 0.06),
+                CGRect(x: 0.70, y: 0.20, width: 0.18, height: 0.06),
+                CGRect(x: 0.30, y: 0.32, width: 0.50, height: 0.06),
+                CGRect(x: 0.12, y: 0.44, width: 0.30, height: 0.06),
+                CGRect(x: 0.50, y: 0.44, width: 0.38, height: 0.06),
+                CGRect(x: 0.30, y: 0.56, width: 0.50, height: 0.06),
+                CGRect(x: 0.12, y: 0.68, width: 0.50, height: 0.06),
+                CGRect(x: 0.70, y: 0.68, width: 0.18, height: 0.06),
+                CGRect(x: 0.30, y: 0.80, width: 0.40, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.84),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.20, y: 0.18),
+            ]
+        ),
+
+        // L79 — Precision corridors
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.22, width: 0.10, height: 0.55),
+                CGRect(x: 0.36, y: 0.22, width: 0.10, height: 0.55),
+                CGRect(x: 0.54, y: 0.22, width: 0.10, height: 0.55),
+                CGRect(x: 0.72, y: 0.22, width: 0.10, height: 0.55),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.88),
+            goal:  UnitPoint(x: 0.5, y: 0.12),
+            coins: [
+                UnitPoint(x: 0.31, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.68, y: 0.50),
+            ]
+        ),
+
+        // L80 — Parchment finale
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.16, width: 0.18, height: 0.10),
+                CGRect(x: 0.64, y: 0.16, width: 0.18, height: 0.10),
+                CGRect(x: 0.40, y: 0.28, width: 0.20, height: 0.08),
+                CGRect(x: 0.16, y: 0.42, width: 0.20, height: 0.10),
+                CGRect(x: 0.64, y: 0.42, width: 0.20, height: 0.10),
+                CGRect(x: 0.40, y: 0.56, width: 0.20, height: 0.08),
+                CGRect(x: 0.16, y: 0.70, width: 0.20, height: 0.08),
+                CGRect(x: 0.40, y: 0.70, width: 0.20, height: 0.08),
+                CGRect(x: 0.64, y: 0.70, width: 0.20, height: 0.08),
+                CGRect(x: 0.30, y: 0.84, width: 0.40, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.95),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.22),
+                UnitPoint(x: 0.50, y: 0.48),
+                UnitPoint(x: 0.50, y: 0.92),
+            ]
+        ),
+
+        // ── SKETCH (L81-90) — charcoal smudges, demanding precision ───────
+
+        // L81 — Big sweeping hazards
+        make(
+            holes: [
+                CGRect(x: 0.20, y: 0.25, width: 0.60, height: 0.10),
+                CGRect(x: 0.18, y: 0.60, width: 0.60, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.18),
+                UnitPoint(x: 0.50, y: 0.48),
+                UnitPoint(x: 0.50, y: 0.82),
+            ]
+        ),
+
+        // L82 — Tight gap field
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.18, height: 0.12),
+                CGRect(x: 0.34, y: 0.22, width: 0.18, height: 0.12),
+                CGRect(x: 0.56, y: 0.22, width: 0.18, height: 0.12),
+                CGRect(x: 0.12, y: 0.42, width: 0.18, height: 0.12),
+                CGRect(x: 0.34, y: 0.42, width: 0.18, height: 0.12),
+                CGRect(x: 0.56, y: 0.42, width: 0.18, height: 0.12),
+                CGRect(x: 0.12, y: 0.62, width: 0.18, height: 0.12),
+                CGRect(x: 0.34, y: 0.62, width: 0.18, height: 0.12),
+                CGRect(x: 0.56, y: 0.62, width: 0.18, height: 0.12),
+            ],
+            start: UnitPoint(x: 0.84, y: 0.90),
+            goal:  UnitPoint(x: 0.84, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.82, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.30, y: 0.85),
+            ]
+        ),
+
+        // L83 — Layered S-curves
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.20, width: 0.45, height: 0.06),
+                CGRect(x: 0.42, y: 0.32, width: 0.45, height: 0.06),
+                CGRect(x: 0.12, y: 0.44, width: 0.45, height: 0.06),
+                CGRect(x: 0.42, y: 0.56, width: 0.45, height: 0.06),
+                CGRect(x: 0.12, y: 0.68, width: 0.45, height: 0.06),
+                CGRect(x: 0.42, y: 0.80, width: 0.45, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.94),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.80, y: 0.86),
+                UnitPoint(x: 0.20, y: 0.50),
+                UnitPoint(x: 0.80, y: 0.26),
+            ]
+        ),
+
+        // L84 — Serpentine
+        make(
+            holes: [
+                CGRect(x: 0.15, y: 0.22, width: 0.55, height: 0.07),
+                CGRect(x: 0.30, y: 0.38, width: 0.55, height: 0.07),
+                CGRect(x: 0.15, y: 0.54, width: 0.55, height: 0.07),
+                CGRect(x: 0.30, y: 0.70, width: 0.55, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.18, y: 0.90),
+            goal:  UnitPoint(x: 0.18, y: 0.12),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.80),
+                UnitPoint(x: 0.20, y: 0.46),
+                UnitPoint(x: 0.78, y: 0.30),
+            ]
+        ),
+
+        // L85 — Dense scatter (harder than L76)
+        make(
+            holes: [
+                CGRect(x: 0.16, y: 0.16, width: 0.10, height: 0.07),
+                CGRect(x: 0.30, y: 0.18, width: 0.10, height: 0.07),
+                CGRect(x: 0.44, y: 0.16, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.18, width: 0.10, height: 0.07),
+                CGRect(x: 0.72, y: 0.16, width: 0.10, height: 0.07),
+                CGRect(x: 0.22, y: 0.30, width: 0.10, height: 0.07),
+                CGRect(x: 0.40, y: 0.32, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.30, width: 0.10, height: 0.07),
+                CGRect(x: 0.16, y: 0.44, width: 0.10, height: 0.07),
+                CGRect(x: 0.30, y: 0.46, width: 0.10, height: 0.07),
+                CGRect(x: 0.50, y: 0.44, width: 0.10, height: 0.07),
+                CGRect(x: 0.66, y: 0.46, width: 0.10, height: 0.07),
+                CGRect(x: 0.22, y: 0.58, width: 0.10, height: 0.07),
+                CGRect(x: 0.40, y: 0.60, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.58, width: 0.10, height: 0.07),
+                CGRect(x: 0.16, y: 0.72, width: 0.10, height: 0.07),
+                CGRect(x: 0.32, y: 0.72, width: 0.10, height: 0.07),
+                CGRect(x: 0.50, y: 0.72, width: 0.10, height: 0.07),
+                CGRect(x: 0.66, y: 0.72, width: 0.10, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.07),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.85),
+                UnitPoint(x: 0.50, y: 0.52),
+                UnitPoint(x: 0.50, y: 0.25),
+            ]
+        ),
+
+        // L86 — Forced narrow path
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.18, width: 0.30, height: 0.62),
+                CGRect(x: 0.52, y: 0.18, width: 0.30, height: 0.62),
+                CGRect(x: 0.42, y: 0.40, width: 0.16, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.82),
+                UnitPoint(x: 0.50, y: 0.58),
+                UnitPoint(x: 0.50, y: 0.20),
+            ]
+        ),
+
+        // L87 — Branching scrambles
+        make(
+            holes: [
+                CGRect(x: 0.30, y: 0.20, width: 0.40, height: 0.06),
+                CGRect(x: 0.18, y: 0.34, width: 0.20, height: 0.06),
+                CGRect(x: 0.50, y: 0.34, width: 0.20, height: 0.06),
+                CGRect(x: 0.30, y: 0.48, width: 0.40, height: 0.06),
+                CGRect(x: 0.12, y: 0.62, width: 0.20, height: 0.06),
+                CGRect(x: 0.68, y: 0.62, width: 0.20, height: 0.06),
+                CGRect(x: 0.30, y: 0.74, width: 0.40, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.20, y: 0.85),
+                UnitPoint(x: 0.50, y: 0.55),
+                UnitPoint(x: 0.80, y: 0.15),
+            ]
+        ),
+
+        // L88 — Punishing precision
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.34, height: 0.14),
+                CGRect(x: 0.54, y: 0.22, width: 0.34, height: 0.14),
+                CGRect(x: 0.30, y: 0.42, width: 0.40, height: 0.08),
+                CGRect(x: 0.12, y: 0.56, width: 0.34, height: 0.14),
+                CGRect(x: 0.54, y: 0.56, width: 0.34, height: 0.14),
+                CGRect(x: 0.30, y: 0.76, width: 0.40, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.87),
+                UnitPoint(x: 0.50, y: 0.52),
+                UnitPoint(x: 0.50, y: 0.18),
+            ]
+        ),
+
+        // L89 — High difficulty multi-route
+        make(
+            holes: [
+                CGRect(x: 0.20, y: 0.18, width: 0.10, height: 0.10),
+                CGRect(x: 0.40, y: 0.18, width: 0.10, height: 0.10),
+                CGRect(x: 0.60, y: 0.18, width: 0.10, height: 0.10),
+                CGRect(x: 0.30, y: 0.34, width: 0.40, height: 0.07),
+                CGRect(x: 0.12, y: 0.48, width: 0.18, height: 0.10),
+                CGRect(x: 0.42, y: 0.48, width: 0.18, height: 0.10),
+                CGRect(x: 0.70, y: 0.48, width: 0.18, height: 0.10),
+                CGRect(x: 0.30, y: 0.66, width: 0.40, height: 0.07),
+                CGRect(x: 0.20, y: 0.80, width: 0.10, height: 0.08),
+                CGRect(x: 0.40, y: 0.80, width: 0.10, height: 0.08),
+                CGRect(x: 0.60, y: 0.80, width: 0.10, height: 0.08),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.95),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.92),
+                UnitPoint(x: 0.50, y: 0.27),
+                UnitPoint(x: 0.50, y: 0.58),
+            ]
+        ),
+
+        // L90 — Sketch finale
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.16, width: 0.18, height: 0.08),
+                CGRect(x: 0.64, y: 0.16, width: 0.18, height: 0.08),
+                CGRect(x: 0.40, y: 0.28, width: 0.20, height: 0.08),
+                CGRect(x: 0.16, y: 0.40, width: 0.24, height: 0.08),
+                CGRect(x: 0.60, y: 0.40, width: 0.24, height: 0.08),
+                CGRect(x: 0.40, y: 0.52, width: 0.20, height: 0.08),
+                CGRect(x: 0.16, y: 0.64, width: 0.24, height: 0.08),
+                CGRect(x: 0.60, y: 0.64, width: 0.24, height: 0.08),
+                CGRect(x: 0.40, y: 0.76, width: 0.20, height: 0.08),
+                CGRect(x: 0.18, y: 0.86, width: 0.18, height: 0.06),
+                CGRect(x: 0.64, y: 0.86, width: 0.18, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.95),
+            goal:  UnitPoint(x: 0.5, y: 0.06),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.20),
+                UnitPoint(x: 0.50, y: 0.48),
+                UnitPoint(x: 0.50, y: 0.80),
+            ]
+        ),
+
+        // ── ORIGAMI (L91-100) — folded paper, the climax of the game ──────
+
+        // L91 — Open Origami intro
+        make(
+            holes: [
+                CGRect(x: 0.32, y: 0.40, width: 0.36, height: 0.20),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.88),
+            goal:  UnitPoint(x: 0.5, y: 0.12),
+            coins: [
+                UnitPoint(x: 0.18, y: 0.50),
+                UnitPoint(x: 0.82, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.74),
+            ]
+        ),
+
+        // L92 — Complex paths
+        make(
+            holes: [
+                CGRect(x: 0.16, y: 0.22, width: 0.32, height: 0.07),
+                CGRect(x: 0.54, y: 0.22, width: 0.32, height: 0.07),
+                CGRect(x: 0.34, y: 0.36, width: 0.32, height: 0.07),
+                CGRect(x: 0.16, y: 0.50, width: 0.32, height: 0.07),
+                CGRect(x: 0.54, y: 0.50, width: 0.32, height: 0.07),
+                CGRect(x: 0.34, y: 0.64, width: 0.32, height: 0.07),
+                CGRect(x: 0.16, y: 0.78, width: 0.32, height: 0.07),
+                CGRect(x: 0.54, y: 0.78, width: 0.32, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.94),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.86),
+                UnitPoint(x: 0.50, y: 0.43),
+                UnitPoint(x: 0.50, y: 0.16),
+            ]
+        ),
+
+        // L93 — Maze
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.20, width: 0.50, height: 0.06),
+                CGRect(x: 0.30, y: 0.30, width: 0.58, height: 0.06),
+                CGRect(x: 0.12, y: 0.40, width: 0.30, height: 0.06),
+                CGRect(x: 0.50, y: 0.40, width: 0.38, height: 0.06),
+                CGRect(x: 0.20, y: 0.50, width: 0.40, height: 0.06),
+                CGRect(x: 0.68, y: 0.50, width: 0.20, height: 0.06),
+                CGRect(x: 0.12, y: 0.60, width: 0.50, height: 0.06),
+                CGRect(x: 0.30, y: 0.70, width: 0.50, height: 0.06),
+                CGRect(x: 0.12, y: 0.80, width: 0.30, height: 0.06),
+                CGRect(x: 0.50, y: 0.80, width: 0.38, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.85),
+                UnitPoint(x: 0.20, y: 0.45),
+                UnitPoint(x: 0.50, y: 0.14),
+            ]
+        ),
+
+        // L94 — Dual routes
+        make(
+            holes: [
+                CGRect(x: 0.40, y: 0.18, width: 0.20, height: 0.65),
+                CGRect(x: 0.12, y: 0.35, width: 0.18, height: 0.10),
+                CGRect(x: 0.70, y: 0.35, width: 0.18, height: 0.10),
+                CGRect(x: 0.12, y: 0.55, width: 0.18, height: 0.10),
+                CGRect(x: 0.70, y: 0.55, width: 0.18, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.22, y: 0.25),
+                UnitPoint(x: 0.78, y: 0.25),
+                UnitPoint(x: 0.50, y: 0.90),
+            ]
+        ),
+
+        // L95 — Precision
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.22, width: 0.30, height: 0.10),
+                CGRect(x: 0.58, y: 0.22, width: 0.30, height: 0.10),
+                CGRect(x: 0.20, y: 0.38, width: 0.30, height: 0.10),
+                CGRect(x: 0.50, y: 0.38, width: 0.30, height: 0.10),
+                CGRect(x: 0.12, y: 0.54, width: 0.30, height: 0.10),
+                CGRect(x: 0.58, y: 0.54, width: 0.30, height: 0.10),
+                CGRect(x: 0.20, y: 0.70, width: 0.30, height: 0.10),
+                CGRect(x: 0.50, y: 0.70, width: 0.30, height: 0.10),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.85),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.17),
+            ]
+        ),
+
+        // L96 — Dense field
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.18, width: 0.10, height: 0.07),
+                CGRect(x: 0.38, y: 0.18, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.18, width: 0.10, height: 0.07),
+                CGRect(x: 0.78, y: 0.18, width: 0.04, height: 0.07),
+                CGRect(x: 0.12, y: 0.30, width: 0.04, height: 0.07),
+                CGRect(x: 0.28, y: 0.30, width: 0.10, height: 0.07),
+                CGRect(x: 0.48, y: 0.30, width: 0.10, height: 0.07),
+                CGRect(x: 0.68, y: 0.30, width: 0.10, height: 0.07),
+                CGRect(x: 0.18, y: 0.42, width: 0.10, height: 0.07),
+                CGRect(x: 0.38, y: 0.42, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.42, width: 0.10, height: 0.07),
+                CGRect(x: 0.28, y: 0.54, width: 0.10, height: 0.07),
+                CGRect(x: 0.48, y: 0.54, width: 0.10, height: 0.07),
+                CGRect(x: 0.68, y: 0.54, width: 0.10, height: 0.07),
+                CGRect(x: 0.18, y: 0.66, width: 0.10, height: 0.07),
+                CGRect(x: 0.38, y: 0.66, width: 0.10, height: 0.07),
+                CGRect(x: 0.58, y: 0.66, width: 0.10, height: 0.07),
+                CGRect(x: 0.28, y: 0.78, width: 0.10, height: 0.07),
+                CGRect(x: 0.48, y: 0.78, width: 0.10, height: 0.07),
+                CGRect(x: 0.68, y: 0.78, width: 0.10, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.92),
+            goal:  UnitPoint(x: 0.5, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.86),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.14),
+            ]
+        ),
+
+        // L97 — Weaving corridors
+        make(
+            holes: [
+                CGRect(x: 0.15, y: 0.20, width: 0.45, height: 0.07),
+                CGRect(x: 0.40, y: 0.32, width: 0.45, height: 0.07),
+                CGRect(x: 0.15, y: 0.44, width: 0.45, height: 0.07),
+                CGRect(x: 0.40, y: 0.56, width: 0.45, height: 0.07),
+                CGRect(x: 0.15, y: 0.68, width: 0.45, height: 0.07),
+                CGRect(x: 0.40, y: 0.80, width: 0.45, height: 0.07),
+            ],
+            start: UnitPoint(x: 0.18, y: 0.95),
+            goal:  UnitPoint(x: 0.82, y: 0.10),
+            coins: [
+                UnitPoint(x: 0.78, y: 0.88),
+                UnitPoint(x: 0.20, y: 0.50),
+                UnitPoint(x: 0.78, y: 0.26),
+            ]
+        ),
+
+        // L98 — Punishing
+        make(
+            holes: [
+                CGRect(x: 0.12, y: 0.18, width: 0.30, height: 0.10),
+                CGRect(x: 0.58, y: 0.18, width: 0.30, height: 0.10),
+                CGRect(x: 0.32, y: 0.32, width: 0.36, height: 0.07),
+                CGRect(x: 0.12, y: 0.44, width: 0.25, height: 0.10),
+                CGRect(x: 0.40, y: 0.44, width: 0.20, height: 0.10),
+                CGRect(x: 0.63, y: 0.44, width: 0.25, height: 0.10),
+                CGRect(x: 0.32, y: 0.58, width: 0.36, height: 0.07),
+                CGRect(x: 0.12, y: 0.70, width: 0.30, height: 0.10),
+                CGRect(x: 0.58, y: 0.70, width: 0.30, height: 0.10),
+                CGRect(x: 0.32, y: 0.84, width: 0.36, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.95),
+            goal:  UnitPoint(x: 0.5, y: 0.08),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.92),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.15),
+            ]
+        ),
+
+        // L99 — Pre-finale
+        make(
+            holes: [
+                CGRect(x: 0.18, y: 0.16, width: 0.14, height: 0.10),
+                CGRect(x: 0.42, y: 0.16, width: 0.14, height: 0.10),
+                CGRect(x: 0.66, y: 0.16, width: 0.14, height: 0.10),
+                CGRect(x: 0.28, y: 0.30, width: 0.14, height: 0.10),
+                CGRect(x: 0.54, y: 0.30, width: 0.14, height: 0.10),
+                CGRect(x: 0.18, y: 0.44, width: 0.14, height: 0.10),
+                CGRect(x: 0.42, y: 0.44, width: 0.14, height: 0.10),
+                CGRect(x: 0.66, y: 0.44, width: 0.14, height: 0.10),
+                CGRect(x: 0.28, y: 0.58, width: 0.14, height: 0.10),
+                CGRect(x: 0.54, y: 0.58, width: 0.14, height: 0.10),
+                CGRect(x: 0.18, y: 0.72, width: 0.14, height: 0.10),
+                CGRect(x: 0.42, y: 0.72, width: 0.14, height: 0.10),
+                CGRect(x: 0.66, y: 0.72, width: 0.14, height: 0.10),
+                CGRect(x: 0.30, y: 0.86, width: 0.40, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.96),
+            goal:  UnitPoint(x: 0.5, y: 0.06),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.92),
+                UnitPoint(x: 0.50, y: 0.50),
+                UnitPoint(x: 0.50, y: 0.20),
+            ]
+        ),
+
+        // L100 — THE FINAL LEVEL — boss of World 2 + game finale
+        // Punishing maze that tests every skill from 99 prior levels.
+        make(
+            holes: [
+                CGRect(x: 0.16, y: 0.14, width: 0.16, height: 0.07),
+                CGRect(x: 0.36, y: 0.14, width: 0.20, height: 0.07),
+                CGRect(x: 0.60, y: 0.14, width: 0.16, height: 0.07),
+                CGRect(x: 0.26, y: 0.26, width: 0.20, height: 0.07),
+                CGRect(x: 0.50, y: 0.26, width: 0.20, height: 0.07),
+                CGRect(x: 0.16, y: 0.38, width: 0.16, height: 0.07),
+                CGRect(x: 0.36, y: 0.38, width: 0.20, height: 0.07),
+                CGRect(x: 0.60, y: 0.38, width: 0.16, height: 0.07),
+                CGRect(x: 0.26, y: 0.50, width: 0.20, height: 0.07),
+                CGRect(x: 0.50, y: 0.50, width: 0.20, height: 0.07),
+                CGRect(x: 0.16, y: 0.62, width: 0.16, height: 0.07),
+                CGRect(x: 0.36, y: 0.62, width: 0.20, height: 0.07),
+                CGRect(x: 0.60, y: 0.62, width: 0.16, height: 0.07),
+                CGRect(x: 0.26, y: 0.74, width: 0.20, height: 0.07),
+                CGRect(x: 0.50, y: 0.74, width: 0.20, height: 0.07),
+                CGRect(x: 0.16, y: 0.86, width: 0.16, height: 0.06),
+                CGRect(x: 0.36, y: 0.86, width: 0.20, height: 0.06),
+                CGRect(x: 0.60, y: 0.86, width: 0.16, height: 0.06),
+            ],
+            start: UnitPoint(x: 0.5, y: 0.97),
+            goal:  UnitPoint(x: 0.5, y: 0.05),
+            coins: [
+                UnitPoint(x: 0.50, y: 0.95),   // tucked at the start
+                UnitPoint(x: 0.50, y: 0.46),   // dead centre, hardest
+                UnitPoint(x: 0.50, y: 0.10),   // right by the goal
+            ]
+        ),
     ]
 
     /// Procedurally add more hazards as levels climb past the hand-crafted set.
