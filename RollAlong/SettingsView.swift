@@ -49,12 +49,12 @@ struct SettingsView: View {
             sectionHeader("Personalization")
             HStack {
                 Text("Your Name")
-                    .font(.system(size: 15, design: .rounded))
+                    .font(.system(.body, design: .rounded))
                     .foregroundStyle(Color(white: 0.75))
                 Spacer()
                 TextField("Enter name", text: $gameState.playerName)
                     .multilineTextAlignment(.trailing)
-                    .font(.system(size: 15, design: .rounded))
+                    .font(.system(.body, design: .rounded))
                     .foregroundStyle(.white)
                     .focused($nameFocused)
                     .submitLabel(.done)
@@ -85,12 +85,12 @@ struct SettingsView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Ball Starts at Top")
-                                .font(.system(size: 15, design: .rounded))
+                                .font(.system(.body, design: .rounded))
                                 .foregroundStyle(Color(white: 0.75))
                             Text(gameState.ballStartsAtTop
                                  ? "Goal is at the bottom"
                                  : "Goal is at the top")
-                                .font(.system(size: 12, design: .rounded))
+                                .font(.system(.caption, design: .rounded))
                                 .foregroundStyle(Color(white: 0.42))
                         }
                     } icon: {
@@ -108,7 +108,7 @@ struct SettingsView: View {
                 Toggle(isOn: $gameState.hapticsEnabled) {
                     Label {
                         Text("Haptic Feedback")
-                            .font(.system(size: 15, design: .rounded))
+                            .font(.system(.body, design: .rounded))
                             .foregroundStyle(Color(white: 0.75))
                     } icon: {
                         Image(systemName: "hand.tap.fill")
@@ -123,7 +123,7 @@ struct SettingsView: View {
                 Toggle(isOn: $gameState.soundEnabled) {
                     Label {
                         Text("Sound Effects")
-                            .font(.system(size: 15, design: .rounded))
+                            .font(.system(.body, design: .rounded))
                             .foregroundStyle(Color(white: 0.75))
                     } icon: {
                         Image(systemName: "speaker.wave.2.fill")
@@ -146,10 +146,10 @@ struct SettingsView: View {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")
                     Text("Reset Level Progress")
-                        .font(.system(size: 15, design: .rounded))
+                        .font(.system(.body, design: .rounded))
                     Spacer()
                     Text("Level \(gameState.currentLevel)")
-                        .font(.system(size: 13, design: .rounded))
+                        .font(.system(.footnote, design: .rounded))
                         .foregroundStyle(Color(white: 0.4))
                 }
                 .foregroundStyle(Color(red: 0.95, green: 0.3, blue: 0.3))
@@ -200,6 +200,11 @@ struct SettingsView: View {
                     .minimumScaleFactor(0.7)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(skin.rawValue) ball skin")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityHint("Double-tap to choose this skin.")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

@@ -123,10 +123,21 @@ struct LevelSelectView: View {
             .simultaneousGesture(TapGesture().onEnded {
                 gameState.currentLevel = level
             })
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel(level: level, stars: stars, coins: coins.count, locked: false, designed: true))
+            .accessibilityHint("Double-tap to play.")
         } else {
             cellContent(level: level, stars: stars, coins: coins,
                         theme: theme, unlocked: unlocked, designed: isDesigned)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilityLabel(level: level, stars: stars, coins: coins.count, locked: !unlocked, designed: isDesigned))
         }
+    }
+
+    private func accessibilityLabel(level: Int, stars: Int, coins: Int, locked: Bool, designed: Bool) -> String {
+        if locked  { return "Level \(level), locked" }
+        if !designed { return "Level \(level), coming soon" }
+        return "Level \(level), \(stars) of 3 stars, \(coins) of 3 coins collected"
     }
 
     private func cellContent(level: Int, stars: Int, coins: Set<Int>,

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Roll Along does NOT track users.  No analytics, no ad SDKs. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <!-- No tracking domains. -->
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- We do NOT collect any data types from users.  All progress is
+         stored locally in UserDefaults on the device. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <!-- Required-reason API declarations.
+         Roll Along uses UserDefaults to persist:
+           - level progression
+           - star/coin/best-time totals
+           - settings (haptics, sound, skin, name, ball orientation)
+           - one-time UX flags (onboarding, welcome moment)
+         All reads/writes stay within the app sandbox.
+         Reason code CA92.1: "Access info from same app, per documentation" -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
