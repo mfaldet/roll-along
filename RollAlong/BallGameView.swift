@@ -3,6 +3,7 @@ import CoreMotion
 import Combine
 import UIKit
 import AudioToolbox
+import AVFoundation
 
 // ---------------------------------------------------------------------------
 // BallGameView — tilt-driven marble game.
@@ -214,7 +215,7 @@ struct BallGameView: View {
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear  { motion.start(); clock.start() }
+        .onAppear  { motion.start(); clock.start(); AudioManager.shared.prepareIfNeeded() }
         .onDisappear { motion.stop();  clock.stop()  }
     }
 
@@ -264,7 +265,7 @@ struct BallGameView: View {
             let pickedThisAttempt = (coinPickedThisAttempt == idx)
             let isBanked = banked.contains(idx)
             if !pickedThisAttempt {
-                coinView(banked: isBanked)
+                coinView(banked: isBanked, index: idx)
                     .position(
                         x: norm.x * geo.size.width,
                         y: norm.y * geo.size.height
@@ -273,39 +274,22 @@ struct BallGameView: View {
         }
     }
 
-    private func coinView(banked: Bool) -> some View {
-        // Gold gradient coin.  Already-banked coins render greyed.
-        let golden = LinearGradient(
-            colors: [
-                Color(red: 1.00, green: 0.84, blue: 0.30),
-                Color(red: 0.93, green: 0.65, blue: 0.10),
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
-        let dimmed = LinearGradient(
-            colors: [Color(white: 0.55), Color(white: 0.35)],
-            startPoint: .top, endPoint: .bottom
-        )
-        return TimelineView(.animation) { tl in
-            // Subtle pulse for ungrabbed coins only — dimmed coins sit still.
-            let t = tl.date.timeIntervalSinceReferenceDate
-            let pulse = banked ? 1.0 : 1.0 + 0.10 * sin(t * 3.4)
-            Circle()
-                .fill(banked ? dimmed : golden)
-                .frame(width: coinRadius * 2, height: coinRadius * 2)
-                .overlay(
-                    Circle()
-                        .stroke(Color.black.opacity(banked ? 0.20 : 0.40), lineWidth: 1)
-                )
-                .overlay(
-                    // Subtle inner highlight
-                    Circle()
-                        .stroke(Color.white.opacity(banked ? 0.0 : 0.45), lineWidth: 0.8)
-                        .scaleEffect(0.6)
-                        .offset(x: -coinRadius * 0.18, y: -coinRadius * 0.18)
-                )
-                .scaleEffect(pulse)
-                .opacity(banked ? 0.45 : 1.0)
+    /// Animated spinning coin.  The 2D illusion of a 3D spin is achieved by
+    /// oscillating scale-X between 0.18 (edge-on, looks like a thin line)
+    /// and 1.0 (full face).  A small vertical bob keeps it feeling alive.
+    /// Each coin is phased differently so they don't spin in unison.
+    ///
+    /// Already-banked coins render dimmed and static so the player can see
+    /// where the previous coin was without it being grabby.
+    @ViewBuilder
+    private func coinView(banked: Bool, index: Int) -> some View {
+        if banked {
+            BankedCoinView(size: coinRadius * 2)
+        } else {
+            SpinningCoinView(
+                size: coinRadius * 2,
+                phase: Double(index) * 1.7
+            )
         }
     }
 
@@ -573,12 +557,13 @@ struct BallGameView: View {
                         let hueOffset = Double(ringIdx) * 0.33
                         let hue = (phase + t * 0.06 + hueOffset).truncatingRemainder(dividingBy: 1.0)
 
-                        let twinkFreq = 2.8 + Double(i % 7) * 0.55
-                        let raw = (sin(t * twinkFreq + phase * .pi * 3 + Double(ringIdx * 7)) + 1) / 2
-                        let twinkle = pow(raw, 2.2)
+                        let twinkFreq: Double = 2.8 + Double(i % 7) * 0.55
+                        let twinkArg: Double = t * twinkFreq + phase * .pi * 3 + Double(ringIdx * 7)
+                        let raw: Double = (sin(twinkArg) + 1) / 2
+                        let twinkle: Double = pow(raw, 2.2)
 
-                        let alpha = 0.30 + twinkle * 0.70
-                        let pR    = CGFloat(minSz + twinkle * (maxSz - minSz))
+                        let alpha: Double = 0.30 + twinkle * 0.70
+                        let pR: CGFloat = CGFloat(minSz + twinkle * (maxSz - minSz))
                         let color = Color(hue: hue, saturation: 1.0, brightness: 0.55 + twinkle * 0.45)
 
                         // Wide glow — radial gradient, bright centre → transparent
@@ -1047,7 +1032,7 @@ struct BallGameView: View {
 
     private func fireWallHit(axis: BounceAxis, force: CGFloat) {
         if gameState.hapticsEnabled { Haptics.light() }
-        SFX.bounce(enabled: gameState.soundEnabled)
+        AudioManager.shared.playBounce(enabled: gameState.soundEnabled)
         // Skip squash animation under Reduce Motion — scale changes can feel
         // jarring for motion-sensitive users.
         if !reduceMotion { squashTrigger &+= 1 }
@@ -1055,13 +1040,22 @@ struct BallGameView: View {
 
     private func fireGoalReached(at center: CGPoint) {
         if gameState.hapticsEnabled { Haptics.success() }
-        SFX.goal(enabled: gameState.soundEnabled)
+        AudioManager.shared.playWin(enabled: gameState.soundEnabled)
         goalBurst = GoalBurstEvent(center: center, start: .now)
     }
 
+    /// Ball fell.  Intentionally NO sound — losing should never feel like a
+    /// jump scare.  We use a double-tap medium haptic instead: a brief
+    /// "tap-tap on the shoulder" that nudges the player back without
+    /// startling them.  Also previous "thud" SystemSound bypassed silent mode,
+    /// which the player understandably hated.
     private func fireFell() {
-        if gameState.hapticsEnabled { Haptics.heavy() }
-        SFX.drop(enabled: gameState.soundEnabled)
+        if gameState.hapticsEnabled {
+            Haptics.medium()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
+                Haptics.medium()
+            }
+        }
         // Skip screen shake under Reduce Motion — sharp translation can
         // trigger discomfort for motion-sensitive users.
         if !reduceMotion { shakeTrigger &+= 1 }
@@ -1069,7 +1063,7 @@ struct BallGameView: View {
 
     private func fireCoinPickup() {
         if gameState.hapticsEnabled { Haptics.soft() }
-        SFX.coin(enabled: gameState.soundEnabled)
+        AudioManager.shared.playCoin(enabled: gameState.soundEnabled)
     }
 
     // MARK: - Level clear handler
@@ -1330,22 +1324,286 @@ struct GoalBurstView: View {
     }
 }
 
-enum SFX {
-    // System sound IDs — see https://github.com/TUNER88/iOSSystemSoundsLibrary
-    private static let bounceID:  SystemSoundID = 1104  // light "tick"
-    private static let dropID:    SystemSoundID = 1073  // low "thud"
-    private static let goalID:    SystemSoundID = 1025  // bright "ding"
-    private static let coinID:    SystemSoundID = 1306  // sharp pickup tick
-    private static let tapID:     SystemSoundID = 1306  // UI tap
+// ---------------------------------------------------------------------------
+// BankedCoinView — already-collected coin, static + dimmed.
+// ---------------------------------------------------------------------------
+struct BankedCoinView: View {
+    let size: CGFloat
+    var body: some View {
+        Circle()
+            .fill(Self.dimmed)
+            .frame(width: size, height: size)
+            .overlay(Circle().stroke(Color.black.opacity(0.20), lineWidth: 1))
+            .opacity(0.45)
+    }
+    static let dimmed = LinearGradient(
+        colors: [Color(white: 0.55), Color(white: 0.35)],
+        startPoint: .top, endPoint: .bottom
+    )
+}
 
-    static func bounce(enabled: Bool) { play(bounceID, enabled: enabled) }
-    static func drop  (enabled: Bool) { play(dropID,   enabled: enabled) }
-    static func goal  (enabled: Bool) { play(goalID,   enabled: enabled) }
-    static func coin  (enabled: Bool) { play(coinID,   enabled: enabled) }
-    static func tap   (enabled: Bool) { play(tapID,    enabled: enabled) }
+// ---------------------------------------------------------------------------
+// SpinningCoinView — animated 3D-illusion spinning gold coin.
+//
+// Built from two layered shapes that together fake a coin with real physical
+// thickness:
+//
+//   • Rim  — a vertical Capsule rendered BEHIND the face. Constant width
+//            (~18% of the coin diameter), constant height (same as the
+//            coin).  This is the "thickness" of the disc — the side you'd
+//            see if you held a real coin edge-on.
+//   • Face — a gold Ellipse on top of the rim, scaled in X by |sin(t)| so
+//            it foreshortens from a full circle (face-on) to a thin sliver
+//            and eventually disappears (edge-on).
+//
+// When the face shrinks below the rim's width, the rim becomes visible
+// poking out from behind — that's the "edge revealed" moment of the spin.
+// Combined with a gentle vertical bob, the coin reads as 3D.
+//
+// Phased per coin so adjacent coins are never all edge-on at the same time.
+// ---------------------------------------------------------------------------
+struct SpinningCoinView: View {
+    let size:  CGFloat
+    let phase: Double
 
-    private static func play(_ id: SystemSoundID, enabled: Bool) {
+    /// Rim width as a fraction of the coin diameter.  ~18% gives a chunky,
+    /// readable thickness without looking like a hockey puck.
+    private var rimWidth: CGFloat { size * 0.20 }
+
+    private static let goldenFace = LinearGradient(
+        colors: [
+            Color(red: 1.00, green: 0.92, blue: 0.48),
+            Color(red: 0.93, green: 0.65, blue: 0.10),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+    /// Rim gradient: mid-gold at top + bottom, darker in the middle band.
+    /// Mimics the light/shadow on a cylinder side lit from above and below.
+    private static let rimGradient = LinearGradient(
+        stops: [
+            .init(color: Color(red: 0.68, green: 0.48, blue: 0.08), location: 0.00),
+            .init(color: Color(red: 0.42, green: 0.27, blue: 0.04), location: 0.50),
+            .init(color: Color(red: 0.66, green: 0.46, blue: 0.07), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let t       = tl.date.timeIntervalSinceReferenceDate
+            let spinRaw = abs(sin(t * 2.6 + phase))          // 0…1 (no clamp)
+            let bob     = sin(t * 2.2 + phase * 0.7) * 1.6    // ±1.6pt
+
+            coinBody(spinRaw: spinRaw)
+                .offset(y: bob)
+        }
+    }
+
+    private func coinBody(spinRaw: Double) -> some View {
+        ZStack {
+            // RIM — the visible thickness.  Behind everything.  Constant size.
+            // Slightly tapered ends via Capsule's rounded caps so the rim
+            // reads as a cylindrical edge rather than a flat strip.
+            Capsule()
+                .fill(Self.rimGradient)
+                .overlay(
+                    Capsule()
+                        .stroke(Color.black.opacity(0.45), lineWidth: 0.8)
+                )
+                // Subtle horizontal "milled" lines on the rim — adds metallic
+                // texture.  Faint enough not to distract.
+                .overlay(milledTexture)
+                .frame(width: rimWidth, height: size * 0.96)
+
+            // FACE — gold ellipse on top, scales in X with the spin.
+            // Goes all the way to zero so the rim shows through fully at
+            // edge-on.  Drop-shadow gives a hint of depth above the rim.
+            faceLayer(spinRaw: spinRaw)
+                .frame(width: size, height: size)
+                .scaleEffect(x: CGFloat(spinRaw), y: 1.0)
+        }
+    }
+
+    /// Tiny darker hatch marks running across the rim — fakes the milled
+    /// edge of a coin.  Rendered with low opacity so it's only readable
+    /// at intermediate spin angles, not distracting at face-on.
+    private var milledTexture: some View {
+        GeometryReader { geo in
+            let count = 14
+            ForEach(0..<count, id: \.self) { i in
+                Rectangle()
+                    .fill(Color.black.opacity(0.18))
+                    .frame(width: geo.size.width, height: 0.6)
+                    .offset(y: geo.size.height * CGFloat(i) / CGFloat(count - 1))
+            }
+        }
+        .clipShape(Capsule())
+        .allowsHitTesting(false)
+    }
+
+    private func faceLayer(spinRaw: Double) -> some View {
+        ZStack {
+            // Base face
+            Ellipse().fill(Self.goldenFace)
+
+            // Rim outline on the face itself
+            Ellipse().stroke(Color.black.opacity(0.40), lineWidth: 1)
+
+            // Inner highlight — brighter when face-on, fades as it rotates
+            Ellipse()
+                .stroke(Color.white.opacity(0.55 * spinRaw), lineWidth: 1.0)
+                .scaleEffect(0.62)
+                .offset(x: -size * 0.09, y: -size * 0.09)
+
+            // Specular shine sweep — soft white vertical stripe that
+            // travels across the face as it rotates.  Most prominent
+            // when face-on, gone by edge-on.
+            shine(spinRaw: spinRaw)
+        }
+    }
+
+    private func shine(spinRaw: Double) -> some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [.clear,
+                             Color.white.opacity(0.50 * spinRaw),
+                             .clear],
+                    startPoint: .leading, endPoint: .trailing
+                )
+            )
+            .frame(width: size * 0.35, height: size)
+            .offset(x: CGFloat(spinRaw - 0.5) * size * 0.7)
+            .clipShape(Ellipse())
+            .blendMode(.plusLighter)
+            .allowsHitTesting(false)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AudioManager — game sound layer.
+//
+// Two channels:
+// 1. Short UI taps (bounce, coin) play via SystemSoundIDs in the 1100-1306
+//    range.  These are documented as UI sounds and respect the device
+//    silent switch.  We deliberately avoid the alert-category IDs (1000s)
+//    that bypass silent — those were the cause of the "loud thud playing
+//    even on silent" complaint.
+// 2. The win sound plays via AVAudioEngine through an AVAudioSession
+//    configured as .ambient — meaning it respects the silent switch and
+//    mixes politely with any other audio.  The buffer is synthesized on
+//    init (small ascending C-E-G-C major arpeggio) so we don't have to
+//    ship a WAV asset.
+//
+// There is intentionally no "drop" sound.  When the ball falls, we lean
+// entirely on a double-tap haptic — losing should feel like a tap on the
+// shoulder, not a jump-scare.
+// ---------------------------------------------------------------------------
+final class AudioManager {
+    static let shared = AudioManager()
+
+    private let engine = AVAudioEngine()
+    private let player = AVAudioPlayerNode()
+    private var winBuffer:  AVAudioPCMBuffer?
+    private var sessionConfigured = false
+
+    private init() {}
+
+    /// Lazily configure the audio session + synth the win buffer.  Called
+    /// from BallGameView's onAppear so we don't pay this cost until the
+    /// game actually starts.
+    func prepareIfNeeded() {
+        guard !sessionConfigured else { return }
+        sessionConfigured = true
+
+        // Ambient + mixWithOthers: respects the silent switch, mixes with
+        // music apps, never ducks anything.
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+        try? session.setActive(true)
+
+        engine.attach(player)
+        let format = engine.outputNode.outputFormat(forBus: 0)
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+        try? engine.start()
+
+        winBuffer = makeWinBuffer(format: format)
+    }
+
+    func playWin(enabled: Bool) {
+        guard enabled, let buffer = winBuffer else { return }
+        if !engine.isRunning {
+            try? engine.start()
+        }
+        player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
+        if !player.isPlaying {
+            player.play()
+        }
+    }
+
+    /// Short UI tick for wall bounces.  System sound 1104 ("Tink") respects
+    /// silent mode.
+    func playBounce(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(id)
+        AudioServicesPlaySystemSound(1104)
+    }
+
+    /// Coin pickup tick.  System sound 1306 (UI "Pop") respects silent.
+    func playCoin(enabled: Bool) {
+        guard enabled else { return }
+        AudioServicesPlaySystemSound(1306)
+    }
+
+    // MARK: - Win sound synthesis
+
+    /// Synthesises a short C-major arpeggio (C5 → E5 → G5 → C6) with a
+    /// gentle exponential decay on each note.  Sounds bright and celebratory
+    /// without being loud or jangly.  Total ~0.7s.
+    private func makeWinBuffer(format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let sampleRate = format.sampleRate
+        let totalDuration = 0.75
+        let frameCount = AVAudioFrameCount(sampleRate * totalDuration)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+            return nil
+        }
+        buffer.frameLength = frameCount
+
+        // Notes: (startSec, attackEndSec, releaseDuration, freqHz, gain)
+        let notes: [(start: Double, attack: Double, release: Double, freq: Double, gain: Double)] = [
+            (0.00, 0.012, 0.32, 523.25, 0.20),   // C5
+            (0.08, 0.012, 0.32, 659.25, 0.20),   // E5
+            (0.16, 0.012, 0.34, 783.99, 0.22),   // G5
+            (0.26, 0.018, 0.45, 1046.50, 0.26),  // C6  — slightly louder finale
+        ]
+
+        guard let channelData = buffer.floatChannelData else { return nil }
+        let channelCount = Int(format.channelCount)
+
+        for frame in 0..<Int(frameCount) {
+            let t = Double(frame) / sampleRate
+            var s: Double = 0
+            for n in notes {
+                guard t >= n.start else { continue }
+                let local = t - n.start
+                // Attack ramp then exponential release.
+                let envelope: Double
+                if local < n.attack {
+                    envelope = local / n.attack
+                } else {
+                    let decay = local - n.attack
+                    envelope = exp(-decay / n.release)
+                }
+                // Tiny bit of second harmonic for warmth.
+                let fundamental = sin(2.0 * .pi * n.freq * local)
+                let harmonic    = sin(2.0 * .pi * n.freq * 2.0 * local) * 0.18
+                s += (fundamental + harmonic) * envelope * n.gain
+            }
+            // Soft global limiter — divide by ~2 worth of overlap, clamp.
+            let sample = Float(max(-0.95, min(0.95, s)))
+            for ch in 0..<channelCount {
+                channelData[ch][frame] = sample
+            }
+        }
+        return buffer
     }
 }
