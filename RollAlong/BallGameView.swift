@@ -56,6 +56,11 @@ struct BallGameView: View {
     @State private var arenaSize:          CGSize    = .zero
     @State private var showWelcomeMoment:  Bool      = false
 
+    // Lives system (Sprint 4c)
+    @State private var showOutOfLives:                Bool   = false
+    @State private var showLivesPlaceholderAlert:     Bool   = false
+    @State private var livesPlaceholderMessage:       String = ""
+
     // Per-attempt progression state
     @State private var levelStartTime:        Date?    = nil
     @State private var coinsPickedThisAttempt: Set<Int> = []    // coin indices 0…2 picked this attempt
@@ -183,9 +188,20 @@ struct BallGameView: View {
                 // HUD — just the level label
                 hud(safeBottom: geo.safeAreaInsets.bottom)
 
+                // Lives HUD — top-left.  Hidden on tutorial levels (where
+                // failure doesn't cost a life) so it doesn't add cognitive
+                // load during onboarding.
+                if !gameState.isTutorialLevel(gameState.currentLevel) {
+                    livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
+                }
+
                 // Overlays
                 if phase == .fell          { oopsOverlay }
                 if phase == .levelComplete { winOverlay }
+
+                // Out-of-lives overlay — shown when the player tries to play
+                // with zero lives.  Sits above the Oops/Win overlays.
+                if showOutOfLives { outOfLivesOverlay }
 
                 // Home button — rendered AFTER oops/win overlays so it stays
                 // tappable while they're showing.  Hidden during the welcome
@@ -215,6 +231,9 @@ struct BallGameView: View {
             }
             .onAppear {
                 arenaSize = geo.size
+                // Snapshot any accumulated regen ticks into stored `lives`
+                // before we read displayedLives in spawnBall.
+                gameState.commitRegen()
                 spawnBall(in: geo.size)
             }
             .onReceive(clock.$tickCount) { _ in
@@ -670,6 +689,211 @@ struct BallGameView: View {
         }
     }
 
+    // MARK: - Lives HUD (top-left)
+
+    /// 6-ball lives indicator with regen countdown.  Wrapped in TimelineView
+    /// so the countdown ticks every second and `displayedLives` stays fresh
+    /// without us having to manually call `commitRegen` on a timer.
+    private func livesHUDOverlay(safeTop: CGFloat) -> some View {
+        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    ForEach(0..<GameState.livesMax, id: \.self) { i in
+                        lifeIcon(filled: i < gameState.displayedLives,
+                                 gold: gameState.unlimitedLives)
+                    }
+                }
+                if let countdown = gameState.timeToNextLife() {
+                    Text("+1 in \(Self.formatCountdown(countdown))")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color(white: 0.50))
+                }
+            }
+            .padding(.leading, 18)
+            .padding(.top, max(safeTop, 8) + 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(livesAccessibilityLabel)
+        }
+    }
+
+    private var livesAccessibilityLabel: String {
+        if gameState.unlimitedLives {
+            return "Unlimited lives."
+        }
+        let count = gameState.displayedLives
+        var label = "\(count) of \(GameState.livesMax) lives."
+        if let next = gameState.timeToNextLife() {
+            label += " Next life in \(Self.formatCountdown(next))."
+        }
+        return label
+    }
+
+    /// One life slot.  Filled = available, outlined = used.
+    @ViewBuilder
+    private func lifeIcon(filled: Bool, gold: Bool) -> some View {
+        if filled {
+            Circle()
+                .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                .frame(width: 13, height: 13)
+                .overlay(
+                    // Tiny upper-left highlight to suggest a marble
+                    Circle()
+                        .fill(Color.white.opacity(0.55))
+                        .frame(width: 4, height: 4)
+                        .offset(x: -2.5, y: -2.5)
+                )
+                .overlay(
+                    Circle().stroke(Color.black.opacity(0.40), lineWidth: 0.6)
+                )
+                .shadow(color: Color.black.opacity(0.22), radius: 1.5, y: 1)
+        } else {
+            Circle()
+                .stroke(Color(white: 0.40).opacity(0.7), lineWidth: 0.9)
+                .frame(width: 13, height: 13)
+        }
+    }
+
+    private static let redLifeGradient = LinearGradient(
+        colors: [
+            Color(red: 1.00, green: 0.32, blue: 0.32),
+            Color(red: 0.78, green: 0.14, blue: 0.14),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+    private static let goldLifeGradient = LinearGradient(
+        colors: [
+            Color(red: 1.00, green: 0.86, blue: 0.36),
+            Color(red: 0.93, green: 0.65, blue: 0.10),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    private static func formatCountdown(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(ceil(seconds)))
+        return String(format: "%d:%02d", s / 60, s % 60)
+    }
+
+    // MARK: - Out of lives overlay
+
+    private var outOfLivesOverlay: some View {
+        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+            ZStack {
+                Color.black.opacity(0.78).ignoresSafeArea()
+
+                VStack(spacing: 22) {
+                    Spacer()
+
+                    VStack(spacing: 6) {
+                        Text("Out of Lives")
+                            .font(.system(size: 36, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("Lives refill 1 every 10 minutes.")
+                            .font(.system(size: 14, weight: .regular, design: .rounded))
+                            .foregroundStyle(Color(white: 0.70))
+                    }
+
+                    HStack(spacing: 8) {
+                        ForEach(0..<GameState.livesMax, id: \.self) { i in
+                            lifeIcon(filled: i < gameState.displayedLives, gold: false)
+                                .scaleEffect(1.6)
+                        }
+                    }
+                    .padding(.vertical, 6)
+
+                    if let countdown = gameState.timeToNextLife() {
+                        Text("Next life in \(Self.formatCountdown(countdown))")
+                            .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color(white: 0.92))
+                    }
+
+                    Spacer()
+
+                    VStack(spacing: 10) {
+                        // Play Now appears when a regen tick has filled a life.
+                        if gameState.displayedLives > 0 {
+                            Button {
+                                gameState.commitRegen()
+                                withAnimation(.easeInOut(duration: 0.28)) {
+                                    showOutOfLives = false
+                                }
+                                spawnBall(in: arenaSize)
+                            } label: {
+                                Text("Play Now")
+                                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color.white)
+                                    )
+                            }
+                        }
+
+                        // Placeholder action — Watch Ad (real wiring in 4i).
+                        Button {
+                            livesPlaceholderMessage = "Rewarded video ads launch with the next update.\n\nFor now, lives refill 1 every 10 minutes — or play tutorial levels (1-10) which don't consume lives."
+                            showLivesPlaceholderAlert = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "play.rectangle.fill")
+                                Text("Watch ad — +1 life")
+                            }
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.92))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.18))
+                            )
+                        }
+
+                        // Placeholder action — Buy Lives (real wiring in 4h).
+                        Button {
+                            livesPlaceholderMessage = "Life and unlimited-lives purchases launch with the next update.\n\nFor now, lives refill 1 every 10 minutes — or play tutorial levels (1-10) which don't consume lives."
+                            showLivesPlaceholderAlert = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "cart.fill")
+                                Text("Buy lives")
+                            }
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.92))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.18))
+                            )
+                        }
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = false }
+                            nav.goHome()
+                        } label: {
+                            Text("Quit to Home")
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color(red: 0.95, green: 0.36, blue: 0.36))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 40)
+                }
+                .padding(.horizontal, 24)
+            }
+        }
+        .alert("Coming soon", isPresented: $showLivesPlaceholderAlert) {
+            Button("Got it", role: .cancel) { }
+        } message: {
+            Text(livesPlaceholderMessage)
+        }
+        .transition(.opacity)
+    }
+
     private var oopsOverlay: some View {
         ZStack {
             Color.black.opacity(0.52).ignoresSafeArea()
@@ -983,6 +1207,17 @@ struct BallGameView: View {
     // MARK: - Game logic
 
     private func spawnBall(in size: CGSize) {
+        // Lives gate — non-tutorial levels require a life to attempt.
+        // If the player tries to spawn with zero lives, show the
+        // out-of-lives overlay instead.
+        if !gameState.isTutorialLevel(gameState.currentLevel),
+           !gameState.unlimitedLives,
+           gameState.displayedLives <= 0 {
+            withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }
+            return
+        }
+        showOutOfLives = false
+
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level
         coinsPickedThisAttempt = []
@@ -1110,6 +1345,11 @@ struct BallGameView: View {
         // Skip screen shake under Reduce Motion — sharp translation can
         // trigger discomfort for motion-sensitive users.
         if !reduceMotion { shakeTrigger &+= 1 }
+
+        // Lives consumption — tutorial (L1-10) is exempt.
+        if !gameState.isTutorialLevel(gameState.currentLevel) {
+            gameState.consumeLife()
+        }
     }
 
     private func fireCoinPickup() {

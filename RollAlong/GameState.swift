@@ -47,6 +47,33 @@ final class GameState: ObservableObject {
         didSet { UserDefaults.standard.set(highestUnlocked, forKey: "ra_highestUnlocked") }
     }
 
+    // ── Lives system (Sprint 4c) ───────────────────────────────────────────
+    // lives             : stored count, 0…6.  May be stale w.r.t. regen —
+    //                     use displayedLives for the live value.
+    // lastLifeLostAt    : timestamp of the most recent life consumption.
+    //                     Drives regen.  nil when lives == max.
+    // unlimitedLives    : true if the $20 unlimited subscription is active.
+    //                     Set by the StoreKit layer in a later PR.
+    static let livesMax: Int = 6
+    static let livesRegenInterval: TimeInterval = 600   // 10 minutes
+    static let tutorialLevelCount: Int = 10             // L1-10 don't consume lives
+
+    @Published var lives: Int {
+        didSet { UserDefaults.standard.set(lives, forKey: "ra_lives") }
+    }
+    @Published var lastLifeLostAt: Date? {
+        didSet {
+            if let d = lastLifeLostAt {
+                UserDefaults.standard.set(d, forKey: "ra_lastLifeLostAt")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "ra_lastLifeLostAt")
+            }
+        }
+    }
+    @Published var unlimitedLives: Bool {
+        didSet { UserDefaults.standard.set(unlimitedLives, forKey: "ra_unlimitedLives") }
+    }
+
     init() {
         let saved = UserDefaults.standard.integer(forKey: "ra_level")
         currentLevel = saved > 0 ? saved : 1
@@ -63,6 +90,12 @@ final class GameState: ObservableObject {
         collectedCoins  = Self.loadSetDict(key: "ra_collectedCoins")
         let unlocked    = UserDefaults.standard.integer(forKey: "ra_highestUnlocked")
         highestUnlocked = max(1, unlocked)
+
+        // Lives — default to a full bar.  `as? Int ?? Self.livesMax` covers
+        // the case where no key has been written yet (fresh install).
+        lives          = UserDefaults.standard.object(forKey: "ra_lives") as? Int ?? Self.livesMax
+        lastLifeLostAt = UserDefaults.standard.object(forKey: "ra_lastLifeLostAt") as? Date
+        unlimitedLives = UserDefaults.standard.bool(forKey: "ra_unlimitedLives")
     }
 
     // MARK: - Level progression
@@ -115,6 +148,77 @@ final class GameState: ObservableObject {
     func isUnlocked(_ level: Int) -> Bool       { level <= highestUnlocked }
     var totalStars: Int                          { bestStars.values.reduce(0, +) }
     var totalCoins: Int                          { collectedCoins.values.reduce(0) { $0 + $1.count } }
+
+    // MARK: - Lives system
+
+    /// True iff this level number consumes a life on failure.  Tutorial
+    /// (L1-10) is exempt so new players can learn without pressure.
+    func isTutorialLevel(_ level: Int) -> Bool { level <= Self.tutorialLevelCount }
+
+    /// Current life count including any regen that has accumulated since
+    /// `lastLifeLostAt`.  Read this for display + gating.  Stored `lives`
+    /// only updates when `commitRegen()` or `consumeLife()` is called.
+    var displayedLives: Int {
+        if unlimitedLives { return Self.livesMax }
+        guard lives < Self.livesMax, let last = lastLifeLostAt else { return lives }
+        let elapsed = Date.now.timeIntervalSince(last)
+        let regenCount = Int(elapsed / Self.livesRegenInterval)
+        return min(Self.livesMax, lives + regenCount)
+    }
+
+    /// Seconds until the next regen tick, or nil if not regenerating.
+    func timeToNextLife() -> TimeInterval? {
+        if unlimitedLives { return nil }
+        guard displayedLives < Self.livesMax, let last = lastLifeLostAt else { return nil }
+        let elapsed = Date.now.timeIntervalSince(last)
+        let untilNext = Self.livesRegenInterval - elapsed.truncatingRemainder(dividingBy: Self.livesRegenInterval)
+        return untilNext
+    }
+
+    /// Promote any accumulated regen ticks into the stored `lives` counter
+    /// and advance `lastLifeLostAt` to the most recent tick boundary.
+    /// Idempotent — call any time you want to snapshot the regen state
+    /// (e.g. before consuming a life so we don't double-count).
+    func commitRegen() {
+        if unlimitedLives {
+            lives = Self.livesMax
+            lastLifeLostAt = nil
+            return
+        }
+        guard lives < Self.livesMax, let last = lastLifeLostAt else { return }
+        let elapsed = Date.now.timeIntervalSince(last)
+        let regenCount = Int(elapsed / Self.livesRegenInterval)
+        guard regenCount > 0 else { return }
+        lives = min(Self.livesMax, lives + regenCount)
+        if lives >= Self.livesMax {
+            lastLifeLostAt = nil
+        } else {
+            lastLifeLostAt = last.addingTimeInterval(TimeInterval(regenCount) * Self.livesRegenInterval)
+        }
+    }
+
+    /// Decrement lives by 1.  Returns true if a life was consumed, false if
+    /// the player was already at zero.  Unlimited-lives subscribers always
+    /// return true without decrementing.
+    @discardableResult
+    func consumeLife() -> Bool {
+        if unlimitedLives { return true }
+        commitRegen()
+        if lives <= 0 { return false }
+        lives -= 1
+        if lastLifeLostAt == nil { lastLifeLostAt = .now }
+        return true
+    }
+
+    /// Award lives (e.g. from rewarded ad or IAP).  Caps at livesMax.
+    func addLives(_ count: Int) {
+        if unlimitedLives { return }
+        commitRegen()
+        lives = min(Self.livesMax, lives + count)
+        if lives >= Self.livesMax {
+            lastLifeLostAt = nil
+        }
+    }
 
     // MARK: - Persistence helpers (UserDefaults can't store [Int: T] directly)
 
