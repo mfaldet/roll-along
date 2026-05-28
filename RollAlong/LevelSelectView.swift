@@ -56,18 +56,20 @@ struct LevelSelectView: View {
                 cap:   "/ \(totalLevels * 3)",
                 label: "Stars"
             )
+            // Spendable coin balance (currency).  Earned from level pickups
+            // + new-star awards.  Spend in the cosmetic shop (Sprint 4e).
             statBlock(
                 icon: "circle.fill",
                 tint: Color(red: 0.93, green: 0.65, blue: 0.10),
-                value: "\(gameState.totalCoins)",
-                cap:   "/ \(totalLevels * 3)",
+                value: "\(gameState.coinBalance)",
+                cap:   nil,
                 label: "Coins"
             )
         }
         .padding(.top, 8)
     }
 
-    private func statBlock(icon: String, tint: Color, value: String, cap: String, label: String) -> some View {
+    private func statBlock(icon: String, tint: Color, value: String, cap: String?, label: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
@@ -82,9 +84,11 @@ struct LevelSelectView: View {
                 Text(value)
                     .font(.system(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Text(cap)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.45))
+                if let cap {
+                    Text(cap)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
+                }
             }
         }
         .padding(14)

@@ -130,6 +130,12 @@ struct HomeView: View {
                     Spacer().frame(height: 48)
                 }
 
+                // Coin balance pill — top-right, always visible (except
+                // during the onboarding overlay).
+                if gameState.seenOnboarding {
+                    coinBalancePill
+                }
+
                 // First-launch onboarding overlay
                 if !gameState.seenOnboarding {
                     onboardingOverlay
@@ -278,6 +284,54 @@ struct HomeView: View {
                                startPoint: .top, endPoint: .bottom)
             )
             .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
+    }
+
+    /// Floating coin-balance pill in the top-right corner.  Tappable —
+    /// tapping it takes you straight to the cosmetic shop (Sprint 4e).
+    /// Until then, it shows a "Shop opens in next update" feedback alert.
+    private var coinBalancePill: some View {
+        VStack {
+            HStack {
+                Spacer()
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.00, green: 0.88, blue: 0.40),
+                                    Color(red: 0.93, green: 0.65, blue: 0.10),
+                                ],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                        .overlay(
+                            Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6)
+                        )
+                        .frame(width: 14, height: 14)
+
+                    Text("\(gameState.coinBalance)")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: Double(gameState.coinBalance)))
+                        .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color(white: 0.14))
+                        .overlay(
+                            Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
+                        )
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            Spacer()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(gameState.coinBalance) coins")
     }
 
     private var liveBall: some View {
