@@ -44,6 +44,7 @@ private enum BorderPhase: Equatable {
 
 struct BallGameView: View {
     @EnvironmentObject var gameState: GameState
+    @EnvironmentObject var nav:       Navigator
     @Environment(\.dismiss) var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -57,7 +58,7 @@ struct BallGameView: View {
 
     // Per-attempt progression state
     @State private var levelStartTime:        Date?    = nil
-    @State private var coinPickedThisAttempt: Int?     = nil    // coin index 0…2
+    @State private var coinsPickedThisAttempt: Set<Int> = []    // coin indices 0…2 picked this attempt
 
     // Graphite trail (Paper world).  Holds recent ball positions so we can
     // render a fading lead streak behind the ball.  Cleared each spawn.
@@ -68,7 +69,7 @@ struct BallGameView: View {
     // Last-completion results (for the win overlay)
     @State private var lastClearedTime:    TimeInterval = 0
     @State private var lastClearedStars:   Int          = 0
-    @State private var lastClearedCoinIdx: Int?         = nil
+    @State private var lastClearedCoinIndices: Set<Int> = []
     @State private var lastClearedIsNewBestStars: Bool  = false
 
     // Animation-polish triggers (keyframe animators key off these)
@@ -179,12 +180,20 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
-                // HUD
+                // HUD — just the level label
                 hud(safeBottom: geo.safeAreaInsets.bottom)
 
                 // Overlays
                 if phase == .fell          { oopsOverlay }
                 if phase == .levelComplete { winOverlay }
+
+                // Home button — rendered AFTER oops/win overlays so it stays
+                // tappable while they're showing.  Hidden during the welcome
+                // moment so it doesn't compete for attention there.
+                if !showWelcomeMoment {
+                    homeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
+                }
+
                 if showWelcomeMoment       { welcomeMomentOverlay }
 
                 // Screen border — always on top, colour reacts to game state
@@ -256,16 +265,15 @@ struct BallGameView: View {
         }
     }
 
-    /// Renders coins for this level that haven't been picked up THIS attempt.
-    /// Coins already banked overall (across past attempts) render dimmed.
+    /// Renders coins for this level.  Coins picked up THIS attempt disappear
+    /// instantly so the player gets immediate feedback.  Coins already banked
+    /// across past attempts render dimmed but visible (signal that this slot
+    /// has already been collected).
     private func coinLayer(geo: GeometryProxy) -> some View {
         let banked = gameState.coinsCollected(for: gameState.currentLevel)
         return ForEach(Array(layout.coins.enumerated()), id: \.offset) { idx, norm in
-            // Hide a coin if it's the one just picked up this attempt.
-            let pickedThisAttempt = (coinPickedThisAttempt == idx)
-            let isBanked = banked.contains(idx)
-            if !pickedThisAttempt {
-                coinView(banked: isBanked, index: idx)
+            if !coinsPickedThisAttempt.contains(idx) {
+                coinView(banked: banked.contains(idx), index: idx)
                     .position(
                         x: norm.x * geo.size.width,
                         y: norm.y * geo.size.height
@@ -618,37 +626,46 @@ struct BallGameView: View {
             .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
     }
 
+    /// Bottom HUD — just the LEVEL X label.  The home button is rendered
+    /// separately by `homeButtonOverlay` so it can sit ABOVE the Oops / Win
+    /// overlays and remain tappable while those are showing.
     private func hud(safeBottom: CGFloat) -> some View {
         VStack {
             Spacer()
-            ZStack(alignment: .center) {
-                Text("LEVEL \(gameState.currentLevel)")
-                    .font(.system(size: 12, weight: .ultraLight, design: .monospaced))
-                    .kerning(4)
-                    .foregroundStyle(Color(white: 0.40))
-                    .frame(maxWidth: .infinity, alignment: .center)
+            Text("LEVEL \(gameState.currentLevel)")
+                .font(.system(size: 12, weight: .ultraLight, design: .monospaced))
+                .kerning(4)
+                .foregroundStyle(Color(white: 0.40))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 16)
+                .padding(.bottom, max(safeBottom, 12) + 8)
+        }
+    }
 
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "house.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color(white: 0.38))
-                            .frame(width: 34, height: 34)
-                            .background(
-                                Circle()
-                                    .fill(Color(white: 1.0, opacity: 0.72))
-                                    .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
-                            )
-                    }
-                    .accessibilityLabel("Quit to home screen")
-                    .accessibilityHint("Returns to the main menu. No level progress is lost.")
-                    Spacer()
+    /// Floating home button — always tappable, even when Oops / Win overlays
+    /// are showing.  Rendered in its own layer so it sits on top.  Hidden
+    /// during the one-time "Roll Along friend!" welcome moment so it doesn't
+    /// compete for the player's attention.
+    private func homeButtonOverlay(safeBottom: CGFloat) -> some View {
+        VStack {
+            Spacer()
+            HStack {
+                Button { nav.goHome() } label: {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(white: 0.38))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(Color(white: 1.0, opacity: 0.85))
+                                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                        )
                 }
+                .accessibilityLabel("Quit to home screen")
+                .accessibilityHint("Returns to the main menu. No level progress is lost.")
+                Spacer()
             }
             .padding(.leading, 22)
-            .padding(.trailing, 16)
             .padding(.bottom, max(safeBottom, 12) + 8)
         }
     }
@@ -707,31 +724,61 @@ struct BallGameView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(lastClearedStars) of 3 stars earned")
 
-                // Time
-                Text(String(format: "%.2fs", lastClearedTime))
-                    .font(.system(size: 18, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color(white: 0.85))
-                    .accessibilityLabel(String(format: "Completed in %.2f seconds", lastClearedTime))
-
-                // Coin
-                if let idx = lastClearedCoinIdx {
-                    HStack(spacing: 8) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 18))
+                // Time + personal best
+                VStack(spacing: 4) {
+                    Text(String(format: "%.2fs", lastClearedTime))
+                        .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    if let best = gameState.time(for: gameState.currentLevel),
+                       best < lastClearedTime + 0.001 {
+                        // Only show "Best" if it's actually different from the
+                        // current run, otherwise we'd just be repeating.
+                        let isNewBest = abs(best - lastClearedTime) < 0.01
+                        Text(isNewBest
+                             ? "New best!"
+                             : String(format: "Best  %.2fs", best))
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.00, green: 0.84, blue: 0.30),
-                                        Color(red: 0.93, green: 0.65, blue: 0.10),
-                                    ],
-                                    startPoint: .top, endPoint: .bottom
-                                )
+                                isNewBest
+                                    ? Color(red: 1.00, green: 0.84, blue: 0.30)
+                                    : Color(white: 0.55)
                             )
-                        Text("Coin \(idx + 1) collected")
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(red: 1.00, green: 0.88, blue: 0.55))
                     }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    String(format: "Completed in %.2f seconds.", lastClearedTime)
+                    + (gameState.time(for: gameState.currentLevel).map {
+                        String(format: " Best %.2f seconds.", $0)
+                    } ?? "")
+                )
+
+                // Coins row — shows all 3 slots, filled gold for picked this attempt
+                HStack(spacing: 10) {
+                    ForEach(0..<3) { i in
+                        if lastClearedCoinIndices.contains(i) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.00, green: 0.88, blue: 0.40),
+                                            Color(red: 0.93, green: 0.65, blue: 0.10),
+                                        ],
+                                        startPoint: .top, endPoint: .bottom
+                                    )
+                                )
+                                .shadow(color: Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.5),
+                                        radius: 6)
+                        } else {
+                            Image(systemName: "circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(Color(white: 0.30))
+                        }
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(lastClearedCoinIndices.count) of 3 coins collected")
 
                 // Actions
                 VStack(spacing: 12) {
@@ -747,8 +794,11 @@ struct BallGameView: View {
                             )
                     }
                     HStack(spacing: 12) {
-                        Button { spawnBall(in: arenaSize) } label: {
-                            Text("Replay")
+                        // Levels button — LEFT.  Takes the player to the Level
+                        // Select grid (not home).  Goes via the Navigator so
+                        // the path is correctly reset.
+                        Button { nav.goToLevels() } label: {
+                            Text("Levels")
                                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color(white: 0.85))
                                 .frame(maxWidth: .infinity)
@@ -758,8 +808,10 @@ struct BallGameView: View {
                                         .fill(Color(white: 0.20))
                                 )
                         }
-                        Button { dismiss() } label: {
-                            Text("Levels")
+                        // Replay button — RIGHT.  Re-runs the current level
+                        // without leaving BallGameView.
+                        Button { spawnBall(in: arenaSize) } label: {
+                            Text("Replay")
                                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color(white: 0.85))
                                 .frame(maxWidth: .infinity)
@@ -933,7 +985,7 @@ struct BallGameView: View {
     private func spawnBall(in size: CGSize) {
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level
-        coinPickedThisAttempt = nil
+        coinsPickedThisAttempt = []
         trailPoints.removeAll(keepingCapacity: true)
         levelStartTime = .now
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
@@ -991,19 +1043,18 @@ struct BallGameView: View {
             if incoming > bounceVelocityThreshold { fireWallHit(axis: .vertical, force: incoming) }
         }
 
-        // Coin pickup (only one per attempt, and only if not already banked)
-        if coinPickedThisAttempt == nil {
-            let banked = gameState.coinsCollected(for: gameState.currentLevel)
-            for (idx, c) in layout.coins.enumerated() {
-                if banked.contains(idx) { continue }
-                let cx = c.x * geoSize.width
-                let cy = c.y * geoSize.height
-                let dist = hypot(b.position.x - cx, b.position.y - cy)
-                if dist < ballRadius + coinRadius {
-                    coinPickedThisAttempt = idx
-                    fireCoinPickup()
-                    break
-                }
+        // Coin pickup — collect any not yet picked this attempt + not banked.
+        // Multiple coins can be collected per run.
+        let banked = gameState.coinsCollected(for: gameState.currentLevel)
+        for (idx, c) in layout.coins.enumerated() {
+            if coinsPickedThisAttempt.contains(idx) { continue }
+            if banked.contains(idx) { continue }
+            let cx = c.x * geoSize.width
+            let cy = c.y * geoSize.height
+            let dist = hypot(b.position.x - cx, b.position.y - cy)
+            if dist < ballRadius + coinRadius {
+                coinsPickedThisAttempt.insert(idx)
+                fireCoinPickup()
             }
         }
 
@@ -1078,16 +1129,16 @@ struct BallGameView: View {
         let level   = gameState.currentLevel
         let prevStars = gameState.stars(for: level)
 
-        lastClearedTime    = elapsed
-        lastClearedStars   = stars
-        lastClearedCoinIdx = coinPickedThisAttempt
+        lastClearedTime          = elapsed
+        lastClearedStars         = stars
+        lastClearedCoinIndices   = coinsPickedThisAttempt
         lastClearedIsNewBestStars = stars > prevStars
 
         gameState.recordResult(
             level: level,
             stars: stars,
             time:  elapsed,
-            coinIndex: coinPickedThisAttempt
+            coinIndices: coinsPickedThisAttempt
         )
 
         withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
@@ -1343,47 +1394,54 @@ struct BankedCoinView: View {
 }
 
 // ---------------------------------------------------------------------------
-// SpinningCoinView — animated 3D-illusion spinning gold coin.
+// SpinningCoinView — minted gold coin with real visible thickness.
 //
-// Built from two layered shapes that together fake a coin with real physical
-// thickness:
+// Built from two layered shapes:
 //
-//   • Rim  — a vertical Capsule rendered BEHIND the face. Constant width
-//            (~18% of the coin diameter), constant height (same as the
-//            coin).  This is the "thickness" of the disc — the side you'd
-//            see if you held a real coin edge-on.
-//   • Face — a gold Ellipse on top of the rim, scaled in X by |sin(t)| so
-//            it foreshortens from a full circle (face-on) to a thin sliver
-//            and eventually disappears (edge-on).
+//   • RIM  — a vertical Capsule rendered BEHIND the face.  Wide (~30% of
+//            the coin diameter) so the thickness reads even at moderate
+//            spin angles.  Decorated with prominent milled grooves —
+//            sharp, evenly-spaced horizontal notches that look like the
+//            knurled edge of a real coin.
+//   • FACE — a gold Ellipse on top, scales in X by |sin(t)| from face-on
+//            (full circle) to edge-on (gone).  Decorated with a recessed
+//            inner ring + a 5-pointed minted star at the centre.
 //
-// When the face shrinks below the rim's width, the rim becomes visible
-// poking out from behind — that's the "edge revealed" moment of the spin.
-// Combined with a gentle vertical bob, the coin reads as 3D.
-//
-// Phased per coin so adjacent coins are never all edge-on at the same time.
+// Phased per coin so adjacent coins never go edge-on at the same time.
 // ---------------------------------------------------------------------------
 struct SpinningCoinView: View {
     let size:  CGFloat
     let phase: Double
 
-    /// Rim width as a fraction of the coin diameter.  ~18% gives a chunky,
-    /// readable thickness without looking like a hockey puck.
-    private var rimWidth: CGFloat { size * 0.20 }
+    /// Rim width as a fraction of the coin diameter.  ~30% makes the
+    /// thickness visible even at moderate spin angles.
+    private var rimWidth: CGFloat { size * 0.30 }
 
+    /// Face gradient — bright top, deep amber bottom.
     private static let goldenFace = LinearGradient(
-        colors: [
-            Color(red: 1.00, green: 0.92, blue: 0.48),
-            Color(red: 0.93, green: 0.65, blue: 0.10),
+        stops: [
+            .init(color: Color(red: 1.00, green: 0.94, blue: 0.55), location: 0.00),
+            .init(color: Color(red: 0.97, green: 0.79, blue: 0.22), location: 0.45),
+            .init(color: Color(red: 0.78, green: 0.50, blue: 0.06), location: 1.00),
         ],
         startPoint: .top, endPoint: .bottom
     )
-    /// Rim gradient: mid-gold at top + bottom, darker in the middle band.
-    /// Mimics the light/shadow on a cylinder side lit from above and below.
+    /// Slightly darker version of the face gradient — used for the
+    /// recessed inner ring so it reads as "etched into" the face.
+    private static let goldenFaceDeep = LinearGradient(
+        stops: [
+            .init(color: Color(red: 0.85, green: 0.70, blue: 0.18), location: 0.00),
+            .init(color: Color(red: 0.72, green: 0.50, blue: 0.10), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+    /// Rim gradient: lit at top + bottom, dark in the middle band.
+    /// Mimics the light/shadow on a cylinder side.
     private static let rimGradient = LinearGradient(
         stops: [
-            .init(color: Color(red: 0.68, green: 0.48, blue: 0.08), location: 0.00),
-            .init(color: Color(red: 0.42, green: 0.27, blue: 0.04), location: 0.50),
-            .init(color: Color(red: 0.66, green: 0.46, blue: 0.07), location: 1.00),
+            .init(color: Color(red: 0.78, green: 0.55, blue: 0.10), location: 0.00),
+            .init(color: Color(red: 0.40, green: 0.25, blue: 0.03), location: 0.50),
+            .init(color: Color(red: 0.76, green: 0.53, blue: 0.09), location: 1.00),
         ],
         startPoint: .top, endPoint: .bottom
     )
@@ -1391,8 +1449,8 @@ struct SpinningCoinView: View {
     var body: some View {
         TimelineView(.animation) { tl in
             let t       = tl.date.timeIntervalSinceReferenceDate
-            let spinRaw = abs(sin(t * 2.6 + phase))          // 0…1 (no clamp)
-            let bob     = sin(t * 2.2 + phase * 0.7) * 1.6    // ±1.6pt
+            let spinRaw = abs(sin(t * 2.6 + phase))
+            let bob     = sin(t * 2.2 + phase * 0.7) * 1.6
 
             coinBody(spinRaw: spinRaw)
                 .offset(y: bob)
@@ -1401,63 +1459,118 @@ struct SpinningCoinView: View {
 
     private func coinBody(spinRaw: Double) -> some View {
         ZStack {
-            // RIM — the visible thickness.  Behind everything.  Constant size.
-            // Slightly tapered ends via Capsule's rounded caps so the rim
-            // reads as a cylindrical edge rather than a flat strip.
-            Capsule()
-                .fill(Self.rimGradient)
-                .overlay(
-                    Capsule()
-                        .stroke(Color.black.opacity(0.45), lineWidth: 0.8)
-                )
-                // Subtle horizontal "milled" lines on the rim — adds metallic
-                // texture.  Faint enough not to distract.
-                .overlay(milledTexture)
-                .frame(width: rimWidth, height: size * 0.96)
+            // RIM with milled grooves and bevelled outline
+            rimLayer
+                .frame(width: rimWidth, height: size * 0.97)
 
-            // FACE — gold ellipse on top, scales in X with the spin.
-            // Goes all the way to zero so the rim shows through fully at
-            // edge-on.  Drop-shadow gives a hint of depth above the rim.
+            // FACE with minted detail, scaled in X by the spin
             faceLayer(spinRaw: spinRaw)
                 .frame(width: size, height: size)
                 .scaleEffect(x: CGFloat(spinRaw), y: 1.0)
         }
     }
 
-    /// Tiny darker hatch marks running across the rim — fakes the milled
-    /// edge of a coin.  Rendered with low opacity so it's only readable
-    /// at intermediate spin angles, not distracting at face-on.
-    private var milledTexture: some View {
+    // MARK: - Rim
+
+    private var rimLayer: some View {
+        Capsule()
+            .fill(Self.rimGradient)
+            .overlay(milledGrooves)
+            .overlay(
+                Capsule().stroke(Color.black.opacity(0.55), lineWidth: 0.9)
+            )
+            // Subtle inner shadow at the top to suggest the recessed
+            // junction between face and rim.
+            .overlay(
+                Capsule()
+                    .stroke(Color.black.opacity(0.30), lineWidth: 0.8)
+                    .blur(radius: 0.6)
+                    .offset(y: 0.5)
+                    .mask(Capsule())
+            )
+    }
+
+    /// Prominent milled (knurled) edge — many short horizontal notches
+    /// evenly spaced down the rim.  This is the most "minted-looking"
+    /// detail on the whole coin.
+    private var milledGrooves: some View {
         GeometryReader { geo in
-            let count = 14
-            ForEach(0..<count, id: \.self) { i in
+            let notchCount = 22
+            ForEach(0..<notchCount, id: \.self) { i in
                 Rectangle()
-                    .fill(Color.black.opacity(0.18))
-                    .frame(width: geo.size.width, height: 0.6)
-                    .offset(y: geo.size.height * CGFloat(i) / CGFloat(count - 1))
+                    .fill(Color.black.opacity(0.45))
+                    .frame(width: geo.size.width * 0.85, height: 0.9)
+                    .offset(x: geo.size.width * 0.075,
+                            y: geo.size.height * CGFloat(i) / CGFloat(notchCount - 1))
+            }
+            // Highlight ridges between notches (every other slot)
+            ForEach(0..<notchCount, id: \.self) { i in
+                Rectangle()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: geo.size.width * 0.85, height: 0.5)
+                    .offset(x: geo.size.width * 0.075,
+                            y: geo.size.height * CGFloat(i) / CGFloat(notchCount - 1) + 1.0)
             }
         }
         .clipShape(Capsule())
         .allowsHitTesting(false)
     }
 
+    // MARK: - Face
+
     private func faceLayer(spinRaw: Double) -> some View {
         ZStack {
             // Base face
             Ellipse().fill(Self.goldenFace)
 
-            // Rim outline on the face itself
-            Ellipse().stroke(Color.black.opacity(0.40), lineWidth: 1)
+            // Outer face stroke
+            Ellipse().stroke(Color.black.opacity(0.45), lineWidth: 1)
 
-            // Inner highlight — brighter when face-on, fades as it rotates
+            // INNER RECESSED RING — the most "minted" cue.  A second
+            // ellipse drawn slightly smaller with the deeper gold gradient,
+            // outlined in dark to read as an etched border.
+            Ellipse()
+                .fill(Self.goldenFaceDeep)
+                .scaleEffect(0.78)
+                .overlay(
+                    Ellipse()
+                        .stroke(Color.black.opacity(0.38), lineWidth: 0.9)
+                        .scaleEffect(0.78)
+                )
+
+            // Centred minted star — gives the coin a unique mark.
+            MintedStar(points: 5, innerRatio: 0.45)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.55, green: 0.34, blue: 0.04),
+                            Color(red: 0.30, green: 0.18, blue: 0.02),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: size * 0.42, height: size * 0.42)
+                .overlay(
+                    MintedStar(points: 5, innerRatio: 0.45)
+                        .stroke(Color.black.opacity(0.45), lineWidth: 0.6)
+                        .frame(width: size * 0.42, height: size * 0.42)
+                )
+                // A tiny white highlight on the upper-left edge of the star
+                // sells the embossed, raised feel.
+                .overlay(
+                    MintedStar(points: 5, innerRatio: 0.45)
+                        .stroke(Color.white.opacity(0.45 * spinRaw), lineWidth: 0.5)
+                        .frame(width: size * 0.41, height: size * 0.41)
+                        .offset(x: -0.5, y: -0.5)
+                )
+
+            // Inner highlight crescent on the face — catches the "light"
             Ellipse()
                 .stroke(Color.white.opacity(0.55 * spinRaw), lineWidth: 1.0)
-                .scaleEffect(0.62)
-                .offset(x: -size * 0.09, y: -size * 0.09)
+                .scaleEffect(0.72)
+                .offset(x: -size * 0.10, y: -size * 0.10)
 
-            // Specular shine sweep — soft white vertical stripe that
-            // travels across the face as it rotates.  Most prominent
-            // when face-on, gone by edge-on.
+            // Specular sweep — vertical stripe that travels across the face
             shine(spinRaw: spinRaw)
         }
     }
@@ -1472,11 +1585,44 @@ struct SpinningCoinView: View {
                     startPoint: .leading, endPoint: .trailing
                 )
             )
-            .frame(width: size * 0.35, height: size)
+            .frame(width: size * 0.32, height: size)
             .offset(x: CGFloat(spinRaw - 0.5) * size * 0.7)
             .clipShape(Ellipse())
             .blendMode(.plusLighter)
             .allowsHitTesting(false)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MintedStar — 5-pointed star shape used on the coin face.
+// Drawn as a Path with explicit outer/inner radii so the star reads
+// crisp at any size.
+// ---------------------------------------------------------------------------
+struct MintedStar: Shape {
+    let points: Int
+    let innerRatio: CGFloat   // inner radius / outer radius (~0.4-0.5)
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outerR = min(rect.width, rect.height) / 2
+        let innerR = outerR * innerRatio
+        let totalPoints = points * 2
+        let step = .pi * 2 / Double(totalPoints)
+        // Start at the top point, pointing up
+        let startAngle = -Double.pi / 2
+
+        for i in 0..<totalPoints {
+            let r = i.isMultiple(of: 2) ? outerR : innerR
+            let angle = startAngle + Double(i) * step
+            let pt = CGPoint(
+                x: center.x + CGFloat(cos(angle)) * r,
+                y: center.y + CGFloat(sin(angle)) * r
+            )
+            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+        }
+        path.closeSubpath()
+        return path
     }
 }
 
