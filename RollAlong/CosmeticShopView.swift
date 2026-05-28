@@ -262,17 +262,52 @@ struct CosmeticShopView: View {
         if equipped { return }
         if owned {
             equip(item)
+            AnalyticsClient.shared.track(
+                "cosmetic_equipped",
+                properties: [
+                    "category": .string(category.rawValue),
+                    "item":     .string(item.rawValue),
+                    "tier":     .string(item.tier.rawValue),
+                ]
+            )
             return
         }
         // Buy + equip
         if !canAfford(item) {
+            AnalyticsClient.shared.track(
+                "cosmetic_purchase_blocked",
+                properties: [
+                    "category":  .string(category.rawValue),
+                    "item":      .string(item.rawValue),
+                    "cost":      .int(item.coinCost),
+                    "balance":   .int(gameState.coinBalance),
+                    "shortfall": .int(item.coinCost - gameState.coinBalance),
+                ]
+            )
             alertMessage = "You need \(item.coinCost - gameState.coinBalance) more coins.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack (coming with the next update)."
             showAlert = true
             return
         }
         let bought = gameState.purchase(item)
         if bought {
+            AnalyticsClient.shared.track(
+                "cosmetic_purchased",
+                properties: [
+                    "category": .string(category.rawValue),
+                    "item":     .string(item.rawValue),
+                    "tier":     .string(item.tier.rawValue),
+                    "cost":     .int(item.coinCost),
+                ]
+            )
             equip(item)
+            AnalyticsClient.shared.track(
+                "cosmetic_equipped",
+                properties: [
+                    "category":      .string(category.rawValue),
+                    "item":          .string(item.rawValue),
+                    "after_purchase": .bool(true),
+                ]
+            )
         }
     }
 

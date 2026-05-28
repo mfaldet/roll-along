@@ -1399,6 +1399,7 @@ struct BallGameView: View {
 
     private func dismissWelcomeMoment() {
         gameState.seenWelcomeMoment = true
+        AnalyticsClient.shared.track("welcome_moment_dismissed")
         gameState.advanceLevel()
         spawnBall(in: arenaSize)
         withAnimation(.easeInOut(duration: 0.32)) {
@@ -1431,6 +1432,16 @@ struct BallGameView: View {
             gameState.equippedMusic = m
         }
         gameState.seenTutorialReward = true
+        AnalyticsClient.shared.track(
+            "tutorial_reward_claimed",
+            properties: [
+                "ball":       .string(pickedBall?.rawValue       ?? ""),
+                "goal":       .string(pickedGoal?.rawValue       ?? ""),
+                "trail":      .string(pickedTrail?.rawValue      ?? ""),
+                "background": .string(pickedBackground?.rawValue ?? ""),
+                "music":      .string(pickedMusic?.rawValue      ?? ""),
+            ]
+        )
         withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = false }
         gameState.advanceLevel()
         spawnBall(in: arenaSize)
@@ -1461,6 +1472,15 @@ struct BallGameView: View {
         trailPoints.removeAll(keepingCapacity: true)
         levelStartTime = .now
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+
+        AnalyticsClient.shared.track(
+            "level_attempt",
+            properties: [
+                "tier":        .string(layout.tier.rawValue),
+                "is_tutorial": .bool(gameState.isTutorialLevel(gameState.currentLevel)),
+            ],
+            level: gameState.currentLevel
+        )
     }
 
     private func tick(geoSize: CGSize) {
@@ -1542,6 +1562,17 @@ struct BallGameView: View {
         if isInHole(position: b.position, size: geoSize) || b.position.x < -r || b.position.x > geoSize.width + r {
             ball = b
             fireFell()
+            let elapsed = levelStartTime.map { Date.now.timeIntervalSince($0) } ?? 0
+            AnalyticsClient.shared.track(
+                "level_fail",
+                properties: [
+                    "tier":          .string(layout.tier.rawValue),
+                    "time_to_fail":  .double(elapsed),
+                    "coins_picked":  .int(coinsPickedThisAttempt.count),
+                    "is_tutorial":   .bool(gameState.isTutorialLevel(gameState.currentLevel)),
+                ],
+                level: gameState.currentLevel
+            )
             withAnimation(.easeIn(duration: 0.22)) { phase = .fell }
             return
         }
@@ -1634,6 +1665,22 @@ struct BallGameView: View {
         if coinReward > 0 {
             gameState.addCoins(coinReward)
         }
+
+        AnalyticsClient.shared.track(
+            "level_complete",
+            properties: [
+                "tier":          .string(layout.tier.rawValue),
+                "time":          .double(elapsed),
+                "stars":         .int(stars),
+                "prev_stars":    .int(prevStars),
+                "new_stars":     .int(newStars),
+                "coins_picked":  .int(coinsPickedThisAttempt.count),
+                "coin_reward":   .int(coinReward),
+                "is_new_best":   .bool(stars > prevStars),
+                "is_tutorial":   .bool(gameState.isTutorialLevel(level)),
+            ],
+            level: level
+        )
 
         withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
     }
