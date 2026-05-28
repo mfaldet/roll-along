@@ -55,6 +55,15 @@ struct BallGameView: View {
     @State private var phase:              GamePhase = .playing
     @State private var arenaSize:          CGSize    = .zero
     @State private var showWelcomeMoment:  Bool      = false
+    @State private var showTutorialReward: Bool      = false
+
+    // Tutorial-reward picks (Sprint 4f).  One per category.  Modal blocks
+    // its Claim button until all five are non-nil.
+    @State private var pickedBall:       BallSkin?         = nil
+    @State private var pickedGoal:       GoalSkin?         = nil
+    @State private var pickedTrail:      TrailColor?       = nil
+    @State private var pickedBackground: BackgroundTheme?  = nil
+    @State private var pickedMusic:      MusicTrack?       = nil
 
     // Lives system (Sprint 4c)
     @State private var showOutOfLives:                Bool   = false
@@ -207,13 +216,15 @@ struct BallGameView: View {
                 if showOutOfLives { outOfLivesOverlay }
 
                 // Home button — rendered AFTER oops/win overlays so it stays
-                // tappable while they're showing.  Hidden during the welcome
-                // moment so it doesn't compete for attention there.
-                if !showWelcomeMoment {
+                // tappable while they're showing.  Hidden during the one-time
+                // welcome moment and tutorial reward modal so it doesn't
+                // compete for attention with those flows.
+                if !showWelcomeMoment && !showTutorialReward {
                     homeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
                 }
 
                 if showWelcomeMoment       { welcomeMomentOverlay }
+                if showTutorialReward      { tutorialRewardOverlay }
 
                 // Screen border — always on top, colour reacts to game state
                 screenBorder
@@ -1070,6 +1081,182 @@ struct BallGameView: View {
         .transition(.opacity)
     }
 
+    // MARK: - Tutorial reward modal (one-time, after first L10 clear)
+    //
+    // Awarded after the tutorial — player picks one .standard-tier item per
+    // category to keep for free.  Picked items are granted + equipped on
+    // Claim.
+
+    private var tutorialRewardOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.88).ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Title
+                VStack(spacing: 6) {
+                    Text("Tutorial Complete!")
+                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("Pick one free cosmetic from each category.")
+                        .font(.system(size: 14, weight: .regular, design: .rounded))
+                        .foregroundStyle(Color(white: 0.70))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 36)
+                .padding(.bottom, 18)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        rewardRow(label: "Ball",
+                                  items: BallSkin.allCases.filter { $0.tier == .standard },
+                                  selected: pickedBall,
+                                  onPick: { pickedBall = $0 })
+                        rewardRow(label: "Goal",
+                                  items: GoalSkin.allCases.filter { $0.tier == .standard },
+                                  selected: pickedGoal,
+                                  onPick: { pickedGoal = $0 })
+                        rewardRow(label: "Trail",
+                                  items: TrailColor.allCases.filter { $0.tier == .standard },
+                                  selected: pickedTrail,
+                                  onPick: { pickedTrail = $0 })
+                        rewardRow(label: "Background",
+                                  items: BackgroundTheme.allCases.filter { $0.tier == .standard },
+                                  selected: pickedBackground,
+                                  onPick: { pickedBackground = $0 })
+                        rewardRow(label: "Music",
+                                  items: MusicTrack.allCases.filter { $0.tier == .standard },
+                                  selected: pickedMusic,
+                                  onPick: { pickedMusic = $0 })
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 24)
+                }
+
+                Button {
+                    claimTutorialReward()
+                } label: {
+                    Text(tutorialPicksComplete ? "Claim 5 cosmetics" : "Pick one per category")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(tutorialPicksComplete ? .black : Color(white: 0.55))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(tutorialPicksComplete ? Color.white : Color(white: 0.20))
+                        )
+                }
+                .disabled(!tutorialPicksComplete)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 28)
+            }
+        }
+        .transition(.opacity)
+    }
+
+    /// One row of pick-able cosmetic items for the tutorial reward modal.
+    private func rewardRow<Item: CosmeticItem>(
+        label: String,
+        items: [Item],
+        selected: Item?,
+        onPick: @escaping (Item) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .kerning(1.5)
+                .foregroundStyle(Color(white: 0.55))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(items, id: \.id) { item in
+                        let isSelected = selected.map { $0.id == item.id } ?? false
+                        Button {
+                            onPick(item)
+                        } label: {
+                            VStack(spacing: 6) {
+                                rewardPreview(for: item)
+                                    .frame(width: 56, height: 56)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color(white: 0.10))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(isSelected ? Color.white : Color.clear,
+                                                    lineWidth: 2.0)
+                                    )
+                                Text(item.displayName)
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(isSelected ? .white : Color(white: 0.70))
+                                    .lineLimit(1)
+                            }
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(isSelected ? Color(white: 0.18) : Color.clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Compact previews mirror the shop's category-specific renderings.
+    @ViewBuilder
+    private func rewardPreview<Item: CosmeticItem>(for item: Item) -> some View {
+        switch item {
+        case let s as BallSkin:
+            Circle()
+                .fill(s.gradient(endRadius: 30))
+                .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+                .padding(6)
+        case let g as GoalSkin:
+            Circle()
+                .fill(GoalSkin.previewGradient(for: g))
+                .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
+                .padding(6)
+        case let t as TrailColor:
+            Canvas { ctx, size in
+                var path = Path()
+                let n = 10
+                for i in 0..<n {
+                    let p = Double(i) / Double(n - 1)
+                    let x = size.width  * CGFloat(0.15 + p * 0.7)
+                    let y = size.height * CGFloat(0.85 - p * 0.7)
+                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                    else      { path.addLine(to: CGPoint(x: x, y: y)) }
+                }
+                ctx.stroke(path,
+                           with: .color(t == .rainbow
+                                        ? Color(red: 0.95, green: 0.30, blue: 0.85)
+                                        : t.color),
+                           style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            }
+            .padding(4)
+        case let b as BackgroundTheme:
+            let th = Theme.for(b)
+            ZStack {
+                RoundedRectangle(cornerRadius: 7).fill(th.floorColor)
+                RoundedRectangle(cornerRadius: 2).fill(th.holeColor).frame(width: 22, height: 12)
+            }
+            .padding(4)
+        case _ as MusicTrack:
+            Image(systemName: "music.note")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(red: 0.45, green: 0.65, blue: 1.0),
+                                 Color(red: 0.25, green: 0.40, blue: 0.85)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+        default:
+            EmptyView()
+        }
+    }
+
     // MARK: - Welcome moment (one-time, after first L1 clear)
 
     private var welcomeMomentOverlay: some View {
@@ -1196,14 +1383,14 @@ struct BallGameView: View {
     }
 
     /// Tapped from the "Next Level" button on the win overlay.
-    /// If the player just cleared Level 1 for the very first time, route
-    /// through the one-time "Roll Along friend" welcome moment before
-    /// advancing.  Otherwise advance immediately.
+    /// "Next Level" handler from the win overlay.  Routes through one-time
+    /// moments (welcome after L1, tutorial reward after L10) when applicable;
+    /// otherwise just advances + respawns.
     private func advanceFromLevelClear() {
         if gameState.currentLevel == 1 && !gameState.seenWelcomeMoment {
-            withAnimation(.easeInOut(duration: 0.32)) {
-                showWelcomeMoment = true
-            }
+            withAnimation(.easeInOut(duration: 0.32)) { showWelcomeMoment = true }
+        } else if gameState.currentLevel == 10 && !gameState.seenTutorialReward {
+            withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = true }
         } else {
             gameState.advanceLevel()
             spawnBall(in: arenaSize)
@@ -1217,6 +1404,41 @@ struct BallGameView: View {
         withAnimation(.easeInOut(duration: 0.32)) {
             showWelcomeMoment = false
         }
+    }
+
+    /// Claim handler for the tutorial reward modal.  Grants + equips each
+    /// of the player's five picks, marks the moment as seen, then advances
+    /// to Level 11.
+    private func claimTutorialReward() {
+        if let b = pickedBall {
+            gameState.grant(b)
+            gameState.activeSkin = b
+        }
+        if let g = pickedGoal {
+            gameState.grant(g)
+            gameState.equippedGoal = g
+        }
+        if let t = pickedTrail {
+            gameState.grant(t)
+            gameState.equippedTrail = t
+        }
+        if let bg = pickedBackground {
+            gameState.grant(bg)
+            gameState.equippedBackground = bg
+        }
+        if let m = pickedMusic {
+            gameState.grant(m)
+            gameState.equippedMusic = m
+        }
+        gameState.seenTutorialReward = true
+        withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = false }
+        gameState.advanceLevel()
+        spawnBall(in: arenaSize)
+    }
+
+    private var tutorialPicksComplete: Bool {
+        pickedBall != nil && pickedGoal != nil && pickedTrail != nil
+            && pickedBackground != nil && pickedMusic != nil
     }
 
     // MARK: - Game logic

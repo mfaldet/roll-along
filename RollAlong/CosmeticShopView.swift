@@ -325,11 +325,8 @@ struct CosmeticShopView: View {
     }
 
     private func goalPreview(_ goal: GoalSkin) -> some View {
-        // Until 4f ships alt goal renderers, every goal previews as the
-        // rainbow Canvas burst.  Tint changes per item to hint at the
-        // variety they'll get when the real renderer lands.
         Circle()
-            .fill(Self.goalTint(goal))
+            .fill(GoalSkin.previewGradient(for: goal))
             .overlay(
                 Circle()
                     .stroke(LinearGradient(
@@ -339,31 +336,6 @@ struct CosmeticShopView: View {
             )
             .frame(width: 56, height: 56)
             .shadow(color: Color.black.opacity(0.40), radius: 6, x: 0, y: 4)
-    }
-
-    private static func goalTint(_ goal: GoalSkin) -> LinearGradient {
-        switch goal {
-        case .rainbow:
-            return LinearGradient(
-                colors: [.purple, .blue, .green, .yellow, .red],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-        case .galaxy:
-            return LinearGradient(colors: [Color(red:0.12,green:0.05,blue:0.30), Color(red:0.50,green:0.10,blue:0.50)],
-                                  startPoint: .top, endPoint: .bottom)
-        case .crystal:
-            return LinearGradient(colors: [Color.cyan, Color.white.opacity(0.5)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .flame:
-            return LinearGradient(colors: [Color.orange, Color.red],
-                                  startPoint: .top, endPoint: .bottom)
-        case .neon:
-            return LinearGradient(colors: [Color(red:0.95, green:0.10, blue:0.95), Color(red:0.10, green:0.90, blue:0.95)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .prism:
-            return LinearGradient(colors: [Color.white, Color.pink.opacity(0.6), Color.blue.opacity(0.6)],
-                                  startPoint: .leading, endPoint: .trailing)
-        }
     }
 
     private func trailPreview(_ trail: TrailColor) -> some View {
