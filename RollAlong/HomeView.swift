@@ -8,6 +8,7 @@ enum HomeRoute: Hashable {
     case game
     case levels
     case settings
+    case shop
 }
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,11 @@ final class Navigator: ObservableObject {
     /// Push Settings on top of the current stack.
     func goToSettings() {
         if path.last != .settings { path.append(.settings) }
+    }
+
+    /// Push the Cosmetic Shop on top of the current stack.
+    func goToShop() {
+        if path.last != .shop { path.append(.shop) }
     }
 }
 
@@ -151,6 +157,7 @@ struct HomeView: View {
                 case .game:     BallGameView()
                 case .levels:   LevelSelectView()
                 case .settings: SettingsView()
+                case .shop:     CosmeticShopView()
                 }
             }
         }
@@ -287,51 +294,59 @@ struct HomeView: View {
     }
 
     /// Floating coin-balance pill in the top-right corner.  Tappable —
-    /// tapping it takes you straight to the cosmetic shop (Sprint 4e).
-    /// Until then, it shows a "Shop opens in next update" feedback alert.
+    /// opens the Cosmetic Shop.  Uses the Navigator so the home path
+    /// becomes [.shop].
     private var coinBalancePill: some View {
         VStack {
             HStack {
                 Spacer()
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.00, green: 0.88, blue: 0.40),
-                                    Color(red: 0.93, green: 0.65, blue: 0.10),
-                                ],
-                                startPoint: .top, endPoint: .bottom
+                Button { nav.goToShop() } label: {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.88, blue: 0.40),
+                                        Color(red: 0.93, green: 0.65, blue: 0.10),
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
                             )
-                        )
-                        .overlay(
-                            Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6)
-                        )
-                        .frame(width: 14, height: 14)
+                            .overlay(
+                                Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6)
+                            )
+                            .frame(width: 14, height: 14)
 
-                    Text("\(gameState.coinBalance)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .monospacedDigit()
-                        .contentTransition(.numericText(value: Double(gameState.coinBalance)))
-                        .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
+                        Text("\(gameState.coinBalance)")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .monospacedDigit()
+                            .contentTransition(.numericText(value: Double(gameState.coinBalance)))
+                            .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color(white: 0.14))
+                            .overlay(
+                                Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
+                            )
+                    )
                 }
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color(white: 0.14))
-                        .overlay(
-                            Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
-                        )
-                )
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(gameState.coinBalance) coins")
+                .accessibilityHint("Opens the cosmetic shop.")
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             Spacer()
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(gameState.coinBalance) coins")
     }
 
     private var liveBall: some View {

@@ -17,6 +17,7 @@
 		AA00000A000000000000AA01 /* SettingsView.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA00000A000000000000AA00 /* SettingsView.swift */; };
 		AA00000C000000000000AA01 /* LevelSelectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000C000000000000AA00 /* LevelSelectView.swift */; };
 		AA00000E000000000000AA01 /* Cosmetics.swift in Sources */       = {isa = PBXBuildFile; fileRef = AA00000E000000000000AA00 /* Cosmetics.swift */; };
+		AA00000F000000000000AA01 /* CosmeticShopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000F000000000000AA00 /* CosmeticShopView.swift */; };
 		AA00000B000000000000AA02 /* Assets.xcassets in Resources */     = {isa = PBXBuildFile; fileRef = AA00000B000000000000AA00 /* Assets.xcassets */; };
 		AA00000D000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
@@ -34,6 +35,7 @@
 		AA00000A000000000000AA00 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AA00000C000000000000AA00 /* LevelSelectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelSelectView.swift; sourceTree = "<group>"; };
 		AA00000E000000000000AA00 /* Cosmetics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cosmetics.swift; sourceTree = "<group>"; };
+		AA00000F000000000000AA00 /* CosmeticShopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmeticShopView.swift; sourceTree = "<group>"; };
 		AA00000B000000000000AA00 /* Assets.xcassets */   = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets;  sourceTree = "<group>"; };
 		AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,6 +62,7 @@
 				AA00000A000000000000AA00 /* SettingsView.swift */,
 				AA00000C000000000000AA00 /* LevelSelectView.swift */,
 				AA00000E000000000000AA00 /* Cosmetics.swift */,
+				AA00000F000000000000AA00 /* CosmeticShopView.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 				AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */,
@@ -151,6 +154,7 @@
 				AA00000A000000000000AA01 /* SettingsView.swift in Sources */,
 				AA00000C000000000000AA01 /* LevelSelectView.swift in Sources */,
 				AA00000E000000000000AA01 /* Cosmetics.swift in Sources */,
+				AA00000F000000000000AA01 /* CosmeticShopView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
