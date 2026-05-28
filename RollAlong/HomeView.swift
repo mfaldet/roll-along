@@ -1,7 +1,49 @@
 import SwiftUI
 
+// ---------------------------------------------------------------------------
+// HomeRoute — destinations reachable from the home screen.
+// Used as the value type for NavigationStack(path:).
+// ---------------------------------------------------------------------------
+enum HomeRoute: Hashable {
+    case game
+    case levels
+    case settings
+}
+
+// ---------------------------------------------------------------------------
+// Navigator — shared navigation state.  Injected via environmentObject so
+// any descendant view (BallGameView's Home / Levels buttons, win overlay's
+// Levels button, etc.) can drive the path without callback plumbing.
+// ---------------------------------------------------------------------------
+@MainActor
+final class Navigator: ObservableObject {
+    @Published var path: [HomeRoute] = []
+
+    /// Pop all the way back to the home screen.
+    func goHome() {
+        path = []
+    }
+
+    /// Replace the current stack with [levels] so the user lands on the
+    /// Levels grid even if they were inside a game.
+    func goToLevels() {
+        path = [.levels]
+    }
+
+    /// Push the game on top of whatever is currently showing.
+    func goToGame() {
+        if path.last != .game { path.append(.game) }
+    }
+
+    /// Push Settings on top of the current stack.
+    func goToSettings() {
+        if path.last != .settings { path.append(.settings) }
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject var gameState: GameState
+    @StateObject private var nav    = Navigator()
     @StateObject private var motion = BallMotion()   // same class used in BallGameView
     @StateObject private var clock  = PhysicsClock()
 
@@ -14,7 +56,7 @@ struct HomeView: View {
     private let ballRadius: CGFloat = 51   // 120 * 0.85 / 2  (15% smaller)
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $nav.path) {
             ZStack {
                 background
 
@@ -65,7 +107,7 @@ struct HomeView: View {
                         .padding(.bottom, 14)
 
                     HStack(spacing: 28) {
-                        NavigationLink(destination: LevelSelectView()) {
+                        NavigationLink(value: HomeRoute.levels) {
                             HStack(spacing: 6) {
                                 Image(systemName: "square.grid.3x3.fill")
                                     .font(.system(size: 14))
@@ -74,7 +116,7 @@ struct HomeView: View {
                             }
                             .foregroundStyle(Color(white: 0.5))
                         }
-                        NavigationLink(destination: SettingsView()) {
+                        NavigationLink(value: HomeRoute.settings) {
                             HStack(spacing: 6) {
                                 Image(systemName: "gearshape.fill")
                                     .font(.system(size: 14))
@@ -98,7 +140,15 @@ struct HomeView: View {
             .onAppear    { motion.start(); clock.start() }
             .onDisappear { motion.stop();  clock.stop()  }
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: HomeRoute.self) { route in
+                switch route {
+                case .game:     BallGameView()
+                case .levels:   LevelSelectView()
+                case .settings: SettingsView()
+                }
+            }
         }
+        .environmentObject(nav)
     }
 
     // MARK: - Onboarding overlay
@@ -240,7 +290,7 @@ struct HomeView: View {
 
     // ── AI gradient Play button ─────────────────────────────────────────────
     private var playButton: some View {
-        NavigationLink(destination: BallGameView()) {
+        NavigationLink(value: HomeRoute.game) {
             playButtonBody
         }
         .accessibilityLabel("Play Level \(gameState.currentLevel)")

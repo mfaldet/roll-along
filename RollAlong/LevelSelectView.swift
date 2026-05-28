@@ -5,6 +5,7 @@ import SwiftUI
 /// level.  Locked levels show a lock and don't navigate.
 struct LevelSelectView: View {
     @EnvironmentObject var gameState: GameState
+    @EnvironmentObject var nav:       Navigator
     @Environment(\.dismiss) var dismiss
 
     /// Total levels currently designed.  Grows in PR 2b/2c.
@@ -31,7 +32,7 @@ struct LevelSelectView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button { dismiss() } label: {
+                Button { nav.goHome() } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 16, weight: .semibold))
@@ -111,18 +112,16 @@ struct LevelSelectView: View {
         let isDesigned = level <= LevelLayout.handCrafted.count
 
         if unlocked && isDesigned {
-            NavigationLink(destination: BallGameView()) {
+            Button {
+                // Set currentLevel BEFORE pushing the game so BallGameView
+                // reads the right course on first appear.
+                gameState.currentLevel = level
+                nav.goToGame()
+            } label: {
                 cellContent(level: level, stars: stars, coins: coins,
                             theme: theme, unlocked: true, designed: true)
             }
             .buttonStyle(.plain)
-            // Set currentLevel BEFORE navigation so BallGameView reads
-            // the right course on first appear.  Done via tap gesture
-            // rather than inside the destination closure to avoid
-            // state-mutation-during-view-update warnings.
-            .simultaneousGesture(TapGesture().onEnded {
-                gameState.currentLevel = level
-            })
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityLabel(level: level, stars: stars, coins: coins.count, locked: false, designed: true))
             .accessibilityHint("Double-tap to play.")
@@ -220,6 +219,19 @@ struct LevelSelectView: View {
                         .frame(width: 7, height: 7)
                 }
             }
+
+            // Best time — shown only for played levels.  Fixed-height
+            // placeholder ensures all cells in a row line up vertically.
+            Group {
+                if let best = gameState.time(for: level), canPlay {
+                    Text(String(format: "%.2fs", best))
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color(white: 0.62))
+                } else {
+                    Text(" ")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                }
+            }
         }
         .padding(.vertical, 6)
         .opacity(canPlay ? 1.0 : 0.7)
@@ -229,6 +241,8 @@ struct LevelSelectView: View {
 
 #Preview {
     NavigationStack {
-        LevelSelectView().environmentObject(GameState())
+        LevelSelectView()
+            .environmentObject(GameState())
+            .environmentObject(Navigator())
     }
 }

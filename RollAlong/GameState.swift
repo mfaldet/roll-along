@@ -88,7 +88,7 @@ final class GameState: ObservableObject {
 
     /// Call when the player completes a level.  Stars only ever increase,
     /// times only ever decrease, collected coins never un-collect.
-    func recordResult(level: Int, stars: Int, time: TimeInterval, coinIndex: Int?) {
+    func recordResult(level: Int, stars: Int, time: TimeInterval, coinIndices: Set<Int>) {
         if stars > (bestStars[level] ?? 0) {
             bestStars[level] = stars
         }
@@ -97,9 +97,9 @@ final class GameState: ObservableObject {
         } else {
             bestTime[level] = time
         }
-        if let idx = coinIndex {
+        if !coinIndices.isEmpty {
             var set = collectedCoins[level] ?? []
-            set.insert(idx)
+            set.formUnion(coinIndices)
             collectedCoins[level] = set
         }
         if level >= highestUnlocked {
