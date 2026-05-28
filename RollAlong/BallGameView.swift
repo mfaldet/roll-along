@@ -72,10 +72,11 @@ struct BallGameView: View {
     private let trailMinStep:  CGFloat = 1.5
 
     // Last-completion results (for the win overlay)
-    @State private var lastClearedTime:    TimeInterval = 0
-    @State private var lastClearedStars:   Int          = 0
-    @State private var lastClearedCoinIndices: Set<Int> = []
-    @State private var lastClearedIsNewBestStars: Bool  = false
+    @State private var lastClearedTime:        TimeInterval = 0
+    @State private var lastClearedStars:       Int          = 0
+    @State private var lastClearedCoinIndices: Set<Int>     = []
+    @State private var lastClearedCoinReward:  Int          = 0
+    @State private var lastClearedIsNewBestStars: Bool      = false
 
     // Animation-polish triggers (keyframe animators key off these)
     @State private var squashTrigger:      Int       = 0   // on wall bounce
@@ -1004,6 +1005,18 @@ struct BallGameView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(lastClearedCoinIndices.count) of 3 coins collected")
 
+                // Coin reward earned this run
+                if lastClearedCoinReward > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("\(lastClearedCoinReward) coins")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityLabel("Plus \(lastClearedCoinReward) coins earned.")
+                }
+
                 // Actions
                 VStack(spacing: 12) {
                     Button { advanceFromLevelClear() } label: {
@@ -1360,7 +1373,8 @@ struct BallGameView: View {
     // MARK: - Level clear handler
 
     /// Called when the ball reaches the goal.  Records the result, computes
-    /// stars, persists to GameState, then transitions to .levelComplete.
+    /// stars, awards currency-coins for newly-earned achievements, then
+    /// transitions to .levelComplete.
     private func handleLevelClear(at center: CGPoint) {
         fireGoalReached(at: center)
 
@@ -1369,10 +1383,23 @@ struct BallGameView: View {
         let level   = gameState.currentLevel
         let prevStars = gameState.stars(for: level)
 
-        lastClearedTime          = elapsed
-        lastClearedStars         = stars
-        lastClearedCoinIndices   = coinsPickedThisAttempt
+        // Currency-coin reward
+        //
+        // Per-level coin pickups (coinsPickedThisAttempt) are by definition
+        // first-time — banked coins are skipped at pickup time — so we award
+        // for every coin in the set.
+        //
+        // Star awards count only NEW stars this run.  A 2-star clear of a
+        // previously 1-star level awards +20 (the new second star).
+        let newStars   = max(0, stars - prevStars)
+        let coinReward = newStars * GameState.coinPerNewStar
+                       + coinsPickedThisAttempt.count * GameState.coinPerPickup
+
+        lastClearedTime           = elapsed
+        lastClearedStars          = stars
+        lastClearedCoinIndices    = coinsPickedThisAttempt
         lastClearedIsNewBestStars = stars > prevStars
+        lastClearedCoinReward     = coinReward
 
         gameState.recordResult(
             level: level,
@@ -1380,6 +1407,9 @@ struct BallGameView: View {
             time:  elapsed,
             coinIndices: coinsPickedThisAttempt
         )
+        if coinReward > 0 {
+            gameState.addCoins(coinReward)
+        }
 
         withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
     }

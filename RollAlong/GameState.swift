@@ -74,6 +74,49 @@ final class GameState: ObservableObject {
         didSet { UserDefaults.standard.set(unlimitedLives, forKey: "ra_unlimitedLives") }
     }
 
+    // ── Cosmetic economy (Sprint 4d) ──────────────────────────────────────
+    // Coins are the in-app currency.  Earned from gameplay; spent in the
+    // shop to unlock cosmetic items.  Also purchasable in coin packs via
+    // StoreKit (PR 4h).  No cap on balance.
+    @Published var coinBalance: Int {
+        didSet { UserDefaults.standard.set(coinBalance, forKey: "ra_coinBalance") }
+    }
+
+    // Owned cosmetic items per category, stored as sets of raw strings so
+    // JSON round-trip is trivial.  Default ("starter") items are always
+    // implicitly owned via `isOwned(_:)`, regardless of set membership.
+    @Published var ownedBallSkins:   Set<String> {
+        didSet { Self.saveStringSet(ownedBallSkins, forKey: "ra_ownedBallSkins") }
+    }
+    @Published var ownedGoals:       Set<String> {
+        didSet { Self.saveStringSet(ownedGoals, forKey: "ra_ownedGoals") }
+    }
+    @Published var ownedTrails:      Set<String> {
+        didSet { Self.saveStringSet(ownedTrails, forKey: "ra_ownedTrails") }
+    }
+    @Published var ownedBackgrounds: Set<String> {
+        didSet { Self.saveStringSet(ownedBackgrounds, forKey: "ra_ownedBackgrounds") }
+    }
+    @Published var ownedMusic:       Set<String> {
+        didSet { Self.saveStringSet(ownedMusic, forKey: "ra_ownedMusic") }
+    }
+
+    // Currently-equipped cosmetic per category.  Always defaults to the
+    // starter on a fresh install.
+    @Published var equippedGoal: GoalSkin {
+        didSet { UserDefaults.standard.set(equippedGoal.rawValue, forKey: "ra_equippedGoal") }
+    }
+    @Published var equippedTrail: TrailColor {
+        didSet { UserDefaults.standard.set(equippedTrail.rawValue, forKey: "ra_equippedTrail") }
+    }
+    @Published var equippedBackground: BackgroundTheme {
+        didSet { UserDefaults.standard.set(equippedBackground.rawValue, forKey: "ra_equippedBackground") }
+    }
+    @Published var equippedMusic: MusicTrack {
+        didSet { UserDefaults.standard.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
+    }
+    // equippedBall lives on `activeSkin` — already defined above.
+
     init() {
         let saved = UserDefaults.standard.integer(forKey: "ra_level")
         currentLevel = saved > 0 ? saved : 1
@@ -96,6 +139,18 @@ final class GameState: ObservableObject {
         lives          = UserDefaults.standard.object(forKey: "ra_lives") as? Int ?? Self.livesMax
         lastLifeLostAt = UserDefaults.standard.object(forKey: "ra_lastLifeLostAt") as? Date
         unlimitedLives = UserDefaults.standard.bool(forKey: "ra_unlimitedLives")
+
+        // Cosmetic economy
+        coinBalance      = UserDefaults.standard.integer(forKey: "ra_coinBalance")
+        ownedBallSkins   = Self.loadStringSet(forKey: "ra_ownedBallSkins")
+        ownedGoals       = Self.loadStringSet(forKey: "ra_ownedGoals")
+        ownedTrails      = Self.loadStringSet(forKey: "ra_ownedTrails")
+        ownedBackgrounds = Self.loadStringSet(forKey: "ra_ownedBackgrounds")
+        ownedMusic       = Self.loadStringSet(forKey: "ra_ownedMusic")
+        equippedGoal       = GoalSkin(rawValue: UserDefaults.standard.string(forKey: "ra_equippedGoal") ?? "") ?? .starter
+        equippedTrail      = TrailColor(rawValue: UserDefaults.standard.string(forKey: "ra_equippedTrail") ?? "") ?? .starter
+        equippedBackground = BackgroundTheme(rawValue: UserDefaults.standard.string(forKey: "ra_equippedBackground") ?? "") ?? .starter
+        equippedMusic      = MusicTrack(rawValue: UserDefaults.standard.string(forKey: "ra_equippedMusic") ?? "") ?? .starter
     }
 
     // MARK: - Level progression
@@ -220,7 +275,78 @@ final class GameState: ObservableObject {
         }
     }
 
+    // MARK: - Cosmetic economy
+
+    /// Per-pickup coin award (currency-coins) on first-time collection.
+    static let coinPerPickup: Int = 10
+    /// Per-new-star coin award (only counts stars never earned before).
+    static let coinPerNewStar: Int = 20
+
+    /// Award coins to the player's balance.  Use this everywhere — never
+    /// mutate coinBalance directly.
+    func addCoins(_ amount: Int) {
+        guard amount > 0 else { return }
+        coinBalance += amount
+    }
+
+    /// Spend coins.  Returns false (no-op) if balance is insufficient.
+    @discardableResult
+    func spendCoins(_ amount: Int) -> Bool {
+        guard amount >= 0 else { return false }
+        guard coinBalance >= amount else { return false }
+        coinBalance -= amount
+        return true
+    }
+
+    /// True if the player owns this cosmetic item.  Starter items are
+    /// implicitly owned regardless of set membership.
+    func isOwned<Item: CosmeticItem>(_ item: Item) -> Bool {
+        if item.tier == .starter { return true }
+        switch item {
+        case let s as BallSkin:         return s == BallSkin.starter        || ownedBallSkins.contains(s.rawValue)
+        case let g as GoalSkin:         return g == GoalSkin.starter        || ownedGoals.contains(g.rawValue)
+        case let t as TrailColor:       return t == TrailColor.starter      || ownedTrails.contains(t.rawValue)
+        case let b as BackgroundTheme:  return b == BackgroundTheme.starter || ownedBackgrounds.contains(b.rawValue)
+        case let m as MusicTrack:       return m == MusicTrack.starter      || ownedMusic.contains(m.rawValue)
+        default: return false
+        }
+    }
+
+    /// Grant ownership of a cosmetic without charging coins (tutorial
+    /// reward, IAP unlock, etc.).
+    func grant<Item: CosmeticItem>(_ item: Item) {
+        switch item {
+        case let s as BallSkin:         ownedBallSkins.insert(s.rawValue)
+        case let g as GoalSkin:         ownedGoals.insert(g.rawValue)
+        case let t as TrailColor:       ownedTrails.insert(t.rawValue)
+        case let b as BackgroundTheme:  ownedBackgrounds.insert(b.rawValue)
+        case let m as MusicTrack:       ownedMusic.insert(m.rawValue)
+        default: break
+        }
+    }
+
+    /// Attempt to purchase a cosmetic with coins.  Returns true on
+    /// success, false if already owned or insufficient balance.
+    @discardableResult
+    func purchase<Item: CosmeticItem>(_ item: Item) -> Bool {
+        if isOwned(item) { return false }
+        guard spendCoins(item.coinCost) else { return false }
+        grant(item)
+        return true
+    }
+
     // MARK: - Persistence helpers (UserDefaults can't store [Int: T] directly)
+
+    private static func saveStringSet(_ set: Set<String>, forKey key: String) {
+        UserDefaults.standard.set(Array(set), forKey: key)
+    }
+
+    private static func loadStringSet(forKey key: String) -> Set<String> {
+        guard let arr = UserDefaults.standard.array(forKey: key) as? [String] else {
+            return []
+        }
+        return Set(arr)
+    }
 
     private static func save(_ dict: [Int: Int], intValueDict key: String) {
         let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), $0.value) })
