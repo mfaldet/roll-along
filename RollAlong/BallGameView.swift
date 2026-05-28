@@ -92,8 +92,10 @@ struct BallGameView: View {
         return gameState.ballStartsAtTop ? base.flipped() : base
     }
 
+    /// Active theme — driven by what the player has equipped in the cosmetic
+    /// shop, not by level number.  Defaults to Classic for new players.
     private var theme: Theme {
-        Theme.forLevel(gameState.currentLevel)
+        Theme.for(gameState.equippedBackground)
     }
 
     // MARK: - Border state
@@ -137,7 +139,7 @@ struct BallGameView: View {
 
                 // Graphite trail (Paper world): drawn over the floor, UNDER the
                 // holes — the streak should appear cut by the page tear.
-                if theme.trailEnabled && trailPoints.count >= 2 {
+                if gameState.equippedTrail != .none && trailPoints.count >= 2 {
                     trailOverlay(geo: geo)
                         .allowsHitTesting(false)
                 }
@@ -375,7 +377,7 @@ struct BallGameView: View {
                 path.addLine(to: curr)
                 ctx.stroke(
                     path,
-                    with: .color(theme.trailColor.opacity(opacity)),
+                    with: .color(gameState.equippedTrail.color.opacity(opacity)),
                     style: StrokeStyle(lineWidth: 3.2, lineCap: .round, lineJoin: .round)
                 )
             }
@@ -1262,7 +1264,7 @@ struct BallGameView: View {
         // Graphite trail (Paper world) — accumulate position points so we
         // can render the streak behind the ball.  Skip if too close to the
         // previous point (the ball is nearly stationary).
-        if theme.trailEnabled {
+        if gameState.equippedTrail != .none {
             if let last = trailPoints.last {
                 if hypot(b.position.x - last.x, b.position.y - last.y) > trailMinStep {
                     trailPoints.append(b.position)

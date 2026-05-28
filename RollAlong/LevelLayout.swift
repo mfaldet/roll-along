@@ -2262,23 +2262,21 @@ struct Theme {
     let trailEnabled: Bool
     let trailColor:   Color
 
-    /// Maps a level number to the theme it should render under.
-    /// World 1 (levels 1-50) — 5 sub-themes of 10 levels each.
-    /// World 2 (levels 51-100) — Paper world, 5 sub-themes of 10 levels each.
-    static func forLevel(_ level: Int) -> Theme {
-        let clamped = max(1, level)
-        switch clamped {
-        case 1...10:    return classic
-        case 11...20:   return inverted
-        case 21...30:   return twilight
-        case 31...40:   return ember
-        case 41...50:   return aurora
-        case 51...60:   return notebook
-        case 61...70:   return graph
-        case 71...80:   return parchment
-        case 81...90:   return sketch
-        case 91...100:  return origami
-        default:        return classic  // future worlds wrap to classic until added
+    /// Resolve the active theme from the player's equipped BackgroundTheme.
+    /// Was previously keyed by level number (auto-themed bands); as of
+    /// Sprint 4e themes are unlockable cosmetics chosen by the player.
+    static func `for`(_ choice: BackgroundTheme) -> Theme {
+        switch choice {
+        case .classic:   return classic
+        case .inverted:  return inverted
+        case .twilight:  return twilight
+        case .ember:     return ember
+        case .aurora:    return aurora
+        case .notebook:  return notebook
+        case .graph:     return graph
+        case .parchment: return parchment
+        case .sketch:    return sketch
+        case .origami:   return origami
         }
     }
 

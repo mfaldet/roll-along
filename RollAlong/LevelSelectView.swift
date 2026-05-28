@@ -112,7 +112,9 @@ struct LevelSelectView: View {
         let unlocked = gameState.isUnlocked(level)
         let stars    = gameState.stars(for: level)
         let coins    = gameState.coinsCollected(for: level)
-        let theme    = Theme.forLevel(level)
+        // For cells, preview the player's currently-equipped background
+        // theme rather than the (now obsolete) per-level theme bands.
+        let theme    = Theme.for(gameState.equippedBackground)
         let isDesigned = level <= LevelLayout.handCrafted.count
 
         if unlocked && isDesigned {
