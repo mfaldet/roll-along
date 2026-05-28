@@ -28,6 +28,9 @@ final class GameState: ObservableObject {
     @Published var seenWelcomeMoment: Bool {
         didSet { UserDefaults.standard.set(seenWelcomeMoment, forKey: "ra_seenWelcomeMoment") }
     }
+    @Published var seenTutorialReward: Bool {
+        didSet { UserDefaults.standard.set(seenTutorialReward, forKey: "ra_seenTutorialReward") }
+    }
 
     // ── Per-level progress (persisted via JSON-encoded dictionaries) ───────
     // bestStars[level]    : 0…3, only ever increases
@@ -127,6 +130,7 @@ final class GameState: ObservableObject {
         ballStartsAtTop = UserDefaults.standard.object(forKey: "ra_startAtTop") as? Bool ?? true
         seenOnboarding = UserDefaults.standard.bool(forKey: "ra_seenOnboarding")
         seenWelcomeMoment = UserDefaults.standard.bool(forKey: "ra_seenWelcomeMoment")
+        seenTutorialReward = UserDefaults.standard.bool(forKey: "ra_seenTutorialReward")
 
         bestStars       = Self.loadIntValueDict(key: "ra_bestStars")
         bestTime        = Self.loadDoubleValueDict(key: "ra_bestTime")
