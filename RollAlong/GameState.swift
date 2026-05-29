@@ -259,21 +259,34 @@ final class GameState: ObservableObject {
     /// Decrement lives by 1.  Returns true if a life was consumed, false if
     /// the player was already at zero.  Unlimited-lives subscribers always
     /// return true without decrementing.
+    ///
+    /// The regen timer only starts when the player's count drops BELOW
+    /// `livesMax`.  Otherwise a player with 78 stockpiled lives would
+    /// see the regen clock churning the moment they lose their first one,
+    /// which is confusing.  Stockpile drains silently until you hit the
+    /// natural bar, then regen kicks in.
     @discardableResult
     func consumeLife() -> Bool {
         if unlimitedLives { return true }
         commitRegen()
         if lives <= 0 { return false }
         lives -= 1
-        if lastLifeLostAt == nil { lastLifeLostAt = .now }
+        if lives < Self.livesMax && lastLifeLostAt == nil {
+            lastLifeLostAt = .now
+        }
         return true
     }
 
-    /// Award lives (e.g. from rewarded ad or IAP).  Caps at livesMax.
+    /// Award lives (e.g. from rewarded ad or IAP grant).  No cap — lives
+    /// stockpile unbounded so the HUD can show 6 marbles + a "+N" indicator
+    /// for whatever the player has banked.
     func addLives(_ count: Int) {
+        guard count > 0 else { return }
         if unlimitedLives { return }
         commitRegen()
-        lives = min(Self.livesMax, lives + count)
+        lives += count
+        // Stockpiled lives don't need the regen timer running.  Clear it
+        // so it isn't ticking through scenarios it can't affect.
         if lives >= Self.livesMax {
             lastLifeLostAt = nil
         }
