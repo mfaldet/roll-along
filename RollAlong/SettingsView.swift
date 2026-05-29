@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var gameState: GameState
+    @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) var dismiss
     @State private var showResetAlert = false
     @FocusState private var nameFocused: Bool
@@ -17,6 +18,7 @@ struct SettingsView: View {
                     personalizationSection
                     skinSection
                     gameSection
+                    purchasesSection
                     resetSection
                 }
                 .padding(.horizontal, 20)
@@ -132,6 +134,40 @@ struct SettingsView: View {
                 }
                 .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
                 .padding()
+            }
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+        }
+    }
+
+    private var purchasesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Purchases")
+            VStack(spacing: 0) {
+                Button {
+                    Task { await store.restore() }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundStyle(Color(white: 0.55))
+                        Text("Restore Purchases")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(Color(white: 0.85))
+                        Spacer()
+                    }
+                    .padding()
+                }
+                if gameState.unlimitedLives {
+                    Divider().background(Color(white: 0.22)).padding(.leading, 16)
+                    HStack {
+                        Image(systemName: "infinity")
+                            .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                        Text("Unlimited Lives — Active")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(Color(red: 1.00, green: 0.88, blue: 0.55))
+                        Spacer()
+                    }
+                    .padding()
+                }
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
         }
