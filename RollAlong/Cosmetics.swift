@@ -85,6 +85,63 @@ enum GoalSkin: String, CosmeticItem {
         }
     }
 
+    /// In-game palette for the actual rainbowHole Canvas in BallGameView.
+    /// Lets each goal type produce a visually distinct rendering of the
+    /// same particle system — narrower hue range + tuned saturation +
+    /// custom background color instead of a one-off renderer per skin.
+    struct HoleStyle {
+        /// Base hue added to the per-particle hue.  Combined with hueRange
+        /// to confine the particle palette to a slice of the colour wheel.
+        let hueBase: Double
+        /// Multiplier on the per-particle hue (1.0 = full spectrum, 0.1 = monochromatic).
+        let hueRange: Double
+        /// Saturation multiplier (0…1).  Lower for pastels/crystals.
+        let saturation: Double
+        /// Background ellipse colour that sits behind the particles.
+        let bgColor: Color
+    }
+
+    var holeStyle: HoleStyle {
+        switch self {
+        case .rainbow:
+            // Default: full spectrum on the original deep purple background.
+            return HoleStyle(
+                hueBase: 0.0, hueRange: 1.0, saturation: 1.0,
+                bgColor: Color(red: 0.03, green: 0.01, blue: 0.06)
+            )
+        case .galaxy:
+            // Deep blue → violet on a navy backdrop.
+            return HoleStyle(
+                hueBase: 0.58, hueRange: 0.30, saturation: 0.85,
+                bgColor: Color(red: 0.03, green: 0.02, blue: 0.12)
+            )
+        case .crystal:
+            // Cool, low-sat cyans + whites.  Reads as glassy.
+            return HoleStyle(
+                hueBase: 0.46, hueRange: 0.14, saturation: 0.55,
+                bgColor: Color(red: 0.02, green: 0.04, blue: 0.08)
+            )
+        case .flame:
+            // Hot reds + oranges on a charred background.
+            return HoleStyle(
+                hueBase: 0.0, hueRange: 0.12, saturation: 1.0,
+                bgColor: Color(red: 0.08, green: 0.02, blue: 0.0)
+            )
+        case .neon:
+            // Magenta-pink with pure black behind — vaporwave glow.
+            return HoleStyle(
+                hueBase: 0.85, hueRange: 0.20, saturation: 1.0,
+                bgColor: Color.black
+            )
+        case .prism:
+            // Full spectrum but desaturated → soft, watercolour-ish.
+            return HoleStyle(
+                hueBase: 0.0, hueRange: 1.0, saturation: 0.65,
+                bgColor: Color(red: 0.08, green: 0.07, blue: 0.10)
+            )
+        }
+    }
+
     /// Compact static preview gradient used by the shop + tutorial reward
     /// modal until the full Canvas renderers ship.
     static func previewGradient(for goal: GoalSkin) -> LinearGradient {

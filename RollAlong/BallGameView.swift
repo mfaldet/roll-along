@@ -373,13 +373,19 @@ struct BallGameView: View {
         }
     }
 
-    /// Graphite trail — drawn as a sequence of short line segments with
-    /// increasing opacity from oldest (tail) to newest (head).  This gives
-    /// the streak a natural fade without needing a gradient-stroke API.
+    /// Trail — drawn as a sequence of short line segments with increasing
+    /// opacity from oldest (tail) to newest (head).  This gives a natural
+    /// pencil-fade without needing a gradient-stroke API.
+    ///
+    /// Most trail colors are flat (.graphite, .fire, .ice, .ink, .gold)
+    /// so each segment uses the trail's single color.  The .rainbow trail
+    /// is special — each segment gets a hue derived from its position
+    /// along the trail, producing a smooth rainbow streak.
     private func trailOverlay(geo: GeometryProxy) -> some View {
         Canvas { ctx, _ in
             let n = trailPoints.count
             guard n >= 2 else { return }
+            let isRainbow = gameState.equippedTrail == .rainbow
             for i in 1..<n {
                 let prev = trailPoints[i - 1]
                 let curr = trailPoints[i]
@@ -389,9 +395,14 @@ struct BallGameView: View {
                 var path = Path()
                 path.move(to: prev)
                 path.addLine(to: curr)
+                let segmentColor: Color = isRainbow
+                    ? Color(hue: Double(i) / Double(n),
+                            saturation: 1.0,
+                            brightness: 1.0)
+                    : gameState.equippedTrail.color
                 ctx.stroke(
                     path,
-                    with: .color(gameState.equippedTrail.color.opacity(opacity)),
+                    with: .color(segmentColor.opacity(opacity)),
                     style: StrokeStyle(lineWidth: 3.2, lineCap: .round, lineJoin: .round)
                 )
             }
@@ -545,7 +556,10 @@ struct BallGameView: View {
     }
 
     private var rainbowHole: some View {
-        TimelineView(.animation) { timeline in
+        // Style derived from the currently-equipped goal so each variant
+        // looks visually distinct without needing its own renderer.
+        let style = gameState.equippedGoal.holeStyle
+        return TimelineView(.animation) { timeline in
             Canvas { ctx, size in
                 let t    = timeline.date.timeIntervalSinceReferenceDate
                 let cx   = size.width  / 2
@@ -553,10 +567,10 @@ struct BallGameView: View {
                 let maxR = (size.width / 2) * 0.90
                 let ctr  = CGPoint(x: cx, y: cy)
 
-                // ── Deep dark background ─────────────────────────────────────
+                // ── Themed dark background ───────────────────────────────────
                 ctx.fill(
                     Path(ellipseIn: CGRect(x: 0, y: 0, width: size.width, height: size.height)),
-                    with: .color(Color(red: 0.03, green: 0.01, blue: 0.06).opacity(0.60))
+                    with: .color(style.bgColor.opacity(0.60))
                 )
 
                 // ── Rim shadow vignette — darkens toward the edge ────────────
@@ -599,7 +613,11 @@ struct BallGameView: View {
                         let pCtr = CGPoint(x: px, y: py)
 
                         let hueOffset = Double(ringIdx) * 0.33
-                        let hue = (phase + t * 0.06 + hueOffset).truncatingRemainder(dividingBy: 1.0)
+                        // Map the unbounded "raw" hue through the equipped
+                        // goal's hueBase + hueRange so each goal occupies a
+                        // distinct slice of the colour wheel.
+                        let rawHue = (phase + t * 0.06 + hueOffset).truncatingRemainder(dividingBy: 1.0)
+                        let hue = (style.hueBase + rawHue * style.hueRange).truncatingRemainder(dividingBy: 1.0)
 
                         let twinkFreq: Double = 2.8 + Double(i % 7) * 0.55
                         let twinkArg: Double = t * twinkFreq + phase * .pi * 3 + Double(ringIdx * 7)
@@ -608,7 +626,7 @@ struct BallGameView: View {
 
                         let alpha: Double = 0.30 + twinkle * 0.70
                         let pR: CGFloat = CGFloat(minSz + twinkle * (maxSz - minSz))
-                        let color = Color(hue: hue, saturation: 1.0, brightness: 0.55 + twinkle * 0.45)
+                        let color = Color(hue: hue, saturation: style.saturation, brightness: 0.55 + twinkle * 0.45)
 
                         // Wide glow — radial gradient, bright centre → transparent
                         let gR = pR * 3.8
