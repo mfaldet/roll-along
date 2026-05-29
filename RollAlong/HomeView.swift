@@ -198,9 +198,7 @@ struct HomeView: View {
                 Spacer()
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.32)) {
-                        gameState.seenOnboarding = true
-                    }
+                    dismissOnboarding(via: "button")
                 } label: {
                     Text("Got it")
                         .font(.system(size: 19, weight: .bold, design: .rounded))
@@ -219,9 +217,17 @@ struct HomeView: View {
         // Tap anywhere also dismisses, for users who skip the button
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.32)) {
-                gameState.seenOnboarding = true
-            }
+            dismissOnboarding(via: "background_tap")
+        }
+    }
+
+    private func dismissOnboarding(via source: String) {
+        AnalyticsClient.shared.track(
+            "onboarding_dismissed",
+            properties: ["source": .string(source)]
+        )
+        withAnimation(.easeInOut(duration: 0.32)) {
+            gameState.seenOnboarding = true
         }
     }
 
