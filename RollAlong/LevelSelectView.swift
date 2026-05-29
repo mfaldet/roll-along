@@ -47,33 +47,98 @@ struct LevelSelectView: View {
 
     // MARK: - Sub-views
 
+    // MARK: - Progress math (over currently-unlocked-and-designed levels)
+    //
+    // The user explicitly wanted the header stats to measure progress on
+    // levels they have ACCESS to, not the full 100-level pool.  Otherwise
+    // the percentage starts at near-zero forever and never feels like
+    // progress.  So we cap the denominator at `min(highestUnlocked,
+    // designedLevels)`.
+
+    private var unlockedDesignedCount: Int {
+        min(gameState.highestUnlocked, LevelLayout.handCrafted.count)
+    }
+
+    private var unlockedStarsEarned: Int {
+        guard unlockedDesignedCount > 0 else { return 0 }
+        return (1...unlockedDesignedCount).reduce(0) { acc, lvl in
+            acc + gameState.stars(for: lvl)
+        }
+    }
+
+    private var unlockedCoinsEarned: Int {
+        guard unlockedDesignedCount > 0 else { return 0 }
+        return (1...unlockedDesignedCount).reduce(0) { acc, lvl in
+            acc + gameState.coinsCollected(for: lvl).count
+        }
+    }
+
+    private var maxStarsAvailable: Int { unlockedDesignedCount * 3 }
+    private var maxCoinsAvailable: Int { unlockedDesignedCount * 3 }
+
+    private var starPercent: Double {
+        maxStarsAvailable > 0
+            ? Double(unlockedStarsEarned) / Double(maxStarsAvailable) : 0
+    }
+    private var coinPercent: Double {
+        maxCoinsAvailable > 0
+            ? Double(unlockedCoinsEarned) / Double(maxCoinsAvailable) : 0
+    }
+
+    /// Three-tier achievement nickname based on percent completion of a
+    /// stat.  Below 34 % is "low" (entry-level encouragement), 34-66 % is
+    /// "mid" (notable progress), 67 %+ is "high" (badge of honour).
+    private static func starNickname(for pct: Double) -> String {
+        if pct < 0.34 { return "Expansionist" }
+        if pct < 0.67 { return "20 Mile Marcher" }
+        return "Speed Demon"
+    }
+
+    private static func coinNickname(for pct: Double) -> String {
+        if pct < 0.34 { return "Minimalist" }
+        if pct < 0.67 { return "Coin Counter" }
+        return "Economic Animal"
+    }
+
     private var header: some View {
         HStack(spacing: 16) {
-            statBlock(
+            progressStat(
                 icon: "star.fill",
                 tint: Color(red: 1.00, green: 0.84, blue: 0.30),
-                value: "\(gameState.totalStars)",
-                cap:   "/ \(totalLevels * 3)",
-                label: "Stars"
+                label: "Stars",
+                earned: unlockedStarsEarned,
+                max:    maxStarsAvailable,
+                percent: starPercent,
+                nickname: Self.starNickname(for: starPercent)
             )
-            // Spendable coin balance (currency).  Earned from level pickups
-            // + new-star awards.  Spend in the cosmetic shop (Sprint 4e).
-            statBlock(
+            progressStat(
                 icon: "circle.fill",
                 tint: Color(red: 0.93, green: 0.65, blue: 0.10),
-                value: "\(gameState.coinBalance)",
-                cap:   nil,
-                label: "Coins"
+                label: "Coins",
+                earned: unlockedCoinsEarned,
+                max:    maxCoinsAvailable,
+                percent: coinPercent,
+                nickname: Self.coinNickname(for: coinPercent)
             )
         }
         .padding(.top, 8)
     }
 
-    private func statBlock(icon: String, tint: Color, value: String, cap: String?, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    /// One progress stat card: icon + label header, "earned / max" main row,
+    /// percentage line, threshold-based achievement nickname.
+    private func progressStat(
+        icon: String,
+        tint: Color,
+        label: String,
+        earned: Int,
+        max: Int,
+        percent: Double,
+        nickname: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(tint)
                 Text(label.uppercased())
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -81,21 +146,35 @@ struct LevelSelectView: View {
                     .foregroundStyle(Color(white: 0.55))
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                Text("\(earned)")
+                    .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                if let cap {
-                    Text(cap)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.45))
-                }
+                Text("/ \(max)")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
             }
+            Text(String(format: "%.0f%%", percent * 100))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(tint)
+                .monospacedDigit()
+            Text(nickname)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.78))
+                .italic()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color(white: 0.14))
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(earned) of \(max) \(label.lowercased()) earned. " +
+            String(format: "%.0f percent. ", percent * 100) +
+            "Ranked \(nickname)."
         )
     }
 

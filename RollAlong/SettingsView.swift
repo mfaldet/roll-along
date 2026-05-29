@@ -16,7 +16,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
                     personalizationSection
-                    skinSection
+                    cosmeticsSection
                     gameSection
                     purchasesSection
                     resetSection
@@ -40,7 +40,7 @@ struct SettingsView: View {
             Button("Reset", role: .destructive) { gameState.resetProgress() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This wipes all level progress — stars, coins, and best times. Your skin, name, and settings will be kept.")
+            Text("This wipes all level progress — stars, coins, and best times. Your cosmetics, nickname, and settings will be kept.")
         }
     }
 
@@ -50,11 +50,11 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Personalization")
             HStack {
-                Text("Your Name")
+                Text("Nickname")
                     .font(.system(.body, design: .rounded))
                     .foregroundStyle(Color(white: 0.75))
                 Spacer()
-                TextField("Enter name", text: $gameState.playerName)
+                TextField("Enter a nickname", text: $gameState.playerName)
                     .multilineTextAlignment(.trailing)
                     .font(.system(.body, design: .rounded))
                     .foregroundStyle(.white)
@@ -67,14 +67,174 @@ struct SettingsView: View {
         }
     }
 
-    private var skinSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Ball Skin")
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(BallSkin.allCases) { skin in
-                    skinCell(skin)
+    private var cosmeticsSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .firstTextBaseline) {
+                sectionHeader("Cosmetics")
+                Spacer()
+                Text("Tap to equip")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
+            }
+            cosmeticRow(
+                label: "Ball",
+                items: BallSkin.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.activeSkin },
+                onTap:      { gameState.activeSkin = $0 }
+            )
+            cosmeticRow(
+                label: "Goal",
+                items: GoalSkin.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.equippedGoal },
+                onTap:      { gameState.equippedGoal = $0 }
+            )
+            cosmeticRow(
+                label: "Trail",
+                items: TrailColor.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.equippedTrail },
+                onTap:      { gameState.equippedTrail = $0 }
+            )
+            cosmeticRow(
+                label: "Background",
+                items: BackgroundTheme.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.equippedBackground },
+                onTap:      { gameState.equippedBackground = $0 }
+            )
+            cosmeticRow(
+                label: "Music",
+                items: MusicTrack.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.equippedMusic },
+                onTap:      { gameState.equippedMusic = $0 }
+            )
+        }
+    }
+
+    /// One category row: kerned uppercase label + horizontal scroll of
+    /// owned items.  Selected item gets a white ring + slight scale-up.
+    private func cosmeticRow<Item: CosmeticItem>(
+        label: String,
+        items: [Item],
+        isEquipped: @escaping (Item) -> Bool,
+        onTap: @escaping (Item) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .kerning(1.5)
+                .foregroundStyle(Color(white: 0.55))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(items, id: \.id) { item in
+                        cosmeticCell(item: item, selected: isEquipped(item)) {
+                            onTap(item)
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    private func cosmeticCell<Item: CosmeticItem>(
+        item: Item,
+        selected: Bool,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button(action: onTap) {
+            VStack(spacing: 6) {
+                cosmeticPreview(for: item)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(white: 0.10))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selected ? Color.white : Color(white: 0.22),
+                                    lineWidth: selected ? 2.0 : 0.8)
+                    )
+                    .scaleEffect(selected ? 1.06 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.65), value: selected)
+                Text(item.displayName)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(selected ? .white : Color(white: 0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(width: 64)
+    }
+
+    @ViewBuilder
+    private func cosmeticPreview<Item: CosmeticItem>(for item: Item) -> some View {
+        switch item {
+        case let s as BallSkin:
+            Circle()
+                .fill(s.gradient(endRadius: 28))
+                .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+                .padding(8)
+        case let g as GoalSkin:
+            Circle()
+                .fill(GoalSkin.previewGradient(for: g))
+                .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
+                .padding(8)
+        case let t as TrailColor:
+            Canvas { ctx, size in
+                var path = Path()
+                let pts = 10
+                for i in 0..<pts {
+                    let p = Double(i) / Double(pts - 1)
+                    let x = size.width * CGFloat(0.15 + p * 0.7)
+                    let y = size.height * CGFloat(0.85 - p * 0.7)
+                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                    else      { path.addLine(to: CGPoint(x: x, y: y)) }
+                }
+                if t == .rainbow {
+                    // Multi-hue stroke for the rainbow preview.
+                    let segs = pts - 1
+                    for i in 0..<segs {
+                        let t1 = Double(i) / Double(segs)
+                        let t2 = Double(i + 1) / Double(segs)
+                        let x1 = size.width * CGFloat(0.15 + t1 * 0.7)
+                        let y1 = size.height * CGFloat(0.85 - t1 * 0.7)
+                        let x2 = size.width * CGFloat(0.15 + t2 * 0.7)
+                        let y2 = size.height * CGFloat(0.85 - t2 * 0.7)
+                        var s = Path()
+                        s.move(to: CGPoint(x: x1, y: y1))
+                        s.addLine(to: CGPoint(x: x2, y: y2))
+                        ctx.stroke(s,
+                                   with: .color(Color(hue: t1, saturation: 1.0, brightness: 1.0)),
+                                   style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    }
+                } else {
+                    ctx.stroke(path,
+                               with: .color(t == .none ? Color(white: 0.30) : t.color),
+                               style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 }
             }
+            .padding(4)
+        case let b as BackgroundTheme:
+            let th = Theme.for(b)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8).fill(th.floorColor)
+                RoundedRectangle(cornerRadius: 2).fill(th.holeColor).frame(width: 22, height: 12)
+            }
+            .padding(6)
+        case let m as MusicTrack:
+            Image(systemName: m == .none ? "speaker.slash.fill" : "music.note")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: m == .none
+                            ? [Color(white: 0.35), Color(white: 0.20)]
+                            : [Color(red: 0.45, green: 0.65, blue: 1.00),
+                               Color(red: 0.25, green: 0.40, blue: 0.85)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+        default:
+            EmptyView()
         }
     }
 
@@ -204,48 +364,12 @@ struct SettingsView: View {
             .foregroundStyle(Color(white: 0.45))
     }
 
-    private func skinCell(_ skin: BallSkin) -> some View {
-        let selected = gameState.activeSkin == skin
-        return Button {
-            gameState.activeSkin = skin
-        } label: {
-            VStack(spacing: 8) {
-                Circle()
-                    .fill(skin.gradient(endRadius: 32))
-                    .frame(width: 62, height: 62)
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                selected
-                                    ? Color.white
-                                    : Color(white: 0.25),
-                                lineWidth: selected ? 2.5 : 1
-                            )
-                    )
-                    .shadow(
-                        color: selected ? .white.opacity(0.25) : .clear,
-                        radius: 8
-                    )
-                    .scaleEffect(selected ? 1.06 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.65), value: selected)
-
-                Text(skin.rawValue)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(selected ? .white : Color(white: 0.5))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(skin.rawValue) ball skin")
-        .accessibilityValue(selected ? "Selected" : "Not selected")
-        .accessibilityHint("Double-tap to choose this skin.")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
 }
 
 #Preview {
     NavigationStack {
-        SettingsView().environmentObject(GameState())
+        SettingsView()
+            .environmentObject(GameState())
+            .environmentObject(StoreKitManager.shared)
     }
 }
