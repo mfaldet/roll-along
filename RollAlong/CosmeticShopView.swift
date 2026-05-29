@@ -42,6 +42,7 @@ struct CosmeticShopView: View {
     @State private var category: ShopCategory = .ball
     @State private var alertMessage: String = ""
     @State private var showAlert: Bool = false
+    @State private var showBuyCoinsSheet: Bool = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
@@ -78,9 +79,17 @@ struct CosmeticShopView: View {
             }
         }
         .alert("Heads up", isPresented: $showAlert) {
+            Button("Get more coins") {
+                showBuyCoinsSheet = true
+                AnalyticsClient.shared.track("buy_coins_sheet_opened",
+                                             properties: ["from": .string("shortfall_alert")])
+            }
             Button("Got it", role: .cancel) { }
         } message: {
             Text(alertMessage)
+        }
+        .sheet(isPresented: $showBuyCoinsSheet) {
+            BuyCoinsSheet()
         }
     }
 
@@ -104,6 +113,23 @@ struct CosmeticShopView: View {
                     .foregroundStyle(Color(white: 0.55))
             }
             Spacer()
+            Button {
+                showBuyCoinsSheet = true
+                AnalyticsClient.shared.track("buy_coins_sheet_opened",
+                                             properties: ["from": .string("shop_header")])
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("Get more")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(.white))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)

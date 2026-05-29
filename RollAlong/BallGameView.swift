@@ -70,6 +70,9 @@ struct BallGameView: View {
     @State private var showLivesPlaceholderAlert:     Bool   = false
     @State private var livesPlaceholderMessage:       String = ""
 
+    // StoreKit purchase sheets (Sprint 4h)
+    @State private var showBuyLivesSheet:             Bool   = false
+
     // Per-attempt progression state
     @State private var levelStartTime:        Date?    = nil
     @State private var coinsPickedThisAttempt: Set<Int> = []    // coin indices 0…2 picked this attempt
@@ -864,22 +867,22 @@ struct BallGameView: View {
                             )
                         }
 
-                        // Placeholder action — Buy Lives (real wiring in 4h).
+                        // Buy lives — opens the StoreKit-backed purchase sheet.
                         Button {
-                            livesPlaceholderMessage = "Life and unlimited-lives purchases launch with the next update.\n\nFor now, lives refill 1 every 10 minutes — or play tutorial levels (1-10) which don't consume lives."
-                            showLivesPlaceholderAlert = true
+                            showBuyLivesSheet = true
+                            AnalyticsClient.shared.track("buy_lives_sheet_opened")
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "cart.fill")
                                 Text("Buy lives")
                             }
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(white: 0.92))
+                            .foregroundStyle(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
                             .background(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(white: 0.18))
+                                    .fill(.white)
                             )
                         }
 
@@ -904,6 +907,9 @@ struct BallGameView: View {
             Button("Got it", role: .cancel) { }
         } message: {
             Text(livesPlaceholderMessage)
+        }
+        .sheet(isPresented: $showBuyLivesSheet) {
+            BuyLivesSheet()
         }
         .transition(.opacity)
     }

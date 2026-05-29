@@ -3,12 +3,20 @@ import SwiftUI
 @main
 struct RollAlongApp: App {
     @StateObject private var gameState = GameState()
+    @StateObject private var store     = StoreKitManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(gameState)
+                .environmentObject(store)
+                .task {
+                    // Bootstrap StoreKit — fetch product catalogue from the
+                    // App Store and re-check non-consumable entitlements
+                    // (the unlimited unlock).
+                    await store.bootstrap(with: gameState)
+                }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared
                     // initialises the persistent user_id + session_id on

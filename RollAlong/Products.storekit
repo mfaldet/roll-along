@@ -1,0 +1,138 @@
+{
+  "identifier" : "AA1B2C3D-4E5F-6789-ABCD-1234567890AB",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "11000001",
+      "localizations" : [
+        {
+          "description" : "6 lives instantly delivered.",
+          "displayName" : "1 full reload",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.lives.pack1",
+      "referenceName" : "1 Full Reload (6 lives) $0.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "11000002",
+      "localizations" : [
+        {
+          "description" : "36 lives — best value for casual play.",
+          "displayName" : "6 full reloads",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.lives.pack5",
+      "referenceName" : "6 Full Reloads (36 lives) $4.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "11000003",
+      "localizations" : [
+        {
+          "description" : "78 lives — for serious chasers.",
+          "displayName" : "13 full reloads",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.lives.pack10",
+      "referenceName" : "13 Full Reloads (78 lives) $9.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "11000004",
+      "localizations" : [
+        {
+          "description" : "Never run out of lives again. Unlocks the gold marble HUD + exclusive cosmetic packs as we release them.",
+          "displayName" : "Unlimited Lives",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.unlimited",
+      "referenceName" : "Unlimited Lives",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "11000005",
+      "localizations" : [
+        {
+          "description" : "100 coins added to your balance.",
+          "displayName" : "100 coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.coins.100",
+      "referenceName" : "100 Coins $0.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "11000006",
+      "localizations" : [
+        {
+          "description" : "600 coins (+100 bonus over the pack-1 rate).",
+          "displayName" : "600 coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.coins.600",
+      "referenceName" : "600 Coins $4.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "11000007",
+      "localizations" : [
+        {
+          "description" : "1,300 coins (+300 bonus).",
+          "displayName" : "1,300 coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.coins.1300",
+      "referenceName" : "1,300 Coins $9.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "11000008",
+      "localizations" : [
+        {
+          "description" : "3,000 coins — biggest pack.",
+          "displayName" : "3,000 coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.coins.3000",
+      "referenceName" : "3,000 Coins $19.99",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
