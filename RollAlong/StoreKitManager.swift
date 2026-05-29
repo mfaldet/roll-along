@@ -239,11 +239,13 @@ final class StoreKitManager: ObservableObject {
         guard let gameState else { return }
         switch productID.category {
         case .lifePack:
-            // Consumable life packs can exceed livesMax.  Sprint 4c's
-            // addLives caps at livesMax, so we bypass it here and write
-            // straight to lives + clear the regen timestamp.
-            let newTotal = min(GameState.livesMax * 4, gameState.lives + productID.rewardLives)
-            gameState.lives = newTotal
+            // Lives from purchases stockpile unbounded.  $9.99 = 78 lives
+            // promised in the App Store Connect product description; the
+            // player gets exactly that.  Earlier code clamped to 24 — that
+            // was a bug, fixed here.
+            gameState.lives += productID.rewardLives
+            // Clearing lastLifeLostAt stops the regen timer; the stockpile
+            // doesn't need regen and the timer would just churn confusingly.
             gameState.lastLifeLostAt = nil
 
         case .coinPack:

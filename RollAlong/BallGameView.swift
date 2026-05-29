@@ -731,11 +731,44 @@ struct BallGameView: View {
     /// without us having to manually call `commitRegen` on a timer.
     private func livesHUDOverlay(safeTop: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+            // Per the agreed spec:
+            //   • Always render 6 marbles.
+            //   • Filled red marbles = your active lives (clamped to 6 max for
+            //     the bar).
+            //   • Stockpiled lives above 6 show as "+N" to the right of the
+            //     6th marble.
+            //   • Unlimited-lives subscribers get 6 gold marbles + an
+            //     infinity symbol instead of "+N".
+            let unlimited     = gameState.unlimitedLives
+            let display       = gameState.displayedLives   // may be > 6 with stockpile
+            let filledMarbles = unlimited ? GameState.livesMax : min(display, GameState.livesMax)
+            let stockpile     = unlimited ? 0 : max(0, display - GameState.livesMax)
+
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     ForEach(0..<GameState.livesMax, id: \.self) { i in
-                        lifeIcon(filled: i < gameState.displayedLives,
-                                 gold: gameState.unlimitedLives)
+                        lifeIcon(filled: i < filledMarbles, gold: unlimited)
+                    }
+                    // Trailing indicator — either the stockpile counter or
+                    // the infinity glyph for unlimited subscribers.
+                    if unlimited {
+                        Image(systemName: "infinity")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.86, blue: 0.36),
+                                        Color(red: 0.93, green: 0.65, blue: 0.10),
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                            .padding(.leading, 2)
+                    } else if stockpile > 0 {
+                        Text("+\(stockpile)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.leading, 2)
                     }
                 }
                 if let countdown = gameState.timeToNextLife() {
@@ -756,8 +789,13 @@ struct BallGameView: View {
         if gameState.unlimitedLives {
             return "Unlimited lives."
         }
-        let count = gameState.displayedLives
-        var label = "\(count) of \(GameState.livesMax) lives."
+        let display    = gameState.displayedLives
+        let filled     = min(display, GameState.livesMax)
+        let stockpile  = max(0, display - GameState.livesMax)
+        var label = "\(filled) of \(GameState.livesMax) lives."
+        if stockpile > 0 {
+            label += " Plus \(stockpile) stockpiled."
+        }
         if let next = gameState.timeToNextLife() {
             label += " Next life in \(Self.formatCountdown(next))."
         }
