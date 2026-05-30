@@ -22,6 +22,7 @@
 		AA000014000000000000AA01 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014000000000000AA00 /* StoreKitManager.swift */; };
 		AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000015000000000000AA00 /* PurchaseSheets.swift */; };
 		AA000016000000000000AA02 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA000016000000000000AA00 /* Products.storekit */; };
+		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
 		AA00000B000000000000AA02 /* Assets.xcassets in Resources */     = {isa = PBXBuildFile; fileRef = AA00000B000000000000AA00 /* Assets.xcassets */; };
 		AA00000D000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
@@ -44,6 +45,7 @@
 		AA000014000000000000AA00 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		AA000015000000000000AA00 /* PurchaseSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseSheets.swift; sourceTree = "<group>"; };
 		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = file; path = Products.storekit; sourceTree = "<group>"; };
+		AA000017000000000000AA00 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
 		AA00000B000000000000AA00 /* Assets.xcassets */   = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets;  sourceTree = "<group>"; };
 		AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -75,6 +77,7 @@
 				AA000014000000000000AA00 /* StoreKitManager.swift */,
 				AA000015000000000000AA00 /* PurchaseSheets.swift */,
 				AA000016000000000000AA00 /* Products.storekit */,
+				AA000017000000000000AA00 /* AdManager.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 				AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */,
@@ -171,6 +174,7 @@
 				AA000013000000000000AA01 /* AnalyticsClient.swift in Sources */,
 				AA000014000000000000AA01 /* StoreKitManager.swift in Sources */,
 				AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */,
+				AA000017000000000000AA01 /* AdManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

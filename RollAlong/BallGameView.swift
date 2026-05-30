@@ -45,6 +45,7 @@ private enum BorderPhase: Equatable {
 struct BallGameView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav:       Navigator
+    @EnvironmentObject var ads:       AdManager
     @Environment(\.dismiss) var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -72,6 +73,11 @@ struct BallGameView: View {
 
     // StoreKit purchase sheets (Sprint 4h)
     @State private var showBuyLivesSheet:             Bool   = false
+
+    // Ad watch state (Sprint 4i).  Disables the button while an ad is in
+    // flight and surfaces a soft retry message if loading hasn't completed.
+    @State private var adInFlight:                    Bool   = false
+    @State private var showAdNotReadyAlert:           Bool   = false
 
     // Per-attempt progression state
     @State private var levelStartTime:        Date?    = nil
@@ -904,14 +910,39 @@ struct BallGameView: View {
                             }
                         }
 
-                        // Placeholder action — Watch Ad (real wiring in 4i).
+                        // Watch ad — grants exactly 1 life on completion.  No
+                        // cap on stockpile.  Pre-loaded at app launch and after
+                        // every dismissal so the tap is instant.
                         Button {
-                            livesPlaceholderMessage = "Rewarded video ads launch with the next update.\n\nFor now, lives refill 1 every 10 minutes — or play tutorial levels (1-10) which don't consume lives."
-                            showLivesPlaceholderAlert = true
+                            guard !adInFlight else { return }
+                            if !ads.isReady {
+                                // No ad cached — kick off a load and surface a
+                                // soft retry message.  Most users hit this only
+                                // on a flaky network.
+                                showAdNotReadyAlert = true
+                                AnalyticsClient.shared.track("ad_watch_tap_not_ready")
+                                return
+                            }
+                            adInFlight = true
+                            AnalyticsClient.shared.track("ad_watch_tap")
+                            ads.showRewarded { _ in
+                                adInFlight = false
+                                // Lives are granted inside AdManager's reward
+                                // handler — no extra plumbing needed here.
+                                // If the ad earned a reward, gameState.lives
+                                // already bumped; the regen / Play Now button
+                                // path can resume naturally.
+                            }
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: "play.rectangle.fill")
-                                Text("Watch ad — +1 life")
+                                if adInFlight {
+                                    ProgressView()
+                                        .progressViewStyle(.circular)
+                                        .tint(Color(white: 0.92))
+                                } else {
+                                    Image(systemName: "play.rectangle.fill")
+                                }
+                                Text(adInFlight ? "Loading…" : "Watch ad — +1 life")
                             }
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color(white: 0.92))
@@ -921,6 +952,12 @@ struct BallGameView: View {
                                 RoundedRectangle(cornerRadius: 16)
                                     .fill(Color(white: 0.18))
                             )
+                        }
+                        .disabled(adInFlight)
+                        .alert("Ad not ready yet", isPresented: $showAdNotReadyAlert) {
+                            Button("OK", role: .cancel) { }
+                        } message: {
+                            Text("Give it a few seconds and try again — the next ad is loading in the background.")
                         }
 
                         // Buy lives — opens the StoreKit-backed purchase sheet.

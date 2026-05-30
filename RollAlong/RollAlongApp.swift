@@ -4,6 +4,7 @@ import SwiftUI
 struct RollAlongApp: App {
     @StateObject private var gameState = GameState()
     @StateObject private var store     = StoreKitManager.shared
+    @StateObject private var ads       = AdManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -11,11 +12,20 @@ struct RollAlongApp: App {
             ContentView()
                 .environmentObject(gameState)
                 .environmentObject(store)
+                .environmentObject(ads)
                 .task {
                     // Bootstrap StoreKit — fetch product catalogue from the
                     // App Store and re-check non-consumable entitlements
                     // (the unlimited unlock).
                     await store.bootstrap(with: gameState)
+                }
+                .task {
+                    // Bootstrap Google Mobile Ads — requests ATT once on
+                    // first cold start (after the user has seen the rest of
+                    // the app at least briefly), initialises the SDK, and
+                    // pre-loads the first rewarded ad so the "Watch ad" tap
+                    // is instant.
+                    await ads.bootstrap(with: gameState)
                 }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared
