@@ -140,6 +140,7 @@ struct HomeView: View {
                 // during the onboarding overlay).
                 if gameState.seenOnboarding {
                     coinBalancePill
+                    livesMarblePill
                 }
 
                 // First-launch onboarding overlay
@@ -353,6 +354,121 @@ struct HomeView: View {
             .padding(.top, 8)
             Spacer()
         }
+    }
+
+    /// Floating lives indicator in the top-LEFT corner — mirrors the
+    /// in-game HUD spec: 6 red marbles always rendered; filled = lives
+    /// you currently have, outlined = empty slots.  Stockpiled lives
+    /// past 6 show as "+N" to the right; unlimited-lives subscribers
+    /// see 6 gold marbles + an infinity glyph.
+    ///
+    /// Wrapped in a TimelineView so the "next life in M:SS" countdown
+    /// ticks every second and the marble count refreshes when regen
+    /// commits.
+    private var livesMarblePill: some View {
+        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+            let unlimited     = gameState.unlimitedLives
+            let display       = gameState.displayedLives
+            let filledMarbles = unlimited ? GameState.livesMax : min(display, GameState.livesMax)
+            let stockpile     = unlimited ? 0 : max(0, display - GameState.livesMax)
+
+            VStack {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            ForEach(0..<GameState.livesMax, id: \.self) { i in
+                                marbleIcon(filled: i < filledMarbles, gold: unlimited)
+                            }
+                            if unlimited {
+                                Image(systemName: "infinity")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Self.goldLifeGradient)
+                                    .padding(.leading, 2)
+                            } else if stockpile > 0 {
+                                Text("+\(stockpile)")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .padding(.leading, 2)
+                            }
+                        }
+                        if let countdown = gameState.timeToNextLife() {
+                            Text("+1 in \(Self.formatCountdown(countdown))")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Color(white: 0.50))
+                        }
+                    }
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(.leading, 18)
+            .padding(.top, 8)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(livesAccessibilityLabel)
+        }
+    }
+
+    /// One marble slot — fills red (or gold for unlimited) when the slot
+    /// is occupied, hollow grey outline when empty.  Matches the in-game
+    /// HUD so the two reads consistently across menu and gameplay.
+    @ViewBuilder
+    private func marbleIcon(filled: Bool, gold: Bool) -> some View {
+        if filled {
+            Circle()
+                .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                .frame(width: 13, height: 13)
+                .overlay(
+                    Circle()
+                        .fill(Color.white.opacity(0.55))
+                        .frame(width: 4, height: 4)
+                        .offset(x: -2.5, y: -2.5)
+                )
+                .overlay(
+                    Circle().stroke(Color.black.opacity(0.40), lineWidth: 0.6)
+                )
+                .shadow(color: Color.black.opacity(0.22), radius: 1.5, y: 1)
+        } else {
+            Circle()
+                .stroke(Color(white: 0.40).opacity(0.7), lineWidth: 0.9)
+                .frame(width: 13, height: 13)
+        }
+    }
+
+    private var livesAccessibilityLabel: String {
+        if gameState.unlimitedLives {
+            return "Unlimited lives."
+        }
+        let display    = gameState.displayedLives
+        let filled     = min(display, GameState.livesMax)
+        let stockpile  = max(0, display - GameState.livesMax)
+        var label = "\(filled) of \(GameState.livesMax) lives."
+        if stockpile > 0 {
+            label += " Plus \(stockpile) stockpiled."
+        }
+        if let next = gameState.timeToNextLife() {
+            label += " Next life in \(Self.formatCountdown(next))."
+        }
+        return label
+    }
+
+    private static let redLifeGradient = LinearGradient(
+        colors: [
+            Color(red: 1.00, green: 0.32, blue: 0.32),
+            Color(red: 0.78, green: 0.14, blue: 0.14),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+    private static let goldLifeGradient = LinearGradient(
+        colors: [
+            Color(red: 1.00, green: 0.86, blue: 0.36),
+            Color(red: 0.93, green: 0.65, blue: 0.10),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    private static func formatCountdown(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(ceil(seconds)))
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     private var liveBall: some View {

@@ -209,12 +209,12 @@ struct BallGameView: View {
                 // HUD — just the level label
                 hud(safeBottom: geo.safeAreaInsets.bottom)
 
-                // Lives HUD — top-left.  Hidden on tutorial levels (where
-                // failure doesn't cost a life) so it doesn't add cognitive
-                // load during onboarding.
-                if !gameState.isTutorialLevel(gameState.currentLevel) {
-                    livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
-                }
+                // Lives HUD — top-left.  Always visible (including tutorial
+                // levels) so the player has a consistent place to check on
+                // their marble stockpile.  Failure on tutorial levels still
+                // doesn't cost a life — that's handled in handleFell —
+                // but the HUD itself is permanent UI furniture.
+                livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
 
                 // Overlays
                 if phase == .fell          { oopsOverlay }
