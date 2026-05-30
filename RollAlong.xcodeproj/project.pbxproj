@@ -7,48 +7,60 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA000001000000000000AA01 /* RollAlongApp.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA000001000000000000AA00 /* RollAlongApp.swift */; };
-		AA000002000000000000AA01 /* ContentView.swift in Sources */     = {isa = PBXBuildFile; fileRef = AA000002000000000000AA00 /* ContentView.swift */; };
-		AA000003000000000000AA01 /* BallGameView.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA000003000000000000AA00 /* BallGameView.swift */; };
-		AA000006000000000000AA01 /* BallSkin.swift in Sources */        = {isa = PBXBuildFile; fileRef = AA000006000000000000AA00 /* BallSkin.swift */; };
-		AA000007000000000000AA01 /* GameState.swift in Sources */       = {isa = PBXBuildFile; fileRef = AA000007000000000000AA00 /* GameState.swift */; };
-		AA000008000000000000AA01 /* LevelLayout.swift in Sources */     = {isa = PBXBuildFile; fileRef = AA000008000000000000AA00 /* LevelLayout.swift */; };
-		AA000009000000000000AA01 /* HomeView.swift in Sources */        = {isa = PBXBuildFile; fileRef = AA000009000000000000AA00 /* HomeView.swift */; };
-		AA00000A000000000000AA01 /* SettingsView.swift in Sources */    = {isa = PBXBuildFile; fileRef = AA00000A000000000000AA00 /* SettingsView.swift */; };
+		AA000001000000000000AA01 /* RollAlongApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000AA00 /* RollAlongApp.swift */; };
+		AA000002000000000000AA01 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000AA00 /* ContentView.swift */; };
+		AA000003000000000000AA01 /* BallGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000AA00 /* BallGameView.swift */; };
+		AA000006000000000000AA01 /* BallSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000006000000000000AA00 /* BallSkin.swift */; };
+		AA000007000000000000AA01 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000007000000000000AA00 /* GameState.swift */; };
+		AA000008000000000000AA01 /* LevelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000008000000000000AA00 /* LevelLayout.swift */; };
+		AA000009000000000000AA01 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000009000000000000AA00 /* HomeView.swift */; };
+		AA00000A000000000000AA01 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000A000000000000AA00 /* SettingsView.swift */; };
+		AA00000B000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000B000000000000AA00 /* Assets.xcassets */; };
 		AA00000C000000000000AA01 /* LevelSelectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000C000000000000AA00 /* LevelSelectView.swift */; };
-		AA00000E000000000000AA01 /* Cosmetics.swift in Sources */       = {isa = PBXBuildFile; fileRef = AA00000E000000000000AA00 /* Cosmetics.swift */; };
+		AA00000D000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */; };
+		AA00000E000000000000AA01 /* Cosmetics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000E000000000000AA00 /* Cosmetics.swift */; };
 		AA00000F000000000000AA01 /* CosmeticShopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000F000000000000AA00 /* CosmeticShopView.swift */; };
 		AA000013000000000000AA01 /* AnalyticsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000013000000000000AA00 /* AnalyticsClient.swift */; };
 		AA000014000000000000AA01 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014000000000000AA00 /* StoreKitManager.swift */; };
 		AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000015000000000000AA00 /* PurchaseSheets.swift */; };
 		AA000016000000000000AA02 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA000016000000000000AA00 /* Products.storekit */; };
 		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
-		AA00000B000000000000AA02 /* Assets.xcassets in Resources */     = {isa = PBXBuildFile; fileRef = AA00000B000000000000AA00 /* Assets.xcassets */; };
-		AA00000D000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */; };
+		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		AA000001000000000000AA00 /* RollAlongApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollAlongApp.swift; sourceTree = "<group>"; };
-		AA000002000000000000AA00 /* ContentView.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift;  sourceTree = "<group>"; };
+		AA000002000000000000AA00 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA000003000000000000AA00 /* BallGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallGameView.swift; sourceTree = "<group>"; };
-		AA000004000000000000AA00 /* Info.plist */         = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		AA000005000000000000AA00 /* RollAlong.app */      = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA000006000000000000AA00 /* BallSkin.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkin.swift;     sourceTree = "<group>"; };
-		AA000007000000000000AA00 /* GameState.swift */    = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift;    sourceTree = "<group>"; };
-		AA000008000000000000AA00 /* LevelLayout.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelLayout.swift;  sourceTree = "<group>"; };
-		AA000009000000000000AA00 /* HomeView.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift;     sourceTree = "<group>"; };
+		AA000004000000000000AA00 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AA000005000000000000AA00 /* RollAlong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000006000000000000AA00 /* BallSkin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkin.swift; sourceTree = "<group>"; };
+		AA000007000000000000AA00 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
+		AA000008000000000000AA00 /* LevelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelLayout.swift; sourceTree = "<group>"; };
+		AA000009000000000000AA00 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		AA00000A000000000000AA00 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA00000B000000000000AA00 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA00000C000000000000AA00 /* LevelSelectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelSelectView.swift; sourceTree = "<group>"; };
+		AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA00000E000000000000AA00 /* Cosmetics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cosmetics.swift; sourceTree = "<group>"; };
 		AA00000F000000000000AA00 /* CosmeticShopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmeticShopView.swift; sourceTree = "<group>"; };
 		AA000013000000000000AA00 /* AnalyticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsClient.swift; sourceTree = "<group>"; };
 		AA000014000000000000AA00 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		AA000015000000000000AA00 /* PurchaseSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseSheets.swift; sourceTree = "<group>"; };
-		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = file; path = Products.storekit; sourceTree = "<group>"; };
+		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		AA000017000000000000AA00 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
-		AA00000B000000000000AA00 /* Assets.xcassets */   = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets;  sourceTree = "<group>"; };
-		AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA000019000000000000AA00 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		AA000010000000000000AA00 /* Products */ = {
@@ -101,6 +113,7 @@
 			buildConfigurationList = AA000031000000000000AA00 /* Build configuration list for PBXNativeTarget "RollAlong" */;
 			buildPhases = (
 				AA000021000000000000AA00 /* Sources */,
+				AA000019000000000000AA00 /* Frameworks */,
 				AA000022000000000000AA00 /* Resources */,
 			);
 			buildRules = (
@@ -109,6 +122,7 @@
 			);
 			name = RollAlong;
 			packageProductDependencies = (
+				D502FED02FCB156C00CA86BD /* GoogleMobileAds */,
 			);
 			productName = RollAlong;
 			productReference = AA000005000000000000AA00 /* RollAlong.app */;
@@ -132,6 +146,9 @@
 			);
 			mainGroup = AA000012000000000000AA00;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AA000010000000000000AA00 /* Products */;
 			projectDirPath = "";
@@ -314,7 +331,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -346,7 +363,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -385,6 +402,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D502FED02FCB156C00CA86BD /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AA000040000000000000AA00 /* Project object */;
 }
