@@ -901,12 +901,15 @@ struct CosmeticBundle: Identifiable {
     /// 66% of the sum-of-individuals.  Re-computed on each read so
     /// future tier shuffles automatically update bundle prices.
     func price(in _: GameState) -> Int {
-        let sum = balls.map(\.coinCost).reduce(0, +)
-                + goals.map(\.coinCost).reduce(0, +)
-                + trails.map(\.coinCost).reduce(0, +)
-                + floors.map(\.coinCost).reduce(0, +)
-                + pits.map(\.coinCost).reduce(0, +)
-                + music.map(\.coinCost).reduce(0, +)
+        // Broken into per-category locals so the Swift type-checker
+        // doesn't choke on one giant chained-generic expression.
+        let ballSum:  Int = balls.reduce(0)  { $0 + $1.coinCost }
+        let goalSum:  Int = goals.reduce(0)  { $0 + $1.coinCost }
+        let trailSum: Int = trails.reduce(0) { $0 + $1.coinCost }
+        let floorSum: Int = floors.reduce(0) { $0 + $1.coinCost }
+        let pitSum:   Int = pits.reduce(0)   { $0 + $1.coinCost }
+        let musicSum: Int = music.reduce(0)  { $0 + $1.coinCost }
+        let sum = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
         return Int((Double(sum) * 0.66).rounded())
     }
 
