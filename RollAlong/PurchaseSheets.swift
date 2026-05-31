@@ -26,6 +26,7 @@ struct BuyLivesSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header
+                        statusBlock
                         unlimitedCard
                         Text("OR PACKS")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -77,6 +78,54 @@ struct BuyLivesSheet: View {
                 .foregroundStyle(Color(white: 0.75))
         }
         .padding(.bottom, 6)
+    }
+
+    /// Live status + explanation block under the 6-marble header.  Shows
+    /// the next-life countdown when regen is active and the standing rule
+    /// (1 life every 10 min, up to 6).  Hidden for unlimited subscribers
+    /// — we tell them they're set instead.
+    private var statusBlock: some View {
+        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+            VStack(alignment: .leading, spacing: 6) {
+                if gameState.unlimitedLives {
+                    HStack(spacing: 6) {
+                        Image(systemName: "infinity")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.86, blue: 0.36),
+                                        Color(red: 0.93, green: 0.65, blue: 0.10),
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                        Text("You have unlimited lives.")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.85))
+                    }
+                } else {
+                    if let countdown = gameState.timeToNextLife() {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 11))
+                            Text("Next life in \(Self.formatCountdown(countdown))")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(Color(white: 0.78))
+                    }
+                    Text("You earn 1 life every 10 minutes, up to 6.")
+                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                }
+            }
+        }
+    }
+
+    private static func formatCountdown(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(ceil(seconds)))
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     @ViewBuilder
@@ -242,10 +291,7 @@ struct BuyCoinsSheet: View {
     private var header: some View {
         HStack {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(Self.coinGradient)
-                    .frame(width: 18, height: 18)
-                    .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.6))
+                CoinIcon(size: 22)
                 Text("\(gameState.coinBalance)")
                     .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
@@ -276,17 +322,16 @@ struct BuyCoinsSheet: View {
     ) -> some View {
         let inProgress = store.purchaseInProgress == pid
         return HStack(alignment: .center, spacing: 12) {
-            // Big stack of coin icons
+            // Stacked coin icons — three CoinIcons offset to suggest a
+            // small pile.  Same paw-print minted graphic as everywhere
+            // else in the app.
             ZStack {
                 ForEach(0..<3) { i in
-                    Circle()
-                        .fill(Self.coinGradient)
-                        .frame(width: 22, height: 22)
-                        .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.6))
+                    CoinIcon(size: 24)
                         .offset(x: CGFloat(i) * 3, y: CGFloat(i) * -2)
                 }
             }
-            .frame(width: 32, height: 28)
+            .frame(width: 34, height: 30)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
@@ -356,9 +401,6 @@ struct BuyCoinsSheet: View {
         }
     }
 
-    private static let coinGradient = LinearGradient(
-        colors: [Color(red: 1.00, green: 0.88, blue: 0.40),
-                 Color(red: 0.93, green: 0.65, blue: 0.10)],
-        startPoint: .top, endPoint: .bottom
-    )
+    // (Coin glyph rendering moved to the shared CoinIcon view in
+    // BallGameView.swift — see PR notes.)
 }

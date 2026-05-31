@@ -31,6 +31,9 @@ final class GameState: ObservableObject {
     @Published var seenTutorialReward: Bool {
         didSet { UserDefaults.standard.set(seenTutorialReward, forKey: "ra_seenTutorialReward") }
     }
+    // (`seenTutorialL1` removed — the L1 phased intro is now keyed
+    //  off `time(for: 1) == nil`, so it correctly re-runs after
+    //  "Reset level progress" without needing a separate flag.)
 
     // ── Per-level progress (persisted via JSON-encoded dictionaries) ───────
     // bestStars[level]    : 0…3, only ever increases
@@ -97,8 +100,19 @@ final class GameState: ObservableObject {
     @Published var ownedTrails:      Set<String> {
         didSet { Self.saveStringSet(ownedTrails, forKey: "ra_ownedTrails") }
     }
-    @Published var ownedBackgrounds: Set<String> {
-        didSet { Self.saveStringSet(ownedBackgrounds, forKey: "ra_ownedBackgrounds") }
+    /// Owned Floor cosmetics (the surface the ball rolls on).
+    @Published var ownedFloors: Set<String> {
+        didSet { Self.saveStringSet(ownedFloors, forKey: "ra_ownedFloors") }
+    }
+    /// Owned Pit cosmetics (the holes the ball falls into).
+    @Published var ownedPits: Set<String> {
+        didSet { Self.saveStringSet(ownedPits, forKey: "ra_ownedPits") }
+    }
+    /// Owned bundle IDs (for the shop's "OWNED" badge — items inside
+    /// each bundle are also added to their individual owned sets at
+    /// purchase time, so this is purely for UI state).
+    @Published var ownedBundles: Set<String> {
+        didSet { Self.saveStringSet(ownedBundles, forKey: "ra_ownedBundles") }
     }
     @Published var ownedMusic:       Set<String> {
         didSet { Self.saveStringSet(ownedMusic, forKey: "ra_ownedMusic") }
@@ -112,8 +126,11 @@ final class GameState: ObservableObject {
     @Published var equippedTrail: TrailColor {
         didSet { UserDefaults.standard.set(equippedTrail.rawValue, forKey: "ra_equippedTrail") }
     }
-    @Published var equippedBackground: BackgroundTheme {
-        didSet { UserDefaults.standard.set(equippedBackground.rawValue, forKey: "ra_equippedBackground") }
+    @Published var equippedFloor: Floor {
+        didSet { UserDefaults.standard.set(equippedFloor.rawValue, forKey: "ra_equippedFloor") }
+    }
+    @Published var equippedPit: Pit {
+        didSet { UserDefaults.standard.set(equippedPit.rawValue, forKey: "ra_equippedPit") }
     }
     @Published var equippedMusic: MusicTrack {
         didSet { UserDefaults.standard.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
@@ -144,17 +161,55 @@ final class GameState: ObservableObject {
         lastLifeLostAt = UserDefaults.standard.object(forKey: "ra_lastLifeLostAt") as? Date
         unlimitedLives = UserDefaults.standard.bool(forKey: "ra_unlimitedLives")
 
-        // Cosmetic economy
-        coinBalance      = UserDefaults.standard.integer(forKey: "ra_coinBalance")
-        ownedBallSkins   = Self.loadStringSet(forKey: "ra_ownedBallSkins")
-        ownedGoals       = Self.loadStringSet(forKey: "ra_ownedGoals")
-        ownedTrails      = Self.loadStringSet(forKey: "ra_ownedTrails")
-        ownedBackgrounds = Self.loadStringSet(forKey: "ra_ownedBackgrounds")
-        ownedMusic       = Self.loadStringSet(forKey: "ra_ownedMusic")
-        equippedGoal       = GoalSkin(rawValue: UserDefaults.standard.string(forKey: "ra_equippedGoal") ?? "") ?? .starter
-        equippedTrail      = TrailColor(rawValue: UserDefaults.standard.string(forKey: "ra_equippedTrail") ?? "") ?? .starter
-        equippedBackground = BackgroundTheme(rawValue: UserDefaults.standard.string(forKey: "ra_equippedBackground") ?? "") ?? .starter
-        equippedMusic      = MusicTrack(rawValue: UserDefaults.standard.string(forKey: "ra_equippedMusic") ?? "") ?? .starter
+        // Cosmetic economy — load owned-sets to local lets first, then
+        // assign to the stored properties.  We re-use the locals when
+        // computing the equipped cosmetics below; referring to
+        // `self.ownedGoals` directly would be a "self used before all
+        // stored properties initialised" error here.
+        coinBalance = UserDefaults.standard.integer(forKey: "ra_coinBalance")
+        let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins")
+        let loadedOwnedGoals   = Self.loadStringSet(forKey: "ra_ownedGoals")
+        let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails")
+        let loadedOwnedFloors  = Self.loadStringSet(forKey: "ra_ownedFloors")
+        let loadedOwnedPits    = Self.loadStringSet(forKey: "ra_ownedPits")
+        let loadedOwnedMusic   = Self.loadStringSet(forKey: "ra_ownedMusic")
+        let loadedOwnedBundles = Self.loadStringSet(forKey: "ra_ownedBundles")
+        ownedBallSkins = loadedOwnedBalls
+        ownedGoals     = loadedOwnedGoals
+        ownedTrails    = loadedOwnedTrails
+        ownedFloors    = loadedOwnedFloors
+        ownedPits      = loadedOwnedPits
+        ownedMusic     = loadedOwnedMusic
+        ownedBundles   = loadedOwnedBundles
+        // Equipped cosmetics — load saved raw values, fall back to the
+        // category's starter if the loaded item is non-starter and not
+        // in the owned set.  Floor + Pit replaced the legacy
+        // `BackgroundTheme` (any saved ra_equippedBackground value is
+        // simply discarded — Mac requested reset-to-defaults for the
+        // single existing tester).
+        let savedGoal  = GoalSkin(rawValue:   UserDefaults.standard.string(forKey: "ra_equippedGoal")  ?? "")
+        let savedTrail = TrailColor(rawValue: UserDefaults.standard.string(forKey: "ra_equippedTrail") ?? "")
+        let savedFloor = Floor(rawValue:      UserDefaults.standard.string(forKey: "ra_equippedFloor") ?? "")
+        let savedPit   = Pit(rawValue:        UserDefaults.standard.string(forKey: "ra_equippedPit")   ?? "")
+        let savedMusic = MusicTrack(rawValue: UserDefaults.standard.string(forKey: "ra_equippedMusic") ?? "")
+        equippedGoal  = Self.legitimise(savedGoal,  owned: loadedOwnedGoals,  starter: GoalSkin.starter)
+        equippedTrail = Self.legitimise(savedTrail, owned: loadedOwnedTrails, starter: TrailColor.starter)
+        equippedFloor = Self.legitimise(savedFloor, owned: loadedOwnedFloors, starter: Floor.starter)
+        equippedPit   = Self.legitimise(savedPit,   owned: loadedOwnedPits,   starter: Pit.starter)
+        equippedMusic = Self.legitimise(savedMusic, owned: loadedOwnedMusic,  starter: MusicTrack.starter)
+    }
+
+    /// Returns `item` if the player actually owns it (starter tier or
+    /// present in the owned-set), otherwise the category's starter.
+    /// Used at init time to recover from tier shuffles that would
+    /// otherwise leave a previously-equipped item in a "not owned"
+    /// state.
+    private static func legitimise<Item: CosmeticItem>(
+        _ item: Item?, owned: Set<String>, starter: Item
+    ) -> Item {
+        guard let item else { return starter }
+        if item.tier == .starter { return item }
+        return owned.contains(item.rawValue) ? item : starter
     }
 
     // MARK: - Level progression
@@ -204,6 +259,26 @@ final class GameState: ObservableObject {
     func stars(for level: Int) -> Int           { bestStars[level] ?? 0 }
     func coinsCollected(for level: Int) -> Set<Int> { collectedCoins[level] ?? [] }
     func time(for level: Int) -> TimeInterval?  { bestTime[level] }
+
+    /// Surgical coin-banking: merges `indices` into the level's banked
+    /// coin set WITHOUT touching bestStars / bestTime / highestUnlocked.
+    /// Used by the L1 phased tutorial when the player picks up all
+    /// three coins (we bank them at that moment so a subsequent fall
+    /// doesn't make them re-appear as pickable).
+    func bankCoins(for level: Int, indices: Set<Int>) {
+        guard !indices.isEmpty else { return }
+        var set = collectedCoins[level] ?? []
+        set.formUnion(indices)
+        collectedCoins[level] = set
+    }
+
+    /// Wipe any banked coins for a single level.  Used by the L1
+    /// tutorial entry path so a player who bailed mid-tutorial after
+    /// the Phase-2 coin bank doesn't return to find the coins already
+    /// banked (which would make them un-pickable on the re-run).
+    func clearCollectedCoins(for level: Int) {
+        collectedCoins.removeValue(forKey: level)
+    }
     func isUnlocked(_ level: Int) -> Bool       { level <= highestUnlocked }
     var totalStars: Int                          { bestStars.values.reduce(0, +) }
     var totalCoins: Int                          { collectedCoins.values.reduce(0) { $0 + $1.count } }
@@ -232,6 +307,19 @@ final class GameState: ObservableObject {
         let elapsed = Date.now.timeIntervalSince(last)
         let untilNext = Self.livesRegenInterval - elapsed.truncatingRemainder(dividingBy: Self.livesRegenInterval)
         return untilNext
+    }
+
+    /// Fraction (0…1) of the way through the current regen cycle.  Used by
+    /// the home HUD to render the next-empty marble as a partial-fill —
+    /// e.g. 0.8 = the bottom 4/5 of the marble is coloured, top 1/5 hollow.
+    /// Returns nil when no regen is active (full bar, no last-loss
+    /// timestamp, or unlimited-lives subscription).
+    func regenProgress() -> Double? {
+        if unlimitedLives { return nil }
+        guard displayedLives < Self.livesMax, let last = lastLifeLostAt else { return nil }
+        let elapsed = Date.now.timeIntervalSince(last)
+        let intoCurrentCycle = elapsed.truncatingRemainder(dividingBy: Self.livesRegenInterval)
+        return min(1.0, max(0.0, intoCurrentCycle / Self.livesRegenInterval))
     }
 
     /// Promote any accumulated regen ticks into the stored `lives` counter
@@ -294,10 +382,14 @@ final class GameState: ObservableObject {
 
     // MARK: - Cosmetic economy
 
-    /// Per-pickup coin award (currency-coins) on first-time collection.
-    static let coinPerPickup: Int = 10
-    /// Per-new-star coin award (only counts stars never earned before).
-    static let coinPerNewStar: Int = 20
+    /// Per-pickup coin award on first-time collection.  Each level has
+    /// up to 3 currency-coins on the floor → 0…3 coins per first clear
+    /// from pickups alone.
+    static let coinPerPickup: Int = 1
+    /// Flat coin award the first time a player clears a level.  Stacks
+    /// with pickups so a perfect first clear yields `coinPerClear + 3`
+    /// coins.  Subsequent clears award 0 (no farming).
+    static let coinPerClear:  Int = 2
 
     /// Award coins to the player's balance.  Use this everywhere — never
     /// mutate coinBalance directly.
@@ -320,24 +412,26 @@ final class GameState: ObservableObject {
     func isOwned<Item: CosmeticItem>(_ item: Item) -> Bool {
         if item.tier == .starter { return true }
         switch item {
-        case let s as BallSkin:         return s == BallSkin.starter        || ownedBallSkins.contains(s.rawValue)
-        case let g as GoalSkin:         return g == GoalSkin.starter        || ownedGoals.contains(g.rawValue)
-        case let t as TrailColor:       return t == TrailColor.starter      || ownedTrails.contains(t.rawValue)
-        case let b as BackgroundTheme:  return b == BackgroundTheme.starter || ownedBackgrounds.contains(b.rawValue)
-        case let m as MusicTrack:       return m == MusicTrack.starter      || ownedMusic.contains(m.rawValue)
+        case let s as BallSkin:    return s == BallSkin.starter    || ownedBallSkins.contains(s.rawValue)
+        case let g as GoalSkin:    return g == GoalSkin.starter    || ownedGoals.contains(g.rawValue)
+        case let t as TrailColor:  return t == TrailColor.starter  || ownedTrails.contains(t.rawValue)
+        case let f as Floor:       return f == Floor.starter       || ownedFloors.contains(f.rawValue)
+        case let p as Pit:         return p == Pit.starter         || ownedPits.contains(p.rawValue)
+        case let m as MusicTrack:  return m == MusicTrack.starter  || ownedMusic.contains(m.rawValue)
         default: return false
         }
     }
 
     /// Grant ownership of a cosmetic without charging coins (tutorial
-    /// reward, IAP unlock, etc.).
+    /// reward, IAP unlock, bundle purchase, etc.).
     func grant<Item: CosmeticItem>(_ item: Item) {
         switch item {
-        case let s as BallSkin:         ownedBallSkins.insert(s.rawValue)
-        case let g as GoalSkin:         ownedGoals.insert(g.rawValue)
-        case let t as TrailColor:       ownedTrails.insert(t.rawValue)
-        case let b as BackgroundTheme:  ownedBackgrounds.insert(b.rawValue)
-        case let m as MusicTrack:       ownedMusic.insert(m.rawValue)
+        case let s as BallSkin:    ownedBallSkins.insert(s.rawValue)
+        case let g as GoalSkin:    ownedGoals.insert(g.rawValue)
+        case let t as TrailColor:  ownedTrails.insert(t.rawValue)
+        case let f as Floor:       ownedFloors.insert(f.rawValue)
+        case let p as Pit:         ownedPits.insert(p.rawValue)
+        case let m as MusicTrack:  ownedMusic.insert(m.rawValue)
         default: break
         }
     }

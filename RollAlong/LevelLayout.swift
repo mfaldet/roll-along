@@ -95,8 +95,21 @@ struct LevelLayout {
         }
         let tier = tierOverrides[level] ?? DifficultyTier.tier(for: level)
         let mult = tier.timeMultiplier
+        // Easy levels (digits 1-4) play across the FULL arena width
+        // instead of the standard narrow column flanked by side-wall
+        // hole-rects.  The off-screen detection (`x < -r` etc.) still
+        // catches a ball that escapes wall bounces under extreme
+        // velocity, but the player no longer sees big black "death
+        // bars" lining the left and right of the screen.
+        let stripSideWalls = tier == .easy
+        let cleanedHoles: [CGRect]
+        if stripSideWalls {
+            cleanedHoles = base.holeRects.filter { !isSideWall($0) }
+        } else {
+            cleanedHoles = base.holeRects
+        }
         return LevelLayout(
-            holeRects:  base.holeRects,
+            holeRects:  cleanedHoles,
             start:      base.start,
             goal:       base.goal,
             coins:      base.coins,
@@ -130,11 +143,25 @@ struct LevelLayout {
 
 extension LevelLayout {
     /// Side-wall hole rectangles used as the standard arena margins.
-    /// Every Classic-theme level has these so the ball can't roll off the side.
+    /// Auto-prepended by `make(...)` so every hand-crafted level ships
+    /// with them.  Stripped by `layout(for:)` for Easy-tier levels
+    /// (digits 1-4) so beginners play across the full arena width.
     private static let sideWalls: [CGRect] = [
         CGRect(x: 0.00, y: 0, width: 0.12, height: 1),
         CGRect(x: 0.88, y: 0, width: 0.12, height: 1),
     ]
+
+    /// True when a hole rect matches one of the standard `sideWalls`
+    /// (left or right strip).  Used to strip side walls on Easy-tier
+    /// levels without affecting any real designed holes.
+    private static func isSideWall(_ rect: CGRect) -> Bool {
+        let eps: CGFloat = 0.001
+        return abs(rect.height - 1)     < eps
+            && abs(rect.origin.y)       < eps
+            && abs(rect.width - 0.12)   < eps
+            && (abs(rect.origin.x)             < eps
+                || abs(rect.origin.x - 0.88)   < eps)
+    }
 
     /// Standard formula for target/gold times based on the start→goal
     /// straight-line distance plus a difficulty penalty per hole.
@@ -204,18 +231,35 @@ extension LevelLayout {
         // hand-crafted, do-not-auto-modify.
         // ═══════════════════════════════════════════════════════════════════
 
-        // ── L1 Easy — Roll straight down ───────────────────────────────────
-        // The simplest possible level.  No interior holes.  Just tilt the
-        // phone forward; the ball rolls down past three coins to the goal.
-        // This is where the player learns the basic tilt mechanic.
+        // ── L1 Easy — Phased intro + roll past one wide hole ───────────────
+        // On first play, BallGameView runs L1 as a 4-phase tutorial
+        // (intro hint → free roam → coins → hole), revealing each
+        // element with an explanatory pill.  After the player dismisses
+        // the third hint (or wins once), L1 plays as the layout below.
+        //
+        // Coins arrange in a slight zig-zag (top-left, top-right, then
+        // just-above-centre in the played orientation — base coords
+        // need the y values flipped since ballStartsAtTop = true).
+        //
+        // The hole is wide (48% × 7%) and sits just BELOW centre in
+        // the played view → just ABOVE centre in base coords (y=0.45).
+        // Easy tier means `layout(for:)` strips the side-wall hole
+        // strips, so the full arena width is playable — the player
+        // can flow around either end of the hole.
         make(
-            holes: [],
+            // Base y=0.38, h=0.07 → flipped played y range 0.55–0.62
+            // (clearly below the vertical centre, between the third
+            // coin and the goal).  Width 0.48 = ~3× the original
+            // small hole.
+            holes: [
+                CGRect(x: 0.26, y: 0.38, width: 0.48, height: 0.07),
+            ],
             start: UnitPoint(x: 0.5, y: 0.90),
             goal:  UnitPoint(x: 0.5, y: 0.10),
             coins: [
-                UnitPoint(x: 0.5, y: 0.72),
-                UnitPoint(x: 0.5, y: 0.50),
-                UnitPoint(x: 0.5, y: 0.28),
+                UnitPoint(x: 0.25, y: 0.75),    // → top-left   in played orientation
+                UnitPoint(x: 0.75, y: 0.75),    // → top-right  in played orientation
+                UnitPoint(x: 0.50, y: 0.60),    // → just above centre in played orientation
             ],
             verified: true
         ),
@@ -2233,147 +2277,4 @@ extension LevelLayout {
             verified:   false
         )
     }
-}
-
-// MARK: - Theme system
-
-/// Identifies a sub-theme.  Used for analytics + UI labelling.
-enum ThemeID: String {
-    case classic
-    case inverted
-    case twilight
-    case ember
-    case aurora
-    case notebook    // Paper world
-    case graph
-    case parchment
-    case sketch
-    case origami
-}
-
-/// Visual presentation for a level — floor + hole colours, plus a flag for
-/// whether the world has the graphite-trail mechanic enabled (Paper world).
-/// Floor overlays (ruled lines, grids, fold shadows) ship in PR 2b/2c.
-struct Theme {
-    let id:           ThemeID
-    let name:         String
-    let floorColor:   Color
-    let holeColor:    Color
-    let trailEnabled: Bool
-    let trailColor:   Color
-
-    /// Resolve the active theme from the player's equipped BackgroundTheme.
-    /// Was previously keyed by level number (auto-themed bands); as of
-    /// Sprint 4e themes are unlockable cosmetics chosen by the player.
-    static func `for`(_ choice: BackgroundTheme) -> Theme {
-        switch choice {
-        case .classic:   return classic
-        case .inverted:  return inverted
-        case .twilight:  return twilight
-        case .ember:     return ember
-        case .aurora:    return aurora
-        case .notebook:  return notebook
-        case .graph:     return graph
-        case .parchment: return parchment
-        case .sketch:    return sketch
-        case .origami:   return origami
-        }
-    }
-
-    // ── Sub-theme palettes ──────────────────────────────────────────────
-
-    static let classic = Theme(
-        id:           .classic,
-        name:         "Classic",
-        floorColor:   Color(red: 0.941, green: 0.937, blue: 0.925),  // warm off-white
-        holeColor:    Color(red: 0.039, green: 0.039, blue: 0.039),  // deep black
-        trailEnabled: false,
-        trailColor:   .clear
-    )
-
-    static let inverted = Theme(
-        id:           .inverted,
-        name:         "Inverted",
-        floorColor:   Color(red: 0.039, green: 0.039, blue: 0.039),  // black floor
-        holeColor:    Color(red: 0.941, green: 0.937, blue: 0.925),  // white holes
-        trailEnabled: false,
-        trailColor:   .clear
-    )
-
-    static let twilight = Theme(
-        id:           .twilight,
-        name:         "Twilight",
-        floorColor:   Color(red: 0.835, green: 0.824, blue: 0.890),  // pale lavender
-        holeColor:    Color(red: 0.047, green: 0.059, blue: 0.122),  // navy-black
-        trailEnabled: false,
-        trailColor:   .clear
-    )
-
-    static let ember = Theme(
-        id:           .ember,
-        name:         "Ember",
-        floorColor:   Color(red: 0.910, green: 0.835, blue: 0.753),  // warm peach
-        holeColor:    Color(red: 0.102, green: 0.039, blue: 0.039),  // maroon-black
-        trailEnabled: false,
-        trailColor:   .clear
-    )
-
-    static let aurora = Theme(
-        id:           .aurora,
-        name:         "Aurora",
-        floorColor:   Color(red: 0.380, green: 0.620, blue: 0.560),  // base; the
-                                                                       // Canvas overlay
-                                                                       // animates a hue
-                                                                       // shift on top
-        holeColor:    Color(red: 0.000, green: 0.000, blue: 0.000),
-        trailEnabled: false,
-        trailColor:   .clear
-    )
-
-    // World 2 — Paper.  trailEnabled = true means the ball leaves a graphite streak.
-
-    static let notebook = Theme(
-        id:           .notebook,
-        name:         "Notebook",
-        floorColor:   Color(red: 0.980, green: 0.961, blue: 0.902),
-        holeColor:    Color(red: 0.169, green: 0.122, blue: 0.071),
-        trailEnabled: true,
-        trailColor:   Color(red: 0.20, green: 0.20, blue: 0.22).opacity(0.7)
-    )
-
-    static let graph = Theme(
-        id:           .graph,
-        name:         "Graph",
-        floorColor:   Color(red: 0.984, green: 0.984, blue: 0.984),
-        holeColor:    Color(red: 0.055, green: 0.102, blue: 0.180),
-        trailEnabled: true,
-        trailColor:   Color(red: 0.20, green: 0.20, blue: 0.22).opacity(0.7)
-    )
-
-    static let parchment = Theme(
-        id:           .parchment,
-        name:         "Parchment",
-        floorColor:   Color(red: 0.914, green: 0.863, blue: 0.753),
-        holeColor:    Color(red: 0.102, green: 0.059, blue: 0.031),
-        trailEnabled: true,
-        trailColor:   Color(red: 0.20, green: 0.15, blue: 0.10).opacity(0.7)
-    )
-
-    static let sketch = Theme(
-        id:           .sketch,
-        name:         "Sketch",
-        floorColor:   Color(red: 0.988, green: 0.988, blue: 0.980),
-        holeColor:    Color(red: 0.102, green: 0.102, blue: 0.102),
-        trailEnabled: true,
-        trailColor:   Color(red: 0.18, green: 0.18, blue: 0.20).opacity(0.7)
-    )
-
-    static let origami = Theme(
-        id:           .origami,
-        name:         "Origami",
-        floorColor:   Color(red: 0.961, green: 0.937, blue: 0.878),
-        holeColor:    Color(red: 0.094, green: 0.078, blue: 0.063),
-        trailEnabled: true,
-        trailColor:   Color(red: 0.20, green: 0.18, blue: 0.15).opacity(0.7)
-    )
 }

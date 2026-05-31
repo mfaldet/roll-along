@@ -59,7 +59,31 @@ struct HomeView: View {
     @State private var arenaSize: CGSize   = .zero
     @State private var spawned:   Bool     = false
 
-    private let ballRadius: CGFloat = 51   // 120 * 0.85 / 2  (15% smaller)
+    /// Recent ball positions for the home-screen trail.  Mirrors the
+    /// in-game trail mechanic — only populated when the player has a
+    /// non-`.none` TrailColor equipped.
+    @State private var trailPoints: [CGPoint] = []
+    private let homeTrailMaxLength = 60         // ~1.0s at 60fps
+    private let homeTrailMinStep:  CGFloat = 1.5
+
+    /// Hue assigned to `trailPoints[0]` (the visible tail end).  Each
+    /// later segment's hue is `offset + i * homeTrailHueStep mod 1`,
+    /// so once a position is coloured, its hue stays put — the
+    /// spectrum follows the ball rather than redistributing across
+    /// the current segment count.  When segments fall off the tail
+    /// we advance this offset by `removed × step` so the surviving
+    /// segments keep their original hues.
+    @State private var trailHueOffset: Double = 0.0
+    /// One full ROYGBIV cycle every `homeTrailMaxLength` segments.
+    /// At less than full length the trail covers a partial slice of
+    /// the spectrum; at full length it shows the whole rainbow.
+    private let homeTrailHueStep: Double = 1.0 / 60.0
+
+    // Lives sheet (top-left pill → BuyLivesSheet, which also serves as
+    // the "lives status / explanation" screen).
+    @State private var showBuyLivesSheet: Bool = false
+
+    private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
     var body: some View {
         NavigationStack(path: $nav.path) {
@@ -79,9 +103,18 @@ struct HomeView: View {
                         ZStack {
                             // Forces the ZStack to fill the GeometryReader.
                             // Without this the ZStack collapsed to the ball's
-                            // 102×102 frame and ballPos coords were wrong,
-                            // pinning the ball off the left edge of the screen.
+                            // frame and ballPos coords were wrong, pinning
+                            // the ball off the left edge of the screen.
                             Color.clear
+
+                            // Equipped trail — same rendering rules as the
+                            // in-game trail (segment opacity ramps from
+                            // 0.10 at the tail to 1.0 at the head;
+                            // `.rainbow` gets a per-segment hue cycle).
+                            if gameState.equippedTrail != .none {
+                                homeTrailLayer
+                                    .allowsHitTesting(false)
+                            }
 
                             liveBall
                                 .position(ballPos)
@@ -161,6 +194,14 @@ struct HomeView: View {
                 case .shop:     CosmeticShopView()
                 }
             }
+            // Sheet driven by tapping the top-left lives pill.  Re-uses
+            // the existing BuyLivesSheet (which itself has been extended
+            // with a regen-countdown + "1 life per 10 min" explanation
+            // block in its header).
+            .sheet(isPresented: $showBuyLivesSheet) {
+                BuyLivesSheet()
+                    .environmentObject(gameState)
+            }
         }
         .environmentObject(nav)
     }
@@ -239,6 +280,8 @@ struct HomeView: View {
         guard size.width > 0, size.height > 0 else { return }
         ballPos = CGPoint(x: size.width / 2, y: size.height / 2)
         ballVel = .zero
+        trailPoints.removeAll(keepingCapacity: true)
+        trailHueOffset = 0.0
     }
 
     private func tickBall() {
@@ -268,6 +311,75 @@ struct HomeView: View {
         // Hard safety clamp — guarantees the ball can never escape the arena
         ballPos.x = min(max(ballPos.x, r), arenaSize.width  - r)
         ballPos.y = min(max(ballPos.y, r), arenaSize.height - r)
+
+        // Trail — append a new point only if the ball moved enough
+        // since the last segment.  Skipped entirely when the player
+        // has `.none` equipped (no trail to draw).
+        if gameState.equippedTrail != .none {
+            if let last = trailPoints.last {
+                if hypot(ballPos.x - last.x, ballPos.y - last.y) > homeTrailMinStep {
+                    trailPoints.append(ballPos)
+                }
+            } else {
+                trailPoints.append(ballPos)
+            }
+            if trailPoints.count > homeTrailMaxLength {
+                let removed = trailPoints.count - homeTrailMaxLength
+                trailPoints.removeFirst(removed)
+                // Advance the tail hue by exactly the number of
+                // segments we dropped — every remaining segment
+                // keeps its original colour.
+                trailHueOffset = (trailHueOffset
+                                  + Double(removed) * homeTrailHueStep)
+                    .truncatingRemainder(dividingBy: 1.0)
+            }
+        } else if !trailPoints.isEmpty {
+            // Player just switched to .none — clear any residual trail.
+            trailPoints.removeAll(keepingCapacity: true)
+            trailHueOffset = 0.0
+        }
+    }
+
+    /// Trail render.  Opacity ramps from 0.10 at the tail to 1.0 at
+    /// the head.  Rainbow trails use a stable per-segment hue baked
+    /// in at creation (`trailHueOffset + i × step`) so each spot
+    /// keeps its colour as the ball moves on — the spectrum follows
+    /// the ball rather than redistributing across the active count.
+    private var homeTrailLayer: some View {
+        Canvas { ctx, _ in
+            let n = trailPoints.count
+            guard n >= 2 else { return }
+            let isRainbow = gameState.equippedTrail == .rainbow
+            let isAir     = gameState.equippedTrail == .air
+            // Air trail — overall opacity decays as the streak grows
+            // longer, matching the in-game air effect.
+            let airDecay: Double = isAir
+                ? max(0.10, 1.0 - Double(n) / Double(homeTrailMaxLength) * 0.85)
+                : 1.0
+            for i in 1..<n {
+                let prev = trailPoints[i - 1]
+                let curr = trailPoints[i]
+                let age = Double(i) / Double(n - 1)
+                let opacity = (0.10 + 0.90 * age) * airDecay
+                var path = Path()
+                path.move(to: prev)
+                path.addLine(to: curr)
+                let segmentColor: Color
+                if isRainbow {
+                    var hue = (trailHueOffset + Double(i) * homeTrailHueStep)
+                        .truncatingRemainder(dividingBy: 1.0)
+                    if hue < 0 { hue += 1.0 }
+                    segmentColor = Color(hue: hue, saturation: 1.0, brightness: 1.0)
+                } else {
+                    segmentColor = gameState.equippedTrail.color
+                }
+                ctx.stroke(
+                    path,
+                    with: .color(segmentColor.opacity(opacity)),
+                    style: StrokeStyle(lineWidth: 5.0, lineCap: .round, lineJoin: .round)
+                )
+            }
+        }
     }
 
     // MARK: - Sub-views
@@ -309,20 +421,11 @@ struct HomeView: View {
                 Spacer()
                 Button { nav.goToShop() } label: {
                     HStack(spacing: 6) {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.00, green: 0.88, blue: 0.40),
-                                        Color(red: 0.93, green: 0.65, blue: 0.10),
-                                    ],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                            .overlay(
-                                Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6)
-                            )
-                            .frame(width: 14, height: 14)
+                        // Shared coin graphic — same paw-print minted
+                        // coin used on every screen.  Slightly larger
+                        // than a plain glyph so the detail reads inside
+                        // the small pill.
+                        CoinIcon(size: 18)
 
                         Text("\(gameState.coinBalance)")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -356,82 +459,134 @@ struct HomeView: View {
         }
     }
 
-    /// Floating lives indicator in the top-LEFT corner — mirrors the
-    /// in-game HUD spec: 6 red marbles always rendered; filled = lives
-    /// you currently have, outlined = empty slots.  Stockpiled lives
-    /// past 6 show as "+N" to the right; unlimited-lives subscribers
-    /// see 6 gold marbles + an infinity glyph.
+    /// Floating lives pill in the top-LEFT corner — sized to match the
+    /// coin balance pill on the right.  Tapping it opens BuyLivesSheet
+    /// (which doubles as the "lives status + explanation + purchase"
+    /// screen).
     ///
-    /// Wrapped in a TimelineView so the "next life in M:SS" countdown
-    /// ticks every second and the marble count refreshes when regen
-    /// commits.
+    /// Spec recap:
+    ///   • 6 marbles always rendered.
+    ///   • Filled red = active lives (clamped to 6).
+    ///   • Next-empty marble shows regen progress as a bottom-up
+    ///     partial fill — 80% elapsed in the 10-min cycle = bottom 4/5
+    ///     of the marble is coloured.  No separate countdown text.
+    ///   • Stockpile above 6 → "+N" trailing the row.
+    ///   • Unlimited-lives subscribers → 6 gold marbles + ∞ glyph.
     private var livesMarblePill: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
             let unlimited     = gameState.unlimitedLives
             let display       = gameState.displayedLives
             let filledMarbles = unlimited ? GameState.livesMax : min(display, GameState.livesMax)
             let stockpile     = unlimited ? 0 : max(0, display - GameState.livesMax)
+            // The first empty marble (index == filledMarbles) shows regen
+            // progress; marbles past it stay fully hollow.  When the bar
+            // is already full (filledMarbles == livesMax) there's no
+            // regen and no partial fill.
+            let regen         = unlimited ? nil : gameState.regenProgress()
 
             VStack {
                 HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 5) {
+                    Button {
+                        AnalyticsClient.shared.track("home_lives_pill_tapped")
+                        showBuyLivesSheet = true
+                    } label: {
+                        HStack(spacing: 6) {
                             ForEach(0..<GameState.livesMax, id: \.self) { i in
-                                marbleIcon(filled: i < filledMarbles, gold: unlimited)
+                                let isFilled = i < filledMarbles
+                                let partial: Double = (!isFilled
+                                                       && i == filledMarbles
+                                                       && regen != nil) ? (regen ?? 0) : 0
+                                marbleIcon(
+                                    filled:      isFilled,
+                                    gold:        unlimited,
+                                    partialFill: partial,
+                                    size:        20
+                                )
                             }
                             if unlimited {
                                 Image(systemName: "infinity")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(Self.goldLifeGradient)
                                     .padding(.leading, 2)
                             } else if stockpile > 0 {
                                 Text("+\(stockpile)")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white)
                                     .padding(.leading, 2)
                             }
                         }
-                        if let countdown = gameState.timeToNextLife() {
-                            Text("+1 in \(Self.formatCountdown(countdown))")
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                .foregroundStyle(Color(white: 0.50))
-                        }
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color(white: 0.14))
+                                .overlay(
+                                    Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
+                                )
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(livesAccessibilityLabel)
+                    .accessibilityHint("Opens the lives status and purchase sheet.")
                     Spacer()
                 }
                 Spacer()
             }
-            .padding(.leading, 18)
+            .padding(.leading, 16)
             .padding(.top, 8)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(livesAccessibilityLabel)
         }
     }
 
-    /// One marble slot — fills red (or gold for unlimited) when the slot
-    /// is occupied, hollow grey outline when empty.  Matches the in-game
-    /// HUD so the two reads consistently across menu and gameplay.
+    /// One marble slot.  Three modes:
+    ///   • `filled == true`        → full gradient fill with the glossy
+    ///                               highlight + drop shadow.
+    ///   • `partialFill > 0`       → bottom-aligned partial fill only,
+    ///                               clipped to the circle silhouette
+    ///                               (no highlight, no shadow — they
+    ///                               look weird at half-coverage).
+    ///   • neither                 → hollow grey outline.
     @ViewBuilder
-    private func marbleIcon(filled: Bool, gold: Bool) -> some View {
-        if filled {
+    private func marbleIcon(
+        filled:      Bool,
+        gold:        Bool,
+        partialFill: Double = 0,
+        size:        CGFloat = 20
+    ) -> some View {
+        ZStack {
+            // Outline — always rendered so the empty/partial states still
+            // read as a "marble shape".
             Circle()
-                .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
-                .frame(width: 13, height: 13)
-                .overlay(
-                    Circle()
-                        .fill(Color.white.opacity(0.55))
-                        .frame(width: 4, height: 4)
-                        .offset(x: -2.5, y: -2.5)
-                )
-                .overlay(
-                    Circle().stroke(Color.black.opacity(0.40), lineWidth: 0.6)
-                )
-                .shadow(color: Color.black.opacity(0.22), radius: 1.5, y: 1)
-        } else {
-            Circle()
-                .stroke(Color(white: 0.40).opacity(0.7), lineWidth: 0.9)
-                .frame(width: 13, height: 13)
+                .stroke(Color(white: 0.40).opacity(0.7), lineWidth: 1.0)
+                .frame(width: size, height: size)
+
+            if filled {
+                Circle()
+                    .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Circle()
+                            .fill(Color.white.opacity(0.55))
+                            .frame(width: size * 0.28, height: size * 0.28)
+                            .offset(x: -size * 0.18, y: -size * 0.18)
+                    )
+                    .overlay(
+                        Circle().stroke(Color.black.opacity(0.40), lineWidth: 0.6)
+                    )
+                    .shadow(color: Color.black.opacity(0.22), radius: 1.5, y: 1)
+            } else if partialFill > 0 {
+                // Render the full gradient and clip to the bottom
+                // `partialFill` fraction.  The clip shape is a Rect, but
+                // because the source is a Circle the visible region
+                // naturally curves along the circle's arc at the
+                // clip-line — exactly the look we want.
+                Circle()
+                    .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                    .frame(width: size, height: size)
+                    .clipShape(BottomFillRect(fraction: partialFill))
+            }
         }
+        .frame(width: size, height: size)
     }
 
     private var livesAccessibilityLabel: String {
@@ -607,6 +762,28 @@ struct HomeView: View {
                 Gradient(colors: [Color.white.opacity(0.28), .clear]),
                 startPoint: CGPoint(x: 0, y: 0),
                 endPoint:   CGPoint(x: 0, y: size.height * 0.45)
+            )
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BottomFillRect — clip shape used by the lives marbles to render the
+// regen-progress partial fill.  The rect occupies the bottom `fraction`
+// of the frame; clipping a Circle to it produces a curved water-line
+// look (the visible boundary follows the circle's arc, not a flat
+// horizontal cut).
+// ---------------------------------------------------------------------------
+struct BottomFillRect: Shape {
+    let fraction: Double
+    func path(in rect: CGRect) -> Path {
+        let h = rect.height * fraction
+        return Path(
+            CGRect(
+                x:      rect.minX,
+                y:      rect.maxY - h,
+                width:  rect.width,
+                height: h
             )
         )
     }

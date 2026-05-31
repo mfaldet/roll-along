@@ -13,24 +13,28 @@ import SwiftUI
 // ---------------------------------------------------------------------------
 
 private enum ShopCategory: String, CaseIterable, Identifiable {
-    case ball, goal, trail, background, music
+    case ball, goal, trail, floor, pit, music, bundle
     var id: String { rawValue }
     var icon: String {
         switch self {
-        case .ball:       return "circle.fill"
-        case .goal:       return "sparkles"
-        case .trail:      return "scribble.variable"
-        case .background: return "rectangle.fill.on.rectangle.fill"
-        case .music:      return "music.note"
+        case .ball:   return "circle.fill"
+        case .goal:   return "sparkles"
+        case .trail:  return "scribble.variable"
+        case .floor:  return "square.fill.on.square.fill"
+        case .pit:    return "circle.dotted"
+        case .music:  return "music.note"
+        case .bundle: return "shippingbox.fill"
         }
     }
     var displayName: String {
         switch self {
-        case .ball:       return "Ball"
-        case .goal:       return "Goal"
-        case .trail:      return "Trail"
-        case .background: return "Theme"
-        case .music:      return "Music"
+        case .ball:   return "Ball"
+        case .goal:   return "Goal"
+        case .trail:  return "Trail"
+        case .floor:  return "Floor"
+        case .pit:    return "Pit"
+        case .music:  return "Music"
+        case .bundle: return "Bundle"
         }
     }
 }
@@ -98,10 +102,7 @@ struct CosmeticShopView: View {
     private var headerBar: some View {
         HStack {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(Self.coinGradient)
-                    .frame(width: 18, height: 18)
-                    .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.6))
+                CoinIcon(size: 22)
                 Text("\(gameState.coinBalance)")
                     .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
@@ -176,15 +177,21 @@ struct CosmeticShopView: View {
     private var grid: some View {
         switch category {
         case .ball:
-            categoryGrid(items: BallSkin.allCases)
+            // Bundle-exclusive balls (e.g. Pluto) are hidden from the
+            // individual Ball grid — they're only obtainable via a bundle.
+            categoryGrid(items: BallSkin.allCases.filter { !$0.isBundleExclusive })
         case .goal:
             categoryGrid(items: GoalSkin.allCases)
         case .trail:
             categoryGrid(items: TrailColor.allCases)
-        case .background:
-            categoryGrid(items: BackgroundTheme.allCases)
+        case .floor:
+            categoryGrid(items: Floor.allCases)
+        case .pit:
+            categoryGrid(items: Pit.allCases)
         case .music:
             categoryGrid(items: MusicTrack.allCases)
+        case .bundle:
+            bundleGrid
         }
     }
 
@@ -256,10 +263,7 @@ struct CosmeticShopView: View {
                     .background(Capsule().fill(Color(white: 0.22)))
             } else {
                 HStack(spacing: 4) {
-                    Circle()
-                        .fill(Self.coinGradient)
-                        .frame(width: 11, height: 11)
-                        .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+                    CoinIcon(size: 13)
                     Text("\(item.coinCost)")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(canAfford(item) ? .white : Color(white: 0.45))
@@ -339,22 +343,24 @@ struct CosmeticShopView: View {
 
     private func equip<Item: CosmeticItem>(_ item: Item) {
         switch item {
-        case let s as BallSkin:        gameState.activeSkin = s
-        case let g as GoalSkin:        gameState.equippedGoal = g
-        case let t as TrailColor:      gameState.equippedTrail = t
-        case let b as BackgroundTheme: gameState.equippedBackground = b
-        case let m as MusicTrack:      gameState.equippedMusic = m
+        case let s as BallSkin:   gameState.activeSkin = s
+        case let g as GoalSkin:   gameState.equippedGoal = g
+        case let t as TrailColor: gameState.equippedTrail = t
+        case let f as Floor:      gameState.equippedFloor = f
+        case let p as Pit:        gameState.equippedPit = p
+        case let m as MusicTrack: gameState.equippedMusic = m
         default: break
         }
     }
 
     private func isEquipped<Item: CosmeticItem>(_ item: Item) -> Bool {
         switch item {
-        case let s as BallSkin:        return s == gameState.activeSkin
-        case let g as GoalSkin:        return g == gameState.equippedGoal
-        case let t as TrailColor:      return t == gameState.equippedTrail
-        case let b as BackgroundTheme: return b == gameState.equippedBackground
-        case let m as MusicTrack:      return m == gameState.equippedMusic
+        case let s as BallSkin:   return s == gameState.activeSkin
+        case let g as GoalSkin:   return g == gameState.equippedGoal
+        case let t as TrailColor: return t == gameState.equippedTrail
+        case let f as Floor:      return f == gameState.equippedFloor
+        case let p as Pit:        return p == gameState.equippedPit
+        case let m as MusicTrack: return m == gameState.equippedMusic
         default: return false
         }
     }
@@ -368,11 +374,12 @@ struct CosmeticShopView: View {
     @ViewBuilder
     private func preview<Item: CosmeticItem>(for item: Item) -> some View {
         switch item {
-        case let s as BallSkin:        ballPreview(s)
-        case let g as GoalSkin:        goalPreview(g)
-        case let t as TrailColor:      trailPreview(t)
-        case let b as BackgroundTheme: backgroundPreview(b)
-        case let m as MusicTrack:      musicPreview(m)
+        case let s as BallSkin:   ballPreview(s)
+        case let g as GoalSkin:   goalPreview(g)
+        case let t as TrailColor: trailPreview(t)
+        case let f as Floor:      floorPreview(f)
+        case let p as Pit:        pitPreview(p)
+        case let m as MusicTrack: musicPreview(m)
         default: EmptyView()
         }
     }
@@ -436,21 +443,121 @@ struct CosmeticShopView: View {
         .padding(8)
     }
 
-    private func backgroundPreview(_ bg: BackgroundTheme) -> some View {
-        let t = Theme.for(bg)
-        return ZStack {
+    private func floorPreview(_ floor: Floor) -> some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(floor.color)
+            .frame(width: 90, height: 60)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.black.opacity(0.25), lineWidth: 0.6)
+            )
+    }
+
+    private func pitPreview(_ pit: Pit) -> some View {
+        ZStack {
             RoundedRectangle(cornerRadius: 10)
-                .fill(t.floorColor)
-            // Tiny floating "hole" to show contrast
-            RoundedRectangle(cornerRadius: 3)
-                .fill(t.holeColor)
-                .frame(width: 28, height: 16)
-                .offset(x: 0, y: -2)
+                .fill(Color(white: 0.18))
+            RoundedRectangle(cornerRadius: 4)
+                .fill(pit.color)
+                .frame(width: 38, height: 22)
         }
         .frame(width: 90, height: 60)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.black.opacity(0.25), lineWidth: 0.6)
+        )
+    }
+
+    /// Bundle grid — lists the catalogue's bundles with a compact
+    /// "buy or owned" cell each.  Bundle definitions live in
+    /// `Bundle.catalogue` (see Cosmetics.swift).
+    @ViewBuilder
+    private var bundleGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                ForEach(CosmeticBundle.catalogue) { bundle in
+                    bundleCell(bundle)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private func bundleCell(_ bundle: CosmeticBundle) -> some View {
+        let owned = gameState.ownedBundles.contains(bundle.id)
+        return Button {
+            handleBundleTap(bundle, owned: owned)
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(bundle.displayName)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    if owned {
+                        Text("OWNED")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .kerning(1.0)
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(Capsule().fill(Color.white))
+                    } else {
+                        HStack(spacing: 4) {
+                            CoinIcon(size: 13)
+                            Text("\(bundle.price(in: gameState))")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(canAffordBundle(bundle) ? .white : Color(white: 0.45))
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Capsule().fill(Color(white: 0.22)))
+                    }
+                }
+                Text(bundle.tagline)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.65))
+                    .multilineTextAlignment(.leading)
+                Text(bundle.contentSummary)
+                    .font(.system(size: 11, weight: .regular, design: .rounded))
+                    .foregroundStyle(Color(white: 0.50))
+                    .lineLimit(3)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(owned ? Color.white.opacity(0.40) : Color.clear, lineWidth: 1.2)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func canAffordBundle(_ bundle: CosmeticBundle) -> Bool {
+        gameState.coinBalance >= bundle.price(in: gameState)
+    }
+
+    private func handleBundleTap(_ bundle: CosmeticBundle, owned: Bool) {
+        if owned { return }
+        let cost = bundle.price(in: gameState)
+        guard gameState.coinBalance >= cost else {
+            alertMessage = "You need \(cost - gameState.coinBalance) more coins for the \(bundle.displayName) bundle.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
+            showAlert = true
+            return
+        }
+        _ = gameState.spendCoins(cost)
+        bundle.grantContents(to: gameState)
+        gameState.ownedBundles.insert(bundle.id)
+        AnalyticsClient.shared.track(
+            "bundle_purchased",
+            properties: [
+                "bundle":  .string(bundle.id),
+                "price":   .int(cost),
+                "items":   .int(bundle.itemCount),
+            ]
         )
     }
 
@@ -468,15 +575,9 @@ struct CosmeticShopView: View {
             )
     }
 
-    // MARK: - Constants
-
-    private static let coinGradient = LinearGradient(
-        colors: [
-            Color(red: 1.00, green: 0.88, blue: 0.40),
-            Color(red: 0.93, green: 0.65, blue: 0.10),
-        ],
-        startPoint: .top, endPoint: .bottom
-    )
+    // (Coin glyph rendering moved to the shared CoinIcon view in
+    // BallGameView.swift — every screen uses the same paw-print
+    // minted-coin graphic now.)
 }
 
 #Preview {

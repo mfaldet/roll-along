@@ -95,10 +95,16 @@ struct SettingsView: View {
                 onTap:      { gameState.equippedTrail = $0 }
             )
             cosmeticRow(
-                label: "Background",
-                items: BackgroundTheme.allCases.filter { gameState.isOwned($0) },
-                isEquipped: { $0 == gameState.equippedBackground },
-                onTap:      { gameState.equippedBackground = $0 }
+                label: "Floor",
+                items: Floor.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.equippedFloor },
+                onTap:      { gameState.equippedFloor = $0 }
+            )
+            cosmeticRow(
+                label: "Pit",
+                items: Pit.allCases.filter { gameState.isOwned($0) },
+                isEquipped: { $0 == gameState.equippedPit },
+                onTap:      { gameState.equippedPit = $0 }
             )
             cosmeticRow(
                 label: "Music",
@@ -131,6 +137,13 @@ struct SettingsView: View {
                     }
                 }
                 .padding(.horizontal, 2)
+                // Vertical breathing room — the selected cell uses
+                // .scaleEffect(1.06) + a 2pt border, which together push
+                // it ~4pt taller than an unselected cell.  Without this
+                // padding the ScrollView's viewport sizes to the
+                // un-scaled height and clips the selected cell's top
+                // border.
+                .padding(.vertical, 6)
             }
         }
     }
@@ -214,11 +227,14 @@ struct SettingsView: View {
                 }
             }
             .padding(4)
-        case let b as BackgroundTheme:
-            let th = Theme.for(b)
+        case let f as Floor:
+            RoundedRectangle(cornerRadius: 8).fill(f.color)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.30), lineWidth: 0.5))
+                .padding(6)
+        case let p as Pit:
             ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(th.floorColor)
-                RoundedRectangle(cornerRadius: 2).fill(th.holeColor).frame(width: 22, height: 12)
+                RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.18))
+                RoundedRectangle(cornerRadius: 2).fill(p.color).frame(width: 26, height: 14)
             }
             .padding(6)
         case let m as MusicTrack:

@@ -137,9 +137,17 @@ struct LevelSelectView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(tint)
+                // The "Coins" row uses the shared CoinIcon graphic so the
+                // currency reads identically here, on the home pill, in
+                // the shop, and on the level-clear screen.  Stars stay
+                // as their SF Symbol — they're a separate award concept.
+                if label == "Coins" {
+                    CoinIcon(size: 16)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(tint)
+                }
                 Text(label.uppercased())
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .kerning(1.5)
@@ -193,7 +201,8 @@ struct LevelSelectView: View {
         let coins    = gameState.coinsCollected(for: level)
         // For cells, preview the player's currently-equipped background
         // theme rather than the (now obsolete) per-level theme bands.
-        let theme    = Theme.for(gameState.equippedBackground)
+        let floor    = gameState.equippedFloor
+        let pit      = gameState.equippedPit
         let isDesigned = level <= LevelLayout.handCrafted.count
 
         if unlocked && isDesigned {
@@ -204,7 +213,7 @@ struct LevelSelectView: View {
                 nav.goToGame()
             } label: {
                 cellContent(level: level, stars: stars, coins: coins,
-                            theme: theme, unlocked: true, designed: true)
+                            floor: floor, pit: pit, unlocked: true, designed: true)
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
@@ -212,7 +221,7 @@ struct LevelSelectView: View {
             .accessibilityHint("Double-tap to play.")
         } else {
             cellContent(level: level, stars: stars, coins: coins,
-                        theme: theme, unlocked: unlocked, designed: isDesigned)
+                        floor: floor, pit: pit, unlocked: unlocked, designed: isDesigned)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(accessibilityLabel(level: level, stars: stars, coins: coins.count, locked: !unlocked, designed: isDesigned))
         }
@@ -226,14 +235,15 @@ struct LevelSelectView: View {
     }
 
     private func cellContent(level: Int, stars: Int, coins: Set<Int>,
-                             theme: Theme, unlocked: Bool, designed: Bool) -> some View {
+                             floor: Floor, pit: Pit,
+                             unlocked: Bool, designed: Bool) -> some View {
         let canPlay = unlocked && designed
         let tier = DifficultyTier.tier(for: level)
         return VStack(spacing: 6) {
             ZStack {
-                // Theme color swatch as background hint
+                // Floor color swatch as background hint
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(canPlay ? theme.floorColor : Color(white: 0.18))
+                    .fill(canPlay ? floor.color : Color(white: 0.18))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color(white: 0.28), lineWidth: 1)
@@ -258,7 +268,7 @@ struct LevelSelectView: View {
                 } else {
                     Text("\(level)")
                         .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(theme.holeColor)
+                        .foregroundStyle(pit.color)
 
                     // Tier badge — small colored dot in the top-right of the cell
                     VStack {
