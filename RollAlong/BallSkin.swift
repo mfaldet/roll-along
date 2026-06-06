@@ -81,6 +81,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //   • dune — warm desert gradient (sand → ochre → terracotta → dusk),
     //     pure radial gradient via the default renderer.
     case dune = "Dune"
+    //   • storm — dark storm-cloud sphere with a lightning bolt, via the
+    //     bespoke `stormMarble` Canvas in BallGameView (clipped to circle).
+    case storm = "Storm"
 
     var id: String { rawValue }
 
@@ -405,6 +408,16 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.86, green: 0.66, blue: 0.34),
                 Color(red: 0.64, green: 0.34, blue: 0.22),
                 Color(red: 0.26, green: 0.16, blue: 0.30),
+            ]
+        case .storm:
+            // Dark storm cloud — pale grey highlight → slate → deep navy.
+            // The lightning bolt + cloud puffs paint on top via the
+            // bespoke `stormMarble` Canvas in BallGameView.
+            return [
+                Color(red: 0.66, green: 0.70, blue: 0.78),
+                Color(red: 0.36, green: 0.42, blue: 0.52),
+                Color(red: 0.16, green: 0.20, blue: 0.30),
+                Color(red: 0.05, green: 0.07, blue: 0.14),
             ]
         }
     }

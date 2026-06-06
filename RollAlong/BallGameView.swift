@@ -1670,6 +1670,14 @@ struct BallGameView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
+        case .storm:
+            // Dark storm-cloud sphere with billowing puffs and a lightning
+            // bolt.  Clipped to a circle so the puffs run off the edge.
+            stormMarble
+                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.30), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
         default:
             Circle()
                 .fill(gameState.activeSkin.gradient(endRadius: effectiveBallRadius * 1.4))
@@ -2120,6 +2128,85 @@ struct BallGameView: View {
                 with: .radialGradient(
                     Gradient(colors: [Color.white.opacity(0.75), .clear]),
                     center: CGPoint(x: w * 0.27, y: h * 0.18),
+                    startRadius: 0,
+                    endRadius:   r * 0.40
+                )
+            )
+        }
+    }
+
+    /// Storm marble — a dark storm-cloud sphere with soft billowing puffs
+    /// and a jagged lightning bolt (a translucent glow stroke under a
+    /// bright core).  Static; the circle clip in `marbleView` trims any
+    /// puff that runs off the silhouette.  Templated on `aquariumMarble`.
+    private var stormMarble: some View {
+        Canvas { ctx, size in
+            let w = size.width
+            let h = size.height
+            let r = min(w, h) / 2
+
+            // Dark storm body — radial gradient for 3D shading.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.66, green: 0.70, blue: 0.78), location: 0.00),
+                        .init(color: Color(red: 0.36, green: 0.42, blue: 0.52), location: 0.45),
+                        .init(color: Color(red: 0.16, green: 0.20, blue: 0.30), location: 0.82),
+                        .init(color: Color(red: 0.05, green: 0.07, blue: 0.14), location: 1.00),
+                    ]),
+                    center: CGPoint(x: w * 0.32, y: h * 0.30),
+                    startRadius: 0,
+                    endRadius:   r * 1.30
+                )
+            )
+
+            // Billowing cloud puffs — soft light-grey blooms that fade out.
+            let puffs: [(x: CGFloat, y: CGFloat, rad: CGFloat)] = [
+                (0.34, 0.40, 0.30),
+                (0.60, 0.34, 0.24),
+                (0.50, 0.54, 0.26),
+                (0.70, 0.52, 0.20),
+            ]
+            for p in puffs {
+                let c  = CGPoint(x: w * p.x, y: h * p.y)
+                let pr = r * p.rad
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: c.x - pr, y: c.y - pr, width: pr * 2, height: pr * 2)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color(red: 0.80, green: 0.83, blue: 0.90).opacity(0.42), .clear]),
+                        center: c,
+                        startRadius: 0,
+                        endRadius:   pr
+                    )
+                )
+            }
+
+            // Lightning bolt — a jagged path stroked twice: a soft wide
+            // glow, then a thin bright core.
+            var bolt = Path()
+            let pts = [
+                CGPoint(x: w * 0.54, y: h * 0.18),
+                CGPoint(x: w * 0.44, y: h * 0.46),
+                CGPoint(x: w * 0.56, y: h * 0.48),
+                CGPoint(x: w * 0.42, y: h * 0.82),
+            ]
+            bolt.move(to: pts[0])
+            for pt in pts.dropFirst() { bolt.addLine(to: pt) }
+            ctx.stroke(bolt,
+                       with: .color(Color(red: 1.00, green: 0.92, blue: 0.45).opacity(0.35)),
+                       style: StrokeStyle(lineWidth: r * 0.22, lineCap: .round, lineJoin: .round))
+            ctx.stroke(bolt,
+                       with: .color(Color(red: 1.00, green: 0.98, blue: 0.78)),
+                       style: StrokeStyle(lineWidth: r * 0.08, lineCap: .round, lineJoin: .round))
+
+            // Top gloss crescent.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.08,
+                                       width: w * 0.32, height: h * 0.24)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.40), .clear]),
+                    center: CGPoint(x: w * 0.26, y: h * 0.18),
                     startRadius: 0,
                     endRadius:   r * 0.40
                 )
