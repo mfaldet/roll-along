@@ -1686,6 +1686,13 @@ struct BallGameView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
+        case .ghost:
+            // Luminous pale spirit with hollow eyes and a wailing mouth.
+            ghostMarble
+                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
         default:
             Circle()
                 .fill(gameState.activeSkin.gradient(endRadius: effectiveBallRadius * 1.4))
@@ -2147,6 +2154,75 @@ struct BallGameView: View {
     /// and a jagged lightning bolt (a translucent glow stroke under a
     /// bright core).  Static; the circle clip in `marbleView` trims any
     /// puff that runs off the silhouette.  Templated on `aquariumMarble`.
+    /// Ghost — a luminous pale orb with hollow eyes and a wailing mouth.
+    private var ghostMarble: some View {
+        Canvas { ctx, size in
+            let w = size.width
+            let h = size.height
+            let r = min(w, h) / 2
+
+            // Luminous spirit body — soft white core fading to a cold
+            // blue-grey rim.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.97, green: 0.98, blue: 1.00), location: 0.00),
+                        .init(color: Color(red: 0.82, green: 0.86, blue: 0.94), location: 0.55),
+                        .init(color: Color(red: 0.58, green: 0.64, blue: 0.76), location: 0.85),
+                        .init(color: Color(red: 0.34, green: 0.40, blue: 0.54), location: 1.00),
+                    ]),
+                    center: CGPoint(x: w * 0.40, y: h * 0.34),
+                    startRadius: 0,
+                    endRadius:   r * 1.25
+                )
+            )
+
+            // Inner glow halo to make the orb feel like it's emitting light.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.18, y: h * 0.18,
+                                       width: w * 0.50, height: h * 0.50)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: w * 0.42, y: h * 0.40),
+                    startRadius: 0,
+                    endRadius:   r * 0.70
+                )
+            )
+
+            // Hollow eyes — two dark soft-edged ovals.
+            let eyeColor = Color(red: 0.16, green: 0.18, blue: 0.26)
+            let eyeW = w * 0.16
+            let eyeH = h * 0.22
+            for ex in [w * 0.36, w * 0.60] {
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: ex - eyeW / 2, y: h * 0.36,
+                                           width: eyeW, height: eyeH)),
+                    with: .color(eyeColor)
+                )
+            }
+
+            // Wailing mouth — a tall dark oval below the eyes.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.50 - w * 0.10, y: h * 0.62,
+                                       width: w * 0.20, height: h * 0.20)),
+                with: .color(eyeColor)
+            )
+
+            // Top gloss crescent.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.16, y: h * 0.08,
+                                       width: w * 0.30, height: h * 0.22)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.65), .clear]),
+                    center: CGPoint(x: w * 0.28, y: h * 0.16),
+                    startRadius: 0,
+                    endRadius:   r * 0.36
+                )
+            )
+        }
+    }
+
     /// Candy — a glossy peppermint sphere with a white pinwheel swirl.
     private var candyMarble: some View {
         Canvas { ctx, size in

@@ -88,7 +88,7 @@ extension BallSkin: CosmeticItem {
              .pastel, .neon, .dune:
             return .premium    // 200 coins — multi-colour blends / planets
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
-             .storm, .candy:
+             .storm, .candy, .ghost:
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -583,6 +583,7 @@ enum Floor: String, CosmeticItem {
     case desert           // Round-5 Dune bundle — warm sand
     case stormcloud       // Round-5 Tempest bundle — slate storm
     case sugar            // Round-5 Candyland bundle — pale candy-pink
+    case fog              // Round-5 Haunted bundle — cold grey mist
 
     // Exclusive / Legendary (500 coins) — animated floor overlays
     case aurora           // the original shimmer
@@ -612,6 +613,7 @@ enum Floor: String, CosmeticItem {
         case .desert:     return "Desert"
         case .stormcloud: return "Stormcloud"
         case .sugar:      return "Sugar"
+        case .fog:        return "Fog"
         case .aurora:     return "Aurora"
         case .disco:      return "Disco"
         case .grass:      return "Grass"
@@ -628,7 +630,7 @@ enum Floor: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .desert, .stormcloud, .sugar:
+             .origami, .mirage, .desert, .stormcloud, .sugar, .fog:
             return .standard   //  50 coins
         case .aurora, .disco, .grass, .moon:
             return .exclusive  // 500 coins — animated / textured overlay
@@ -659,6 +661,7 @@ enum Floor: String, CosmeticItem {
         case .desert:     return Color(red: 0.90,  green: 0.78,  blue: 0.55 )  // warm sand
         case .stormcloud: return Color(red: 0.32,  green: 0.36,  blue: 0.44 )  // slate storm
         case .sugar:      return Color(red: 0.99,  green: 0.92,  blue: 0.95 )  // pale candy-pink
+        case .fog:        return Color(red: 0.66,  green: 0.69,  blue: 0.70 )  // cold grey mist
         case .aurora:     return Color(red: 0.380, green: 0.620, blue: 0.560)
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -714,6 +717,7 @@ enum Pit: String, CosmeticItem {
     case canyon           // Round-5 Dune bundle — deep rust gorge
     case downpour         // Round-5 Tempest bundle — dark rainy blue
     case syrup            // Round-5 Candyland bundle — dark molasses
+    case graveyard        // Round-5 Haunted bundle — near-black graveyard earth
 
     // Exclusive / Legendary (500 coins) — animated pit overlays
     case evil             // burning fire-pit animation
@@ -744,6 +748,7 @@ enum Pit: String, CosmeticItem {
         case .canyon:     return "Canyon"
         case .downpour:   return "Downpour"
         case .syrup:      return "Syrup"
+        case .graveyard:  return "Graveyard"
         case .evil:       return "Evil"
         case .sky:        return "Sky"
         case .pond:       return "Pond"
@@ -760,7 +765,7 @@ enum Pit: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .aurora, .canyon, .downpour, .syrup:
+             .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard:
             return .standard   //  50 coins
         case .evil, .sky, .pond, .space:
             return .exclusive  // 500 coins — animated overlay
@@ -792,6 +797,7 @@ enum Pit: String, CosmeticItem {
         case .canyon:     return Color(red: 0.32,  green: 0.14,  blue: 0.08 )  // deep rust gorge
         case .downpour:   return Color(red: 0.10,  green: 0.16,  blue: 0.26 )  // dark rainy blue
         case .syrup:      return Color(red: 0.20,  green: 0.06,  blue: 0.10 )  // dark molasses
+        case .graveyard:  return Color(red: 0.04,  green: 0.07,  blue: 0.05 )  // near-black graveyard earth
         case .evil:       return Color(red: 0.10,  green: 0.02,  blue: 0.00 )  // dark base; flames paint over
         case .sky:        return Color(red: 0.55,  green: 0.78,  blue: 0.95 )  // pale blue base; clouds drift on top
         case .pond:       return Color(red: 0.08,  green: 0.30,  blue: 0.42 )  // deep water; ripples + lily pad on top
@@ -1335,6 +1341,18 @@ struct CosmeticBundle: Identifiable {
             floors: [.sugar],
             pits:   [.syrup],
             music:  [.lofi]
+        ),
+        CosmeticBundle(
+            id:             "haunted",
+            displayName:    "Haunted",
+            tagline:        "A restless spirit drifting through the dark.",
+            contentSummary: "Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music",
+            balls:  [.ghost],
+            goals:  [.obsidian],
+            trails: [.smoke],
+            floors: [.fog],
+            pits:   [.graveyard],
+            music:  [.downtempo]
         ),
     ]
 }

@@ -87,6 +87,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //   • candy — glossy peppermint pinwheel of red/white wedges, via the
     //     bespoke `candyMarble` Canvas in BallGameView (clipped to circle).
     case candy = "Candy"
+    //   • ghost — luminous pale orb with hollow eyes and a wailing mouth,
+    //     via the bespoke `ghostMarble` Canvas in BallGameView.
+    case ghost = "Ghost"
 
     var id: String { rawValue }
 
@@ -431,6 +434,16 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.92, green: 0.20, blue: 0.28),
                 Color(red: 0.74, green: 0.08, blue: 0.18),
                 Color(red: 0.46, green: 0.03, blue: 0.10),
+            ]
+        case .ghost:
+            // Luminous pale spirit — soft white core fading to a cold
+            // blue-grey rim.  The eyes + mouth paint on top via the bespoke
+            // `ghostMarble` Canvas in BallGameView.
+            return [
+                Color(red: 0.97, green: 0.98, blue: 1.00),
+                Color(red: 0.82, green: 0.86, blue: 0.94),
+                Color(red: 0.58, green: 0.64, blue: 0.76),
+                Color(red: 0.34, green: 0.40, blue: 0.54),
             ]
         }
     }
