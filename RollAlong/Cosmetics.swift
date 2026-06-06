@@ -1153,5 +1153,70 @@ struct CosmeticBundle: Identifiable {
             pits:   [.aurora],
             music:  [.celestial]
         ),
+
+        CosmeticBundle(
+            id:             "citrus",
+            displayName:    "Citrus",
+            tagline:        "Zest and warmth from dawn to dusk.",
+            contentSummary: "Lemon ball · Flame goal · Ember trail · Dusk floor · Sunset pit · Jazz music",
+            balls:  [.lemon],
+            goals:  [.flame],
+            trails: [.ember],
+            floors: [.dusk],
+            pits:   [.sunset],
+            music:  [.jazz]
+        ),
+
+        CosmeticBundle(
+            id:             "midas",
+            displayName:    "Midas",
+            tagline:        "Everything you touch turns to gold.",
+            contentSummary: "Gold ball · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music",
+            balls:  [.gold],
+            goals:  [.quasar],
+            trails: [.gilded],
+            floors: [.mirage],
+            pits:   [.mirage],
+            music:  [.orchestral]
+        ),
+
+        CosmeticBundle(
+            id:             "sketchbook",
+            displayName:    "Sketchbook",
+            tagline:        "Pencil, graphite, and a steady hand.",
+            contentSummary: "Silver ball · Archery goal · Smoke trail · Sketch floor · Sketch pit · Classical music",
+            balls:  [.silver],
+            goals:  [.archery],
+            trails: [.smoke],
+            floors: [.sketch],
+            pits:   [.sketch],
+            music:  [.classical]
+        ),
+
+        CosmeticBundle(
+            id:             "zen-garden",
+            displayName:    "Zen Garden",
+            tagline:        "A folded-paper serpent in a calm green world.",
+            contentSummary: "Green ball · Rainbow goal · Snake trail · Origami floor · Origami pit · Dreamscape music",
+            balls:  [.green],
+            goals:  [.rainbow],
+            trails: [.snake],
+            floors: [.origami],
+            pits:   [.origami],
+            music:  [.dreamscape]
+        ),
+
+        CosmeticBundle(
+            id:             "eclipse",
+            displayName:    "Eclipse",
+            tagline:        "A golden corona around the dark.",
+            contentSummary: "Blue ball · Eclipse goal · Gold trail · Mysterium music",
+            balls:  [.blue],
+            goals:  [.eclipse],
+            trails: [.gold],
+            floors: [],
+            pits:   [],
+            music:  [.mysterium]
+        ),
     ]
 }
