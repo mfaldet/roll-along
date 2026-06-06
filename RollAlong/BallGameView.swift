@@ -1678,6 +1678,14 @@ struct BallGameView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.30), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
+        case .candy:
+            // Glossy peppermint sphere with a white pinwheel swirl.
+            // Clipped to a circle so the swirl arms run off the edge.
+            candyMarble
+                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
         default:
             Circle()
                 .fill(gameState.activeSkin.gradient(endRadius: effectiveBallRadius * 1.4))
@@ -2139,6 +2147,81 @@ struct BallGameView: View {
     /// and a jagged lightning bolt (a translucent glow stroke under a
     /// bright core).  Static; the circle clip in `marbleView` trims any
     /// puff that runs off the silhouette.  Templated on `aquariumMarble`.
+    /// Candy — a glossy peppermint sphere with a white pinwheel swirl.
+    private var candyMarble: some View {
+        Canvas { ctx, size in
+            let w = size.width
+            let h = size.height
+            let r = min(w, h) / 2
+            let center = CGPoint(x: w / 2, y: h / 2)
+
+            // Glossy candy-red base — radial gradient for 3D shading.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.62, blue: 0.66), location: 0.00),
+                        .init(color: Color(red: 0.92, green: 0.20, blue: 0.28), location: 0.50),
+                        .init(color: Color(red: 0.74, green: 0.08, blue: 0.18), location: 0.85),
+                        .init(color: Color(red: 0.46, green: 0.03, blue: 0.10), location: 1.00),
+                    ]),
+                    center: CGPoint(x: w * 0.36, y: h * 0.32),
+                    startRadius: 0,
+                    endRadius:   r * 1.25
+                )
+            )
+
+            // White peppermint swirl — six curved arms spiralling from the
+            // centre out past the rim (the circle clip trims the overflow).
+            let arms    = 6
+            let reach   = r * 1.05
+            let twist:    CGFloat = 0.55
+            let armWidth: CGFloat = (.pi * 2 / CGFloat(arms)) * 0.5
+            let candyWhite = Color(red: 0.99, green: 0.97, blue: 0.98)
+            for i in 0..<arms {
+                let base  = CGFloat(i) / CGFloat(arms) * .pi * 2
+                let aLead = base + twist
+                var arm = Path()
+                arm.move(to: center)
+                arm.addQuadCurve(
+                    to: CGPoint(x: center.x + cos(aLead) * reach,
+                                y: center.y + sin(aLead) * reach),
+                    control: CGPoint(x: center.x + cos(base + twist * 0.4) * reach * 0.55,
+                                     y: center.y + sin(base + twist * 0.4) * reach * 0.55))
+                arm.addArc(center: center, radius: reach,
+                           startAngle: .radians(Double(aLead)),
+                           endAngle:   .radians(Double(aLead + armWidth)),
+                           clockwise: false)
+                arm.addQuadCurve(
+                    to: center,
+                    control: CGPoint(x: center.x + cos(base + armWidth + twist * 0.4) * reach * 0.55,
+                                     y: center.y + sin(base + armWidth + twist * 0.4) * reach * 0.55))
+                arm.closeSubpath()
+                ctx.fill(arm, with: .color(candyWhite))
+            }
+
+            // White centre cap so the arms meet cleanly.
+            let capR = r * 0.16
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: center.x - capR, y: center.y - capR,
+                                       width: capR * 2, height: capR * 2)),
+                with: .color(candyWhite)
+            )
+
+            // Top gloss crescent.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.14, y: h * 0.08,
+                                       width: w * 0.34, height: h * 0.26)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: w * 0.28, y: h * 0.18),
+                    startRadius: 0,
+                    endRadius:   r * 0.42
+                )
+            )
+        }
+    }
+
     private var stormMarble: some View {
         Canvas { ctx, size in
             let w = size.width
