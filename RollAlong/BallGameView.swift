@@ -1632,6 +1632,14 @@ struct BallGameView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.25), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
+        case .soccer:
+            // White body + black pentagons.  Clipped to a circle so the
+            // ring pentagons run off the silhouette like a real ball.
+            soccerMarble
+                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.30), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
         case .saturn:
             // Bespoke ringed renderer — the gas-giant body plus the
             // iconic tilted ring system.  The rings extend beyond the
@@ -1864,6 +1872,78 @@ struct BallGameView: View {
                                        width: w * 0.32, height: h * 0.26)),
                 with: .radialGradient(
                     Gradient(colors: [Color.white.opacity(0.50), .clear]),
+                    center: CGPoint(x: w * 0.25, y: h * 0.20),
+                    startRadius: 0,
+                    endRadius:   r * 0.40
+                )
+            )
+        }
+    }
+
+    /// Soccer-ball marble — the classic Telstar pattern: a white sphere
+    /// with one central black pentagon ringed by five more.  Static (no
+    /// rotation tracked).  The ring pentagons sit past the body radius so
+    /// the circle clip in `marbleView` trims them, selling the wrap.
+    private var soccerMarble: some View {
+        Canvas { ctx, size in
+            let w = size.width
+            let h = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // Base white sphere — radial gradient for 3D shading.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color.white,                                  location: 0.00),
+                        .init(color: Color(red: 0.95, green: 0.95, blue: 0.95),    location: 0.55),
+                        .init(color: Color(red: 0.72, green: 0.72, blue: 0.72),    location: 0.95),
+                        .init(color: Color(red: 0.42, green: 0.42, blue: 0.42),    location: 1.00),
+                    ]),
+                    center: CGPoint(x: w * 0.32, y: h * 0.32),
+                    startRadius: 0,
+                    endRadius:   r * 1.30
+                )
+            )
+
+            // Regular-pentagon path centred at `c`, vertex radius `pr`,
+            // rotated by `rot` radians (0 → one vertex points straight up).
+            func pentagon(center c: CGPoint, radius pr: CGFloat, rotation rot: CGFloat) -> Path {
+                var p = Path()
+                for i in 0..<5 {
+                    let a = rot - .pi / 2 + CGFloat(i) * (2 * .pi / 5)
+                    let pt = CGPoint(x: c.x + pr * cos(a), y: c.y + pr * sin(a))
+                    if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                }
+                p.closeSubpath()
+                return p
+            }
+
+            let black  = Color(red: 0.09, green: 0.09, blue: 0.11)
+            let pentR  = r * 0.30
+
+            // Central pentagon (flat top — one vertex pointing down).
+            ctx.fill(pentagon(center: CGPoint(x: cx, y: cy), radius: pentR, rotation: .pi),
+                     with: .color(black))
+
+            // Five ring pentagons, each pointing outward from centre and
+            // sitting partway off the body so the clip trims them.
+            let ringDist = r * 0.74
+            for i in 0..<5 {
+                let a  = -.pi / 2 + CGFloat(i) * (2 * .pi / 5)
+                let pc = CGPoint(x: cx + ringDist * cos(a), y: cy + ringDist * sin(a))
+                ctx.fill(pentagon(center: pc, radius: pentR * 0.95, rotation: a + .pi / 2),
+                         with: .color(black))
+            }
+
+            // Gloss highlight crescent — sells the gloss.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.10, y: h * 0.08,
+                                       width: w * 0.32, height: h * 0.26)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.45), .clear]),
                     center: CGPoint(x: w * 0.25, y: h * 0.20),
                     startRadius: 0,
                     endRadius:   r * 0.40

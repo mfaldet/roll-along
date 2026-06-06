@@ -84,9 +84,10 @@ extension BallSkin: CosmeticItem {
             return .standard   //  50 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
              .earth, .mars, .saturn, .mercury,
-             .neptune, .jupiter, .venus, .uranus:
+             .neptune, .jupiter, .venus, .uranus,
+             .pastel, .neon:
             return .premium    // 200 coins — multi-colour blends / planets
-        case .snowglobe, .golfBall, .pluto, .ufo:
+        case .snowglobe, .golfBall, .pluto, .ufo, .soccer:
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -1217,6 +1218,42 @@ struct CosmeticBundle: Identifiable {
             floors: [],
             pits:   [],
             music:  [.mysterium]
+        ),
+        CosmeticBundle(
+            id:             "pastel",
+            displayName:    "Pastel",
+            tagline:        "Soft candy hues and a gentle piano.",
+            contentSummary: "Pastel ball · Blossom goal · Rose trail · Twilight floor · Parchment pit · Piano music",
+            balls:  [.pastel],
+            goals:  [.blossom],
+            trails: [.roseTrail],
+            floors: [.twilight],
+            pits:   [.parchment],
+            music:  [.piano]
+        ),
+        CosmeticBundle(
+            id:             "neon",
+            displayName:    "Neon",
+            tagline:        "Electric pink on a pulsing dance floor.",
+            contentSummary: "Neon ball · Neon goal · Bubblegum trail · Disco floor · Midnight pit · Electronic music",
+            balls:  [.neon],
+            goals:  [.neon],
+            trails: [.bubblegum],
+            floors: [.disco],
+            pits:   [.midnight],
+            music:  [.electronic]
+        ),
+        CosmeticBundle(
+            id:             "soccer",
+            displayName:    "Soccer",
+            tagline:        "Hit the pitch — hex-stitched ball on fresh turf.",
+            contentSummary: "Soccer Ball · Mist trail · Grass floor · Meadow pit · Synthwave music",
+            balls:  [.soccer],
+            goals:  [],
+            trails: [.mist],
+            floors: [.grass],
+            pits:   [.meadow],
+            music:  [.synthwave]
         ),
     ]
 }

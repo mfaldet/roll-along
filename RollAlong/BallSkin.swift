@@ -60,6 +60,15 @@ enum BallSkin: String, CaseIterable, Identifiable {
     // in BallGameView.ufoMarble.
     case ufo     = "UFO"
 
+    // Round-4 themed bundles.
+    //   • pastel / neon — pure radial-gradient marbles (default renderer).
+    //   • soccer — white body with black pentagons via the bespoke
+    //     `soccerMarble` Canvas in BallGameView (clipped to a circle so
+    //     the edge pentagons run off the silhouette like the real thing).
+    case pastel  = "Pastel"
+    case neon    = "Neon"
+    case soccer  = "Soccer Ball"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -323,6 +332,34 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.55, green: 0.62, blue: 0.70),
                 Color(red: 0.30, green: 0.36, blue: 0.44),
                 Color(red: 0.12, green: 0.16, blue: 0.22),
+            ]
+
+        // ── Round-4 themed bundles ──
+        case .pastel:
+            // Soft multi-pastel: pale pink highlight → blush → periwinkle
+            // → mint shadow.  Reads as a gentle candy marble.
+            return [
+                Color(red: 1.00, green: 0.93, blue: 0.97),
+                Color(red: 0.98, green: 0.78, blue: 0.90),
+                Color(red: 0.74, green: 0.80, blue: 0.98),
+                Color(red: 0.55, green: 0.84, blue: 0.80),
+            ]
+        case .neon:
+            // Electric magenta → violet → blue.  Bright, club-lit.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 1.00),
+                Color(red: 1.00, green: 0.10, blue: 0.90),
+                Color(red: 0.45, green: 0.05, blue: 0.85),
+                Color(red: 0.05, green: 0.40, blue: 0.95),
+            ]
+        case .soccer:
+            // White sphere base — the black pentagons paint on top via
+            // the bespoke `soccerMarble` Canvas in BallGameView.
+            return [
+                Color(red: 1.00, green: 1.00, blue: 1.00),
+                Color(red: 0.95, green: 0.95, blue: 0.95),
+                Color(red: 0.72, green: 0.72, blue: 0.72),
+                Color(red: 0.42, green: 0.42, blue: 0.42),
             ]
         }
     }
