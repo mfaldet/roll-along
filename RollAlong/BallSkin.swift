@@ -77,6 +77,11 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case aquarium = "Aquarium"
     case marble   = "Marble"
 
+    // Round-5 themed bundles.
+    //   • dune — warm desert gradient (sand → ochre → terracotta → dusk),
+    //     pure radial gradient via the default renderer.
+    case dune = "Dune"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -388,6 +393,18 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.85, green: 0.90, blue: 0.96),
                 Color(red: 0.62, green: 0.70, blue: 0.82),
                 Color(red: 0.30, green: 0.38, blue: 0.52),
+            ]
+
+        // ── Round-5 themed bundles ──
+        case .dune:
+            // Desert at dusk — pale sand → golden ochre → terracotta →
+            // cool violet shadow.  Spans warm hues into a dusk shadow,
+            // reading as a layered sandstone marble (Epic).
+            return [
+                Color(red: 0.98, green: 0.92, blue: 0.74),
+                Color(red: 0.86, green: 0.66, blue: 0.34),
+                Color(red: 0.64, green: 0.34, blue: 0.22),
+                Color(red: 0.26, green: 0.16, blue: 0.30),
             ]
         }
     }

@@ -85,7 +85,7 @@ extension BallSkin: CosmeticItem {
         case .galaxy, .nebula, .opal,
              .earth, .mars, .saturn, .mercury,
              .neptune, .jupiter, .venus, .uranus,
-             .pastel, .neon:
+             .pastel, .neon, .dune:
             return .premium    // 200 coins — multi-colour blends / planets
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble:
             return .exclusive  // 500 coins — animated / special / bundle-only
@@ -579,6 +579,7 @@ enum Floor: String, CosmeticItem {
     case sunset
     case origami
     case mirage
+    case desert           // Round-5 Dune bundle — warm sand
 
     // Exclusive / Legendary (500 coins) — animated floor overlays
     case aurora           // the original shimmer
@@ -605,6 +606,7 @@ enum Floor: String, CosmeticItem {
         case .sunset:     return "Sunset"
         case .origami:    return "Origami"
         case .mirage:     return "Mirage"
+        case .desert:     return "Desert"
         case .aurora:     return "Aurora"
         case .disco:      return "Disco"
         case .grass:      return "Grass"
@@ -621,7 +623,7 @@ enum Floor: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage:
+             .origami, .mirage, .desert:
             return .standard   //  50 coins
         case .aurora, .disco, .grass, .moon:
             return .exclusive  // 500 coins — animated / textured overlay
@@ -649,6 +651,7 @@ enum Floor: String, CosmeticItem {
         case .sunset:     return Color(red: 0.98,  green: 0.55,  blue: 0.25 )
         case .origami:    return Color(red: 0.961, green: 0.937, blue: 0.878)
         case .mirage:     return Color(red: 0.92,  green: 0.82,  blue: 0.55 )
+        case .desert:     return Color(red: 0.90,  green: 0.78,  blue: 0.55 )  // warm sand
         case .aurora:     return Color(red: 0.380, green: 0.620, blue: 0.560)
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -701,6 +704,7 @@ enum Pit: String, CosmeticItem {
     case origami
     case mirage
     case aurora
+    case canyon           // Round-5 Dune bundle — deep rust gorge
 
     // Exclusive / Legendary (500 coins) — animated pit overlays
     case evil             // burning fire-pit animation
@@ -728,6 +732,7 @@ enum Pit: String, CosmeticItem {
         case .origami:    return "Origami"
         case .mirage:     return "Mirage"
         case .aurora:     return "Aurora"
+        case .canyon:     return "Canyon"
         case .evil:       return "Evil"
         case .sky:        return "Sky"
         case .pond:       return "Pond"
@@ -744,7 +749,7 @@ enum Pit: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .aurora:
+             .origami, .mirage, .aurora, .canyon:
             return .standard   //  50 coins
         case .evil, .sky, .pond, .space:
             return .exclusive  // 500 coins — animated overlay
@@ -773,6 +778,7 @@ enum Pit: String, CosmeticItem {
         case .origami:    return Color(red: 0.094, green: 0.078, blue: 0.063)
         case .mirage:     return Color(red: 0.22,  green: 0.14,  blue: 0.05 )
         case .aurora:     return Color(red: 0.000, green: 0.000, blue: 0.000)
+        case .canyon:     return Color(red: 0.32,  green: 0.14,  blue: 0.08 )  // deep rust gorge
         case .evil:       return Color(red: 0.10,  green: 0.02,  blue: 0.00 )  // dark base; flames paint over
         case .sky:        return Color(red: 0.55,  green: 0.78,  blue: 0.95 )  // pale blue base; clouds drift on top
         case .pond:       return Color(red: 0.08,  green: 0.30,  blue: 0.42 )  // deep water; ripples + lily pad on top
@@ -1278,6 +1284,20 @@ struct CosmeticBundle: Identifiable {
             floors: [.velvet],
             pits:   [.velvet],
             music:  [.cinematic]
+        ),
+
+        // ── Round 5 ──
+        CosmeticBundle(
+            id:             "dune",
+            displayName:    "Dune",
+            tagline:        "Drift the desert as the sun sinks low.",
+            contentSummary: "Dune ball · Mirage goal · Air trail · Desert floor · Canyon pit · Ambient music",
+            balls:  [.dune],
+            goals:  [.mirage],
+            trails: [.air],
+            floors: [.desert],
+            pits:   [.canyon],
+            music:  [.ambient]
         ),
     ]
 }
