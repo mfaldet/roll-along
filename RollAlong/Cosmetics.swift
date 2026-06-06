@@ -1281,3 +1281,66 @@ struct CosmeticBundle: Identifiable {
         ),
     ]
 }
+
+// MARK: - Ball Packs
+//
+// A Pack is a curated set of BALL skins only — distinct from a
+// CosmeticBundle (which spans multiple cosmetic categories).  Packs
+// live INSIDE the Ball section of the shop + inventory (no separate
+// tab).  When a Pack is equipped, the ball shuffles to a different
+// member skin at the start of every attempt — a no-repeat shuffle bag,
+// see `GameState.advancePackSkin()`.  Buying a Pack grants every member
+// skin individually AND records Pack ownership, so the player can equip
+// the whole Pack (shuffle) or any single ball from it.
+struct BallPack: Identifiable {
+    let id: String
+    let displayName: String
+    /// One-line marketing pitch shown under the title.
+    let tagline: String
+    /// Member ball skins in catalogue order (the shuffle bag is derived
+    /// from this set).
+    let skins: [BallSkin]
+
+    var itemCount: Int { skins.count }
+
+    /// 66% of the sum of member-skin coin costs, floored to the nearest
+    /// multiple of 20 — same discount + rounding as `CosmeticBundle`.
+    func price(in _: GameState) -> Int {
+        let sum = skins.reduce(0) { $0 + $1.coinCost }
+        let discounted = Double(sum) * 0.66
+        return Int(discounted / 20.0) * 20
+    }
+
+    /// Grant every member skin to the player's owned-set.  One-way — the
+    /// skins stay owned even if the Pack later leaves the catalogue.
+    func grantContents(to state: GameState) {
+        skins.forEach { state.grant($0) }
+    }
+
+    // ── Catalogue ──────────────────────────────────────────────────
+    // Pass 1 uses ONLY ball skins that already render.  Themed packs
+    // that need new art (billiards solids/stripes, more sports balls,
+    // more vintage glass marbles) arrive in follow-up passes once their
+    // bespoke renderers exist.
+    static let catalogue: [BallPack] = [
+        BallPack(
+            id:          "planets",
+            displayName: "Planets",
+            tagline:     "Roll a different world every run.",
+            skins:       [.earth, .mars, .saturn, .mercury,
+                          .neptune, .jupiter, .venus, .uranus]
+        ),
+        BallPack(
+            id:          "sports-balls",
+            displayName: "Sports Balls",
+            tagline:     "Take the field — a new ball each attempt.",
+            skins:       [.golfBall, .soccer]
+        ),
+        BallPack(
+            id:          "glass-marbles",
+            displayName: "Vintage Glass Marbles",
+            tagline:     "A jar of classics — cat's-eye, frost, and shimmer.",
+            skins:       [.marble, .aquarium, .snowglobe, .opal]
+        ),
+    ]
+}

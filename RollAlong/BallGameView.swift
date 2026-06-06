@@ -3242,7 +3242,7 @@ struct BallGameView: View {
         switch pick {
         case .ball(let b):
             gameState.grant(b)
-            gameState.activeSkin = b
+            gameState.equipBall(b)
             (category, itemRaw) = ("ball", b.rawValue)
         case .goal(let g):
             gameState.grant(g)
@@ -3292,6 +3292,10 @@ struct BallGameView: View {
             return
         }
         showOutOfLives = false
+
+        // If a ball Pack is equipped, advance to its next shuffled skin so
+        // every attempt rolls a different member of the pack.
+        gameState.advancePackSkin()
 
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level

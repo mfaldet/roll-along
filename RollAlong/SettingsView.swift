@@ -79,9 +79,10 @@ struct SettingsView: View {
             cosmeticRow(
                 label: "Ball",
                 items: BallSkin.allCases.filter { gameState.isOwned($0) },
-                isEquipped: { $0 == gameState.activeSkin },
-                onTap:      { gameState.activeSkin = $0 }
+                isEquipped: { $0 == gameState.activeSkin && gameState.equippedPackID == nil },
+                onTap:      { gameState.equipBall($0) }
             )
+            packRow
             cosmeticRow(
                 label: "Goal",
                 items: GoalSkin.allCases.filter { gameState.isOwned($0) },
@@ -169,6 +170,74 @@ struct SettingsView: View {
                     .scaleEffect(selected ? 1.06 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.65), value: selected)
                 Text(item.displayName)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(selected ? .white : Color(white: 0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(width: 64)
+    }
+
+    /// Packs inventory row — owned ball Packs, shown beneath the Ball row.
+    /// Bespoke (not `cosmeticRow`) because `BallPack` isn't a `CosmeticItem`.
+    /// Tapping equips the whole pack; the ball then shuffles through its
+    /// members each attempt.
+    @ViewBuilder
+    private var packRow: some View {
+        let owned = BallPack.catalogue.filter { gameState.ownsPack($0) }
+        if !owned.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("PACKS")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .kerning(1.5)
+                    .foregroundStyle(Color(white: 0.55))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(owned) { pack in
+                            packCell(pack: pack, selected: gameState.isPackEquipped(pack)) {
+                                gameState.equipPack(pack)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 6)
+                }
+            }
+        }
+    }
+
+    private func packCell(pack: BallPack,
+                          selected: Bool,
+                          onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            VStack(spacing: 6) {
+                ZStack {
+                    // Back swatch (second ball) peeks out to signal a stack.
+                    if pack.skins.count > 1 {
+                        Circle()
+                            .fill(pack.skins[1].gradient(endRadius: 16))
+                            .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+                            .frame(width: 30, height: 30)
+                            .offset(x: 11, y: 8)
+                    }
+                    Circle()
+                        .fill(pack.skins[0].gradient(endRadius: 18))
+                        .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+                        .frame(width: 36, height: 36)
+                        .offset(x: -6, y: -4)
+                }
+                .frame(width: 56, height: 56)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.10)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(selected ? Color.white : Color(white: 0.22),
+                                lineWidth: selected ? 2.0 : 0.8)
+                )
+                .scaleEffect(selected ? 1.06 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.65), value: selected)
+                Text(pack.displayName)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(selected ? .white : Color(white: 0.5))
                     .lineLimit(1)

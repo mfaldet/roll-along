@@ -177,9 +177,7 @@ struct CosmeticShopView: View {
     private var grid: some View {
         switch category {
         case .ball:
-            // Bundle-exclusive balls (e.g. Pluto) are hidden from the
-            // individual Ball grid — they're only obtainable via a bundle.
-            categoryGrid(items: BallSkin.allCases.filter { !$0.isBundleExclusive })
+            ballSection
         case .goal:
             categoryGrid(items: GoalSkin.allCases)
         case .trail:
@@ -201,6 +199,37 @@ struct CosmeticShopView: View {
                 itemCell(item: item)
             }
         }
+    }
+
+    /// The Ball tab stacks Packs (multi-ball collections that shuffle each
+    /// attempt) above the individual ball grid — Packs live inside the Ball
+    /// section rather than getting their own tab.
+    @ViewBuilder
+    private var ballSection: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            if !BallPack.catalogue.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionLabel("PACKS")
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                        ForEach(BallPack.catalogue) { pack in
+                            packCell(pack)
+                        }
+                    }
+                }
+                sectionLabel("BALLS")
+            }
+            // Bundle-exclusive balls (e.g. Pluto) are hidden from the
+            // individual Ball grid — they're only obtainable via a bundle.
+            categoryGrid(items: BallSkin.allCases.filter { !$0.isBundleExclusive })
+        }
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .kerning(1.4)
+            .foregroundStyle(Color(white: 0.55))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Item cell
@@ -343,7 +372,7 @@ struct CosmeticShopView: View {
 
     private func equip<Item: CosmeticItem>(_ item: Item) {
         switch item {
-        case let s as BallSkin:   gameState.activeSkin = s
+        case let s as BallSkin:   gameState.equipBall(s)
         case let g as GoalSkin:   gameState.equippedGoal = g
         case let t as TrailColor: gameState.equippedTrail = t
         case let f as Floor:      gameState.equippedFloor = f
@@ -355,7 +384,7 @@ struct CosmeticShopView: View {
 
     private func isEquipped<Item: CosmeticItem>(_ item: Item) -> Bool {
         switch item {
-        case let s as BallSkin:   return s == gameState.activeSkin
+        case let s as BallSkin:   return s == gameState.activeSkin && gameState.equippedPackID == nil
         case let g as GoalSkin:   return g == gameState.equippedGoal
         case let t as TrailColor: return t == gameState.equippedTrail
         case let f as Floor:      return f == gameState.equippedFloor
@@ -559,6 +588,120 @@ struct CosmeticShopView: View {
                 "items":   .int(bundle.itemCount),
             ]
         )
+    }
+
+    // MARK: - Pack cell
+
+    private func packCell(_ pack: BallPack) -> some View {
+        let owned    = gameState.ownsPack(pack)
+        let equipped = gameState.isPackEquipped(pack)
+        return Button {
+            handlePackTap(pack, owned: owned, equipped: equipped)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(pack.displayName)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    packBadge(pack, owned: owned, equipped: equipped)
+                }
+                Text(pack.tagline)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.65))
+                    .multilineTextAlignment(.leading)
+                // Mini swatches of every ball in the pack.
+                HStack(spacing: 8) {
+                    ForEach(pack.skins, id: \.self) { skin in
+                        Circle()
+                            .fill(skin.gradient(endRadius: 15))
+                            .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6))
+                            .frame(width: 30, height: 30)
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(equipped ? Color.white.opacity(0.55)
+                                             : (owned ? Color.white.opacity(0.30) : Color.clear),
+                                    lineWidth: equipped ? 1.5 : 1.2)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func packBadge(_ pack: BallPack, owned: Bool, equipped: Bool) -> some View {
+        if equipped {
+            Text("EQUIPPED")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .kerning(1.0)
+                .foregroundStyle(.black)
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .background(Capsule().fill(Color.white))
+        } else if owned {
+            Text("OWNED — TAP TO EQUIP")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .kerning(0.8)
+                .foregroundStyle(Color(white: 0.85))
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.22)))
+        } else {
+            let affordable = gameState.coinBalance >= pack.price(in: gameState)
+            HStack(spacing: 4) {
+                CoinIcon(size: 13)
+                Text("\(pack.price(in: gameState))")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(affordable ? .white : Color(white: 0.45))
+            }
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(
+                Capsule().fill(affordable ? Color(red: 0.20, green: 0.78, blue: 0.38).opacity(0.85)
+                                          : Color(white: 0.22))
+            )
+        }
+    }
+
+    private func handlePackTap(_ pack: BallPack, owned: Bool, equipped: Bool) {
+        if equipped { return }
+        if owned {
+            gameState.equipPack(pack)
+            AnalyticsClient.shared.track(
+                "pack_equipped",
+                properties: ["pack": .string(pack.id)]
+            )
+            return
+        }
+        let cost = pack.price(in: gameState)
+        guard gameState.coinBalance >= cost else {
+            alertMessage = "You need \(cost - gameState.coinBalance) more coins for the \(pack.displayName) pack.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
+            showAlert = true
+            return
+        }
+        if gameState.purchasePack(pack) {
+            AnalyticsClient.shared.track(
+                "pack_purchased",
+                properties: [
+                    "pack":  .string(pack.id),
+                    "price": .int(cost),
+                    "items": .int(pack.itemCount),
+                ]
+            )
+            gameState.equipPack(pack)
+            AnalyticsClient.shared.track(
+                "pack_equipped",
+                properties: [
+                    "pack":           .string(pack.id),
+                    "after_purchase": .bool(true),
+                ]
+            )
+        }
     }
 
     private func musicPreview(_ track: MusicTrack) -> some View {

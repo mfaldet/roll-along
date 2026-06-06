@@ -114,6 +114,12 @@ final class GameState: ObservableObject {
     @Published var ownedBundles: Set<String> {
         didSet { Self.saveStringSet(ownedBundles, forKey: "ra_ownedBundles") }
     }
+    /// Owned Ball-Pack IDs.  Buying a Pack also adds its member skins to
+    /// `ownedBallSkins` (so they're individually equippable); this set
+    /// is for the shop's "OWNED" state + the equip-the-whole-Pack flow.
+    @Published var ownedPacks: Set<String> {
+        didSet { Self.saveStringSet(ownedPacks, forKey: "ra_ownedPacks") }
+    }
     @Published var ownedMusic:       Set<String> {
         didSet { Self.saveStringSet(ownedMusic, forKey: "ra_ownedMusic") }
     }
@@ -136,6 +142,24 @@ final class GameState: ObservableObject {
         didSet { UserDefaults.standard.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
     }
     // equippedBall lives on `activeSkin` — already defined above.
+
+    /// The currently-equipped Ball Pack, or nil when an individual ball
+    /// skin is equipped.  When non-nil, `activeSkin` is driven by the
+    /// pack's shuffle (see `advancePackSkin()`) and is overwritten at the
+    /// start of every attempt.
+    @Published var equippedPackID: String? {
+        didSet {
+            if let id = equippedPackID {
+                UserDefaults.standard.set(id, forKey: "ra_equippedPack")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "ra_equippedPack")
+            }
+        }
+    }
+    /// In-memory no-repeat shuffle bag for the equipped pack.  Drained one
+    /// skin per attempt; refilled (re-shuffled) when empty.  Not persisted
+    /// — a fresh launch simply re-shuffles.
+    private var packBag: [BallSkin] = []
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: "ra_level")
@@ -174,6 +198,7 @@ final class GameState: ObservableObject {
         let loadedOwnedPits    = Self.loadStringSet(forKey: "ra_ownedPits")
         let loadedOwnedMusic   = Self.loadStringSet(forKey: "ra_ownedMusic")
         let loadedOwnedBundles = Self.loadStringSet(forKey: "ra_ownedBundles")
+        let loadedOwnedPacks   = Self.loadStringSet(forKey: "ra_ownedPacks")
         ownedBallSkins = loadedOwnedBalls
         ownedGoals     = loadedOwnedGoals
         ownedTrails    = loadedOwnedTrails
@@ -181,6 +206,7 @@ final class GameState: ObservableObject {
         ownedPits      = loadedOwnedPits
         ownedMusic     = loadedOwnedMusic
         ownedBundles   = loadedOwnedBundles
+        ownedPacks     = loadedOwnedPacks
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -197,6 +223,12 @@ final class GameState: ObservableObject {
         equippedFloor = Self.legitimise(savedFloor, owned: loadedOwnedFloors, starter: Floor.starter)
         equippedPit   = Self.legitimise(savedPit,   owned: loadedOwnedPits,   starter: Pit.starter)
         equippedMusic = Self.legitimise(savedMusic, owned: loadedOwnedMusic,  starter: MusicTrack.starter)
+
+        // Restore the equipped Ball Pack only if it's still owned;
+        // otherwise leave it nil so the individual `activeSkin` (loaded
+        // above) stays in effect.
+        let savedPack  = UserDefaults.standard.string(forKey: "ra_equippedPack")
+        equippedPackID = savedPack.flatMap { loadedOwnedPacks.contains($0) ? $0 : nil }
     }
 
     /// Returns `item` if the player actually owns it (starter tier or
@@ -444,6 +476,61 @@ final class GameState: ObservableObject {
         guard spendCoins(item.coinCost) else { return false }
         grant(item)
         return true
+    }
+
+    // MARK: - Ball Packs
+
+    /// True if the player owns this Pack.
+    func ownsPack(_ pack: BallPack) -> Bool { ownedPacks.contains(pack.id) }
+
+    /// True if this Pack is the currently-equipped cosmetic.
+    func isPackEquipped(_ pack: BallPack) -> Bool { equippedPackID == pack.id }
+
+    /// Buy a Pack with coins.  Grants every member skin individually AND
+    /// records Pack ownership.  Returns false if already owned or the
+    /// balance is insufficient.
+    @discardableResult
+    func purchasePack(_ pack: BallPack) -> Bool {
+        if ownedPacks.contains(pack.id) { return false }
+        guard spendCoins(pack.price(in: self)) else { return false }
+        pack.grantContents(to: self)
+        ownedPacks.insert(pack.id)
+        return true
+    }
+
+    /// Equip a whole Pack: remember it, reset the shuffle bag, and apply
+    /// the first shuffled member so menus/previews immediately show a
+    /// pack ball.
+    func equipPack(_ pack: BallPack) {
+        equippedPackID = pack.id
+        packBag = []
+        advancePackSkin()
+    }
+
+    /// Equip an individual ball skin — clears any equipped Pack so the
+    /// shuffle stops and this exact skin stays put.
+    func equipBall(_ skin: BallSkin) {
+        equippedPackID = nil
+        packBag = []
+        activeSkin = skin
+    }
+
+    /// If a Pack is equipped, advance `activeSkin` to the next member via
+    /// a no-repeat shuffle bag (every member appears once before any
+    /// repeat).  No-op when an individual skin is equipped.  Called at
+    /// the start of each attempt from `spawnBall`.
+    func advancePackSkin() {
+        guard let id = equippedPackID,
+              let pack = BallPack.catalogue.first(where: { $0.id == id }),
+              !pack.skins.isEmpty else { return }
+        if packBag.isEmpty {
+            packBag = pack.skins.shuffled()
+            // Avoid showing the same skin twice across a bag refill.
+            if pack.skins.count > 1, packBag.first == activeSkin {
+                packBag.append(packBag.removeFirst())
+            }
+        }
+        activeSkin = packBag.removeFirst()
     }
 
     // MARK: - Persistence helpers (UserDefaults can't store [Int: T] directly)
