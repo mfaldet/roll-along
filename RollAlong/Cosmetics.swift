@@ -1088,5 +1088,70 @@ struct CosmeticBundle: Identifiable {
             pits:   [.velvet],
             music:  []
         ),
+
+        CosmeticBundle(
+            id:             "golden-hour",
+            displayName:    "Golden Hour",
+            tagline:        "Chase the last warm light of the day.",
+            contentSummary: "Coral ball · Mirage goal · Fire trail · Sunset floor · Dusk pit · Acoustic music",
+            balls:  [.coral],
+            goals:  [.mirage],
+            trails: [.fire],
+            floors: [.sunset],
+            pits:   [.dusk],
+            music:  [.acoustic]
+        ),
+
+        CosmeticBundle(
+            id:             "arcade",
+            displayName:    "Arcade",
+            tagline:        "Pixel-perfect retro on a grid.",
+            contentSummary: "Copper ball · Comet goal · Comet trail · Graph floor · Graph pit · Chiptune music",
+            balls:  [.copper],
+            goals:  [.comet],
+            trails: [.cometTrail],
+            floors: [.graph],
+            pits:   [.graph],
+            music:  [.chiptune]
+        ),
+
+        CosmeticBundle(
+            id:             "bloom",
+            displayName:    "Bloom",
+            tagline:        "Soft petals on warm parchment.",
+            contentSummary: "Rose ball · Mosaic goal · Rose trail · Parchment floor · Parchment pit · Piano music",
+            balls:  [.rose],
+            goals:  [.mosaic],
+            trails: [.roseTrail],
+            floors: [.parchment],
+            pits:   [.parchment],
+            music:  [.piano]
+        ),
+
+        CosmeticBundle(
+            id:             "noir",
+            displayName:    "Noir",
+            tagline:        "Black, white, and everything stark.",
+            contentSummary: "Slate ball · Obsidian goal · Ink trail · Inverted floor · Inverted pit · Cinematic music",
+            balls:  [.slate],
+            goals:  [.obsidian],
+            trails: [.ink],
+            floors: [.inverted],
+            pits:   [.inverted],
+            music:  [.cinematic]
+        ),
+
+        CosmeticBundle(
+            id:             "aurora",
+            displayName:    "Aurora",
+            tagline:        "Northern lights over a shimmering field.",
+            contentSummary: "Galaxy ball · Prism goal · Mist trail · Aurora floor · Aurora pit · Celestial music",
+            balls:  [.galaxy],
+            goals:  [.prism],
+            trails: [.mist],
+            floors: [.aurora],
+            pits:   [.aurora],
+            music:  [.celestial]
+        ),
     ]
 }
