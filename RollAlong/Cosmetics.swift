@@ -873,8 +873,8 @@ enum MusicTrack: String, CosmeticItem {
 // after the bundle is owned; the bundle just costs less than the sum
 // of its parts.
 //
-// Pricing: 66% of (sum of individual item prices), rounded to the
-// nearest coin.  Per Mac's spec.
+// Pricing: 66% of (sum of individual item prices), rounded DOWN to
+// the nearest multiple of 20.  Per Mac's spec.
 // ---------------------------------------------------------------------------
 
 struct CosmeticBundle: Identifiable {
@@ -910,7 +910,10 @@ struct CosmeticBundle: Identifiable {
         let pitSum:   Int = pits.reduce(0)   { $0 + $1.coinCost }
         let musicSum: Int = music.reduce(0)  { $0 + $1.coinCost }
         let sum = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
-        return Int((Double(sum) * 0.66).rounded())
+        // 66% discount, then rounded DOWN to the nearest multiple of 20
+        // so every bundle lands on a clean price point (per Mac's spec).
+        let discounted = Double(sum) * 0.66
+        return Int(discounted / 20.0) * 20
     }
 
     /// Add every contained item to the appropriate owned-set on
@@ -1018,6 +1021,71 @@ struct CosmeticBundle: Identifiable {
             trails: [.raybeam],
             floors: [.moon],
             pits:   [.space],
+            music:  []
+        ),
+
+        CosmeticBundle(
+            id:             "winter",
+            displayName:    "Winter",
+            tagline:        "A snowglobe marble through crystal frost.",
+            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit",
+            balls:  [.snowglobe],
+            goals:  [.crystal],
+            trails: [.ice],
+            floors: [.twilight],
+            pits:   [.twilight],
+            music:  []
+        ),
+
+        CosmeticBundle(
+            id:             "cosmos",
+            displayName:    "Cosmos",
+            tagline:        "Drift the deep with a nebula in hand.",
+            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit",
+            balls:  [.nebula],
+            goals:  [.galaxy],
+            trails: [.stardust],
+            floors: [.midnight],
+            pits:   [.midnight],
+            music:  []
+        ),
+
+        CosmeticBundle(
+            id:             "nature",
+            displayName:    "Nature",
+            tagline:        "Jade and blossoms over a meadow green.",
+            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit",
+            balls:  [.jade],
+            goals:  [.blossom],
+            trails: [.forest],
+            floors: [.meadow],
+            pits:   [.meadow],
+            music:  []
+        ),
+
+        CosmeticBundle(
+            id:             "ocean",
+            displayName:    "Ocean",
+            tagline:        "Ride the tide on a wave of mint.",
+            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit",
+            balls:  [.mint],
+            goals:  [.ripple],
+            trails: [.sky],
+            floors: [.blueprint],
+            pits:   [.blueprint],
+            music:  []
+        ),
+
+        CosmeticBundle(
+            id:             "velvet-night",
+            displayName:    "Velvet Night",
+            tagline:        "Plasma and rainbow over deep velvet.",
+            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit",
+            balls:  [.purple],
+            goals:  [.plasma],
+            trails: [.rainbow],
+            floors: [.velvet],
+            pits:   [.velvet],
             music:  []
         ),
     ]
