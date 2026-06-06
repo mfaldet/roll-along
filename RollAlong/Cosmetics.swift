@@ -87,7 +87,7 @@ extension BallSkin: CosmeticItem {
              .neptune, .jupiter, .venus, .uranus,
              .pastel, .neon:
             return .premium    // 200 coins — multi-colour blends / planets
-        case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium:
+        case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble:
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -1266,6 +1266,18 @@ struct CosmeticBundle: Identifiable {
             floors: [.mirage],
             pits:   [.pond],
             music:  [.dreamscape]
+        ),
+        CosmeticBundle(
+            id:             "realistic-marble",
+            displayName:    "Realistic Marble",
+            tagline:        "A genuine glass cat's-eye, swirled in cobalt.",
+            contentSummary: "Marble ball · Crystal goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music",
+            balls:  [.marble],
+            goals:  [.crystal],
+            trails: [.gilded],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.cinematic]
         ),
     ]
 }

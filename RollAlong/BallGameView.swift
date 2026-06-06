@@ -1662,6 +1662,14 @@ struct BallGameView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
+        case .marble:
+            // Clear glass sphere with an internal cobalt cat's-eye swirl.
+            // Clipped to a circle; the swirl + gloss live in glassMarble.
+            glassMarble
+                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
         default:
             Circle()
                 .fill(gameState.activeSkin.gradient(endRadius: effectiveBallRadius * 1.4))
@@ -2018,6 +2026,102 @@ struct BallGameView: View {
                     center: CGPoint(x: w * 0.26, y: h * 0.18),
                     startRadius: 0,
                     endRadius:   r * 0.42
+                )
+            )
+        }
+    }
+
+    /// Realistic glass marble — a clear sphere with an internal cobalt
+    /// cat's-eye vane (three curved blades meeting at the centre), a
+    /// darkening refractive rim, and a sharp surface gloss.  Static.
+    /// The circle clip in `marbleView` trims the silhouette.
+    private var glassMarble: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // Clear glass body.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.97, green: 0.99, blue: 1.00), location: 0.00),
+                        .init(color: Color(red: 0.86, green: 0.91, blue: 0.97), location: 0.50),
+                        .init(color: Color(red: 0.62, green: 0.70, blue: 0.82), location: 0.88),
+                        .init(color: Color(red: 0.30, green: 0.38, blue: 0.52), location: 1.00),
+                    ]),
+                    center: CGPoint(x: w * 0.34, y: h * 0.32),
+                    startRadius: 0,
+                    endRadius:   r * 1.25
+                )
+            )
+
+            // A lens/petal Path from centre → tip with a curved belly on
+            // each side — one blade of the cat's-eye vane.
+            func blade(angle a: CGFloat, length len: CGFloat, width wd: CGFloat) -> Path {
+                var p = Path()
+                let tip  = CGPoint(x: cx + len * cos(a),       y: cy + len * sin(a))
+                let perp = a + .pi / 2
+                let mid  = CGPoint(x: cx + len * 0.5 * cos(a), y: cy + len * 0.5 * sin(a))
+                let b1   = CGPoint(x: mid.x + wd * cos(perp),  y: mid.y + wd * sin(perp))
+                let b2   = CGPoint(x: mid.x - wd * cos(perp),  y: mid.y - wd * sin(perp))
+                p.move(to: CGPoint(x: cx, y: cy))
+                p.addQuadCurve(to: tip, control: b1)
+                p.addQuadCurve(to: CGPoint(x: cx, y: cy), control: b2)
+                p.closeSubpath()
+                return p
+            }
+
+            let cobalt = Color(red: 0.12, green: 0.34, blue: 0.86)
+            let azure  = Color(red: 0.45, green: 0.72, blue: 1.00)
+
+            // Outer cobalt blades, then inner azure for a layered core.
+            for i in 0..<3 {
+                let a = -.pi / 2 + CGFloat(i) * (2 * .pi / 3)
+                ctx.fill(blade(angle: a, length: r * 0.78, width: r * 0.26),
+                         with: .color(cobalt.opacity(0.92)))
+            }
+            for i in 0..<3 {
+                let a = -.pi / 2 + CGFloat(i) * (2 * .pi / 3)
+                ctx.fill(blade(angle: a, length: r * 0.48, width: r * 0.16),
+                         with: .color(azure.opacity(0.95)))
+            }
+
+            // White centre speck.
+            let ctrR = r * 0.10
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - ctrR, y: cy - ctrR,
+                                            width: ctrR * 2, height: ctrR * 2)),
+                     with: .color(.white.opacity(0.85)))
+
+            // Refractive rim — darkens just the edge so the swirl reads
+            // as sitting inside the glass.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .clear, location: 0.00),
+                        .init(color: .clear, location: 0.82),
+                        .init(color: Color(red: 0.10, green: 0.16, blue: 0.30).opacity(0.55),
+                              location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx, y: cy),
+                    startRadius: 0,
+                    endRadius:   r
+                )
+            )
+
+            // Top gloss crescent — the glass surface reflection.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.14, y: h * 0.09,
+                                       width: w * 0.34, height: h * 0.24)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.75), .clear]),
+                    center: CGPoint(x: w * 0.27, y: h * 0.18),
+                    startRadius: 0,
+                    endRadius:   r * 0.40
                 )
             )
         }

@@ -72,7 +72,10 @@ enum BallSkin: String, CaseIterable, Identifiable {
     // Round-4 pass 2 — bespoke glass spheres.
     //   • aquarium — translucent aqua orb with static bubbles, via the
     //     `aquariumMarble` Canvas in BallGameView (clipped to a circle).
+    //   • marble — clear glass with an internal cobalt cat's-eye swirl,
+    //     via the `glassMarble` Canvas (clipped to a circle).
     case aquarium = "Aquarium"
+    case marble   = "Marble"
 
     var id: String { rawValue }
 
@@ -375,6 +378,16 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.36, green: 0.84, blue: 0.92),
                 Color(red: 0.10, green: 0.55, blue: 0.72),
                 Color(red: 0.03, green: 0.26, blue: 0.40),
+            ]
+        case .marble:
+            // Clear glass base — near-white highlight → pale grey-blue →
+            // refractive rim.  The cobalt cat's-eye swirl paints on top
+            // via the bespoke `glassMarble` Canvas in BallGameView.
+            return [
+                Color(red: 0.96, green: 0.99, blue: 1.00),
+                Color(red: 0.85, green: 0.90, blue: 0.96),
+                Color(red: 0.62, green: 0.70, blue: 0.82),
+                Color(red: 0.30, green: 0.38, blue: 0.52),
             ]
         }
     }
