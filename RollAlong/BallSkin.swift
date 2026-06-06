@@ -69,6 +69,11 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case neon    = "Neon"
     case soccer  = "Soccer Ball"
 
+    // Round-4 pass 2 — bespoke glass spheres.
+    //   • aquarium — translucent aqua orb with static bubbles, via the
+    //     `aquariumMarble` Canvas in BallGameView (clipped to a circle).
+    case aquarium = "Aquarium"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -360,6 +365,16 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.95, green: 0.95, blue: 0.95),
                 Color(red: 0.72, green: 0.72, blue: 0.72),
                 Color(red: 0.42, green: 0.42, blue: 0.42),
+            ]
+        case .aquarium:
+            // Translucent aqua glass — bright cyan highlight → teal →
+            // deep sea.  Bubbles paint on top via the bespoke
+            // `aquariumMarble` Canvas in BallGameView.
+            return [
+                Color(red: 0.80, green: 0.98, blue: 0.98),
+                Color(red: 0.36, green: 0.84, blue: 0.92),
+                Color(red: 0.10, green: 0.55, blue: 0.72),
+                Color(red: 0.03, green: 0.26, blue: 0.40),
             ]
         }
     }

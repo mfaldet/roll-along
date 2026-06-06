@@ -1654,6 +1654,14 @@ struct BallGameView: View {
             ufoMarble
                 .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
                 .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
+        case .aquarium:
+            // Translucent aqua glass sphere with static bubbles.  Clipped
+            // to a circle so any edge bubbles run off the silhouette.
+            aquariumMarble
+                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
         default:
             Circle()
                 .fill(gameState.activeSkin.gradient(endRadius: effectiveBallRadius * 1.4))
@@ -1947,6 +1955,69 @@ struct BallGameView: View {
                     center: CGPoint(x: w * 0.25, y: h * 0.20),
                     startRadius: 0,
                     endRadius:   r * 0.40
+                )
+            )
+        }
+    }
+
+    /// Aquarium marble — a translucent aqua glass sphere with a cluster
+    /// of static bubbles (each a bright ring + highlight speck) and a top
+    /// gloss crescent.  Static; the circle clip in `marbleView` trims any
+    /// bubble that touches the silhouette.  Templated on `soccerMarble`.
+    private var aquariumMarble: some View {
+        Canvas { ctx, size in
+            let w = size.width
+            let h = size.height
+            let r = min(w, h) / 2
+
+            // Aqua glass body — radial gradient for 3D shading.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.80, green: 0.98, blue: 0.98), location: 0.00),
+                        .init(color: Color(red: 0.36, green: 0.84, blue: 0.92), location: 0.45),
+                        .init(color: Color(red: 0.10, green: 0.55, blue: 0.72), location: 0.82),
+                        .init(color: Color(red: 0.03, green: 0.26, blue: 0.40), location: 1.00),
+                    ]),
+                    center: CGPoint(x: w * 0.34, y: h * 0.32),
+                    startRadius: 0,
+                    endRadius:   r * 1.25
+                )
+            )
+
+            // Bubbles — fixed fractions of the frame.  Faint fill, bright
+            // rim, and an upper-left highlight speck on each.
+            let bubbles: [(x: CGFloat, y: CGFloat, rad: CGFloat)] = [
+                (0.36, 0.62, 0.15),
+                (0.58, 0.46, 0.10),
+                (0.50, 0.76, 0.07),
+                (0.70, 0.66, 0.06),
+                (0.30, 0.40, 0.055),
+            ]
+            for b in bubbles {
+                let c    = CGPoint(x: w * b.x, y: h * b.y)
+                let br   = r * b.rad
+                let rect = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(.white.opacity(0.12)))
+                ctx.stroke(Path(ellipseIn: rect),
+                           with: .color(.white.opacity(0.75)),
+                           lineWidth: max(1, br * 0.18))
+                let hr = br * 0.30
+                let hc = CGRect(x: c.x - br * 0.40 - hr, y: c.y - br * 0.40 - hr,
+                                width: hr * 2, height: hr * 2)
+                ctx.fill(Path(ellipseIn: hc), with: .color(.white.opacity(0.85)))
+            }
+
+            // Top gloss crescent.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.08,
+                                       width: w * 0.34, height: h * 0.24)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: w * 0.26, y: h * 0.18),
+                    startRadius: 0,
+                    endRadius:   r * 0.42
                 )
             )
         }

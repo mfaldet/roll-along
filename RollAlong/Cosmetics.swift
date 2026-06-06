@@ -87,7 +87,7 @@ extension BallSkin: CosmeticItem {
              .neptune, .jupiter, .venus, .uranus,
              .pastel, .neon:
             return .premium    // 200 coins — multi-colour blends / planets
-        case .snowglobe, .golfBall, .pluto, .ufo, .soccer:
+        case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium:
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -1254,6 +1254,18 @@ struct CosmeticBundle: Identifiable {
             floors: [.grass],
             pits:   [.meadow],
             music:  [.synthwave]
+        ),
+        CosmeticBundle(
+            id:             "aquarium",
+            displayName:    "Aquarium",
+            tagline:        "A glass orb of bubbles over a rippling pond.",
+            contentSummary: "Aquarium ball · Ripple goal · Ice trail · Mirage floor · Pond pit · Dreamscape music",
+            balls:  [.aquarium],
+            goals:  [.ripple],
+            trails: [.ice],
+            floors: [.mirage],
+            pits:   [.pond],
+            music:  [.dreamscape]
         ),
     ]
 }
