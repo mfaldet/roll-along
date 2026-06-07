@@ -251,6 +251,27 @@ final class GameState: ObservableObject {
         if currentLevel > highestUnlocked {
             highestUnlocked = currentLevel
         }
+        syncSocialProgress()
+    }
+
+    /// Push the player's headline progression to the social backend, if and
+    /// only if they're signed in.  Fire-and-forget: a failed/paused server
+    /// must never block or slow local gameplay.  `climb_level` — the number
+    /// shown next to the player's name on leaderboards/clans — is the highest
+    /// level reached (`highestUnlocked`).  No-op when signed out, so this is
+    /// inert until the Sign-in-with-Apple flow installs a session.
+    private func syncSocialProgress() {
+        guard SocialClient.shared.isSignedIn else { return }
+        let climb = highestUnlocked
+        let unlocked = highestUnlocked
+        let stars = totalStars
+        Task {
+            try? await SocialClient.shared.syncProgress(
+                climbLevel: climb,
+                highestUnlocked: unlocked,
+                totalStars: stars
+            )
+        }
     }
 
     /// Reset level-progress only — clears stars/coins/times/unlocks.  Skin,
