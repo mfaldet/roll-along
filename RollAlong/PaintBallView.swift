@@ -1,0 +1,687 @@
+import SwiftUI
+
+// ===========================================================================
+// PaintBallView — the "Paint Ball" competitive mode.
+//
+// A 60-second territory scramble.  Every marble trails its own paint colour as
+// it rolls; whoever has the most paint on the floor when the clock hits zero
+// wins.  Scattered "puddle" pits freeze any marble that rolls into one for a
+// 3-second penalty — no painting, no moving — so positioning matters.
+//
+// Single-player vs AI (solo-testable): you are the blue painter; three AI
+// rivals each chase fresh ground in their own colour.  Coverage is tracked on
+// a coarse grid (the source of truth) and rendered as overlapping paint blobs.
+//
+// SAFE BY CONSTRUCTION: a brand-new, isolated file.  It reuses only the shared
+// physics primitives (BallMotion / PhysicsClock) and the coin / skin economy on
+// GameState; it touches nothing in the climb engine.  Reached only when
+// HomeView routes `.mode("paintball")` here and PaintBallMode is flagged on.
+//
+// FEEL IS TUNABLE: every gameplay number lives in the "Tunables" block.
+// ===========================================================================
+
+struct PaintBallView: View {
+    @EnvironmentObject var gameState: GameState
+    @EnvironmentObject var nav: Navigator
+    @StateObject private var motion = BallMotion()
+    @StateObject private var clock  = PhysicsClock()
+
+    // MARK: - Tunables
+
+    private let marbleRadius: CGFloat = 16
+    private let playerAccel:  CGFloat = 1_500     // your tilt → acceleration
+    private let aiAccel:      CGFloat = 1_150     // a touch slower than you
+    private let friction:     CGFloat = 0.990
+    private let maxSpeed:     CGFloat = 620
+    private let wallBounce:   CGFloat = 0.70
+    private let rivalCount         = 3
+    private let roundSeconds       = 60
+    private let cellSize:     CGFloat = 24         // paint-grid resolution
+    private let paintRadius:  CGFloat = 23         // brush blob radius around a marble
+    private let penaltySeconds     = 3             // freeze time on falling in a pit
+    private let pitCount           = 6
+    private let pitRadius:    CGFloat = 26
+    private let graceTicks         = 36            // immunity after climbing out (~0.6s)
+    private let retargetTicks      = 50            // how often a bot picks a new goal
+    private let winBonus           = 20
+
+    private var colorCount: Int { 1 + rivalCount }
+    private var penaltyTicks: Int { penaltySeconds * 60 }
+    private var roundTicks:   Int { roundSeconds * 60 }
+
+    /// Paint palette — index 0 is always the player (blue).
+    private static let paintColors: [Color] = [
+        Color(red: 0.25, green: 0.62, blue: 1.00),   // you — blue
+        Color(red: 1.00, green: 0.35, blue: 0.62),   // pink
+        Color(red: 0.55, green: 0.86, blue: 0.32),   // green
+        Color(red: 1.00, green: 0.60, blue: 0.20),   // orange
+    ]
+
+    // MARK: - Model
+
+    private struct Painter: Identifiable {
+        let id = UUID()
+        var pos: CGPoint
+        var vel: CGVector = .zero
+        let colorIndex: Int
+        let isPlayer: Bool
+        // AI goal-seeking
+        var target: CGPoint = .zero
+        var retargetAt: Int = 0
+        // penalty state
+        var stuckUntil: Int = 0
+        var immuneUntil: Int = 0
+        var stuckPit: Int = -1
+    }
+
+    private struct Pit: Identifiable {
+        let id = UUID()
+        let pos: CGPoint
+        let radius: CGFloat
+    }
+
+    private struct Splash: Identifiable {
+        let id = UUID()
+        let pos: CGPoint
+        let color: Color
+        let born: Int
+    }
+
+    // MARK: - State
+
+    @State private var painters: [Painter] = []
+    @State private var pits:     [Pit]     = []
+    @State private var splashes: [Splash]  = []
+
+    @State private var grid:    [Int8] = []     // colour index per cell, -1 = bare
+    @State private var blocked: [Bool] = []     // cells under a pit — never paintable
+    @State private var coverage: [Int] = []     // painted-cell count per colour
+    @State private var totalPaintable = 0
+
+    @State private var arena:  CGSize  = .zero
+    @State private var center: CGPoint = .zero
+    @State private var cols = 0
+    @State private var rows = 0
+    @State private var cellW: CGFloat = 0
+    @State private var cellH: CGFloat = 0
+
+    @State private var started   = false
+    @State private var isOver    = false
+    @State private var playerWon = false
+    @State private var localTick = 0
+    @State private var roundTick = 0
+    @State private var awarded   = false
+
+    private var secondsLeft: Int {
+        max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0)))
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        ZStack {
+            Color(white: 0.07).ignoresSafeArea()
+
+            GeometryReader { geo in
+                ZStack {
+                    Color.clear
+                    paintLayer.allowsHitTesting(false)
+                    pitLayer.allowsHitTesting(false)
+                    splashLayer.allowsHitTesting(false)
+                    ForEach(painters) { p in
+                        marble(p).position(p.pos)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onAppear { layout(geo.size); reset() }
+                .onChange(of: geo.size) { _, newSize in
+                    let wasEmpty = painters.isEmpty
+                    layout(newSize)
+                    if wasEmpty { reset() }
+                }
+                .onTapGesture { if !started && !isOver { started = true } }
+            }
+
+            topBar
+            if !started && !isOver { startPrompt }
+            if isOver { gameOverOverlay }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .onReceive(clock.$tickCount) { _ in tick() }
+        .onAppear { motion.start(); clock.start() }
+        .onDisappear { motion.stop(); clock.stop() }
+    }
+
+    // MARK: - Render layers
+
+    private var paintLayer: some View {
+        Canvas { ctx, _ in
+            guard cols > 0, rows > 0, grid.count == cols * rows else { return }
+            let rad = max(cellW, cellH) * 0.64
+            for row in 0..<rows {
+                let base = row * cols
+                let cy = (CGFloat(row) + 0.5) * cellH
+                for col in 0..<cols {
+                    let v = grid[base + col]
+                    if v < 0 { continue }
+                    let cx = (CGFloat(col) + 0.5) * cellW
+                    let rect = CGRect(x: cx - rad, y: cy - rad, width: rad * 2, height: rad * 2)
+                    ctx.fill(Path(ellipseIn: rect),
+                             with: .color(Self.paintColors[Int(v)].opacity(0.92)))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pitLayer: some View {
+        ForEach(pits) { pit in
+            Circle()
+                .fill(RadialGradient(colors: [.black, Color(white: 0.05)],
+                                     center: .center, startRadius: 0, endRadius: pit.radius))
+                .overlay(Circle().stroke(Color(white: 0.22), lineWidth: 2))
+                .frame(width: pit.radius * 2, height: pit.radius * 2)
+                .position(pit.pos)
+                .shadow(color: .black.opacity(0.6), radius: 6)
+        }
+    }
+
+    @ViewBuilder
+    private var splashLayer: some View {
+        ForEach(splashes) { s in
+            let age = Double(max(0, localTick - s.born)) / 22.0   // 0→1 over ~0.37s
+            if age <= 1 {
+                Circle()
+                    .stroke(s.color.opacity(0.8 * (1 - age)), lineWidth: 4)
+                    .frame(width: marbleRadius * 2 * (1 + age * 2.4),
+                           height: marbleRadius * 2 * (1 + age * 2.4))
+                    .position(s.pos)
+            }
+        }
+    }
+
+    private func marble(_ p: Painter) -> some View {
+        let stuck = localTick < p.stuckUntil
+        let paint = Self.paintColors[p.colorIndex]
+        return ZStack {
+            if p.isPlayer {
+                Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
+                    .overlay(Circle().stroke(paint, lineWidth: 3))
+                    .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
+            } else {
+                Circle().fill(RadialGradient(
+                    colors: [paint, paint.opacity(0.7)],
+                    center: .init(x: 0.35, y: 0.32),
+                    startRadius: 1, endRadius: marbleRadius * 1.4))
+                    .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
+            }
+        }
+        .frame(width: marbleRadius * 2, height: marbleRadius * 2)
+        .overlay(alignment: .topLeading) {
+            Circle().fill(.white.opacity(0.5))
+                .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
+                .offset(x: marbleRadius * 0.35, y: marbleRadius * 0.35)
+        }
+        .opacity(stuck ? 0.5 : 1)
+        .overlay {
+            if stuck {
+                let left = max(1, Int(ceil(Double(p.stuckUntil - localTick) / 60.0)))
+                Circle().stroke(paint.opacity(0.9), lineWidth: 3)
+                    .frame(width: marbleRadius * 3, height: marbleRadius * 3)
+                    .overlay(
+                        Text("\(left)")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                    )
+            }
+        }
+        .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
+    }
+
+    // MARK: - HUD / overlays
+
+    private var topBar: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Button { nav.goHome() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(10)
+                        .background(Circle().fill(Color(white: 0.16)))
+                }
+                Spacer()
+                VStack(spacing: 1) {
+                    Text(timeString)
+                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .foregroundStyle(secondsLeft <= 10 ? Color(red: 1.0, green: 0.45, blue: 0.4) : .white)
+                        .monospacedDigit()
+                    Text("PAINT")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.5))
+                        .tracking(2)
+                }
+                Spacer()
+                Color.clear.frame(width: 38, height: 38)
+            }
+            coverageBar
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+    }
+
+    private var timeString: String {
+        let s = secondsLeft
+        return String(format: "0:%02d", s)
+    }
+
+    private var coverageBar: some View {
+        VStack(spacing: 4) {
+            GeometryReader { g in
+                HStack(spacing: 0) {
+                    ForEach(0..<colorCount, id: \.self) { i in
+                        Self.paintColors[i]
+                            .frame(width: g.size.width * fraction(i))
+                    }
+                    Color(white: 0.18)   // bare floor remainder
+                }
+            }
+            .frame(height: 12)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 1))
+
+            HStack(spacing: 4) {
+                Circle().fill(Self.paintColors[0]).frame(width: 9, height: 9)
+                Text("You  \(percent(0))%")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func fraction(_ i: Int) -> CGFloat {
+        guard totalPaintable > 0, i < coverage.count else { return 0 }
+        return CGFloat(coverage[i]) / CGFloat(totalPaintable)
+    }
+
+    private func percent(_ i: Int) -> Int {
+        guard totalPaintable > 0, i < coverage.count else { return 0 }
+        return Int((Double(coverage[i]) / Double(totalPaintable)) * 100)
+    }
+
+    private var startPrompt: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "paintbrush.pointed.fill")
+                .font(.system(size: 38, weight: .light))
+                .foregroundStyle(Self.paintColors[0])
+            Text("Tilt to play")
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text("Splash the most paint in 60 seconds.\nAvoid the puddles — they freeze you for 3s.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.6))
+                .multilineTextAlignment(.center)
+        }
+        .padding(28)
+        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+    }
+
+    private var gameOverOverlay: some View {
+        let pct = percent(0)
+        let placement = 1 + coverage.enumerated().filter { $0.offset != 0 && $0.element > coverage[0] }.count
+        let banked = pct + (playerWon ? winBonus : 0)
+        return ZStack {
+            Color.black.opacity(0.72).ignoresSafeArea()
+            VStack(spacing: 22) {
+                VStack(spacing: 6) {
+                    Text(playerWon ? "You Win!" : "Round Over")
+                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .foregroundStyle(playerWon
+                            ? Self.paintColors[0]
+                            : Color(white: 0.85))
+                    Text("You painted \(pct)% — \(ordinal(placement)) place")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.65))
+                }
+
+                HStack(spacing: 12) {
+                    CoinIcon(size: 44)
+                        .shadow(color: Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.5), radius: 10)
+                    Text("+\(banked)")
+                        .font(.system(size: 52, weight: .black, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+                Text("coins banked")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+
+                VStack(spacing: 12) {
+                    Button { reset() } label: {
+                        Text("Play Again")
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(RoundedRectangle(cornerRadius: 18)
+                                .fill(Self.paintColors[0]))
+                    }
+                    Button { nav.goHome() } label: {
+                        Text("Home")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.85))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                }
+                .padding(.horizontal, 40)
+            }
+            .padding(.horizontal, 28)
+        }
+    }
+
+    private func ordinal(_ n: Int) -> String {
+        switch n {
+        case 1:  return "1st"
+        case 2:  return "2nd"
+        case 3:  return "3rd"
+        default: return "\(n)th"
+        }
+    }
+
+    // MARK: - Lifecycle
+
+    private func layout(_ size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        arena = size
+        center = CGPoint(x: size.width / 2, y: size.height / 2)
+        cols = max(1, Int(size.width / cellSize))
+        rows = max(1, Int(size.height / cellSize))
+        cellW = size.width / CGFloat(cols)
+        cellH = size.height / CGFloat(rows)
+    }
+
+    private func reset() {
+        guard cols > 0, rows > 0 else { return }
+        started = false
+        isOver = false
+        playerWon = false
+        awarded = false
+        roundTick = 0
+        splashes = []
+
+        // Fresh, bare canvas.
+        grid = Array(repeating: -1, count: cols * rows)
+        coverage = Array(repeating: 0, count: colorCount)
+
+        scatterPits()
+        spawnPainters()
+    }
+
+    private func scatterPits() {
+        var ps: [Pit] = []
+        let margin: CGFloat = 44
+        let topReserve: CGFloat = 130   // keep pits clear of the HUD
+        var attempts = 0
+        while ps.count < pitCount && attempts < 240 {
+            attempts += 1
+            let x = CGFloat.random(in: margin...(arena.width - margin))
+            let y = CGFloat.random(in: (topReserve)...(arena.height - margin))
+            if hypot(x - center.x, y - center.y) < 95 { continue }            // not on spawn
+            if ps.contains(where: { hypot($0.pos.x - x, $0.pos.y - y) < pitRadius * 3 }) { continue }
+            ps.append(Pit(pos: CGPoint(x: x, y: y), radius: pitRadius))
+        }
+        pits = ps
+
+        // Mark every cell under a pit as unpaintable, and tally the rest.
+        var b = Array(repeating: false, count: cols * rows)
+        for row in 0..<rows {
+            let cy = (CGFloat(row) + 0.5) * cellH
+            for col in 0..<cols {
+                let cx = (CGFloat(col) + 0.5) * cellW
+                if pits.contains(where: { hypot(cx - $0.pos.x, cy - $0.pos.y) <= $0.radius }) {
+                    b[row * cols + col] = true
+                }
+            }
+        }
+        blocked = b
+        totalPaintable = b.lazy.filter { !$0 }.count
+    }
+
+    private func spawnPainters() {
+        var fresh: [Painter] = [Painter(pos: center, colorIndex: 0, isPlayer: true,
+                                        immuneUntil: localTick + 45)]
+        let ringR = min(arena.width, arena.height) * 0.30
+        for i in 0..<rivalCount {
+            let angle = (Double(i) / Double(rivalCount)) * 2 * .pi - .pi / 2
+            let p = CGPoint(x: center.x + CGFloat(cos(angle)) * ringR,
+                            y: center.y + CGFloat(sin(angle)) * ringR)
+            fresh.append(Painter(pos: p, colorIndex: i + 1, isPlayer: false,
+                                 target: p, immuneUntil: localTick + 45))
+        }
+        painters = fresh
+    }
+
+    private func endRound() {
+        guard !isOver else { return }
+        isOver = true
+        let top = topColorIndex()
+        playerWon = (top == 0)
+        if !awarded {
+            awarded = true
+            let pct = percent(0)
+            let banked = pct + (playerWon ? winBonus : 0)
+            if banked > 0 { gameState.addCoins(banked) }
+            AnalyticsClient.shared.track(
+                "paintball_round_over",
+                properties: ["won": .bool(playerWon),
+                             "coverage_pct": .int(pct),
+                             "coins": .int(banked)]
+            )
+            if gameState.hapticsEnabled {
+                if playerWon { Haptics.success() } else { Haptics.warning() }
+            }
+        }
+    }
+
+    private func topColorIndex() -> Int {
+        var best = 0
+        for i in 1..<coverage.count where coverage[i] > coverage[best] { best = i }
+        return best
+    }
+
+    // MARK: - Simulation
+
+    private func tick() {
+        localTick &+= 1
+        pruneSplashes()
+        guard started, !isOver, cols > 0 else { return }
+        roundTick += 1
+        let dt: CGFloat = 1.0 / 60.0
+
+        for i in painters.indices {
+            // Frozen: serving a pit penalty — no input, no motion.
+            if localTick < painters[i].stuckUntil {
+                painters[i].vel = .zero
+                continue
+            }
+            // Just climbed out — pop clear of the pit and grant brief immunity.
+            if painters[i].stuckPit >= 0 {
+                releaseFromPit(&painters[i])
+            }
+
+            // Accelerate.
+            if painters[i].isPlayer {
+                painters[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
+                painters[i].vel.dy += CGFloat(motion.gravity.y) * playerAccel * dt
+            } else {
+                steerBot(&painters[i])
+            }
+
+            // Friction + speed clamp.
+            painters[i].vel.dx *= friction
+            painters[i].vel.dy *= friction
+            let s = hypot(painters[i].vel.dx, painters[i].vel.dy)
+            if s > maxSpeed {
+                let k = maxSpeed / s
+                painters[i].vel.dx *= k
+                painters[i].vel.dy *= k
+            }
+
+            // Integrate + bounce off the arena walls.
+            painters[i].pos.x += painters[i].vel.dx * dt
+            painters[i].pos.y += painters[i].vel.dy * dt
+            bounceWalls(&painters[i])
+        }
+
+        resolvePits()
+        paintPass()
+
+        if roundTick >= roundTicks { endRound() }
+    }
+
+    private func releaseFromPit(_ p: inout Painter) {
+        let pit = pits[p.stuckPit]
+        var dir = unit(dx: center.x - pit.pos.x, dy: center.y - pit.pos.y, scale: 1)
+        if dir.dx == 0 && dir.dy == 0 { dir = CGVector(dx: 1, dy: 0) }
+        p.pos = CGPoint(x: pit.pos.x + dir.dx * (pit.radius + marbleRadius + 3),
+                        y: pit.pos.y + dir.dy * (pit.radius + marbleRadius + 3))
+        p.vel = .zero
+        p.immuneUntil = localTick + graceTicks
+        p.stuckPit = -1
+    }
+
+    private func steerBot(_ p: inout Painter) {
+        if localTick >= p.retargetAt
+            || hypot(p.target.x - p.pos.x, p.target.y - p.pos.y) < 40 {
+            p.target = pickTarget(for: p)
+            p.retargetAt = localTick + retargetTicks
+        }
+        let dt: CGFloat = 1.0 / 60.0
+        let s = unit(dx: p.target.x - p.pos.x, dy: p.target.y - p.pos.y, scale: aiAccel)
+        p.vel.dx += s.dx * dt
+        p.vel.dy += s.dy * dt
+    }
+
+    /// Sample a handful of points and head for the most worthwhile one:
+    /// bare floor beats a rival's paint beats the bot's own colour.
+    private func pickTarget(for p: Painter) -> CGPoint {
+        var best = p.pos
+        var bestScore = -1
+        let margin: CGFloat = 36
+        for _ in 0..<10 {
+            let x = CGFloat.random(in: margin...(arena.width - margin))
+            let y = CGFloat.random(in: margin...(arena.height - margin))
+            if pits.contains(where: { hypot(x - $0.pos.x, y - $0.pos.y) < $0.radius + marbleRadius * 1.5 }) {
+                continue
+            }
+            let col = min(cols - 1, max(0, Int(x / cellW)))
+            let row = min(rows - 1, max(0, Int(y / cellH)))
+            let v = grid[row * cols + col]
+            let worth = (v < 0) ? 2 : (Int(v) == p.colorIndex ? 0 : 1)
+            let travel = Int(hypot(x - p.pos.x, y - p.pos.y) / 18)
+            let score = worth * 1_000 + travel + Int.random(in: 0...40)
+            if score > bestScore { bestScore = score; best = CGPoint(x: x, y: y) }
+        }
+        return best
+    }
+
+    private func bounceWalls(_ p: inout Painter) {
+        if p.pos.x < marbleRadius {
+            p.pos.x = marbleRadius; p.vel.dx = -p.vel.dx * wallBounce
+        } else if p.pos.x > arena.width - marbleRadius {
+            p.pos.x = arena.width - marbleRadius; p.vel.dx = -p.vel.dx * wallBounce
+        }
+        if p.pos.y < marbleRadius {
+            p.pos.y = marbleRadius; p.vel.dy = -p.vel.dy * wallBounce
+        } else if p.pos.y > arena.height - marbleRadius {
+            p.pos.y = arena.height - marbleRadius; p.vel.dy = -p.vel.dy * wallBounce
+        }
+    }
+
+    private func resolvePits() {
+        for i in painters.indices {
+            if localTick < painters[i].stuckUntil { continue }   // already frozen
+            if localTick < painters[i].immuneUntil { continue }  // just got out
+            for (pi, pit) in pits.enumerated() {
+                if hypot(painters[i].pos.x - pit.pos.x, painters[i].pos.y - pit.pos.y) < pit.radius {
+                    painters[i].pos = pit.pos
+                    painters[i].vel = .zero
+                    painters[i].stuckUntil = localTick + penaltyTicks
+                    painters[i].stuckPit = pi
+                    splashes.append(Splash(pos: pit.pos,
+                                           color: Self.paintColors[painters[i].colorIndex],
+                                           born: localTick))
+                    if painters[i].isPlayer && gameState.hapticsEnabled { Haptics.warning() }
+                    break
+                }
+            }
+        }
+    }
+
+    /// Stamp every moving (non-frozen) marble's brush blob onto the grid.
+    /// Copies grid + coverage into locals and writes back once for one redraw.
+    private func paintPass() {
+        guard grid.count == cols * rows else { return }
+        var g = grid
+        var cov = coverage
+        var changed = false
+        for p in painters {
+            if localTick < p.stuckUntil { continue }    // frozen marbles don't paint
+            if stamp(&g, &cov, at: p.pos, color: p.colorIndex) { changed = true }
+        }
+        if changed { grid = g; coverage = cov }
+    }
+
+    @discardableResult
+    private func stamp(_ g: inout [Int8], _ cov: inout [Int], at pos: CGPoint, color: Int) -> Bool {
+        let c0 = Int(pos.x / cellW)
+        let r0 = Int(pos.y / cellH)
+        let span = 2
+        var changed = false
+        for dr in -span...span {
+            let r = r0 + dr
+            if r < 0 || r >= rows { continue }
+            let cy = (CGFloat(r) + 0.5) * cellH
+            for dc in -span...span {
+                let c = c0 + dc
+                if c < 0 || c >= cols { continue }
+                let idx = r * cols + c
+                if blocked[idx] { continue }
+                let cx = (CGFloat(c) + 0.5) * cellW
+                if hypot(cx - pos.x, cy - pos.y) > paintRadius { continue }
+                let old = g[idx]
+                if Int(old) == color { continue }
+                if old >= 0 { cov[Int(old)] -= 1 }
+                cov[color] += 1
+                g[idx] = Int8(color)
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    private func pruneSplashes() {
+        if !splashes.isEmpty {
+            splashes.removeAll { localTick - $0.born > 24 }
+        }
+    }
+
+    private func unit(dx: CGFloat, dy: CGFloat, scale: CGFloat) -> CGVector {
+        let m = hypot(dx, dy)
+        guard m > 0 else { return CGVector(dx: 0, dy: 0) }
+        return CGVector(dx: dx / m * scale, dy: dy / m * scale)
+    }
+}
+
+#Preview {
+    NavigationStack {
+        PaintBallView()
+            .environmentObject(GameState())
+            .environmentObject(Navigator())
+    }
+}

@@ -124,6 +124,7 @@ struct GameMenuView: View {
         case "coinpit": return ("dollarsign.circle.fill", Color(red: 1.00, green: 0.82, blue: 0.28))
         case "snake":   return ("scribble.variable",      Color(red: 0.50, green: 0.85, blue: 0.45))
         case "bumper":  return ("car.side.fill",          Color(red: 0.98, green: 0.45, blue: 0.40))
+        case "paintball": return ("paintbrush.pointed.fill", Color(red: 0.25, green: 0.62, blue: 1.0))
         default:        return ("gamecontroller.fill",    Color(red: 0.55, green: 0.78, blue: 1.0))
         }
     }

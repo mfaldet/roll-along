@@ -247,6 +247,23 @@ struct BumperCarsMode: GameMode {
     let showsScore                   = true
 }
 
+/// Paint Ball — 60-second territory scramble: every marble trails its own paint
+/// colour; most paint on the floor when the clock hits zero wins.  Scattered
+/// puddle-pits freeze a marble that rolls in for a 3-second penalty.
+struct PaintBallMode: GameMode {
+    let id          = "paintball"
+    let displayName = "Paint Ball"
+    let tagline     = "Sixty seconds. Splash the most paint. Mind the puddles."
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .none   // pits penalise, they don't end the run
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .unlimited
+    let hasHoles                     = false
+    let showsTimer                   = true
+    let showsScore                   = true
+}
+
 // MARK: - Catalogue + feature flags
 
 /// The registry of game modes and whether each is live.
@@ -266,6 +283,7 @@ enum GameModeCatalogue {
         (CoinPitMode(),    true),    // engine behavior implemented — live
         (SnakeMode(),      true),     // self-contained SnakeGameView — live
         (BumperCarsMode(), true),    // self-contained BumperCarsView — live
+        (PaintBallMode(),  true),    // self-contained PaintBallView — live
     ]
 
     /// Modes the player can currently see in the UI.

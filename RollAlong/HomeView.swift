@@ -250,6 +250,7 @@ struct HomeView: View {
                 case .games:       GameMenuView()
                 case .mode("snake"): SnakeGameView()
                 case .mode("bumper"): BumperCarsView()
+                case .mode("paintball"): PaintBallView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)
