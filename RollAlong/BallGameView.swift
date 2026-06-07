@@ -352,8 +352,12 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
-                // Hole zones (themed)
-                holeLayer(geo: geo)
+                // Hole zones (themed) — only modes that use holes draw them.
+                // ClimbMode has holes, so this is unchanged today; hole-free
+                // modes (Zen Garden, Coin Pit) render no pits.
+                if activeMode.hasHoles {
+                    holeLayer(geo: geo)
+                }
 
                 // Coins (not-yet-collected this attempt, not-yet-banked overall)
                 coinLayer(geo: geo)
