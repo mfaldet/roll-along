@@ -189,14 +189,20 @@ struct BallGameView: View {
     private let coinRadius:  CGFloat = 9
     private let tickRate              = 1.0 / 60.0
 
-    /// The game mode this screen is currently presenting.  Every Roll Along
-    /// experience runs the same tilt-physics engine wearing a different
-    /// costume; the mode supplies the rules that differ (HUD flags, control
-    /// scheme, fail/win behaviour, progression).  For now this is always the
-    /// endless climb — `ClimbMode` encodes today's exact behaviour, so routing
-    /// through it changes nothing.  When mini-games / competitive modes land,
-    /// this becomes an injected value selected on the menu.
-    private let activeMode: GameMode = GameModeCatalogue.climb
+    /// The game mode this screen is presenting.  Every Roll Along experience
+    /// runs the same tilt-physics engine wearing a different costume; the mode
+    /// supplies the rules that differ (HUD flags, control scheme, fail/win
+    /// behaviour, progression).  Injected at construction and defaulting to the
+    /// endless climb, so every existing `BallGameView()` call site is unchanged
+    /// — only an explicit `BallGameView(activeMode:)` (e.g. from a mode picker)
+    /// selects something else.
+    let activeMode: GameMode
+
+    /// Only `activeMode` is injected; every `@State` / `@StateObject` keeps its
+    /// declared default, so this single-parameter init is all SwiftUI needs.
+    init(activeMode: GameMode = GameModeCatalogue.climb) {
+        self.activeMode = activeMode
+    }
 
     /// The ball's actual radius after the equipped skin's size modifier
     /// is applied.  Every skin is full-size except Pluto (0.5×), the
