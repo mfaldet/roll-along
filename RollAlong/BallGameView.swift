@@ -510,6 +510,12 @@ struct BallGameView: View {
                     livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
                 }
 
+                // Coin Pit: live round HUD — seconds remaining + coins caught.
+                // Gated to the reward round; every other mode renders nothing.
+                if isCoinPit {
+                    coinPitHUDOverlay(safeTop: geo.safeAreaInsets.top)
+                }
+
                 // Spawn-lock "Tap to start" hint — only shown while the
                 // lock is engaged.  Sits below the lives HUD, above the
                 // home button.  Tap anywhere to release the lock.
@@ -2723,6 +2729,64 @@ struct BallGameView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(livesAccessibilityLabel)
+        }
+    }
+
+    // MARK: - Coin Pit live HUD
+
+    /// The Coin Pit round HUD: a top-center pill showing the seconds left and
+    /// the running haul (coins caught / target).  The countdown is driven on a
+    /// 1-second cadence; the score updates instantly because `coinPitScore` is
+    /// observed @State.  Dormant outside the Coin Pit (gated by the caller).
+    private func coinPitHUDOverlay(safeTop: CGFloat) -> some View {
+        TimelineView(.periodic(from: .now, by: 1.0)) { context in
+            let target = coinPitTarget ?? 0
+            // Show the full duration until the first tick arms the clock, then
+            // the live remaining time to the deadline (never negative).
+            let remaining: TimeInterval = {
+                guard let deadline = coinPitDeadline else { return coinPitDuration }
+                return max(0, deadline.timeIntervalSince(context.date))
+            }()
+            let urgent = remaining <= 5
+
+            HStack(spacing: 12) {
+                // Countdown — turns warm red in the closing seconds.
+                HStack(spacing: 5) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 13, weight: .bold))
+                    Text(Self.formatCountdown(remaining))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(urgent ? Color(red: 1.00, green: 0.42, blue: 0.38) : .white)
+
+                Capsule()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(width: 1, height: 16)
+
+                // Haul so far.
+                HStack(spacing: 5) {
+                    CoinIcon(size: 16)
+                    Text("\(coinPitScore)/\(target)")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.32))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
+            )
+            .padding(.top, max(safeTop + 4, 50))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(Int(ceil(remaining))) seconds left. "
+                + "\(coinPitScore) of \(target) coins caught."
+            )
         }
     }
 
