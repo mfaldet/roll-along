@@ -214,6 +214,11 @@ struct BallGameView: View {
     }
 
     private var layout: LevelLayout {
+        // Goal-free modes (Zen Garden) roll in an open, hazard-free sandbox
+        // rather than the player's current climb level.
+        if activeMode.goal == .endless {
+            return LevelLayout.openArena
+        }
         let base = LevelLayout.layout(for: gameState.currentLevel)
         return gameState.ballStartsAtTop ? base.flipped() : base
     }
@@ -2480,7 +2485,7 @@ struct BallGameView: View {
     private func hud(safeBottom: CGFloat) -> some View {
         VStack {
             Spacer()
-            Text("LEVEL \(gameState.currentLevel)")
+            Text(bottomLabelText)
                 .font(.system(size: 12, weight: .ultraLight, design: .monospaced))
                 .kerning(4)
                 .foregroundStyle(Color(white: 0.40))
@@ -2488,6 +2493,15 @@ struct BallGameView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, max(safeBottom, 12) + 8)
         }
+    }
+
+    /// Bottom-HUD caption: the climb shows the level number; other modes show
+    /// their own name (e.g. "ZEN GARDEN") since they aren't climb levels.
+    private var bottomLabelText: String {
+        if case .mainClimb = activeMode.progression {
+            return "LEVEL \(gameState.currentLevel)"
+        }
+        return activeMode.displayName.uppercased()
     }
 
     /// Floating home button — always tappable, even when Oops / Win overlays
@@ -3777,6 +3791,14 @@ struct BallGameView: View {
 
         // Hole check
         if isInHole(position: b.position, size: geoSize) || b.position.x < -r || b.position.x > geoSize.width + r {
+            // No-fail modes (Zen Garden) can't lose: there's nothing to fall
+            // into and no Oops state.  If the ball somehow escapes a wall
+            // bounce under extreme velocity, quietly recenter and carry on —
+            // no life, no overlay, no analytics fail event.
+            if activeMode.onFail == FailKind.none {
+                ball = Ball(position: startPoint(in: geoSize), velocity: .zero)
+                return
+            }
             // Spawn-grace: a fall registered in the first ~300ms of an
             // attempt is almost always spurious — the player hasn't had
             // time to tilt yet, motion gravity is still ramping, or the

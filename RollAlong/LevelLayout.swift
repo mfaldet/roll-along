@@ -315,6 +315,22 @@ extension LevelLayout {
         )
     }
 
+    /// An open, hazard-free sandbox for goal-free modes (e.g. Zen Garden).
+    /// No holes — not even the standard side-wall margins, since the arena
+    /// walls already bounce the ball back, so there's nothing to fall into.
+    /// No coins; the ball starts dead centre.  `goal` is required by the type
+    /// but is ignored by any mode whose goal isn't `.reachGoal`.
+    static let openArena = LevelLayout(
+        holeRects:  [],
+        start:      UnitPoint(x: 0.5, y: 0.5),
+        goal:       UnitPoint(x: 0.5, y: 0.5),
+        coins:      [],
+        targetTime: 0,
+        goldTime:   0,
+        tier:       .easy,
+        verified:   true
+    )
+
     /// Levels 1-10 — World 1, Classic sub-theme.
     /// Difficulty climbs gradually so new players learn tilt control.
     static let handCrafted: [LevelLayout] = [
