@@ -300,6 +300,23 @@ struct MarbleCupMode: GameMode {
     let showsScore                   = true
 }
 
+/// King of the Hill — 60-second fight over a glowing zone that drifts around the
+/// arena.  Hold it alone to bank time; a rival rolling in makes it contested
+/// (nobody scores) until you shove them out.  Most hold-time wins.
+struct KingOfTheHillMode: GameMode {
+    let id          = "koth"
+    let displayName = "King of the Hill"
+    let tagline     = "Hold the moving zone — alone. Most time on the hill wins."
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .none
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .unlimited
+    let hasHoles                     = false
+    let showsTimer                   = true
+    let showsScore                   = true
+}
+
 // MARK: - Catalogue + feature flags
 
 /// The registry of game modes and whether each is live.
@@ -322,6 +339,7 @@ enum GameModeCatalogue {
         (PaintBallMode(),  true),    // self-contained PaintBallView — live
         (GoldRushMode(),   true),    // self-contained GoldRushView — live
         (MarbleCupMode(),  true),    // self-contained MarbleCupView — live
+        (KingOfTheHillMode(), true), // self-contained KingOfTheHillView — live
     ]
 
     /// Modes the player can currently see in the UI.
