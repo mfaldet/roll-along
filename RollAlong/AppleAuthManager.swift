@@ -33,7 +33,10 @@ import UIKit
 @MainActor
 final class AppleAuthManager: NSObject, ObservableObject {
     static let shared = AppleAuthManager()
-    private override init() { super.init() }
+    // `nonisolated` so the static `shared` initializer (a nonisolated context)
+    // can build it without a main-actor hop.  The body touches no isolated
+    // state — it just chains to NSObject.init — so this is safe.
+    private nonisolated override init() { super.init() }
 
     // MARK: - Published state (drive the sign-in button / UI)
 
@@ -209,13 +212,18 @@ extension AppleAuthManager: ASAuthorizationControllerPresentationContextProvidin
     nonisolated func presentationAnchor(
         for controller: ASAuthorizationController
     ) -> ASPresentationAnchor {
-        // Find the active foreground window to anchor the system sheet.
-        let scenes = UIApplication.shared.connectedScenes
-        let window = scenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }
-        return window ?? ASPresentationAnchor()
+        // UIKit always calls this back on the main thread, so it's safe to
+        // assert main-actor isolation here.  Doing so lets us read the
+        // main-actor-isolated UIApplication scene/window APIs without warnings.
+        MainActor.assumeIsolated {
+            // Find the active foreground window to anchor the system sheet.
+            let scenes = UIApplication.shared.connectedScenes
+            let window = scenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+            return window ?? ASPresentationAnchor()
+        }
     }
 }
 
