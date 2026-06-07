@@ -230,9 +230,10 @@ struct BallGameView: View {
     }
 
     private var layout: LevelLayout {
-        // Goal-free modes (Zen Garden) roll in an open, hazard-free sandbox
-        // rather than the player's current climb level.
-        if activeMode.goal == .endless {
+        // Hole-free modes (Zen Garden, Coin Pit) roll in an open, hazard-free
+        // arena rather than the player's current climb level.  ClimbMode and
+        // any holed mode still resolve to the real level layout.
+        if !activeMode.hasHoles {
             return LevelLayout.openArena
         }
         let base = LevelLayout.layout(for: gameState.currentLevel)
