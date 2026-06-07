@@ -9,6 +9,7 @@ enum HomeRoute: Hashable {
     case levels
     case settings
     case shop
+    case leaderboard
 }
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,11 @@ final class Navigator: ObservableObject {
     /// Push the Cosmetic Shop on top of the current stack.
     func goToShop() {
         if path.last != .shop { path.append(.shop) }
+    }
+
+    /// Push the global Leaderboard on top of the current stack.
+    func goToLeaderboard() {
+        if path.last != .leaderboard { path.append(.leaderboard) }
     }
 }
 
@@ -145,12 +151,21 @@ struct HomeView: View {
                         .padding(.horizontal, 40)
                         .padding(.bottom, 14)
 
-                    HStack(spacing: 28) {
+                    HStack(spacing: 22) {
                         NavigationLink(value: HomeRoute.levels) {
                             HStack(spacing: 6) {
                                 Image(systemName: "square.grid.3x3.fill")
                                     .font(.system(size: 14))
                                 Text("Levels")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                            }
+                            .foregroundStyle(Color(white: 0.5))
+                        }
+                        NavigationLink(value: HomeRoute.leaderboard) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 14))
+                                Text("Ranks")
                                     .font(.system(size: 16, weight: .medium, design: .rounded))
                             }
                             .foregroundStyle(Color(white: 0.5))
@@ -188,10 +203,11 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: HomeRoute.self) { route in
                 switch route {
-                case .game:     BallGameView()
-                case .levels:   LevelSelectView()
-                case .settings: SettingsView()
-                case .shop:     CosmeticShopView()
+                case .game:        BallGameView()
+                case .levels:      LevelSelectView()
+                case .settings:    SettingsView()
+                case .shop:        CosmeticShopView()
+                case .leaderboard: LeaderboardView()
                 }
             }
             // Sheet driven by tapping the top-left lives pill.  Re-uses
