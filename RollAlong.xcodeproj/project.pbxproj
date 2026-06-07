@@ -38,6 +38,7 @@
 		D502FEEB2FD5024E00CA86BD /* BumperCarsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEEA2FD5024E00CA86BD /* BumperCarsView.swift */; };
 		D502FEED2FD5024E00CA86BD /* PaintBallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEEC2FD5024E00CA86BD /* PaintBallView.swift */; };
 		D502FEEF2FD5024E00CA86BD /* GoldRushView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */; };
+		D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -73,6 +74,7 @@
 		D502FEEA2FD5024E00CA86BD /* BumperCarsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BumperCarsView.swift; sourceTree = "<group>"; };
 		D502FEEC2FD5024E00CA86BD /* PaintBallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintBallView.swift; sourceTree = "<group>"; };
 		D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldRushView.swift; sourceTree = "<group>"; };
+		D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarbleCupView.swift; sourceTree = "<group>"; };
 		D569BB962FD5B4AB008E91A6 /* RollAlong.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RollAlong.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -111,6 +113,7 @@
 				D502FEEA2FD5024E00CA86BD /* BumperCarsView.swift */,
 				D502FEEC2FD5024E00CA86BD /* PaintBallView.swift */,
 				D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */,
+				D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */,
 				AA000001000000000000AA00 /* RollAlongApp.swift */,
 				AA000002000000000000AA00 /* ContentView.swift */,
 				AA000003000000000000AA00 /* BallGameView.swift */,
@@ -241,6 +244,7 @@
 				D502FEEB2FD5024E00CA86BD /* BumperCarsView.swift in Sources */,
 				D502FEED2FD5024E00CA86BD /* PaintBallView.swift in Sources */,
 				D502FEEF2FD5024E00CA86BD /* GoldRushView.swift in Sources */,
+				D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */,
 				D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

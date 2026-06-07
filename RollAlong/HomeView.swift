@@ -252,6 +252,7 @@ struct HomeView: View {
                 case .mode("bumper"): BumperCarsView()
                 case .mode("paintball"): PaintBallView()
                 case .mode("goldrush"): GoldRushView()
+                case .mode("marblecup"): MarbleCupView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)

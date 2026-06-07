@@ -281,6 +281,23 @@ struct GoldRushMode: GameMode {
     let showsScore                   = true
 }
 
+/// Marble Cup — 90-second marble soccer (Rocket League with marbles).  Tilt to
+/// slam a light neutral ball into the opponent's goal; the heavy marbles launch
+/// it on a clean hit.  A solo match versus a defending AI.  Most goals wins.
+struct MarbleCupMode: GameMode {
+    let id          = "marblecup"
+    let displayName = "Marble Cup"
+    let tagline     = "Marble soccer. Roll the ball into their net before the whistle."
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .none
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .unlimited
+    let hasHoles                     = false
+    let showsTimer                   = true
+    let showsScore                   = true
+}
+
 // MARK: - Catalogue + feature flags
 
 /// The registry of game modes and whether each is live.
@@ -302,6 +319,7 @@ enum GameModeCatalogue {
         (BumperCarsMode(), true),    // self-contained BumperCarsView — live
         (PaintBallMode(),  true),    // self-contained PaintBallView — live
         (GoldRushMode(),   true),    // self-contained GoldRushView — live
+        (MarbleCupMode(),  true),    // self-contained MarbleCupView — live
     ]
 
     /// Modes the player can currently see in the UI.
