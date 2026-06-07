@@ -425,7 +425,12 @@ struct BallGameView: View {
                 // their marble stockpile.  Failure on tutorial levels still
                 // doesn't cost a life — that's handled in handleFell —
                 // but the HUD itself is permanent UI furniture.
-                livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
+                // Only consume-lives modes show the marble stockpile HUD;
+                // unlimited modes (Zen, Coin Pit) have no lives to display.
+                // ClimbMode consumes, so this stays visible today.
+                if activeMode.lives == .consume {
+                    livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
+                }
 
                 // Spawn-lock "Tap to start" hint — only shown while the
                 // lock is engaged.  Sits below the lives HUD, above the
@@ -3544,7 +3549,8 @@ struct BallGameView: View {
         // Lives gate — non-tutorial levels require a life to attempt.
         // If the player tries to spawn with zero lives, show the
         // out-of-lives overlay instead.
-        if !gameState.isTutorialLevel(gameState.currentLevel),
+        if activeMode.lives == .consume,
+           !gameState.isTutorialLevel(gameState.currentLevel),
            !gameState.unlimitedLives,
            gameState.displayedLives <= 0 {
             withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }
@@ -3863,8 +3869,12 @@ struct BallGameView: View {
         // trigger discomfort for motion-sensitive users.
         if !reduceMotion { shakeTrigger &+= 1 }
 
-        // Lives consumption — tutorial (L1-10) is exempt.
-        if !gameState.isTutorialLevel(gameState.currentLevel) {
+        // Lives consumption — only modes whose lives policy is `.consume`,
+        // and tutorial (L1-10) is always exempt.  ClimbMode consumes, so this
+        // is unchanged today; endless/unlimited modes (Zen, Coin Pit) won't
+        // burn a life on a fall.
+        if activeMode.lives == .consume,
+           !gameState.isTutorialLevel(gameState.currentLevel) {
             gameState.consumeLife()
         }
     }
