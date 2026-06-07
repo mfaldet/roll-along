@@ -33,6 +33,7 @@
 		D502FEE12FD5024E00CA86BD /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEE02FD5024E00CA86BD /* LeaderboardView.swift */; };
 		D502FEE32FD5024E00CA86BD /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEE22FD5024E00CA86BD /* FriendsView.swift */; };
 		D502FEE52FD5024E00CA86BD /* ClansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEE42FD5024E00CA86BD /* ClansView.swift */; };
+		D502FEE72FD5024E00CA86BD /* GameMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEE62FD5024E00CA86BD /* GameMenuView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +64,7 @@
 		D502FEE02FD5024E00CA86BD /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
 		D502FEE22FD5024E00CA86BD /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		D502FEE42FD5024E00CA86BD /* ClansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClansView.swift; sourceTree = "<group>"; };
+		D502FEE62FD5024E00CA86BD /* GameMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMenuView.swift; sourceTree = "<group>"; };
 		D569BB962FD5B4AB008E91A6 /* RollAlong.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RollAlong.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -96,6 +98,7 @@
 				D502FEE02FD5024E00CA86BD /* LeaderboardView.swift */,
 				D502FEE22FD5024E00CA86BD /* FriendsView.swift */,
 				D502FEE42FD5024E00CA86BD /* ClansView.swift */,
+				D502FEE62FD5024E00CA86BD /* GameMenuView.swift */,
 				AA000001000000000000AA00 /* RollAlongApp.swift */,
 				AA000002000000000000AA00 /* ContentView.swift */,
 				AA000003000000000000AA00 /* BallGameView.swift */,
@@ -221,6 +224,7 @@
 				D502FEE12FD5024E00CA86BD /* LeaderboardView.swift in Sources */,
 				D502FEE32FD5024E00CA86BD /* FriendsView.swift in Sources */,
 				D502FEE52FD5024E00CA86BD /* ClansView.swift in Sources */,
+				D502FEE72FD5024E00CA86BD /* GameMenuView.swift in Sources */,
 				D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

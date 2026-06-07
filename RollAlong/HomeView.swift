@@ -12,6 +12,7 @@ enum HomeRoute: Hashable {
     case leaderboard
     case friends
     case clans
+    case games
     /// Launch an alternate game mode by its GameModeCatalogue id (e.g. "zen").
     /// The climb uses `.game`; this carries the id so one route serves every
     /// non-climb mode as the modes hub grows.
@@ -66,6 +67,11 @@ final class Navigator: ObservableObject {
     /// Push the Clans screen on top of the current stack.
     func goToClans() {
         if path.last != .clans { path.append(.clans) }
+    }
+
+    /// Push the Game Menu (all non-climb modes) on top of the current stack.
+    func goToGames() {
+        if path.last != .games { path.append(.games) }
     }
 }
 
@@ -167,43 +173,23 @@ struct HomeView: View {
                         .padding(.horizontal, 40)
                         .padding(.bottom, 12)
 
-                    // Secondary modes: low-key entries to the alternate
-                    // experiences that sit beside the competitive climb —
-                    // a calm Zen Garden and the quick Coin Pit reward round.
-                    HStack(spacing: 10) {
-                        NavigationLink(value: HomeRoute.mode("zen")) {
-                            HStack(spacing: 7) {
-                                Image(systemName: "leaf.fill")
-                                    .font(.system(size: 13))
-                                Text("Zen Garden")
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            }
-                            .foregroundStyle(Color(white: 0.82))
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 9)
-                            .background(
-                                Capsule()
-                                    .fill(Color(white: 0.14))
-                                    .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
-                            )
+                    // One tap to every non-climb experience — Zen Garden,
+                    // Coin Pit, and the competitive modes as they come online.
+                    NavigationLink(value: HomeRoute.games) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "gamecontroller.fill")
+                                .font(.system(size: 15))
+                            Text("Game Modes")
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
                         }
-                        NavigationLink(value: HomeRoute.mode("coinpit")) {
-                            HStack(spacing: 7) {
-                                Image(systemName: "dollarsign.circle.fill")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
-                                Text("Coin Pit")
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color(white: 0.82))
-                            }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 9)
-                            .background(
-                                Capsule()
-                                    .fill(Color(white: 0.14))
-                                    .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
-                            )
-                        }
+                        .foregroundStyle(Color(white: 0.85))
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 11)
+                        .background(
+                            Capsule()
+                                .fill(Color(white: 0.14))
+                                .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
+                        )
                     }
                     .padding(.bottom, 14)
 
@@ -261,6 +247,7 @@ struct HomeView: View {
                 case .leaderboard: LeaderboardView()
                 case .friends:     FriendsView()
                 case .clans:       ClansView()
+                case .games:       GameMenuView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)
