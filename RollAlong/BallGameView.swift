@@ -3610,7 +3610,12 @@ struct BallGameView: View {
         //
         // Any banked coin progress on L1 from a prior aborted tutorial
         // is wiped so the Phase 2 pickup flow works fresh.
-        let isFirstL1Run = gameState.currentLevel == 1
+        // The phased L1 tutorial belongs to the climb only — never run it in
+        // an alternate mode (e.g. a new player who taps Zen Garden before
+        // clearing L1 would otherwise get climb intro hints in the sandbox).
+        var isClimb: Bool { if case .mainClimb = activeMode.progression { return true } else { return false } }
+        let isFirstL1Run = isClimb
+                        && gameState.currentLevel == 1
                         && gameState.time(for: 1) == nil
         if isFirstL1Run {
             tutorialPhase  = .introHint
