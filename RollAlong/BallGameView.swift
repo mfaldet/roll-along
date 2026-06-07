@@ -189,6 +189,38 @@ struct BallGameView: View {
         return trailMaxLength
     }
 
+    // MARK: - Coin Pit (collect-count reward round) state
+    //
+    // The Coin Pit is the shared engine in its "reward" costume: a fixed-time
+    // round where coins rain down the screen and the player tilt-rolls to catch
+    // them.  No holes, no lives, no progression — a pure payout.  This state is
+    // dormant in every other mode (gated by `isCoinPit`, derived from the active
+    // mode's `.collectCount` goal), so it cannot touch the climb.
+    private struct FallingCoin: Identifiable {
+        let id = UUID()
+        var x:     CGFloat
+        var y:     CGFloat
+        var vy:    CGFloat   // fall speed, points/sec
+        let size:  CGFloat
+        let phase: Double    // spin phase so coins don't pulse in unison
+    }
+    private let coinPitDuration: TimeInterval = 30
+    private let coinPitPayoutPerCoin = 1
+    @State private var fallingCoins:       [FallingCoin] = []
+    @State private var coinPitDeadline:    Date? = nil
+    @State private var coinPitLastRelease: Date? = nil
+    @State private var coinPitReleased:    Int = 0
+    @State private var coinPitScore:       Int = 0
+    @State private var coinPitOver:        Bool = false
+
+    /// The catch target if the active mode is a collect-count round, else nil.
+    private var coinPitTarget: Int? {
+        if case let .collectCount(n) = activeMode.goal { return n }
+        return nil
+    }
+    /// True only while presenting a Coin Pit round.
+    private var isCoinPit: Bool { coinPitTarget != nil }
+
     // Last-completion results (for the win overlay)
     @State private var lastClearedTime:        TimeInterval = 0
     @State private var lastClearedStars:       Int          = 0
@@ -397,6 +429,12 @@ struct BallGameView: View {
 
                 // Coins (not-yet-collected this attempt, not-yet-banked overall)
                 coinLayer(geo: geo)
+
+                // Coin Pit: the raining coins for the reward round (catch is
+                // resolved in the tick; this layer is purely cosmetic).
+                if isCoinPit {
+                    fallingCoinLayer(geo: geo).allowsHitTesting(false)
+                }
 
                 // Goal — three renderer paths:
                 //
@@ -3683,6 +3721,15 @@ struct BallGameView: View {
         coinsPickedThisAttempt = []
         trailPoints.removeAll(keepingCapacity: true)
         trailHueOffset = 0.0
+        // Coin Pit: a fresh ball means a fresh round — clear the rain & clock.
+        if isCoinPit {
+            fallingCoins.removeAll()
+            coinPitDeadline    = nil
+            coinPitLastRelease = nil
+            coinPitReleased    = 0
+            coinPitScore       = 0
+            coinPitOver        = false
+        }
         // Engage the spawn lock — physics is paused, border shows the
         // "armed" white state, and a "Tap to start" hint sits above the
         // ball.  levelStartTime is intentionally NOT set here — it's set
@@ -3750,6 +3797,9 @@ struct BallGameView: View {
             spawnLockUntil = nil
             levelStartTime = .now
         }
+
+        // Coin Pit: once the round ends, freeze play behind the payout card.
+        if isCoinPit && coinPitOver { return }
 
         let dt = CGFloat(tickRate)
 
@@ -3831,6 +3881,9 @@ struct BallGameView: View {
             b.velocity.dx = -b.velocity.dx * 0.55
             if incoming > bounceVelocityThreshold { fireWallHit(axis: .horizontal, force: incoming) }
         }
+
+        // Coin Pit: rain, fall, and catch the falling coins for this round.
+        if isCoinPit { coinPitTick(ballPos: b.position, size: geoSize, dt: dt) }
 
         // Coin pickup — collect any not yet picked this attempt + not banked.
         // Multiple coins can be collected per run.  Driven by
@@ -4022,6 +4075,81 @@ struct BallGameView: View {
     private func fireCoinPickup() {
         if gameState.hapticsEnabled { Haptics.soft() }
         AudioManager.shared.playCoin(enabled: gameState.soundEnabled)
+    }
+
+    // MARK: - Coin Pit round simulation
+    //
+    // Driven once per physics tick while a Coin Pit round is live.  Releases
+    // coins on a steady cadence (front-loaded so the last few seconds aren't
+    // empty), advances each coin's fall, catches any that overlap the ball,
+    // banks the haul as real currency, and ends the round on target-or-timeout.
+    private func coinPitTick(ballPos: CGPoint, size: CGSize, dt: CGFloat) {
+        guard let target = coinPitTarget, !coinPitOver else { return }
+        let now = Date.now
+
+        // First tick of the round arms the clock and the release pacing.
+        if coinPitDeadline == nil {
+            coinPitDeadline    = now.addingTimeInterval(coinPitDuration)
+            coinPitLastRelease = now
+        }
+
+        // Drip the full target out over the first 85% of the round so the
+        // closing seconds are about catching stragglers, not waiting on spawns.
+        let interval = (coinPitDuration * 0.85) / Double(target)
+        if coinPitReleased < target,
+           now.timeIntervalSince(coinPitLastRelease ?? now) >= interval {
+            spawnFallingCoin(in: size)
+            coinPitReleased   += 1
+            coinPitLastRelease = now
+        }
+
+        // Advance falls, catch overlaps, cull off-screen coins in one pass.
+        let r = effectiveBallRadius
+        var survivors: [FallingCoin] = []
+        survivors.reserveCapacity(fallingCoins.count)
+        var caught = 0
+        for var c in fallingCoins {
+            c.y += c.vy * dt
+            if hypot(ballPos.x - c.x, ballPos.y - c.y) < r + c.size / 2 {
+                caught += 1
+                continue
+            }
+            if c.y > size.height + c.size { continue }   // fell past the floor
+            survivors.append(c)
+        }
+        fallingCoins = survivors
+
+        if caught > 0 {
+            coinPitScore += caught
+            gameState.addCoins(caught * coinPitPayoutPerCoin)
+            fireCoinPickup()
+        }
+
+        // End on target reached or time up; freeze the field for the payout.
+        if coinPitScore >= target || now >= (coinPitDeadline ?? now) {
+            coinPitOver = true
+            fallingCoins.removeAll()
+        }
+    }
+
+    /// Drop a single coin from just above the top edge at a random x and speed.
+    private func spawnFallingCoin(in size: CGSize) {
+        let s: CGFloat = coinRadius * 2
+        let margin = s
+        let x  = CGFloat.random(in: margin...max(margin, size.width - margin))
+        let vy = CGFloat.random(in: 240...430)
+        fallingCoins.append(
+            FallingCoin(x: x, y: -s, vy: vy, size: s,
+                        phase: Double.random(in: 0...6.28))
+        )
+    }
+
+    /// The raining coins.  Purely cosmetic — catching is resolved in the tick.
+    private func fallingCoinLayer(geo: GeometryProxy) -> some View {
+        ForEach(fallingCoins) { coin in
+            SpinningCoinView(size: coin.size, phase: coin.phase)
+                .position(x: coin.x, y: coin.y)
+        }
     }
 
     // MARK: - Level clear handler
