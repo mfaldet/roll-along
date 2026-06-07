@@ -264,6 +264,23 @@ struct PaintBallMode: GameMode {
     let showsScore                   = true
 }
 
+/// Gold Rush — 60-second coin scramble: grab the most coins off the floor;
+/// ramming a rival knocks coins loose for anyone to snatch.  Your final count
+/// is paid into your real balance, plus a win bonus.
+struct GoldRushMode: GameMode {
+    let id          = "goldrush"
+    let displayName = "Gold Rush"
+    let tagline     = "Grab the most coins in a minute. Bump rivals to make them spill."
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .none
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .unlimited
+    let hasHoles                     = false
+    let showsTimer                   = true
+    let showsScore                   = true
+}
+
 // MARK: - Catalogue + feature flags
 
 /// The registry of game modes and whether each is live.
@@ -284,6 +301,7 @@ enum GameModeCatalogue {
         (SnakeMode(),      true),     // self-contained SnakeGameView — live
         (BumperCarsMode(), true),    // self-contained BumperCarsView — live
         (PaintBallMode(),  true),    // self-contained PaintBallView — live
+        (GoldRushMode(),   true),    // self-contained GoldRushView — live
     ]
 
     /// Modes the player can currently see in the UI.
