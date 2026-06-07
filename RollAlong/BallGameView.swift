@@ -3629,14 +3629,21 @@ struct BallGameView: View {
         }
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
 
-        AnalyticsClient.shared.track(
-            "level_attempt",
-            properties: [
-                "tier":        .string(layout.tier.rawValue),
-                "is_tutorial": .bool(gameState.isTutorialLevel(gameState.currentLevel)),
-            ],
-            level: gameState.currentLevel
-        )
+        // `level_attempt` is a climb-funnel event keyed to a climb level —
+        // only meaningful for goal-reaching modes (the climb today, themed
+        // challenge tracks later).  Endless/score modes like Zen Garden have
+        // no "level attempt," so logging one against the player's current
+        // climb level would pollute the climb's attempt→complete funnel.
+        if activeMode.goal == .reachGoal {
+            AnalyticsClient.shared.track(
+                "level_attempt",
+                properties: [
+                    "tier":        .string(layout.tier.rawValue),
+                    "is_tutorial": .bool(gameState.isTutorialLevel(gameState.currentLevel)),
+                ],
+                level: gameState.currentLevel
+            )
+        }
     }
 
     private func tick(geoSize: CGSize) {
