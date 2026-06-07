@@ -53,12 +53,12 @@ struct World {
     static let maxLevel       = count * levelsPerWorld   // 5,000
 
     var levelRange: ClosedRange<Int> {
-        ((index - 1) * levelsPerWorld + 1) ... (index * levelsPerWorld)
+        ((index - 1) * Self.levelsPerWorld + 1) ... (index * Self.levelsPerWorld)
     }
 
     /// 0…1 position of this world across the whole climb — the master
     /// difficulty dial the generator reads.
-    var difficulty: Double { Double(index - 1) / Double(max(1, count - 1)) }
+    var difficulty: Double { Double(index - 1) / Double(max(1, Self.count - 1)) }
 
     static func index(for level: Int) -> Int {
         min(count, max(1, (level - 1) / levelsPerWorld + 1))
