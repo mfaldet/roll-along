@@ -10,6 +10,7 @@ enum HomeRoute: Hashable {
     case settings
     case shop
     case leaderboard
+    case friends
     /// Launch an alternate game mode by its GameModeCatalogue id (e.g. "zen").
     /// The climb uses `.game`; this carries the id so one route serves every
     /// non-climb mode as the modes hub grows.
@@ -54,6 +55,11 @@ final class Navigator: ObservableObject {
     /// Push the global Leaderboard on top of the current stack.
     func goToLeaderboard() {
         if path.last != .leaderboard { path.append(.leaderboard) }
+    }
+
+    /// Push the Friends screen on top of the current stack.
+    func goToFriends() {
+        if path.last != .friends { path.append(.friends) }
     }
 }
 
@@ -195,7 +201,7 @@ struct HomeView: View {
                     }
                     .padding(.bottom, 14)
 
-                    HStack(spacing: 22) {
+                    HStack(spacing: 16) {
                         NavigationLink(value: HomeRoute.levels) {
                             HStack(spacing: 6) {
                                 Image(systemName: "square.grid.3x3.fill")
@@ -210,6 +216,15 @@ struct HomeView: View {
                                 Image(systemName: "trophy.fill")
                                     .font(.system(size: 14))
                                 Text("Ranks")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                            }
+                            .foregroundStyle(Color(white: 0.5))
+                        }
+                        NavigationLink(value: HomeRoute.friends) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.2.fill")
+                                    .font(.system(size: 14))
+                                Text("Friends")
                                     .font(.system(size: 16, weight: .medium, design: .rounded))
                             }
                             .foregroundStyle(Color(white: 0.5))
@@ -252,6 +267,7 @@ struct HomeView: View {
                 case .settings:    SettingsView()
                 case .shop:        CosmeticShopView()
                 case .leaderboard: LeaderboardView()
+                case .friends:     FriendsView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)
