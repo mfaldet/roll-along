@@ -265,7 +265,7 @@ enum GameModeCatalogue {
         (ZenGardenMode(),  true),    // engine behavior implemented — live
         (CoinPitMode(),    true),    // engine behavior implemented — live
         (SnakeMode(),      true),     // self-contained SnakeGameView — live
-        (BumperCarsMode(), false),
+        (BumperCarsMode(), true),    // self-contained BumperCarsView — live
     ]
 
     /// Modes the player can currently see in the UI.
