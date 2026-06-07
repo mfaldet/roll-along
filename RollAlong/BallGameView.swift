@@ -143,6 +143,10 @@ struct BallGameView: View {
     // Graphite trail (Paper world).  Holds recent ball positions so we can
     // render a fading lead streak behind the ball.  Cleared each spawn.
     @State private var trailPoints:           [CGPoint] = []
+    /// Opacity of the Zen sand groove.  The "smooth the sand" (rake) button
+    /// fades this to 0, wipes the trail, then restores it to 1 so the next
+    /// strokes draw crisp.  Stays 1 in every other mode.
+    @State private var sandClearFade:         Double = 1.0
     /// Default cap on trail segments — about 1.5s at 60fps.
     private let trailMaxLength = 90
     /// Extra segments granted per coin picked up while the Snake
@@ -379,6 +383,7 @@ struct BallGameView: View {
                 // holes — the streak should appear cut by the page tear.
                 if (gameState.equippedTrail != .none || usesSandTrail) && trailPoints.count >= 2 {
                     trailOverlay(geo: geo)
+                        .opacity(usesSandTrail ? sandClearFade : 1)
                         .allowsHitTesting(false)
                 }
 
@@ -490,6 +495,13 @@ struct BallGameView: View {
                 // compete for attention with those flows.
                 if !showWelcomeMoment && !showTutorialReward {
                     homeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
+                }
+
+                // Rake — Zen Garden only.  Mirrors the home button on the
+                // right; smooths the sand so the player can start a fresh
+                // pattern.  Other modes have no persistent trail to clear.
+                if usesSandTrail {
+                    rakeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
                 }
 
                 if showWelcomeMoment       { welcomeMomentOverlay }
@@ -2569,6 +2581,45 @@ struct BallGameView: View {
             }
             .padding(.leading, 22)
             .padding(.bottom, max(safeBottom, 12) + 8)
+        }
+    }
+
+    /// Floating rake button (Zen Garden) — bottom-right mirror of the home
+    /// button.  Gently smooths the sand: fades the groove out, wipes the
+    /// trail, then restores full opacity so the next strokes draw crisp.
+    private func rakeButtonOverlay(safeBottom: CGFloat) -> some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button { smoothSand() } label: {
+                    Image(systemName: "wind")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.52, green: 0.43, blue: 0.28))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(Color(white: 1.0, opacity: 0.85))
+                                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                        )
+                }
+                .accessibilityLabel("Smooth the sand")
+                .accessibilityHint("Clears the raked line so you can start a fresh pattern.")
+            }
+            .padding(.trailing, 22)
+            .padding(.bottom, max(safeBottom, 12) + 8)
+        }
+    }
+
+    /// Rake action — fade the sand groove away, then wipe it and restore
+    /// opacity.  The ball keeps rolling throughout; its fresh marks draw at
+    /// full strength once the wipe completes.
+    private func smoothSand() {
+        if gameState.hapticsEnabled { Haptics.soft() }
+        withAnimation(.easeOut(duration: 0.45)) { sandClearFade = 0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            trailPoints.removeAll(keepingCapacity: true)
+            sandClearFade = 1
         }
     }
 
