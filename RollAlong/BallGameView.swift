@@ -530,6 +530,11 @@ struct BallGameView: View {
                 if phase == .fell && !showOutOfLives { oopsOverlay }
                 if phase == .levelComplete { winOverlay }
 
+                // Coin Pit: round-over payout — the haul, Play Again, Home.
+                // Coin Pit never uses .fell/.levelComplete, so this is its
+                // only end screen.  Gated so no other mode can surface it.
+                if isCoinPit && coinPitOver { coinPitPayoutOverlay }
+
                 // Out-of-lives overlay — shown when the player tries to play
                 // with zero lives.  Sits above the Oops/Win overlays.
                 if showOutOfLives { outOfLivesOverlay }
@@ -538,7 +543,8 @@ struct BallGameView: View {
                 // tappable while they're showing.  Hidden during the one-time
                 // welcome moment and tutorial reward modal so it doesn't
                 // compete for attention with those flows.
-                if !showWelcomeMoment && !showTutorialReward {
+                if !showWelcomeMoment && !showTutorialReward
+                    && !(isCoinPit && coinPitOver) {
                     homeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
                 }
 
@@ -3357,6 +3363,82 @@ struct BallGameView: View {
                                         .fill(Color(white: 0.20))
                                 )
                         }
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 6)
+            }
+            .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+    }
+
+    // MARK: - Coin Pit payout screen
+    //
+    // Shown when a Coin Pit round ends (target reached or time up).  Presents
+    // the haul and offers another round or a trip home.  "Play Again" re-runs
+    // spawnBall, whose reset block clears the round state for a fresh start;
+    // the new round's clock arms only once the player taps to begin.
+    private var coinPitPayoutOverlay: some View {
+        let target  = coinPitTarget ?? 0
+        let perfect = target > 0 && coinPitScore >= target
+        let banked  = coinPitScore * coinPitPayoutPerCoin
+
+        return ZStack {
+            Color.black.opacity(0.72).ignoresSafeArea()
+
+            VStack(spacing: 26) {
+                VStack(spacing: 6) {
+                    Text(perfect ? "Pit Cleared!" : "Time!")
+                        .font(.system(size: 44, weight: .black, design: .rounded))
+                        .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
+                    Text(perfect ? "You caught every coin."
+                                 : "Nice haul — grab the rest next time.")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.65))
+                }
+
+                // The haul — a big coin and the count caught.
+                HStack(spacing: 12) {
+                    CoinIcon(size: 46)
+                        .shadow(color: Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.5),
+                                radius: 10)
+                    Text("\(coinPitScore)")
+                        .font(.system(size: 56, weight: .black, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("You caught \(coinPitScore) of \(target) coins.")
+
+                Text("+\(banked) coins banked")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityLabel("Plus \(banked) coins banked.")
+
+                // Actions
+                VStack(spacing: 12) {
+                    Button { spawnBall(in: arenaSize) } label: {
+                        Text("Play Again")
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .fill(Color(red: 1.00, green: 0.70, blue: 0.20))
+                            )
+                    }
+                    Button { nav.goHome() } label: {
+                        Text("Home")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.85))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(white: 0.20))
+                            )
                     }
                 }
                 .padding(.horizontal, 32)
