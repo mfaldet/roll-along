@@ -10,6 +10,10 @@ enum HomeRoute: Hashable {
     case settings
     case shop
     case leaderboard
+    /// Launch an alternate game mode by its GameModeCatalogue id (e.g. "zen").
+    /// The climb uses `.game`; this carries the id so one route serves every
+    /// non-climb mode as the modes hub grows.
+    case mode(String)
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +153,27 @@ struct HomeView: View {
 
                     playButton
                         .padding(.horizontal, 40)
-                        .padding(.bottom, 14)
+                        .padding(.bottom, 12)
+
+                    // Secondary mode: a calm, low-key entry to Zen Garden —
+                    // the "just relax" alternative to the competitive climb.
+                    NavigationLink(value: HomeRoute.mode("zen")) {
+                        HStack(spacing: 7) {
+                            Image(systemName: "leaf.fill")
+                                .font(.system(size: 13))
+                            Text("Zen Garden")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundStyle(Color(white: 0.82))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 9)
+                        .background(
+                            Capsule()
+                                .fill(Color(white: 0.14))
+                                .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
+                        )
+                    }
+                    .padding(.bottom, 14)
 
                     HStack(spacing: 22) {
                         NavigationLink(value: HomeRoute.levels) {
@@ -208,6 +232,9 @@ struct HomeView: View {
                 case .settings:    SettingsView()
                 case .shop:        CosmeticShopView()
                 case .leaderboard: LeaderboardView()
+                case .mode(let id):
+                    BallGameView(activeMode: GameModeCatalogue.mode(id: id)
+                                 ?? GameModeCatalogue.climb)
                 }
             }
             // Sheet driven by tapping the top-left lives pill.  Re-uses
