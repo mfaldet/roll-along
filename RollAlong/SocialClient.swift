@@ -146,6 +146,76 @@ final class SocialClient: @unchecked Sendable {
                            prefer: "return=minimal")
     }
 
+    // MARK: - Friends
+
+    /// Find players whose display name contains `term` (case-insensitive),
+    /// excluding yourself — powers the "add a friend" search box.  The search
+    /// term is fully percent-escaped so the `*` wildcards stay literal while a
+    /// stray `&`/`=`/space in the term can't corrupt the query string.
+    func searchPlayers(matching term: String, limit: Int = 20) async throws -> [PlayerProfile] {
+        let me = try requireSession()
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? trimmed
+        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives"
+            + "&display_name=ilike.*\(escaped)*"
+            + "&id=neq.\(me.userId.uuidString)"
+            + "&order=climb_level.desc&limit=\(limit)"
+        let data = try await send(method: "GET", path: "players", query: query)
+        return try decode([PlayerProfile].self, from: data)
+    }
+
+    /// Resolve a set of player ids to their profiles (e.g. friends from edges).
+    func fetchProfiles(ids: [UUID]) async throws -> [PlayerProfile] {
+        guard !ids.isEmpty else { return [] }
+        let list = ids.map { $0.uuidString }.joined(separator: ",")
+        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives"
+            + "&id=in.(\(list))"
+        let data = try await send(method: "GET", path: "players", query: query)
+        return try decode([PlayerProfile].self, from: data)
+    }
+
+    /// Every friendship edge involving the signed-in player.  RLS already
+    /// scopes this to rows where you are the requester or addressee, so the UI
+    /// just splits them into incoming / outgoing / accepted.
+    func fetchFriendships() async throws -> [Friendship] {
+        _ = try requireSession()
+        let query = "select=id,requester_id,addressee_id,status,created_at"
+            + "&order=created_at.desc"
+        let data = try await send(method: "GET", path: "friendships", query: query)
+        return try decode([Friendship].self, from: data)
+    }
+
+    /// Send a friend request (status defaults to `pending`).  The unique
+    /// (requester, addressee) constraint means re-sending throws; the UI avoids
+    /// that by only offering "Add" when no edge exists yet.
+    func sendFriendRequest(to addressee: UUID) async throws {
+        let me = try requireSession()
+        let body = FriendshipInsert(requester_id: me.userId,
+                                    addressee_id: addressee,
+                                    status: "pending")
+        _ = try await send(method: "POST", path: "friendships",
+                           bodyData: try encoder.encode([body]),
+                           prefer: "return=minimal")
+    }
+
+    /// Accept a pending request (the addressee flips it to `accepted`).
+    func acceptFriendRequest(id: UUID) async throws {
+        let body = FriendStatusPatch(status: "accepted")
+        _ = try await send(method: "PATCH", path: "friendships",
+                           query: "id=eq.\(id.uuidString)",
+                           bodyData: try encoder.encode(body),
+                           prefer: "return=minimal")
+    }
+
+    /// Remove an edge — declining an incoming request OR unfriending.  RLS
+    /// permits either participant to delete.
+    func removeFriendship(id: UUID) async throws {
+        _ = try await send(method: "DELETE", path: "friendships",
+                           query: "id=eq.\(id.uuidString)",
+                           prefer: "return=minimal")
+    }
+
     // MARK: - Networking core
 
     private func requireSession() throws -> Session {
@@ -248,6 +318,36 @@ struct LifeGift: Codable, Identifiable {
     }
 }
 
+/// A friend-graph edge (independent of clans).  `status` ∈ pending|accepted|blocked.
+struct Friendship: Codable, Identifiable {
+    let id: UUID
+    let requesterId: UUID
+    let addresseeId: UUID
+    var status: String
+    var createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case requesterId = "requester_id"
+        case addresseeId = "addressee_id"
+        case status
+        case createdAt   = "created_at"
+    }
+
+    /// The participant who isn't `me`.
+    func otherId(than me: UUID) -> UUID {
+        requesterId == me ? addresseeId : requesterId
+    }
+    /// An unanswered request sent TO me (I can accept/decline).
+    func isIncomingPending(for me: UUID) -> Bool {
+        status == "pending" && addresseeId == me
+    }
+    /// My own request still awaiting their answer.
+    func isOutgoingPending(for me: UUID) -> Bool {
+        status == "pending" && requesterId == me
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Private write payloads — snake_case property names map straight to columns.
 // ---------------------------------------------------------------------------
@@ -274,4 +374,14 @@ private struct GiftInsert: Encodable {
 
 private struct ClaimPatch: Encodable {
     let claimed_at: String
+}
+
+private struct FriendshipInsert: Encodable {
+    let requester_id: UUID
+    let addressee_id: UUID
+    let status: String
+}
+
+private struct FriendStatusPatch: Encodable {
+    let status: String
 }
