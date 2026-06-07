@@ -369,7 +369,7 @@ struct BallGameView: View {
                 // Hidden during the early L1 tutorial phases — the
                 // portal "spawns" alongside the hole when the player
                 // collects their third coin (showHoleHint onward).
-                if showGoalForCurrentPhase {
+                if activeMode.goal == .reachGoal, showGoalForCurrentPhase {
                     Group {
                         switch gameState.equippedGoal {
                         case .target:      simpleBullseyeTarget
@@ -3752,7 +3752,11 @@ struct BallGameView: View {
         // (`.notTutorial`).  This stops a first-time L1 player from
         // accidentally rolling into the goal during the free-roam or
         // coin-collecting phases and skipping the rest of the tour.
-        let goalLive = tutorialPhase == .playing || tutorialPhase == .notTutorial
+        // The goal is only a winning target in modes that win by reaching it.
+        // ClimbMode's goal is `.reachGoal`, so this is unchanged today;
+        // endless/score modes (Zen, Snake, Coin Pit) never trigger a win here.
+        let goalLive = activeMode.goal == .reachGoal
+            && (tutorialPhase == .playing || tutorialPhase == .notTutorial)
         let gp = goalPoint(in: geoSize)
         if goalLive,
            hypot(b.position.x - gp.x, b.position.y - gp.y) < effectiveBallRadius * 1.7 {
