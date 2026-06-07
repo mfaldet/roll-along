@@ -1,5 +1,93 @@
 import SwiftUI
 
+// ===========================================================================
+// LevelRNG — a tiny deterministic random source.
+//
+// The procedural level generator must be DETERMINISTIC: level 1,234 has to
+// produce the exact same layout on every device, every launch, forever — so
+// star times, leaderboards, and "I'm stuck on 1,234" all mean the same thing
+// for everyone.  Swift's SystemRandomNumberGenerator is non-deterministic, so
+// we seed our own (SplitMix64) from the level number.
+// ===========================================================================
+struct LevelRNG: RandomNumberGenerator {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed &+ 0x9E3779B97F4A7C15 }
+    mutating func next() -> UInt64 {
+        state = state &+ 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
+    }
+    /// Uniform Double in 0..<1.
+    mutating func unit() -> Double { Double(next() >> 11) * (1.0 / 9007199254740992.0) }
+    /// Uniform Double in lo...hi.
+    mutating func range(_ lo: Double, _ hi: Double) -> Double { lo + (hi - lo) * unit() }
+    /// Uniform Int in lo...hi (inclusive).
+    mutating func int(_ lo: Int, _ hi: Int) -> Int { lo + Int(unit() * Double(hi - lo + 1)) }
+}
+
+// ===========================================================================
+// World — a named 100-level chapter of the main climb.
+//
+//   50 worlds × 100 levels = 5,000.
+//
+// A world is the climb's CHAPTER structure: it gives each 100-level stretch an
+// identity (name + accent colour) and anchors the difficulty curve the
+// generator follows (deeper world → longer, busier courses — never tighter
+// pixel-precision, per the core design rule).
+//
+// A world does NOT override the player's equipped cosmetics.  Floor / pit /
+// ball stay player choices — the old per-level theme bands were retired (see
+// LevelSelectView).  `suggestedFloor` / `suggestedPit` are optional and used
+// only as level-select chrome today, leaving the door open to an opt-in
+// "world re-skin" later without reworking this model.
+// ===========================================================================
+struct World {
+    let index: Int            // 1…50
+    let name:  String
+    let accent: Color
+
+    static let count          = 50
+    static let levelsPerWorld = 100
+    static let maxLevel       = count * levelsPerWorld   // 5,000
+
+    var levelRange: ClosedRange<Int> {
+        ((index - 1) * levelsPerWorld + 1) ... (index * levelsPerWorld)
+    }
+
+    /// 0…1 position of this world across the whole climb — the master
+    /// difficulty dial the generator reads.
+    var difficulty: Double { Double(index - 1) / Double(max(1, count - 1)) }
+
+    static func index(for level: Int) -> Int {
+        min(count, max(1, (level - 1) / levelsPerWorld + 1))
+    }
+    static func world(for level: Int) -> World { all[index(for: level) - 1] }
+
+    /// The 50 chapters, ascending from gentle ground to the final summit.
+    /// Accent is a smooth hue sweep so the map reads as one long journey.
+    static let all: [World] = names.enumerated().map { i, name in
+        World(index: i + 1,
+              name:  name,
+              accent: Color(hue: Double(i) / Double(count),
+                            saturation: 0.58, brightness: 0.90))
+    }
+
+    private static let names: [String] = [
+        "Meadowgate",   "Pebble Shore",  "Hollow Woods",  "Amber Dunes",   "Cinder Reach",
+        "Frostpine",    "Tidecaller",    "Glasswind",     "Thornfield",    "Sunspire",
+        "Mistmarsh",    "Copper Mesa",   "Verdant Hollow","Saltflats",     "Stormwatch",
+        "Ironwood",     "Cobalt Bay",    "Emberfall",     "Driftwood",     "Dawnspire",
+        "Ashen Vale",   "Lumen Grove",   "Quartz Canyon", "Bramblewick",   "Gale Crest",
+        "Umbral Fen",   "Marble Heights","Solace Reef",   "Nettle Run",    "Duskspire",
+        "Hollowmere",   "Garnet Wastes", "Willowdeep",    "Cinderpath",    "Auric Steppe",
+        "Frostward",    "Tempest Line",  "Opaline Coast", "Briarmoor",     "Starspire",
+        "Veil Hollow",  "Prism Reach",   "Onyx Span",     "The Verge",     "Aurora Gate",
+        "Nimbus Field", "Halcyon",       "Eventide",      "Zenith Climb",  "The Summit",
+    ]
+}
+
 // ---------------------------------------------------------------------------
 // DifficultyTier — what kind of level is this?
 //
@@ -2250,31 +2338,123 @@ extension LevelLayout {
         ),
     ]
 
-    /// Procedurally add more hazards as levels climb past the hand-crafted set.
-    /// No coins on generated levels (yet) — future PRs add the remaining 90.
+    // -----------------------------------------------------------------------
+    // Procedural generator — deterministic, archetype-based, difficulty-scaled.
+    //
+    // Produces every level beyond the hand-crafted set, all the way to 5,000.
+    // Deterministic (seeded by level number) so a given level is identical for
+    // every player forever.  Four archetypes that ALWAYS leave a clear route —
+    // density and course length scale with World.difficulty, gaps never shrink
+    // to pixel-precision (core rule: harder = longer / busier, not punishing).
+    //
+    // Any generated level can later be replaced by a hand-crafted "landmark"
+    // or a fix via `handCrafted` + the override maps in `layout(for:)`.
+    // -----------------------------------------------------------------------
     static func generated(for level: Int) -> LevelLayout {
-        var holes: [CGRect] = sideWalls
-        let count = min(level + 1, 8)
-        for i in 0..<count {
-            let col = i % 2 == 0 ? 0.18 : 0.52
-            let rowStep = 0.55 / Double(count)
-            let y = 0.28 + Double(i) * rowStep
-            let w = 0.16 + Double(i % 3) * 0.06
-            let h = 0.07 + Double(i % 2) * 0.04
-            holes.append(CGRect(x: col, y: y, width: w, height: h))
-        }
-        let start = UnitPoint(x: 0.5, y: 0.88)
+        var rng   = LevelRNG(seed: UInt64(max(0, level)))
+        let world = World.world(for: level)
+        let d     = world.difficulty                 // 0…1 across the climb
+
+        let start = UnitPoint(x: 0.5, y: 0.90)
         let goal  = UnitPoint(x: 0.5, y: 0.10)
-        let times = defaultTimes(start: start, goal: goal, holeCount: count)
+
+        let designed: [CGRect]
+        switch level % 4 {
+        case 0:  designed = genZigzag(&rng, d)
+        case 1:  designed = genStaircase(&rng, d)
+        case 2:  designed = genScattered(&rng, d)
+        default: designed = genCorridor(&rng, d)
+        }
+
+        let coins = [0.27, 0.50, 0.73].map { y in
+            UnitPoint(x: freeX(at: y, holes: designed), y: y)
+        }
+
+        let holes = sideWalls + designed
+        var times = defaultTimes(start: start, goal: goal, holeCount: designed.count)
+        times.target += d * 1.2          // deeper worlds run a little longer
+        times.gold   += d * 0.8
         return LevelLayout(
             holeRects:  holes,
             start:      start,
             goal:       goal,
-            coins:      [],
+            coins:      coins,
             targetTime: times.target,
             goldTime:   times.gold,
-            tier:       .easy,    // placeholder; overridden in layout(for:)
+            tier:       .easy,           // placeholder; overridden in layout(for:)
             verified:   false
         )
+    }
+
+    // Archetype 0 — Zigzag: alternating wide bars; weave through the gaps.
+    private static func genZigzag(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rows = 3 + Int(d * 4.0)                   // 3…7
+        let w    = 0.46 + d * 0.06                    // gap stays ≥ ~0.24
+        var out: [CGRect] = []
+        for i in 0..<rows {
+            let y = 0.22 + (0.60 / Double(max(1, rows - 1))) * Double(i)
+            let x = (i % 2 == 0) ? 0.12 : (0.88 - w)
+            out.append(CGRect(x: x, y: y, width: w, height: 0.05 + rng.range(0, 0.02)))
+        }
+        return out
+    }
+
+    // Archetype 1 — Staircase: stepped bars descending side to side.
+    private static func genStaircase(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let steps = 4 + Int(d * 4.0)                  // 4…8
+        let w     = 0.30 + d * 0.06
+        var out: [CGRect] = []
+        for i in 0..<steps {
+            let y = 0.18 + (0.64 / Double(max(1, steps - 1))) * Double(i)
+            let x = (i % 2 == 0) ? (0.14 + rng.range(0, 0.04))
+                                 : (0.86 - w - rng.range(0, 0.04))
+            out.append(CGRect(x: x, y: y, width: w, height: 0.05))
+        }
+        return out
+    }
+
+    // Archetype 2 — Scattered: small holes on a jittered grid; pick a route.
+    private static func genScattered(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rows = 5 + Int(d * 3.0)                   // 5…8 rows
+        var out: [CGRect] = []
+        for r in 0..<rows {
+            let y = 0.20 + (0.62 / Double(max(1, rows - 1))) * Double(r)
+            // 1 or 2 small holes per row, always leaving a wide gap.
+            let n = 1 + (rng.unit() < (0.2 + d * 0.5) ? 1 : 0)
+            for _ in 0..<n {
+                let s = 0.08 + rng.range(0, 0.03)
+                let x = rng.range(0.16, 0.84 - s)
+                out.append(CGRect(x: x, y: y, width: s, height: 0.07))
+            }
+        }
+        return out
+    }
+
+    // Archetype 3 — Corridor: side blocks leaving a winding centre lane.
+    private static func genCorridor(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        var out: [CGRect] = []
+        let blocks = 3 + Int(d * 3.0)                 // 3…6 pinch points
+        for i in 0..<blocks {
+            let y = 0.20 + (0.62 / Double(max(1, blocks - 1))) * Double(i)
+            let fromLeft = (i % 2 == 0)               // serpentine lane
+            let w = 0.40 + d * 0.10 + rng.range(0, 0.04)
+            let x = fromLeft ? 0.12 : (0.88 - w)
+            out.append(CGRect(x: x, y: y, width: w, height: 0.07 + d * 0.02))
+        }
+        return out
+    }
+
+    // Find an x at the given y not sitting on a hole (with margin) so a coin
+    // lands on open floor.  Falls back to centre if nothing clears.
+    private static func freeX(at y: Double, holes: [CGRect]) -> Double {
+        let candidates = [0.50, 0.30, 0.70, 0.22, 0.78, 0.40, 0.60]
+        let margin = 0.05
+        for x in candidates {
+            let p = CGPoint(x: x, y: y)
+            if holes.allSatisfy({ !$0.insetBy(dx: -margin, dy: -margin).contains(p) }) {
+                return x
+            }
+        }
+        return 0.5
     }
 }
