@@ -174,9 +174,30 @@ struct LevelLayout {
     /// so we can mark levels verified without re-editing every layout.
     static let verifiedLevels: Set<Int> = []
 
+    /// Data-driven override store: level number → replacement layout.
+    ///
+    /// Loaded at launch from the bundled `LevelOverrides.json` (empty/absent →
+    /// no overrides → identical behavior), and mergeable from remote config
+    /// later via `applyRemoteOverrides(_:)`.  Checked FIRST in `layout(for:)`,
+    /// so any level can be hot-patched — drop in a hand-crafted landmark, or
+    /// fix a bad generated level — without shipping an app update once remote
+    /// refresh is wired.  This is the "Codable now, remote-refresh later" seam.
+    private(set) static var overrides: [Int: LevelLayout] = LevelOverrideStore.loadBundled()
+
+    /// Merge externally-sourced overrides (e.g. fetched remote config JSON) on
+    /// top of the current set; later keys win.  STUB: the actual fetch/endpoint
+    /// is wired when remote config lands — this is the merge point it calls.
+    static func applyRemoteOverrides(_ data: Data) {
+        let fetched = LevelOverrideStore.decode(data)
+        guard !fetched.isEmpty else { return }
+        overrides.merge(fetched) { _, new in new }
+    }
+
     static func layout(for level: Int) -> LevelLayout {
         let base: LevelLayout
-        if level >= 1 && level <= handCrafted.count {
+        if let override = overrides[level] {
+            base = override                       // hot-patch / landmark wins
+        } else if level >= 1 && level <= handCrafted.count {
             base = handCrafted[level - 1]
         } else {
             base = generated(for: level)
@@ -2456,5 +2477,113 @@ extension LevelLayout {
             }
         }
         return 0.5
+    }
+}
+
+// ===========================================================================
+// Codable data layer — the authoring & wire format for level overrides.
+//
+// WHY A DTO INSTEAD OF `LevelLayout: Codable`
+//   LevelLayout stores CGRect / UnitPoint.  Their synthesized Codable encodes
+//   as nested arrays (e.g. a CGRect becomes [[x,y],[w,h]]) — fine for machines,
+//   miserable to hand-author and easy to get wrong.  LevelDTO is a FLAT struct
+//   of named Doubles, so the JSON reads like a level sheet:
+//
+//     { "holes": [ { "x": 0.30, "y": 0.42, "w": 0.40, "h": 0.16 } ],
+//       "start": { "x": 0.5, "y": 0.90 },
+//       "goal":  { "x": 0.5, "y": 0.10 },
+//       "coins": [ { "x": 0.2, "y": 0.5 } ] }
+//
+//   Decoupling the wire format from the in-memory type also lets each evolve
+//   independently (bump `schemaVersion`, add fields) without touching physics.
+//
+// CONVENTIONS (match the hand-crafted `make(...)` path)
+//   • `holes` are the DESIGNED holes only; standard side-walls are auto-added,
+//     and `layout(for:)` still strips them on Easy-tier levels.
+//   • `targetTime` / `goldTime` omitted → auto-computed from start→goal + holes.
+//   • `verified` omitted → true (an authored override is intentional).
+//   • Tier still comes from the digit rule / `tierOverrides`; overrides shape
+//     geometry + optional times, not difficulty class.
+// ===========================================================================
+
+/// Flat, hand-authorable form of one level.  See header above.
+struct LevelDTO: Codable {
+    struct Rect:  Codable { var x: Double; var y: Double; var w: Double; var h: Double }
+    struct Point: Codable { var x: Double; var y: Double }
+
+    var holes: [Rect]
+    var start: Point
+    var goal:  Point
+    var coins: [Point]
+    var targetTime: Double?     // omitted → auto-computed
+    var goldTime:   Double?     // omitted → auto-computed
+    var verified:   Bool?       // omitted → true
+
+    /// Resolve to an engine-ready `LevelLayout` (tier injected later by
+    /// `LevelLayout.layout(for:)`).
+    func toLayout() -> LevelLayout { LevelLayout.make(from: self) }
+}
+
+extension LevelLayout {
+    /// Build a `LevelLayout` from a decoded DTO, applying the same side-wall
+    /// and default-time conventions as the hand-crafted `make(...)` path.
+    fileprivate static func make(from dto: LevelDTO) -> LevelLayout {
+        let designed = dto.holes.map { CGRect(x: $0.x, y: $0.y, width: $0.w, height: $0.h) }
+        let start = UnitPoint(x: dto.start.x, y: dto.start.y)
+        let goal  = UnitPoint(x: dto.goal.x,  y: dto.goal.y)
+        let coins = dto.coins.map { UnitPoint(x: $0.x, y: $0.y) }
+        let allHoles = sideWalls + designed
+        let times = defaultTimes(start: start, goal: goal, holeCount: designed.count)
+        return LevelLayout(
+            holeRects:  allHoles,
+            start:      start,
+            goal:       goal,
+            coins:      coins,
+            targetTime: dto.targetTime ?? times.target,
+            goldTime:   dto.goldTime   ?? times.gold,
+            tier:       .easy,                 // placeholder; layout(for:) injects real tier
+            verified:   dto.verified ?? true   // authored overrides are intentional
+        )
+    }
+}
+
+// ===========================================================================
+// LevelOverrideStore — loads override layouts from JSON.
+//
+// Bundled file (`LevelOverrides.json`) is read once at launch; if it's absent
+// or empty the store yields no overrides and the game behaves EXACTLY as
+// before — this whole layer is inert until a level is actually listed.  The
+// same `decode` path also serves remote refresh (`applyRemoteOverrides`).
+// ===========================================================================
+enum LevelOverrideStore {
+    /// Resource name of the bundled overrides file (`LevelOverrides.json`).
+    /// Add it to the app target to activate; safe to leave absent.
+    static let bundledResource = "LevelOverrides"
+
+    /// On-disk / on-wire shape: a schema version plus a level-keyed map.
+    struct File: Codable {
+        var schemaVersion: Int
+        var levels: [String: LevelDTO]   // keys are level numbers as strings
+    }
+
+    /// Read the bundled overrides, or `[:]` if missing / unparseable.
+    static func loadBundled() -> [Int: LevelLayout] {
+        guard let url = Bundle.main.url(forResource: bundledResource, withExtension: "json"),
+              let data = try? Data(contentsOf: url) else {
+            return [:]            // no file → no overrides → unchanged behavior
+        }
+        return decode(data)
+    }
+
+    /// Decode an overrides JSON blob (bundled or remote) into resolved layouts.
+    /// Bad keys / parse failures degrade gracefully to fewer (or zero) entries.
+    static func decode(_ data: Data) -> [Int: LevelLayout] {
+        guard let file = try? JSONDecoder().decode(File.self, from: data) else { return [:] }
+        var out: [Int: LevelLayout] = [:]
+        for (key, dto) in file.levels {
+            guard let n = Int(key) else { continue }
+            out[n] = dto.toLayout()
+        }
+        return out
     }
 }
