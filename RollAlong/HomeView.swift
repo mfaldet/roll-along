@@ -11,6 +11,7 @@ enum HomeRoute: Hashable {
     case shop
     case leaderboard
     case friends
+    case clans
     /// Launch an alternate game mode by its GameModeCatalogue id (e.g. "zen").
     /// The climb uses `.game`; this carries the id so one route serves every
     /// non-climb mode as the modes hub grows.
@@ -60,6 +61,11 @@ final class Navigator: ObservableObject {
     /// Push the Friends screen on top of the current stack.
     func goToFriends() {
         if path.last != .friends { path.append(.friends) }
+    }
+
+    /// Push the Clans screen on top of the current stack.
+    func goToClans() {
+        if path.last != .clans { path.append(.clans) }
     }
 }
 
@@ -201,42 +207,28 @@ struct HomeView: View {
                     }
                     .padding(.bottom, 14)
 
+                    // Social — connect with other climbers.  Friends and
+                    // Clans share a row so the social pair reads together.
+                    HStack(spacing: 28) {
+                        NavigationLink(value: HomeRoute.friends) {
+                            homeNavLabel("person.2.fill", "Friends")
+                        }
+                        NavigationLink(value: HomeRoute.clans) {
+                            homeNavLabel("person.3.fill", "Clans")
+                        }
+                    }
+                    .padding(.bottom, 14)
+
+                    // Utilities — levels grid, global ranks, settings.
                     HStack(spacing: 16) {
                         NavigationLink(value: HomeRoute.levels) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "square.grid.3x3.fill")
-                                    .font(.system(size: 14))
-                                Text("Levels")
-                                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                            }
-                            .foregroundStyle(Color(white: 0.5))
+                            homeNavLabel("square.grid.3x3.fill", "Levels")
                         }
                         NavigationLink(value: HomeRoute.leaderboard) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "trophy.fill")
-                                    .font(.system(size: 14))
-                                Text("Ranks")
-                                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                            }
-                            .foregroundStyle(Color(white: 0.5))
-                        }
-                        NavigationLink(value: HomeRoute.friends) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 14))
-                                Text("Friends")
-                                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                            }
-                            .foregroundStyle(Color(white: 0.5))
+                            homeNavLabel("trophy.fill", "Ranks")
                         }
                         NavigationLink(value: HomeRoute.settings) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "gearshape.fill")
-                                    .font(.system(size: 14))
-                                Text("Settings")
-                                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                            }
-                            .foregroundStyle(Color(white: 0.5))
+                            homeNavLabel("gearshape.fill", "Settings")
                         }
                     }
 
@@ -268,6 +260,7 @@ struct HomeView: View {
                 case .shop:        CosmeticShopView()
                 case .leaderboard: LeaderboardView()
                 case .friends:     FriendsView()
+                case .clans:       ClansView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)
@@ -462,6 +455,18 @@ struct HomeView: View {
     }
 
     // MARK: - Sub-views
+
+    /// One entry in the secondary navigation rows below the Play button —
+    /// an icon over-under a label in the muted home-screen grey.
+    private func homeNavLabel(_ icon: String, _ title: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+            Text(title)
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+        }
+        .foregroundStyle(Color(white: 0.5))
+    }
 
     private var background: some View {
         LinearGradient(
