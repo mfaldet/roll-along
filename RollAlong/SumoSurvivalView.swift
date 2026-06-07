@@ -1,21 +1,27 @@
 import SwiftUI
 
 // ===========================================================================
-// BumperCarsView — the "Bumper Cars" competitive mode.
+// SumoSurvivalView — the "Sumo Survival" competitive mode.
 //
-// A sumo arena on a round platform floating in the void.  Tilt accelerates
-// your marble; ram the AI rivals off the edge.  The edge IS the hazard — any
-// marble whose center crosses the rim falls out.  Last marble standing wins.
+// A sumo dohyo on a round platform floating in the void.  Tilt accelerates
+// your marble; ram the AI rivals off the edge.  The rim IS the hazard — any
+// marble whose center crosses it falls out.  But this is SURVIVAL, not a
+// one-and-done round:
 //
-// SAFE BY CONSTRUCTION: a brand-new, isolated file.  It reuses only the shared
-// physics primitives (BallMotion / PhysicsClock) and the coin / skin economy
-// on GameState; it touches nothing in the climb engine.  Reached only when
-// HomeView routes `.mode("bumper")` here and BumperCarsMode is flagged on.
+//   • the ring slowly SHRINKS, closing in to force confrontation;
+//   • fresh rivals keep SPAWNING in waves, so the pressure never stops;
+//   • your score is the number of rivals YOU knock out;
+//   • you last until *you* get rung out — then bank your coins.
+//
+// SAFE BY CONSTRUCTION: an isolated file.  It reuses only the shared physics
+// primitives (BallMotion / PhysicsClock) and the coin / skin economy on
+// GameState; it touches nothing in the climb engine.  Reached only when
+// HomeView routes `.mode("sumo")` here and SumoSurvivalMode is flagged on.
 //
 // FEEL IS TUNABLE: every gameplay number lives in the "Tunables" block.
 // ===========================================================================
 
-struct BumperCarsView: View {
+struct SumoSurvivalView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
     @StateObject private var motion = BallMotion()
@@ -25,15 +31,21 @@ struct BumperCarsView: View {
 
     private let marbleRadius: CGFloat = 19
     private let playerAccel:  CGFloat = 1_520     // your tilt → acceleration
-    private let aiAccel:      CGFloat = 1_180     // a touch slower, so you can win
+    private let aiAccel:      CGFloat = 1_160     // base rival acceleration
+    private let aiAccelRampPerSec: CGFloat = 5    // rivals speed up the longer you last
+    private let aiAccelRampCap:    CGFloat = 260  // …up to this much extra
     private let friction:     CGFloat = 0.992     // marbles glide on the floor
-    private let maxSpeed:     CGFloat = 760
+    private let maxSpeed:     CGFloat = 780
     private let restitution:  CGFloat = 0.92       // bounciness of marble hits
-    private let rivalCount         = 3
+    private let startingRivals     = 3
+    private let maxConcurrentRivals = 5
+    private let spawnEveryTicks    = 150           // a fresh rival every ~2.5s
     private let platformMargin: CGFloat = 26       // void gap around the platform
+    private let shrinkFrac:    CGFloat = 0.42      // ring closes to 58% of full…
+    private let shrinkOverTicks     = 60 * 60      // …across the first 60 seconds
     private let edgePull       = 0.62              // AI starts steering home past this × radius
     private let coinsPerKO         = 4
-    private let winBonus           = 12
+    private let coinsPerSurvived4s = 1             // a coin for every 4s you stay alive
 
     // MARK: - Model
 
@@ -43,6 +55,7 @@ struct BumperCarsView: View {
         var vel: CGVector = .zero
         let color: Color
         let isPlayer: Bool
+        var lastHitBy: UUID? = nil   // who shoved me most recently (for KO credit)
     }
 
     private struct Poof: Identifiable {
@@ -57,6 +70,7 @@ struct BumperCarsView: View {
         Color(red: 0.40, green: 0.70, blue: 0.98),
         Color(red: 0.95, green: 0.78, blue: 0.30),
         Color(red: 0.70, green: 0.55, blue: 0.98),
+        Color(red: 0.45, green: 0.85, blue: 0.55),
     ]
 
     // MARK: - State
@@ -65,17 +79,19 @@ struct BumperCarsView: View {
     @State private var poofs:   [Poof]   = []
     @State private var arena:   CGSize = .zero
     @State private var center:  CGPoint = .zero
-    @State private var radius:  CGFloat = 0
+    @State private var baseRadius: CGFloat = 0
+    @State private var radius:  CGFloat = 0       // current (shrunken) ring radius
 
     @State private var started = false
     @State private var isOver  = false
-    @State private var playerWon = false
-    @State private var eliminatedRivals = 0
+    @State private var knockouts = 0
+    @State private var survivalTicks = 0
     @State private var localTick = 0
     @State private var awarded = false
 
     private var rivalsAlive: Int { bumpers.filter { !$0.isPlayer }.count }
     private var playerAlive: Bool { bumpers.contains { $0.isPlayer } }
+    private var survivedSeconds: Int { survivalTicks / 60 }
 
     // MARK: - Body
 
@@ -119,7 +135,8 @@ struct BumperCarsView: View {
         Circle()
             .fill(RadialGradient(colors: [Color(white: 0.20), Color(white: 0.12)],
                                  center: .center, startRadius: 0, endRadius: radius))
-            .overlay(Circle().stroke(Color(white: 0.32), lineWidth: 4))
+            .overlay(Circle().stroke(Color(red: 0.62, green: 0.30, blue: 0.26).opacity(0.9), lineWidth: 5))
+            .overlay(Circle().stroke(Color(white: 0.32), lineWidth: 1))
             .frame(width: radius * 2, height: radius * 2)
             .position(center)
             .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
@@ -174,17 +191,26 @@ struct BumperCarsView: View {
                 }
                 Spacer()
                 VStack(spacing: 1) {
-                    Text("\(max(0, bumpers.count))")
+                    Text("\(knockouts)")
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
                         .monospacedDigit()
-                    Text("MARBLES LEFT")
+                    Text("KNOCKOUTS")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .tracking(1)
                 }
                 Spacer()
-                Color.clear.frame(width: 38, height: 38)
+                VStack(spacing: 1) {
+                    Text(timeString)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.85))
+                        .monospacedDigit()
+                    Text("SURVIVED")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.5))
+                        .tracking(1)
+                }
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
@@ -192,15 +218,19 @@ struct BumperCarsView: View {
         }
     }
 
+    private var timeString: String {
+        String(format: "%d:%02d", survivedSeconds / 60, survivedSeconds % 60)
+    }
+
     private var startPrompt: some View {
         VStack(spacing: 10) {
-            Image(systemName: "circle.circle")
+            Image(systemName: "circle.dashed")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Color(red: 0.98, green: 0.45, blue: 0.40))
             Text("Tilt to play")
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
-            Text("Shove the other marbles off the edge.\nLast one on the floor wins.")
+            Text("Shove rivals off the ring.\nIt shrinks, they keep coming — survive.")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
@@ -210,19 +240,15 @@ struct BumperCarsView: View {
     }
 
     private var gameOverOverlay: some View {
-        let banked = eliminatedRivals * coinsPerKO + (playerWon ? winBonus : 0)
+        let banked = knockouts * coinsPerKO + survivedSeconds / 4 * coinsPerSurvived4s
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
             VStack(spacing: 24) {
                 VStack(spacing: 6) {
-                    Text(playerWon ? "You Win!" : "Knocked Out")
+                    Text("Knocked Out")
                         .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(playerWon
-                            ? Color(red: 0.50, green: 0.88, blue: 0.45)
-                            : Color(red: 0.98, green: 0.45, blue: 0.40))
-                    Text(playerWon
-                         ? "Last marble standing."
-                         : "You knocked out \(eliminatedRivals) of \(rivalCount).")
+                        .foregroundStyle(Color(red: 0.98, green: 0.45, blue: 0.40))
+                    Text("\(knockouts) knockouts · survived \(timeString)")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
                 }
@@ -269,23 +295,25 @@ struct BumperCarsView: View {
         guard size.width > 0, size.height > 0 else { return }
         arena = size
         center = CGPoint(x: size.width / 2, y: size.height / 2)
-        radius = min(size.width, size.height) / 2 - platformMargin
+        baseRadius = min(size.width, size.height) / 2 - platformMargin
+        if radius == 0 { radius = baseRadius }
     }
 
     private func reset() {
-        guard radius > 0 else { return }
+        guard baseRadius > 0 else { return }
         started = false
         isOver = false
-        playerWon = false
-        eliminatedRivals = 0
+        knockouts = 0
+        survivalTicks = 0
         awarded = false
         poofs = []
+        radius = baseRadius
 
         // Player spawns dead center; rivals on a ring around it.
         var fresh: [Bumper] = [Bumper(pos: center, color: .white, isPlayer: true)]
-        let spawnR = radius * 0.6
-        for i in 0..<rivalCount {
-            let angle = (Double(i) / Double(rivalCount)) * 2 * .pi - .pi / 2
+        let spawnR = baseRadius * 0.6
+        for i in 0..<startingRivals {
+            let angle = (Double(i) / Double(startingRivals)) * 2 * .pi - .pi / 2
             let p = CGPoint(x: center.x + CGFloat(cos(angle)) * spawnR,
                             y: center.y + CGFloat(sin(angle)) * spawnR)
             fresh.append(Bumper(pos: p,
@@ -295,20 +323,20 @@ struct BumperCarsView: View {
         bumpers = fresh
     }
 
-    private func endRun(won: Bool) {
+    private func endRun() {
         guard !isOver else { return }
         isOver = true
-        playerWon = won
         if !awarded {
             awarded = true
-            let banked = eliminatedRivals * coinsPerKO + (won ? winBonus : 0)
+            let banked = knockouts * coinsPerKO + survivedSeconds / 4 * coinsPerSurvived4s
             if banked > 0 { gameState.addCoins(banked) }
             AnalyticsClient.shared.track(
-                "bumper_round_over",
-                properties: ["won": .bool(won),
-                             "knockouts": .int(eliminatedRivals),
+                "sumo_round_over",
+                properties: ["knockouts": .int(knockouts),
+                             "survived_sec": .int(survivedSeconds),
                              "coins": .int(banked)]
             )
+            if gameState.hapticsEnabled { Haptics.warning() }
         }
     }
 
@@ -317,8 +345,11 @@ struct BumperCarsView: View {
     private func tick() {
         localTick &+= 1
         prunePoofs()
-        guard started, !isOver, radius > 0 else { return }
+        guard started, !isOver, baseRadius > 0 else { return }
+        survivalTicks += 1
+        updateRing()
         let dt: CGFloat = 1.0 / 60.0
+        let effAiAccel = aiAccel + min(aiAccelRampCap, CGFloat(survivedSeconds) * aiAccelRampPerSec)
 
         // 1) Steering / acceleration.
         for i in bumpers.indices {
@@ -326,7 +357,7 @@ struct BumperCarsView: View {
                 bumpers[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
                 bumpers[i].vel.dy += CGFloat(motion.gravity.y) * playerAccel * dt
             } else {
-                let steer = aiSteer(for: bumpers[i])
+                let steer = aiSteer(for: bumpers[i], accel: effAiAccel)
                 bumpers[i].vel.dx += steer.dx * dt
                 bumpers[i].vel.dy += steer.dy * dt
             }
@@ -352,11 +383,20 @@ struct BumperCarsView: View {
 
         // 4) Eliminate anyone whose center crossed the rim.
         resolveEliminations()
+
+        // 5) Feed the waves.
+        spawnWaveIfNeeded()
+    }
+
+    /// Close the ring in over time, down to `1 - shrinkFrac` of full.
+    private func updateRing() {
+        let progress = min(1, CGFloat(survivalTicks) / CGFloat(shrinkOverTicks))
+        radius = baseRadius * (1 - shrinkFrac * progress)
     }
 
     /// Aim at the nearest other marble, but steer back toward center when near
     /// the rim so rivals don't trivially drive themselves off.
-    private func aiSteer(for b: Bumper) -> CGVector {
+    private func aiSteer(for b: Bumper, accel: CGFloat) -> CGVector {
         var target: CGPoint?
         var best = CGFloat.greatestFiniteMagnitude
         for o in bumpers where o.id != b.id {
@@ -365,12 +405,12 @@ struct BumperCarsView: View {
         }
         var steer = CGVector(dx: 0, dy: 0)
         if let t = target {
-            steer = unit(dx: t.x - b.pos.x, dy: t.y - b.pos.y, scale: aiAccel)
+            steer = unit(dx: t.x - b.pos.x, dy: t.y - b.pos.y, scale: accel)
         }
         let fromCenter = CGVector(dx: b.pos.x - center.x, dy: b.pos.y - center.y)
         let distC = hypot(fromCenter.dx, fromCenter.dy)
         if distC > radius * edgePull {
-            let inward = unit(dx: -fromCenter.dx, dy: -fromCenter.dy, scale: aiAccel * 1.4)
+            let inward = unit(dx: -fromCenter.dx, dy: -fromCenter.dy, scale: accel * 1.4)
             steer = CGVector(dx: steer.dx * 0.35 + inward.dx,
                              dy: steer.dy * 0.35 + inward.dy)
         }
@@ -396,6 +436,10 @@ struct BumperCarsView: View {
                 // Elastic impulse along the normal (equal mass).
                 let relVel = (bumpers[j].vel.dx - bumpers[i].vel.dx) * nx
                            + (bumpers[j].vel.dy - bumpers[i].vel.dy) * ny
+                // Record who shoved whom — last contact wins KO credit.
+                let idI = bumpers[i].id, idJ = bumpers[j].id
+                bumpers[i].lastHitBy = idJ
+                bumpers[j].lastHitBy = idI
                 guard relVel < 0 else { continue }
                 let jImp = -(1 + restitution) * relVel / 2
                 bumpers[i].vel.dx -= jImp * nx
@@ -408,26 +452,37 @@ struct BumperCarsView: View {
 
     private func resolveEliminations() {
         let limit = radius + marbleRadius * 0.3   // center past the rim = falling
+        let playerID = bumpers.first(where: { $0.isPlayer })?.id
         var survivors: [Bumper] = []
         var playerFell = false
         for b in bumpers {
             let d = hypot(b.pos.x - center.x, b.pos.y - center.y)
             if d > limit {
                 poofs.append(Poof(pos: b.pos, color: b.isPlayer ? .white : b.color, born: localTick))
-                if b.isPlayer { playerFell = true }
-                else { eliminatedRivals += 1 }
+                if b.isPlayer {
+                    playerFell = true
+                } else if b.lastHitBy == playerID {
+                    knockouts += 1     // you shoved this one off — credit
+                }
                 if gameState.hapticsEnabled { Haptics.heavy() }
             } else {
                 survivors.append(b)
             }
         }
         if survivors.count != bumpers.count { bumpers = survivors }
+        if playerFell { endRun() }
+    }
 
-        if playerFell {
-            endRun(won: false)
-        } else if rivalsAlive == 0 {
-            endRun(won: true)
-        }
+    /// Periodically feed in a fresh rival from near the rim so the pressure
+    /// never lets up.  Capped so the floor doesn't get impossibly crowded.
+    private func spawnWaveIfNeeded() {
+        guard survivalTicks % spawnEveryTicks == 0, rivalsAlive < maxConcurrentRivals else { return }
+        let angle = Double.random(in: 0..<(2 * .pi))
+        let r = radius * 0.82
+        let p = CGPoint(x: center.x + CGFloat(cos(angle)) * r,
+                        y: center.y + CGFloat(sin(angle)) * r)
+        let color = Self.rivalColors[Int.random(in: 0..<Self.rivalColors.count)]
+        bumpers.append(Bumper(pos: p, color: color, isPlayer: false))
     }
 
     private func prunePoofs() {
@@ -445,7 +500,7 @@ struct BumperCarsView: View {
 
 #Preview {
     NavigationStack {
-        BumperCarsView()
+        SumoSurvivalView()
             .environmentObject(GameState())
             .environmentObject(Navigator())
     }

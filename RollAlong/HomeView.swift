@@ -249,7 +249,7 @@ struct HomeView: View {
                 case .clans:       ClansView()
                 case .games:       GameMenuView()
                 case .mode("snake"): SnakeGameView()
-                case .mode("bumper"): BumperCarsView()
+                case .mode("sumo"): SumoSurvivalView()
                 case .mode("paintball"): PaintBallView()
                 case .mode("goldrush"): GoldRushView()
                 case .mode("marblecup"): MarbleCupView()

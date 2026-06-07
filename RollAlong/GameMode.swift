@@ -233,17 +233,19 @@ struct SnakeMode: GameMode {
     let showsScore                   = true
 }
 
-/// Bumper Cars — competitive arena: tilt-accelerate to knock rivals off.
-struct BumperCarsMode: GameMode {
-    let id          = "bumper"
-    let displayName = "Bumper Cars"
-    let tagline     = "Tilt for speed. Last marble on the floor wins."
+/// Sumo Survival — sumo dohyo with a shrinking ring and endless waves of rivals.
+/// Tilt to ram rivals off the rim; survive as long as you can.  Score = your
+/// knockouts.  (Evolved from the old "Bumper Cars" last-one-standing round.)
+struct SumoSurvivalMode: GameMode {
+    let id          = "sumo"
+    let displayName = "Sumo Survival"
+    let tagline     = "Shove rivals off a shrinking ring. Survive the waves."
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .endRun
     let progression: ProgressionKind = .none
     let lives:       LivesPolicy     = .unlimited
-    let hasHoles                     = true   // the arena edge is the hazard
+    let hasHoles                     = true   // the ring edge is the hazard
     let showsScore                   = true
 }
 
@@ -316,7 +318,7 @@ enum GameModeCatalogue {
         (ZenGardenMode(),  true),    // engine behavior implemented — live
         (CoinPitMode(),    true),    // engine behavior implemented — live
         (SnakeMode(),      true),     // self-contained SnakeGameView — live
-        (BumperCarsMode(), true),    // self-contained BumperCarsView — live
+        (SumoSurvivalMode(), true),  // self-contained SumoSurvivalView — live
         (PaintBallMode(),  true),    // self-contained PaintBallView — live
         (GoldRushMode(),   true),    // self-contained GoldRushView — live
         (MarbleCupMode(),  true),    // self-contained MarbleCupView — live
