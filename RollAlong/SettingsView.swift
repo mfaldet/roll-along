@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var store:     StoreKitManager
+    @ObservedObject private var auth = AppleAuthManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var showResetAlert = false
     @FocusState private var nameFocused: Bool
@@ -16,6 +17,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
                     personalizationSection
+                    accountSection
                     cosmeticsSection
                     gameSection
                     purchasesSection
@@ -24,6 +26,24 @@ struct SettingsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
                 .padding(.bottom, 48)
+            }
+        }
+        .onAppear {
+            // After a successful Apple sign-in, publish the player's current
+            // profile so they appear on leaderboards immediately (rather than
+            // waiting for their next level clear to PATCH progress).
+            auth.onSignedIn = { [weak gameState] in
+                guard let gameState else { return }
+                let name = gameState.playerName.isEmpty ? "Climber" : gameState.playerName
+                Task {
+                    try? await SocialClient.shared.upsertMyProfile(
+                        displayName:     name,
+                        climbLevel:      gameState.highestUnlocked,
+                        highestUnlocked: gameState.highestUnlocked,
+                        totalStars:      gameState.totalStars,
+                        lives:           gameState.lives
+                    )
+                }
             }
         }
         .navigationTitle("Settings")
@@ -64,6 +84,70 @@ struct SettingsView: View {
             }
             .padding()
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+        }
+    }
+
+    // MARK: - Account (Sign in with Apple)
+
+    @ViewBuilder
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Account")
+
+            if auth.isSignedIn {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.30, green: 0.78, blue: 0.45))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Signed in")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("Your climb appears on leaderboards.")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color(white: 0.45))
+                    }
+                    Spacer()
+                    Button("Sign Out") { auth.signOut() }
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
+                }
+                .padding()
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Button {
+                        auth.startSignIn()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if auth.isWorking {
+                                ProgressView()
+                                    .tint(.black)
+                            } else {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 17, weight: .medium))
+                            }
+                            Text(auth.isWorking ? "Signing in…" : "Sign in with Apple")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.white.clipShape(RoundedRectangle(cornerRadius: 14)))
+                    }
+                    .disabled(auth.isWorking)
+
+                    Text("Optional. Sign in to climb the global leaderboard, join clans, and send friends extra lives. Your level progress is always saved on this device either way.")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
+
+                    if let err = auth.lastError {
+                        Text(err)
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
+                    }
+                }
+            }
         }
     }
 
