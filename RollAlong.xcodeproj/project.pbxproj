@@ -26,6 +26,10 @@
 		AA000016000000000000AA02 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA000016000000000000AA00 /* Products.storekit */; };
 		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
 		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
+		D502FED42FD5024E00CA86BD /* SocialClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FED32FD5024E00CA86BD /* SocialClient.swift */; };
+		D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FED12FD5024E00CA86BD /* GameMode.swift */; };
+		D502FED62FD5024E00CA86BD /* LevelOverrides.json in Resources */ = {isa = PBXBuildFile; fileRef = D502FED22FD5024E00CA86BD /* LevelOverrides.json */; };
+		D502FED82FD52BAB00CA86BD /* AppleAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FED72FD52BAB00CA86BD /* AppleAuthManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +53,10 @@
 		AA000015000000000000AA00 /* PurchaseSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseSheets.swift; sourceTree = "<group>"; };
 		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		AA000017000000000000AA00 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
+		D502FED12FD5024E00CA86BD /* GameMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMode.swift; sourceTree = "<group>"; };
+		D502FED22FD5024E00CA86BD /* LevelOverrides.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = LevelOverrides.json; sourceTree = "<group>"; };
+		D502FED32FD5024E00CA86BD /* SocialClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialClient.swift; sourceTree = "<group>"; };
+		D502FED72FD52BAB00CA86BD /* AppleAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleAuthManager.swift; path = RollAlong/AppleAuthManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +82,9 @@
 		AA000011000000000000AA00 /* RollAlong */ = {
 			isa = PBXGroup;
 			children = (
+				D502FED12FD5024E00CA86BD /* GameMode.swift */,
+				D502FED22FD5024E00CA86BD /* LevelOverrides.json */,
+				D502FED32FD5024E00CA86BD /* SocialClient.swift */,
 				AA000001000000000000AA00 /* RollAlongApp.swift */,
 				AA000002000000000000AA00 /* ContentView.swift */,
 				AA000003000000000000AA00 /* BallGameView.swift */,
@@ -100,6 +111,7 @@
 		AA000012000000000000AA00 = {
 			isa = PBXGroup;
 			children = (
+				D502FED72FD52BAB00CA86BD /* AppleAuthManager.swift */,
 				AA000011000000000000AA00 /* RollAlong */,
 				AA000010000000000000AA00 /* Products */,
 			);
@@ -166,6 +178,7 @@
 			files = (
 				AA00000B000000000000AA02 /* Assets.xcassets in Resources */,
 				AA00000D000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */,
+				D502FED62FD5024E00CA86BD /* LevelOverrides.json in Resources */,
 				AA000016000000000000AA02 /* Products.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -189,9 +202,12 @@
 				AA00000E000000000000AA01 /* Cosmetics.swift in Sources */,
 				AA00000F000000000000AA01 /* CosmeticShopView.swift in Sources */,
 				AA000013000000000000AA01 /* AnalyticsClient.swift in Sources */,
+				D502FED82FD52BAB00CA86BD /* AppleAuthManager.swift in Sources */,
 				AA000014000000000000AA01 /* StoreKitManager.swift in Sources */,
 				AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */,
 				AA000017000000000000AA01 /* AdManager.swift in Sources */,
+				D502FED42FD5024E00CA86BD /* SocialClient.swift in Sources */,
+				D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
