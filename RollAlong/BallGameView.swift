@@ -189,6 +189,15 @@ struct BallGameView: View {
     private let coinRadius:  CGFloat = 9
     private let tickRate              = 1.0 / 60.0
 
+    /// The game mode this screen is currently presenting.  Every Roll Along
+    /// experience runs the same tilt-physics engine wearing a different
+    /// costume; the mode supplies the rules that differ (HUD flags, control
+    /// scheme, fail/win behaviour, progression).  For now this is always the
+    /// endless climb — `ClimbMode` encodes today's exact behaviour, so routing
+    /// through it changes nothing.  When mini-games / competitive modes land,
+    /// this becomes an injected value selected on the menu.
+    private let activeMode: GameMode = GameModeCatalogue.climb
+
     /// The ball's actual radius after the equipped skin's size modifier
     /// is applied.  Every skin is full-size except Pluto (0.5×), the
     /// dwarf planet from the Planets bundle.  Used for BOTH rendering
@@ -2999,53 +3008,57 @@ struct BallGameView: View {
                     }
                 }
 
-                // Stars
-                HStack(spacing: 14) {
-                    ForEach(0..<3) { i in
-                        Image(systemName: i < lastClearedStars ? "star.fill" : "star")
-                            .font(.system(size: 38, weight: .bold))
-                            .foregroundStyle(
-                                i < lastClearedStars
-                                    ? Color(red: 1.00, green: 0.84, blue: 0.30)
-                                    : Color(white: 0.30)
-                            )
-                            .shadow(color: i < lastClearedStars
-                                    ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.5)
-                                    : .clear,
-                                    radius: 8)
+                // Stars — only modes that score on stars surface this row.
+                if activeMode.showsStars {
+                    HStack(spacing: 14) {
+                        ForEach(0..<3) { i in
+                            Image(systemName: i < lastClearedStars ? "star.fill" : "star")
+                                .font(.system(size: 38, weight: .bold))
+                                .foregroundStyle(
+                                    i < lastClearedStars
+                                        ? Color(red: 1.00, green: 0.84, blue: 0.30)
+                                        : Color(white: 0.30)
+                                )
+                                .shadow(color: i < lastClearedStars
+                                        ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.5)
+                                        : .clear,
+                                        radius: 8)
+                        }
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(lastClearedStars) of 3 stars earned")
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(lastClearedStars) of 3 stars earned")
 
-                // Time + personal best
-                VStack(spacing: 4) {
-                    Text(String(format: "%.2fs", lastClearedTime))
-                        .font(.system(size: 22, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white)
-                    if let best = gameState.time(for: gameState.currentLevel),
-                       best < lastClearedTime + 0.001 {
-                        // Only show "Best" if it's actually different from the
-                        // current run, otherwise we'd just be repeating.
-                        let isNewBest = abs(best - lastClearedTime) < 0.01
-                        Text(isNewBest
-                             ? "New best!"
-                             : String(format: "Best  %.2fs", best))
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            .foregroundStyle(
-                                isNewBest
-                                    ? Color(red: 1.00, green: 0.84, blue: 0.30)
-                                    : Color(white: 0.55)
-                            )
+                // Time + personal best — only timed modes show the clock.
+                if activeMode.showsTimer {
+                    VStack(spacing: 4) {
+                        Text(String(format: "%.2fs", lastClearedTime))
+                            .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                        if let best = gameState.time(for: gameState.currentLevel),
+                           best < lastClearedTime + 0.001 {
+                            // Only show "Best" if it's actually different from the
+                            // current run, otherwise we'd just be repeating.
+                            let isNewBest = abs(best - lastClearedTime) < 0.01
+                            Text(isNewBest
+                                 ? "New best!"
+                                 : String(format: "Best  %.2fs", best))
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .foregroundStyle(
+                                    isNewBest
+                                        ? Color(red: 1.00, green: 0.84, blue: 0.30)
+                                        : Color(white: 0.55)
+                                )
+                        }
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        String(format: "Completed in %.2f seconds.", lastClearedTime)
+                        + (gameState.time(for: gameState.currentLevel).map {
+                            String(format: " Best %.2f seconds.", $0)
+                        } ?? "")
+                    )
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                    String(format: "Completed in %.2f seconds.", lastClearedTime)
-                    + (gameState.time(for: gameState.currentLevel).map {
-                        String(format: " Best %.2f seconds.", $0)
-                    } ?? "")
-                )
 
                 // Coins row — shows all 3 pickup slots.  Collected this
                 // attempt → full detailed CoinIcon (same graphic as the
