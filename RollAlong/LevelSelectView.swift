@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// Grid view showing all 100 hand-crafted levels with star/coin progress.
-/// Tapping a cleared (or next-unlocked) level pushes BallGameView for that
-/// level.  Locked levels show a lock and don't navigate.
+/// The climb, grouped into World chapters (50 worlds × 100 levels = 5,000).
+/// Each world the player has reached shows as its own titled section; tapping
+/// a cleared or next-unlocked level pushes BallGameView for that level.  Locked
+/// levels show a lock and don't navigate.  A banner up top shows the player's
+/// name beside their headline climb level and current world — the same
+/// "level-next-to-name" identity that mirrors onto leaderboards and clans.
 struct LevelSelectView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav:       Navigator
     @Environment(\.dismiss) var dismiss
 
-    /// Total levels currently designed.  Grows in PR 2b/2c.
-    private let totalLevels = 100
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
 
     var body: some View {
@@ -18,8 +19,9 @@ struct LevelSelectView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    climbBanner
                     header
-                    grid
+                    worldSections
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -56,7 +58,9 @@ struct LevelSelectView: View {
     // designedLevels)`.
 
     private var unlockedDesignedCount: Int {
-        min(gameState.highestUnlocked, LevelLayout.handCrafted.count)
+        // Every level up to the 5,000-cap is now designed (hand-crafted set +
+        // procedural generator), so progress measures all reached levels.
+        min(gameState.highestUnlocked, World.maxLevel)
     }
 
     private var unlockedStarsEarned: Int {
@@ -186,11 +190,103 @@ struct LevelSelectView: View {
         )
     }
 
-    private var grid: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(1...totalLevels, id: \.self) { level in
-                cell(for: level)
+    // MARK: - Climb banner (player identity: name + headline level + world)
+
+    /// Headline "level next to your name" card.  `highestUnlocked` is the
+    /// canonical climb level — the same number that syncs to the social
+    /// backend (PlayerProfile.climbLevel) and shows on leaderboards/clans.
+    private var climbBanner: some View {
+        let level = max(1, gameState.highestUnlocked)
+        let world = World.world(for: level)
+        let name  = gameState.playerName.trimmingCharacters(in: .whitespaces)
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(world.accent.opacity(0.22))
+                    .overlay(Circle().stroke(world.accent, lineWidth: 2))
+                VStack(spacing: 0) {
+                    Text("\(level)")
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    Text("LVL")
+                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .kerning(1)
+                        .foregroundStyle(Color(white: 0.6))
+                }
+                .padding(.horizontal, 4)
             }
+            .frame(width: 62, height: 62)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(name.isEmpty ? "Climber" : name)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text("\(world.name) · World \(world.index)")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(world.accent)
+                    .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.14)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(name.isEmpty ? "Climber" : name), climb level \(level), "
+            + "World \(world.index), \(world.name)."
+        )
+    }
+
+    // MARK: - World-chaptered grid
+
+    /// The deepest world the player has unlocked into — sections render up to
+    /// this so a new chapter appears the moment they climb past a 100 boundary.
+    private var reachedWorldIndex: Int {
+        World.index(for: max(1, gameState.highestUnlocked))
+    }
+
+    private var worldSections: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            ForEach(1...reachedWorldIndex, id: \.self) { wi in
+                worldSection(World.all[wi - 1])
+            }
+        }
+    }
+
+    private func worldSection(_ world: World) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            worldHeader(world)
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(world.levelRange, id: \.self) { level in
+                    cell(for: level)
+                }
+            }
+        }
+    }
+
+    private func worldHeader(_ world: World) -> some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(world.accent)
+                .frame(width: 5, height: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("WORLD \(world.index)")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .kerning(1.5)
+                    .foregroundStyle(Color(white: 0.55))
+                Text(world.name)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            Spacer()
+            Text("\(world.levelRange.lowerBound)–\(world.levelRange.upperBound)")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+                .monospacedDigit()
         }
     }
 
@@ -203,7 +299,10 @@ struct LevelSelectView: View {
         // theme rather than the (now obsolete) per-level theme bands.
         let floor    = gameState.equippedFloor
         let pit      = gameState.equippedPit
-        let isDesigned = level <= LevelLayout.handCrafted.count
+        // Every level 1…5,000 is now playable — hand-crafted set first, then
+        // the procedural generator (see LevelLayout.layout(for:)).  The old
+        // "coming soon" state only triggers beyond the 5,000 cap.
+        let isDesigned = level <= World.maxLevel
 
         if unlocked && isDesigned {
             Button {
