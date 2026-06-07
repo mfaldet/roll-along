@@ -277,7 +277,14 @@ struct BallGameView: View {
     /// Equipped Floor and Pit — read from GameState so the view
     /// re-renders when either is swapped.  Replaces the old `theme`
     /// abstraction since Floor and Pit are now independent picks.
-    private var floor: Floor { gameState.equippedFloor }
+    /// The floor cosmetic in play.  Zen Garden ignores whatever the player
+    /// has equipped and lays down the warm `.desert` sand bed, so the raked
+    /// groove always reads on sand.  As a side effect every cosmetic floor
+    /// overlay (aurora/disco/grass/moon/paper) is skipped, since none of the
+    /// `floor == .x` checks match `.desert`.  This is render-only — it never
+    /// touches `gameState.equippedFloor`, so the player's real floor returns
+    /// the moment they leave Zen.
+    private var floor: Floor { usesSandTrail ? .desert : gameState.equippedFloor }
     private var pit:   Pit   { gameState.equippedPit }
 
     // MARK: - Border state
