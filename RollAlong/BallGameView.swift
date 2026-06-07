@@ -162,11 +162,23 @@ struct BallGameView: View {
     /// rainbow, so the step staying tied to the base length is fine.
     private let trailHueStep: Double = 1.0 / 90.0
 
+    /// Persistent-trail cap for Zen Garden's raked-sand line.  Far longer
+    /// than the cosmetic trail so the ball builds a lasting drawing; still
+    /// bounded so a long session can't grow the point buffer without limit
+    /// (the very oldest marks quietly smooth away once the cap is reached).
+    private let sandTrailMaxLength = 2000
+
+    /// True when the active mode carves a single persistent sand line
+    /// (Zen Garden) instead of the standard fading cosmetic trail.
+    private var usesSandTrail: Bool { activeMode.leavesPersistentTrail }
+
     /// Actual trim cap used by the tick loop.  Equals `trailMaxLength`
     /// for every trail except the Snake, which grows by
     /// `snakeGrowthPerCoin` for each coin the player has picked up
-    /// this attempt — the eat-and-grow mechanic.
+    /// this attempt — the eat-and-grow mechanic.  Sand-trail modes use the
+    /// much larger persistent cap.
     private var effectiveTrailMaxLength: Int {
+        if usesSandTrail { return sandTrailMaxLength }
         if gameState.equippedTrail == .snake {
             return trailMaxLength + coinsPickedThisAttempt.count * snakeGrowthPerCoin
         }
@@ -358,7 +370,7 @@ struct BallGameView: View {
 
                 // Graphite trail (Paper world): drawn over the floor, UNDER the
                 // holes — the streak should appear cut by the page tear.
-                if gameState.equippedTrail != .none && trailPoints.count >= 2 {
+                if (gameState.equippedTrail != .none || usesSandTrail) && trailPoints.count >= 2 {
                     trailOverlay(geo: geo)
                         .allowsHitTesting(false)
                 }
@@ -1017,6 +1029,27 @@ struct BallGameView: View {
         Canvas { ctx, _ in
             let n = trailPoints.count
             guard n >= 2 else { return }
+            // Zen Garden — one continuous raked-sand groove.  Unlike the
+            // cosmetic trail it doesn't fade head-to-tail (it's a permanent
+            // furrow, not a comet) and is drawn two-tone: a soft wide shadow
+            // for the depression, under a thin pale highlight for the carved
+            // line catching the light.
+            if usesSandTrail {
+                var groove = Path()
+                groove.move(to: trailPoints[0])
+                for i in 1..<n { groove.addLine(to: trailPoints[i]) }
+                ctx.stroke(
+                    groove,
+                    with: .color(Color(red: 0.40, green: 0.32, blue: 0.22).opacity(0.22)),
+                    style: StrokeStyle(lineWidth: 7.0, lineCap: .round, lineJoin: .round)
+                )
+                ctx.stroke(
+                    groove,
+                    with: .color(Color(red: 0.96, green: 0.91, blue: 0.80).opacity(0.55)),
+                    style: StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round)
+                )
+                return
+            }
             let isRainbow = gameState.equippedTrail == .rainbow
             let isAir     = gameState.equippedTrail == .air
             let isRaybeam = gameState.equippedTrail == .raybeam
@@ -3680,7 +3713,7 @@ struct BallGameView: View {
         // Graphite trail (Paper world) — accumulate position points so we
         // can render the streak behind the ball.  Skip if too close to the
         // previous point (the ball is nearly stationary).
-        if gameState.equippedTrail != .none {
+        if gameState.equippedTrail != .none || usesSandTrail {
             if let last = trailPoints.last {
                 if hypot(b.position.x - last.x, b.position.y - last.y) > trailMinStep {
                     trailPoints.append(b.position)

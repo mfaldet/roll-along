@@ -121,6 +121,11 @@ protocol GameMode {
     /// Whether the arena contains fall-hazards (holes/pits) at all.
     var hasHoles:    Bool { get }
 
+    /// Whether the ball carves one persistent line that stays for the whole
+    /// session — the raked-sand signature of Zen Garden.  Most modes use the
+    /// standard fading cosmetic trail and leave this false.
+    var leavesPersistentTrail: Bool { get }
+
     // HUD composition — which overlays the mode shows.
     var showsStars:  Bool { get }
     var showsTimer:  Bool { get }
@@ -130,6 +135,7 @@ protocol GameMode {
 // Sensible defaults so each mode struct only states what makes it distinct.
 extension GameMode {
     var tagline:     String { "" }
+    var leavesPersistentTrail: Bool { false }
     var showsStars:  Bool   { false }
     var showsTimer:  Bool   { false }
     var showsScore:  Bool   { false }
@@ -194,6 +200,7 @@ struct ZenGardenMode: GameMode {
     let progression: ProgressionKind = .none
     let lives:       LivesPolicy     = .unlimited
     let hasHoles                     = false
+    let leavesPersistentTrail        = true
 }
 
 /// Coin Pit — the 30-second reward mini-game.  Roll to gather up to 100 coins
