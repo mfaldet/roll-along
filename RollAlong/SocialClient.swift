@@ -216,6 +216,112 @@ final class SocialClient: @unchecked Sendable {
                            prefer: "return=minimal")
     }
 
+    // MARK: - Clans
+
+    private static let clanColumns =
+        "id,name,tag,description,owner_id,created_at,updated_at"
+    private static let memberColumns =
+        "clan_id,player_id,role,joined_at"
+
+    /// The signed-in player's clan membership, or nil if they're in none.
+    /// (A player belongs to at most one clan — enforced by a unique index.)
+    func fetchMyClanMembership() async throws -> ClanMember? {
+        let me = try requireSession()
+        let query = "select=\(Self.memberColumns)"
+            + "&player_id=eq.\(me.userId.uuidString)&limit=1"
+        let data = try await send(method: "GET", path: "clan_members", query: query)
+        return try decode([ClanMember].self, from: data).first
+    }
+
+    /// A single clan by id (nil if it no longer exists, e.g. just disbanded).
+    func fetchClan(id: UUID) async throws -> Clan? {
+        _ = try requireSession()
+        let query = "select=\(Self.clanColumns)&id=eq.\(id.uuidString)&limit=1"
+        let data = try await send(method: "GET", path: "clans", query: query)
+        return try decode([Clan].self, from: data).first
+    }
+
+    /// Recent clans to browse when not searching.
+    func fetchClans(limit: Int = 30) async throws -> [Clan] {
+        _ = try requireSession()
+        let query = "select=\(Self.clanColumns)&order=created_at.desc&limit=\(limit)"
+        let data = try await send(method: "GET", path: "clans", query: query)
+        return try decode([Clan].self, from: data)
+    }
+
+    /// Find clans whose name contains `term` (case-insensitive).  Mirrors
+    /// `searchPlayers`: the term is fully percent-escaped so the `*` wildcards
+    /// stay literal and a stray `&`/`=` can't corrupt the query string.
+    func searchClans(matching term: String, limit: Int = 30) async throws -> [Clan] {
+        _ = try requireSession()
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? trimmed
+        let query = "select=\(Self.clanColumns)"
+            + "&name=ilike.*\(escaped)*"
+            + "&order=name.asc&limit=\(limit)"
+        let data = try await send(method: "GET", path: "clans", query: query)
+        return try decode([Clan].self, from: data)
+    }
+
+    /// Every membership row for a clan (resolve player_ids to profiles via
+    /// `fetchProfiles` to render the roster).
+    func fetchClanRoster(clanId: UUID) async throws -> [ClanMember] {
+        _ = try requireSession()
+        let query = "select=\(Self.memberColumns)&clan_id=eq.\(clanId.uuidString)"
+        let data = try await send(method: "GET", path: "clan_members", query: query)
+        return try decode([ClanMember].self, from: data)
+    }
+
+    /// Create a clan (you become its owner) and join it as `owner`.  Two
+    /// writes: insert the clan with `return=representation` to recover its
+    /// generated id, then insert your owner membership row.
+    func createClan(name: String, tag: String, description: String) async throws -> Clan {
+        let me = try requireSession()
+        let insert = ClanInsert(name: name, tag: tag,
+                                description: description, owner_id: me.userId)
+        let data = try await send(method: "POST", path: "clans",
+                                  bodyData: try encoder.encode([insert]),
+                                  prefer: "return=representation")
+        guard let clan = try decode([Clan].self, from: data).first else {
+            throw SocialError.emptyResponse
+        }
+        let membership = ClanMemberInsert(clan_id: clan.id,
+                                          player_id: me.userId, role: "owner")
+        _ = try await send(method: "POST", path: "clan_members",
+                           bodyData: try encoder.encode([membership]),
+                           prefer: "return=minimal")
+        return clan
+    }
+
+    /// Join an existing clan as a `member`.  The one-clan-per-player unique
+    /// index makes this throw if you're already in one, so the UI only offers
+    /// Join when you have no membership.
+    func joinClan(id: UUID) async throws {
+        let me = try requireSession()
+        let membership = ClanMemberInsert(clan_id: id,
+                                          player_id: me.userId, role: "member")
+        _ = try await send(method: "POST", path: "clan_members",
+                           bodyData: try encoder.encode([membership]),
+                           prefer: "return=minimal")
+    }
+
+    /// Leave a clan (deletes only your own membership row).
+    func leaveClan(id: UUID) async throws {
+        let me = try requireSession()
+        let query = "clan_id=eq.\(id.uuidString)&player_id=eq.\(me.userId.uuidString)"
+        _ = try await send(method: "DELETE", path: "clan_members",
+                           query: query, prefer: "return=minimal")
+    }
+
+    /// Disband a clan you own — deleting the row cascades every membership.
+    /// RLS permits this only for the owner.
+    func disbandClan(id: UUID) async throws {
+        _ = try requireSession()
+        _ = try await send(method: "DELETE", path: "clans",
+                           query: "id=eq.\(id.uuidString)", prefer: "return=minimal")
+    }
+
     // MARK: - Networking core
 
     private func requireSession() throws -> Session {
@@ -348,6 +454,43 @@ struct Friendship: Codable, Identifiable {
     }
 }
 
+/// A collaborative group.  `tag` is the short [TAG] shown beside member names.
+struct Clan: Codable, Identifiable {
+    let id: UUID
+    var name: String
+    var tag: String
+    var description: String
+    let ownerId: UUID
+    var createdAt: String?
+    var updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, tag, description
+        case ownerId   = "owner_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+/// One player's membership in a clan.  Identified by `playerId` (unique within
+/// a roster) so it can drive a `ForEach` directly.
+struct ClanMember: Codable, Identifiable {
+    let clanId: UUID
+    let playerId: UUID
+    var role: String
+    var joinedAt: String?
+
+    var id: UUID { playerId }
+    var isOwner: Bool { role == "owner" }
+
+    enum CodingKeys: String, CodingKey {
+        case clanId   = "clan_id"
+        case playerId = "player_id"
+        case role
+        case joinedAt = "joined_at"
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Private write payloads — snake_case property names map straight to columns.
 // ---------------------------------------------------------------------------
@@ -384,4 +527,17 @@ private struct FriendshipInsert: Encodable {
 
 private struct FriendStatusPatch: Encodable {
     let status: String
+}
+
+private struct ClanInsert: Encodable {
+    let name: String
+    let tag: String
+    let description: String
+    let owner_id: UUID
+}
+
+private struct ClanMemberInsert: Encodable {
+    let clan_id: UUID
+    let player_id: UUID
+    let role: String
 }
