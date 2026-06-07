@@ -264,7 +264,7 @@ enum GameModeCatalogue {
         (climb,            true),
         (ZenGardenMode(),  true),    // engine behavior implemented — live
         (CoinPitMode(),    true),    // engine behavior implemented — live
-        (SnakeMode(),      false),
+        (SnakeMode(),      true),     // self-contained SnakeGameView — live
         (BumperCarsMode(), false),
     ]
 

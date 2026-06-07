@@ -248,6 +248,7 @@ struct HomeView: View {
                 case .friends:     FriendsView()
                 case .clans:       ClansView()
                 case .games:       GameMenuView()
+                case .mode("snake"): SnakeGameView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)
