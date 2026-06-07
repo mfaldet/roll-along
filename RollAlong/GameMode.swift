@@ -263,7 +263,7 @@ enum GameModeCatalogue {
     static let registry: [(mode: GameMode, isEnabled: Bool)] = [
         (climb,            true),
         (ZenGardenMode(),  true),    // engine behavior implemented — live
-        (CoinPitMode(),    false),
+        (CoinPitMode(),    true),    // engine behavior implemented — live
         (SnakeMode(),      false),
         (BumperCarsMode(), false),
     ]

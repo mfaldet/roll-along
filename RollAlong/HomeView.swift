@@ -155,23 +155,43 @@ struct HomeView: View {
                         .padding(.horizontal, 40)
                         .padding(.bottom, 12)
 
-                    // Secondary mode: a calm, low-key entry to Zen Garden —
-                    // the "just relax" alternative to the competitive climb.
-                    NavigationLink(value: HomeRoute.mode("zen")) {
-                        HStack(spacing: 7) {
-                            Image(systemName: "leaf.fill")
-                                .font(.system(size: 13))
-                            Text("Zen Garden")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    // Secondary modes: low-key entries to the alternate
+                    // experiences that sit beside the competitive climb —
+                    // a calm Zen Garden and the quick Coin Pit reward round.
+                    HStack(spacing: 10) {
+                        NavigationLink(value: HomeRoute.mode("zen")) {
+                            HStack(spacing: 7) {
+                                Image(systemName: "leaf.fill")
+                                    .font(.system(size: 13))
+                                Text("Zen Garden")
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundStyle(Color(white: 0.82))
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 9)
+                            .background(
+                                Capsule()
+                                    .fill(Color(white: 0.14))
+                                    .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
+                            )
                         }
-                        .foregroundStyle(Color(white: 0.82))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 9)
-                        .background(
-                            Capsule()
-                                .fill(Color(white: 0.14))
-                                .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
-                        )
+                        NavigationLink(value: HomeRoute.mode("coinpit")) {
+                            HStack(spacing: 7) {
+                                Image(systemName: "dollarsign.circle.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
+                                Text("Coin Pit")
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color(white: 0.82))
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 9)
+                            .background(
+                                Capsule()
+                                    .fill(Color(white: 0.14))
+                                    .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
+                            )
+                        }
                     }
                     .padding(.bottom, 14)
 
