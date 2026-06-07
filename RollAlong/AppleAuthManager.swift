@@ -1,0 +1,245 @@
+import AuthenticationServices
+import CryptoKit
+import Foundation
+import Security
+import UIKit
+
+// ===========================================================================
+// AppleAuthManager — Sign in with Apple → Supabase Auth → SocialClient session.
+//
+// The identity bridge for Roll Along's social layer.  Flow:
+//
+//   1. Player taps "Sign in with Apple".  We launch the native
+//      ASAuthorizationController with a one-time, SHA256-hashed nonce.
+//   2. Apple returns an `identityToken` (a signed JWT) that embeds the
+//      hashed nonce and the player's stable Apple user id.
+//   3. We POST that token + the *raw* nonce to Supabase's id_token grant
+//      (`/auth/v1/token?grant_type=id_token`).  Supabase verifies Apple's
+//      signature, re-hashes our nonce to confirm it matches, and mints a
+//      Supabase access token (role=authenticated) + a Supabase user id.
+//   4. We hand both to `SocialClient.setSession(...)`, which from then on
+//      attaches `Authorization: Bearer <token>` to every request so
+//      Postgres RLS scopes writes to this player's own rows.
+//
+// SAFE BY CONSTRUCTION: self-contained, additive.  Nothing calls this until
+// a UI surface invokes `startSignIn`.  Until then the social layer stays in
+// its signed-out state (every SocialClient method throws `.notSignedIn`).
+//
+// NOTE: the "Sign in with Apple" entitlement requires a *paid* Apple
+// Developer Program membership.  This code compiles on a free team but the
+// system sheet will only present once the capability is added to the target.
+// ===========================================================================
+
+@MainActor
+final class AppleAuthManager: NSObject, ObservableObject {
+    static let shared = AppleAuthManager()
+    private override init() { super.init() }
+
+    // MARK: - Published state (drive the sign-in button / UI)
+
+    /// True once a Supabase session is installed on `SocialClient`.
+    @Published private(set) var isSignedIn: Bool = false
+    /// In-flight indicator so the button can disable + spin.
+    @Published private(set) var isWorking: Bool = false
+    /// Human-readable last error, for surfacing a toast/label.  Cleared on
+    /// each new attempt.
+    @Published private(set) var lastError: String?
+
+    // MARK: - Config (mirrors SocialClient; both are client-safe values)
+
+    private static let projectURL = "https://mhwpcwauzvmtmuphtajs.supabase.co"
+    private static let apiKey = "sb_publishable_A1RRz_2m9qDAWikrVlyfnQ_M-YgOSaR"
+
+    // MARK: - Per-attempt state
+
+    /// Raw (un-hashed) nonce for the current attempt.  Apple embeds the
+    /// hash in the returned token; Supabase re-hashes this raw value to
+    /// verify, so we must keep and forward the raw form.
+    private var currentNonce: String?
+
+    /// Optional hook fired after a successful sign-in + session install,
+    /// e.g. to upsert the player's profile with current game stats.  Set by
+    /// the caller before invoking `startSignIn`.
+    var onSignedIn: (() -> Void)?
+
+    // MARK: - Public entry points
+
+    /// Begin the native Sign in with Apple flow.  Results land in
+    /// `isSignedIn` / `lastError`; `onSignedIn` fires on success.
+    func startSignIn() {
+        lastError = nil
+        isWorking = true
+
+        let nonce = Self.randomNonceString()
+        currentNonce = nonce
+
+        let provider = ASAuthorizationAppleIDProvider()
+        let request  = provider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = Self.sha256(nonce)
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+        controller.performRequests()
+    }
+
+    /// Forget the local session.  (Apple has no programmatic sign-out; this
+    /// just drops our Supabase token so the social layer goes quiet again.)
+    func signOut() {
+        SocialClient.shared.clearSession()
+        isSignedIn = false
+    }
+
+    // MARK: - Supabase id_token exchange
+
+    private func exchangeWithSupabase(idToken: String, rawNonce: String) async {
+        do {
+            let url = URL(string: "\(Self.projectURL)/auth/v1/token?grant_type=id_token")!
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(Self.apiKey,        forHTTPHeaderField: "apikey")
+
+            let body = IdTokenGrant(provider: "apple", id_token: idToken, nonce: rawNonce)
+            req.httpBody = try JSONEncoder().encode(body)
+
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                throw AuthError.message("No HTTP response from auth server.")
+            }
+            guard (200...299).contains(http.statusCode) else {
+                let detail = String(data: data, encoding: .utf8) ?? ""
+                throw AuthError.message("Auth exchange failed (\(http.statusCode)). \(detail)")
+            }
+
+            let session = try JSONDecoder().decode(SupabaseSession.self, from: data)
+            guard let userId = UUID(uuidString: session.user.id) else {
+                throw AuthError.message("Auth server returned an unreadable user id.")
+            }
+
+            SocialClient.shared.setSession(accessToken: session.access_token, userId: userId)
+            isSignedIn = true
+            isWorking  = false
+            onSignedIn?()
+        } catch {
+            fail(error.localizedDescription)
+        }
+    }
+
+    private func fail(_ message: String) {
+        lastError = message
+        isWorking = false
+        isSignedIn = SocialClient.shared.isSignedIn
+    }
+
+    // MARK: - Nonce helpers (Apple-recommended pattern)
+
+    private static func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        let charset: [Character] =
+            Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remaining = length
+        while remaining > 0 {
+            var randoms = [UInt8](repeating: 0, count: 16)
+            let status = SecRandomCopyBytes(kSecRandomDefault, randoms.count, &randoms)
+            if status != errSecSuccess {
+                // Fallback — still random enough for a one-time nonce.
+                randoms = (0..<16).map { _ in UInt8.random(in: 0...255) }
+            }
+            for random in randoms where remaining > 0 {
+                if Int(random) < charset.count {
+                    result.append(charset[Int(random)])
+                    remaining -= 1
+                }
+            }
+        }
+        return result
+    }
+
+    private static func sha256(_ input: String) -> String {
+        let hashed = SHA256.hash(data: Data(input.utf8))
+        return hashed.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// ===========================================================================
+// Delegate + presentation
+// ===========================================================================
+extension AppleAuthManager: ASAuthorizationControllerDelegate {
+    nonisolated func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        guard
+            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+            let tokenData  = credential.identityToken,
+            let idToken    = String(data: tokenData, encoding: .utf8)
+        else {
+            Task { @MainActor in self.fail("Apple did not return an identity token.") }
+            return
+        }
+        Task { @MainActor in
+            guard let nonce = self.currentNonce else {
+                self.fail("Missing sign-in nonce; please try again.")
+                return
+            }
+            await self.exchangeWithSupabase(idToken: idToken, rawNonce: nonce)
+        }
+    }
+
+    nonisolated func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: Error
+    ) {
+        Task { @MainActor in
+            // User cancellation isn't a real error — keep it quiet.
+            if let authError = error as? ASAuthorizationError,
+               authError.code == .canceled {
+                self.isWorking = false
+                return
+            }
+            self.fail(error.localizedDescription)
+        }
+    }
+}
+
+extension AppleAuthManager: ASAuthorizationControllerPresentationContextProviding {
+    nonisolated func presentationAnchor(
+        for controller: ASAuthorizationController
+    ) -> ASPresentationAnchor {
+        // Find the active foreground window to anchor the system sheet.
+        let scenes = UIApplication.shared.connectedScenes
+        let window = scenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
+        return window ?? ASPresentationAnchor()
+    }
+}
+
+// ===========================================================================
+// Wire models
+// ===========================================================================
+private struct IdTokenGrant: Encodable {
+    let provider: String
+    let id_token: String
+    let nonce: String
+}
+
+private struct SupabaseSession: Decodable {
+    let access_token: String
+    let user: SupabaseUser
+}
+
+private struct SupabaseUser: Decodable {
+    let id: String
+}
+
+private enum AuthError: LocalizedError {
+    case message(String)
+    var errorDescription: String? {
+        switch self { case .message(let m): return m }
+    }
+}
