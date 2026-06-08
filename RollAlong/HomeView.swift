@@ -117,6 +117,10 @@ struct HomeView: View {
     @State private var showDailyRewardSheet: Bool = false
     @State private var autoPresentedDaily: Bool = false
 
+    // Starter Pack sheet — shown once automatically when coinBalance first
+    // reaches 50.  Also shown on re-launch while the 48-hour window is open.
+    @State private var showStarterPackSheet: Bool = false
+
     private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
     var body: some View {
@@ -278,6 +282,22 @@ struct HomeView: View {
             .sheet(isPresented: $showDailyRewardSheet) {
                 DailyRewardView()
                     .environmentObject(gameState)
+            }
+            .sheet(isPresented: $showStarterPackSheet) {
+                StarterPackSheet()
+                    .environmentObject(gameState)
+                    .environmentObject(StoreKitManager.shared)
+            }
+            // Auto-present the Starter Pack sheet the first time coinBalance
+            // reaches 50 (trigger fires once and is never re-armed).
+            // On re-launch, also re-present while the 48-hour window is still
+            // open.  The `showStarterPackSheet` guard prevents a double-pop
+            // when dailyReward fires at the same moment.
+            .onChange(of: gameState.coinBalance) { _, _ in
+                maybeAutoPresentStarterPack()
+            }
+            .onAppear {
+                maybeAutoPresentStarterPack()
             }
         }
         .environmentObject(nav)
@@ -552,6 +572,29 @@ struct HomeView: View {
         autoPresentedDaily = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if gameState.dailyRewardAvailable { showDailyRewardSheet = true }
+        }
+    }
+
+    /// Present the Starter Pack sheet when:
+    ///   (a) coinBalance just crossed 50 for the first time (trigger fires once), OR
+    ///   (b) the player re-opens the app while the 48-hour window is still live.
+    /// Guards prevent double-pop or showing when another sheet is already visible.
+    private func maybeAutoPresentStarterPack() {
+        guard gameState.seenOnboarding, !showStarterPackSheet else { return }
+
+        if gameState.shouldTriggerStarterPack {
+            // First trigger: stamp shownAt so the countdown starts now.
+            gameState.starterPackShownAt = Date()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                guard !showDailyRewardSheet else { return }
+                showStarterPackSheet = true
+            }
+        } else if gameState.starterPackOfferActive {
+            // Re-open within the 48-hour window.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                guard !showDailyRewardSheet else { return }
+                showStarterPackSheet = true
+            }
         }
     }
 

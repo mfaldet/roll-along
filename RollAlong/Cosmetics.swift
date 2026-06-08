@@ -89,7 +89,8 @@ extension BallSkin: CosmeticItem {
             return .premium    // 200 coins — multi-colour blends / planets
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
              .storm, .candy, .ghost,
-             .basketball, .eightBall, .baseball:
+             .basketball, .eightBall, .baseball,
+             .aurora:          // starter-pack-exclusive; never coin-purchasable
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }

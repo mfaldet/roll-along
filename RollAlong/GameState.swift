@@ -100,6 +100,26 @@ final class GameState: ObservableObject {
         }
     }
 
+    // ── Starter Pack one-time offer ─────────────────────────────────────────
+    // starterPackShownAt : timestamp when the offer sheet was first presented.
+    //                      nil until the trigger fires (first time coinBalance
+    //                      reaches 50).  Drives the 48-hour countdown.
+    // starterPackClaimed : true after the player purchases OR permanently
+    //                      dismisses the offer.  Once true the sheet never
+    //                      shows again.
+    @Published var starterPackShownAt: Date? {
+        didSet {
+            if let d = starterPackShownAt {
+                UserDefaults.standard.set(d, forKey: "ra_starterPackShownAt")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "ra_starterPackShownAt")
+            }
+        }
+    }
+    @Published var starterPackClaimed: Bool {
+        didSet { UserDefaults.standard.set(starterPackClaimed, forKey: "ra_starterPackClaimed") }
+    }
+
     // ── Cosmetic economy (Sprint 4d) ──────────────────────────────────────
     // Coins are the in-app currency.  Earned from gameplay; spent in the
     // shop to unlock cosmetic items.  Also purchasable in coin packs via
@@ -208,6 +228,10 @@ final class GameState: ObservableObject {
         // Daily reward / login streak.
         dailyStreak    = UserDefaults.standard.integer(forKey: "ra_dailyStreak")
         lastDailyClaim = UserDefaults.standard.object(forKey: "ra_lastDailyClaim") as? Date
+
+        // Starter Pack offer state.
+        starterPackShownAt = UserDefaults.standard.object(forKey: "ra_starterPackShownAt") as? Date
+        starterPackClaimed = UserDefaults.standard.bool(forKey: "ra_starterPackClaimed")
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -537,6 +561,29 @@ final class GameState: ObservableObject {
         lastDailyClaim = Date()
         addCoins(amount)
         return amount
+    }
+
+    // MARK: - Starter Pack offer
+
+    /// Fires once: true the first time `coinBalance` reaches 50 AND the
+    /// player hasn't claimed or permanently dismissed the offer yet.
+    /// HomeView observes `coinBalance` and checks this to auto-present
+    /// the sheet.
+    var shouldTriggerStarterPack: Bool {
+        !starterPackClaimed && starterPackShownAt == nil && coinBalance >= 50
+    }
+
+    /// True while the 48-hour countdown is still ticking — the offer sheet
+    /// is still worth showing (e.g., player re-opens the app mid-window).
+    var starterPackOfferActive: Bool {
+        guard !starterPackClaimed, let shownAt = starterPackShownAt else { return false }
+        return Date().timeIntervalSince(shownAt) < 48 * 3_600
+    }
+
+    /// Seconds remaining in the 48-hour offer window (0 when expired/unclaimed).
+    var starterPackSecondsRemaining: TimeInterval {
+        guard let shownAt = starterPackShownAt else { return 0 }
+        return max(0, 48 * 3_600 - Date().timeIntervalSince(shownAt))
     }
 
     /// True if the player owns this cosmetic item.  Starter items are

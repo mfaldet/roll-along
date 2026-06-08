@@ -96,6 +96,12 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.20), lineWidth: 0.5))
 
+        // ── Starter Pack exclusive ──────────────────────────────────────
+        case .aurora:
+            auroraCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.white.opacity(0.14), lineWidth: 0.5))
+
         // ── Gradient-based (all remaining skins) ───────────────────────
         default:
             Circle()
@@ -939,6 +945,121 @@ struct BallSkinView: View {
                     Gradient(colors: [Color.white.opacity(0.50), .clear]),
                     center: CGPoint(x: w * 0.22, y: h * 0.16),
                     startRadius: 0, endRadius: r * 0.36))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Aurora  (Starter Pack exclusive)
+    // Deep midnight sphere with animated Northern Lights.  Two aurora bands
+    // — teal-green and violet — undulate slowly on independent cycles.
+    // Twinkling star specks fill the upper hemisphere.  Animated via
+    // TimelineView; under Reduce Motion both bands and stars hold steady.
+    // =========================================================================
+    private var auroraCanvas: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
+
+                // ── 1. Base sphere — deep midnight sky ──────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r,
+                                           width: r * 2, height: r * 2)),
+                    with: .radialGradient(
+                        Gradient(colors: [
+                            Color(red: 0.10, green: 0.14, blue: 0.26),
+                            Color(red: 0.03, green: 0.04, blue: 0.14),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.18),
+                        startRadius: 0, endRadius: r * 1.30
+                    )
+                )
+
+                // ── 2. Teal-green aurora band ───────────────────────────
+                // Drifts ±12% of the sphere height on a ~16-second cycle.
+                let greenFraction = CGFloat(0.47 + 0.12 * sin(t * 0.40))
+                let greenY  = cy - r + r * 2 * greenFraction
+                let greenBW = r * 1.85
+                let greenBH = r * 0.36
+                let greenRect = CGRect(x: cx - greenBW / 2, y: greenY - greenBH / 2,
+                                       width: greenBW, height: greenBH)
+                ctx.fill(
+                    Path(ellipseIn: greenRect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.00), location: 0.0),
+                            .init(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.72), location: 0.5),
+                            .init(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.00), location: 1.0),
+                        ]),
+                        startPoint: CGPoint(x: cx, y: greenRect.minY),
+                        endPoint:   CGPoint(x: cx, y: greenRect.maxY)
+                    )
+                )
+
+                // ── 3. Violet aurora band ───────────────────────────────
+                // Slower drift, offset phase so the two bands never align.
+                let violetFraction = CGFloat(0.65 + 0.10 * sin(t * 0.28 + 1.2))
+                let violetY  = cy - r + r * 2 * violetFraction
+                let violetBW = r * 1.60
+                let violetBH = r * 0.28
+                let violetRect = CGRect(x: cx - violetBW / 2, y: violetY - violetBH / 2,
+                                        width: violetBW, height: violetBH)
+                ctx.fill(
+                    Path(ellipseIn: violetRect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.62, green: 0.18, blue: 0.92).opacity(0.00), location: 0.0),
+                            .init(color: Color(red: 0.62, green: 0.18, blue: 0.92).opacity(0.58), location: 0.5),
+                            .init(color: Color(red: 0.62, green: 0.18, blue: 0.92).opacity(0.00), location: 1.0),
+                        ]),
+                        startPoint: CGPoint(x: cx, y: violetRect.minY),
+                        endPoint:   CGPoint(x: cx, y: violetRect.maxY)
+                    )
+                )
+
+                // ── 4. Star specks (twinkling when not Reduce Motion) ───
+                // Fixed (fx, fy) fractions in the upper hemisphere.
+                // Each star's phase is offset by its index so they don't
+                // all pulse together.
+                let stars: [(Double, Double)] = [
+                    (0.22, 0.18), (0.68, 0.12), (0.44, 0.28), (0.78, 0.24),
+                    (0.14, 0.32), (0.58, 0.08), (0.82, 0.34), (0.36, 0.15),
+                    (0.52, 0.40), (0.74, 0.39), (0.28, 0.06), (0.62, 0.35),
+                ]
+                let sr = r * 0.030
+                for (idx, (fx, fy)) in stars.enumerated() {
+                    let sx = cx - r + CGFloat(fx) * r * 2
+                    let sy = cy - r + CGFloat(fy) * r * 2
+                    guard hypot(sx - cx, sy - cy) < r * 0.88 else { continue }
+                    let twinkle: CGFloat = reduceMotion
+                        ? 0.80
+                        : CGFloat(0.40 + 0.60 * sin(t * 2.1 + Double(idx) * 1.3))
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr,
+                                               width: sr * 2, height: sr * 2)),
+                        with: .color(.white.opacity(twinkle))
+                    )
+                }
+
+                // ── 5. Specular highlight — sells the spherical form ────
+                let hlRect = CGRect(x: cx - r * 0.40, y: cy - r * 0.78,
+                                    width: r * 0.50, height: r * 0.32)
+                ctx.fill(
+                    Path(ellipseIn: hlRect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.32), location: 0.0),
+                            .init(color: .white.opacity(0.00), location: 1.0),
+                        ]),
+                        startPoint: CGPoint(x: cx - r * 0.15, y: hlRect.minY),
+                        endPoint:   CGPoint(x: cx - r * 0.15, y: hlRect.maxY)
+                    )
+                )
+            }
         }
     }
 }

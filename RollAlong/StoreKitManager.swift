@@ -36,13 +36,20 @@ final class StoreKitManager: ObservableObject {
         case coins600     = "com.macfaldet.RollAlong.coins.600"
         case coins1300    = "com.macfaldet.RollAlong.coins.1300"
         case coins3000    = "com.macfaldet.RollAlong.coins.3000"
+        /// One-time welcome offer: 500 coins + exclusive Aurora ball skin.
+        /// Non-consumable so it can be restored on a new device; delivery
+        /// is idempotent (grantCosmetic + addCoins are safe to call twice
+        /// — grantCosmetic is a set.insert and addCoins only runs when
+        /// `starterPackClaimed` is still false).
+        case starterPack  = "com.macfaldet.RollAlong.starterpack"
 
         var id: String { rawValue }
 
         enum Category {
-            case lifePack       // grants N lives
-            case coinPack       // grants N coins
-            case unlimitedUnlock // non-consumable; flips unlimitedLives true
+            case lifePack           // grants N lives
+            case coinPack           // grants N coins
+            case unlimitedUnlock    // non-consumable; flips unlimitedLives true
+            case starterPackUnlock  // non-consumable; grants 500 coins + Aurora skin
         }
 
         var category: Category {
@@ -50,6 +57,7 @@ final class StoreKitManager: ObservableObject {
             case .livesPack1, .livesPack5, .livesPack10: return .lifePack
             case .unlimited:                              return .unlimitedUnlock
             case .coins100, .coins600, .coins1300, .coins3000: return .coinPack
+            case .starterPack:                            return .starterPackUnlock
             }
         }
 
@@ -66,11 +74,12 @@ final class StoreKitManager: ObservableObject {
         /// Coins granted by this purchase.  Zero for non-coin products.
         var rewardCoins: Int {
             switch self {
-            case .coins100:  return 100
-            case .coins600:  return 600
-            case .coins1300: return 1300
-            case .coins3000: return 3000
-            default:         return 0
+            case .coins100:    return 100
+            case .coins600:    return 600
+            case .coins1300:   return 1300
+            case .coins3000:   return 3000
+            case .starterPack: return 500
+            default:           return 0
             }
         }
     }
@@ -142,15 +151,19 @@ final class StoreKitManager: ObservableObject {
     /// Re-check the user's current entitlements.  The unlimited tier is a
     /// non-consumable, so it lives in currentEntitlements forever.
     func refreshEntitlements() async {
-        var unlimitedSeen = false
+        var unlimitedSeen     = false
+        var starterPackSeen   = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let txn) = result else { continue }
-            if txn.productID == ProductID.unlimited.rawValue {
-                unlimitedSeen = true
-            }
+            if txn.productID == ProductID.unlimited.rawValue    { unlimitedSeen   = true }
+            if txn.productID == ProductID.starterPack.rawValue  { starterPackSeen = true }
         }
-        if unlimitedSeen {
-            gameState?.unlimitedLives = true
+        if unlimitedSeen   { gameState?.unlimitedLives = true }
+        if starterPackSeen {
+            guard let gs = gameState, !gs.starterPackClaimed else { return }
+            gs.addCoins(ProductID.starterPack.rewardCoins)
+            gs.grant(BallSkin.aurora)
+            gs.starterPackClaimed = true
         }
     }
 
@@ -253,6 +266,13 @@ final class StoreKitManager: ObservableObject {
 
         case .unlimitedUnlock:
             gameState.unlimitedLives = true
+
+        case .starterPackUnlock:
+            // Only deliver once — guard lets restore calls be idempotent.
+            guard !gameState.starterPackClaimed else { break }
+            gameState.addCoins(productID.rewardCoins)
+            gameState.grant(BallSkin.aurora)
+            gameState.starterPackClaimed = true
         }
         lastDelivery = DeliveryReceipt(
             productID:          productID,

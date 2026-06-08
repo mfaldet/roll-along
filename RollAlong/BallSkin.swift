@@ -102,6 +102,13 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     via the bespoke `baseballCanvas` in BallSkinView.
     case baseball   = "Baseball"
 
+    // ── Starter Pack exclusive ──────────────────────────────────────────
+    //   • aurora — deep midnight sphere with animated teal-green and violet
+    //     Northern Lights bands and twinkling stars.  Available ONLY via
+    //     the one-time $1.99 Starter Pack offer; never purchasable with
+    //     coins and hidden from the regular shop grid.
+    case aurora = "Aurora"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -118,8 +125,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     /// are hidden from the standalone shop's individual Ball grid.
     var isBundleExclusive: Bool {
         switch self {
-        case .pluto: return true
-        default:     return false
+        case .pluto, .aurora: return true
+        default:              return false
         }
     }
 
@@ -482,6 +489,18 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.95, green: 0.93, blue: 0.88),
                 Color(red: 0.78, green: 0.74, blue: 0.68),
                 Color(red: 0.54, green: 0.48, blue: 0.42),
+            ]
+
+        // ── Starter Pack exclusive ──
+        case .aurora:
+            // Northern Lights — icy highlight → vivid teal-green aurora →
+            // deep violet sky → near-black midnight.  Fallback for any static
+            // context that doesn't go through BallSkinView's animated Canvas.
+            return [
+                Color(red: 0.88, green: 1.00, blue: 0.96),
+                Color(red: 0.20, green: 0.92, blue: 0.62),
+                Color(red: 0.42, green: 0.10, blue: 0.72),
+                Color(red: 0.04, green: 0.04, blue: 0.18),
             ]
         }
     }
