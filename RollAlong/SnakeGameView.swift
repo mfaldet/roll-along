@@ -53,7 +53,15 @@ struct SnakeGameView: View {
     private let coinsPerPower  = 3                 // coins banked per point of power
     private let winBonus       = 20                // coins for last-comet-standing
 
-    private let rivalCount     = 0                 // AI rivals (increment 2 sets this to 3)
+    private let rivalCount     = 3                 // AI rival comets
+
+    // Rival AI
+    private let aiAccel:       CGFloat = 1_200
+    private let aiLookAhead:   CGFloat = 78         // forward probe distance for avoidance
+    private let aiTurn:        CGFloat = 0.85       // radians to swing when the path ahead is blocked
+    private let aiAvoidRadius: CGFloat = 34         // a probe within this of a wall counts as blocked
+    private let aiSelfSkip      = 14                // own newest nodes the AI ignores as obstacles
+    private let aiForwardBias: CGFloat = 0.6        // keep cruising forward while seeking sparks
 
     /// Head-to-trail-centerline distance that counts as a fatal hit.
     private var collideDistance: CGFloat { headRadius + trailWidth * 0.35 }
@@ -402,8 +410,9 @@ struct SnakeGameView: View {
             if cycles[i].isPlayer {
                 steer = CGVector(dx: CGFloat(motion.gravity.x) * accel,
                                  dy: CGFloat(motion.gravity.y) * accel)
+            } else {
+                steer = aiSteer(i)
             }
-            // (rival AI steering is added in increment 2)
             cycles[i].vel.dx += steer.dx * dt
             cycles[i].vel.dy += steer.dy * dt
             cycles[i].vel.dx *= friction
@@ -547,6 +556,91 @@ struct SnakeGameView: View {
         let x = hiX > loX ? CGFloat.random(in: loX...hiX) : arena.width / 2
         let y = hiY > loY ? CGFloat.random(in: loY...hiY) : arena.height / 2
         return CGPoint(x: x, y: y)
+    }
+
+    // MARK: - Rival AI
+
+    /// Steer a rival: drive toward the nearest spark, but if a wall or trail is
+    /// dead ahead, swing toward whichever side has more open space.
+    private func aiSteer(_ i: Int) -> CGVector {
+        let c = cycles[i]
+        let heading = c.heading
+        let ahead = project(from: c.pos, heading: heading, dist: aiLookAhead)
+
+        if isBlocked(ahead, for: i) {
+            let leftH  = heading - aiTurn
+            let rightH = heading + aiTurn
+            let lc = clearance(project(from: c.pos, heading: leftH,  dist: aiLookAhead), for: i)
+            let rc = clearance(project(from: c.pos, heading: rightH, dist: aiLookAhead), for: i)
+            let chosen = lc >= rc ? leftH : rightH
+            return CGVector(dx: cos(chosen) * aiAccel, dy: sin(chosen) * aiAccel)
+        }
+
+        if let orb = nearestOrb(to: c.pos) {
+            let u = unit(orb.x - c.pos.x, orb.y - c.pos.y)
+            let fx = cos(heading) * aiForwardBias
+            let fy = sin(heading) * aiForwardBias
+            return CGVector(dx: (u.x + fx) * aiAccel, dy: (u.y + fy) * aiAccel)
+        }
+        return CGVector(dx: cos(heading) * aiAccel, dy: sin(heading) * aiAccel)
+    }
+
+    private func project(from p: CGPoint, heading: CGFloat, dist: CGFloat) -> CGPoint {
+        CGPoint(x: p.x + cos(heading) * dist, y: p.y + sin(heading) * dist)
+    }
+
+    private func unit(_ dx: CGFloat, _ dy: CGFloat) -> (x: CGFloat, y: CGFloat) {
+        let m = hypot(dx, dy)
+        guard m > 0 else { return (0, 0) }
+        return (dx / m, dy / m)
+    }
+
+    private func nearestOrb(to p: CGPoint) -> CGPoint? {
+        var best: CGPoint? = nil
+        var bestD = CGFloat.greatestFiniteMagnitude
+        for o in orbs {
+            let d = (o.pos.x - p.x) * (o.pos.x - p.x) + (o.pos.y - p.y) * (o.pos.y - p.y)
+            if d < bestD { bestD = d; best = o.pos }
+        }
+        return best
+    }
+
+    /// True if a probe point is off the arena or sitting on a live trail.
+    private func isBlocked(_ p: CGPoint, for i: Int) -> Bool {
+        let m = headRadius
+        if p.x < m || p.x > arena.width - m || p.y < m || p.y > arena.height - m { return true }
+        let r2 = aiAvoidRadius * aiAvoidRadius
+        for yi in cycles.indices {
+            let trail = cycles[yi].trail
+            let upper = (yi == i) ? max(0, trail.count - aiSelfSkip) : trail.count
+            var k = 0
+            while k < upper {
+                let dx = p.x - trail[k].pos.x, dy = p.y - trail[k].pos.y
+                if dx * dx + dy * dy < r2 { return true }
+                k += 1
+            }
+        }
+        return false
+    }
+
+    /// Open space around a probe point: distance to the nearest wall or trail.
+    /// Off-arena probes return a negative score so they're never preferred.
+    private func clearance(_ p: CGPoint, for i: Int) -> CGFloat {
+        let m = headRadius
+        if p.x < m || p.x > arena.width - m || p.y < m || p.y > arena.height - m { return -1 }
+        var nearest = min(min(p.x, arena.width - p.x), min(p.y, arena.height - p.y))
+        for yi in cycles.indices {
+            let trail = cycles[yi].trail
+            let upper = (yi == i) ? max(0, trail.count - aiSelfSkip) : trail.count
+            var k = 0
+            while k < upper {
+                let dx = p.x - trail[k].pos.x, dy = p.y - trail[k].pos.y
+                let d = dx * dx + dy * dy
+                if d < nearest * nearest { nearest = sqrt(d) }
+                k += 1
+            }
+        }
+        return nearest
     }
 }
 
