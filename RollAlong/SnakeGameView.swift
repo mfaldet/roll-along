@@ -52,6 +52,7 @@ struct SnakeGameView: View {
     private let orbCount       = 3                 // sparks live on the field at once
     private let coinsPerPower  = 3                 // coins banked per point of power
     private let winBonus       = 20                // coins for last-comet-standing
+    private let poofLifeTicks  = 26                // death-burst animation length
 
     private let rivalCount     = 3                 // AI rival comets
 
@@ -92,6 +93,13 @@ struct SnakeGameView: View {
         var pos: CGPoint
     }
 
+    private struct Poof: Identifiable {
+        let id = UUID()
+        var pos: CGPoint
+        var colorIndex: Int
+        var age = 0
+    }
+
     private static let palette: [Color] = [
         Color(red: 0.30, green: 0.72, blue: 1.00),   // 0 — player cyan
         Color(red: 1.00, green: 0.42, blue: 0.42),   // 1 — red
@@ -104,6 +112,7 @@ struct SnakeGameView: View {
 
     @State private var cycles: [Cycle] = []
     @State private var orbs:   [Orb]   = []
+    @State private var poofs:  [Poof]  = []
     @State private var arena:  CGSize  = .zero
     @State private var localTick = 0
 
@@ -133,6 +142,7 @@ struct SnakeGameView: View {
                     ForEach(cycles.filter { $0.alive }) { c in
                         headView(c).position(c.pos)
                     }
+                    poofLayer.allowsHitTesting(false)
                 }
                 .contentShape(Rectangle())
                 .onAppear { arena = geo.size; reset() }
@@ -209,6 +219,23 @@ struct SnakeGameView: View {
         }
         .frame(width: headRadius * 2, height: headRadius * 2)
         .shadow(color: col.opacity(0.7), radius: 8)
+    }
+
+    private var poofLayer: some View {
+        ForEach(poofs) { p in
+            let f = CGFloat(p.age) / CGFloat(poofLifeTicks)        // 0 → 1 over its life
+            let col = Self.palette[p.colorIndex % Self.palette.count]
+            let ring = headRadius * 2 + f * 64
+            ZStack {
+                Circle()
+                    .stroke(col.opacity(Double(1 - f)), lineWidth: 3.5 * (1 - f) + 0.5)
+                    .frame(width: ring, height: ring)
+                Circle()
+                    .fill(col.opacity(Double((1 - f) * 0.5)))
+                    .frame(width: headRadius * 2 * (1 - f), height: headRadius * 2 * (1 - f))
+            }
+            .position(p.pos)
+        }
     }
 
     // MARK: - HUD / overlays
@@ -451,8 +478,9 @@ struct SnakeGameView: View {
         // 3) Age out old wall (dead comets' walls keep fading too).
         for i in cycles.indices { prune(i) }
 
-        // 4) Sparks, fatal trails, then win/lose.
+        // 4) Sparks, death bursts, fatal trails, then win/lose.
         collectOrbs()
+        agePoofs()
         resolveCollisions()
         evaluateEnd()
     }
@@ -469,6 +497,11 @@ struct SnakeGameView: View {
     }
 
     private func ttlTicks(power: Int) -> Int { baseTTLTicks + ttlPerPower * power }
+
+    private func agePoofs() {
+        for j in poofs.indices { poofs[j].age += 1 }
+        poofs.removeAll { $0.age >= poofLifeTicks }
+    }
 
     private func collectOrbs() {
         let reach = (headRadius + orbRadius) * (headRadius + orbRadius)
@@ -517,6 +550,7 @@ struct SnakeGameView: View {
         for n in died.indices {
             let xi = died[n]
             cycles[xi].alive = false
+            poofs.append(Poof(pos: cycles[xi].pos, colorIndex: cycles[xi].colorIndex))
             if cycles[xi].isPlayer && gameState.hapticsEnabled { Haptics.heavy() }
             if credit[n] >= 0 { cycles[credit[n]].kills += 1 }
         }
