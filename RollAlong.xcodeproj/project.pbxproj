@@ -39,6 +39,7 @@
 		D502FEED2FD5024E00CA86BD /* PaintBallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEEC2FD5024E00CA86BD /* PaintBallView.swift */; };
 		D502FEEF2FD5024E00CA86BD /* GoldRushView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */; };
 		DA11FEED0000000000000001 /* DailyRewardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000002 /* DailyRewardView.swift */; };
+		DA11FEED0000000000000003 /* BallSkinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000004 /* BallSkinView.swift */; };
 		D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */; };
 		D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */; };
 		D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF42FD5024E00CA86BD /* PinballView.swift */; };
@@ -78,6 +79,7 @@
 		D502FEEC2FD5024E00CA86BD /* PaintBallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintBallView.swift; sourceTree = "<group>"; };
 		D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldRushView.swift; sourceTree = "<group>"; };
 		DA11FEED0000000000000002 /* DailyRewardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRewardView.swift; sourceTree = "<group>"; };
+		DA11FEED0000000000000004 /* BallSkinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkinView.swift; sourceTree = "<group>"; };
 		D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarbleCupView.swift; sourceTree = "<group>"; };
 		D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KingOfTheHillView.swift; sourceTree = "<group>"; };
 		D502FEF42FD5024E00CA86BD /* PinballView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinballView.swift; sourceTree = "<group>"; };
@@ -120,6 +122,7 @@
 				D502FEEC2FD5024E00CA86BD /* PaintBallView.swift */,
 				D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */,
 				DA11FEED0000000000000002 /* DailyRewardView.swift */,
+				DA11FEED0000000000000004 /* BallSkinView.swift */,
 				D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */,
 				D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */,
 				D502FEF42FD5024E00CA86BD /* PinballView.swift */,
@@ -254,6 +257,7 @@
 				D502FEED2FD5024E00CA86BD /* PaintBallView.swift in Sources */,
 				D502FEEF2FD5024E00CA86BD /* GoldRushView.swift in Sources */,
 				DA11FEED0000000000000001 /* DailyRewardView.swift in Sources */,
+				DA11FEED0000000000000003 /* BallSkinView.swift in Sources */,
 				D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */,
 				D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */,
 				D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */,
