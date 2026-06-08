@@ -128,6 +128,7 @@ struct GameMenuView: View {
         case "goldrush": return ("bag.fill",              Color(red: 1.00, green: 0.82, blue: 0.28))
         case "marblecup": return ("soccerball",           Color(red: 0.30, green: 0.62, blue: 1.0))
         case "koth":    return ("flag.fill",              Color(red: 0.30, green: 0.80, blue: 0.70))
+        case "pinball": return ("hand.tap.fill",          Color(red: 0.78, green: 0.42, blue: 0.95))
         default:        return ("gamecontroller.fill",    Color(red: 0.55, green: 0.78, blue: 1.0))
         }
     }

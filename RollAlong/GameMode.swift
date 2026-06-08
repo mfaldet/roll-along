@@ -317,6 +317,24 @@ struct KingOfTheHillMode: GameMode {
     let showsScore                   = true
 }
 
+/// Pinball — classic single-ball pinball, NO tilt.  Tap the LEFT half of the
+/// screen to flick the left flipper, the RIGHT half for the right one.  Knock
+/// the ball into the pop bumpers up top to score; three balls, then the run's
+/// score banks coins.  Single-player against gravity and the drain.
+struct PinballMode: GameMode {
+    let id          = "pinball"
+    let displayName = "Pinball"
+    let tagline     = "No tilt — tap left & right to flick the flippers. Three balls."
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .none
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .unlimited
+    let hasHoles                     = false
+    let showsTimer                   = false
+    let showsScore                   = true
+}
+
 // MARK: - Catalogue + feature flags
 
 /// The registry of game modes and whether each is live.
@@ -340,6 +358,7 @@ enum GameModeCatalogue {
         (GoldRushMode(),   true),    // self-contained GoldRushView — live
         (MarbleCupMode(),  true),    // self-contained MarbleCupView — live
         (KingOfTheHillMode(), true), // self-contained KingOfTheHillView — live
+        (PinballMode(),    true),    // self-contained PinballView — live
     ]
 
     /// Modes the player can currently see in the UI.
