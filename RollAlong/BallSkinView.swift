@@ -108,6 +108,18 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
 
+        // ── Halloween 2026 seasonal exclusive ────────────────────────────
+        case .pumpkin:
+            pumpkinCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.28), lineWidth: 0.5))
+
+        // ── Winter 2026 seasonal exclusive ───────────────────────────────
+        case .ornament:
+            ornamentCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
+
         // ── Gradient-based (all remaining skins) ───────────────────────
         default:
             Circle()
@@ -1149,6 +1161,234 @@ struct BallSkinView: View {
                     Gradient(colors: [Color.white.opacity(0.70), .clear]),
                     center: CGPoint(x: w * 0.22, y: h * 0.16),
                     startRadius: 0, endRadius: r * 0.40))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Pumpkin  (Halloween 2026 seasonal exclusive)
+    // Orange Jack-o'-lantern with five vertical rib lines, a warm amber
+    // inner glow, triangular eyes, a jagged three-toothed grin, and a
+    // small curved stem.  Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var pumpkinCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Orange radial gradient sphere base ───────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.72, blue: 0.22), location: 0.00),
+                        .init(color: Color(red: 0.95, green: 0.44, blue: 0.08), location: 0.48),
+                        .init(color: Color(red: 0.62, green: 0.22, blue: 0.04), location: 0.82),
+                        .init(color: Color(red: 0.32, green: 0.10, blue: 0.01), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
+                    startRadius: 0, endRadius: r * 1.28))
+
+            // ── 2. Warm amber inner glow — lit-from-inside effect ────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.22,
+                                       width: r * 1.16, height: r * 0.88)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.88, blue: 0.28).opacity(0.52), location: 0.00),
+                        .init(color: Color(red: 1.00, green: 0.68, blue: 0.08).opacity(0.22), location: 0.55),
+                        .init(color: .clear, location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx, y: cy + r * 0.18),
+                    startRadius: 0, endRadius: r * 0.72))
+
+            // ── 3. Five rib lines — fan from north pole to south pole ────
+            let ribColor = Color(red: 0.24, green: 0.09, blue: 0.01)
+            let ribW     = max(1, r * 0.052)
+            let ribStyle = StrokeStyle(lineWidth: ribW, lineCap: .round)
+
+            // Centre rib — straight vertical
+            var centre = Path()
+            centre.move(to: CGPoint(x: cx, y: cy - r * 0.88))
+            centre.addLine(to: CGPoint(x: cx, y: cy + r * 0.88))
+            ctx.stroke(centre, with: .color(ribColor.opacity(0.68)), style: ribStyle)
+
+            // Inner pair — bow ±r*0.44 outward
+            for sign in [-1, 1] as [CGFloat] {
+                var rib = Path()
+                rib.move(to: CGPoint(x: cx, y: cy - r * 0.86))
+                rib.addQuadCurve(to: CGPoint(x: cx, y: cy + r * 0.86),
+                                 control: CGPoint(x: cx + sign * r * 0.44, y: cy))
+                ctx.stroke(rib, with: .color(ribColor.opacity(0.62)), style: ribStyle)
+            }
+
+            // Outer pair — bow ±r*0.82 outward
+            for sign in [-1, 1] as [CGFloat] {
+                var rib = Path()
+                rib.move(to: CGPoint(x: cx, y: cy - r * 0.78))
+                rib.addQuadCurve(to: CGPoint(x: cx, y: cy + r * 0.78),
+                                 control: CGPoint(x: cx + sign * r * 0.82, y: cy))
+                ctx.stroke(rib, with: .color(ribColor.opacity(0.50)), style: ribStyle)
+            }
+
+            // ── 4. Stem — small curved stalk at north pole ───────────────
+            var stemPath = Path()
+            stemPath.move(to: CGPoint(x: cx + r * 0.04, y: cy - r * 0.82))
+            stemPath.addQuadCurve(
+                to:      CGPoint(x: cx + r * 0.14, y: cy - r * 0.96),
+                control: CGPoint(x: cx + r * 0.16, y: cy - r * 0.86))
+            ctx.stroke(stemPath,
+                       with: .color(Color(red: 0.16, green: 0.34, blue: 0.10)),
+                       style: StrokeStyle(lineWidth: max(1.5, r * 0.10), lineCap: .round))
+
+            // ── 5. Two triangular eyes — downward-pointing ───────────────
+            let faceColor = Color(red: 0.08, green: 0.03, blue: 0.00)
+            let eyeW  = r * 0.22
+            let eyeH  = r * 0.26
+            let eyeTop = cy - r * 0.30
+
+            for ex in [cx - r * 0.30, cx + r * 0.30] as [CGFloat] {
+                var eye = Path()
+                eye.move(to: CGPoint(x: ex - eyeW / 2, y: eyeTop))
+                eye.addLine(to: CGPoint(x: ex + eyeW / 2, y: eyeTop))
+                eye.addLine(to: CGPoint(x: ex,            y: eyeTop + eyeH))
+                eye.closeSubpath()
+                ctx.fill(eye, with: .color(faceColor))
+            }
+
+            // ── 6. Jagged grin — 3 orange teeth visible at bottom ────────
+            // The dark filled grin shape has three triangular notches cut
+            // from its lower edge, exposing the orange sphere beneath them.
+            // This creates 3 orange triangular teeth rising from the bottom
+            // of the grin opening — the classic carved Jack-o'-lantern look.
+            let mouthL    = cx - r * 0.44
+            let mouthR    = cx + r * 0.44
+            let mouthT    = cy + r * 0.08
+            let mouthB    = cy + r * 0.38
+            let mH2       = mouthB - mouthT
+            let seg       = (mouthR - mouthL) / 7.0
+            let toothTopY = mouthT + mH2 * 0.30  // tips of orange notches
+
+            var grin = Path()
+            grin.move(to: CGPoint(x: mouthL, y: mouthT))
+            grin.addLine(to: CGPoint(x: mouthR,              y: mouthT))
+            grin.addLine(to: CGPoint(x: mouthR,              y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 6,    y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 5.5,  y: toothTopY))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 5,    y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 4,    y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 3.5,  y: toothTopY))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 3,    y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 2,    y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 1.5,  y: toothTopY))
+            grin.addLine(to: CGPoint(x: mouthL + seg * 1,    y: mouthB))
+            grin.addLine(to: CGPoint(x: mouthL,              y: mouthB))
+            grin.closeSubpath()
+            ctx.fill(grin, with: .color(faceColor))
+
+            // ── 7. Specular highlight ────────────────────────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.54, y: cy - r * 0.66,
+                                       width: r * 0.36, height: r * 0.24)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.48), .clear]),
+                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.56),
+                    startRadius: 0, endRadius: r * 0.28))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Ornament  (Winter 2026 seasonal exclusive)
+    // Mirror-glossy deep crimson Christmas ornament.  The very large specular
+    // highlight is the signature element — it's substantially bigger and
+    // brighter than other skins to sell the mirror-glass quality.  Gold
+    // metallic cap at north pole, thin equatorial gold stripe, small caustic
+    // secondary reflection at lower-right.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var ornamentCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Deep crimson sphere — very high contrast ──────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.98, green: 0.58, blue: 0.58), location: 0.00),
+                        .init(color: Color(red: 0.88, green: 0.06, blue: 0.14), location: 0.30),
+                        .init(color: Color(red: 0.50, green: 0.02, blue: 0.08), location: 0.65),
+                        .init(color: Color(red: 0.10, green: 0.00, blue: 0.02), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
+                    startRadius: 0, endRadius: r * 1.05))
+
+            // ── 2. Thin gold equatorial stripe ───────────────────────────
+            let stripeRx   = r * 0.95
+            let stripeRy   = r * 0.13
+            let stripeRect = CGRect(x: cx - stripeRx, y: cy - stripeRy,
+                                     width: stripeRx * 2, height: stripeRy * 2)
+            ctx.stroke(
+                Path(ellipseIn: stripeRect),
+                with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.72, green: 0.56, blue: 0.18), location: 0.00),
+                        .init(color: Color(red: 1.00, green: 0.88, blue: 0.50), location: 0.40),
+                        .init(color: Color(red: 0.80, green: 0.62, blue: 0.22), location: 0.75),
+                        .init(color: Color(red: 0.48, green: 0.36, blue: 0.08), location: 1.00),
+                    ]),
+                    startPoint: CGPoint(x: cx - stripeRx, y: cy),
+                    endPoint:   CGPoint(x: cx + stripeRx, y: cy)),
+                lineWidth: max(1.5, r * 0.058))
+
+            // ── 3. Gold metallic cap at north pole ───────────────────────
+            let capRx   = r * 0.19
+            let capRy   = r * 0.11
+            let capCy   = cy - r * 0.82
+            let capRect = CGRect(x: cx - capRx, y: capCy - capRy,
+                                  width: capRx * 2, height: capRy * 2)
+            ctx.fill(
+                Path(ellipseIn: capRect),
+                with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.94, blue: 0.60), location: 0.00),
+                        .init(color: Color(red: 0.78, green: 0.60, blue: 0.20), location: 0.55),
+                        .init(color: Color(red: 0.44, green: 0.30, blue: 0.08), location: 1.00),
+                    ]),
+                    startPoint: CGPoint(x: cx, y: capCy - capRy),
+                    endPoint:   CGPoint(x: cx, y: capCy + capRy)))
+            ctx.stroke(
+                Path(ellipseIn: capRect),
+                with: .color(Color(red: 0.22, green: 0.14, blue: 0.03).opacity(0.75)),
+                lineWidth: max(0.5, r * 0.022))
+
+            // ── 4. Very large specular highlight — mirror-glass signature ─
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.64, y: cy - r * 0.76,
+                                       width: r * 0.72, height: r * 0.50)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.94), location: 0.00),
+                        .init(color: .white.opacity(0.62), location: 0.30),
+                        .init(color: .white.opacity(0.00), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.55),
+                    startRadius: 0, endRadius: r * 0.52))
+
+            // ── 5. Small secondary caustic reflection — lower-right ───────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx + r * 0.26, y: cy + r * 0.30,
+                                       width: r * 0.22, height: r * 0.14)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.38), .clear]),
+                    center: CGPoint(x: cx + r * 0.36, y: cy + r * 0.36),
+                    startRadius: 0, endRadius: r * 0.14))
         }
     }
 }

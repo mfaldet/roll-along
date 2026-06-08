@@ -116,6 +116,23 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     from the regular shop grid.
     case beachBall = "Beach Ball"
 
+    // ── Halloween 2026 seasonal exclusive ────────────────────────────────
+    //   • pumpkin — Jack-o'-lantern sphere with five vertical rib lines, a
+    //     warm amber inner glow, triangular eyes, a jagged toothed grin, and
+    //     a small curved stem.  Available ONLY via the Trick or Roll bundle
+    //     (Oct 2026); never coin-purchasable and hidden from the regular
+    //     shop grid.
+    case pumpkin  = "Pumpkin"
+
+    // ── Winter 2026 seasonal exclusive ───────────────────────────────────
+    //   • ornament — mirror-glossy deep crimson Christmas ornament with a
+    //     gold metallic cap, thin equatorial gold stripe, an oversized
+    //     specular highlight (sells the mirror-glass quality), and a small
+    //     caustic reflection.  Available ONLY via the Winter Wonderland
+    //     bundle (Dec 2026–Jan 2027); never coin-purchasable and hidden
+    //     from the regular shop grid.
+    case ornament = "Ornament"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -132,7 +149,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
     /// are hidden from the standalone shop's individual Ball grid.
     var isBundleExclusive: Bool {
         switch self {
-        case .pluto, .aurora, .beachBall: return true
+        case .pluto, .aurora, .beachBall, .pumpkin, .ornament: return true
         default:                          return false
         }
     }
@@ -521,6 +538,30 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.96, green: 0.30, blue: 0.30),
                 Color(red: 0.22, green: 0.44, blue: 0.82),
                 Color(red: 0.06, green: 0.18, blue: 0.40),
+            ]
+
+        // ── Halloween 2026 seasonal exclusive ──
+        case .pumpkin:
+            // Jack-o'-lantern — bright pumpkin-orange highlight → saturated
+            // orange → deep burnt-sienna shadow.  Ribs, stem, eyes, and grin
+            // paint on top via the bespoke pumpkinCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.72, blue: 0.22),
+                Color(red: 0.95, green: 0.44, blue: 0.08),
+                Color(red: 0.62, green: 0.22, blue: 0.04),
+                Color(red: 0.32, green: 0.10, blue: 0.01),
+            ]
+
+        // ── Winter 2026 seasonal exclusive ──
+        case .ornament:
+            // Christmas ornament — vivid crimson highlight → deep ruby red →
+            // near-black shadow.  Gold cap, stripe, and specular paint on top
+            // via the bespoke ornamentCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.60, blue: 0.60),
+                Color(red: 0.86, green: 0.08, blue: 0.16),
+                Color(red: 0.48, green: 0.02, blue: 0.08),
+                Color(red: 0.18, green: 0.00, blue: 0.02),
             ]
         }
     }

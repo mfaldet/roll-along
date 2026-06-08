@@ -91,7 +91,9 @@ extension BallSkin: CosmeticItem {
              .storm, .candy, .ghost,
              .basketball, .eightBall, .baseball,
              .aurora,          // starter-pack-exclusive; never coin-purchasable
-             .beachBall:       // summer-2026-exclusive; never coin-purchasable
+             .beachBall,       // summer-2026-exclusive; never coin-purchasable
+             .pumpkin,         // halloween-2026-exclusive; never coin-purchasable
+             .ornament:        // winter-2026-exclusive; never coin-purchasable
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -1461,8 +1463,8 @@ struct CosmeticBundle: Identifiable {
             id:             "halloween-2026",
             displayName:    "Trick or Roll",
             tagline:        "A restless spirit through the dark.",
-            contentSummary: "Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music",
-            balls:  [.ghost],
+            contentSummary: "Pumpkin ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music",
+            balls:  [.pumpkin],
             goals:  [.obsidian],
             trails: [.smoke],
             floors: [.fog],
@@ -1474,9 +1476,9 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "winter-2026",
             displayName:    "Winter Wonderland",
-            tagline:        "A snowglobe marble through crystal frost.",
-            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Dreamscape music",
-            balls:  [.snowglobe],
+            tagline:        "A mirror-bright ornament through crystal frost.",
+            contentSummary: "Ornament ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Dreamscape music",
+            balls:  [.ornament],
             goals:  [.crystal],
             trails: [.ice],
             floors: [.twilight],
