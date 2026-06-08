@@ -43,6 +43,13 @@ final class StoreKitManager: ObservableObject {
         /// `starterPackClaimed` is still false).
         case starterPack  = "com.macfaldet.RollAlong.starterpack"
 
+        /// Seasonal bundle IAP products — non-consumable real-money purchases
+        /// that grant the full bundle contents + mark ownedBundles.  Idempotent
+        /// on restore via the `ownedBundles.contains` guard in deliverReward.
+        case summerBundle2026    = "com.macfaldet.RollAlong.bundle.summer2026"
+        case halloweenBundle2026 = "com.macfaldet.RollAlong.bundle.halloween2026"
+        case winterBundle2026    = "com.macfaldet.RollAlong.bundle.winter2026"
+
         var id: String { rawValue }
 
         enum Category {
@@ -50,6 +57,7 @@ final class StoreKitManager: ObservableObject {
             case coinPack           // grants N coins
             case unlimitedUnlock    // non-consumable; flips unlimitedLives true
             case starterPackUnlock  // non-consumable; grants 500 coins + Aurora skin
+            case bundlePurchase     // non-consumable; grants seasonal bundle contents
         }
 
         var category: Category {
@@ -58,7 +66,26 @@ final class StoreKitManager: ObservableObject {
             case .unlimited:                              return .unlimitedUnlock
             case .coins100, .coins600, .coins1300, .coins3000: return .coinPack
             case .starterPack:                            return .starterPackUnlock
+            case .summerBundle2026, .halloweenBundle2026, .winterBundle2026:
+                                                          return .bundlePurchase
             }
+        }
+
+        /// The catalogue bundle ID delivered by this IAP.  Non-nil only for
+        /// seasonal bundle products.
+        var bundleID: String? {
+            switch self {
+            case .summerBundle2026:    return "summer-2026"
+            case .halloweenBundle2026: return "halloween-2026"
+            case .winterBundle2026:    return "winter-2026"
+            default:                   return nil
+            }
+        }
+
+        /// Reverse lookup — returns the ProductID whose bundleID matches `id`,
+        /// or nil if no seasonal IAP covers that bundle.
+        static func productID(forBundleID id: String) -> ProductID? {
+            allCases.first { $0.bundleID == id }
         }
 
         /// Lives granted by this purchase.  Zero for non-life products.
@@ -149,14 +176,24 @@ final class StoreKitManager: ObservableObject {
     }
 
     /// Re-check the user's current entitlements.  The unlimited tier is a
-    /// non-consumable, so it lives in currentEntitlements forever.
+    /// non-consumable, so it lives in currentEntitlements forever.  Seasonal
+    /// bundle IAPs are also non-consumable and handled here for restore.
     func refreshEntitlements() async {
-        var unlimitedSeen     = false
-        var starterPackSeen   = false
+        var unlimitedSeen      = false
+        var starterPackSeen    = false
+        var summerSeen         = false
+        var halloweenSeen      = false
+        var winterSeen         = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let txn) = result else { continue }
-            if txn.productID == ProductID.unlimited.rawValue    { unlimitedSeen   = true }
-            if txn.productID == ProductID.starterPack.rawValue  { starterPackSeen = true }
+            switch txn.productID {
+            case ProductID.unlimited.rawValue:          unlimitedSeen   = true
+            case ProductID.starterPack.rawValue:        starterPackSeen = true
+            case ProductID.summerBundle2026.rawValue:   summerSeen      = true
+            case ProductID.halloweenBundle2026.rawValue: halloweenSeen  = true
+            case ProductID.winterBundle2026.rawValue:   winterSeen      = true
+            default: break
+            }
         }
         if unlimitedSeen   { gameState?.unlimitedLives = true }
         if starterPackSeen {
@@ -165,6 +202,9 @@ final class StoreKitManager: ObservableObject {
             gs.grant(BallSkin.aurora)
             gs.starterPackClaimed = true
         }
+        if summerSeen    { await deliverReward(for: .summerBundle2026)    }
+        if halloweenSeen { await deliverReward(for: .halloweenBundle2026) }
+        if winterSeen    { await deliverReward(for: .winterBundle2026)    }
     }
 
     // MARK: - Purchase
@@ -273,6 +313,16 @@ final class StoreKitManager: ObservableObject {
             gameState.addCoins(productID.rewardCoins)
             gameState.grant(BallSkin.aurora)
             gameState.starterPackClaimed = true
+
+        case .bundlePurchase:
+            // Non-consumable seasonal bundle — grant contents + record ownership.
+            // The ownedBundles.contains guard makes this idempotent on restore.
+            guard let bundleID = productID.bundleID,
+                  let bundle   = CosmeticBundle.catalogue.first(where: { $0.id == bundleID }),
+                  !gameState.ownedBundles.contains(bundleID)
+            else { break }
+            bundle.grantContents(to: gameState)
+            gameState.ownedBundles.insert(bundleID)
         }
         lastDelivery = DeliveryReceipt(
             productID:          productID,

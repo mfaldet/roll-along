@@ -90,7 +90,8 @@ extension BallSkin: CosmeticItem {
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
              .storm, .candy, .ghost,
              .basketball, .eightBall, .baseball,
-             .aurora:          // starter-pack-exclusive; never coin-purchasable
+             .aurora,          // starter-pack-exclusive; never coin-purchasable
+             .beachBall:       // summer-2026-exclusive; never coin-purchasable
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -1446,8 +1447,8 @@ struct CosmeticBundle: Identifiable {
             id:             "summer-2026",
             displayName:    "Summer Vibes",
             tagline:        "Sun, sea, and rolling waves.",
-            contentSummary: "Aquarium ball · Ripple goal · Sky trail · Blueprint floor · Pond pit · Acoustic music",
-            balls:  [.aquarium],
+            contentSummary: "Beach Ball · Ripple goal · Sky trail · Blueprint floor · Pond pit · Acoustic music",
+            balls:  [.beachBall],
             goals:  [.ripple],
             trails: [.sky],
             floors: [.blueprint],

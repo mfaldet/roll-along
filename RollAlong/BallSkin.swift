@@ -109,6 +109,13 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     coins and hidden from the regular shop grid.
     case aurora = "Aurora"
 
+    // ── Summer 2026 seasonal exclusive ──────────────────────────────────
+    //   • beachBall — classic glossy inflatable beach ball with red, yellow,
+    //     and blue wedge panels.  Available ONLY via the Summer Vibes
+    //     seasonal bundle (Jun–Sep 2026); never coin-purchasable and hidden
+    //     from the regular shop grid.
+    case beachBall = "Beach Ball"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -125,8 +132,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     /// are hidden from the standalone shop's individual Ball grid.
     var isBundleExclusive: Bool {
         switch self {
-        case .pluto, .aurora: return true
-        default:              return false
+        case .pluto, .aurora, .beachBall: return true
+        default:                          return false
         }
     }
 
@@ -501,6 +508,19 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.20, green: 0.92, blue: 0.62),
                 Color(red: 0.42, green: 0.10, blue: 0.72),
                 Color(red: 0.04, green: 0.04, blue: 0.18),
+            ]
+
+        // ── Summer 2026 seasonal exclusive ──
+        case .beachBall:
+            // Classic inflatable beach ball — vivid primary panels (red,
+            // yellow, blue) painted by the bespoke beachBallCanvas in
+            // BallSkinView.  This fallback gradient reads as a bright,
+            // toy-coloured sphere in static contexts (settings picker, etc.).
+            return [
+                Color(red: 1.00, green: 0.78, blue: 0.60),
+                Color(red: 0.96, green: 0.30, blue: 0.30),
+                Color(red: 0.22, green: 0.44, blue: 0.82),
+                Color(red: 0.06, green: 0.18, blue: 0.40),
             ]
         }
     }

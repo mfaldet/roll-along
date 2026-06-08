@@ -138,6 +138,51 @@
       "productID" : "com.macfaldet.RollAlong.starterpack",
       "referenceName" : "Starter Pack $1.99",
       "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000010",
+      "localizations" : [
+        {
+          "description" : "The full Summer Vibes seasonal collection — Beach Ball, Ripple goal, Sky trail, Blueprint floor, Pond pit, and Acoustic music. Available Jun–Sep 2026 only.",
+          "displayName" : "Summer Vibes Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.summer2026",
+      "referenceName" : "Summer Vibes Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000011",
+      "localizations" : [
+        {
+          "description" : "The full Trick or Roll seasonal collection — Ghost, Obsidian goal, Smoke trail, Fog floor, Graveyard pit, and Downtempo music. Available Oct 2026 only.",
+          "displayName" : "Trick or Roll Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.halloween2026",
+      "referenceName" : "Trick or Roll Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000012",
+      "localizations" : [
+        {
+          "description" : "The full Winter Wonderland seasonal collection — Snowglobe, Crystal goal, Ice trail, Twilight floor, Twilight pit, and Dreamscape music. Available Dec 2026–Jan 2027 only.",
+          "displayName" : "Winter Wonderland Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.winter2026",
+      "referenceName" : "Winter Wonderland Bundle $2.99",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {

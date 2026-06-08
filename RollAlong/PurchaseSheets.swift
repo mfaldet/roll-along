@@ -394,11 +394,13 @@ struct BuyCoinsSheet: View {
 
     private func defaultPrice(for pid: StoreKitManager.ProductID) -> String {
         switch pid {
-        case .coins100, .livesPack1:  return "$0.99"
-        case .coins600, .livesPack5:  return "$4.99"
+        case .coins100, .livesPack1:   return "$0.99"
+        case .coins600, .livesPack5:   return "$4.99"
         case .coins1300, .livesPack10: return "$9.99"
-        case .coins3000, .unlimited:  return "$19.99"
-        case .starterPack:            return "$1.99"
+        case .coins3000, .unlimited:   return "$19.99"
+        case .starterPack:             return "$1.99"
+        case .summerBundle2026, .halloweenBundle2026, .winterBundle2026:
+                                       return "$2.99"
         }
     }
 

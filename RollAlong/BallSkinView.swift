@@ -102,6 +102,12 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.white.opacity(0.14), lineWidth: 0.5))
 
+        // ── Summer 2026 seasonal exclusive ──────────────────────────────
+        case .beachBall:
+            beachBallCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
+
         // ── Gradient-based (all remaining skins) ───────────────────────
         default:
             Circle()
@@ -1060,6 +1066,89 @@ struct BallSkinView: View {
                     )
                 )
             }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Beach Ball  (Summer 2026 seasonal exclusive)
+    // Classic glossy inflatable beach ball with 6 alternating wedge panels:
+    // red · yellow · blue · red · yellow · blue, radiating from the centre.
+    // A radial edge-darkening overlay + upper-left specular highlight sell
+    // the inflated 3-D read.  Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var beachBallCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Base white fill ──────────────────────────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .color(.white))
+
+            // ── 2. Six coloured wedge panels ────────────────────────────
+            // Each wedge spans 60°.  The oversized radius (r * 1.05) lets
+            // them fill the circle cleanly; clipShape(Circle()) trims any
+            // overflow.
+            let wedgeColors: [Color] = [
+                Color(red: 0.90, green: 0.18, blue: 0.22),  // red
+                Color(red: 0.96, green: 0.84, blue: 0.10),  // yellow
+                Color(red: 0.22, green: 0.54, blue: 0.92),  // blue
+                Color(red: 0.90, green: 0.18, blue: 0.22),  // red
+                Color(red: 0.96, green: 0.84, blue: 0.10),  // yellow
+                Color(red: 0.22, green: 0.54, blue: 0.92),  // blue
+            ]
+            let wedgeAngle = CGFloat.pi * 2 / CGFloat(wedgeColors.count)
+            for (i, color) in wedgeColors.enumerated() {
+                let startAngle = CGFloat(i) * wedgeAngle - .pi / 2
+                let endAngle   = startAngle + wedgeAngle
+                var wedge = Path()
+                wedge.move(to: CGPoint(x: cx, y: cy))
+                wedge.addArc(center: CGPoint(x: cx, y: cy),
+                             radius: r * 1.05,
+                             startAngle: .radians(Double(startAngle)),
+                             endAngle:   .radians(Double(endAngle)),
+                             clockwise:  false)
+                wedge.closeSubpath()
+                ctx.fill(wedge, with: .color(color))
+            }
+
+            // ── 3. Thin white seam lines between panels ─────────────────
+            for i in 0..<6 {
+                let angle = CGFloat(i) * wedgeAngle - .pi / 2
+                var seam = Path()
+                seam.move(to: CGPoint(x: cx, y: cy))
+                seam.addLine(to: CGPoint(x: cx + cos(angle) * r * 1.05,
+                                         y: cy + sin(angle) * r * 1.05))
+                ctx.stroke(seam,
+                           with: .color(Color.white.opacity(0.72)),
+                           style: StrokeStyle(lineWidth: max(1, r * 0.035),
+                                              lineCap: .round))
+            }
+
+            // ── 4. Spherical shading — edge-darkening inflated look ──────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.00), location: 0.00),
+                        .init(color: .white.opacity(0.00), location: 0.50),
+                        .init(color: .black.opacity(0.28), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx, y: cy),
+                    startRadius: 0, endRadius: r * 1.05))
+
+            // ── 5. Specular highlight — upper-left gloss crescent ────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: w * 0.10, y: h * 0.08,
+                                       width: w * 0.32, height: h * 0.24)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.70), .clear]),
+                    center: CGPoint(x: w * 0.22, y: h * 0.16),
+                    startRadius: 0, endRadius: r * 0.40))
         }
     }
 }

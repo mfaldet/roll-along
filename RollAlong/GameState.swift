@@ -586,6 +586,32 @@ final class GameState: ObservableObject {
         return max(0, 48 * 3_600 - Date().timeIntervalSince(shownAt))
     }
 
+    // MARK: - Completionist tracking
+
+    /// Set of bundle IDs where the player owns every item in the bundle.
+    /// Includes bundles explicitly purchased as a unit (`ownedBundles`) AND
+    /// any bundle where all individual items are independently owned.  Empty
+    /// arrays in a bundle (e.g. no music track) count as satisfied — vacuous
+    /// truth via `allSatisfy`.
+    ///
+    /// Used by HomeView to render the completionist aura ring behind the live
+    /// ball, and by CosmeticShopView to fire the collection-complete toast.
+    var completedBundleIDs: Set<String> {
+        var completed = ownedBundles   // bought-as-a-unit bundles are always complete
+        for bundle in CosmeticBundle.catalogue {
+            guard !completed.contains(bundle.id) else { continue }
+            let allOwned =
+                bundle.balls.allSatisfy  { isOwned($0) } &&
+                bundle.goals.allSatisfy  { isOwned($0) } &&
+                bundle.trails.allSatisfy { isOwned($0) } &&
+                bundle.floors.allSatisfy { isOwned($0) } &&
+                bundle.pits.allSatisfy   { isOwned($0) } &&
+                bundle.music.allSatisfy  { isOwned($0) }
+            if allOwned { completed.insert(bundle.id) }
+        }
+        return completed
+    }
+
     /// True if the player owns this cosmetic item.  Starter items are
     /// implicitly owned regardless of set membership.
     func isOwned<Item: CosmeticItem>(_ item: Item) -> Bool {

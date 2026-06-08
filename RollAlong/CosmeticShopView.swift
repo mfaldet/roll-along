@@ -42,11 +42,16 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
 struct CosmeticShopView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav:       Navigator
+    /// Observed for purchase-in-progress state on seasonal IAP buttons (S8).
+    @ObservedObject private var store = StoreKitManager.shared
 
     @State private var category: ShopCategory = .collections
     @State private var alertMessage: String = ""
     @State private var showAlert: Bool = false
     @State private var showBuyCoinsSheet: Bool = false
+    /// Non-nil while the collection-complete toast is visible.  Holds the
+    /// display name of the newly completed bundle.
+    @State private var completionToastBundle: String? = nil
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
@@ -64,7 +69,45 @@ struct CosmeticShopView: View {
                         .padding(.bottom, 36)
                 }
             }
+
+            // ── Collection-complete toast (S7) ────────────────────────────
+            // Floats above the scroll view and slides in from the bottom
+            // edge.  Auto-dismisses after 3 seconds.  Non-interactive so it
+            // doesn't block taps on the shop.
+            if let bundleName = completionToastBundle {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+                        Text("Collection Complete!")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(bundleName)
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color(white: 0.68))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(
+                        Capsule()
+                            .fill(Color(white: 0.16))
+                            .overlay(
+                                Capsule().stroke(
+                                    Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.55),
+                                    lineWidth: 1)
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.40), radius: 12, y: 4)
+                    .padding(.bottom, 28)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .allowsHitTesting(false)
+            }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.72), value: completionToastBundle)
         .navigationTitle("Shop")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -347,6 +390,7 @@ struct CosmeticShopView: View {
             showAlert = true
             return
         }
+        let beforeCompleted = gameState.completedBundleIDs
         let bought = gameState.purchase(item)
         if bought {
             AnalyticsClient.shared.track(
@@ -367,6 +411,7 @@ struct CosmeticShopView: View {
                     "after_purchase": .bool(true),
                 ]
             )
+            checkCompletionToast(before: beforeCompleted)
         }
     }
 
@@ -658,6 +703,48 @@ struct CosmeticShopView: View {
                     )
                 }
                 .buttonStyle(.plain)
+
+                // ── Real-money IAP button (seasonal bundles only) ─────────
+                // Gives the player an alternative to grinding coins: a one-tap
+                // $2.99 purchase that instantly grants the full collection.
+                if bundle.isLimitedTime,
+                   let pid = StoreKitManager.ProductID.productID(forBundleID: bundle.id) {
+                    let inProgress = store.purchaseInProgress == pid
+                    Button {
+                        guard !inProgress else { return }
+                        Task { _ = await store.purchase(pid) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if inProgress {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .scaleEffect(0.75)
+                                    .tint(Color(white: 0.60))
+                            } else {
+                                Image(systemName: "creditcard.fill")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            Text(inProgress ? "Processing…" : "Buy Now")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                            Spacer()
+                            Text(store.displayPrice(for: pid, fallback: "$2.99"))
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(inProgress ? Color(white: 0.45) : Color(white: 0.88))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(white: 0.15))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color(white: 0.28), lineWidth: 0.8)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(inProgress)
+                }
             }
         }
         .padding(14)
@@ -884,6 +971,7 @@ struct CosmeticShopView: View {
             showAlert = true
             return
         }
+        let beforeCompleted = gameState.completedBundleIDs
         _ = gameState.spendCoins(cost)
         bundle.grantContents(to: gameState)
         gameState.ownedBundles.insert(bundle.id)
@@ -895,6 +983,22 @@ struct CosmeticShopView: View {
                 "items":   .int(bundle.itemCount),
             ]
         )
+        checkCompletionToast(before: beforeCompleted)
+    }
+
+    /// Show the collection-complete toast if the most recent purchase
+    /// caused any new bundle to be fully owned.  Call with a snapshot of
+    /// `completedBundleIDs` taken BEFORE the purchase.  Auto-dismisses
+    /// after 3 seconds.
+    private func checkCompletionToast(before: Set<String>) {
+        let newIDs = gameState.completedBundleIDs.subtracting(before)
+        guard let newID = newIDs.first,
+              let bundle = CosmeticBundle.catalogue.first(where: { $0.id == newID })
+        else { return }
+        completionToastBundle = bundle.displayName
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            completionToastBundle = nil
+        }
     }
 
     // MARK: - Pack cell
