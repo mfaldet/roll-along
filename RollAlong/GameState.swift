@@ -80,6 +80,26 @@ final class GameState: ObservableObject {
         didSet { UserDefaults.standard.set(unlimitedLives, forKey: "ra_unlimitedLives") }
     }
 
+    // ── Daily reward / login streak ────────────────────────────────────────
+    // dailyStreak    : consecutive days claimed, as of the last claim.  Climbs
+    //                  forever; the coin ladder cycles every 7 days but the
+    //                  counter keeps going, so a long streak reads big.
+    // lastDailyClaim : timestamp of the most recent claim.  nil until the first
+    //                  claim.  Drives both "is a reward available today" and
+    //                  whether the streak is still alive (claimed yesterday).
+    @Published var dailyStreak: Int {
+        didSet { UserDefaults.standard.set(dailyStreak, forKey: "ra_dailyStreak") }
+    }
+    @Published var lastDailyClaim: Date? {
+        didSet {
+            if let d = lastDailyClaim {
+                UserDefaults.standard.set(d, forKey: "ra_lastDailyClaim")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "ra_lastDailyClaim")
+            }
+        }
+    }
+
     // ── Cosmetic economy (Sprint 4d) ──────────────────────────────────────
     // Coins are the in-app currency.  Earned from gameplay; spent in the
     // shop to unlock cosmetic items.  Also purchasable in coin packs via
@@ -184,6 +204,10 @@ final class GameState: ObservableObject {
         lives          = UserDefaults.standard.object(forKey: "ra_lives") as? Int ?? Self.livesMax
         lastLifeLostAt = UserDefaults.standard.object(forKey: "ra_lastLifeLostAt") as? Date
         unlimitedLives = UserDefaults.standard.bool(forKey: "ra_unlimitedLives")
+
+        // Daily reward / login streak.
+        dailyStreak    = UserDefaults.standard.integer(forKey: "ra_dailyStreak")
+        lastDailyClaim = UserDefaults.standard.object(forKey: "ra_lastDailyClaim") as? Date
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -458,6 +482,61 @@ final class GameState: ObservableObject {
         guard coinBalance >= amount else { return false }
         coinBalance -= amount
         return true
+    }
+
+    // MARK: - Daily reward / login streak
+
+    /// Coins granted on each day of the 7-day cycle (day 1 … day 7).  After
+    /// day 7 the ladder repeats from the top, but `dailyStreak` keeps climbing
+    /// so an unbroken streak still reads as a big number in the HUD.
+    static let dailyRewardLadder: [Int] = [25, 40, 60, 80, 100, 150, 300]
+
+    /// True when the player hasn't yet claimed today's reward.
+    var dailyRewardAvailable: Bool {
+        guard let last = lastDailyClaim else { return true }
+        return !Calendar.current.isDateInToday(last)
+    }
+
+    /// The streak the player is *currently* riding, accounting for a missed
+    /// day: 0 before the first claim or once a day has been skipped; equal to
+    /// `dailyStreak` while still alive (claimed today or yesterday).  This is
+    /// the value the HUD should display.
+    var liveStreak: Int {
+        guard let last = lastDailyClaim else { return 0 }
+        let cal = Calendar.current
+        if cal.isDateInToday(last) || cal.isDateInYesterday(last) { return dailyStreak }
+        return 0                                   // a day was skipped — streak broken
+    }
+
+    /// What `dailyStreak` becomes on the next claim: extend a live streak, else
+    /// restart at day 1.
+    private var nextDailyStreak: Int { liveStreak + 1 }
+
+    /// 1-based day in the 7-day cycle the *next* claim will land on.
+    var nextDailyRewardDay: Int { ((nextDailyStreak - 1) % Self.dailyRewardLadder.count) + 1 }
+
+    /// Coins the *next* claim will grant.
+    var nextDailyRewardAmount: Int {
+        Self.dailyRewardLadder[(nextDailyStreak - 1) % Self.dailyRewardLadder.count]
+    }
+
+    /// Coins granted on a given 1-based cycle day — for rendering the ladder.
+    func dailyReward(forDay day: Int) -> Int {
+        Self.dailyRewardLadder[(max(1, day) - 1) % Self.dailyRewardLadder.count]
+    }
+
+    /// Claim today's reward.  No-op (returns nil) if already claimed today.
+    /// On success: advances the streak, banks the coins via `addCoins`, stamps
+    /// the claim time, and returns the amount granted.
+    @discardableResult
+    func claimDailyReward() -> Int? {
+        guard dailyRewardAvailable else { return nil }
+        let newStreak = nextDailyStreak
+        let amount = Self.dailyRewardLadder[(newStreak - 1) % Self.dailyRewardLadder.count]
+        dailyStreak = newStreak
+        lastDailyClaim = Date()
+        addCoins(amount)
+        return amount
     }
 
     /// True if the player owns this cosmetic item.  Starter items are
