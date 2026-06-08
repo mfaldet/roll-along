@@ -111,6 +111,12 @@ struct HomeView: View {
     // the "lives status / explanation" screen).
     @State private var showBuyLivesSheet: Bool = false
 
+    // Daily-reward sheet — the gift pill opens it, and it auto-presents once
+    // per launch when a reward is unclaimed.  `autoPresentedDaily` guards the
+    // auto-pop so popping back from a sub-screen doesn't re-open it.
+    @State private var showDailyRewardSheet: Bool = false
+    @State private var autoPresentedDaily: Bool = false
+
     private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
     var body: some View {
@@ -226,6 +232,7 @@ struct HomeView: View {
                 if gameState.seenOnboarding {
                     coinBalancePill
                     livesMarblePill
+                    dailyRewardPill
                 }
 
                 // First-launch onboarding overlay
@@ -235,7 +242,7 @@ struct HomeView: View {
                 }
             }
             .onReceive(clock.$tickCount) { _ in tickBall() }
-            .onAppear    { motion.start(); clock.start() }
+            .onAppear    { motion.start(); clock.start(); maybeAutoPresentDailyReward() }
             .onDisappear { motion.stop();  clock.stop()  }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: HomeRoute.self) { route in
@@ -266,6 +273,10 @@ struct HomeView: View {
             // block in its header).
             .sheet(isPresented: $showBuyLivesSheet) {
                 BuyLivesSheet()
+                    .environmentObject(gameState)
+            }
+            .sheet(isPresented: $showDailyRewardSheet) {
+                DailyRewardView()
                     .environmentObject(gameState)
             }
         }
@@ -493,6 +504,57 @@ struct HomeView: View {
     /// Floating coin-balance pill in the top-right corner.  Tappable —
     /// opens the Cosmetic Shop.  Uses the Navigator so the home path
     /// becomes [.shop].
+    // Gift pill — top-centre call-to-action shown only while a daily reward is
+    // unclaimed.  Tapping opens DailyRewardView; it vanishes once claimed
+    // (until tomorrow).  Auto-present covers first-glance discovery; this is
+    // the re-entry affordance if the player dismissed the sheet.
+    @ViewBuilder
+    private var dailyRewardPill: some View {
+        if gameState.dailyRewardAvailable {
+            VStack {
+                Button { showDailyRewardSheet = true } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gift.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.30))
+                        Text("Daily Reward")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.36, blue: 0.36))
+                            .frame(width: 7, height: 7)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .fill(Color(white: 0.14))
+                            .overlay(Capsule().stroke(Color(red: 1.0, green: 0.82, blue: 0.30).opacity(0.5),
+                                                      lineWidth: 1))
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Daily reward available")
+                .accessibilityHint("Opens the daily reward.")
+                Spacer()
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    /// Auto-present the daily-reward sheet the first time Home appears this
+    /// launch — only when something's unclaimed and onboarding is done.  The
+    /// short delay lets Home settle so the sheet animates in cleanly.
+    private func maybeAutoPresentDailyReward() {
+        guard !autoPresentedDaily,
+              gameState.seenOnboarding,
+              gameState.dailyRewardAvailable else { return }
+        autoPresentedDaily = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if gameState.dailyRewardAvailable { showDailyRewardSheet = true }
+        }
+    }
+
     private var coinBalancePill: some View {
         VStack {
             HStack {
