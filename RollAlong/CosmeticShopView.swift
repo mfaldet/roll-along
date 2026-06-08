@@ -507,29 +507,60 @@ struct CosmeticShopView: View {
     // The featured collection (weekly rotation) gets a gold border and badge.
     // =========================================================================
 
-    /// Weekly-rotating featured bundle.  Stable within the same calendar week
-    /// so the pick doesn't change mid-session.
-    private var featuredBundle: CosmeticBundle {
+    /// Weekly-rotating featured bundle — drawn only from permanent (non-seasonal)
+    /// bundles so seasonal items don't occupy two sections at once.
+    private var permanentFeaturedBundle: CosmeticBundle {
+        let permanent = CosmeticBundle.catalogue.filter { !$0.isLimitedTime }
+        guard !permanent.isEmpty else { return CosmeticBundle.catalogue[0] }
         let week = Calendar.current.component(.weekOfYear, from: Date())
-        return CosmeticBundle.catalogue[week % CosmeticBundle.catalogue.count]
+        return permanent[week % permanent.count]
     }
 
     @ViewBuilder
     private var collectionsView: some View {
+        let seasonal  = CosmeticBundle.catalogue.filter { $0.isLimitedTime && $0.isAvailable }
+        let permanent = CosmeticBundle.catalogue.filter { !$0.isLimitedTime }
+        let featured  = permanentFeaturedBundle
+
         LazyVStack(alignment: .leading, spacing: 0) {
-            // Featured collection
+            // ── Limited-time seasonal bundles (top of shop) ───────────────
+            if !seasonal.isEmpty {
+                limitedTimeSectionHeader
+                    .padding(.bottom, 8)
+                ForEach(seasonal) { bundle in
+                    collectionCard(bundle, isFeatured: false)
+                        .padding(.bottom, 12)
+                }
+                Color(white: 0.20)
+                    .frame(height: 0.5)
+                    .padding(.vertical, 14)
+            }
+
+            // ── Weekly featured (permanent rotation) ─────────────────────
             sectionLabel("FEATURED THIS WEEK")
                 .padding(.bottom, 8)
-            collectionCard(featuredBundle, isFeatured: true)
+            collectionCard(featured, isFeatured: true)
                 .padding(.bottom, 22)
 
-            // All other collections
+            // ── All permanent collections ─────────────────────────────────
             sectionLabel("ALL COLLECTIONS")
                 .padding(.bottom, 8)
-            ForEach(CosmeticBundle.catalogue.filter { $0.id != featuredBundle.id }) { bundle in
+            ForEach(permanent.filter { $0.id != featured.id }) { bundle in
                 collectionCard(bundle, isFeatured: false)
                     .padding(.bottom, 12)
             }
+        }
+    }
+
+    private var limitedTimeSectionHeader: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color(red: 1.00, green: 0.42, blue: 0.18))
+            Text("LIMITED TIME")
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .kerning(1.4)
+                .foregroundStyle(Color(red: 1.00, green: 0.42, blue: 0.18))
         }
     }
 
@@ -544,11 +575,32 @@ struct CosmeticShopView: View {
             // ── Title row ────────────────────────────────────────────────
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    if isFeatured {
-                        Text("⭐ FEATURED")
-                            .font(.system(size: 9, weight: .black, design: .rounded))
-                            .kerning(1.4)
-                            .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    // Chips row — ⭐ FEATURED and/or 🔥 LIMITED
+                    let showFeatured = isFeatured
+                    let showLimited  = bundle.isLimitedTime && bundle.isAvailable
+                    if showFeatured || showLimited {
+                        HStack(spacing: 6) {
+                            if showFeatured {
+                                Text("⭐ FEATURED")
+                                    .font(.system(size: 9, weight: .black, design: .rounded))
+                                    .kerning(1.4)
+                                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                            }
+                            if showLimited {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "flame.fill")
+                                        .font(.system(size: 9, weight: .bold))
+                                    if let label = bundle.timeRemainingLabel {
+                                        Text(label.uppercased())
+                                    } else {
+                                        Text("LIMITED TIME")
+                                    }
+                                }
+                                .font(.system(size: 9, weight: .black, design: .rounded))
+                                .kerning(1.2)
+                                .foregroundStyle(limitedTimeColor(for: bundle))
+                            }
+                        }
                     }
                     Text(bundle.displayName)
                         .font(.system(size: 17, weight: .black, design: .rounded))
@@ -614,16 +666,29 @@ struct CosmeticShopView: View {
                 .fill(Color(white: isFeatured ? 0.14 : 0.12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .stroke(
-                            isFeatured
-                                ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40)
-                                : (bundleOwned
-                                   ? Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.35)
-                                   : Color.clear),
-                            lineWidth: 1.2
-                        )
+                        .stroke(borderColor(bundle: bundle,
+                                            isFeatured: isFeatured,
+                                            bundleOwned: bundleOwned),
+                                lineWidth: 1.2)
                 )
         )
+    }
+
+    /// Border color for a collection card — priority: complete > seasonal > featured > none.
+    private func borderColor(bundle: CosmeticBundle, isFeatured: Bool, bundleOwned: Bool) -> Color {
+        if bundleOwned                                       { return Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.35) }
+        if bundle.isLimitedTime && bundle.isAvailable        { return limitedTimeColor(for: bundle).opacity(0.50) }
+        if isFeatured                                        { return Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40) }
+        return .clear
+    }
+
+    /// Countdown text colour scales from amber (many days) → orange → red as deadline nears.
+    private func limitedTimeColor(for bundle: CosmeticBundle) -> Color {
+        switch bundle.daysRemaining ?? 999 {
+        case 0...3:   return Color(red: 1.00, green: 0.28, blue: 0.18)  // urgent red-orange
+        case 4...7:   return Color(red: 1.00, green: 0.52, blue: 0.18)  // orange
+        default:      return Color(red: 1.00, green: 0.72, blue: 0.22)  // amber
+        }
     }
 
     // X / Y badge showing collection progress.

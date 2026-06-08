@@ -940,6 +940,67 @@ struct CosmeticBundle: Identifiable {
     let pits:   [Pit]
     let music:  [MusicTrack]
 
+    // ── Seasonal availability window ───────────────────────────────
+    // Both nil = always available (permanent bundle).
+    // Non-nil `availableUntil` marks the bundle as limited-time.
+    // Shop only shows it when `isAvailable` is true.
+    var availableFrom:  Date? = nil
+    var availableUntil: Date? = nil
+
+    // MARK: Availability computed vars
+
+    /// True when this bundle has an expiry date (i.e., is seasonal).
+    var isLimitedTime: Bool { availableUntil != nil }
+
+    /// True when the current date falls within the availability window.
+    var isAvailable: Bool {
+        let now = Date()
+        if let from  = availableFrom,  now < from  { return false }
+        if let until = availableUntil, now >= until { return false }
+        return true
+    }
+
+    /// True when availableUntil is in the past.
+    var isExpired: Bool {
+        guard let until = availableUntil else { return false }
+        return Date() >= until
+    }
+
+    /// True when availableFrom is in the future (offer hasn't opened yet).
+    var isUpcoming: Bool {
+        guard let from = availableFrom else { return false }
+        return Date() < from
+    }
+
+    /// Full days remaining until expiry.  nil when not limited or already
+    /// expired.  0 = "ends today" (less than 24 h left).
+    var daysRemaining: Int? {
+        guard isLimitedTime, isAvailable, let until = availableUntil else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: Date(), to: until).day ?? 0
+        return max(0, days)
+    }
+
+    /// Short human-readable countdown label ("3 days left", "Ends today").
+    var timeRemainingLabel: String? {
+        guard let days = daysRemaining else { return nil }
+        switch days {
+        case 0:  return "Ends today"
+        case 1:  return "1 day left"
+        default: return "\(days) days left"
+        }
+    }
+
+    // MARK: Date helper
+
+    /// Convenience: build a `Date` from Gregorian year / month / day.
+    /// Falls back to `.distantFuture` so a malformed date makes the
+    /// bundle safely unavailable rather than always-available.
+    static func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        var c = DateComponents()
+        c.year = year; c.month = month; c.day = day
+        return Calendar(identifier: .gregorian).date(from: c) ?? .distantFuture
+    }
+
     var itemCount: Int {
         balls.count + goals.count + trails.count + floors.count + pits.count + music.count
     }
@@ -1373,6 +1434,55 @@ struct CosmeticBundle: Identifiable {
             floors: [.fog],
             pits:   [.graveyard],
             music:  [.downtempo]
+        ),
+
+        // ── Seasonal bundles (limited-time, return annually) ───────────
+        //
+        // Items used here are shared with permanent bundles for now.  S4 will
+        // add bespoke exclusive cosmetics (beach ball, sandy floor, wave trail,
+        // etc.) and update these entries.  The availability window is what
+        // makes them feel special, not just the items.
+        CosmeticBundle(
+            id:             "summer-2026",
+            displayName:    "Summer Vibes",
+            tagline:        "Sun, sea, and rolling waves.",
+            contentSummary: "Aquarium ball · Ripple goal · Sky trail · Blueprint floor · Pond pit · Acoustic music",
+            balls:  [.aquarium],
+            goals:  [.ripple],
+            trails: [.sky],
+            floors: [.blueprint],
+            pits:   [.pond],
+            music:  [.acoustic],
+            availableFrom:  CosmeticBundle.date(2026, 6,  1),
+            availableUntil: CosmeticBundle.date(2026, 9,  1)
+        ),
+        CosmeticBundle(
+            id:             "halloween-2026",
+            displayName:    "Trick or Roll",
+            tagline:        "A restless spirit through the dark.",
+            contentSummary: "Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music",
+            balls:  [.ghost],
+            goals:  [.obsidian],
+            trails: [.smoke],
+            floors: [.fog],
+            pits:   [.graveyard],
+            music:  [.downtempo],
+            availableFrom:  CosmeticBundle.date(2026, 10,  1),
+            availableUntil: CosmeticBundle.date(2026, 11,  1)
+        ),
+        CosmeticBundle(
+            id:             "winter-2026",
+            displayName:    "Winter Wonderland",
+            tagline:        "A snowglobe marble through crystal frost.",
+            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Dreamscape music",
+            balls:  [.snowglobe],
+            goals:  [.crystal],
+            trails: [.ice],
+            floors: [.twilight],
+            pits:   [.twilight],
+            music:  [.dreamscape],
+            availableFrom:  CosmeticBundle.date(2026, 12,  1),
+            availableUntil: CosmeticBundle.date(2027,  1,  6)
         ),
 
         // ── Sports bundles ──────────────────────────────────────────────
