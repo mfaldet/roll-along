@@ -219,11 +219,13 @@ struct CoinPitMode: GameMode {
     let showsScore                   = true
 }
 
-/// Snake — competitive twist: tilt-steer a growing tail; don't cross yourself.
+/// Comet Clash — Tron light-cycle twist (internal id stays "snake").  Tilt-steer
+/// a comet that leaves a glowing, lethal wall; the wall fades over time but lasts
+/// longer the more sparks you grab and rivals you wreck.  Last comet glowing wins.
 struct SnakeMode: GameMode {
     let id          = "snake"
-    let displayName = "Snake"
-    let tagline     = "Tilt to steer. Grow. Don't cross your own trail."
+    let displayName = "Comet Clash"
+    let tagline     = "Leave a glowing wall. Grab sparks to extend it. Touch any trail and you're out."
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .endRun

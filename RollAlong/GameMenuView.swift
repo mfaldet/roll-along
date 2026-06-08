@@ -122,7 +122,7 @@ struct GameMenuView: View {
         switch id {
         case "zen":     return ("leaf.fill",             Color(red: 0.45, green: 0.80, blue: 0.55))
         case "coinpit": return ("dollarsign.circle.fill", Color(red: 1.00, green: 0.82, blue: 0.28))
-        case "snake":   return ("scribble.variable",      Color(red: 0.50, green: 0.85, blue: 0.45))
+        case "snake":   return ("sparkles",               Color(red: 0.30, green: 0.72, blue: 1.00))
         case "sumo":    return ("circle.dashed",          Color(red: 0.98, green: 0.45, blue: 0.40))
         case "paintball": return ("paintbrush.pointed.fill", Color(red: 0.25, green: 0.62, blue: 1.0))
         case "goldrush": return ("bag.fill",              Color(red: 1.00, green: 0.82, blue: 0.28))

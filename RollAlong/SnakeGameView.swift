@@ -1,21 +1,29 @@
 import SwiftUI
 
 // ===========================================================================
-// SnakeGameView — the "Snake" competitive mode.
+// SnakeGameView — the "Comet Clash" competitive mode (internal id "snake").
 //
-// A self-contained take on the shared marble: tilt rolls the head, which
-// leaves a thick, growing body behind it.  Eat a pellet to grow longer and
-// score; cross your own body and the run ends.  No lives, no progression —
-// a quick high-score chase that banks coins on game over.
+// A Tron light-cycle take on the shared marble.  Tilt rolls your comet, which
+// leaves a glowing TRAIL behind it.  The trail is a solid, lethal wall — but
+// it is NOT permanent.  Each piece of trail fades and disappears on its own,
+// and touching ANY live trail (yours or a rival's) ends that comet's run.
 //
-// SAFE BY CONSTRUCTION: this is a brand-new, isolated file.  It reuses only
-// the shared physics primitives (BallMotion / PhysicsClock) and the coin /
-// skin economy on GameState — it touches nothing in the climb engine, so it
-// cannot affect the main game.  It's reached only when HomeView routes
-// `.mode("snake")` here and SnakeMode is flagged on in the catalogue.
+// Trail length is A + B:
+//   A — how long ago you were last in that spot.  Every trail node ages and
+//       expires after a time-to-live; old wall vanishes from the tail.
+//   B — how much you've collected / destroyed.  Each spark you grab and each
+//       rival you wreck raises your TTL, so your wall lingers longer and
+//       reaches further.  Early on your wall is short; late game it's a maze.
 //
-// FEEL IS TUNABLE: every gameplay number lives in the "Tunables" block below
-// so the difficulty / pace can be dialed in from one place after playtesting.
+// Single-player by construction: rivals are AI comets (added in increment 2),
+// so no second device is ever needed.
+//
+// SAFE BY CONSTRUCTION: a brand-new, isolated file.  It reuses only the shared
+// physics primitives (BallMotion / PhysicsClock) and the coin / skin economy
+// on GameState — it touches nothing in the climb engine.  Reached only when
+// HomeView routes `.mode("snake")` here and SnakeMode is flagged on.
+//
+// FEEL IS TUNABLE: every gameplay number lives in the "Tunables" block.
 // ===========================================================================
 
 struct SnakeGameView: View {
@@ -26,62 +34,103 @@ struct SnakeGameView: View {
 
     // MARK: - Tunables
 
-    private let headRadius:  CGFloat = 15        // the rolling head marble
-    private let bodyWidth:   CGFloat = 26        // drawn thickness of the body
-    private let accel:       CGFloat = 1_300     // tilt → acceleration
-    private let friction:    CGFloat = 0.986     // per-tick velocity damping
-    private let maxSpeed:    CGFloat = 540        // velocity clamp (pts/sec)
-    private let wallBounce:  CGFloat = 0.55       // energy kept on a wall hit
-    private let segmentStep: CGFloat = 5          // min head travel per body node
-    private let startSegments  = 26               // body length at spawn (nodes)
-    private let growPerPellet  = 7                // nodes added per pellet eaten
-    private let safeSkipNodes  = 6                // nodes nearest the head ignored
-    private let pelletRadius:  CGFloat = 12
-    private let coinsPerPellet = 2                // coins banked per pellet
+    private let headRadius:  CGFloat = 14         // the rolling comet head
+    private let trailWidth:  CGFloat = 16         // drawn thickness of the wall
+    private let accel:       CGFloat = 1_300      // tilt → acceleration
+    private let friction:    CGFloat = 0.986      // per-tick velocity damping
+    private let maxSpeed:    CGFloat = 540         // velocity clamp (pts/sec)
+    private let minCruise:   CGFloat = 130         // always-forward drift; 0 = pure momentum
+    private let wallBounce:  CGFloat = 0.50        // energy kept on an arena-wall hit (walls are NOT lethal)
+    private let segmentStep: CGFloat = 5           // min head travel per trail node
 
-    /// Head-to-body-centerline distance that counts as a self-hit.
-    private var collideDistance: CGFloat { headRadius * 0.85 + bodyWidth * 0.20 }
+    private let safeSkipNodes  = 7                 // newest own-trail nodes ignored for self-hits
+    private let baseTTLTicks   = 150               // wall life at 0 power (2.5s @ 60fps) — mechanic A
+    private let ttlPerPower    = 42                // +ticks of wall life per collect/kill — mechanic B
+    private let maxTrailNodes  = 600               // hard safety cap per comet
+
+    private let orbRadius:   CGFloat = 11
+    private let orbCount       = 3                 // sparks live on the field at once
+    private let coinsPerPower  = 3                 // coins banked per point of power
+    private let winBonus       = 20                // coins for last-comet-standing
+
+    private let rivalCount     = 0                 // AI rivals (increment 2 sets this to 3)
+
+    /// Head-to-trail-centerline distance that counts as a fatal hit.
+    private var collideDistance: CGFloat { headRadius + trailWidth * 0.35 }
+
+    // MARK: - Model
+
+    private struct TrailNode {
+        var pos: CGPoint
+        var birthTick: Int
+    }
+
+    private struct Cycle: Identifiable {
+        let id = UUID()
+        var pos: CGPoint
+        var vel: CGVector = .zero
+        var heading: CGFloat                   // radians; last real travel direction
+        var trail: [TrailNode] = []
+        var collects = 0
+        var kills = 0
+        let colorIndex: Int
+        let isPlayer: Bool
+        var alive = true
+        var power: Int { collects + kills }    // mechanic B
+    }
+
+    private struct Orb: Identifiable {
+        let id = UUID()
+        var pos: CGPoint
+    }
+
+    private static let palette: [Color] = [
+        Color(red: 0.30, green: 0.72, blue: 1.00),   // 0 — player cyan
+        Color(red: 1.00, green: 0.42, blue: 0.42),   // 1 — red
+        Color(red: 0.68, green: 0.50, blue: 1.00),   // 2 — violet
+        Color(red: 1.00, green: 0.78, blue: 0.32),   // 3 — amber
+    ]
+    private static let playerColor = palette[0]
 
     // MARK: - State
 
-    @State private var headPos: CGPoint = .zero
-    @State private var headVel: CGVector = .zero
-    @State private var arena:   CGSize  = .zero
+    @State private var cycles: [Cycle] = []
+    @State private var orbs:   [Orb]   = []
+    @State private var arena:  CGSize  = .zero
+    @State private var localTick = 0
 
-    /// The body, oldest node first, newest (closest to the head) last.
-    @State private var body: [CGPoint] = []
-    @State private var maxNodes = 0
+    @State private var started   = false
+    @State private var isOver     = false
+    @State private var playerWon  = false
+    @State private var awarded     = false
 
-    @State private var pellet: CGPoint?
-    @State private var score  = 0
-
-    @State private var started = false   // begins on first tilt / tap
-    @State private var isOver  = false
-    @State private var awarded = false   // guard so coins bank exactly once
+    private var playerCycle: Cycle? { cycles.first(where: { $0.isPlayer }) }
+    private var totalRivals: Int { cycles.filter { !$0.isPlayer }.count }
+    private var rivalsAlive: Int { cycles.filter { !$0.isPlayer && $0.alive }.count }
+    private var wallSeconds: Double { Double(ttlTicks(power: playerCycle?.power ?? 0)) / 60.0 }
 
     // MARK: - Body
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)],
+            LinearGradient(colors: [Color(white: 0.05), Color(white: 0.11)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
 
             GeometryReader { geo in
                 ZStack {
                     Color.clear
-                    bodyLayer.allowsHitTesting(false)
-                    pelletLayer.allowsHitTesting(false)
-                    headMarble.position(headPos)
+                    trailsLayer.allowsHitTesting(false)
+                    orbsLayer.allowsHitTesting(false)
+                    ForEach(cycles.filter { $0.alive }) { c in
+                        headView(c).position(c.pos)
+                    }
                 }
                 .contentShape(Rectangle())
-                .onAppear {
-                    arena = geo.size
-                    reset(in: geo.size)
-                }
+                .onAppear { arena = geo.size; reset() }
                 .onChange(of: geo.size) { _, newSize in
                     arena = newSize
-                    if body.isEmpty { reset(in: newSize) }
+                    if cycles.isEmpty { reset() }
                 }
                 .onTapGesture { if !started && !isOver { started = true } }
             }
@@ -99,57 +148,66 @@ struct SnakeGameView: View {
 
     // MARK: - Render layers
 
-    private var bodyLayer: some View {
+    private var trailsLayer: some View {
         Canvas { ctx, _ in
-            guard body.count >= 2 else { return }
-            var path = Path()
-            path.move(to: body[0])
-            for p in body.dropFirst() { path.addLine(to: p) }
-            // Soft outer glow, then the bright body on top.
-            ctx.stroke(path,
-                       with: .color(Color(red: 0.20, green: 0.55, blue: 0.25).opacity(0.55)),
-                       style: StrokeStyle(lineWidth: bodyWidth + 6, lineCap: .round, lineJoin: .round))
-            ctx.stroke(path,
-                       with: .linearGradient(
-                            Gradient(colors: [Color(red: 0.45, green: 0.85, blue: 0.40),
-                                              Color(red: 0.30, green: 0.72, blue: 0.32)]),
-                            startPoint: body.first ?? .zero,
-                            endPoint:   body.last ?? .zero),
-                       style: StrokeStyle(lineWidth: bodyWidth, lineCap: .round, lineJoin: .round))
+            for c in cycles {
+                let t = c.trail
+                guard t.count >= 2 else { continue }
+                var path = Path()
+                path.move(to: t[0].pos)
+                for k in 1..<t.count { path.addLine(to: t[k].pos) }
+                let col = Self.palette[c.colorIndex % Self.palette.count]
+                ctx.stroke(path,
+                           with: .color(col.opacity(0.28)),
+                           style: StrokeStyle(lineWidth: trailWidth + 7, lineCap: .round, lineJoin: .round))
+                ctx.stroke(path,
+                           with: .linearGradient(
+                                Gradient(colors: [col.opacity(0.22), col]),
+                                startPoint: t[0].pos, endPoint: t[t.count - 1].pos),
+                           style: StrokeStyle(lineWidth: trailWidth, lineCap: .round, lineJoin: .round))
+            }
         }
     }
 
-    @ViewBuilder
-    private var pelletLayer: some View {
-        if let pellet {
+    private var orbsLayer: some View {
+        ForEach(orbs) { orb in
             ZStack {
                 Circle()
-                    .fill(Color(red: 1.0, green: 0.42, blue: 0.42).opacity(0.35))
-                    .frame(width: pelletRadius * 3, height: pelletRadius * 3)
+                    .fill(Color(red: 1.0, green: 0.90, blue: 0.50).opacity(0.30))
+                    .frame(width: orbRadius * 3, height: orbRadius * 3)
                 Circle()
-                    .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.55, blue: 0.45),
-                                                  Color(red: 0.95, green: 0.25, blue: 0.30)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: pelletRadius * 2, height: pelletRadius * 2)
-                    .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 1))
+                    .fill(RadialGradient(colors: [.white, Color(red: 1.0, green: 0.84, blue: 0.34)],
+                                         center: .center, startRadius: 0, endRadius: orbRadius))
+                    .frame(width: orbRadius * 2, height: orbRadius * 2)
+                    .overlay(Circle().stroke(.white.opacity(0.7), lineWidth: 1))
             }
-            .position(pellet)
+            .position(orb.pos)
         }
     }
 
-    private var headMarble: some View {
-        Circle()
-            .fill(gameState.activeSkin.gradient(endRadius: headRadius * 1.4))
-            .frame(width: headRadius * 2, height: headRadius * 2)
-            .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.6), radius: 8, x: 2, y: 5)
+    private func headView(_ c: Cycle) -> some View {
+        let col = Self.palette[c.colorIndex % Self.palette.count]
+        return ZStack {
+            if c.isPlayer {
+                Circle().fill(gameState.activeSkin.gradient(endRadius: headRadius * 1.4))
+                    .overlay(Circle().stroke(col, lineWidth: 2.5))
+                    .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
+            } else {
+                Circle().fill(RadialGradient(colors: [col, col.opacity(0.65)],
+                                             center: .init(x: 0.35, y: 0.32),
+                                             startRadius: 1, endRadius: headRadius * 1.4))
+                    .overlay(Circle().stroke(.white.opacity(0.4), lineWidth: 1))
+            }
+        }
+        .frame(width: headRadius * 2, height: headRadius * 2)
+        .shadow(color: col.opacity(0.7), radius: 8)
     }
 
     // MARK: - HUD / overlays
 
     private var topBar: some View {
         VStack {
-            HStack {
+            HStack(alignment: .top) {
                 Button { nav.goHome() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .bold))
@@ -159,18 +217,21 @@ struct SnakeGameView: View {
                 }
                 Spacer()
                 VStack(spacing: 1) {
-                    Text("\(score)")
+                    Text("\(playerCycle?.power ?? 0)")
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
                         .monospacedDigit()
-                    Text("LENGTH")
+                    Text("CHARGE")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .tracking(1)
+                    Text(String(format: "wall %.1fs", wallSeconds))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Self.playerColor.opacity(0.9))
+                        .monospacedDigit()
                 }
                 Spacer()
-                // Balances the X so the score stays centered.
-                Color.clear.frame(width: 38, height: 38)
+                rivalsPip
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
@@ -178,15 +239,38 @@ struct SnakeGameView: View {
         }
     }
 
+    @ViewBuilder
+    private var rivalsPip: some View {
+        if totalRivals > 0 {
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 4) {
+                    ForEach(cycles.filter { !$0.isPlayer }) { r in
+                        Circle()
+                            .fill(r.alive ? Self.palette[r.colorIndex % Self.palette.count]
+                                          : Color(white: 0.22))
+                            .frame(width: 9, height: 9)
+                    }
+                }
+                Text("RIVALS")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .tracking(1)
+                    .foregroundStyle(Color(white: 0.5))
+            }
+            .frame(width: 56, alignment: .trailing)
+        } else {
+            Color.clear.frame(width: 38, height: 38)
+        }
+    }
+
     private var startPrompt: some View {
         VStack(spacing: 10) {
-            Image(systemName: "gyroscope")
-                .font(.system(size: 40, weight: .light))
-                .foregroundStyle(Color(red: 0.45, green: 0.85, blue: 0.40))
+            Image(systemName: "sparkles")
+                .font(.system(size: 38, weight: .light))
+                .foregroundStyle(Self.playerColor)
             Text("Tilt to play")
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
-            Text("Roll into the pellets to grow.\nDon't cross your own body.")
+            Text("Leave a glowing trail.  Grab sparks to make\nyour wall last longer.  Touching any trail is fatal.")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
@@ -196,15 +280,21 @@ struct SnakeGameView: View {
     }
 
     private var gameOverOverlay: some View {
-        let banked = score * coinsPerPellet
+        let power = playerCycle?.power ?? 0
+        let kills = playerCycle?.kills ?? 0
+        let collects = playerCycle?.collects ?? 0
+        let banked = power * coinsPerPower + (playerWon ? winBonus : 0)
+        let title = playerWon ? "You Win!" : "Eliminated"
+        let titleColor: Color = playerWon ? Color(red: 0.45, green: 0.88, blue: 0.55)
+                                          : Color(red: 1.00, green: 0.45, blue: 0.45)
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
-            VStack(spacing: 24) {
+            VStack(spacing: 22) {
                 VStack(spacing: 6) {
-                    Text("Game Over")
+                    Text(title)
                         .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(Color(red: 0.45, green: 0.85, blue: 0.40))
-                    Text("You grew to a length of \(score).")
+                        .foregroundStyle(titleColor)
+                    Text("charged to \(power) · \(kills) KO · \(collects) sparks")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
                 }
@@ -222,14 +312,13 @@ struct SnakeGameView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset(in: arena) } label: {
+                    Button { reset() } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
-                            .background(RoundedRectangle(cornerRadius: 18)
-                                .fill(Color(red: 0.50, green: 0.88, blue: 0.45)))
+                            .background(RoundedRectangle(cornerRadius: 18).fill(Self.playerColor))
                     }
                     Button { nav.goHome() } label: {
                         Text("Home")
@@ -247,131 +336,217 @@ struct SnakeGameView: View {
 
     // MARK: - Lifecycle
 
-    private func reset(in size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
-        headPos = CGPoint(x: size.width / 2, y: size.height / 2)
-        headVel = .zero
-        body = [headPos]
-        maxNodes = startSegments
-        score = 0
+    private func reset() {
+        guard arena.width > 0, arena.height > 0 else { return }
+        localTick = 0
         started = false
         isOver = false
+        playerWon = false
         awarded = false
-        spawnPellet(in: size)
+
+        let cx = arena.width / 2, cy = arena.height / 2
+        var fresh: [Cycle] = [
+            Cycle(pos: CGPoint(x: cx, y: arena.height * 0.72),
+                  heading: -.pi / 2, colorIndex: 0, isPlayer: true)
+        ]
+        for i in 0..<rivalCount {
+            let ang = (Double(i) / Double(max(1, rivalCount))) * 2 * .pi
+            let p = CGPoint(x: cx + CGFloat(cos(ang)) * arena.width * 0.28,
+                            y: cy + CGFloat(sin(ang)) * arena.height * 0.20)
+            fresh.append(Cycle(pos: clampInside(p),
+                               heading: CGFloat(ang),
+                               colorIndex: (i % (Self.palette.count - 1)) + 1,
+                               isPlayer: false))
+        }
+        cycles = fresh
+
+        orbs = []
+        for _ in 0..<orbCount { orbs.append(Orb(pos: randomOrbPoint())) }
     }
 
-    private func endRun() {
+    private func endRun(didWin: Bool) {
         guard !isOver else { return }
         isOver = true
-        headVel = .zero
+        playerWon = didWin
         if !awarded {
             awarded = true
-            let banked = score * coinsPerPellet
+            let power = playerCycle?.power ?? 0
+            let kills = playerCycle?.kills ?? 0
+            let collects = playerCycle?.collects ?? 0
+            let banked = power * coinsPerPower + (didWin ? winBonus : 0)
             if banked > 0 { gameState.addCoins(banked) }
             AnalyticsClient.shared.track(
-                "snake_round_over",
-                properties: ["length": .int(score), "coins": .int(banked)]
+                "comet_round_over",
+                properties: ["won": .bool(didWin),
+                             "power": .int(power),
+                             "kills": .int(kills),
+                             "collects": .int(collects),
+                             "coins": .int(banked)]
             )
+            if gameState.hapticsEnabled {
+                if didWin { Haptics.success() } else { Haptics.warning() }
+            }
         }
     }
 
     // MARK: - Simulation
 
     private func tick() {
-        guard started, !isOver else { return }
-        let r = headRadius
-        guard arena.width >= 2 * r, arena.height >= 2 * r else { return }
+        guard started, !isOver, arena.width > 1, arena.height > 1 else { return }
+        localTick &+= 1
         let dt: CGFloat = 1.0 / 60.0
 
-        // Integrate tilt → velocity (same model as the home/climb physics).
-        headVel.dx += CGFloat(motion.gravity.x) * accel * dt
-        headVel.dy += CGFloat(motion.gravity.y) * accel * dt
-        headVel.dx *= friction
-        headVel.dy *= friction
+        // 1) Steer + integrate every living comet.
+        for i in cycles.indices where cycles[i].alive {
+            var steer = CGVector.zero
+            if cycles[i].isPlayer {
+                steer = CGVector(dx: CGFloat(motion.gravity.x) * accel,
+                                 dy: CGFloat(motion.gravity.y) * accel)
+            }
+            // (rival AI steering is added in increment 2)
+            cycles[i].vel.dx += steer.dx * dt
+            cycles[i].vel.dy += steer.dy * dt
+            cycles[i].vel.dx *= friction
+            cycles[i].vel.dy *= friction
 
-        // Clamp top speed so the snake stays steerable.
-        let speed = hypot(headVel.dx, headVel.dy)
-        if speed > maxSpeed {
-            let k = maxSpeed / speed
-            headVel.dx *= k
-            headVel.dy *= k
+            var sp = hypot(cycles[i].vel.dx, cycles[i].vel.dy)
+            if sp > 1 { cycles[i].heading = atan2(cycles[i].vel.dy, cycles[i].vel.dx) }
+            if sp < minCruise {
+                cycles[i].vel.dx = cos(cycles[i].heading) * minCruise
+                cycles[i].vel.dy = sin(cycles[i].heading) * minCruise
+                sp = minCruise
+            }
+            if sp > maxSpeed { let k = maxSpeed / sp; cycles[i].vel.dx *= k; cycles[i].vel.dy *= k }
+
+            cycles[i].pos.x += cycles[i].vel.dx * dt
+            cycles[i].pos.y += cycles[i].vel.dy * dt
+            bounceWalls(&cycles[i])
         }
 
-        headPos.x += headVel.dx * dt
-        headPos.y += headVel.dy * dt
-
-        // Walls bounce (the body is the only fatal hazard).
-        if headPos.x < r              { headPos.x = r;              headVel.dx = -headVel.dx * wallBounce }
-        if headPos.x > arena.width - r { headPos.x = arena.width - r; headVel.dx = -headVel.dx * wallBounce }
-        if headPos.y < r              { headPos.y = r;              headVel.dy = -headVel.dy * wallBounce }
-        if headPos.y > arena.height - r { headPos.y = arena.height - r; headVel.dy = -headVel.dy * wallBounce }
-        headPos.x = min(max(headPos.x, r), arena.width  - r)
-        headPos.y = min(max(headPos.y, r), arena.height - r)
-
-        // Extend the body only when the head has travelled far enough — so
-        // sitting still never piles nodes (and never self-collides at rest).
-        if let last = body.last {
-            if hypot(headPos.x - last.x, headPos.y - last.y) >= segmentStep {
-                body.append(headPos)
+        // 2) Lay trail behind every living comet.
+        for i in cycles.indices where cycles[i].alive {
+            if let last = cycles[i].trail.last {
+                let dx = cycles[i].pos.x - last.pos.x, dy = cycles[i].pos.y - last.pos.y
+                if dx * dx + dy * dy >= segmentStep * segmentStep {
+                    cycles[i].trail.append(TrailNode(pos: cycles[i].pos, birthTick: localTick))
+                } else {
+                    let n = cycles[i].trail.count - 1
+                    cycles[i].trail[n].pos = cycles[i].pos
+                    cycles[i].trail[n].birthTick = localTick
+                }
             } else {
-                body[body.count - 1] = headPos   // keep the tip glued to the head
+                cycles[i].trail.append(TrailNode(pos: cycles[i].pos, birthTick: localTick))
             }
-        } else {
-            body.append(headPos)
-        }
-        if body.count > maxNodes {
-            body.removeFirst(body.count - maxNodes)
         }
 
-        eatPelletIfReached()
-        checkSelfCollision()
+        // 3) Age out old wall (dead comets' walls keep fading too).
+        for i in cycles.indices { prune(i) }
+
+        // 4) Sparks, fatal trails, then win/lose.
+        collectOrbs()
+        resolveCollisions()
+        evaluateEnd()
     }
 
-    private func eatPelletIfReached() {
-        guard let p = pellet else { return }
-        if hypot(headPos.x - p.x, headPos.y - p.y) <= headRadius + pelletRadius {
-            score += 1
-            maxNodes += growPerPellet
-            if gameState.hapticsEnabled { Haptics.light() }
-            spawnPellet(in: arena)
+    /// Mechanic A + B: drop trail nodes older than the owner's current TTL.
+    private func prune(_ idx: Int) {
+        let maxAge = ttlTicks(power: cycles[idx].power)
+        var cut = 0
+        let trail = cycles[idx].trail
+        while cut < trail.count && localTick - trail[cut].birthTick > maxAge { cut += 1 }
+        if cut > 0 { cycles[idx].trail.removeFirst(cut) }
+        let over = cycles[idx].trail.count - maxTrailNodes
+        if over > 0 { cycles[idx].trail.removeFirst(over) }
+    }
+
+    private func ttlTicks(power: Int) -> Int { baseTTLTicks + ttlPerPower * power }
+
+    private func collectOrbs() {
+        let reach = (headRadius + orbRadius) * (headRadius + orbRadius)
+        for ci in cycles.indices where cycles[ci].alive {
+            let h = cycles[ci].pos
+            for oi in orbs.indices {
+                let dx = h.x - orbs[oi].pos.x, dy = h.y - orbs[oi].pos.y
+                if dx * dx + dy * dy <= reach {
+                    cycles[ci].collects += 1
+                    if cycles[ci].isPlayer && gameState.hapticsEnabled { Haptics.light() }
+                    orbs[oi].pos = randomOrbPoint()
+                }
+            }
         }
     }
 
-    private func checkSelfCollision() {
-        // Skip the nodes nearest the head — they're always "touching."
-        let checkable = body.count - safeSkipNodes
-        guard checkable > 0 else { return }
-        for i in 0..<checkable {
-            let seg = body[i]
-            if hypot(headPos.x - seg.x, headPos.y - seg.y) < collideDistance {
-                if gameState.hapticsEnabled { Haptics.heavy() }
-                endRun()
-                return
+    /// Any head touching any live trail dies.  If the wall belonged to another
+    /// comet, that comet banks the kill (+1 power → a longer-lasting wall).
+    private func resolveCollisions() {
+        var died: [Int] = []
+        var credit: [Int] = []
+        let lethal2 = collideDistance * collideDistance
+        for xi in cycles.indices where cycles[xi].alive {
+            let h = cycles[xi].pos
+            var hit = false
+            var killer = -1
+            for yi in cycles.indices {
+                let trail = cycles[yi].trail
+                let isSelf = (yi == xi)
+                let upper = isSelf ? max(0, trail.count - safeSkipNodes) : trail.count
+                var k = 0
+                while k < upper {
+                    let dx = h.x - trail[k].pos.x, dy = h.y - trail[k].pos.y
+                    if dx * dx + dy * dy < lethal2 {
+                        hit = true
+                        killer = isSelf ? -1 : yi
+                        break
+                    }
+                    k += 1
+                }
+                if hit { break }
             }
+            if hit { died.append(xi); credit.append(killer) }
+        }
+        guard !died.isEmpty else { return }
+        for n in died.indices {
+            let xi = died[n]
+            cycles[xi].alive = false
+            if cycles[xi].isPlayer && gameState.hapticsEnabled { Haptics.heavy() }
+            if credit[n] >= 0 { cycles[credit[n]].kills += 1 }
         }
     }
 
-    private func spawnPellet(in size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
-        let margin = pelletRadius + 14
-        // Try a handful of spots; prefer one clear of the head and body.
-        var best: CGPoint = CGPoint(x: size.width / 2, y: size.height / 2)
-        var bestClearance: CGFloat = -1
-        for _ in 0..<12 {
-            let candidate = CGPoint(
-                x: CGFloat.random(in: margin...(size.width  - margin)),
-                y: CGFloat.random(in: margin...(size.height - margin)))
-            var nearest = hypot(candidate.x - headPos.x, candidate.y - headPos.y)
-            for seg in body {
-                nearest = min(nearest, hypot(candidate.x - seg.x, candidate.y - seg.y))
-            }
-            if nearest > bestClearance {
-                bestClearance = nearest
-                best = candidate
-            }
-            if nearest > bodyWidth * 2 { break }   // good enough
+    private func evaluateEnd() {
+        guard !isOver else { return }
+        let alive = playerCycle?.alive ?? false
+        if !alive { endRun(didWin: false); return }
+        if totalRivals > 0 && rivalsAlive == 0 { endRun(didWin: true) }
+    }
+
+    private func bounceWalls(_ c: inout Cycle) {
+        let r = headRadius
+        if c.pos.x < r {
+            c.pos.x = r; c.vel.dx = abs(c.vel.dx) * wallBounce
+        } else if c.pos.x > arena.width - r {
+            c.pos.x = arena.width - r; c.vel.dx = -abs(c.vel.dx) * wallBounce
         }
-        pellet = best
+        if c.pos.y < r {
+            c.pos.y = r; c.vel.dy = abs(c.vel.dy) * wallBounce
+        } else if c.pos.y > arena.height - r {
+            c.pos.y = arena.height - r; c.vel.dy = -abs(c.vel.dy) * wallBounce
+        }
+    }
+
+    private func clampInside(_ p: CGPoint) -> CGPoint {
+        let m = headRadius + 6
+        return CGPoint(x: min(max(p.x, m), arena.width - m),
+                       y: min(max(p.y, m), arena.height - m))
+    }
+
+    private func randomOrbPoint() -> CGPoint {
+        let m = orbRadius + 18
+        let loX = m, hiX = arena.width - m
+        let loY = m, hiY = arena.height - m
+        let x = hiX > loX ? CGFloat.random(in: loX...hiX) : arena.width / 2
+        let y = hiY > loY ? CGFloat.random(in: loY...hiY) : arena.height / 2
+        return CGPoint(x: x, y: y)
     }
 }
 
