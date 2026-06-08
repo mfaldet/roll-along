@@ -183,6 +183,66 @@
       "productID" : "com.macfaldet.RollAlong.bundle.winter2026",
       "referenceName" : "Winter Wonderland Bundle $2.99",
       "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000013",
+      "localizations" : [
+        {
+          "description" : "The full Sweetheart seasonal collection — Heartstone ball, Blossom goal, Rose trail, Velvet floor, Dusk pit, and Piano music. Available Feb 1–14, 2027 only.",
+          "displayName" : "Sweetheart Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.valentines2027",
+      "referenceName" : "Sweetheart Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000014",
+      "localizations" : [
+        {
+          "description" : "The full Luck of the Roll seasonal collection — Shamrock ball, Mirage goal, Gilded trail, Meadow floor, Pond pit, and Lofi music. Available Mar 1–17, 2027 only.",
+          "displayName" : "Luck of the Roll Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.stpatricks2027",
+      "referenceName" : "Luck of the Roll Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000015",
+      "localizations" : [
+        {
+          "description" : "The full Countdown seasonal collection — Confetti ball, Rainbow goal, Gold trail, Disco floor, Midnight pit, and Electronic music. Available Dec 28–Jan 4 only.",
+          "displayName" : "Countdown Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.newyear2027",
+      "referenceName" : "Countdown Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000016",
+      "localizations" : [
+        {
+          "description" : "The full Spring Fling seasonal collection — Speckled Egg ball, Mosaic goal, Forest trail, Meadow floor, Sky pit, and Acoustic music. Available Mar 20–May 1, 2027 only.",
+          "displayName" : "Spring Fling Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.spring2027",
+      "referenceName" : "Spring Fling Bundle $2.99",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {

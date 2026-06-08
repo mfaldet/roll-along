@@ -120,6 +120,30 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
 
+        // ── Valentine's Day 2027 seasonal exclusive ──────────────────────
+        case .heartstone:
+            heartstoneCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
+
+        // ── St. Patrick's Day 2027 seasonal exclusive ─────────────────────
+        case .shamrock:
+            shamrockCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.28), lineWidth: 0.5))
+
+        // ── New Year's 2027 seasonal exclusive ───────────────────────────
+        case .confetti:
+            confettiCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
+
+        // ── Spring 2027 seasonal exclusive ───────────────────────────────
+        case .speckledEgg:
+            speckledEggCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.20), lineWidth: 0.5))
+
         // ── Gradient-based (all remaining skins) ───────────────────────
         default:
             Circle()
@@ -1389,6 +1413,332 @@ struct BallSkinView: View {
                     Gradient(colors: [Color.white.opacity(0.38), .clear]),
                     center: CGPoint(x: cx + r * 0.36, y: cy + r * 0.36),
                     startRadius: 0, endRadius: r * 0.14))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Heartstone  (Valentine's Day 2027 seasonal exclusive)
+    // Deep fuchsia sphere with a gold embossed heart inlaid at centre.
+    // The heart is built from four cubic Bézier curves meeting at a bottom
+    // tip point — the classic cardioid construction.  A large upper-left
+    // specular sells the spherical gloss.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var heartstoneCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Deep fuchsia radial gradient sphere ───────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.98, green: 0.72, blue: 0.82), location: 0.00),
+                        .init(color: Color(red: 0.92, green: 0.22, blue: 0.56), location: 0.38),
+                        .init(color: Color(red: 0.62, green: 0.06, blue: 0.30), location: 0.75),
+                        .init(color: Color(red: 0.28, green: 0.02, blue: 0.12), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
+                    startRadius: 0, endRadius: r * 1.05))
+
+            // ── 2. Gold embossed heart — 4 cubic Bézier construction ─────
+            // Scale factor and centre of the heart motif.
+            let pS  = r * 0.28
+            let hCx = cx
+            let hCy = cy + r * 0.04
+
+            // Tip (bottom of heart) and the four quadrant points in
+            // normalised coordinates (multiplied by pS and offset by hCx/hCy).
+            func hp(_ nx: CGFloat, _ ny: CGFloat) -> CGPoint {
+                CGPoint(x: hCx + nx * pS, y: hCy + ny * pS)
+            }
+
+            var heart = Path()
+            // Start at bottom tip
+            heart.move(to: hp(0.0,  0.90))
+            // Bottom-left lobe sweep
+            heart.addCurve(to:        hp(-1.00, -0.30),
+                           control1:  hp(-0.10,  1.00),
+                           control2:  hp(-1.20,  0.30))
+            // Top-left crossing to top-centre
+            heart.addCurve(to:        hp( 0.00, -0.80),
+                           control1:  hp(-1.20, -0.90),
+                           control2:  hp(-0.40, -1.10))
+            // Top-right to right lobe
+            heart.addCurve(to:        hp( 1.00, -0.30),
+                           control1:  hp( 0.40, -1.10),
+                           control2:  hp( 1.20, -0.90))
+            // Bottom-right lobe back to tip
+            heart.addCurve(to:        hp( 0.00,  0.90),
+                           control1:  hp( 1.20,  0.30),
+                           control2:  hp( 0.10,  1.00))
+            heart.closeSubpath()
+
+            ctx.fill(heart,
+                     with: .color(Color(red: 0.92, green: 0.76, blue: 0.28)))
+            ctx.stroke(heart,
+                       with: .color(Color(red: 0.55, green: 0.38, blue: 0.08)),
+                       lineWidth: max(0.8, r * 0.028))
+
+            // ── 3. Large specular highlight crescent (upper-left) ────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.74,
+                                       width: r * 0.46, height: r * 0.30)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.68), .clear]),
+                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.62),
+                    startRadius: 0, endRadius: r * 0.32))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Shamrock  (St. Patrick's Day 2027 seasonal exclusive)
+    // Vivid forest-green sphere with a white four-leaf clover — four
+    // overlapping petal circles arranged at N/E/S/W with a small centre
+    // circle unifying them.  Gold outline rings the petals.  A curved gold
+    // stem descends from the base of the clover.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var shamrockCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Forest-green radial gradient sphere ───────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.72, green: 0.98, blue: 0.52), location: 0.00),
+                        .init(color: Color(red: 0.20, green: 0.72, blue: 0.22), location: 0.42),
+                        .init(color: Color(red: 0.06, green: 0.42, blue: 0.10), location: 0.80),
+                        .init(color: Color(red: 0.02, green: 0.18, blue: 0.04), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.26),
+                    startRadius: 0, endRadius: r * 1.30))
+
+            // ── 2. Four-leaf clover ──────────────────────────────────────
+            let cloverCX = cx
+            let cloverCY = cy - r * 0.06
+            let petalR   = r * 0.195
+            let petalD   = r * 0.155   // centre-to-petal-centre offset
+            let goldStroke = Color(red: 0.88, green: 0.74, blue: 0.24)
+            let strokeW    = max(0.6, r * 0.022)
+
+            // Cardinal offsets: N, E, S, W
+            let offsets: [(CGFloat, CGFloat)] = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+            for (dx, dy) in offsets {
+                let pcx = cloverCX + dx * petalD
+                let pcy = cloverCY + dy * petalD
+                let pRect = CGRect(x: pcx - petalR, y: pcy - petalR,
+                                   width: petalR * 2, height: petalR * 2)
+                ctx.fill(Path(ellipseIn: pRect), with: .color(.white))
+                ctx.stroke(Path(ellipseIn: pRect),
+                           with: .color(goldStroke), lineWidth: strokeW)
+            }
+
+            // Small centre circle to unify the four petals
+            let ctrR = petalR * 0.35
+            ctx.fill(Path(ellipseIn: CGRect(x: cloverCX - ctrR, y: cloverCY - ctrR,
+                                            width: ctrR * 2, height: ctrR * 2)),
+                     with: .color(.white))
+
+            // ── 3. Gold curved stem ──────────────────────────────────────
+            let stemBase = cloverCY + petalD + petalR * 0.6
+            var stem = Path()
+            stem.move(to:    CGPoint(x: cloverCX + r * 0.02, y: stemBase))
+            stem.addQuadCurve(
+                to:      CGPoint(x: cloverCX + r * 0.08, y: stemBase + petalR * 1.5),
+                control: CGPoint(x: cloverCX - r * 0.02, y: stemBase + petalR * 1.1))
+            ctx.stroke(stem,
+                       with: .color(Color(red: 0.88, green: 0.72, blue: 0.22)),
+                       style: StrokeStyle(lineWidth: max(1.5, r * 0.075), lineCap: .round))
+
+            // ── 4. Specular highlight crescent ───────────────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.70,
+                                       width: r * 0.38, height: r * 0.26)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.52), .clear]),
+                    center: CGPoint(x: cx - r * 0.35, y: cy - r * 0.60),
+                    startRadius: 0, endRadius: r * 0.28))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Confetti  (New Year's 2027 seasonal exclusive)
+    // Champagne-gold sphere scattered with 18 deterministic multicolor
+    // confetti rectangles, each individually rotated via a manual 2-D
+    // rotation matrix (SwiftUI Canvas has no transform API).
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var confettiCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Champagne-gold radial gradient sphere ─────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.96, blue: 0.80), location: 0.00),
+                        .init(color: Color(red: 0.94, green: 0.78, blue: 0.32), location: 0.40),
+                        .init(color: Color(red: 0.70, green: 0.52, blue: 0.14), location: 0.78),
+                        .init(color: Color(red: 0.36, green: 0.24, blue: 0.04), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
+                    startRadius: 0, endRadius: r * 1.28))
+
+            // ── 2. 18 deterministic rotated confetti rectangles ──────────
+            let pieceW = max(2.0, r * 0.075)
+            let pieceH = max(1.5, r * 0.045)
+            let confettiColors: [Color] = [
+                Color(red: 0.92, green: 0.12, blue: 0.18),   // red
+                Color(red: 0.18, green: 0.42, blue: 0.92),   // cobalt
+                Color(red: 0.12, green: 0.76, blue: 0.30),   // emerald
+                Color(red: 0.96, green: 0.22, blue: 0.80),   // magenta
+                Color(red: 0.56, green: 0.16, blue: 0.94),   // violet
+                Color(red: 1.00, green: 1.00, blue: 1.00),   // white
+            ]
+            // (normX, normY, angleDeg, colorIdx) — positions in [0,1] space
+            let pieces: [(CGFloat, CGFloat, CGFloat, Int)] = [
+                (0.32, 0.18,  25, 0), (0.55, 0.22, -35, 1), (0.44, 0.32,  55, 2),
+                (0.68, 0.30, -20, 3), (0.25, 0.42,  45, 4), (0.58, 0.42,  70, 5),
+                (0.38, 0.55, -50, 0), (0.72, 0.50,  15, 1), (0.28, 0.60,  60, 2),
+                (0.50, 0.62, -40, 3), (0.70, 0.68,  30, 4), (0.22, 0.28, -60, 5),
+                (0.42, 0.72,  45, 0), (0.62, 0.78, -25, 1), (0.35, 0.78,  65, 2),
+                (0.74, 0.38, -45, 3), (0.18, 0.52,  20, 4), (0.56, 0.14, -55, 5),
+            ]
+
+            for (nx, ny, angleDeg, colorIdx) in pieces {
+                let px = cx - r + nx * r * 2
+                let py = cy - r + ny * r * 2
+                let dx = px - cx
+                let dy = py - cy
+                // Skip pieces that fall outside the sphere silhouette
+                if sqrt(dx * dx + dy * dy) > r * 0.86 { continue }
+
+                // Manual 2-D rotation matrix: avoids the unavailable ctx.transform
+                let angleRad = angleDeg * CGFloat.pi / 180
+                let cosA     = cos(angleRad)
+                let sinA     = sin(angleRad)
+
+                // Half-extents of the rectangle in local space
+                let lx = pieceW / 2
+                let ly = pieceH / 2
+
+                // Rotate all four corners around (px, py)
+                func rotate(_ lx: CGFloat, _ ly: CGFloat) -> CGPoint {
+                    CGPoint(x: px + lx * cosA - ly * sinA,
+                            y: py + lx * sinA + ly * cosA)
+                }
+
+                var piece = Path()
+                piece.move(to:    rotate(-lx, -ly))
+                piece.addLine(to: rotate( lx, -ly))
+                piece.addLine(to: rotate( lx,  ly))
+                piece.addLine(to: rotate(-lx,  ly))
+                piece.closeSubpath()
+
+                ctx.fill(piece, with: .color(confettiColors[colorIdx]))
+            }
+
+            // ── 3. Bright specular highlight (upper-left) ────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.72,
+                                       width: r * 0.48, height: r * 0.32)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.80), location: 0.00),
+                        .init(color: .white.opacity(0.42), location: 0.40),
+                        .init(color: .clear,               location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.60),
+                    startRadius: 0, endRadius: r * 0.36))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Speckled Egg  (Spring 2027 seasonal exclusive)
+    // Robin's-egg blue sphere with 16 deterministic dark oval speckles
+    // scattered across its face.  Each oval is slightly elongated (width >
+    // height) and slightly random in size via a per-speckle sizeScale factor.
+    // A bright white specular crescent at upper-left anchors the lighting.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var speckledEggCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Robin's-egg blue radial gradient sphere ───────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.82, green: 0.96, blue: 0.98), location: 0.00),
+                        .init(color: Color(red: 0.46, green: 0.82, blue: 0.90), location: 0.42),
+                        .init(color: Color(red: 0.22, green: 0.60, blue: 0.76), location: 0.80),
+                        .init(color: Color(red: 0.08, green: 0.28, blue: 0.44), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.28),
+                    startRadius: 0, endRadius: r * 1.25))
+
+            // ── 2. 16 deterministic dark oval speckles ───────────────────
+            let baseSpeckleR = r * 0.040
+            let speckleColor = Color(red: 0.10, green: 0.28, blue: 0.38).opacity(0.80)
+
+            // (normX, normY, sizeScale) — positions in [0,1] space
+            let speckles: [(CGFloat, CGFloat, CGFloat)] = [
+                (0.42, 0.22, 0.90), (0.62, 0.20, 1.10), (0.36, 0.36, 0.75),
+                (0.58, 0.38, 0.95), (0.72, 0.34, 0.80), (0.28, 0.44, 1.00),
+                (0.50, 0.46, 0.70), (0.66, 0.52, 1.05), (0.36, 0.58, 0.85),
+                (0.52, 0.60, 0.90), (0.70, 0.62, 0.75), (0.30, 0.68, 0.95),
+                (0.48, 0.72, 0.80), (0.62, 0.74, 1.00), (0.38, 0.80, 0.70),
+                (0.56, 0.82, 0.85),
+            ]
+
+            for (nx, ny, scale) in speckles {
+                let sx = cx - r + nx * r * 2
+                let sy = cy - r + ny * r * 2
+                let dx = sx - cx
+                let dy = sy - cy
+                // Skip speckles outside the sphere silhouette
+                if sqrt(dx * dx + dy * dy) > r * 0.88 { continue }
+
+                let sr = baseSpeckleR * scale
+                // Slightly elongated oval (1.0 wide, 0.62 tall)
+                let sRect = CGRect(x: sx - sr, y: sy - sr * 0.62,
+                                   width: sr * 2, height: sr * 1.24)
+                ctx.fill(Path(ellipseIn: sRect), with: .color(speckleColor))
+            }
+
+            // ── 3. Bright white specular crescent (upper-left) ───────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.54, y: cy - r * 0.72,
+                                       width: r * 0.44, height: r * 0.30)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.72), location: 0.00),
+                        .init(color: .white.opacity(0.36), location: 0.45),
+                        .init(color: .clear,               location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.60),
+                    startRadius: 0, endRadius: r * 0.34))
         }
     }
 }

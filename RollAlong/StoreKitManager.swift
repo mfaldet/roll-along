@@ -46,9 +46,13 @@ final class StoreKitManager: ObservableObject {
         /// Seasonal bundle IAP products — non-consumable real-money purchases
         /// that grant the full bundle contents + mark ownedBundles.  Idempotent
         /// on restore via the `ownedBundles.contains` guard in deliverReward.
-        case summerBundle2026    = "com.macfaldet.RollAlong.bundle.summer2026"
-        case halloweenBundle2026 = "com.macfaldet.RollAlong.bundle.halloween2026"
-        case winterBundle2026    = "com.macfaldet.RollAlong.bundle.winter2026"
+        case summerBundle2026      = "com.macfaldet.RollAlong.bundle.summer2026"
+        case halloweenBundle2026   = "com.macfaldet.RollAlong.bundle.halloween2026"
+        case winterBundle2026      = "com.macfaldet.RollAlong.bundle.winter2026"
+        case valentinesBundle2027  = "com.macfaldet.RollAlong.bundle.valentines2027"
+        case stPatricksBundle2027  = "com.macfaldet.RollAlong.bundle.stpatricks2027"
+        case newYearBundle2027     = "com.macfaldet.RollAlong.bundle.newyear2027"
+        case springBundle2027      = "com.macfaldet.RollAlong.bundle.spring2027"
 
         var id: String { rawValue }
 
@@ -66,7 +70,9 @@ final class StoreKitManager: ObservableObject {
             case .unlimited:                              return .unlimitedUnlock
             case .coins100, .coins600, .coins1300, .coins3000: return .coinPack
             case .starterPack:                            return .starterPackUnlock
-            case .summerBundle2026, .halloweenBundle2026, .winterBundle2026:
+            case .summerBundle2026, .halloweenBundle2026, .winterBundle2026,
+                 .valentinesBundle2027, .stPatricksBundle2027,
+                 .newYearBundle2027, .springBundle2027:
                                                           return .bundlePurchase
             }
         }
@@ -75,10 +81,14 @@ final class StoreKitManager: ObservableObject {
         /// seasonal bundle products.
         var bundleID: String? {
             switch self {
-            case .summerBundle2026:    return "summer-2026"
-            case .halloweenBundle2026: return "halloween-2026"
-            case .winterBundle2026:    return "winter-2026"
-            default:                   return nil
+            case .summerBundle2026:     return "summer-2026"
+            case .halloweenBundle2026:  return "halloween-2026"
+            case .winterBundle2026:     return "winter-2026"
+            case .valentinesBundle2027: return "valentines-2027"
+            case .stPatricksBundle2027: return "stpatricks-2027"
+            case .newYearBundle2027:    return "newyear-2027"
+            case .springBundle2027:     return "spring-2027"
+            default:                    return nil
             }
         }
 
@@ -184,14 +194,22 @@ final class StoreKitManager: ObservableObject {
         var summerSeen         = false
         var halloweenSeen      = false
         var winterSeen         = false
+        var valentinesSeen     = false
+        var stPatricksSeen     = false
+        var newYearSeen        = false
+        var springSeen         = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let txn) = result else { continue }
             switch txn.productID {
-            case ProductID.unlimited.rawValue:          unlimitedSeen   = true
-            case ProductID.starterPack.rawValue:        starterPackSeen = true
-            case ProductID.summerBundle2026.rawValue:   summerSeen      = true
-            case ProductID.halloweenBundle2026.rawValue: halloweenSeen  = true
-            case ProductID.winterBundle2026.rawValue:   winterSeen      = true
+            case ProductID.unlimited.rawValue:               unlimitedSeen   = true
+            case ProductID.starterPack.rawValue:             starterPackSeen = true
+            case ProductID.summerBundle2026.rawValue:        summerSeen      = true
+            case ProductID.halloweenBundle2026.rawValue:     halloweenSeen   = true
+            case ProductID.winterBundle2026.rawValue:        winterSeen      = true
+            case ProductID.valentinesBundle2027.rawValue:    valentinesSeen  = true
+            case ProductID.stPatricksBundle2027.rawValue:    stPatricksSeen  = true
+            case ProductID.newYearBundle2027.rawValue:       newYearSeen     = true
+            case ProductID.springBundle2027.rawValue:        springSeen      = true
             default: break
             }
         }
@@ -202,9 +220,13 @@ final class StoreKitManager: ObservableObject {
             gs.grant(BallSkin.aurora)
             gs.starterPackClaimed = true
         }
-        if summerSeen    { await deliverReward(for: .summerBundle2026)    }
-        if halloweenSeen { await deliverReward(for: .halloweenBundle2026) }
-        if winterSeen    { await deliverReward(for: .winterBundle2026)    }
+        if summerSeen       { await deliverReward(for: .summerBundle2026)       }
+        if halloweenSeen    { await deliverReward(for: .halloweenBundle2026)    }
+        if winterSeen       { await deliverReward(for: .winterBundle2026)       }
+        if valentinesSeen   { await deliverReward(for: .valentinesBundle2027)   }
+        if stPatricksSeen   { await deliverReward(for: .stPatricksBundle2027)   }
+        if newYearSeen      { await deliverReward(for: .newYearBundle2027)      }
+        if springSeen       { await deliverReward(for: .springBundle2027)       }
     }
 
     // MARK: - Purchase

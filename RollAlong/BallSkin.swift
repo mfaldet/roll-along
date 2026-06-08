@@ -133,6 +133,30 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     from the regular shop grid.
     case ornament = "Ornament"
 
+    // ── Valentine's Day 2027 seasonal exclusive ─────────────────────────
+    //   • heartstone — deep fuchsia sphere with a gold embossed heart.
+    //     Available ONLY via the Sweetheart bundle (Feb 1–14, 2027); never
+    //     coin-purchasable and hidden from the regular shop grid.
+    case heartstone  = "Heartstone"
+
+    // ── St. Patrick's Day 2027 seasonal exclusive ────────────────────────
+    //   • shamrock — vivid forest-green sphere with a white 4-leaf clover.
+    //     Available ONLY via the Luck of the Roll bundle (Mar 1–17, 2027);
+    //     never coin-purchasable and hidden from the regular shop grid.
+    case shamrock    = "Shamrock"
+
+    // ── New Year's 2027 seasonal exclusive ──────────────────────────────
+    //   • confetti — champagne-gold sphere with scattered multicolor confetti
+    //     squares. Available ONLY via the Countdown bundle (Dec 28 – Jan 4);
+    //     never coin-purchasable and hidden from the regular shop grid.
+    case confetti    = "Confetti"
+
+    // ── Spring 2027 seasonal exclusive ──────────────────────────────────
+    //   • speckledEgg — robin's-egg blue sphere with dark freckle speckles.
+    //     Available ONLY via the Spring Fling bundle (Mar 20 – May 1, 2027);
+    //     never coin-purchasable and hidden from the regular shop grid.
+    case speckledEgg = "Speckled Egg"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -149,7 +173,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     /// are hidden from the standalone shop's individual Ball grid.
     var isBundleExclusive: Bool {
         switch self {
-        case .pluto, .aurora, .beachBall, .pumpkin, .ornament: return true
+        case .pluto, .aurora, .beachBall, .pumpkin, .ornament,
+             .heartstone, .shamrock, .confetti, .speckledEgg: return true
         default:                          return false
         }
     }
@@ -562,6 +587,54 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.86, green: 0.08, blue: 0.16),
                 Color(red: 0.48, green: 0.02, blue: 0.08),
                 Color(red: 0.18, green: 0.00, blue: 0.02),
+            ]
+
+        // ── Valentine's Day 2027 ──
+        case .heartstone:
+            // Deep fuchsia sphere — rosy highlight → hot pink → deep magenta →
+            // near-black shadow.  Gold embossed heart paints on top via the
+            // bespoke heartstoneCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.72, blue: 0.82),
+                Color(red: 0.92, green: 0.22, blue: 0.56),
+                Color(red: 0.62, green: 0.06, blue: 0.30),
+                Color(red: 0.28, green: 0.02, blue: 0.12),
+            ]
+
+        // ── St. Patrick's Day 2027 ──
+        case .shamrock:
+            // Vivid forest-green sphere — light spring-green highlight →
+            // saturated green → dark forest → near-black shadow.  White
+            // 4-leaf clover with gold stem paints on top via shamrockCanvas.
+            return [
+                Color(red: 0.68, green: 0.98, blue: 0.48),
+                Color(red: 0.18, green: 0.74, blue: 0.22),
+                Color(red: 0.06, green: 0.42, blue: 0.10),
+                Color(red: 0.02, green: 0.16, blue: 0.04),
+            ]
+
+        // ── New Year's 2027 ──
+        case .confetti:
+            // Champagne-gold sphere — bright warm highlight → golden mid →
+            // rich amber → deep shadow.  Scattered multicolor confetti squares
+            // paint on top via the bespoke confettiCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.96, blue: 0.80),
+                Color(red: 0.94, green: 0.78, blue: 0.32),
+                Color(red: 0.70, green: 0.52, blue: 0.14),
+                Color(red: 0.36, green: 0.24, blue: 0.04),
+            ]
+
+        // ── Spring 2027 ──
+        case .speckledEgg:
+            // Robin's-egg blue sphere — pale sky highlight → mid robin blue →
+            // deeper teal-blue → dark shadow.  Dark oval speckles paint on top
+            // via the bespoke speckledEggCanvas in BallSkinView.
+            return [
+                Color(red: 0.82, green: 0.96, blue: 0.98),
+                Color(red: 0.46, green: 0.82, blue: 0.90),
+                Color(red: 0.22, green: 0.60, blue: 0.76),
+                Color(red: 0.08, green: 0.28, blue: 0.44),
             ]
         }
     }

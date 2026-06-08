@@ -93,7 +93,11 @@ extension BallSkin: CosmeticItem {
              .aurora,          // starter-pack-exclusive; never coin-purchasable
              .beachBall,       // summer-2026-exclusive; never coin-purchasable
              .pumpkin,         // halloween-2026-exclusive; never coin-purchasable
-             .ornament:        // winter-2026-exclusive; never coin-purchasable
+             .ornament,        // winter-2026-exclusive; never coin-purchasable
+             .heartstone,      // valentines-2027-exclusive; never coin-purchasable
+             .shamrock,        // stpatricks-2027-exclusive; never coin-purchasable
+             .confetti,        // newyear-2027-exclusive; never coin-purchasable
+             .speckledEgg:     // spring-2027-exclusive; never coin-purchasable
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -1486,6 +1490,62 @@ struct CosmeticBundle: Identifiable {
             music:  [.dreamscape],
             availableFrom:  CosmeticBundle.date(2026, 12,  1),
             availableUntil: CosmeticBundle.date(2027,  1,  6)
+        ),
+        CosmeticBundle(
+            id:             "valentines-2027",
+            displayName:    "Sweetheart",
+            tagline:        "All heart, no brakes.",
+            contentSummary: "Heartstone ball · Blossom goal · Rose trail · Velvet floor · Dusk pit · Piano music",
+            balls:  [.heartstone],
+            goals:  [.blossom],
+            trails: [.roseTrail],
+            floors: [.velvet],
+            pits:   [.dusk],
+            music:  [.piano],
+            availableFrom:  CosmeticBundle.date(2027, 2,  1),
+            availableUntil: CosmeticBundle.date(2027, 2, 15)
+        ),
+        CosmeticBundle(
+            id:             "stpatricks-2027",
+            displayName:    "Luck of the Roll",
+            tagline:        "Find your four-leaf marble.",
+            contentSummary: "Shamrock ball · Mirage goal · Gilded trail · Meadow floor · Pond pit · Lofi music",
+            balls:  [.shamrock],
+            goals:  [.mirage],
+            trails: [.gilded],
+            floors: [.meadow],
+            pits:   [.pond],
+            music:  [.lofi],
+            availableFrom:  CosmeticBundle.date(2027, 3,  1),
+            availableUntil: CosmeticBundle.date(2027, 3, 18)
+        ),
+        CosmeticBundle(
+            id:             "newyear-2027",
+            displayName:    "Countdown",
+            tagline:        "Three, two, one — roll.",
+            contentSummary: "Confetti ball · Rainbow goal · Gold trail · Disco floor · Midnight pit · Electronic music",
+            balls:  [.confetti],
+            goals:  [.rainbow],
+            trails: [.gold],
+            floors: [.disco],
+            pits:   [.midnight],
+            music:  [.electronic],
+            availableFrom:  CosmeticBundle.date(2026, 12, 28),
+            availableUntil: CosmeticBundle.date(2027,  1,  5)
+        ),
+        CosmeticBundle(
+            id:             "spring-2027",
+            displayName:    "Spring Fling",
+            tagline:        "Speckled. Bright. Unstoppable.",
+            contentSummary: "Speckled Egg ball · Mosaic goal · Forest trail · Meadow floor · Sky pit · Acoustic music",
+            balls:  [.speckledEgg],
+            goals:  [.mosaic],
+            trails: [.forest],
+            floors: [.meadow],
+            pits:   [.sky],
+            music:  [.acoustic],
+            availableFrom:  CosmeticBundle.date(2027, 3, 20),
+            availableUntil: CosmeticBundle.date(2027, 5,  1)
         ),
 
         // ── Sports bundles ──────────────────────────────────────────────
