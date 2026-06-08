@@ -13,28 +13,28 @@ import SwiftUI
 // ---------------------------------------------------------------------------
 
 private enum ShopCategory: String, CaseIterable, Identifiable {
-    case ball, goal, trail, floor, pit, music, bundle
+    case collections, ball, goal, trail, floor, pit, music
     var id: String { rawValue }
     var icon: String {
         switch self {
-        case .ball:   return "circle.fill"
-        case .goal:   return "sparkles"
-        case .trail:  return "scribble.variable"
-        case .floor:  return "square.fill.on.square.fill"
-        case .pit:    return "circle.dotted"
-        case .music:  return "music.note"
-        case .bundle: return "shippingbox.fill"
+        case .collections: return "square.stack.3d.up.fill"
+        case .ball:        return "circle.fill"
+        case .goal:        return "sparkles"
+        case .trail:       return "scribble.variable"
+        case .floor:       return "square.fill.on.square.fill"
+        case .pit:         return "circle.dotted"
+        case .music:       return "music.note"
         }
     }
     var displayName: String {
         switch self {
-        case .ball:   return "Ball"
-        case .goal:   return "Goal"
-        case .trail:  return "Trail"
-        case .floor:  return "Floor"
-        case .pit:    return "Pit"
-        case .music:  return "Music"
-        case .bundle: return "Bundle"
+        case .collections: return "Collections"
+        case .ball:        return "Ball"
+        case .goal:        return "Goal"
+        case .trail:       return "Trail"
+        case .floor:       return "Floor"
+        case .pit:         return "Pit"
+        case .music:       return "Music"
         }
     }
 }
@@ -43,7 +43,7 @@ struct CosmeticShopView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav:       Navigator
 
-    @State private var category: ShopCategory = .ball
+    @State private var category: ShopCategory = .collections
     @State private var alertMessage: String = ""
     @State private var showAlert: Bool = false
     @State private var showBuyCoinsSheet: Bool = false
@@ -176,6 +176,8 @@ struct CosmeticShopView: View {
     @ViewBuilder
     private var grid: some View {
         switch category {
+        case .collections:
+            collectionsView
         case .ball:
             ballSection
         case .goal:
@@ -188,8 +190,6 @@ struct CosmeticShopView: View {
             categoryGrid(items: Pit.allCases)
         case .music:
             categoryGrid(items: MusicTrack.allCases)
-        case .bundle:
-            bundleGrid
         }
     }
 
@@ -495,72 +495,316 @@ struct CosmeticShopView: View {
         )
     }
 
-    /// Bundle grid — lists the catalogue's bundles with a compact
-    /// "buy or owned" cell each.  Bundle definitions live in
-    /// `Bundle.catalogue` (see Cosmetics.swift).
+    // =========================================================================
+    // MARK: - Collections view (S2)
+    //
+    // Collection cards replaced the old flat bundle list.  Each card shows:
+    //   • A 6-slot item preview row (ball · goal · trail · floor · pit · music)
+    //     with owned items full-colour and unowned items dimmed + locked.
+    //   • X/Y progress badge in the top-right corner.
+    //   • "Complete the Set" CTA when partially owned; "Get Bundle" when 0 owned;
+    //     "✓ Collection Complete" when all owned.
+    // The featured collection (weekly rotation) gets a gold border and badge.
+    // =========================================================================
+
+    /// Weekly-rotating featured bundle.  Stable within the same calendar week
+    /// so the pick doesn't change mid-session.
+    private var featuredBundle: CosmeticBundle {
+        let week = Calendar.current.component(.weekOfYear, from: Date())
+        return CosmeticBundle.catalogue[week % CosmeticBundle.catalogue.count]
+    }
+
     @ViewBuilder
-    private var bundleGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                ForEach(CosmeticBundle.catalogue) { bundle in
-                    bundleCell(bundle)
-                }
+    private var collectionsView: some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            // Featured collection
+            sectionLabel("FEATURED THIS WEEK")
+                .padding(.bottom, 8)
+            collectionCard(featuredBundle, isFeatured: true)
+                .padding(.bottom, 22)
+
+            // All other collections
+            sectionLabel("ALL COLLECTIONS")
+                .padding(.bottom, 8)
+            ForEach(CosmeticBundle.catalogue.filter { $0.id != featuredBundle.id }) { bundle in
+                collectionCard(bundle, isFeatured: false)
+                    .padding(.bottom, 12)
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 24)
         }
     }
 
-    private func bundleCell(_ bundle: CosmeticBundle) -> some View {
-        let owned = gameState.ownedBundles.contains(bundle.id)
-        return Button {
-            handleBundleTap(bundle, owned: owned)
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+    private func collectionCard(_ bundle: CosmeticBundle, isFeatured: Bool) -> some View {
+        let bundleOwned = gameState.ownedBundles.contains(bundle.id)
+        let owned       = ownedCount(in: bundle)
+        let total       = bundle.itemCount
+        let cost        = bundle.price(in: gameState)
+        let canAfford   = gameState.coinBalance >= cost
+
+        return VStack(alignment: .leading, spacing: 10) {
+            // ── Title row ────────────────────────────────────────────────
+            HStack(alignment: .top, spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
+                    if isFeatured {
+                        Text("⭐ FEATURED")
+                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .kerning(1.4)
+                            .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    }
                     Text(bundle.displayName)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Spacer()
-                    if owned {
-                        Text("OWNED")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .kerning(1.0)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(Capsule().fill(Color.white))
-                    } else {
-                        HStack(spacing: 4) {
+                    Text(bundle.tagline)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.58))
+                        .lineLimit(2)
+                }
+                Spacer()
+                // X/Y progress badge
+                if !bundleOwned {
+                    collectionProgressBadge(owned: owned, total: total)
+                }
+            }
+
+            // ── 6-slot item row ──────────────────────────────────────────
+            collectionSlotRow(bundle)
+
+            // ── Action button ────────────────────────────────────────────
+            if bundleOwned {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Collection Complete")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+                .padding(.top, 2)
+            } else {
+                Button {
+                    handleBundleTap(bundle, owned: bundleOwned)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(owned > 0 ? "Complete the Set" : "Get Bundle")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(canAfford ? .black : Color(white: 0.50))
+                        Spacer()
+                        HStack(spacing: 3) {
                             CoinIcon(size: 13)
-                            Text("\(bundle.price(in: gameState))")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(canAffordBundle(bundle) ? .white : Color(white: 0.45))
+                            Text("\(cost)")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(canAfford ? .black : Color(white: 0.45))
                         }
-                        .padding(.horizontal, 10).padding(.vertical, 4)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(canAfford
+                                  ? (owned > 0
+                                     ? Color(red: 0.30, green: 0.86, blue: 0.56)   // teal-green for "complete set"
+                                     : Color.white)                                  // white for "get bundle"
+                                  : Color(white: 0.20))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(white: isFeatured ? 0.14 : 0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(
+                            isFeatured
+                                ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40)
+                                : (bundleOwned
+                                   ? Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.35)
+                                   : Color.clear),
+                            lineWidth: 1.2
+                        )
+                )
+        )
+    }
+
+    // X / Y badge showing collection progress.
+    private func collectionProgressBadge(owned: Int, total: Int) -> some View {
+        let fraction = total > 0 ? Double(owned) / Double(total) : 0
+        let color: Color = owned == 0
+            ? Color(white: 0.35)
+            : (owned == total
+               ? Color(red: 0.24, green: 0.82, blue: 0.48)
+               : Color(red: 1.00, green: 0.72, blue: 0.20))
+        return HStack(spacing: 3) {
+            // Mini dot-progress strip
+            HStack(spacing: 3) {
+                ForEach(0..<min(total, 6), id: \.self) { i in
+                    Circle()
+                        .fill(i < owned ? color : Color(white: 0.22))
+                        .frame(width: 6, height: 6)
+                }
+            }
+            Text("\(owned)/\(total)")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Color(white: 0.12)))
+        .animation(.easeInOut(duration: 0.3), value: fraction)
+    }
+
+    // ── 6-slot item row ──────────────────────────────────────────────────────
+
+    private func collectionSlotRow(_ bundle: CosmeticBundle) -> some View {
+        HStack(spacing: 6) {
+            // Ball
+            collectionSlot(label: "Ball",
+                           isOwned: bundle.balls.first.map { gameState.isOwned($0) }) {
+                if let ball = bundle.balls.first {
+                    BallSkinView(skin: ball, diameter: 34)
+                        .frame(width: 34, height: 34)
+                }
+                if bundle.balls.count > 1 {
+                    Text("+\(bundle.balls.count - 1)")
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .foregroundStyle(Color(white: 0.85))
+                        .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(Capsule().fill(Color(white: 0.22)))
+                        .offset(x: 10, y: -10)
+                }
+            }
+            // Goal
+            collectionSlot(label: "Goal",
+                           isOwned: bundle.goals.first.map { gameState.isOwned($0) }) {
+                if let goal = bundle.goals.first {
+                    Circle()
+                        .fill(GoalSkin.previewGradient(for: goal))
+                        .frame(width: 34, height: 34)
+                }
+            }
+            // Trail
+            collectionSlot(label: "Trail",
+                           isOwned: bundle.trails.first.map { gameState.isOwned($0) }) {
+                if let trail = bundle.trails.first {
+                    Canvas { ctx, size in
+                        var p = Path()
+                        p.move(to: CGPoint(x: size.width * 0.12, y: size.height * 0.88))
+                        p.addLine(to: CGPoint(x: size.width * 0.88, y: size.height * 0.12))
+                        ctx.stroke(p, with: .color(trail == .none ? Color(white: 0.30) : trail.color),
+                                   style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    }
+                    .frame(width: 38, height: 38)
+                }
+            }
+            // Floor
+            collectionSlot(label: "Floor",
+                           isOwned: bundle.floors.first.map { gameState.isOwned($0) }) {
+                if let floor = bundle.floors.first {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(floor.color)
+                        .frame(width: 38, height: 26)
+                }
+            }
+            // Pit
+            collectionSlot(label: "Pit",
+                           isOwned: bundle.pits.first.map { gameState.isOwned($0) }) {
+                if let pit = bundle.pits.first {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color(white: 0.22))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(pit.color)
+                            .frame(width: 18, height: 10)
+                    }
+                    .frame(width: 38, height: 26)
+                }
+            }
+            // Music
+            collectionSlot(label: "Music",
+                           isOwned: bundle.music.first.map { gameState.isOwned($0) }) {
+                if let track = bundle.music.first {
+                    Image(systemName: track == .none ? "speaker.slash.fill" : "music.note")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(red: 0.45, green: 0.65, blue: 1.00),
+                                         Color(red: 0.25, green: 0.40, blue: 0.85)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                }
+            }
+        }
+    }
+
+    /// A single item slot in a collection card.  `isOwned == nil` means the
+    /// bundle has no item in this category → renders a dotted empty placeholder.
+    /// `isOwned == false` → dimmed preview + lock icon.
+    /// `isOwned == true`  → full-colour preview + subtle green ring.
+    private func collectionSlot<Content: View>(
+        label: String,
+        isOwned: Bool?,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        let owned   = isOwned == true
+        let isEmpty = isOwned == nil
+
+        return VStack(spacing: 4) {
+            ZStack {
+                // Slot background
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isEmpty ? Color.clear : Color(white: 0.10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(
+                                isEmpty
+                                    ? Color(white: 0.22).opacity(0.60)
+                                    : (owned
+                                       ? Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.55)
+                                       : Color.clear),
+                                style: isEmpty
+                                    ? StrokeStyle(lineWidth: 1.0, dash: [3, 3])
+                                    : StrokeStyle(lineWidth: 1.2)
+                            )
+                    )
+
+                if isEmpty {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color(white: 0.22))
+                } else {
+                    // Item preview — dimmed when locked
+                    content()
+                        .opacity(owned ? 1.0 : 0.28)
+
+                    // Lock icon overlay
+                    if !owned {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(white: 0.70))
                     }
                 }
-                Text(bundle.tagline)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.65))
-                    .multilineTextAlignment(.leading)
-                Text(bundle.contentSummary)
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color(white: 0.50))
-                    .lineLimit(3)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(white: 0.14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(owned ? Color.white.opacity(0.40) : Color.clear, lineWidth: 1.2)
-                    )
-            )
+            .frame(width: 52, height: 52)
+
+            Text(label)
+                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                .foregroundStyle(isEmpty ? Color(white: 0.22) : Color(white: 0.40))
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+    }
+
+    // ── Bundle ownership helpers ─────────────────────────────────────────────
+
+    private func ownedCount(in bundle: CosmeticBundle) -> Int {
+        var n = 0
+        n += bundle.balls.filter  { gameState.isOwned($0) }.count
+        n += bundle.goals.filter  { gameState.isOwned($0) }.count
+        n += bundle.trails.filter { gameState.isOwned($0) }.count
+        n += bundle.floors.filter { gameState.isOwned($0) }.count
+        n += bundle.pits.filter   { gameState.isOwned($0) }.count
+        n += bundle.music.filter  { gameState.isOwned($0) }.count
+        return n
     }
 
     private func canAffordBundle(_ bundle: CosmeticBundle) -> Bool {
