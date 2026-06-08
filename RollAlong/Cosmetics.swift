@@ -88,7 +88,8 @@ extension BallSkin: CosmeticItem {
              .pastel, .neon, .dune:
             return .premium    // 200 coins — multi-colour blends / planets
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
-             .storm, .candy, .ghost:
+             .storm, .candy, .ghost,
+             .basketball, .eightBall, .baseball:
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }
@@ -591,6 +592,10 @@ enum Floor: String, CosmeticItem {
     case grass            // golf-course turf with grass tufts (Golf bundle)
     case moon             // ★ NEW (Space Travel bundle) — lunar regolith + craters
 
+    // Sports bundles (new)
+    case court            // Full Court bundle — warm hardwood basketball floor
+    case felt             // Billiards Hall bundle — deep-green pool-table felt
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -618,6 +623,8 @@ enum Floor: String, CosmeticItem {
         case .disco:      return "Disco"
         case .grass:      return "Grass"
         case .moon:       return "Moon"
+        case .court:      return "Court"
+        case .felt:       return "Felt"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -630,7 +637,8 @@ enum Floor: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .desert, .stormcloud, .sugar, .fog:
+             .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
+             .court, .felt:
             return .standard   //  50 coins
         case .aurora, .disco, .grass, .moon:
             return .exclusive  // 500 coins — animated / textured overlay
@@ -666,6 +674,8 @@ enum Floor: String, CosmeticItem {
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
+        case .court:      return Color(red: 0.84,  green: 0.65,  blue: 0.38 )  // warm hardwood
+        case .felt:       return Color(red: 0.18,  green: 0.48,  blue: 0.24 )  // pool-table green
         }
     }
 
@@ -725,6 +735,10 @@ enum Pit: String, CosmeticItem {
     case pond             // water with ripples + lily pad (Golf bundle)
     case space            // ★ NEW (Space Travel bundle) — starfield void
 
+    // Sports bundles (new)
+    case sideline         // Full Court bundle — dark-grey out-of-bounds edge
+    case pocket           // Billiards Hall bundle — near-black pool pocket
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -753,6 +767,8 @@ enum Pit: String, CosmeticItem {
         case .sky:        return "Sky"
         case .pond:       return "Pond"
         case .space:      return "Space"
+        case .sideline:   return "Sideline"
+        case .pocket:     return "Pocket"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -765,7 +781,8 @@ enum Pit: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard:
+             .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard,
+             .sideline, .pocket:
             return .standard   //  50 coins
         case .evil, .sky, .pond, .space:
             return .exclusive  // 500 coins — animated overlay
@@ -802,6 +819,8 @@ enum Pit: String, CosmeticItem {
         case .sky:        return Color(red: 0.55,  green: 0.78,  blue: 0.95 )  // pale blue base; clouds drift on top
         case .pond:       return Color(red: 0.08,  green: 0.30,  blue: 0.42 )  // deep water; ripples + lily pad on top
         case .space:      return Color(red: 0.02,  green: 0.02,  blue: 0.06 )  // near-black void; stars twinkle on top
+        case .sideline:   return Color(red: 0.14,  green: 0.14,  blue: 0.16 )  // dark court edge / out-of-bounds
+        case .pocket:     return Color(red: 0.06,  green: 0.08,  blue: 0.06 )  // near-black pool pocket
         }
     }
 
@@ -1354,6 +1373,44 @@ struct CosmeticBundle: Identifiable {
             pits:   [.graveyard],
             music:  [.downtempo]
         ),
+
+        // ── Sports bundles ──────────────────────────────────────────────
+        CosmeticBundle(
+            id:             "full-court",
+            displayName:    "Full Court",
+            tagline:        "Hardwood, orange leather, and the buzz of the arena.",
+            contentSummary: "Basketball · Eclipse goal · Fire trail · Court floor · Sideline pit · Jazz music",
+            balls:  [.basketball],
+            goals:  [.eclipse],
+            trails: [.fire],
+            floors: [.court],
+            pits:   [.sideline],
+            music:  [.jazz]
+        ),
+        CosmeticBundle(
+            id:             "billiards-hall",
+            displayName:    "Billiards Hall",
+            tagline:        "Eight ball, corner pocket. The felt is perfect.",
+            contentSummary: "8-Ball · Crystal goal · Smoke trail · Felt floor · Pocket pit · Jazz music",
+            balls:  [.eightBall],
+            goals:  [.crystal],
+            trails: [.smoke],
+            floors: [.felt],
+            pits:   [.pocket],
+            music:  [.jazz]
+        ),
+        CosmeticBundle(
+            id:             "diamond",
+            displayName:    "Diamond",
+            tagline:        "Step up to the plate. The crowd is watching.",
+            contentSummary: "Baseball · Target goal · Rose trail · Meadow floor · Sketch pit · Orchestral music",
+            balls:  [.baseball],
+            goals:  [.target],
+            trails: [.roseTrail],
+            floors: [.meadow],
+            pits:   [.sketch],
+            music:  [.orchestral]
+        ),
     ]
 }
 
@@ -1409,7 +1466,7 @@ struct BallPack: Identifiable {
             id:          "sports-balls",
             displayName: "Sports Balls",
             tagline:     "Take the field — a new ball each attempt.",
-            skins:       [.golfBall, .soccer]
+            skins:       [.golfBall, .soccer, .basketball, .baseball]
         ),
         BallPack(
             id:          "glass-marbles",

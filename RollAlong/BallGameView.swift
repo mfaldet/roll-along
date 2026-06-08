@@ -1745,93 +1745,20 @@ struct BallGameView: View {
         .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
     }
 
-    /// In-game marble.  Standard / Epic ball skins use the shared
-    /// radial-gradient renderer; the Snowglobe (Legendary) marble
-    /// swaps in a bespoke animated Canvas with snowflakes drifting
-    /// inside a frosted-glass dome.
-    @ViewBuilder
+    /// In-game marble.  All rendering is delegated to BallSkinView, which
+    /// dispatches to the appropriate Canvas renderer or gradient based on the
+    /// active skin.  Clipping, overlay strokes, and animation are handled
+    /// inside BallSkinView so the shop, home screen, and in-game view are
+    /// guaranteed to show identical art for every skin.
     private var marbleView: some View {
-        switch gameState.activeSkin {
-        case .snowglobe:
-            snowglobeMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .golfBall:
-            golfBallMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.25), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .soccer:
-            // White body + black pentagons.  Clipped to a circle so the
-            // ring pentagons run off the silhouette like a real ball.
-            soccerMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.30), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .saturn:
-            // Bespoke ringed renderer — the gas-giant body plus the
-            // iconic tilted ring system.  The rings extend beyond the
-            // body so this case is NOT clipped to a circle.
-            saturnMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .ufo:
-            // Animated flying saucer — metallic disc, glowing green
-            // dome, rotating belly lights.  Not clipped (the saucer is
-            // wider than tall and fits inside the square frame).
-            ufoMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .aquarium:
-            // Translucent aqua glass sphere with static bubbles.  Clipped
-            // to a circle so any edge bubbles run off the silhouette.
-            aquariumMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .marble:
-            // Clear glass sphere with an internal cobalt cat's-eye swirl.
-            // Clipped to a circle; the swirl + gloss live in glassMarble.
-            glassMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .storm:
-            // Dark storm-cloud sphere with billowing puffs and a lightning
-            // bolt.  Clipped to a circle so the puffs run off the edge.
-            stormMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.30), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .candy:
-            // Glossy peppermint sphere with a white pinwheel swirl.
-            // Clipped to a circle so the swirl arms run off the edge.
-            candyMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        case .ghost:
-            // Luminous pale spirit with hollow eyes and a wailing mouth.
-            ghostMarble
-                .frame(width: effectiveBallRadius * 2, height: effectiveBallRadius * 2)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        default:
-            Circle()
-                .fill(gameState.activeSkin.gradient(endRadius: effectiveBallRadius * 1.4))
-                .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
-        }
+        BallSkinView(skin: gameState.activeSkin, diameter: effectiveBallRadius * 2)
+            .shadow(color: .black.opacity(0.55), radius: 4, x: 2, y: 5)
     }
+
+    // NOTE: The bespoke Canvas renderers below (saturnMarble … snowglobeMarble)
+    // are now dead code.  The canonical implementations live in BallSkinView.swift
+    // and are used by marbleView, the shop, and the home screen.  Remove in a
+    // follow-up cleanup pass once the build is confirmed green.
 
     /// Saturn — pale-gold body with a tilted elliptical ring system.
     /// Drawn in a Canvas so the rings can render in front of the lower

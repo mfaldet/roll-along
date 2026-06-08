@@ -705,10 +705,8 @@ struct HomeView: View {
     }
 
     private var liveBall: some View {
-        Circle()
-            .fill(gameState.activeSkin.gradient(endRadius: ballRadius * 1.4))
+        BallSkinView(skin: gameState.activeSkin, diameter: ballRadius * 2)
             .frame(width: ballRadius * 2, height: ballRadius * 2)
-            .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.65), radius: 14, x: 3, y: 9)
     }
 

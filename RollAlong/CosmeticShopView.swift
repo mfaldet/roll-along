@@ -414,9 +414,7 @@ struct CosmeticShopView: View {
     }
 
     private func ballPreview(_ skin: BallSkin) -> some View {
-        Circle()
-            .fill(skin.gradient(endRadius: 35))
-            .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6))
+        BallSkinView(skin: skin, diameter: 54)
             .frame(width: 54, height: 54)
             .shadow(color: Color.black.opacity(0.40), radius: 6, x: 2, y: 4)
     }
@@ -613,9 +611,7 @@ struct CosmeticShopView: View {
                 // Mini swatches of every ball in the pack.
                 HStack(spacing: 8) {
                     ForEach(pack.skins, id: \.self) { skin in
-                        Circle()
-                            .fill(skin.gradient(endRadius: 15))
-                            .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6))
+                        BallSkinView(skin: skin, diameter: 30)
                             .frame(width: 30, height: 30)
                     }
                 }

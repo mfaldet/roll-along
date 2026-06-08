@@ -91,6 +91,17 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     via the bespoke `ghostMarble` Canvas in BallGameView.
     case ghost = "Ghost"
 
+    // ── Sports bundle skins (new) ──────────────────────────────────────
+    //   • basketball — orange sphere with classic NBA seam curves, via the
+    //     bespoke `basketballCanvas` in BallSkinView.
+    case basketball = "Basketball"
+    //   • eightBall — near-black sphere with a white badge containing "8",
+    //     via the bespoke `eightBallCanvas` in BallSkinView.
+    case eightBall  = "8-Ball"
+    //   • baseball — off-white leather sphere with red stitched seam curves,
+    //     via the bespoke `baseballCanvas` in BallSkinView.
+    case baseball   = "Baseball"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -444,6 +455,33 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.82, green: 0.86, blue: 0.94),
                 Color(red: 0.58, green: 0.64, blue: 0.76),
                 Color(red: 0.34, green: 0.40, blue: 0.54),
+            ]
+
+        // ── Sports skins (new) ──
+        case .basketball:
+            // Fallback gradient — bright orange highlight → deep terracotta.
+            // The bespoke Canvas renderer in BallSkinView is the real display path.
+            return [
+                Color(red: 1.00, green: 0.78, blue: 0.38),
+                Color(red: 0.92, green: 0.44, blue: 0.06),
+                Color(red: 0.68, green: 0.24, blue: 0.02),
+                Color(red: 0.36, green: 0.10, blue: 0.01),
+            ]
+        case .eightBall:
+            // Fallback gradient — near-black with subtle highlight.
+            return [
+                Color(red: 0.30, green: 0.30, blue: 0.32),
+                Color(red: 0.10, green: 0.10, blue: 0.12),
+                Color(red: 0.04, green: 0.04, blue: 0.06),
+                Color.black,
+            ]
+        case .baseball:
+            // Fallback gradient — off-white leather.
+            return [
+                Color.white,
+                Color(red: 0.95, green: 0.93, blue: 0.88),
+                Color(red: 0.78, green: 0.74, blue: 0.68),
+                Color(red: 0.54, green: 0.48, blue: 0.42),
             ]
         }
     }
