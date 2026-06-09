@@ -195,6 +195,23 @@ struct ChallengeTrackMode: GameMode {
     let showsStars                   = true
     let showsTimer                   = true
 
+    // MARK: - Difficulty helpers (called by LevelLayout.trackLayout)
+
+    /// Converts a track level (1–100) to a 0…1 difficulty fraction that drives
+    /// hole density and obstacle complexity.  Matches the 6-phase arc:
+    ///   Tutorial (1–15) → Apprentice (16–35) → Journeyman (36–60)
+    ///   → Expert (61–80) → Master (81–95) → Pinnacle (96–100)
+    /// 0…1 difficulty fraction for a track level — delegates to LevelLayout
+    /// which owns the authoritative implementation (same file as the generator).
+    static func difficultyFraction(for level: Int) -> Double {
+        LevelLayout.difficultyFraction(for: level)
+    }
+
+    /// DifficultyTier for a track level — delegates to LevelLayout.
+    static func challengeTier(for level: Int) -> DifficultyTier {
+        LevelLayout.trackDifficultyTier(for: level)
+    }
+
     /// Maps every defined Challenge Track ID to its cosmetic reward bundle ID.
     /// The bundle is granted for free by `GameState.deliverTrackReward(for:)`
     /// when the player clears level 100.  Returning nil means the track is
@@ -450,15 +467,19 @@ enum GameModeCatalogue {
         (MarbleCupMode(),    true),    // self-contained MarbleCupView — live
         (KingOfTheHillMode(),true),    // self-contained KingOfTheHillView — live
         (PinballMode(),      true),    // self-contained PinballView — live
-        // ── Challenge Tracks (disabled until S18 engine ships) ───────────
-        (frozenPeaks,    false),
-        (deepCosmos,     false),
-        (infernoRun,     false),
-        (neonArcade,     false),
-        (hauntedManor,   false),
-        (ancientTemple,  false),
-        (abyssalDepths,  false),
-        (goldenGauntlet, false),
+        // ── Challenge Tracks ─────────────────────────────────────────────
+        // S19: existing-bundle tracks — engine + generator live
+        (frozenPeaks,    true),
+        (deepCosmos,     true),
+        (infernoRun,     true),
+        (neonArcade,     true),
+        (hauntedManor,   true),
+        // S20: ancient-temple bundle uses existing cosmetics — live
+        (ancientTemple,  true),
+        // S21: requires Trench ball + abyssal-depths bundle — live
+        (abyssalDepths,  true),
+        // S22: requires Trophy ball + champion bundle; gated at ≥3 completions
+        (goldenGauntlet, true),
     ]
 
     /// Modes the player can currently see in the UI.

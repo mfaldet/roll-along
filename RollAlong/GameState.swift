@@ -182,6 +182,46 @@ final class GameState: ObservableObject {
         didSet { Self.saveStringSet(completedTracks, forKey: "ra_completedTracks") }
     }
 
+    // ── Challenge Track active session (transient — not persisted) ──────────
+    //
+    // Set by `startTrack(_:)` when the player taps Play on a track level.
+    // Read by BallGameView to choose the right LevelLayout and to record
+    // progress when a level is cleared.
+
+    /// The track currently being played, or nil when in the main climb.
+    @Published var activeTrackID: String? = nil
+
+    /// The level number (1–100) being played within the active track.
+    @Published var activeTrackLevel: Int = 1
+
+    /// Configure the active track session and set `activeTrackLevel` to
+    /// the next un-cleared level (or 100 if the track is already complete).
+    func startTrack(_ trackID: String) {
+        activeTrackID    = trackID
+        let cleared      = trackProgress[trackID] ?? 0
+        activeTrackLevel = min(100, cleared + 1)
+    }
+
+    /// Begin playing a specific level within the active track (used by the
+    /// level-grid in ChallengeTrackView to let the player replay any level).
+    func startTrack(_ trackID: String, atLevel level: Int) {
+        activeTrackID    = trackID
+        activeTrackLevel = max(1, min(100, level))
+    }
+
+    /// Called by BallGameView on a track level clear.  Advances
+    /// `activeTrackLevel` to the next level and records progress.
+    /// Returns true when the track was just completed (level 100 cleared).
+    @discardableResult
+    func advanceTrackLevel() -> Bool {
+        guard let trackID = activeTrackID else { return false }
+        let cleared = activeTrackLevel
+        advanceTrackProgress(trackID: trackID, to: cleared)
+        let justCompleted = cleared == 100
+        if !justCompleted { activeTrackLevel = cleared + 1 }
+        return justCompleted
+    }
+
     // Currently-equipped cosmetic per category.  Always defaults to the
     // starter on a fresh install.
     @Published var equippedGoal: GoalSkin {

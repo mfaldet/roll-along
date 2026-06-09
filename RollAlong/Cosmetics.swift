@@ -89,7 +89,8 @@ extension BallSkin: CosmeticItem {
             return .premium    // 200 coins — multi-colour blends / planets
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
              .storm, .candy, .ghost,
-             .basketball, .eightBall, .baseball, .lava,
+             .basketball, .eightBall, .baseball, .lava, .trench,
+             .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
              .aurora,          // starter-pack-exclusive; never coin-purchasable
              .beachBall,       // summer-2026-exclusive; never coin-purchasable
              .pumpkin,         // halloween-2026-exclusive; never coin-purchasable
@@ -1612,14 +1613,33 @@ struct CosmeticBundle: Identifiable {
         ),
         //
         // S21 ─────────────────────────────────────────────────────────────
-        // "abyssal-depths" bundle — awaiting Trench BallSkin.
-        // Will contain: Trench ball · Comet goal · Ice trail · Blueprint floor
-        //               · Space pit · Dreamscape music.
-        //
+        CosmeticBundle(
+            id:             "abyssal-depths",
+            displayName:    "Abyssal Depths",
+            tagline:        "Light doesn't reach here. Roll by feel.",
+            contentSummary: "Trench ball · Comet goal · Ice trail · Blueprint floor · Space pit · Dreamscape music",
+            balls:  [.trench],
+            goals:  [.comet],
+            trails: [.ice],
+            floors: [.blueprint],
+            pits:   [.space],
+            music:  [.dreamscape]
+        ),
         // S22 ─────────────────────────────────────────────────────────────
-        // "champion" bundle — awaiting Trophy BallSkin (pack-exclusive).
-        // Will contain: Trophy ball (exclusive) · Quasar goal · Gold trail
-        //               · Mirage floor · Mirage pit · Orchestral music.
+        // Trophy ball is isBundleExclusive = true — hidden from shop grid,
+        // only earned by completing Golden Gauntlet.
+        CosmeticBundle(
+            id:             "champion",
+            displayName:    "Champion",
+            tagline:        "No tutorial. No mercy. A hundred flawless rooms.",
+            contentSummary: "Trophy ball (exclusive) · Quasar goal · Gold trail · Mirage floor · Mirage pit · Orchestral music",
+            balls:  [.trophy],
+            goals:  [.quasar],
+            trails: [.gold],
+            floors: [.mirage],
+            pits:   [.mirage],
+            music:  [.orchestral]
+        ),
 
         // ── S15 ──────────────────────────────────────────────────────────
         CosmeticBundle(

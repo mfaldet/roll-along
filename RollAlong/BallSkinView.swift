@@ -101,6 +101,16 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color(red: 0.55, green: 0.08, blue: 0.00).opacity(0.55), lineWidth: 0.5))
 
+        case .trench:
+            trenchCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.04, green: 0.18, blue: 0.40).opacity(0.70), lineWidth: 0.5))
+
+        case .trophy:
+            trophyCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.82, green: 0.60, blue: 0.08).opacity(0.60), lineWidth: 0.5))
+
         // ── Starter Pack exclusive ──────────────────────────────────────
         case .aurora:
             auroraCanvas
@@ -1845,6 +1855,197 @@ struct BallSkinView: View {
                         ]),
                         center: CGPoint(x: cx - r * 0.31, y: cy - r * 0.56),
                         startRadius: 0, endRadius: r * 0.26))
+            }
+        }
+    }
+
+    // ── Trench ───────────────────────────────────────────────────────────────
+    // Deep navy sphere with 7 bioluminescent teal/green dot clusters that
+    // pulse slowly (opacity sine wave per cluster).  A dark radial vignette
+    // sells the crushing abyssal pressure, and a faint cyan edge rim keeps
+    // the silhouette readable on dark backgrounds.
+    //
+    // Animation freezes at t = 0 when reduceMotion is on.
+    private var trenchCanvas: some View {
+        @Environment(\.accessibilityReduceMotion) var reduceMotion: Bool
+        return TimelineView(.animation) { timeline in
+            let rawT = timeline.date.timeIntervalSinceReferenceDate
+            let t: Double = reduceMotion ? 0.0 : rawT
+
+            Canvas { ctx, size in
+                let r  = min(size.width, size.height) * 0.5
+                let cx = size.width  * 0.5
+                let cy = size.height * 0.5
+
+                // ── 1. Deep navy base gradient ───────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.05, green: 0.15, blue: 0.38), location: 0.00),
+                            .init(color: Color(red: 0.02, green: 0.07, blue: 0.22), location: 0.50),
+                            .init(color: Color(red: 0.01, green: 0.02, blue: 0.10), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx, y: cy),
+                        startRadius: 0, endRadius: r))
+
+                // ── 2. Bioluminescent dot clusters ────────────────────────
+                // Each tuple: (xFrac, yFrac, dotCount, baseRadius, speed, phase, hue)
+                //   hue: 0 = teal, 1 = green-cyan
+                let clusters: [(CGFloat, CGFloat, Int, CGFloat, Double, Double, Bool)] = [
+                    (0.38, 0.55, 5, 0.025, 0.42, 0.00, false),
+                    (0.62, 0.38, 4, 0.022, 0.55, 1.40, true),
+                    (0.28, 0.32, 6, 0.020, 0.38, 2.80, false),
+                    (0.70, 0.65, 3, 0.028, 0.48, 0.70, true),
+                    (0.50, 0.72, 5, 0.023, 0.35, 2.10, false),
+                    (0.42, 0.22, 4, 0.018, 0.60, 3.50, true),
+                    (0.65, 0.28, 3, 0.026, 0.44, 1.05, false),
+                ]
+                var clusterRng = LevelRNG(seed: 42)
+                for (xFrac, yFrac, count, baseR, speed, phase, greenTint) in clusters {
+                    let bx  = cx + (xFrac - 0.5) * r * 1.62
+                    let by  = cy + (yFrac - 0.5) * r * 1.62
+                    let dx  = bx - cx
+                    let dy  = by - cy
+                    guard sqrt(dx*dx + dy*dy) < r * 0.88 else { continue }
+
+                    let pulse = 0.40 + 0.60 * (sin(t * speed + phase) * 0.5 + 0.5)
+                    let dotColor = greenTint
+                        ? Color(red: 0.10, green: 0.92, blue: 0.68).opacity(pulse * 0.82)
+                        : Color(red: 0.18, green: 0.82, blue: 0.88).opacity(pulse * 0.82)
+                    let glowColor = greenTint
+                        ? Color(red: 0.05, green: 0.80, blue: 0.55).opacity(pulse * 0.28)
+                        : Color(red: 0.08, green: 0.70, blue: 0.85).opacity(pulse * 0.28)
+
+                    for _ in 0..<count {
+                        let ox = CGFloat(clusterRng.range(-1, 1)) * baseR * r * 3.5
+                        let oy = CGFloat(clusterRng.range(-1, 1)) * baseR * r * 3.5
+                        let px = bx + ox
+                        let py = by + oy
+                        let dpx = px - cx; let dpy = py - cy
+                        guard sqrt(dpx*dpx + dpy*dpy) < r * 0.84 else { continue }
+                        let dr = baseR * r
+                        // Glow halo
+                        ctx.fill(
+                            Path(ellipseIn: CGRect(x: px - dr*1.8, y: py - dr*1.8,
+                                                   width: dr*3.6, height: dr*3.6)),
+                            with: .color(glowColor))
+                        // Core dot
+                        ctx.fill(
+                            Path(ellipseIn: CGRect(x: px - dr, y: py - dr,
+                                                   width: dr*2, height: dr*2)),
+                            with: .color(dotColor))
+                    }
+                }
+
+                // ── 3. Depth vignette ────────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .clear, location: 0.55),
+                            .init(color: Color(red: 0.01, green: 0.02, blue: 0.08).opacity(0.80), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx, y: cy),
+                        startRadius: 0, endRadius: r))
+
+                // ── 4. Cyan rim highlight ────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.70,
+                                           width: r * 0.34, height: r * 0.20)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.40, green: 0.92, blue: 0.88).opacity(0.22), location: 0),
+                            .init(color: .clear, location: 1),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.35, y: cy - r * 0.60),
+                        startRadius: 0, endRadius: r * 0.22))
+            }
+        }
+    }
+
+    // ── Trophy ───────────────────────────────────────────────────────────────
+    // Polished prestige gold sphere with a slow counter-rotating obsidian swirl
+    // band across the equator, and a large mirror-quality specular crescent.
+    //
+    // Rendering layers:
+    //   1. Gold radial gradient base
+    //   2. Obsidian swirl — sinusoidal vertical strip that rotates over ~12 s
+    //   3. Metallic sheen overlay (subtle warm-to-cool gradient across the sphere)
+    //   4. Large mirror specular (upper-left, sharp highlight → soft falloff)
+    //
+    // Freezes at t = 0 when reduceMotion is on.
+    private var trophyCanvas: some View {
+        @Environment(\.accessibilityReduceMotion) var reduceMotion: Bool
+        return TimelineView(.animation) { timeline in
+            let rawT = timeline.date.timeIntervalSinceReferenceDate
+            let t: Double = reduceMotion ? 0.0 : rawT
+
+            Canvas { ctx, size in
+                let r  = min(size.width, size.height) * 0.5
+                let cx = size.width  * 0.5
+                let cy = size.height * 0.5
+
+                // ── 1. Gold base gradient ────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.96, blue: 0.66), location: 0.00),
+                            .init(color: Color(red: 0.94, green: 0.72, blue: 0.18), location: 0.38),
+                            .init(color: Color(red: 0.62, green: 0.44, blue: 0.07), location: 0.72),
+                            .init(color: Color(red: 0.14, green: 0.09, blue: 0.02), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
+                        startRadius: 0,
+                        endRadius: r * 1.05))
+
+                // ── 2. Obsidian counter-swirl band ───────────────────────
+                // The band sweeps across the equator and rotates slowly.
+                // We approximate it as a sinusoidal vertical slice.
+                let swirlAngle = t * (.pi / 6.0)          // ~12 s full rotation
+                let bandCX     = cx + r * CGFloat(cos(swirlAngle)) * 0.70
+                let bandW      = r * 0.32
+                let bandRect   = CGRect(x: bandCX - bandW * 0.5,
+                                        y: cy - r,
+                                        width: bandW,
+                                        height: r * 2)
+                ctx.fill(
+                    Path(ellipseIn: bandRect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: Color(red: 0.06, green: 0.04, blue: 0.02).opacity(0.58), location: 0.5),
+                            .init(color: .clear, location: 1),
+                        ]),
+                        startPoint: CGPoint(x: bandCX - bandW, y: 0),
+                        endPoint:   CGPoint(x: bandCX + bandW, y: 0)))
+
+                // ── 3. Metallic warm sheen (left-to-right) ───────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.0, green: 0.88, blue: 0.40).opacity(0.12), location: 0.0),
+                            .init(color: .clear, location: 0.5),
+                            .init(color: Color(red: 0.30, green: 0.18, blue: 0.00).opacity(0.16), location: 1.0),
+                        ]),
+                        startPoint: CGPoint(x: cx - r, y: cy),
+                        endPoint:   CGPoint(x: cx + r, y: cy)))
+
+                // ── 4. Mirror specular (upper-left) ─────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.72,
+                                           width: r * 0.50, height: r * 0.28)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color.white.opacity(0.88), location: 0.00),
+                            .init(color: Color.white.opacity(0.42), location: 0.40),
+                            .init(color: Color(red: 1.0, green: 0.92, blue: 0.60).opacity(0.15), location: 0.75),
+                            .init(color: .clear, location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.62),
+                        startRadius: 0, endRadius: r * 0.36))
             }
         }
     }

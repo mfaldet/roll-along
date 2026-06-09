@@ -268,7 +268,12 @@ struct BallGameView: View {
         if !activeMode.hasHoles {
             return LevelLayout.openArena
         }
-        let base = LevelLayout.layout(for: gameState.currentLevel)
+        let base: LevelLayout
+        if case .challengeTrack(let id) = activeMode.progression {
+            base = LevelLayout.trackLayout(trackID: id, level: gameState.activeTrackLevel)
+        } else {
+            base = LevelLayout.layout(for: gameState.currentLevel)
+        }
         return gameState.ballStartsAtTop ? base.flipped() : base
     }
 
@@ -1777,6 +1782,9 @@ struct BallGameView: View {
         if case .mainClimb = activeMode.progression {
             return "LEVEL \(gameState.currentLevel)"
         }
+        if case .challengeTrack = activeMode.progression {
+            return "\(activeMode.displayName.uppercased())  \(gameState.activeTrackLevel) / 100"
+        }
         return activeMode.displayName.uppercased()
     }
 
@@ -2948,6 +2956,17 @@ struct BallGameView: View {
     /// moments (welcome after L1, tutorial reward after L10) when applicable;
     /// otherwise just advances + respawns.
     private func advanceFromLevelClear() {
+        // Challenge tracks bypass the climb's welcome/tutorial moments.
+        if case .challengeTrack = activeMode.progression {
+            let completed = gameState.advanceTrackLevel()
+            if completed {
+                // Level 100 cleared — pop back to the track select screen.
+                nav.goHome()
+            } else {
+                spawnBall(in: arenaSize)
+            }
+            return
+        }
         if gameState.currentLevel == 1 && !gameState.seenWelcomeMoment {
             withAnimation(.easeInOut(duration: 0.32)) { showWelcomeMoment = true }
         } else if gameState.currentLevel == 10 && !gameState.seenTutorialReward {
@@ -3481,7 +3500,38 @@ struct BallGameView: View {
 
         let elapsed = levelStartTime.map { Date.now.timeIntervalSince($0) } ?? 0
         let stars   = computeStars(elapsed: elapsed)
-        let level   = gameState.currentLevel
+
+        // ── Challenge Track fast-path ───────────────────────────────────────
+        if case .challengeTrack(let trackID) = activeMode.progression {
+            let coinReward = coinsPickedThisAttempt.count * GameState.coinPerPickup
+                           + GameState.coinPerClear
+            if coinReward > 0 { gameState.addCoins(coinReward) }
+            lastClearedTime           = elapsed
+            lastClearedStars          = stars
+            lastClearedCoinIndices    = coinsPickedThisAttempt
+            lastClearedIsNewBestStars = true   // no persistent record; always "new"
+            lastClearedCoinReward     = coinReward
+            AnalyticsClient.shared.track(
+                "track_level_cleared",
+                properties: [
+                    "track_id": .string(trackID),
+                    "level":    .int(gameState.activeTrackLevel),
+                    "stars":    .int(stars),
+                    "time":     .double(elapsed),
+                ]
+            )
+            if gameState.activeTrackLevel == 100 {
+                AnalyticsClient.shared.track(
+                    "track_completed",
+                    properties: ["track_id": .string(trackID)]
+                )
+            }
+            withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
+            return
+        }
+        // ── Main climb (original logic below) ──────────────────────────────
+
+        let level     = gameState.currentLevel
         let prevStars = gameState.stars(for: level)
 
         // Currency-coin reward.  Two stackable sources:

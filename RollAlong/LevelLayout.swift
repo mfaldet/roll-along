@@ -2497,6 +2497,332 @@ extension LevelLayout {
 }
 
 // ===========================================================================
+// Challenge Track Level Generator
+//
+// Produces deterministic, theme-specific layouts for any of the 8 Challenge
+// Tracks.  Being in the same file as LevelLayout gives us access to all the
+// private helper functions (sideWalls, defaultTimes, freeX, the 4 standard
+// archetypes) plus LevelRNG without changing any access modifiers.
+//
+// DIFFICULTY CURVE
+//   difficultyFraction(for:) converts a track level (1–100) to a 0…1 value
+//   that drives both hole density and time pressure:
+//
+//     Phase         Levels   d range
+//     Tutorial      1–15     0.00 – 0.15
+//     Apprentice    16–35    0.15 – 0.37
+//     Journeyman    36–60    0.37 – 0.62
+//     Expert        61–80    0.62 – 0.82
+//     Master        81–95    0.82 – 0.95
+//     Pinnacle      96–100   0.95 – 1.00
+//
+// SEEDING
+//   seed = FNV-1a(trackID) XOR (level * big_prime)
+//   Guarantees that each (trackID, level) pair produces a unique layout, and
+//   that layouts are stable across app versions (same seed = same arena).
+// ===========================================================================
+
+extension LevelLayout {
+
+    // MARK: Public entry point
+
+    /// Return the LevelLayout for `level` (1–100) in the given Challenge Track.
+    /// Always deterministic: same trackID + level → same arena every call.
+    static func trackLayout(trackID: String, level: Int) -> LevelLayout {
+        let d    = difficultyFraction(for: level)
+        let tier = trackDifficultyTier(for: level)
+
+        // Unique-per-(track, level) seed using FNV-1a on the trackID bytes.
+        var seed = trackFNV(trackID)
+        seed = seed &+ UInt64(bitPattern: Int64(level)) &* 6364136223846793005
+        var rng = LevelRNG(seed: seed)
+
+        let start = UnitPoint(x: 0.5, y: 0.90)
+        let goal  = UnitPoint(x: 0.5, y: 0.10)
+
+        let designed = trackArchetype(trackID: trackID, level: level, rng: &rng, d: d)
+        let coins    = [0.27, 0.50, 0.73].map { y in
+            UnitPoint(x: freeX(at: y, holes: designed), y: y)
+        }
+        let holes = sideWalls + designed
+
+        // Time pressure is slightly tighter for tracks than the main climb.
+        var times = defaultTimes(start: start, goal: goal, holeCount: designed.count)
+        let pressure = trackTimePressure(trackID: trackID)
+        times.target *= pressure
+        times.gold   *= pressure
+
+        return LevelLayout(
+            holeRects:  holes,
+            start:      start,
+            goal:       goal,
+            coins:      coins,
+            targetTime: times.target,
+            goldTime:   times.gold,
+            tier:       tier,
+            verified:   false
+        )
+    }
+
+    // MARK: - Difficulty curve
+
+    /// DifficultyTier for a challenge track level — drives the time multiplier.
+    /// Challenge tracks use range-based tiers (not the last-digit rule).
+    static func trackDifficultyTier(for level: Int) -> DifficultyTier {
+        switch level {
+        case ...35:  return .easy
+        case 36...60: return .hard
+        default:     return .veryHard
+        }
+    }
+
+    static func difficultyFraction(for level: Int) -> Double {
+        switch level {
+        case ...15:    return Double(level) / 100.0
+        case 16...35:  return 0.15 + Double(level - 15) / 20.0 * 0.22
+        case 36...60:  return 0.37 + Double(level - 35) / 25.0 * 0.25
+        case 61...80:  return 0.62 + Double(level - 60) / 20.0 * 0.20
+        case 81...95:  return 0.82 + Double(level - 80) / 15.0 * 0.13
+        default:       return 0.95 + Double(level - 95) /  5.0 * 0.05
+        }
+    }
+
+    // MARK: - Archetype dispatch
+
+    private static func trackArchetype(
+        trackID: String, level: Int,
+        rng: inout LevelRNG, d: Double
+    ) -> [CGRect] {
+        // Tutorial phase — gentle open layouts for all tracks.
+        if level <= 15 { return level % 2 == 0 ? genZigzag(&rng, d) : genStaircase(&rng, d) }
+
+        // Golden Gauntlet rotates all 7 premium archetypes at max pressure.
+        if trackID == "golden-gauntlet" {
+            let boosted = max(0.70, d)
+            switch level % 7 {
+            case 0: return tgBridge(&rng, boosted)
+            case 1: return tgRings(&rng, boosted)
+            case 2: return tgField(&rng, boosted)
+            case 3: return tgGridMaze(&rng, boosted)
+            case 4: return tgLabyrinth(&rng, boosted)
+            case 5: return tgSymmetric(&rng, boosted)
+            default: return tgDescending(&rng, boosted)
+            }
+        }
+
+        // Track-specific primary archetypes.
+        switch trackID {
+        case "frozen-peaks":
+            return level % 4 == 0 ? genStaircase(&rng, d) : tgBridge(&rng, d)
+        case "deep-cosmos":
+            return level % 3 == 0 ? genScattered(&rng, d) : tgRings(&rng, d)
+        case "inferno-run":
+            return level % 4 == 0 ? genZigzag(&rng, d)    : tgField(&rng, d)
+        case "neon-arcade":
+            return level % 4 == 0 ? genCorridor(&rng, d)  : tgGridMaze(&rng, d)
+        case "haunted-manor":
+            return level % 4 == 0 ? genCorridor(&rng, d)  : tgLabyrinth(&rng, d)
+        case "ancient-temple":
+            return level % 4 == 0 ? genZigzag(&rng, d)    : tgSymmetric(&rng, d)
+        case "abyssal-depths":
+            return level % 4 == 0 ? genCorridor(&rng, d)  : tgDescending(&rng, d)
+        default:
+            switch level % 4 {
+            case 0: return genZigzag(&rng, d)
+            case 1: return genStaircase(&rng, d)
+            case 2: return genScattered(&rng, d)
+            default: return genCorridor(&rng, d)
+            }
+        }
+    }
+
+    // MARK: - Track-specific archetypes
+
+    /// Bridge — wide holes leave a narrow safe ledge on alternate sides.
+    /// Frosty Peaks favourite: ice-bridge corridor feel.
+    private static func tgBridge(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rows        = 3 + Int(d * 5.0)                       // 3…8
+        let bridgeW     = max(0.10, 0.24 - d * 0.14)            // 0.10…0.24 wide
+        var out: [CGRect] = []
+        for i in 0..<rows {
+            let y        = 0.18 + (0.64 / Double(max(1, rows - 1))) * Double(i)
+            let fromLeft = i % 2 == 0
+            let holeW    = 0.76 - bridgeW
+            let x        = fromLeft ? 0.12 + bridgeW : 0.12
+            out.append(CGRect(x: x, y: y, width: holeW, height: 0.06))
+        }
+        return out
+    }
+
+    /// Rings — sparse arcs of small holes with a passable gap.
+    /// Deep Cosmos favourite: asteroid-belt feel.
+    private static func tgRings(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rings   = 2 + Int(d * 2.0)                          // 2…4
+        let gapSize = max(0.12, 0.24 - d * 0.12)
+        var out: [CGRect] = []
+        for r in 0..<rings {
+            let y      = 0.20 + (0.60 / Double(max(1, rings - 1))) * Double(r)
+            let gapCX  = rng.range(0.24, 0.76)
+            var x      = 0.12
+            while x < 0.88 {
+                let hw = 0.055 + rng.range(0, 0.02)
+                let mid = x + hw * 0.5
+                if abs(mid - gapCX) > gapSize * 0.5 {
+                    out.append(CGRect(x: x, y: y - 0.025, width: hw, height: 0.05))
+                }
+                x += hw + rng.range(0.015, 0.035)
+            }
+        }
+        return out
+    }
+
+    /// Field — dense small holes; the path is whatever gaps survive.
+    /// Inferno Run favourite: stepping-stone-through-lava feel.
+    private static func tgField(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rows    = 5 + Int(d * 5.0)                          // 5…10
+        let fillP   = 0.50 + d * 0.28                           // fill probability
+        var out: [CGRect] = []
+        for r in 0..<rows {
+            let y = 0.16 + (0.68 / Double(max(1, rows - 1))) * Double(r)
+            var x = 0.12
+            while x < 0.86 {
+                let hw = 0.06 + rng.range(0, 0.035)
+                if rng.unit() < fillP {
+                    out.append(CGRect(x: x, y: y - 0.025, width: hw, height: 0.05))
+                }
+                x += hw + rng.range(0.025, 0.050)
+            }
+        }
+        return out
+    }
+
+    /// Grid Maze — holes aligned to a pixel grid; a single path winds through.
+    /// Neon Arcade favourite: retro-maze feel.
+    private static func tgGridMaze(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let cols  = 5
+        let rows  = 5 + Int(d * 3.0)                            // 5…8
+        let cellW = 0.76 / Double(cols)
+        let cellH = 0.68 / Double(rows)
+        var pathX = rng.int(0, cols - 1)
+        var path  = Set<Int>()
+        for r in 0..<rows {
+            path.insert(r * cols + pathX)
+            pathX = max(0, min(cols - 1, pathX + rng.int(-1, 1)))
+            path.insert(r * cols + pathX)          // include transition cell
+        }
+        var out: [CGRect] = []
+        for r in 0..<rows {
+            for c in 0..<cols {
+                guard !path.contains(r * cols + c) else { continue }
+                if rng.unit() < (0.55 + d * 0.30) {
+                    let x = 0.12 + Double(c) * cellW + cellW * 0.10
+                    let y = 0.16 + Double(r) * cellH + cellH * 0.10
+                    out.append(CGRect(x: x, y: y, width: cellW * 0.80, height: cellH * 0.80))
+                }
+            }
+        }
+        return out
+    }
+
+    /// Labyrinth — walls with gaps + optional dead-end stubs at high difficulty.
+    /// Haunted Manor favourite: winding, surprising, eerie.
+    private static func tgLabyrinth(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let segs    = 4 + Int(d * 4.0)                          // 4…8
+        var out: [CGRect] = []
+        for i in 0..<segs {
+            let y        = 0.17 + (0.66 / Double(max(1, segs - 1))) * Double(i)
+            let fromLeft = i % 2 == 0
+            let gapW     = max(0.09, 0.22 - d * 0.13)
+            let wallW    = 0.76 - gapW
+            let x        = fromLeft ? 0.12 : 0.12 + gapW
+            out.append(CGRect(x: x, y: y, width: wallW, height: 0.055))
+            // Dead-end stub to confuse the route at Expert+
+            if d > 0.45 && rng.unit() < d * 0.50 {
+                let stubX = fromLeft ? (x - 0.09) : (x + wallW + 0.02)
+                out.append(CGRect(
+                    x: max(0.12, min(0.78, stubX)),
+                    y: y + 0.07,
+                    width: 0.07 + rng.range(0, 0.04),
+                    height: 0.04
+                ))
+            }
+        }
+        return out
+    }
+
+    /// Symmetric — mirrored left/right; centre obstacles at Expert+.
+    /// Ancient Temple favourite: ceremonial, precise, unforgiving.
+    private static func tgSymmetric(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rows = 3 + Int(d * 4.0)                             // 3…7
+        var out: [CGRect] = []
+        for i in 0..<rows {
+            let y    = 0.18 + (0.64 / Double(max(1, rows - 1))) * Double(i)
+            let hw   = 0.10 + d * 0.10 + rng.range(0, 0.04)
+            let hx   = 0.12 + rng.range(0, 0.10)
+            out.append(CGRect(x: hx,                y: y, width: hw, height: 0.055))
+            out.append(CGRect(x: 1.0 - hx - hw,    y: y, width: hw, height: 0.055))
+        }
+        if d > 0.50 {
+            let cx = Int((d - 0.50) * 6.0)                      // 0…3 centre holes
+            for i in 0..<cx {
+                let y  = 0.25 + Double(i) * (0.50 / Double(max(1, cx)))
+                let hw = 0.08 + rng.range(0, 0.04)
+                out.append(CGRect(x: 0.50 - hw * 0.5, y: y, width: hw, height: 0.05))
+            }
+        }
+        return out
+    }
+
+    /// Descending — a central channel that narrows toward the goal.
+    /// Abyssal Depths favourite: claustrophobic, relentless pressure.
+    private static func tgDescending(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
+        let rows = 4 + Int(d * 5.0)                             // 4…9
+        var out: [CGRect] = []
+        for i in 0..<rows {
+            let t        = Double(i) / Double(max(1, rows - 1))  // 0 bottom → 1 top
+            let y        = 0.18 + (0.64 / Double(max(1, rows - 1))) * Double(i)
+            let channelW = max(0.10, 0.42 - t * d * 0.32)
+            let chanX    = 0.50 - channelW * 0.5
+            let leftW    = chanX - 0.12
+            if leftW > 0.04 {
+                out.append(CGRect(x: 0.12, y: y, width: leftW, height: 0.055))
+            }
+            let rightX = chanX + channelW
+            let rightW = 0.88 - rightX
+            if rightW > 0.04 {
+                out.append(CGRect(x: rightX, y: y, width: rightW, height: 0.055))
+            }
+        }
+        return out
+    }
+
+    // MARK: - Support
+
+    /// FNV-1a hash of a String — fast, stable, avalanches well.
+    private static func trackFNV(_ s: String) -> UInt64 {
+        var h: UInt64 = 14695981039346656037
+        for byte in s.utf8 { h = (h ^ UInt64(byte)) &* 1099511628211 }
+        return h
+    }
+
+    /// Time-pressure multiplier per track.  Neon Arcade is tighter (speed run
+    /// flavour); Haunted Manor is looser (exploration flavour).
+    private static func trackTimePressure(trackID: String) -> Double {
+        switch trackID {
+        case "neon-arcade":    return 0.85   // speed-run emphasis
+        case "golden-gauntlet":return 0.80   // every second counts
+        case "frozen-peaks":   return 1.00
+        case "deep-cosmos":    return 1.05
+        case "inferno-run":    return 0.92
+        case "haunted-manor":  return 1.10   // exploration, more generous
+        case "ancient-temple": return 0.95
+        case "abyssal-depths": return 1.00
+        default:               return 1.00
+        }
+    }
+}
+
+// ===========================================================================
 // Codable data layer — the authoring & wire format for level overrides.
 //
 // WHY A DTO INSTEAD OF `LevelLayout: Codable`

@@ -18,6 +18,7 @@ enum HomeRoute: Hashable {
     /// non-climb mode as the modes hub grows.
     case mode(String)
     case profile
+    case challengeTracks
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +79,11 @@ final class Navigator: ObservableObject {
     /// Push the Profile screen on top of the current stack.
     func goToProfile() {
         if path.last != .profile { path.append(.profile) }
+    }
+
+    /// Push the Challenge Tracks selection screen.
+    func goToTracks() {
+        if path.last != .challengeTracks { path.append(.challengeTracks) }
     }
 }
 
@@ -235,6 +241,9 @@ struct HomeView: View {
                         NavigationLink(value: HomeRoute.profile) {
                             homeNavLabel("person.fill", "Profile")
                         }
+                        NavigationLink(value: HomeRoute.challengeTracks) {
+                            homeNavLabel("flag.checkered", "Tracks")
+                        }
                     }
 
                     Spacer().frame(height: 48)
@@ -275,7 +284,8 @@ struct HomeView: View {
                 case .mode("marblecup"): MarbleCupView()
                 case .mode("koth"): KingOfTheHillView()
                 case .mode("pinball"): PinballView()
-                case .profile:     ProfileView()
+                case .profile:          ProfileView()
+                case .challengeTracks:  ChallengeTrackSelectView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)

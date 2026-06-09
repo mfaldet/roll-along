@@ -105,6 +105,17 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     rising through a vivid orange-red magma field.  Coin-purchasable
     //     (exclusive tier, 500 coins); also included in the Lava Flow bundle.
     case lava       = "Lava"
+    //   • trench — deep navy sphere with slowly pulsing bioluminescent teal
+    //     dot clusters.  Animated Canvas; coin-purchasable (exclusive tier,
+    //     500 coins); also included in the Abyssal Depths challenge bundle.
+    case trench     = "Trench"
+
+    // ── Golden Gauntlet exclusive (pack-exclusive, never coin-purchasable) ─
+    //   • trophy — polished deep gold sphere with a slow-rotating obsidian
+    //     counter-swirl band and a large mirror specular.  Awarded ONLY by
+    //     completing the Golden Gauntlet challenge track; hidden from the
+    //     shop grid.
+    case trophy     = "Trophy"
 
     // ── Starter Pack exclusive ──────────────────────────────────────────
     //   • aurora — deep midnight sphere with animated teal-green and violet
@@ -178,7 +189,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     var isBundleExclusive: Bool {
         switch self {
         case .pluto, .aurora, .beachBall, .pumpkin, .ornament,
-             .heartstone, .shamrock, .confetti, .speckledEgg: return true
+             .heartstone, .shamrock, .confetti, .speckledEgg,
+             .trophy:   // Golden Gauntlet completion exclusive
+            return true
         default:                          return false
         }
     }
@@ -554,6 +567,28 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.95, green: 0.30, blue: 0.08),
                 Color(red: 0.65, green: 0.10, blue: 0.02),
                 Color(red: 0.28, green: 0.04, blue: 0.00),
+            ]
+
+        case .trench:
+            // Abyssal deep — pale bioluminescent cyan highlight → dark navy →
+            // near-black abyssal blue.  Animated glowing dot clusters are
+            // rendered by trenchCanvas in BallSkinView.
+            return [
+                Color(red: 0.42, green: 0.92, blue: 0.88),
+                Color(red: 0.06, green: 0.22, blue: 0.48),
+                Color(red: 0.02, green: 0.08, blue: 0.24),
+                Color(red: 0.01, green: 0.02, blue: 0.10),
+            ]
+
+        case .trophy:
+            // Polished prestige gold with obsidian swirl — mirror highlight
+            // → rich gold → dark bronze → near-black obsidian shadow.
+            // Animated swirl rendered by trophyCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.95, blue: 0.62),
+                Color(red: 0.94, green: 0.72, blue: 0.18),
+                Color(red: 0.60, green: 0.42, blue: 0.06),
+                Color(red: 0.12, green: 0.08, blue: 0.02),
             ]
 
         // ── Starter Pack exclusive ──
