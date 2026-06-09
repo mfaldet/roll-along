@@ -210,7 +210,20 @@ final class StoreKitManager: ObservableObject {
         var newYearSeen        = false
         var springSeen         = false
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let txn) = result else { continue }
+            guard case .verified(let txn) = result else {
+                // .unverified: Apple's JWS signature check failed.  Skip —
+                // no entitlement granted.  Log for monitoring.
+                if case .unverified(_, let verificationError) = result {
+                    AnalyticsClient.shared.track(
+                        "iap_verification_failed",
+                        properties: [
+                            "error":   .string(verificationError.localizedDescription),
+                            "context": .string("entitlements"),
+                        ]
+                    )
+                }
+                continue
+            }
             switch txn.productID {
             case ProductID.unlimited.rawValue:               unlimitedSeen   = true
             case ProductID.starterPack.rawValue:             starterPackSeen = true
@@ -256,7 +269,9 @@ final class StoreKitManager: ObservableObject {
             let result = try await product.purchase()
             switch result {
             case .success(let verification):
-                if case .verified(let transaction) = verification {
+                // Explicit switch — .unverified must NEVER grant a reward.
+                switch verification {
+                case .verified(let transaction):
                     await deliverReward(for: productID)
                     await transaction.finish()
                     AnalyticsClient.shared.track(
@@ -270,8 +285,19 @@ final class StoreKitManager: ObservableObject {
                         ]
                     )
                     return true
-                } else {
+                case .unverified(_, let verificationError):
+                    // Apple's JWS signature check failed — do NOT grant any
+                    // reward.  Log for monitoring (could indicate a tampered
+                    // receipt on a jailbroken device).
                     self.lastError = "Couldn't verify purchase."
+                    AnalyticsClient.shared.track(
+                        "iap_verification_failed",
+                        properties: [
+                            "product_id": .string(productID.rawValue),
+                            "error":      .string(verificationError.localizedDescription),
+                            "context":    .string("purchase"),
+                        ]
+                    )
                     return false
                 }
             case .pending:
@@ -369,13 +395,28 @@ final class StoreKitManager: ObservableObject {
 
     private func listenForTransactions() async {
         for await update in Transaction.updates {
-            guard case .verified(let transaction) = update else { continue }
-            guard let productID = ProductID(rawValue: transaction.productID) else {
+            switch update {
+            case .verified(let transaction):
+                guard let productID = ProductID(rawValue: transaction.productID) else {
+                    // Unknown product ID (e.g., old product retired from the
+                    // catalogue).  Finish so it doesn't keep re-delivering.
+                    await transaction.finish()
+                    continue
+                }
+                await deliverReward(for: productID)
                 await transaction.finish()
-                continue
+            case .unverified(_, let verificationError):
+                // Apple's JWS signature check failed.  Do NOT grant any
+                // reward and do NOT finish — let the transaction remain
+                // unfinished so StoreKit can retry verification.
+                AnalyticsClient.shared.track(
+                    "iap_verification_failed",
+                    properties: [
+                        "error":   .string(verificationError.localizedDescription),
+                        "context": .string("listener"),
+                    ]
+                )
             }
-            await deliverReward(for: productID)
-            await transaction.finish()
         }
     }
 }
