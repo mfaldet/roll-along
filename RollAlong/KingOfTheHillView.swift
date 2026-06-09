@@ -89,6 +89,8 @@ struct KingOfTheHillView: View {
     @State private var mapIndex   = 0
     @State private var showMapName = false
 
+    // MARK: - Computed
+
     private var currentPillars: [PillarFrac] {
         KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].pillars
     }
@@ -153,7 +155,7 @@ struct KingOfTheHillView: View {
         }
     }
 
-    // MARK: - Render
+    // MARK: - Render layers
 
     private var mapNameLabel: some View {
         VStack(spacing: 0) {

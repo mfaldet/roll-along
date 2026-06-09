@@ -2,6 +2,9 @@ import StoreKit
 import SwiftUI
 
 final class GameState: ObservableObject {
+
+    // MARK: - Published state
+
     @Published var currentLevel: Int {
         didSet { UserDefaults.standard.set(currentLevel, forKey: "ra_level") }
     }
@@ -274,6 +277,8 @@ final class GameState: ObservableObject {
     /// skin per attempt; refilled (re-shuffled) when empty.  Not persisted
     /// — a fresh launch simply re-shuffles.
     private var packBag: [BallSkin] = []
+
+    // MARK: - Initialisation
 
     /// Loads all persisted state from UserDefaults.
     ///

@@ -95,6 +95,8 @@ struct MarbleCupView: View {
 
     private let postR: CGFloat = 14          // radius of all side-post bumpers
 
+    // MARK: - Computed
+
     private var secondsLeft: Int { max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0))) }
     private var goalHalf: CGFloat { field.width * currentGoalWidthFrac / 2 }
     private var celebrating: Bool { localTick < celebrateUntil }

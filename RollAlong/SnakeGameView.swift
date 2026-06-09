@@ -128,6 +128,8 @@ struct SnakeGameView: View {
     @State private var walls:     [WallSegFrac] = []
     @State private var asteroids: [PillarFrac]  = []
 
+    // MARK: - Computed
+
     private var playerCycle: Cycle? { cycles.first(where: { $0.isPlayer }) }
     private var totalRivals: Int { cycles.filter { !$0.isPlayer }.count }
     private var rivalsAlive: Int { cycles.filter { !$0.isPlayer && $0.alive }.count }

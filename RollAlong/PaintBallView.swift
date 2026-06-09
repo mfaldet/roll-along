@@ -116,6 +116,8 @@ struct PaintBallView: View {
     @State private var mapIndex    = 0
     @State private var showMapName = false
 
+    // MARK: - Computed
+
     private var secondsLeft: Int {
         max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0)))
     }

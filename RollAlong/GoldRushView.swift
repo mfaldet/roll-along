@@ -112,6 +112,8 @@ struct GoldRushView: View {
     @State private var showMapName = false
     @State private var walls: [WallSegFrac] = []
 
+    // MARK: - Computed
+
     private var secondsLeft: Int { max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0))) }
     private var playerScore: Int { racers.first { $0.isPlayer }?.score ?? 0 }
     private var maxScore: Int { racers.map(\.score).max() ?? 0 }
