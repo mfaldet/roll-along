@@ -895,7 +895,7 @@ struct BallSkinView: View {
             let resolvedText = ctx.resolve(
                 Text("8")
                     .font(.system(size: fontSize, weight: .black, design: .default))
-                    .foregroundColor(.black))
+                    .foregroundStyle(.black))
             ctx.draw(resolvedText, at: CGPoint(x: cx, y: cy), anchor: .center)
 
             // Subtle gloss crescent — dimmed so it reads on the dark body

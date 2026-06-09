@@ -71,18 +71,17 @@ final class AdManager: NSObject, ObservableObject {
     /// no-ops apart from ensuring an ad is loaded.
     func bootstrap(with gameState: GameState) async {
         self.gameState = gameState
-        // Request ATT — iOS 14.5+ requires this before personalised ads.
+        // Request ATT before personalised ads (required since iOS 14.5;
+        // #available guard removed — deployment target is iOS 17).
         // Result doesn't gate ad serving; Google falls back to non-
         // personalised ads automatically if the user denies.
-        if #available(iOS 14, *) {
-            let status = await ATTrackingManager.requestTrackingAuthorization()
-            AnalyticsClient.shared.track(
-                "att_response",
-                properties: [
-                    "status": .string(Self.attStatusString(status)),
-                ]
-            )
-        }
+        let status = await ATTrackingManager.requestTrackingAuthorization()
+        AnalyticsClient.shared.track(
+            "att_response",
+            properties: [
+                "status": .string(Self.attStatusString(status)),
+            ]
+        )
         // Start the Mobile Ads SDK.
         _ = await MobileAds.shared.start()
         await loadRewarded()
