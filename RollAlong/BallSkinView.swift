@@ -96,6 +96,11 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.20), lineWidth: 0.5))
 
+        case .lava:
+            lavaCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.55, green: 0.08, blue: 0.00).opacity(0.55), lineWidth: 0.5))
+
         // ── Starter Pack exclusive ──────────────────────────────────────
         case .aurora:
             auroraCanvas
@@ -1739,6 +1744,108 @@ struct BallSkinView: View {
                     ]),
                     center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.60),
                     startRadius: 0, endRadius: r * 0.34))
+        }
+    }
+
+    // ── Lava ────────────────────────────────────────────────────────────────
+    // Animated molten sphere.  A vivid orange-red radial gradient base is
+    // overlaid with 6 dark amber "blob" ovals that drift sinusoidally
+    // upward, simulating slow convection currents.  A pulsing magma core
+    // adds internal glow, an edge vignette deepens the scorched crust, and
+    // a small dim specular keeps it from looking totally matte.
+    //
+    // Animation is frozen (t = 0) when reduceMotion is on.
+    private var lavaCanvas: some View {
+        @Environment(\.accessibilityReduceMotion) var reduceMotion: Bool
+        return TimelineView(.animation) { timeline in
+            let rawT = timeline.date.timeIntervalSinceReferenceDate
+            let t: Double = reduceMotion ? 0.0 : rawT
+
+            Canvas { ctx, size in
+                let r  = min(size.width, size.height) * 0.5
+                let cx = size.width  * 0.5
+                let cy = size.height * 0.5
+
+                // ── 1. Molten base gradient ──────────────────────────────
+                let baseGrad = Gradient(stops: [
+                    .init(color: Color(red: 1.00, green: 0.70, blue: 0.28), location: 0.00),
+                    .init(color: Color(red: 0.96, green: 0.30, blue: 0.06), location: 0.38),
+                    .init(color: Color(red: 0.60, green: 0.08, blue: 0.01), location: 0.72),
+                    .init(color: Color(red: 0.20, green: 0.02, blue: 0.00), location: 1.00),
+                ])
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(baseGrad,
+                                         center: CGPoint(x: cx, y: cy),
+                                         startRadius: 0,
+                                         endRadius: r))
+
+                // ── 2. Pulsing magma core ───────────────────────────────
+                let corePulse = 0.85 + 0.15 * sin(t * 0.7)
+                let coreGrad = Gradient(stops: [
+                    .init(color: Color(red: 1.00, green: 0.90, blue: 0.50).opacity(0.55 * corePulse), location: 0.00),
+                    .init(color: Color(red: 1.00, green: 0.55, blue: 0.10).opacity(0.28 * corePulse), location: 0.45),
+                    .init(color: .clear, location: 1.00),
+                ])
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.46, y: cy - r * 0.46,
+                                           width: r * 0.92, height: r * 0.92)),
+                    with: .radialGradient(coreGrad,
+                                         center: CGPoint(x: cx, y: cy),
+                                         startRadius: 0,
+                                         endRadius: r * 0.46))
+
+                // ── 3. Drifting dark amber blobs (convection) ──────────
+                // Each tuple: (xFrac, yBase, yAmp, speed, phase, rFrac)
+                let blobs: [(CGFloat, CGFloat, CGFloat, Double, Double, CGFloat)] = [
+                    (0.32, 0.55, 0.14, 0.48, 0.00, 0.22),
+                    (0.62, 0.48, 0.18, 0.55, 1.30, 0.19),
+                    (0.45, 0.68, 0.12, 0.42, 2.60, 0.16),
+                    (0.22, 0.36, 0.20, 0.60, 0.80, 0.14),
+                    (0.72, 0.62, 0.16, 0.38, 1.90, 0.20),
+                    (0.54, 0.28, 0.10, 0.52, 3.40, 0.13),
+                ]
+                let blobColor = Color(red: 0.30, green: 0.06, blue: 0.00)
+                for (xFrac, yBase, yAmp, speed, phase, rFrac) in blobs {
+                    let bx  = cx + (xFrac - 0.5) * r * 2
+                    let byF = yBase + CGFloat(yAmp) * CGFloat(sin(t * speed + phase))
+                    let by  = cy + (byF - 0.5) * r * 2
+                    let br  = r * rFrac
+
+                    // Skip blobs entirely outside the sphere silhouette
+                    let dx = bx - cx, dy = by - cy
+                    if sqrt(dx * dx + dy * dy) > r * 0.88 + br { continue }
+
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: bx - br, y: by - br * 0.72,
+                                               width: br * 2, height: br * 1.44)),
+                        with: .color(blobColor.opacity(0.62)))
+                }
+
+                // ── 4. Edge vignette (scorched crust) ───────────────────
+                let vigGrad = Gradient(stops: [
+                    .init(color: .clear,                                     location: 0.60),
+                    .init(color: Color(red: 0.10, green: 0.01, blue: 0.00).opacity(0.72), location: 1.00),
+                ])
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(vigGrad,
+                                         center: CGPoint(x: cx, y: cy),
+                                         startRadius: 0,
+                                         endRadius: r))
+
+                // ── 5. Dim matte specular (upper-left) ──────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.50, y: cy - r * 0.68,
+                                           width: r * 0.38, height: r * 0.24)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.0, green: 0.70, blue: 0.45).opacity(0.32), location: 0.00),
+                            .init(color: .clear, location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.31, y: cy - r * 0.56),
+                        startRadius: 0, endRadius: r * 0.26))
+            }
         }
     }
 }

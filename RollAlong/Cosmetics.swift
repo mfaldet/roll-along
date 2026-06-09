@@ -89,7 +89,7 @@ extension BallSkin: CosmeticItem {
             return .premium    // 200 coins — multi-colour blends / planets
         case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
              .storm, .candy, .ghost,
-             .basketball, .eightBall, .baseball,
+             .basketball, .eightBall, .baseball, .lava,
              .aurora,          // starter-pack-exclusive; never coin-purchasable
              .beachBall,       // summer-2026-exclusive; never coin-purchasable
              .pumpkin,         // halloween-2026-exclusive; never coin-purchasable
@@ -1584,6 +1584,83 @@ struct CosmeticBundle: Identifiable {
             floors: [.meadow],
             pits:   [.sketch],
             music:  [.orchestral]
+        ),
+
+        // ── Challenge Track reward bundles ───────────────────────────────
+        //
+        // Earned free by completing a 100-level Challenge Track; never
+        // sold in the shop as a standalone purchase.  Idempotent delivery
+        // via GameState.deliverTrackReward(for:) + ownedBundles guard.
+        //
+        // Tracks S19: frozen-peaks→winter, deep-cosmos→cosmos,
+        //   inferno-run→lava-flow, neon-arcade→neon, haunted-manor→haunted
+        //   all reward EXISTING bundles already in this catalogue — no new
+        //   entries needed for those five.
+        //
+        // S20 ─────────────────────────────────────────────────────────────
+        CosmeticBundle(
+            id:             "ancient-temple",
+            displayName:    "Ancient Temple",
+            tagline:        "Every stone carries the weight of centuries.",
+            contentSummary: "Dune ball · Eclipse goal · Gilded trail · Desert floor · Canyon pit · Orchestral music",
+            balls:  [.dune],
+            goals:  [.eclipse],
+            trails: [.gilded],
+            floors: [.desert],
+            pits:   [.canyon],
+            music:  [.orchestral]
+        ),
+        //
+        // S21 ─────────────────────────────────────────────────────────────
+        // "abyssal-depths" bundle — awaiting Trench BallSkin.
+        // Will contain: Trench ball · Comet goal · Ice trail · Blueprint floor
+        //               · Space pit · Dreamscape music.
+        //
+        // S22 ─────────────────────────────────────────────────────────────
+        // "champion" bundle — awaiting Trophy BallSkin (pack-exclusive).
+        // Will contain: Trophy ball (exclusive) · Quasar goal · Gold trail
+        //               · Mirage floor · Mirage pit · Orchestral music.
+
+        // ── S15 ──────────────────────────────────────────────────────────
+        CosmeticBundle(
+            id:             "crystal-cavern",
+            displayName:    "Crystal Cavern",
+            tagline:        "Deep underground, the crystals glow.",
+            contentSummary: "Opal ball · Prism goal · Comet trail · Midnight floor · Aurora pit · Mysterium music",
+            balls:  [.opal],
+            goals:  [.prism],
+            trails: [.cometTrail],
+            floors: [.midnight],
+            pits:   [.aurora],
+            music:  [.mysterium]
+        ),
+
+        // ── S16 ──────────────────────────────────────────────────────────
+        CosmeticBundle(
+            id:             "midnight-carnival",
+            displayName:    "Midnight Carnival",
+            tagline:        "The rides never stop when the sun goes down.",
+            contentSummary: "Copper ball · Neon goal · Phoenix trail · Midnight floor · Velvet pit · Retrowave music",
+            balls:  [.copper],
+            goals:  [.neon],
+            trails: [.phoenix],
+            floors: [.midnight],
+            pits:   [.velvet],
+            music:  [.retrowave]
+        ),
+
+        // ── S17 ──────────────────────────────────────────────────────────
+        CosmeticBundle(
+            id:             "lava-flow",
+            displayName:    "Lava Flow",
+            tagline:        "Slow, relentless, unstoppable.",
+            contentSummary: "Lava ball · Eclipse goal · Fire trail · Sunset floor · Evil pit · Downtempo music",
+            balls:  [.lava],
+            goals:  [.eclipse],
+            trails: [.fire],
+            floors: [.sunset],
+            pits:   [.evil],
+            music:  [.downtempo]
         ),
     ]
 }

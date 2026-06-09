@@ -17,6 +17,7 @@ enum HomeRoute: Hashable {
     /// The climb uses `.game`; this carries the id so one route serves every
     /// non-climb mode as the modes hub grows.
     case mode(String)
+    case profile
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,11 @@ final class Navigator: ObservableObject {
     /// Push the Game Menu (all non-climb modes) on top of the current stack.
     func goToGames() {
         if path.last != .games { path.append(.games) }
+    }
+
+    /// Push the Profile screen on top of the current stack.
+    func goToProfile() {
+        if path.last != .profile { path.append(.profile) }
     }
 }
 
@@ -226,6 +232,9 @@ struct HomeView: View {
                         NavigationLink(value: HomeRoute.settings) {
                             homeNavLabel("gearshape.fill", "Settings")
                         }
+                        NavigationLink(value: HomeRoute.profile) {
+                            homeNavLabel("person.fill", "Profile")
+                        }
                     }
 
                     Spacer().frame(height: 48)
@@ -266,6 +275,7 @@ struct HomeView: View {
                 case .mode("marblecup"): MarbleCupView()
                 case .mode("koth"): KingOfTheHillView()
                 case .mode("pinball"): PinballView()
+                case .profile:     ProfileView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)

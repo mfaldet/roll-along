@@ -164,6 +164,24 @@ final class GameState: ObservableObject {
         didSet { Self.saveStringSet(ownedMusic, forKey: "ra_ownedMusic") }
     }
 
+    // ── Challenge Track progress ─────────────────────────────────────────
+    //
+    // Each Challenge Track is a 100-level themed side quest.  Beating level
+    // 100 delivers the track's paired cosmetic bundle for free (earned, not
+    // purchased).  Progress survives app restarts via UserDefaults.
+
+    /// Highest level cleared per Challenge Track: [trackID: level (1…100)].
+    /// Missing key = track not yet started.  Level 100 = track complete.
+    @Published var trackProgress: [String: Int] {
+        didSet { Self.save(trackProgress, trackProgressKey: "ra_trackProgress") }
+    }
+
+    /// Set of Challenge Track IDs fully completed (level 100 cleared).
+    /// The reward bundle is granted exactly once when a track enters this set.
+    @Published var completedTracks: Set<String> {
+        didSet { Self.saveStringSet(completedTracks, forKey: "ra_completedTracks") }
+    }
+
     // Currently-equipped cosmetic per category.  Always defaults to the
     // starter on a fresh install.
     @Published var equippedGoal: GoalSkin {
@@ -255,6 +273,8 @@ final class GameState: ObservableObject {
         ownedMusic     = loadedOwnedMusic
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
+        trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress")
+        completedTracks = Self.loadStringSet(forKey: "ra_completedTracks")
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -586,6 +606,35 @@ final class GameState: ObservableObject {
         return max(0, 48 * 3_600 - Date().timeIntervalSince(shownAt))
     }
 
+    // MARK: - Challenge Track progression
+
+    /// Record that the player cleared `level` in the given Challenge Track.
+    /// • Advances `trackProgress[trackID]` only when the new level beats the
+    ///   stored high-water mark (safe to call on every completion event).
+    /// • When level 100 is cleared for the first time the paired reward
+    ///   bundle is granted and the track is marked complete.
+    func advanceTrackProgress(trackID: String, to level: Int) {
+        let previous = trackProgress[trackID] ?? 0
+        guard level > previous else { return }
+        trackProgress[trackID] = level
+        guard level >= 100, !completedTracks.contains(trackID) else { return }
+        completedTracks.insert(trackID)
+        deliverTrackReward(for: trackID)
+    }
+
+    /// Grant the cosmetic bundle paired with a completed Challenge Track.
+    /// Uses the mapping defined in `ChallengeTrackMode.rewardBundleID(for:)`.
+    /// Idempotent — no-op when the bundle is already owned or the track
+    /// has no paired bundle yet (future tracks may be planned but not built).
+    func deliverTrackReward(for trackID: String) {
+        guard let bundleID = ChallengeTrackMode.rewardBundleID(for: trackID),
+              let bundle   = CosmeticBundle.catalogue.first(where: { $0.id == bundleID }),
+              !ownedBundles.contains(bundleID)
+        else { return }
+        bundle.grantContents(to: self)
+        ownedBundles.insert(bundleID)
+    }
+
     // MARK: - Completionist tracking
 
     /// Set of bundle IDs where the player owns every item in the bundle.
@@ -765,5 +814,21 @@ final class GameState: ObservableObject {
         return Dictionary(uniqueKeysWithValues: stringKeyed.compactMap { entry in
             Int(entry.key).map { k in (k, Set(entry.value)) }
         })
+    }
+
+    /// Persist a [String: Int] dictionary (e.g. trackProgress) to UserDefaults.
+    /// Keys are already strings so no conversion is needed.
+    private static func save(_ dict: [String: Int], trackProgressKey key: String) {
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    /// Load a [String: Int] dictionary from UserDefaults.
+    private static func loadTrackProgress(key: String) -> [String: Int] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let dict = try? JSONDecoder().decode([String: Int].self, from: data)
+        else { return [:] }
+        return dict
     }
 }

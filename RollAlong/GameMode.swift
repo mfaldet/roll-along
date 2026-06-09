@@ -168,9 +168,18 @@ struct ClimbMode: GameMode {
 // until each is actually built out (arena setup + per-tick rules live in the
 // engine layer, added per-mode later).
 
-/// A themed 100-level side quest (e.g. "Frosty Challenge").  Plays like the
-/// climb but on its own self-contained track, assembling a cosmetic as you go
-/// (a piece every 10 levels) and awarding a bundle at level 100.
+/// A themed 100-level side quest (e.g. "Frosty Peaks").  Plays like the
+/// climb but on its own self-contained track, with a consistent difficulty
+/// arc from easy (levels 1–15) through expert (81–95) to pinnacle (96–100),
+/// and a free cosmetic bundle delivered on clearing level 100.
+///
+/// Difficulty Arc (applies to all tracks; see docs/challenge-tracks-roadmap.md):
+///   1–15   Tutorial Phase    — easy tier, open layouts, learn the theme
+///  16–35   Apprentice Phase  — easy/hard mix, 2 per-track obstacle types
+///  36–60   Journeyman Phase  — hard tier, theme-specific mechanic introduced
+///  61–80   Expert Phase      — very hard, precision routing required
+///  81–95   Master Phase      — very hard, no redundant space, tight gold times
+///  96–100  Pinnacle          — 5 showcase levels, equivalent to main-climb ~500+
 struct ChallengeTrackMode: GameMode {
     let trackID: String
     let displayName: String
@@ -185,6 +194,26 @@ struct ChallengeTrackMode: GameMode {
     let hasHoles                     = true
     let showsStars                   = true
     let showsTimer                   = true
+
+    /// Maps every defined Challenge Track ID to its cosmetic reward bundle ID.
+    /// The bundle is granted for free by `GameState.deliverTrackReward(for:)`
+    /// when the player clears level 100.  Returning nil means the track is
+    /// planned but its reward bundle hasn't been built yet.
+    static func rewardBundleID(for trackID: String) -> String? {
+        switch trackID {
+        // ── Packs backed by existing bundles (live in S19) ──────────────
+        case "frozen-peaks":    return "winter"
+        case "deep-cosmos":     return "cosmos"
+        case "inferno-run":     return "lava-flow"
+        case "neon-arcade":     return "neon"
+        case "haunted-manor":   return "haunted"
+        // ── Packs backed by new bundles (added progressively, S20–S22) ──
+        case "ancient-temple":  return "ancient-temple"   // S20 — uses existing cosmetics
+        case "abyssal-depths":  return "abyssal-depths"   // S21 — needs Trench ball
+        case "golden-gauntlet": return "champion"         // S22 — needs Trophy ball (exclusive)
+        default:                return nil
+        }
+    }
 }
 
 /// Zen Garden — a metallic marble on an unbounded sand field.  No goal, no
@@ -348,23 +377,97 @@ enum GameModeCatalogue {
     /// The always-on spine.
     static let climb = ClimbMode()
 
+    // ── Challenge Tracks ─────────────────────────────────────────────────
+    // 100-level themed side quests.  Disabled until the challenge-track
+    // engine (ChallengeTrackView, level generator, progress HUD) ships in S18.
+    // See docs/challenge-tracks-roadmap.md for the full design.
+    //
+    // Reward bundles delivered by GameState.deliverTrackReward(for:) when
+    // the player clears level 100.
+
+    /// S19 — Winter / ice theme. Reward: "winter" bundle.
+    static let frozenPeaks = ChallengeTrackMode(
+        trackID:     "frozen-peaks",
+        displayName: "Frosty Peaks",
+        tagline:     "A hundred icy corridors. Every degree colder."
+    )
+    /// S19 — Nebulae / asteroid field theme. Reward: "cosmos" bundle.
+    static let deepCosmos = ChallengeTrackMode(
+        trackID:     "deep-cosmos",
+        displayName: "Deep Cosmos",
+        tagline:     "Roll through the asteroid belt. The void is patient."
+    )
+    /// S19 — Volcano / lava tubes theme. Reward: "lava-flow" bundle.
+    static let infernoRun = ChallengeTrackMode(
+        trackID:     "inferno-run",
+        displayName: "Inferno Run",
+        tagline:     "The floor is lava. Every floor. All one hundred."
+    )
+    /// S19 — Retro neon arcade theme. Reward: "neon" bundle.
+    static let neonArcade = ChallengeTrackMode(
+        trackID:     "neon-arcade",
+        displayName: "Neon Arcade",
+        tagline:     "Insert coin. Roll perfect. High score awaits."
+    )
+    /// S19 — Haunted manor / ghost theme. Reward: "haunted" bundle.
+    static let hauntedManor = ChallengeTrackMode(
+        trackID:     "haunted-manor",
+        displayName: "Haunted Manor",
+        tagline:     "The fog never lifts. The graveyard is the goal."
+    )
+    /// S20 — Desert ruins / archaeology theme. Reward: "ancient-temple" bundle.
+    static let ancientTemple = ChallengeTrackMode(
+        trackID:     "ancient-temple",
+        displayName: "Ancient Temple",
+        tagline:     "Carved corridors. Gilded traps. The relic waits."
+    )
+    /// S21 — Deep ocean descent theme. Reward: "abyssal-depths" bundle.
+    /// NOTE: requires Trench BallSkin (bioluminescent navy) — built in S21.
+    static let abyssalDepths = ChallengeTrackMode(
+        trackID:     "abyssal-depths",
+        displayName: "Abyssal Depths",
+        tagline:     "Light doesn't reach here. Roll by feel."
+    )
+    /// S22 — Prestige gauntlet. Reward: "champion" bundle (pack-exclusive).
+    /// NOTE: requires Trophy BallSkin (polished gold, exclusive) — built in S22.
+    /// All 100 levels are Expert / Pinnacle tier — no Phase 1/2 ramp.
+    static let goldenGauntlet = ChallengeTrackMode(
+        trackID:     "golden-gauntlet",
+        displayName: "Golden Gauntlet",
+        tagline:     "No tutorial. No mercy. A hundred flawless rooms."
+    )
+
     /// Everything else, with its launch flag.  Off until each mode's engine
     /// behavior is implemented.
     static let registry: [(mode: GameMode, isEnabled: Bool)] = [
-        (climb,            true),
-        (ZenGardenMode(),  true),    // engine behavior implemented — live
-        (CoinPitMode(),    true),    // engine behavior implemented — live
-        (SnakeMode(),      true),     // self-contained SnakeGameView — live
-        (SumoSurvivalMode(), true),  // self-contained SumoSurvivalView — live
-        (PaintBallMode(),  true),    // self-contained PaintBallView — live
-        (GoldRushMode(),   true),    // self-contained GoldRushView — live
-        (MarbleCupMode(),  true),    // self-contained MarbleCupView — live
-        (KingOfTheHillMode(), true), // self-contained KingOfTheHillView — live
-        (PinballMode(),    true),    // self-contained PinballView — live
+        (climb,              true),
+        (ZenGardenMode(),    true),    // engine behavior implemented — live
+        (CoinPitMode(),      true),    // engine behavior implemented — live
+        (SnakeMode(),        true),    // self-contained SnakeGameView — live
+        (SumoSurvivalMode(), true),    // self-contained SumoSurvivalView — live
+        (PaintBallMode(),    true),    // self-contained PaintBallView — live
+        (GoldRushMode(),     true),    // self-contained GoldRushView — live
+        (MarbleCupMode(),    true),    // self-contained MarbleCupView — live
+        (KingOfTheHillMode(),true),    // self-contained KingOfTheHillView — live
+        (PinballMode(),      true),    // self-contained PinballView — live
+        // ── Challenge Tracks (disabled until S18 engine ships) ───────────
+        (frozenPeaks,    false),
+        (deepCosmos,     false),
+        (infernoRun,     false),
+        (neonArcade,     false),
+        (hauntedManor,   false),
+        (ancientTemple,  false),
+        (abyssalDepths,  false),
+        (goldenGauntlet, false),
     ]
 
     /// Modes the player can currently see in the UI.
     static var enabled: [GameMode] { registry.filter { $0.isEnabled }.map { $0.mode } }
+
+    /// All registered Challenge Tracks (enabled or not).
+    static var challengeTracks: [ChallengeTrackMode] {
+        registry.compactMap { $0.mode as? ChallengeTrackMode }
+    }
 
     /// Look up a mode by id (e.g. to resume the last-played mode).
     static func mode(id: String) -> GameMode? {

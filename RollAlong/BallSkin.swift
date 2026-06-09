@@ -101,6 +101,10 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //   • baseball — off-white leather sphere with red stitched seam curves,
     //     via the bespoke `baseballCanvas` in BallSkinView.
     case baseball   = "Baseball"
+    //   • lava — animated molten sphere with drifting dark amber blobs
+    //     rising through a vivid orange-red magma field.  Coin-purchasable
+    //     (exclusive tier, 500 coins); also included in the Lava Flow bundle.
+    case lava       = "Lava"
 
     // ── Starter Pack exclusive ──────────────────────────────────────────
     //   • aurora — deep midnight sphere with animated teal-green and violet
@@ -538,6 +542,18 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.95, green: 0.93, blue: 0.88),
                 Color(red: 0.78, green: 0.74, blue: 0.68),
                 Color(red: 0.54, green: 0.48, blue: 0.42),
+            ]
+
+        case .lava:
+            // Molten lava — pale incandescent highlight → vivid orange →
+            // deep ember red → near-black scorched crust.  Animated blobs
+            // are rendered by lavaCanvas in BallSkinView; this gradient
+            // is the static fallback used by shop thumbnails, etc.
+            return [
+                Color(red: 1.00, green: 0.60, blue: 0.20),
+                Color(red: 0.95, green: 0.30, blue: 0.08),
+                Color(red: 0.65, green: 0.10, blue: 0.02),
+                Color(red: 0.28, green: 0.04, blue: 0.00),
             ]
 
         // ── Starter Pack exclusive ──
