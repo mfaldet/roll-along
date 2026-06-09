@@ -1,6 +1,27 @@
 import StoreKit
 import SwiftUI
 
+// ---------------------------------------------------------------------------
+// UserDefaults audit (QE2 §7) — all ra_* keys are non-sensitive game state.
+//
+// Keys written: ra_level, ra_skin, ra_name, ra_haptics, ra_sound,
+//   ra_startAtTop, ra_seenOnboarding, ra_seenWelcomeMoment, ra_seenTutorialReward,
+//   ra_bestStars, ra_bestTime, ra_collectedCoins, ra_highestUnlocked,
+//   ra_lives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
+//   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
+//   ra_lastReviewPromptDate, ra_coinBalance, ra_ownedBallSkins, ra_ownedGoals,
+//   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBundles, ra_ownedPacks,
+//   ra_ownedMusic, ra_trackProgress, ra_completedTracks, ra_equippedGoal,
+//   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedMusic,
+//   ra_equippedPack.
+//
+// AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
+//   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
+//
+// Verdict: no auth tokens, no IDFA/IDFV, no payment data.  All values are
+//   gameplay state or UI settings.  UserDefaults is the appropriate store.
+//   No iCloud KV sync in use.  Keychain migration: not required.
+// ---------------------------------------------------------------------------
 final class GameState: ObservableObject {
 
     // MARK: - Published state
