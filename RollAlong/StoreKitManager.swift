@@ -79,6 +79,10 @@ final class StoreKitManager: ObservableObject {
 
         /// The catalogue bundle ID delivered by this IAP.  Non-nil only for
         /// seasonal bundle products.
+        ///
+        /// **Exhaustive by design** — non-bundle cases listed explicitly so
+        /// the Swift compiler flags any newly-added seasonal bundle ProductID
+        /// that is missing a bundleID entry (a silent `nil` would break delivery).
         var bundleID: String? {
             switch self {
             case .summerBundle2026:     return "summer-2026"
@@ -88,7 +92,10 @@ final class StoreKitManager: ObservableObject {
             case .stPatricksBundle2027: return "stpatricks-2027"
             case .newYearBundle2027:    return "newyear-2027"
             case .springBundle2027:     return "spring-2027"
-            default:                    return nil
+            case .livesPack1, .livesPack5, .livesPack10,
+                 .unlimited,
+                 .coins100, .coins600, .coins1300, .coins3000,
+                 .starterPack:          return nil
             }
         }
 
