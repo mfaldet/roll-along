@@ -43,7 +43,7 @@ struct KingOfTheHillView: View {
     private let zoneRepickDist: CGFloat = 14       // re-aim when this close to its target
     private let coinsPerHoldSec    = 2
     private let winBonus           = 15
-    private let topReserve: CGFloat = 124          // HUD breathing room at the top
+    private let topReserve: CGFloat = Layout.topReserve  // HUD breathing room at the top
 
     private var roundTicks: Int { roundSeconds * 60 }
 
@@ -157,7 +157,7 @@ struct KingOfTheHillView: View {
 
     private var mapNameLabel: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: 108)
+            Spacer().frame(height: Layout.mapNameTopInset)
             Text(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color(white: 0.7))

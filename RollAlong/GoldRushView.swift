@@ -49,7 +49,7 @@ struct GoldRushView: View {
     private let winBonus           = 15
 
     private var roundTicks: Int { roundSeconds * 60 }
-    private let topReserve: CGFloat = 124           // keep coins/marbles clear of the HUD
+    private let topReserve: CGFloat = Layout.topReserve  // keep coins/marbles clear of the HUD
 
     /// Marble palette — index 0 is always the player (blue).
     private static let racerColors: [Color] = [
@@ -380,7 +380,7 @@ struct GoldRushView: View {
 
     private var mapNameLabel: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: 108)
+            Spacer().frame(height: Layout.mapNameTopInset)
             Text(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color(white: 0.7))

@@ -685,7 +685,7 @@ final class GameState: ObservableObject {
     func maybeRequestReview(after win: Bool) {
         guard win,
               highestUnlocked >= 5,
-              Date().timeIntervalSince(lastReviewPromptDate ?? .distantPast) > 30 * 86_400
+              Date().timeIntervalSince(lastReviewPromptDate ?? .distantPast) > Timing.reviewCooldownSecs
         else { return }
         lastReviewPromptDate = Date()
         DispatchQueue.main.async {
