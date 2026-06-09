@@ -268,9 +268,14 @@ struct CosmeticShopView: View {
                 }
                 sectionLabel("BALLS")
             }
-            // Bundle-exclusive balls (e.g. Pluto) are hidden from the
-            // individual Ball grid — they're only obtainable via a bundle.
-            categoryGrid(items: BallSkin.allCases.filter { !$0.isBundleExclusive })
+            // Bundle-exclusive balls are hidden from the individual Ball grid
+            // if the user does NOT own them — purchase path is via the IAP
+            // bundle, not the coin shop.  Owned bundle-exclusive skins ARE
+            // shown so the user can equip them (possession implies legitimate
+            // acquisition via the bundle, starter pack, or challenge track).
+            categoryGrid(items: BallSkin.allCases.filter {
+                !$0.isBundleExclusive || gameState.isOwned($0)
+            })
         }
     }
 
