@@ -2,29 +2,113 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Roll Along does NOT track users.  No analytics, no ad SDKs. -->
+    <!-- Roll Along calls ATTrackingManager.requestTrackingAuthorization via
+         AdManager.  If the user grants permission, the Google Mobile Ads SDK
+         may share IDFA with Google's ad network for cross-app ad targeting —
+         which meets Apple's definition of "tracking."  Must be <true/>.
+         (If user denies ATT, Google falls back to non-personalised ads and
+         no cross-app identifier is shared, but the request still happens.) -->
     <key>NSPrivacyTracking</key>
-    <false/>
+    <true/>
 
-    <!-- No tracking domains. -->
+    <!-- Internet domains contacted for tracking purposes (personalised ads).
+         These are Google AdMob's core ad-serving and measurement domains.
+         The Google Mobile Ads SDK also declares its own PrivacyInfo.xcprivacy
+         (SDK v10+); these entries here are the app-level complement. -->
     <key>NSPrivacyTrackingDomains</key>
-    <array/>
+    <array>
+        <string>googlesyndication.com</string>
+        <string>doubleclick.net</string>
+        <string>googleadservices.com</string>
+        <string>googleadmob.com</string>
+    </array>
 
-    <!-- We do NOT collect any data types from users.  All progress is
-         stored locally in UserDefaults on the device. -->
+    <!-- First-party data collected by AnalyticsClient and sent to Supabase.
+         All data is anonymous — no PII, no real-world identity linkage.
+         Google Mobile Ads SDK declares its own data-collection types in its
+         bundled PrivacyInfo.xcprivacy (not repeated here). -->
     <key>NSPrivacyCollectedDataTypes</key>
-    <array/>
+    <array>
 
-    <!-- Required-reason API declarations.
-         Roll Along uses UserDefaults to persist:
-           - level progression
-           - star/coin/best-time totals
-           - settings (haptics, sound, skin, name, ball orientation)
-           - one-time UX flags (onboarding, welcome moment)
-         All reads/writes stay within the app sandbox.
-         Reason code CA92.1: "Access info from same app, per documentation" -->
+        <!-- Anonymous per-install UUID (ra_analytics_user_id) generated on
+             first launch and stored in UserDefaults.  Sent to Supabase to
+             group analytics events by device across sessions.  Not linked
+             to any real-world identity; not used for cross-app tracking. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+        <!-- Gameplay events sent to Supabase: level_complete, level_fail,
+             minigame round start/over, challenge track progress, att_response,
+             and ad impression/rewarded/failed events.  Used for product
+             analytics and funnel analysis only. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeGameplayContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+        <!-- IAP and cosmetic purchase events sent to Supabase:
+             iap_purchased, iap_failed, iap_pending, iap_cancelled,
+             cosmetic_purchased, pack_purchased.  Used for purchase funnel
+             analytics.  No payment details, card numbers, or receipt data
+             are collected — only event names and product IDs. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+        <!-- Hardware model string ("iPhone17,1") and iOS version string
+             sent to Supabase as columns on every analytics event.  Used
+             for hardware/OS segmentation in product dashboards.  Not
+             linked to identity; not used for tracking. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+    </array>
+
+    <!-- Required-reason API declarations. -->
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
+
+        <!-- GameState uses UserDefaults for all player progression, settings,
+             owned cosmetics, lives, coins, IAP flags, and review prompt date.
+             AnalyticsClient also reads/writes ra_analytics_user_id.
+             Reason CA92.1: access info from the same app, per documentation. -->
         <dict>
             <key>NSPrivacyAccessedAPIType</key>
             <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
@@ -33,6 +117,7 @@
                 <string>CA92.1</string>
             </array>
         </dict>
+
     </array>
 </dict>
 </plist>
