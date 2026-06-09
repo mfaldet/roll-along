@@ -23,6 +23,7 @@ import SwiftUI
 struct GoldRushView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
@@ -77,6 +78,10 @@ struct GoldRushView: View {
         var ignoreRacer: UUID? = nil    // who can't grab it yet (a fresh spill)
         var ignoreUntil: Int = 0
         let born: Int
+        /// Pre-computed spawn-pop scale (0.6 → 1.0 over the first 8 ticks).
+        /// Stored in the struct so coinView doesn't depend on `localTick` and
+        /// SwiftUI can skip redraws for coins whose scale has stabilised at 1.0.
+        var popScale: CGFloat = 0.6
     }
 
     private struct Poof: Identifiable {
@@ -133,7 +138,15 @@ struct GoldRushView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .onTapGesture { if !started && !isOver { started = true } }
+                .onTapGesture {
+                    if !started && !isOver {
+                        started = true
+                        AnalyticsClient.shared.track(
+                            "goldrush_round_started",
+                            properties: ["map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
+                        )
+                    }
+                }
             }
 
             topBar
@@ -146,6 +159,10 @@ struct GoldRushView: View {
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
         .onDisappear { motion.stop(); clock.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop(); motion.stop() }
+            else if phase == .active && started && !isOver { clock.start(); motion.start() }
+        }
     }
 
     // MARK: - Render layers
@@ -173,9 +190,8 @@ struct GoldRushView: View {
     }
 
     private func coinView(_ c: Coin) -> some View {
-        let pop = min(1, Double(localTick - c.born) / 8.0)   // little spawn pop
-        return CoinIcon(size: coinSize)
-            .scaleEffect(0.6 + 0.4 * pop)
+        CoinIcon(size: coinSize)
+            .scaleEffect(c.popScale)   // stabilises at 1.0 after 8 ticks — no localTick dependency
             .shadow(color: .black.opacity(0.4), radius: 3, y: 2)
             .position(c.pos)
     }
@@ -299,6 +315,8 @@ struct GoldRushView: View {
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Gold Rush. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
     }
 
     private var gameOverOverlay: some View {
@@ -326,9 +344,12 @@ struct GoldRushView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Plus \(banked) coins banked")
                 Text("coins banked")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
                     Button {
@@ -433,7 +454,8 @@ struct GoldRushView: View {
                 "goldrush_round_over",
                 properties: ["won": .bool(playerWon),
                              "collected": .int(playerScore),
-                             "coins": .int(banked)]
+                             "coins": .int(banked),
+                             "map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
             )
             if gameState.hapticsEnabled {
                 if playerWon { Haptics.success() } else { Haptics.warning() }
@@ -450,6 +472,15 @@ struct GoldRushView: View {
         roundTick += 1
 
         if coins.count < maxCoins && localTick % spawnEveryTicks == 0 { spawnCoin() }
+
+        // Advance pop scale for coins still in their 8-tick spawn animation.
+        // After age 8 popScale is locked at 1.0 — no further mutations, so
+        // coinView no longer reads localTick and the coin view can stay stable.
+        for i in coins.indices {
+            let age = localTick - coins[i].born
+            guard age <= 8 else { continue }
+            coins[i].popScale = CGFloat(0.6 + 0.4 * Double(age) / 8.0)
+        }
 
         let dt: CGFloat = 1.0 / 60.0
         for i in racers.indices {

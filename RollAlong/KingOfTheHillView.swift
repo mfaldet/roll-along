@@ -23,6 +23,7 @@ import SwiftUI
 struct KingOfTheHillView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
@@ -110,7 +111,9 @@ struct KingOfTheHillView: View {
                 ZStack {
                     Color.clear
                     pitch
-                    pillarsLayer.allowsHitTesting(false)
+                    PillarsLayer(field: field, pillars: currentPillars)
+                        .equatable()
+                        .allowsHitTesting(false)
                     zoneView
                     ForEach(racers) { r in
                         marble(r).position(r.pos)
@@ -123,7 +126,15 @@ struct KingOfTheHillView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .onTapGesture { if !started && !isOver { started = true } }
+                .onTapGesture {
+                    if !started && !isOver {
+                        started = true
+                        AnalyticsClient.shared.track(
+                            "koth_round_started",
+                            properties: ["map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
+                        )
+                    }
+                }
             }
 
             topBar
@@ -136,23 +147,13 @@ struct KingOfTheHillView: View {
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
         .onDisappear { motion.stop(); clock.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop(); motion.stop() }
+            else if phase == .active && started && !isOver { clock.start(); motion.start() }
+        }
     }
 
     // MARK: - Render
-
-    /// Pillar obstacles at fractional positions within the field rect (S25).
-    private var pillarsLayer: some View {
-        Canvas { ctx, _ in
-            guard field.width > 0 else { return }
-            for p in currentPillars {
-                let cx = field.minX + p.cx * field.width
-                let cy = field.minY + p.cy * field.height
-                let rect = CGRect(x: cx - p.r, y: cy - p.r, width: p.r * 2, height: p.r * 2)
-                ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.20)))
-                ctx.stroke(Path(ellipseIn: rect), with: .color(Color(white: 0.38)), lineWidth: 2)
-            }
-        }
-    }
 
     private var mapNameLabel: some View {
         VStack(spacing: 0) {
@@ -328,6 +329,8 @@ struct KingOfTheHillView: View {
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("King of the Hill. Tilt to enter the moving zone and hold it alone. Most time on the hill in 60 seconds wins. Tap anywhere to begin.")
     }
 
     private var gameOverOverlay: some View {
@@ -356,9 +359,12 @@ struct KingOfTheHillView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Plus \(banked) coins banked")
                 Text("coins banked")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
                     Button {
@@ -436,7 +442,8 @@ struct KingOfTheHillView: View {
                 "koth_round_over",
                 properties: ["won": .bool(playerWon),
                              "hold_sec": .int(holdSec),
-                             "coins": .int(banked)]
+                             "coins": .int(banked),
+                             "map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
             )
             if gameState.hapticsEnabled {
                 if playerWon { Haptics.success() } else { Haptics.warning() }
@@ -591,6 +598,29 @@ struct KingOfTheHillView: View {
         let m = hypot(dx, dy)
         guard m > 0 else { return CGVector(dx: 0, dy: 0) }
         return CGVector(dx: dx / m * scale, dy: dy / m * scale)
+    }
+}
+
+// MARK: - Pillar layer (extracted for equatable skip)
+
+/// Circular pillar obstacles at fractional field positions (S25 engine).
+/// Extracted so `.equatable()` lets SwiftUI skip this Canvas on every physics tick —
+/// `field` and `pillars` only change on map load or screen-size change.
+private struct PillarsLayer: View, Equatable {
+    let field:   CGRect
+    let pillars: [PillarFrac]
+
+    var body: some View {
+        Canvas { ctx, _ in
+            guard field.width > 0 else { return }
+            for p in pillars {
+                let cx = field.minX + p.cx * field.width
+                let cy = field.minY + p.cy * field.height
+                let rect = CGRect(x: cx - p.r, y: cy - p.r, width: p.r * 2, height: p.r * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.20)))
+                ctx.stroke(Path(ellipseIn: rect), with: .color(Color(white: 0.38)), lineWidth: 2)
+            }
+        }
     }
 }
 

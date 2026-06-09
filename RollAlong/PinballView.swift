@@ -28,6 +28,7 @@ import SwiftUI
 struct PinballView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var clock = PhysicsClock()
 
     // MARK: - Tunables
@@ -142,6 +143,10 @@ struct PinballView: View {
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { clock.start() }
         .onDisappear { clock.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop() }
+            else if phase == .active && started && !isOver { clock.start() }
+        }
     }
 
     // MARK: - Render
@@ -287,6 +292,8 @@ struct PinballView: View {
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pinball. Tap the left side of the screen for the left flipper, the right side for the right flipper. Keep the ball alive and score as high as you can. Tap anywhere to launch.")
     }
 
     private var gameOverOverlay: some View {
@@ -312,9 +319,12 @@ struct PinballView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Plus \(banked) coins banked")
                 Text("coins banked")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
                     Button {
@@ -423,7 +433,9 @@ struct PinballView: View {
             if banked > 0 { gameState.addCoins(banked) }
             AnalyticsClient.shared.track(
                 "pinball_game_over",
-                properties: ["score": .int(score), "coins": .int(banked)]
+                properties: ["score": .int(score),
+                             "coins": .int(banked),
+                             "map_name": .string(PinballMaps.maps[mapIndex % PinballMaps.maps.count].name)]
             )
             if gameState.hapticsEnabled { Haptics.success() }
         }
@@ -433,7 +445,15 @@ struct PinballView: View {
 
     private func handleTap(at p: CGPoint) {
         if isOver { return }
-        if !started { started = true; launchBall(); return }
+        if !started {
+            started = true
+            AnalyticsClient.shared.track(
+                "pinball_game_started",
+                properties: ["map_name": .string(PinballMaps.maps[mapIndex % PinballMaps.maps.count].name)]
+            )
+            launchBall()
+            return
+        }
         if !ballInPlay { launchBall(); return }
         if p.x < field.midX { flick(isLeft: true) } else { flick(isLeft: false) }
     }
@@ -523,6 +543,8 @@ struct PinballView: View {
         }
     }
 
+    /// Ball-vs-bumper overlap resolution.  O(n) in bumper count — see
+    /// `PinballMap` doc comment for the ≤ 8 cap rationale.
     private func collideBumpers() {
         let r = ballRadius
         for i in bumpers.indices {

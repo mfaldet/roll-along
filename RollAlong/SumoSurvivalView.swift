@@ -24,6 +24,7 @@ import SwiftUI
 struct SumoSurvivalView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
@@ -124,7 +125,15 @@ struct SumoSurvivalView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .onTapGesture { if !started && !isOver { started = true } }
+                .onTapGesture {
+                    if !started && !isOver {
+                        started = true
+                        AnalyticsClient.shared.track(
+                            "sumo_round_started",
+                            properties: ["map_name": .string(SumoMaps.maps[mapIndex % SumoMaps.maps.count].name)]
+                        )
+                    }
+                }
             }
 
             topBar
@@ -137,6 +146,10 @@ struct SumoSurvivalView: View {
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
         .onDisappear { motion.stop(); clock.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop(); motion.stop() }
+            else if phase == .active && started && !isOver { clock.start(); motion.start() }
+        }
     }
 
     // MARK: - Render layers
@@ -281,6 +294,8 @@ struct SumoSurvivalView: View {
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sumo Survival. Tilt to push rivals off the shrinking ring. Last marble standing wins. Tap anywhere to begin.")
     }
 
     private var gameOverOverlay: some View {
@@ -305,9 +320,12 @@ struct SumoSurvivalView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Plus \(banked) coins banked")
                 Text("coins banked")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
                     Button {
@@ -382,7 +400,8 @@ struct SumoSurvivalView: View {
                 "sumo_round_over",
                 properties: ["knockouts": .int(knockouts),
                              "survived_sec": .int(survivedSeconds),
-                             "coins": .int(banked)]
+                             "coins": .int(banked),
+                             "map_name": .string(SumoMaps.maps[mapIndex % SumoMaps.maps.count].name)]
             )
             if gameState.hapticsEnabled { Haptics.warning() }
         }

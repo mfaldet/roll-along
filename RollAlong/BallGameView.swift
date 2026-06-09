@@ -86,6 +86,7 @@ struct BallGameView: View {
     @EnvironmentObject var ads:       AdManager
     @Environment(\.dismiss) var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
@@ -596,6 +597,10 @@ struct BallGameView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear  { motion.start(); clock.start(); AudioManager.shared.prepareIfNeeded() }
         .onDisappear { motion.stop();  clock.stop()  }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop(); motion.stop() }
+            else if phase == .active && self.phase == .playing { clock.start(); motion.start() }
+        }
     }
 
     // MARK: - Border
@@ -3121,6 +3126,17 @@ struct BallGameView: View {
                 level: gameState.currentLevel
             )
         }
+        // Challenge Track funnel: parallel start event so we can measure
+        // started → cleared drop-off per track and level.
+        if case .challengeTrack(let trackID) = activeMode.progression {
+            AnalyticsClient.shared.track(
+                "track_level_started",
+                properties: [
+                    "track_id": .string(trackID),
+                    "level":    .int(gameState.activeTrackLevel),
+                ]
+            )
+        }
     }
 
     private func tick(geoSize: CGSize) {
@@ -3526,6 +3542,10 @@ struct BallGameView: View {
                     properties: ["track_id": .string(trackID)]
                 )
             }
+            // Prompt at milestone levels — positive moment, player is clearly engaged.
+            if [10, 50, 100].contains(gameState.activeTrackLevel) {
+                gameState.maybeRequestReview(after: true)
+            }
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
@@ -3599,6 +3619,10 @@ struct BallGameView: View {
             level: level
         )
 
+        // Prompt on a 3-star clear — peak positive emotional moment on the main climb.
+        if stars == 3 {
+            gameState.maybeRequestReview(after: true)
+        }
         withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
     }
 

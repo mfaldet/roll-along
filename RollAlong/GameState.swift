@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 final class GameState: ObservableObject {
@@ -118,6 +119,21 @@ final class GameState: ObservableObject {
     }
     @Published var starterPackClaimed: Bool {
         didSet { UserDefaults.standard.set(starterPackClaimed, forKey: "ra_starterPackClaimed") }
+    }
+
+    // ── Ratings prompt ────────────────────────────────────────────────────
+    // Timestamp of the last time SKStoreReviewController.requestReview was
+    // called.  nil until the first time the conditions are met.  Used to
+    // enforce the 30-day minimum between prompts (Apple allows at most 3
+    // per 365 days regardless, but we gate more tightly).
+    @Published var lastReviewPromptDate: Date? {
+        didSet {
+            if let d = lastReviewPromptDate {
+                UserDefaults.standard.set(d, forKey: "ra_lastReviewPromptDate")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "ra_lastReviewPromptDate")
+            }
+        }
     }
 
     // ── Cosmetic economy (Sprint 4d) ──────────────────────────────────────
@@ -259,9 +275,16 @@ final class GameState: ObservableObject {
     /// — a fresh launch simply re-shuffles.
     private var packBag: [BallSkin] = []
 
+    /// Loads all persisted state from UserDefaults.
+    ///
+    /// **Defensive loads** — every load is guarded so a corrupt or missing
+    /// UserDefaults store never crashes the app:
+    ///   • `integer(forKey:)` returns 0 for missing/wrong-type keys — clamped to safe ranges.
+    ///   • `object(forKey:) as? T` returns nil for wrong-type keys — nil-coalesced to defaults.
+    ///   • JSON-backed dicts use `try?` so a bad blob returns `[:]`.
     init() {
         let saved = UserDefaults.standard.integer(forKey: "ra_level")
-        currentLevel = saved > 0 ? saved : 1
+        currentLevel = max(1, saved)
         activeSkin = BallSkin(rawValue: UserDefaults.standard.string(forKey: "ra_skin") ?? "") ?? .red
         playerName = UserDefaults.standard.string(forKey: "ra_name") ?? ""
         hapticsEnabled = UserDefaults.standard.object(forKey: "ra_haptics") as? Bool ?? true
@@ -275,11 +298,12 @@ final class GameState: ObservableObject {
         bestTime        = Self.loadDoubleValueDict(key: "ra_bestTime")
         collectedCoins  = Self.loadSetDict(key: "ra_collectedCoins")
         let unlocked    = UserDefaults.standard.integer(forKey: "ra_highestUnlocked")
-        highestUnlocked = max(1, unlocked)
+        highestUnlocked = max(currentLevel, max(1, unlocked))  // never less than currentLevel
 
         // Lives — default to a full bar.  `as? Int ?? Self.livesMax` covers
         // the case where no key has been written yet (fresh install).
-        lives          = UserDefaults.standard.object(forKey: "ra_lives") as? Int ?? Self.livesMax
+        // `max(0, ...)` guards against a corrupt negative value.
+        lives          = max(0, UserDefaults.standard.object(forKey: "ra_lives") as? Int ?? Self.livesMax)
         lastLifeLostAt = UserDefaults.standard.object(forKey: "ra_lastLifeLostAt") as? Date
         unlimitedLives = UserDefaults.standard.bool(forKey: "ra_unlimitedLives")
 
@@ -291,12 +315,15 @@ final class GameState: ObservableObject {
         starterPackShownAt = UserDefaults.standard.object(forKey: "ra_starterPackShownAt") as? Date
         starterPackClaimed = UserDefaults.standard.bool(forKey: "ra_starterPackClaimed")
 
+        // Ratings prompt.
+        lastReviewPromptDate = UserDefaults.standard.object(forKey: "ra_lastReviewPromptDate") as? Date
+
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
         // computing the equipped cosmetics below; referring to
         // `self.ownedGoals` directly would be a "self used before all
         // stored properties initialised" error here.
-        coinBalance = UserDefaults.standard.integer(forKey: "ra_coinBalance")
+        coinBalance = max(0, UserDefaults.standard.integer(forKey: "ra_coinBalance"))
         let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins")
         let loadedOwnedGoals   = Self.loadStringSet(forKey: "ra_ownedGoals")
         let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails")
@@ -644,6 +671,29 @@ final class GameState: ObservableObject {
     var starterPackSecondsRemaining: TimeInterval {
         guard let shownAt = starterPackShownAt else { return 0 }
         return max(0, 48 * 3_600 - Date().timeIntervalSince(shownAt))
+    }
+
+    // MARK: - Ratings prompt
+
+    /// Request an App Store review if all three conditions are met:
+    ///   1. `win` is true — only prompt on a positive emotional moment.
+    ///   2. Player has cleared at least level 5 on the main climb.
+    ///   3. We haven't prompted in the last 30 days.
+    ///
+    /// Apple enforces a hard cap of 3 prompts per 365 days per app; this gate
+    /// is stricter so we use those slots on genuinely engaged players.
+    func maybeRequestReview(after win: Bool) {
+        guard win,
+              highestUnlocked >= 5,
+              Date().timeIntervalSince(lastReviewPromptDate ?? .distantPast) > 30 * 86_400
+        else { return }
+        lastReviewPromptDate = Date()
+        DispatchQueue.main.async {
+            if let scene = UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                SKStoreReviewController.requestReview(in: scene)
+            }
+        }
     }
 
     // MARK: - Challenge Track progression

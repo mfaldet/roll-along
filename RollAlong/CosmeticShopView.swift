@@ -49,6 +49,7 @@ struct CosmeticShopView: View {
     @State private var alertMessage: String = ""
     @State private var showAlert: Bool = false
     @State private var showBuyCoinsSheet: Bool = false
+    @State private var purchaseError: String? = nil
     /// Non-nil while the collection-complete toast is visible.  Holds the
     /// display name of the newly completed bundle.
     @State private var completionToastBundle: String? = nil
@@ -138,6 +139,12 @@ struct CosmeticShopView: View {
         .sheet(isPresented: $showBuyCoinsSheet) {
             BuyCoinsSheet()
         }
+        .onChange(of: store.lastError) { _, err in purchaseError = err }
+        .alert("Purchase Failed", isPresented: Binding(
+            get: { purchaseError != nil },
+            set: { _ in purchaseError = nil; store.clearLastError() }
+        ), actions: { Button("OK", role: .cancel) {} },
+        message: { Text(purchaseError ?? "") })
     }
 
     // MARK: - Header (coin balance)

@@ -25,6 +25,7 @@ import SwiftUI
 struct MarbleCupView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
@@ -122,7 +123,15 @@ struct MarbleCupView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .onTapGesture { if !started && !isOver { started = true } }
+                .onTapGesture {
+                    if !started && !isOver {
+                        started = true
+                        AnalyticsClient.shared.track(
+                            "marblecup_match_started",
+                            properties: ["map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
+                        )
+                    }
+                }
             }
 
             topBar
@@ -136,6 +145,10 @@ struct MarbleCupView: View {
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
         .onDisappear { motion.stop(); clock.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop(); motion.stop() }
+            else if phase == .active && started && !isOver { clock.start(); motion.start() }
+        }
     }
 
     // MARK: - Pitch / markings
@@ -357,6 +370,8 @@ struct MarbleCupView: View {
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Marble Cup. Tilt to knock the ball into the opponent's goal. Most goals in 90 seconds wins. Tap anywhere to begin.")
     }
 
     private var matchOverOverlay: some View {
@@ -385,9 +400,12 @@ struct MarbleCupView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Plus \(banked) coins banked")
                 Text("coins banked")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
                     Button {
@@ -470,7 +488,8 @@ struct MarbleCupView: View {
                 properties: ["won": .bool(playerWon),
                              "goals_for": .int(playerGoals),
                              "goals_against": .int(aiGoals),
-                             "coins": .int(banked)]
+                             "coins": .int(banked),
+                             "map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
             )
             if gameState.hapticsEnabled {
                 if playerWon { Haptics.success() } else { Haptics.warning() }

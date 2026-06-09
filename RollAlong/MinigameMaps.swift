@@ -23,14 +23,14 @@ import SwiftUI
 /// Convert to screen coords: x_pt = xFrac * arena.width, etc.
 /// Wall collision: project ball onto segment → closest point P → if dist < r push out
 /// along normal, reflect vel component along normal × wallBounce.
-struct WallSegFrac {
+struct WallSegFrac: Equatable {
     let x1, y1, x2, y2: CGFloat
 }
 
 /// Circular post or pillar at a fractional field position.
 /// Convert to screen coords: cx_pt = pf.cx * field.width, etc.
 /// Pillar collision: identical to marble-marble but pillar has infinite mass — ball only.
-struct PillarFrac {
+struct PillarFrac: Equatable {
     let cx, cy: CGFloat   // 0.0–1.0 relative to field bounds
     let r: CGFloat        // radius in points
 }
@@ -50,6 +50,12 @@ struct SumoPillar {
 /// `bumperFracs` are (xFrac, yFrac) within the playfield rect, where
 /// (0,0) = field.minX/minY and (1,1) = field.maxX/maxY.
 /// Keep xFrac ≤ 0.74 to stay clear of the right launch lane (≈ rightmost 11%).
+///
+/// **Bumper count cap — keep ≤ 8.**
+/// `collideBumpers()` runs a ball-vs-each-bumper loop every physics tick
+/// (O(n) in bumpers).  All current maps use 3–7 bumpers; beyond ~10 the loop
+/// overhead becomes measurable at 60 fps.  If you need a denser layout,
+/// consider a spatial grid or broad-phase cull first.
 struct PinballMap {
     let name: String
     let bumperFracs: [(CGFloat, CGFloat)]

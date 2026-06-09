@@ -128,6 +128,10 @@ final class StoreKitManager: ObservableObject {
     @Published private(set) var lastError: String? = nil
     @Published private(set) var lastDelivery: DeliveryReceipt? = nil
 
+    /// Called by purchase-sheet alert dismiss to clear the error so the same
+    /// error string can re-trigger onChange on a subsequent attempt.
+    func clearLastError() { lastError = nil }
+
     /// Surface-able info for the UI after a successful purchase or restore.
     struct DeliveryReceipt: Equatable {
         let productID: ProductID

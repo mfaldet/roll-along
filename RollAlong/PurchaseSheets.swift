@@ -18,6 +18,7 @@ struct BuyLivesSheet: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
+    @State private var purchaseError: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -58,6 +59,12 @@ struct BuyLivesSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .onChange(of: store.lastError) { _, err in purchaseError = err }
+        .alert("Purchase Failed", isPresented: Binding(
+            get: { purchaseError != nil },
+            set: { _ in purchaseError = nil; store.clearLastError() }
+        ), actions: { Button("OK", role: .cancel) {} },
+        message: { Text(purchaseError ?? "") })
     }
 
     private var header: some View {
@@ -253,6 +260,7 @@ struct BuyCoinsSheet: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
+    @State private var purchaseError: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -286,6 +294,12 @@ struct BuyCoinsSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .onChange(of: store.lastError) { _, err in purchaseError = err }
+        .alert("Purchase Failed", isPresented: Binding(
+            get: { purchaseError != nil },
+            set: { _ in purchaseError = nil; store.clearLastError() }
+        ), actions: { Button("OK", role: .cancel) {} },
+        message: { Text(purchaseError ?? "") })
     }
 
     private var header: some View {
@@ -421,6 +435,7 @@ struct StarterPackSheet: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
+    @State private var purchaseError: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -554,6 +569,12 @@ struct StarterPackSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
+        .onChange(of: store.lastError) { _, err in purchaseError = err }
+        .alert("Purchase Failed", isPresented: Binding(
+            get: { purchaseError != nil },
+            set: { _ in purchaseError = nil; store.clearLastError() }
+        ), actions: { Button("OK", role: .cancel) {} },
+        message: { Text(purchaseError ?? "") })
     }
 
     // ── Reward row helper ────────────────────────────────────────────────

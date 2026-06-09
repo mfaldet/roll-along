@@ -277,13 +277,27 @@ struct HomeView: View {
                 case .friends:     FriendsView()
                 case .clans:       ClansView()
                 case .games:       GameMenuView()
-                case .mode("snake"): SnakeGameView()
-                case .mode("sumo"): SumoSurvivalView()
-                case .mode("paintball"): PaintBallView()
-                case .mode("goldrush"): GoldRushView()
-                case .mode("marblecup"): MarbleCupView()
-                case .mode("koth"): KingOfTheHillView()
-                case .mode("pinball"): PinballView()
+                case .mode("snake"):
+                    SnakeGameView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("snake")]) }
+                case .mode("sumo"):
+                    SumoSurvivalView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("sumo")]) }
+                case .mode("paintball"):
+                    PaintBallView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("paintball")]) }
+                case .mode("goldrush"):
+                    GoldRushView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("goldrush")]) }
+                case .mode("marblecup"):
+                    MarbleCupView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("marblecup")]) }
+                case .mode("koth"):
+                    KingOfTheHillView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("koth")]) }
+                case .mode("pinball"):
+                    PinballView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("pinball")]) }
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
                 case .mode(let id):

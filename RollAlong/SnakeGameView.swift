@@ -29,6 +29,7 @@ import SwiftUI
 struct SnakeGameView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
@@ -143,7 +144,9 @@ struct SnakeGameView: View {
             GeometryReader { geo in
                 ZStack {
                     Color.clear
-                    staticLayer.allowsHitTesting(false)
+                    StaticObstacleLayer(arena: arena, walls: walls, asteroids: asteroids)
+                        .equatable()
+                        .allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
                     orbsLayer.allowsHitTesting(false)
                     ForEach(cycles.filter { $0.alive }) { c in
@@ -157,7 +160,15 @@ struct SnakeGameView: View {
                     arena = newSize
                     if cycles.isEmpty { reset() }
                 }
-                .onTapGesture { if !started && !isOver { started = true } }
+                .onTapGesture {
+                    if !started && !isOver {
+                        started = true
+                        AnalyticsClient.shared.track(
+                            "comet_round_started",
+                            properties: ["map_name": .string(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)]
+                        )
+                    }
+                }
             }
 
             topBar
@@ -170,33 +181,13 @@ struct SnakeGameView: View {
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
         .onDisappear { motion.stop(); clock.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { clock.stop(); motion.stop() }
+            else if phase == .active && started && !isOver { clock.start(); motion.start() }
+        }
     }
 
     // MARK: - Render layers
-
-    /// Static obstacles layer: interior walls and asteroid rocks (drawn below trails).
-    private var staticLayer: some View {
-        Canvas { ctx, _ in
-            guard arena.width > 0 else { return }
-            for seg in walls {
-                let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
-                let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
-                var path = Path(); path.move(to: p1); path.addLine(to: p2)
-                ctx.stroke(path, with: .color(Color(white: 0.30).opacity(0.85)),
-                           style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                ctx.stroke(path, with: .color(Color(white: 0.55).opacity(0.55)),
-                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            }
-            for ast in asteroids {
-                let cx = ast.cx * arena.width, cy = ast.cy * arena.height
-                let rect = CGRect(x: cx - ast.r, y: cy - ast.r,
-                                  width: ast.r * 2, height: ast.r * 2)
-                ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.24)))
-                ctx.stroke(Path(ellipseIn: rect),
-                           with: .color(Color(white: 0.42).opacity(0.8)), lineWidth: 2)
-            }
-        }
-    }
 
     private var trailsLayer: some View {
         Canvas { ctx, _ in
@@ -344,6 +335,8 @@ struct SnakeGameView: View {
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Comet Clash. Tilt to steer your comet. Leave a glowing trail. Grab sparks to extend your wall. Touching any trail eliminates you. Tap anywhere to begin.")
     }
 
     private var gameOverOverlay: some View {
@@ -374,9 +367,12 @@ struct SnakeGameView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Plus \(banked) coins banked")
                 Text("coins banked")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
                     Button {
@@ -477,17 +473,24 @@ struct SnakeGameView: View {
                              "power": .int(power),
                              "kills": .int(kills),
                              "collects": .int(collects),
-                             "coins": .int(banked)]
+                             "coins": .int(banked),
+                             "map_name": .string(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)]
             )
             if gameState.hapticsEnabled {
                 if didWin { Haptics.success() } else { Haptics.warning() }
             }
+            gameState.maybeRequestReview(after: didWin)
         }
     }
 
     // MARK: - Simulation
 
     private func tick() {
+        // `started` remains false until the player taps — this guard also
+        // covers the clock/GeometryReader race: ticks can fire in .onAppear
+        // before the GeometryReader delivers its first size, but they are
+        // silently discarded here.  The arena.width > 1 check is a secondary
+        // safety net for any future path that sets `started` early.
         guard started, !isOver, arena.width > 1, arena.height > 1 else { return }
         localTick &+= 1
         let dt: CGFloat = 1.0 / 60.0
@@ -539,6 +542,9 @@ struct SnakeGameView: View {
         }
 
         // 3) Age out old wall (dead comets' walls keep fading too).
+        //    maxTrailNodes cap is enforced here — BEFORE resolveCollisions() in
+        //    step 4.  This keeps the O(comets × total_trail_nodes) collision
+        //    loop bounded at 4 × 600 = 2 400 nodes in the worst case.
         for i in cycles.indices { prune(i) }
 
         // 4) Sparks, death bursts, fatal trails, then win/lose.
@@ -835,6 +841,41 @@ struct SnakeGameView: View {
             if d < nearest { nearest = d }
         }
         return nearest
+    }
+}
+
+// MARK: - Static obstacle layer (extracted for equatable skip)
+
+/// Interior walls and asteroid rocks, drawn below trails every frame.
+/// Extracted as a separate `View` struct so SwiftUI can skip re-rendering it
+/// on every physics tick — `.equatable()` at the call site lets the engine
+/// compare `arena`, `walls`, and `asteroids` and bail out if nothing changed.
+private struct StaticObstacleLayer: View, Equatable {
+    let arena:    CGSize
+    let walls:    [WallSegFrac]
+    let asteroids: [PillarFrac]
+
+    var body: some View {
+        Canvas { ctx, _ in
+            guard arena.width > 0 else { return }
+            for seg in walls {
+                let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+                let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+                var path = Path(); path.move(to: p1); path.addLine(to: p2)
+                ctx.stroke(path, with: .color(Color(white: 0.30).opacity(0.85)),
+                           style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                ctx.stroke(path, with: .color(Color(white: 0.55).opacity(0.55)),
+                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+            for ast in asteroids {
+                let cx = ast.cx * arena.width, cy = ast.cy * arena.height
+                let rect = CGRect(x: cx - ast.r, y: cy - ast.r,
+                                  width: ast.r * 2, height: ast.r * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.24)))
+                ctx.stroke(Path(ellipseIn: rect),
+                           with: .color(Color(white: 0.42).opacity(0.8)), lineWidth: 2)
+            }
+        }
     }
 }
 
