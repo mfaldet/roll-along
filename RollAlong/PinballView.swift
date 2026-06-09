@@ -102,6 +102,9 @@ struct PinballView: View {
     @State private var awarded = false
     @State private var localTick = 0
 
+    @State private var mapIndex    = 0
+    @State private var showMapName = false
+
     // MARK: - Body
 
     var body: some View {
@@ -132,6 +135,7 @@ struct PinballView: View {
             topBar
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
+            if showMapName && !isOver { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -249,6 +253,25 @@ struct PinballView: View {
         .frame(width: 52, alignment: .trailing)
     }
 
+    private var mapNameLabel: some View {
+        VStack {
+            Spacer().frame(height: topReserve + 6)
+            Text(PinballMaps.maps[mapIndex % PinballMaps.maps.count].name)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.60))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.14)))
+            Spacer()
+        }
+        .transition(.opacity)
+        .allowsHitTesting(false)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeOut(duration: 0.5)) { showMapName = false }
+            }
+        }
+    }
+
     private var startPrompt: some View {
         VStack(spacing: 10) {
             Image(systemName: "hand.tap.fill")
@@ -294,7 +317,10 @@ struct PinballView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset() } label: {
+                    Button {
+                        mapIndex = (mapIndex + 1) % PinballMaps.maps.count
+                        reset()
+                    } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
@@ -336,11 +362,7 @@ struct PinballView: View {
         dividerTopY = field.minY + field.height * 0.32
         laneCenterX = field.maxX - laneWidth / 2
 
-        bumpers = [
-            Bumper(pos: CGPoint(x: field.minX + field.width * 0.30, y: field.minY + field.height * 0.24)),
-            Bumper(pos: CGPoint(x: field.minX + field.width * 0.58, y: field.minY + field.height * 0.18)),
-            Bumper(pos: CGPoint(x: field.minX + field.width * 0.42, y: field.minY + field.height * 0.40)),
-        ]
+        applyBumpers()
     }
 
     // MARK: - Lifecycle
@@ -354,8 +376,18 @@ struct PinballView: View {
         ballsLeft = startingBalls
         leftFlickTicks = 0
         rightFlickTicks = 0
-        for i in bumpers.indices { bumpers[i].litTicks = 0 }
+        applyBumpers()
+        showMapName = true
         placeBallInLane()
+    }
+
+    private func applyBumpers() {
+        guard field.width > 0 else { return }
+        let map = PinballMaps.maps[mapIndex % PinballMaps.maps.count]
+        bumpers = map.bumperFracs.map { xf, yf in
+            Bumper(pos: CGPoint(x: field.minX + field.width  * xf,
+                                y: field.minY + field.height * yf))
+        }
     }
 
     private func placeBallInLane() {

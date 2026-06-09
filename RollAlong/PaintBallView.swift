@@ -112,6 +112,9 @@ struct PaintBallView: View {
     @State private var roundTick = 0
     @State private var awarded   = false
 
+    @State private var mapIndex    = 0
+    @State private var showMapName = false
+
     private var secondsLeft: Int {
         max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0)))
     }
@@ -145,6 +148,7 @@ struct PaintBallView: View {
             topBar
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
+            if showMapName && !isOver { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -313,6 +317,25 @@ struct PaintBallView: View {
         return Int((Double(coverage[i]) / Double(totalPaintable)) * 100)
     }
 
+    private var mapNameLabel: some View {
+        VStack {
+            Spacer().frame(height: 98)
+            Text(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count].name)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.60))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.14)))
+            Spacer()
+        }
+        .transition(.opacity)
+        .allowsHitTesting(false)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeOut(duration: 0.5)) { showMapName = false }
+            }
+        }
+    }
+
     private var startPrompt: some View {
         VStack(spacing: 10) {
             Image(systemName: "paintbrush.pointed.fill")
@@ -361,7 +384,10 @@ struct PaintBallView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset() } label: {
+                    Button {
+                        mapIndex = (mapIndex + 1) % PaintBallMaps.maps.count
+                        reset()
+                    } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
@@ -418,25 +444,16 @@ struct PaintBallView: View {
         grid = Array(repeating: -1, count: cols * rows)
         coverage = Array(repeating: 0, count: colorCount)
 
-        scatterPits()
+        loadMapPits(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count])
+        showMapName = true
         spawnPainters()
     }
 
-    private func scatterPits() {
-        var ps: [Pit] = []
-        let margin: CGFloat = 44
-        let topReserve: CGFloat = 130   // keep pits clear of the HUD
-        var attempts = 0
-        while ps.count < pitCount && attempts < 240 {
-            attempts += 1
-            let x = CGFloat.random(in: margin...(arena.width - margin))
-            let y = CGFloat.random(in: (topReserve)...(arena.height - margin))
-            if hypot(x - center.x, y - center.y) < 95 { continue }            // not on spawn
-            if ps.contains(where: { hypot($0.pos.x - x, $0.pos.y - y) < pitRadius * 3 }) { continue }
-            ps.append(Pit(pos: CGPoint(x: x, y: y), radius: pitRadius))
+    private func loadMapPits(_ map: PaintBallMap) {
+        guard cols > 0, rows > 0 else { return }
+        pits = map.pitFracs.map { xf, yf in
+            Pit(pos: CGPoint(x: arena.width * xf, y: arena.height * yf), radius: pitRadius)
         }
-        pits = ps
-
         // Mark every cell under a pit as unpaintable, and tally the rest.
         var b = Array(repeating: false, count: cols * rows)
         for row in 0..<rows {
