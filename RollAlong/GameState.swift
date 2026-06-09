@@ -328,7 +328,11 @@ final class GameState: ObservableObject {
         // computing the equipped cosmetics below; referring to
         // `self.ownedGoals` directly would be a "self used before all
         // stored properties initialised" error here.
-        coinBalance = max(0, UserDefaults.standard.integer(forKey: "ra_coinBalance"))
+        // Clamp both sides: floor of 0, ceiling of maxCoinBalance.
+        // A corrupted save with a huge value is silently reset rather than
+        // displaying an absurd balance.
+        coinBalance = min(max(0, UserDefaults.standard.integer(forKey: "ra_coinBalance")),
+                          Self.maxCoinBalance)
         let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins")
         let loadedOwnedGoals   = Self.loadStringSet(forKey: "ra_ownedGoals")
         let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails")
@@ -584,11 +588,36 @@ final class GameState: ObservableObject {
     /// coins.  Subsequent clears award 0 (no farming).
     static let coinPerClear:  Int = 2
 
+    /// Maximum coins grantable in a single `addCoins` call.
+    /// Highest legitimate single award is 3 000 (coins3000 IAP).
+    /// Values exceeding this are clamped and printed in DEBUG so any
+    /// runaway-reward bug surfaces during development.
+    private static let maxSingleAward: Int = 5_000
+
+    /// Hard ceiling on the stored coin balance — prevents overflows and
+    /// absurd displays from a corrupted save or a future bug.
+    static let maxCoinBalance: Int = 999_999
+
     /// Award coins to the player's balance.  Use this everywhere — never
-    /// mutate coinBalance directly.
+    /// mutate `coinBalance` directly.
+    ///
+    /// - Asserts `amount >= 0` in debug builds; negative amounts are a
+    ///   programming error (use `spendCoins(_:)` for deductions).
+    /// - Clamps `amount` to `[0, maxSingleAward]`; excess is logged.
+    /// - Clamps the resulting balance to `[0, maxCoinBalance]`.
     func addCoins(_ amount: Int) {
+        assert(amount >= 0, "addCoins: negative amount — use spendCoins(_:) for deductions")
         guard amount > 0 else { return }
-        coinBalance += amount
+        let clamped: Int
+        if amount > Self.maxSingleAward {
+            #if DEBUG
+            print("[GameState] addCoins: \(amount) exceeds maxSingleAward \(Self.maxSingleAward); clamping")
+            #endif
+            clamped = Self.maxSingleAward
+        } else {
+            clamped = amount
+        }
+        coinBalance = min(coinBalance + clamped, Self.maxCoinBalance)
     }
 
     /// Spend coins.  Returns false (no-op) if balance is insufficient.
