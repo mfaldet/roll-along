@@ -1,90 +1,77 @@
 # Roll Along
 
-A tilt-driven iOS marble game starter. Tap to spawn a 3D-shaded red marble,
-tilt the device to roll it around a flat arena, bounce off the walls.
-The whole thing is one SwiftUI view backed by `CoreMotion`.
+A tilt-driven iOS marble game for the App Store. Tilt the device to roll your marble through 100 climb levels and 7 competitive minigames, collect cosmetics, and compete on leaderboards.
 
-Originally extracted from [`pourart`](https://github.com/mfaldet/pourart)'s
-on-device tilt diagnostic, intended here as the foundation for a tilt-based
-game.
+**Platform:** iOS 17+ · **Language:** Swift / SwiftUI · **Physics:** CoreMotion + custom tick engine
 
-## Run it
+---
 
-Open `RollAlong.xcodeproj` in Xcode 15+ and run on a physical device (the
-simulator can't report device motion). iOS 17+.
+## Features
+
+### Climb mode
+100 procedurally-laid-out levels with increasing difficulty. Each level places the marble at the top (or bottom) of the arena and scores on time and stars. Lives regenerate over time or can be refilled via IAP.
+
+### 7 Competitive minigames
+| Mode | Mechanic |
+|---|---|
+| Comet Clash | Tron light-cycle — tilt to leave a fading trail; outlast AI rivals |
+| Gold Rush | Collect the most coins against AI racers in a timed round |
+| Sumo Survival | Knock rivals off a shrinking ring |
+| King of the Hill | Hold the moving zone longer than any rival |
+| Marble Cup | Tilt-soccer — knock the ball into the opponent's goal |
+| Pinball | Tap-flipper pinball with 12 map layouts |
+| Paint Ball | Cover the most arena surface in your colour |
+
+### Challenge Tracks
+8 handcrafted skill tracks (Beginner → Elite → Legendary), each with 100 levels and exclusive cosmetic rewards on completion.
+
+### Cosmetics shop
+Ball skins, goal skins, trail colours, floor themes, pit styles, and music tracks — all earnable with in-game coins or purchasable as seasonal bundles.
+
+### Social
+Clans, friends, global leaderboards via Supabase backend.
+
+---
 
 ## Project layout
 
 ```
 RollAlong/
-├── RollAlongApp.swift     ← app entry point
-├── ContentView.swift      ← intentionally thin — wraps BallGameView
-├── BallGameView.swift     ← the game view + BallMotion (CMMotionManager wrapper)
-└── Info.plist             ← declares NSMotionUsageDescription
+├── RollAlongApp.swift          ← app entry point + scene-lifecycle handler
+├── ContentView.swift           ← thin shell wrapping HomeView
+├── HomeView.swift              ← routing hub (climb, minigames, shop, profile)
+├── BallGameView.swift          ← climb engine + physics + rendering (~4 000 lines)
+├── GameState.swift             ← all persisted player state + IAP rewards
+├── StoreKitManager.swift       ← StoreKit 2 purchase + restore flow
+├── Constants.swift             ← shared Layout / Timing constants
+├── MinigameMaps.swift          ← static map data for all 7 minigames
+├── [Mode]View.swift            ← one file per minigame (7 files)
+├── LevelLayout.swift           ← procedural level generator
+├── Cosmetics.swift             ← cosmetic catalogue (skins, goals, trails, …)
+├── BallSkin.swift / BallSkinView.swift  ← skin enum + Canvas renderers
+└── Assets.xcassets/            ← app icon + accent colour (all art is Canvas)
 ```
 
-## How it works
+---
 
-### Input — `BallMotion`
+## Running locally
 
-A small `@MainActor ObservableObject` wraps `CMMotionManager`:
+Open `RollAlong.xcodeproj` in Xcode 15+ and run on a **physical device** — `CMMotionManager` does not report device motion in the simulator. An iOS 17+ device is required.
 
-- Pulls `motion.gravity` at 60 Hz
-- Flips the Y axis to match SwiftUI's top-down coordinate system
-- Applies a ~3° deadband so the ball doesn't drift on a level surface
-- Publishes the resulting 2D gravity vector
+For IAP testing, select the `Products.storekit` configuration under the scheme's **Run → Options → StoreKit Configuration**.
 
-### Physics — `BallGameView.tick(geoSize:)`
+---
 
-Driven by a SwiftUI `Timer.publish(every: 1/60)` and `onReceive`:
+## Architecture notes
 
-```
-acceleration = gravity × 1800 pt/s² (per unit gravity)
-velocity     += acceleration × dt
-velocity     *= 0.985                          ← rolling friction
-position     += velocity × dt
-```
+- **Physics clock:** `PhysicsClock` (CADisplayLink-backed, 60 fps) drives all minigames via `onReceive(clock.$tickCount)`. Paused automatically on `scenePhase == .background`.
+- **Motion:** `BallMotion` wraps `CMMotionManager`, publishes a 2D gravity vector at 60 Hz with a ~3° deadband.
+- **Canvas rendering:** All game art (marbles, trails, arenas, cosmetics) is drawn with SwiftUI `Canvas` — no image assets.
+- **Persistence:** All player state persists in `UserDefaults` via `@Published` `didSet` observers in `GameState`. JSON-encoded for complex types (`[Int: Int]`, sets).
+- **Analytics:** `AnalyticsClient` batches events and flushes on background transition.
 
-Walls are checked individually — when the ball crosses any edge, its
-position is clamped and the perpendicular velocity component is negated
-with 0.55 elasticity. If gravity is in the deadband AND the ball is moving
-slowly (`|v| < 6 pt/s`), the velocity is snapped to zero so the ball can
-truly come to rest.
-
-### Rendering — `marble`
-
-A SwiftUI `Circle` filled with a `RadialGradient` centered at the
-top-left, plus a drop shadow. The gradient runs:
-
-```
-bright pink highlight → red → dark red → near-black
-```
-
-…which reads as a glossy 3D sphere lit from above.
-
-## Tuning knobs
-
-All in `BallGameView`:
-
-| Value             | Default | What it controls                               |
-| ----------------- | ------- | ---------------------------------------------- |
-| `ballRadius`      | 18      | Ball size (points)                             |
-| `accelScale`      | 1800    | Acceleration per unit gravity (pt/s²)         |
-| `0.985`           |         | Rolling-friction multiplier (per frame)        |
-| `0.55`            |         | Wall-bounce elasticity                         |
-| `BallMotion.deadband` | 0.05 | Tilt deadband, ≈ 3°                           |
-
-## Where to go from here
-
-- **Goal / target**: place a flagged tile, end the round when the ball
-  reaches it
-- **Obstacles**: walls drawn from a level definition
-- **Levels**: a series of arenas with different layouts
-- **Multiple balls**: physics is per-object — add a collection
-- **Sound**: AVFoundation tap on wall bounces (volume scaled by impact speed)
-- **Score / time**: SwiftUI overlay above the arena
-- **Vibrations**: `UIImpactFeedbackGenerator` on bounces
+---
 
 ## License
 
-MIT (or whatever Mac decides). For now, treat it as personal-project code.
+Personal project — all rights reserved.

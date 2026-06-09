@@ -7,14 +7,17 @@ import SwiftUI
 //   • Each game gets a lightweight map struct and a catalogue enum.
 //   • Views read a map by index, cycling on "Play Again."
 //   • Shared primitives (WallSegFrac, PillarFrac, SumoPillar) are declared
-//     here for use in S24+ wall and pillar engines; they are not yet wired to
-//     any physics in S23.
+//     here and are fully wired into the wall engine (S24) and pillar engine
+//     (S25); SumoPillar additionally drives the polar-coordinate ring-shrink
+//     in SumoSurvivalView.
 //
 // Sprint status:
 //   S23 — PinballMap (12 maps) + PaintBallMap (10 maps)          ✅
 //   S24 — CometClashMap (8) + GoldRushMap (8); wall engine        ✅
 //   S25 — SumoMap (8) + KOTHMap (8); pillar engine                ✅
 //   S26 — MarbleCupMap (8); pitch bumpers + goal width            ✅
+//   QE1–QE4 — operational hardening (analytics, lifecycle,        ✅
+//             perf, accessibility, hygiene)
 // ===========================================================================
 
 // MARK: - Shared primitives (S24 / S25 / S26 engines)
