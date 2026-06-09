@@ -69,12 +69,33 @@ final class AdManager: NSObject, ObservableObject {
     /// Initialise the Mobile Ads SDK and pre-load the first ad.  Call once
     /// at app launch.  Safe to call multiple times — subsequent calls are
     /// no-ops apart from ensuring an ad is loaded.
+    ///
+    /// **ATT timing:** on first launch (`seenOnboarding == false`) the ATT
+    /// dialog is NOT shown here — `HomeView` calls `requestTracking()` after
+    /// the onboarding overlay is dismissed, so the user understands the app
+    /// before deciding.  On subsequent launches (`seenOnboarding == true`)
+    /// the ATT status is already determined and `requestTracking()` is called
+    /// here directly; the system returns the cached value with no dialog.
     func bootstrap(with gameState: GameState) async {
         self.gameState = gameState
-        // Request ATT before personalised ads (required since iOS 14.5;
-        // #available guard removed — deployment target is iOS 17).
-        // Result doesn't gate ad serving; Google falls back to non-
-        // personalised ads automatically if the user denies.
+        if gameState.seenOnboarding {
+            // Non-first-launch: status is cached — no dialog will appear.
+            await requestTracking()
+        }
+        // Start the Mobile Ads SDK.  Google falls back to non-personalised
+        // ads automatically until/unless ATT is authorised.
+        _ = await MobileAds.shared.start()
+        await loadRewarded()
+    }
+
+    /// Request ATT authorisation and fire an `att_response` analytics event.
+    ///
+    /// - On **first launch** this is called by `HomeView` after the user
+    ///   dismisses the onboarding overlay — the system dialog appears here.
+    /// - On **subsequent launches** this is called by `bootstrap` when
+    ///   `seenOnboarding == true` — `requestTrackingAuthorization()` returns
+    ///   the already-determined status immediately with no dialog.
+    func requestTracking() async {
         let status = await ATTrackingManager.requestTrackingAuthorization()
         AnalyticsClient.shared.track(
             "att_response",
@@ -82,9 +103,6 @@ final class AdManager: NSObject, ObservableObject {
                 "status": .string(Self.attStatusString(status)),
             ]
         )
-        // Start the Mobile Ads SDK.
-        _ = await MobileAds.shared.start()
-        await loadRewarded()
     }
 
     private static func attStatusString(_ status: ATTrackingManager.AuthorizationStatus) -> String {
