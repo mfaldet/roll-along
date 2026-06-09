@@ -14,7 +14,11 @@
     <!-- Internet domains contacted for tracking purposes (personalised ads).
          These are Google AdMob's core ad-serving and measurement domains.
          The Google Mobile Ads SDK also declares its own PrivacyInfo.xcprivacy
-         (SDK v10+); these entries here are the app-level complement. -->
+         (SDK v13.4.0, verified in Package.resolved; v10+ ships the manifest);
+         these entries here are the app-level complement.
+         The Google UMP SDK (v3.1.0, transitive dep of the Ads SDK, not directly
+         imported) also ships its own PrivacyInfo.xcprivacy — no supplement
+         needed from the app layer for either SDK. -->
     <key>NSPrivacyTrackingDomains</key>
     <array>
         <string>googlesyndication.com</string>
