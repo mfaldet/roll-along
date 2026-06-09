@@ -84,6 +84,14 @@ struct KingOfTheHillView: View {
     @State private var roundTick  = 0
     @State private var awarded    = false
 
+    // Map cycling (S25)
+    @State private var mapIndex   = 0
+    @State private var showMapName = false
+
+    private var currentPillars: [PillarFrac] {
+        KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].pillars
+    }
+
     private var secondsLeft: Int { max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0))) }
 
     private var playerHoldTicks: Int { racers.first(where: { $0.isPlayer })?.holdTicks ?? 0 }
@@ -102,6 +110,7 @@ struct KingOfTheHillView: View {
                 ZStack {
                     Color.clear
                     pitch
+                    pillarsLayer.allowsHitTesting(false)
                     zoneView
                     ForEach(racers) { r in
                         marble(r).position(r.pos)
@@ -120,6 +129,7 @@ struct KingOfTheHillView: View {
             topBar
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
+            if showMapName && started { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -129,6 +139,38 @@ struct KingOfTheHillView: View {
     }
 
     // MARK: - Render
+
+    /// Pillar obstacles at fractional positions within the field rect (S25).
+    private var pillarsLayer: some View {
+        Canvas { ctx, _ in
+            guard field.width > 0 else { return }
+            for p in currentPillars {
+                let cx = field.minX + p.cx * field.width
+                let cy = field.minY + p.cy * field.height
+                let rect = CGRect(x: cx - p.r, y: cy - p.r, width: p.r * 2, height: p.r * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.20)))
+                ctx.stroke(Path(ellipseIn: rect), with: .color(Color(white: 0.38)), lineWidth: 2)
+            }
+        }
+    }
+
+    private var mapNameLabel: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 108)
+            Text(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.7))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.14)))
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { showMapName = false }
+                    }
+                }
+            Spacer()
+        }
+    }
 
     private var pitch: some View {
         RoundedRectangle(cornerRadius: 16)
@@ -319,7 +361,10 @@ struct KingOfTheHillView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset() } label: {
+                    Button {
+                        mapIndex = (mapIndex + 1) % KOTHMaps.maps.count
+                        reset()
+                    } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
@@ -375,6 +420,7 @@ struct KingOfTheHillView: View {
                                isPlayer: false))
         }
         racers = fresh
+        showMapName = true
     }
 
     private func endRun() {
@@ -429,6 +475,7 @@ struct KingOfTheHillView: View {
         }
 
         resolveCollisions()
+        resolvePillarCollisions()
         scoreHill()
 
         if roundTick >= roundTicks { endRun() }
@@ -505,6 +552,32 @@ struct KingOfTheHillView: View {
                 racers[i].vel.dy -= jImp * ny
                 racers[j].vel.dx += jImp * nx
                 racers[j].vel.dy += jImp * ny
+            }
+        }
+    }
+
+    // MARK: - Pillar collision (S25)
+
+    /// Resolve collisions between all marbles and the current map's pillar obstacles.
+    /// Pillars have infinite mass — only the marble moves.
+    private func resolvePillarCollisions() {
+        guard field.width > 0, !currentPillars.isEmpty else { return }
+        for i in racers.indices {
+            for p in currentPillars {
+                let cx = field.minX + p.cx * field.width
+                let cy = field.minY + p.cy * field.height
+                let dx = racers[i].pos.x - cx, dy = racers[i].pos.y - cy
+                let dist = hypot(dx, dy)
+                let minD = marbleRadius + p.r
+                guard dist < minD, dist > 0 else { continue }
+                let nx = dx / dist, ny = dy / dist
+                racers[i].pos.x += nx * (minD - dist)
+                racers[i].pos.y += ny * (minD - dist)
+                let dot = racers[i].vel.dx * nx + racers[i].vel.dy * ny
+                guard dot < 0 else { continue }
+                let jImp = -(1 + restitution) * dot
+                racers[i].vel.dx += jImp * nx
+                racers[i].vel.dy += jImp * ny
             }
         }
     }

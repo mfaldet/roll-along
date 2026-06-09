@@ -45,7 +45,6 @@ struct MarbleCupView: View {
     private let marbleRestitution: CGFloat = 0.50
     private let ballRestitution:   CGFloat = 0.88
     private let roundSeconds       = 90
-    private let goalWidthFrac: CGFloat = 0.42      // goal mouth = 42% of pitch width
     private let celebrateTicks     = 75            // GOAL! freeze (~1.25s, clock paused)
     private let coinsPerGoal       = 6
     private let winBonus           = 15
@@ -86,8 +85,17 @@ struct MarbleCupView: View {
     @State private var celebrateUntil = 0
     @State private var lastScorerPlayer = false
 
+    // Map cycling (S26)
+    @State private var mapIndex          = 0
+    @State private var showMapName       = false
+    @State private var currentGoalWidthFrac: CGFloat = 0.42
+    @State private var sidePosts:  [(yFrac: CGFloat, side: MarbleCupMap.Side)] = []
+    @State private var midBumpers: [PillarFrac] = []
+
+    private let postR: CGFloat = 14          // radius of all side-post bumpers
+
     private var secondsLeft: Int { max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0))) }
-    private var goalHalf: CGFloat { field.width * goalWidthFrac / 2 }
+    private var goalHalf: CGFloat { field.width * currentGoalWidthFrac / 2 }
     private var celebrating: Bool { localTick < celebrateUntil }
 
     // MARK: - Body
@@ -121,6 +129,7 @@ struct MarbleCupView: View {
             if celebrating && started && !isOver { goalBanner }
             if !started && !isOver { startPrompt }
             if isOver { matchOverOverlay }
+            if showMapName && started { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -163,6 +172,35 @@ struct MarbleCupView: View {
                 ctx.stroke(Path(CGRect(x: field.midX - boxW / 2, y: field.maxY - boxH,
                                        width: boxW, height: boxH)),
                            with: .color(line), lineWidth: 2)
+
+                // Side posts and mid bumpers (S26)
+                let postFill = Color(white: 0.55).opacity(0.8)
+                let postStroke = Color.white.opacity(0.6)
+                for sp in sidePosts {
+                    let py = field.minY + sp.yFrac * field.height
+                    let pxLeft  = field.minX + postR
+                    let pxRight = field.maxX - postR
+                    let xs: [CGFloat]
+                    switch sp.side {
+                    case .left:  xs = [pxLeft]
+                    case .right: xs = [pxRight]
+                    case .both:  xs = [pxLeft, pxRight]
+                    }
+                    for px in xs {
+                        let rect = CGRect(x: px - postR, y: py - postR,
+                                          width: postR * 2, height: postR * 2)
+                        ctx.fill(Path(ellipseIn: rect), with: .color(postFill))
+                        ctx.stroke(Path(ellipseIn: rect), with: .color(postStroke), lineWidth: 2)
+                    }
+                }
+                for mb in midBumpers {
+                    let bx = field.minX + mb.cx * field.width
+                    let by = field.minY + mb.cy * field.height
+                    let rect = CGRect(x: bx - mb.r, y: by - mb.r,
+                                      width: mb.r * 2, height: mb.r * 2)
+                    ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.50).opacity(0.85)))
+                    ctx.stroke(Path(ellipseIn: rect), with: .color(postStroke), lineWidth: 2)
+                }
             }
 
             goalMouth(top: true)
@@ -286,6 +324,24 @@ struct MarbleCupView: View {
         .shadow(color: .black.opacity(0.6), radius: 10)
     }
 
+    private var mapNameLabel: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 98)
+            Text(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.7))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.14)))
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { showMapName = false }
+                    }
+                }
+            Spacer()
+        }
+    }
+
     private var startPrompt: some View {
         VStack(spacing: 10) {
             Image(systemName: "soccerball")
@@ -334,7 +390,10 @@ struct MarbleCupView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset() } label: {
+                    Button {
+                        mapIndex = (mapIndex + 1) % MarbleCupMaps.maps.count
+                        reset()
+                    } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
@@ -375,7 +434,16 @@ struct MarbleCupView: View {
         playerGoals = 0
         aiGoals = 0
         celebrateUntil = 0
+        loadMap()
         placeForKickoff()
+    }
+
+    private func loadMap() {
+        let map = MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count]
+        currentGoalWidthFrac = map.goalWidthFrac
+        sidePosts  = map.sidePosts
+        midBumpers = map.midBumpers
+        showMapName = true
     }
 
     /// Ball at centre, marbles back in their halves, all stationary.
@@ -446,6 +514,7 @@ struct MarbleCupView: View {
         }
 
         resolveCollisions()
+        resolveBumperCollisions()
         checkGoal()
 
         if !isOver && roundTick >= roundTicks { endMatch() }
@@ -551,6 +620,47 @@ struct MarbleCupView: View {
             if playerScored { Haptics.success() } else { Haptics.warning() }
         }
         placeForKickoff()
+    }
+
+    // MARK: - Bumper collision (S26)
+
+    /// Resolve collisions between all movers and the current map's side posts + mid bumpers.
+    /// All obstacles have infinite mass — only the mover moves.
+    private func resolveBumperCollisions() {
+        guard field.width > 0 else { return }
+        // Build obstacle list: mid bumpers + expanded side-post entries
+        var obstacles: [(cx: CGFloat, cy: CGFloat, r: CGFloat)] = []
+        for mb in midBumpers {
+            obstacles.append((field.minX + mb.cx * field.width,
+                               field.minY + mb.cy * field.height, mb.r))
+        }
+        for sp in sidePosts {
+            let py = field.minY + sp.yFrac * field.height
+            switch sp.side {
+            case .left:  obstacles.append((field.minX + postR, py, postR))
+            case .right: obstacles.append((field.maxX - postR, py, postR))
+            case .both:
+                obstacles.append((field.minX + postR, py, postR))
+                obstacles.append((field.maxX - postR, py, postR))
+            }
+        }
+        guard !obstacles.isEmpty else { return }
+        for i in movers.indices {
+            let e: CGFloat = movers[i].role == .ball ? ballRestitution : marbleRestitution
+            for obs in obstacles {
+                let dx = movers[i].pos.x - obs.cx, dy = movers[i].pos.y - obs.cy
+                let dist = hypot(dx, dy)
+                let minD = movers[i].radius + obs.r
+                guard dist < minD, dist > 0 else { continue }
+                let nx = dx / dist, ny = dy / dist
+                movers[i].pos.x += nx * (minD - dist)
+                movers[i].pos.y += ny * (minD - dist)
+                let dot = movers[i].vel.dx * nx + movers[i].vel.dy * ny
+                guard dot < 0 else { continue }
+                movers[i].vel.dx -= (1 + e) * dot * nx
+                movers[i].vel.dy -= (1 + e) * dot * ny
+            }
+        }
     }
 
     private func unit(dx: CGFloat, dy: CGFloat, scale: CGFloat) -> CGVector {

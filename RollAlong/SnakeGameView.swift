@@ -121,6 +121,12 @@ struct SnakeGameView: View {
     @State private var playerWon  = false
     @State private var awarded     = false
 
+    // Map cycling (S24)
+    @State private var mapIndex   = 0
+    @State private var showMapName = false
+    @State private var walls:     [WallSegFrac] = []
+    @State private var asteroids: [PillarFrac]  = []
+
     private var playerCycle: Cycle? { cycles.first(where: { $0.isPlayer }) }
     private var totalRivals: Int { cycles.filter { !$0.isPlayer }.count }
     private var rivalsAlive: Int { cycles.filter { !$0.isPlayer && $0.alive }.count }
@@ -137,6 +143,7 @@ struct SnakeGameView: View {
             GeometryReader { geo in
                 ZStack {
                     Color.clear
+                    staticLayer.allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
                     orbsLayer.allowsHitTesting(false)
                     ForEach(cycles.filter { $0.alive }) { c in
@@ -156,6 +163,7 @@ struct SnakeGameView: View {
             topBar
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
+            if showMapName && started { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -165,6 +173,30 @@ struct SnakeGameView: View {
     }
 
     // MARK: - Render layers
+
+    /// Static obstacles layer: interior walls and asteroid rocks (drawn below trails).
+    private var staticLayer: some View {
+        Canvas { ctx, _ in
+            guard arena.width > 0 else { return }
+            for seg in walls {
+                let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+                let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+                var path = Path(); path.move(to: p1); path.addLine(to: p2)
+                ctx.stroke(path, with: .color(Color(white: 0.30).opacity(0.85)),
+                           style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                ctx.stroke(path, with: .color(Color(white: 0.55).opacity(0.55)),
+                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+            for ast in asteroids {
+                let cx = ast.cx * arena.width, cy = ast.cy * arena.height
+                let rect = CGRect(x: cx - ast.r, y: cy - ast.r,
+                                  width: ast.r * 2, height: ast.r * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(Color(white: 0.24)))
+                ctx.stroke(Path(ellipseIn: rect),
+                           with: .color(Color(white: 0.42).opacity(0.8)), lineWidth: 2)
+            }
+        }
+    }
 
     private var trailsLayer: some View {
         Canvas { ctx, _ in
@@ -347,7 +379,10 @@ struct SnakeGameView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset() } label: {
+                    Button {
+                        mapIndex = (mapIndex + 1) % CometClashMaps.maps.count
+                        reset()
+                    } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
@@ -366,6 +401,24 @@ struct SnakeGameView: View {
                 .padding(.horizontal, 40)
             }
             .padding(.horizontal, 28)
+        }
+    }
+
+    private var mapNameLabel: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 90)
+            Text(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.7))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.14)))
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { showMapName = false }
+                    }
+                }
+            Spacer()
         }
     }
 
@@ -395,8 +448,16 @@ struct SnakeGameView: View {
         }
         cycles = fresh
 
+        loadMap()
         orbs = []
         for _ in 0..<orbCount { orbs.append(Orb(pos: randomOrbPoint())) }
+    }
+
+    private func loadMap() {
+        let map = CometClashMaps.maps[mapIndex % CometClashMaps.maps.count]
+        walls     = map.walls
+        asteroids = map.asteroids
+        showMapName = true
     }
 
     private func endRun(didWin: Bool) {
@@ -457,6 +518,8 @@ struct SnakeGameView: View {
             cycles[i].pos.x += cycles[i].vel.dx * dt
             cycles[i].pos.y += cycles[i].vel.dy * dt
             bounceWalls(&cycles[i])
+            for seg in walls     { resolveWallCollision(&cycles[i], seg: seg) }
+            for ast in asteroids { resolveAsteroidCollision(&cycles[i], ast: ast) }
         }
 
         // 2) Lay trail behind every living comet.
@@ -583,13 +646,75 @@ struct SnakeGameView: View {
                        y: min(max(p.y, m), arena.height - m))
     }
 
+    // MARK: - Static collision (S24)
+
+    /// Reflect a comet off an interior wall segment.
+    private func resolveWallCollision(_ c: inout Cycle, seg: WallSegFrac) {
+        let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+        let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+        let dx = p2.x - p1.x, dy = p2.y - p1.y
+        let lenSq = dx * dx + dy * dy
+        guard lenSq > 0 else { return }
+        let t = max(0, min(1, ((c.pos.x - p1.x) * dx + (c.pos.y - p1.y) * dy) / lenSq))
+        let nx = c.pos.x - (p1.x + t * dx), ny = c.pos.y - (p1.y + t * dy)
+        let dist = hypot(nx, ny)
+        guard dist < headRadius, dist > 0 else { return }
+        let inv = 1 / dist
+        let nnx = nx * inv, nny = ny * inv
+        c.pos.x += nnx * (headRadius - dist)
+        c.pos.y += nny * (headRadius - dist)
+        let dot = c.vel.dx * nnx + c.vel.dy * nny
+        c.vel.dx -= 2 * dot * nnx * wallBounce
+        c.vel.dy -= 2 * dot * nny * wallBounce
+    }
+
+    /// Reflect a comet off a circular asteroid rock.
+    private func resolveAsteroidCollision(_ c: inout Cycle, ast: PillarFrac) {
+        let cx = ast.cx * arena.width, cy = ast.cy * arena.height
+        let dx = c.pos.x - cx, dy = c.pos.y - cy
+        let dist = hypot(dx, dy)
+        let minD = headRadius + ast.r
+        guard dist < minD, dist > 0 else { return }
+        let inv = 1 / dist
+        let nx = dx * inv, ny = dy * inv
+        c.pos.x += nx * (minD - dist)
+        c.pos.y += ny * (minD - dist)
+        let dot = c.vel.dx * nx + c.vel.dy * ny
+        c.vel.dx -= 2 * dot * nx * wallBounce
+        c.vel.dy -= 2 * dot * ny * wallBounce
+    }
+
+    /// True if an orb spawn candidate is too close to a wall or asteroid.
+    private func isOrbBlocked(_ p: CGPoint) -> Bool {
+        let margin = orbRadius + headRadius + 6
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq))
+            if hypot(p.x - (p1.x + t * dx), p.y - (p1.y + t * dy)) < margin { return true }
+        }
+        for ast in asteroids {
+            if hypot(p.x - ast.cx * arena.width, p.y - ast.cy * arena.height) < margin + ast.r {
+                return true
+            }
+        }
+        return false
+    }
+
     private func randomOrbPoint() -> CGPoint {
         let m = orbRadius + 18
         let loX = m, hiX = arena.width - m
         let loY = m, hiY = arena.height - m
-        let x = hiX > loX ? CGFloat.random(in: loX...hiX) : arena.width / 2
-        let y = hiY > loY ? CGFloat.random(in: loY...hiY) : arena.height / 2
-        return CGPoint(x: x, y: y)
+        guard hiX > loX, hiY > loY else { return CGPoint(x: arena.width / 2, y: arena.height / 2) }
+        for _ in 0..<12 {
+            let p = CGPoint(x: CGFloat.random(in: loX...hiX),
+                            y: CGFloat.random(in: loY...hiY))
+            if !isOrbBlocked(p) { return p }
+        }
+        return CGPoint(x: arena.width / 2, y: arena.height / 2)
     }
 
     // MARK: - Rival AI
@@ -639,10 +764,12 @@ struct SnakeGameView: View {
         return best
     }
 
-    /// True if a probe point is off the arena or sitting on a live trail.
+    /// True if a probe point is off the arena, on a live trail, near a wall, or
+    /// overlapping an asteroid.
     private func isBlocked(_ p: CGPoint, for i: Int) -> Bool {
         let m = headRadius
         if p.x < m || p.x > arena.width - m || p.y < m || p.y > arena.height - m { return true }
+        // Trails
         let r2 = aiAvoidRadius * aiAvoidRadius
         for yi in cycles.indices {
             let trail = cycles[yi].trail
@@ -654,15 +781,32 @@ struct SnakeGameView: View {
                 k += 1
             }
         }
+        // Interior walls
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq))
+            if hypot(p.x - (p1.x + t * dx), p.y - (p1.y + t * dy)) < aiAvoidRadius { return true }
+        }
+        // Asteroids
+        for ast in asteroids {
+            if hypot(p.x - ast.cx * arena.width, p.y - ast.cy * arena.height) < aiAvoidRadius + ast.r {
+                return true
+            }
+        }
         return false
     }
 
-    /// Open space around a probe point: distance to the nearest wall or trail.
+    /// Open space around a probe point: distance to the nearest wall, trail, or asteroid.
     /// Off-arena probes return a negative score so they're never preferred.
     private func clearance(_ p: CGPoint, for i: Int) -> CGFloat {
         let m = headRadius
         if p.x < m || p.x > arena.width - m || p.y < m || p.y > arena.height - m { return -1 }
         var nearest = min(min(p.x, arena.width - p.x), min(p.y, arena.height - p.y))
+        // Trails
         for yi in cycles.indices {
             let trail = cycles[yi].trail
             let upper = (yi == i) ? max(0, trail.count - aiSelfSkip) : trail.count
@@ -673,6 +817,22 @@ struct SnakeGameView: View {
                 if d < nearest * nearest { nearest = sqrt(d) }
                 k += 1
             }
+        }
+        // Interior walls
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq))
+            let d = hypot(p.x - (p1.x + t * dx), p.y - (p1.y + t * dy))
+            if d < nearest { nearest = d }
+        }
+        // Asteroids
+        for ast in asteroids {
+            let d = max(0, hypot(p.x - ast.cx * arena.width, p.y - ast.cy * arena.height) - ast.r)
+            if d < nearest { nearest = d }
         }
         return nearest
     }

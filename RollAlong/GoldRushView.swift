@@ -102,6 +102,11 @@ struct GoldRushView: View {
     @State private var roundTick = 0
     @State private var awarded   = false
 
+    // Map cycling (S24)
+    @State private var mapIndex   = 0
+    @State private var showMapName = false
+    @State private var walls: [WallSegFrac] = []
+
     private var secondsLeft: Int { max(0, Int(ceil(Double(roundTicks - roundTick) / 60.0))) }
     private var playerScore: Int { racers.first { $0.isPlayer }?.score ?? 0 }
     private var maxScore: Int { racers.map(\.score).max() ?? 0 }
@@ -116,6 +121,7 @@ struct GoldRushView: View {
                 ZStack {
                     Color.clear
                     floor
+                    wallsLayer.allowsHitTesting(false)
                     ForEach(coins) { c in coinView(c) }
                     poofLayer.allowsHitTesting(false)
                     ForEach(racers) { r in marble(r).position(r.pos) }
@@ -133,6 +139,7 @@ struct GoldRushView: View {
             topBar
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
+            if showMapName && started { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -142,6 +149,21 @@ struct GoldRushView: View {
     }
 
     // MARK: - Render layers
+
+    private var wallsLayer: some View {
+        Canvas { ctx, _ in
+            guard arena.width > 0 else { return }
+            for seg in walls {
+                let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+                let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+                var path = Path(); path.move(to: p1); path.addLine(to: p2)
+                ctx.stroke(path, with: .color(Color(white: 0.32).opacity(0.9)),
+                           style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                ctx.stroke(path, with: .color(Color(white: 0.55).opacity(0.5)),
+                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+        }
+    }
 
     private var floor: some View {
         RadialGradient(colors: [Color(white: 0.11), Color(white: 0.05)],
@@ -309,7 +331,10 @@ struct GoldRushView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
 
                 VStack(spacing: 12) {
-                    Button { reset() } label: {
+                    Button {
+                        mapIndex = (mapIndex + 1) % GoldRushMaps.maps.count
+                        reset()
+                    } label: {
                         Text("Play Again")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
@@ -329,6 +354,24 @@ struct GoldRushView: View {
                 .padding(.horizontal, 40)
             }
             .padding(.horizontal, 28)
+        }
+    }
+
+    private var mapNameLabel: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 108)
+            Text(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.7))
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.14)))
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { showMapName = false }
+                    }
+                }
+            Spacer()
         }
     }
 
@@ -369,7 +412,13 @@ struct GoldRushView: View {
         }
         racers = fresh
 
+        loadMap()
         for _ in 0..<initialCoins { spawnCoin() }
+    }
+
+    private func loadMap() {
+        walls = GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].walls
+        showMapName = true
     }
 
     private func endRound() {
@@ -423,6 +472,7 @@ struct GoldRushView: View {
             racers[i].pos.x += racers[i].vel.dx * dt
             racers[i].pos.y += racers[i].vel.dy * dt
             bounceWalls(&racers[i])
+            bounceStaticWalls(&racers[i])
         }
 
         resolveCollisions()
@@ -476,6 +526,45 @@ struct GoldRushView: View {
         } else if r.pos.y > arena.height - marbleRadius {
             r.pos.y = arena.height - marbleRadius; r.vel.dy = -r.vel.dy * wallBounce
         }
+    }
+
+    // MARK: - Static wall collision (S24)
+
+    /// Reflect a marble off an interior wall segment.
+    private func bounceStaticWalls(_ r: inout Racer) {
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((r.pos.x - p1.x) * dx + (r.pos.y - p1.y) * dy) / lenSq))
+            let nx = r.pos.x - (p1.x + t * dx), ny = r.pos.y - (p1.y + t * dy)
+            let dist = hypot(nx, ny)
+            guard dist < marbleRadius, dist > 0 else { continue }
+            let inv = 1 / dist
+            let nnx = nx * inv, nny = ny * inv
+            r.pos.x += nnx * (marbleRadius - dist)
+            r.pos.y += nny * (marbleRadius - dist)
+            let dot = r.vel.dx * nnx + r.vel.dy * nny
+            r.vel.dx -= 2 * dot * nnx * wallBounce
+            r.vel.dy -= 2 * dot * nny * wallBounce
+        }
+    }
+
+    /// True if a coin spawn candidate sits too close to an interior wall.
+    private func isNearWall(_ p: CGPoint) -> Bool {
+        let margin = marbleRadius + 8
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq))
+            if hypot(p.x - (p1.x + t * dx), p.y - (p1.y + t * dy)) < margin { return true }
+        }
+        return false
     }
 
     private func resolveCollisions() {
@@ -553,8 +642,10 @@ struct GoldRushView: View {
         for _ in 0..<8 {
             let x = CGFloat.random(in: margin...(arena.width - margin))
             let y = CGFloat.random(in: topReserve...(arena.height - margin))
+            let pt = CGPoint(x: x, y: y)
             if racers.contains(where: { hypot($0.pos.x - x, $0.pos.y - y) < marbleRadius * 2 }) { continue }
-            coins.append(Coin(pos: CGPoint(x: x, y: y), value: 1, born: localTick))
+            if isNearWall(pt) { continue }
+            coins.append(Coin(pos: pt, value: 1, born: localTick))
             return
         }
     }
