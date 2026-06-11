@@ -233,8 +233,12 @@ struct HomeView: View {
                                 .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
                         )
                     }
-                    .homeBallCollider()
+                    // Identifier FIRST so it attaches straight to the link —
+                    // the smoke test queries app.buttons["GameModesButton"],
+                    // and interposing the collider background can re-target
+                    // which accessibility element receives the identifier.
                     .accessibilityIdentifier("GameModesButton")  // UI smoke test
+                    .homeBallCollider()
                     .padding(.bottom, 16)
 
                     // Five square, icon-only buttons hugging the bottom edge.
@@ -631,10 +635,19 @@ struct HomeView: View {
         }
     }
 
+    /// True when launched by the UI test runner (SmokeTests passes
+    /// `--uitesting`).  Auto-presenting sheets are suppressed: a sheet
+    /// hides the home screen's accessibility elements, so an auto-pop
+    /// 0.5s after launch races the test's element queries and makes
+    /// "GameModesButton not found" failures that have nothing to do
+    /// with the navigation under test.
+    private static let isUITesting = CommandLine.arguments.contains("--uitesting")
+
     /// Auto-present the daily-reward sheet the first time Home appears this
     /// launch — only when something's unclaimed and onboarding is done.  The
     /// short delay lets Home settle so the sheet animates in cleanly.
     private func maybeAutoPresentDailyReward() {
+        guard !Self.isUITesting else { return }
         guard !autoPresentedDaily,
               gameState.seenOnboarding,
               gameState.dailyRewardAvailable else { return }
@@ -649,6 +662,7 @@ struct HomeView: View {
     ///   (b) the player re-opens the app while the 48-hour window is still live.
     /// Guards prevent double-pop or showing when another sheet is already visible.
     private func maybeAutoPresentStarterPack() {
+        guard !Self.isUITesting else { return }
         guard gameState.seenOnboarding, !showStarterPackSheet else { return }
 
         if gameState.shouldTriggerStarterPack {

@@ -27,7 +27,11 @@ final class SmokeTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["--skip-onboarding"]
+        // --skip-onboarding bypasses the first-launch overlay;
+        // --uitesting suppresses the auto-presenting sheets (daily reward,
+        // starter pack) whose 0.5s-after-launch pop hides the home screen's
+        // accessibility elements right when the test is querying them.
+        app.launchArguments = ["--uitesting", "--skip-onboarding"]
         app.launch()
     }
 

@@ -24,9 +24,17 @@ import SnapshotTesting
 
 final class BallSkinSnapshotTests: XCTestCase {
 
-    // Flip to true (or delete __Snapshots__) to regenerate references.
-    override func setUp() {
-        super.setUp()
+    // Flip isRecording to true (or delete __Snapshots__) to regenerate
+    // references.
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        // Reference images live in the repo next to this file and are
+        // read/written through the simulator's shared filesystem.  A
+        // physical device's sandbox can't touch them ("You don't have
+        // permission to save…"), so skip — don't fail — on hardware.
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Snapshot tests run on the iPhone 17 Pro simulator only — a physical device can't write the repo's reference images.")
+        #endif
         // isRecording = true
     }
 
