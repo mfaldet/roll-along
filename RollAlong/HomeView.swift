@@ -217,8 +217,21 @@ struct HomeView: View {
                     .accessibilityIdentifier("GameModesButton")  // UI smoke test
                     .padding(.bottom, 14)
 
-                    // Social — connect with other climbers.  Friends and
-                    // Clans share a row so the social pair reads together.
+                    // Secondary navigation, grouped into three clear strips:
+                    // more game content (reads as part of the Play / Game
+                    // Modes cluster above), then social, then account & app
+                    // settings.  Max three items per row so labels never wrap.
+                    HStack(spacing: 28) {
+                        NavigationLink(value: HomeRoute.levels) {
+                            homeNavLabel("square.grid.3x3.fill", "Levels")
+                        }
+                        NavigationLink(value: HomeRoute.challengeTracks) {
+                            homeNavLabel("flag.checkered", "Tracks")
+                        }
+                    }
+                    .padding(.bottom, 18)
+
+                    navGroupCaption("SOCIAL")
                     HStack(spacing: 28) {
                         NavigationLink(value: HomeRoute.friends) {
                             homeNavLabel("person.2.fill", "Friends")
@@ -226,29 +239,23 @@ struct HomeView: View {
                         NavigationLink(value: HomeRoute.clans) {
                             homeNavLabel("person.3.fill", "Clans")
                         }
+                        NavigationLink(value: HomeRoute.leaderboard) {
+                            homeNavLabel("trophy.fill", "Ranks")
+                        }
                     }
                     .padding(.bottom, 14)
 
-                    // Utilities — levels grid, global ranks, settings.
-                    HStack(spacing: 16) {
-                        NavigationLink(value: HomeRoute.levels) {
-                            homeNavLabel("square.grid.3x3.fill", "Levels")
-                        }
-                        NavigationLink(value: HomeRoute.leaderboard) {
-                            homeNavLabel("trophy.fill", "Ranks")
+                    navGroupCaption("ACCOUNT")
+                    HStack(spacing: 28) {
+                        NavigationLink(value: HomeRoute.profile) {
+                            homeNavLabel("person.fill", "Profile")
                         }
                         NavigationLink(value: HomeRoute.settings) {
                             homeNavLabel("gearshape.fill", "Settings")
                         }
-                        NavigationLink(value: HomeRoute.profile) {
-                            homeNavLabel("person.fill", "Profile")
-                        }
-                        NavigationLink(value: HomeRoute.challengeTracks) {
-                            homeNavLabel("flag.checkered", "Tracks")
-                        }
                     }
 
-                    Spacer().frame(height: 48)
+                    Spacer().frame(height: 36)
                 }
 
                 // Coin balance pill — top-right, always visible (except
@@ -533,6 +540,17 @@ struct HomeView: View {
                 .font(.system(size: 16, weight: .medium, design: .rounded))
         }
         .foregroundStyle(Color(white: 0.5))
+        .fixedSize()   // a nav label never wraps mid-word
+    }
+
+    /// Tiny tracked caption above a secondary-nav strip ("SOCIAL", "ACCOUNT")
+    /// — names the group without competing with the buttons themselves.
+    private func navGroupCaption(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .foregroundStyle(Color(white: 0.35))
+            .tracking(2.2)
+            .padding(.bottom, 6)
     }
 
     private var background: some View {
