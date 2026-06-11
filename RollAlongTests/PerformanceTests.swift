@@ -12,8 +12,8 @@ import XCTest
 // local environment is stable, switch to `measureMetrics([.wallClockTime], …)`
 // with a `maxStandardDeviations` budget to fail on regressions.
 //
-// Runs against GoldRushEngine — the headless mirror of GoldRushView.tick() —
-// so the simulation is exercised without a view, accelerometer, or run loop.
+// Runs against GoldRushEngine — now GoldRushView's production simulation —
+// driven headless here, without a view, accelerometer, or run loop.
 // Reference environment: iPhone 16 Pro, iOS 18 (see SmokeTests).
 // ---------------------------------------------------------------------------
 

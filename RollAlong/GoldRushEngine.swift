@@ -2,31 +2,32 @@ import CoreGraphics
 import Foundation
 
 // ---------------------------------------------------------------------------
-// GoldRushEngine — headless, view-independent Gold Rush simulation.
+// GoldRushEngine — the headless, view-independent Gold Rush simulation.
 //
-// This mirrors the per-frame `tick()` that currently lives inside
-// `GoldRushView`, so the simulation can be driven and measured without a
-// SwiftUI view, an accelerometer, or a run loop.  See
-// `RollAlongTests/PerformanceTests.swift` for the 60-tick (1 s @ 60 fps)
-// performance baseline (QE3 §7).
+// This is the single source of truth for the per-frame `tick()`.  `GoldRushView`
+// drives it: each frame it feeds `playerInput`, calls `tick()`, and renders the
+// engine's `racers`/`coins`/`poofs`.  Because the engine carries no SwiftUI,
+// accelerometer, or run-loop dependency, the same `tick()` can also run headless
+// — see `RollAlongTests/PerformanceTests.swift` for the 60-tick (1 s @ 60 fps)
+// performance baseline (QE3 §7), which now measures the real production tick.
 //
 // It deliberately reuses the already-shared primitives — `PhysicsHelpers`
-// (bounceEdges / resolveWallSegment) and `GoldRushMaps` — so only the tick
-// *orchestration* is mirrored here.  Side effects that don't affect the
-// simulation cost are intentionally omitted: coin awards (GameState),
-// analytics, and haptics.  The player's accelerometer input is supplied via
-// `playerInput` (zero by default, so the player marble is stationary while
-// the AI rivals still exercise steering, collisions, and coin logic).
+// (bounceEdges / resolveWallSegment) and `GoldRushMaps`.  Side effects that
+// don't affect the simulation are intentionally left to the host view: the coin
+// award (GameState), analytics, and haptics.  The player's accelerometer input
+// is supplied via `playerInput` (zero by default, so in headless use the player
+// marble is stationary while the AI rivals still exercise steering, collisions,
+// and coin logic).
 //
-// STAGE 1 of a migration: `GoldRushView` still owns its own copy of this
-// logic.  Having the view adopt this engine (a single source of truth that
-// also removes the Snake/GoldRush tick duplication) is a deliberate follow-up
-// that must be playtested.  Until then, keep the two `tick()` bodies in sync.
+// The class is a plain (non-Observable) type with `private(set)` state so the
+// performance test measures pure simulation cost; the view schedules its own
+// redraws by mirroring the engine's arrays into @State once per tick.  Applying
+// the same pattern to de-duplicate SnakeGameView's physics is a future follow-up.
 // ---------------------------------------------------------------------------
 
 final class GoldRushEngine {
 
-    // MARK: - Tunables (mirror GoldRushView)
+    // MARK: - Tunables (the gameplay feel knobs)
 
     private let marbleRadius: CGFloat = 17
     private let playerAccel:  CGFloat = 1_500
@@ -171,7 +172,7 @@ final class GoldRushEngine {
         started = true
     }
 
-    // MARK: - Simulation (mirrors GoldRushView.tick)
+    // MARK: - Simulation
 
     func tick() {
         localTick &+= 1
