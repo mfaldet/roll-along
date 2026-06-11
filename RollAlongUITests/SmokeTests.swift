@@ -51,6 +51,32 @@ final class SmokeTests: XCTestCase {
         app.descendants(matching: .any)[id].firstMatch
     }
 
+    /// Dump the app's full accessibility tree into the test log AND a
+    /// keep-always attachment — ground truth for "the element is plainly
+    /// on screen but the query can't find it" mysteries.  Find it in the
+    /// Report navigator under the failed test, or in the console between
+    /// the AX TREE markers.
+    private func attachAccessibilityTree(_ name: String) {
+        let tree = app.debugDescription
+        print("=== AX TREE (\(name)) ===\n\(tree)\n=== END AX TREE ===")
+        let attachment = XCTAttachment(string: tree)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// Resolve a tappable entry by accessibility identifier, falling back
+    /// to its visible text label.  When the identifier is missing (SwiftUI
+    /// has repeatedly dropped wrapper identifiers on modified
+    /// NavigationLinks), the tree is attached for diagnosis and the label
+    /// keeps the navigation under test working.
+    private func entry(_ id: String, labeled label: String) -> XCUIElement {
+        let byID = element(id)
+        if byID.waitForExistence(timeout: 5) { return byID }
+        attachAccessibilityTree("missing-\(id)")
+        return app.staticTexts[label].firstMatch
+    }
+
     // MARK: - Launch
 
     func testApp_launchesAndShowsHomeView() throws {
@@ -67,18 +93,21 @@ final class SmokeTests: XCTestCase {
         let homeView = app.otherElements["HomeView"]
         XCTAssertTrue(homeView.waitForExistence(timeout: 10))
 
-        // 2. Navigate to Game Modes hub (any-type query — see element(_:))
-        let gameModeButton = element("GameModesButton")
+        // 2. Navigate to Game Modes hub — by identifier, else by its
+        // visible "Game Modes" label (with an AX-tree attachment for
+        // diagnosis whenever the identifier is missing).
+        let gameModeButton = entry("GameModesButton", labeled: "Game Modes")
         XCTAssertTrue(gameModeButton.waitForExistence(timeout: 5),
-                      "GameModesButton should be on the home screen")
+                      "Neither the GameModesButton identifier nor the 'Game Modes' label was found — see the AX-tree attachment")
         gameModeButton.tap()
 
         // 3. Tap the competitive coin scramble in the mode list (id
-        // "goldrush"; displayed as "Coin Pit").  It sits a few cards down
-        // the hub — scroll once if it's below the fold on small screens.
-        let goldRushButton = element("goldrush")
+        // "goldrush"; DISPLAYED as "Coin Pit" since the name swap).  It
+        // sits a few cards down the hub — scroll once if it's below the
+        // fold on small screens.
+        let goldRushButton = entry("goldrush", labeled: "Coin Pit")
         XCTAssertTrue(goldRushButton.waitForExistence(timeout: 5),
-                      "goldrush mode card should be in the Games hub")
+                      "Neither the goldrush identifier nor the 'Coin Pit' label was found in the Games hub — see the AX-tree attachment")
         if !goldRushButton.isHittable { app.swipeUp() }
         goldRushButton.tap()
 
