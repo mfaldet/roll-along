@@ -234,12 +234,16 @@ struct HomeView: View {
                                 .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
                         )
                     }
-                    // Identifier FIRST so it attaches straight to the link —
-                    // the smoke test queries app.buttons["GameModesButton"],
-                    // and interposing the collider background can re-target
-                    // which accessibility element receives the identifier.
-                    .accessibilityIdentifier("GameModesButton")  // UI smoke test
                     .homeBallCollider()
+                    // One stable accessibility element for the UI smoke
+                    // test: combining collapses the link + label into a
+                    // single button-traited element that reliably carries
+                    // the identifier, however SwiftUI shuffles the
+                    // modified link's internal AX structure.
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Game Modes")
+                    .accessibilityIdentifier("GameModesButton")  // UI smoke test
                     .padding(.bottom, 12)
 
                     playButton
@@ -1080,6 +1084,12 @@ private extension View {
                     value: [g.frame(in: .named(HomeView.arenaSpaceName))]
                 )
             }
+            // Pure physics plumbing — keep it out of the accessibility
+            // tree.  Without this the GeometryReader background fragments
+            // the decorated control's accessibility element and its
+            // identifier never surfaces (the UI smoke test then can't
+            // find buttons that are plainly on screen).
+            .accessibilityHidden(true)
         )
     }
 }
