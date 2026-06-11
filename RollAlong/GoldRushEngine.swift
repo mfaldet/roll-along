@@ -118,9 +118,21 @@ final class GoldRushEngine {
         walls = GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].walls
     }
 
-    func startRound() {
+    /// Resize the arena (and recompute its centre) when the host view's
+    /// geometry changes.  Does not disturb an in-progress round — the next
+    /// `tick()` simply clamps marbles to the new bounds.
+    func updateArena(_ size: CGSize) {
+        arena = size
+        center = CGPoint(x: size.width / 2, y: size.height / 2)
+    }
+
+    /// Lay out a fresh board — player in the centre, rivals on a ring, the
+    /// opening scatter of coins — but leave the round un-started (`started`
+    /// stays false) so a host view can show its "tap to begin" prompt over a
+    /// settled arena.  Call `loadMap(index:)` first so coin spawns avoid walls.
+    func resetBoard() {
         guard arena.width > 0 else { return }
-        started = true
+        started = false
         isOver = false
         playerWon = false
         awarded = false
@@ -140,6 +152,23 @@ final class GoldRushEngine {
         racers = fresh
 
         for _ in 0..<initialCoins { spawnCoin() }
+    }
+
+    /// Lay out a board and immediately begin play.  Retained as the headless
+    /// entry point for tests/benchmarks (see PerformanceTests); a host view
+    /// instead pairs `resetBoard()` with `beginPlay()` so it can render the
+    /// pre-roll prompt over the settled board.
+    func startRound() {
+        resetBoard()
+        guard arena.width > 0 else { return }
+        started = true
+    }
+
+    /// Begin a round whose board was already laid out by `resetBoard()`
+    /// (the player tapped to start).  No-op once the round is over.
+    func beginPlay() {
+        guard arena.width > 0, !isOver else { return }
+        started = true
     }
 
     // MARK: - Simulation (mirrors GoldRushView.tick)
