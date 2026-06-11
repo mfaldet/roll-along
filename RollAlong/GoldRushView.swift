@@ -270,21 +270,36 @@ struct GoldRushView: View {
 
     private var startPrompt: some View {
         VStack(spacing: 10) {
-            Image(systemName: "bag.fill")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.30))
-            Text("Tilt to play")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Grab the most coins in 60 seconds.\nRam rivals to knock coins loose.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .multilineTextAlignment(.center)
+            VStack(spacing: 10) {
+                Image(systemName: "bag.fill")
+                    .font(.system(size: 36, weight: .light))
+                    .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.30))
+                Text("Tilt to play")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text("Grab the most coins in 60 seconds.\nRam rivals to knock coins loose.")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .multilineTextAlignment(.center)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Gold Rush. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
+
+            // The card sits above the arena's tap-to-start gesture, so
+            // adjusting difficulty here never accidentally starts the round.
+            Picker("Rival difficulty", selection: $gameState.minigameDifficulty) {
+                ForEach(MinigameDifficulty.allCases) { d in
+                    Text(d.displayName).tag(d)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.top, 8)
+            Text("Rival difficulty")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.5))
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Gold Rush. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
     }
 
     private var gameOverOverlay: some View {
@@ -426,6 +441,9 @@ struct GoldRushView: View {
     private func tick() {
         engine.playerInput = CGVector(dx: CGFloat(motion.gravity.x),
                                       dy: CGFloat(motion.gravity.y))
+        let difficulty = gameState.minigameDifficulty
+        engine.aiAccelScale = difficulty.aiAccelScale
+        engine.aiSpeedScale = difficulty.aiSpeedScale
         let wasOver = engine.isOver
         engine.tick()
         syncFromEngine()

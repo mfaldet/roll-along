@@ -102,6 +102,14 @@ final class GoldRushEngine {
     /// use; a view would set this from `BallMotion.gravity` each frame.
     var playerInput: CGVector = .zero
 
+    /// AI handicap multipliers (1.0 = full strength = the original AI).  The
+    /// host view sets these from the player's MinigameDifficulty; headless /
+    /// test use keeps the defaults so the performance baseline measures the
+    /// busiest AI.  Applied to rival steering acceleration and top speed —
+    /// never to the player's marble.
+    var aiAccelScale: CGFloat = 1.0
+    var aiSpeedScale: CGFloat = 1.0
+
     // MARK: - Computed
 
     var playerScore: Int { racers.first { $0.isPlayer }?.score ?? 0 }
@@ -200,9 +208,11 @@ final class GoldRushEngine {
             }
             racers[i].vel.dx *= friction
             racers[i].vel.dy *= friction
+            // Rivals get a difficulty-scaled speed cap; the player never does.
+            let cap = racers[i].isPlayer ? maxSpeed : maxSpeed * aiSpeedScale
             let s = hypot(racers[i].vel.dx, racers[i].vel.dy)
-            if s > maxSpeed {
-                let k = maxSpeed / s
+            if s > cap {
+                let k = cap / s
                 racers[i].vel.dx *= k
                 racers[i].vel.dy *= k
             }
@@ -221,14 +231,15 @@ final class GoldRushEngine {
     /// Head for the nearest grabbable coin.  A "bully" rival instead chases the
     /// current leader when they're close, to bump coins loose.
     private func botSteer(_ r: Racer) -> CGVector {
+        let accel = aiAccel * aiAccelScale
         if r.aggro, let leader = leaderToHarass(than: r),
            hypot(leader.pos.x - r.pos.x, leader.pos.y - r.pos.y) < ramSeekRange {
-            return unit(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y, scale: aiAccel)
+            return unit(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y, scale: accel)
         }
         if let coin = nearestCoin(to: r) {
-            return unit(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y, scale: aiAccel)
+            return unit(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y, scale: accel)
         }
-        return unit(dx: center.x - r.pos.x, dy: center.y - r.pos.y, scale: aiAccel * 0.5)
+        return unit(dx: center.x - r.pos.x, dy: center.y - r.pos.y, scale: accel * 0.5)
     }
 
     private func nearestCoin(to r: Racer) -> Coin? {

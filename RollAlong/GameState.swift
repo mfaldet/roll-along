@@ -5,7 +5,8 @@ import SwiftUI
 // UserDefaults audit (QE2 §7) — all ra_* keys are non-sensitive game state.
 //
 // Keys written: ra_level, ra_skin, ra_name, ra_haptics, ra_sound,
-//   ra_startAtTop, ra_seenOnboarding, ra_seenWelcomeMoment, ra_seenTutorialReward,
+//   ra_startAtTop, ra_minigameDifficulty, ra_seenOnboarding, ra_seenWelcomeMoment,
+//   ra_seenTutorialReward,
 //   ra_bestStars, ra_bestTime, ra_collectedCoins, ra_highestUnlocked,
 //   ra_lives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
@@ -43,6 +44,10 @@ final class GameState: ObservableObject {
     }
     @Published var ballStartsAtTop: Bool {
         didSet { defaults.set(ballStartsAtTop, forKey: "ra_startAtTop") }
+    }
+    /// How hard the competitive-minigame AI plays (see MinigameDifficulty).
+    @Published var minigameDifficulty: MinigameDifficulty {
+        didSet { defaults.set(minigameDifficulty.rawValue, forKey: "ra_minigameDifficulty") }
     }
 
     // One-time UX moments — survive resetProgress() so a returning player
@@ -322,6 +327,8 @@ final class GameState: ObservableObject {
         hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
         ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
+        minigameDifficulty = MinigameDifficulty(
+            rawValue: defaults.string(forKey: "ra_minigameDifficulty") ?? "") ?? .normal
         seenOnboarding = defaults.bool(forKey: "ra_seenOnboarding")
         seenWelcomeMoment = defaults.bool(forKey: "ra_seenWelcomeMoment")
         seenTutorialReward = defaults.bool(forKey: "ra_seenTutorialReward")
@@ -981,5 +988,50 @@ final class GameState: ObservableObject {
               let dict = try? JSONDecoder().decode([String: Int].self, from: data)
         else { return [:] }
         return dict
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MinigameDifficulty — how hard the competitive-minigame AI plays.
+//
+// The engines (GoldRushEngine today; others as they adopt the engine pattern)
+// take raw multipliers rather than this enum, so they stay preference-free and
+// headless-testable.  Their default of 1.0 equals .hard — also what the QE3 §7
+// performance baseline measures (the busiest AI).
+//
+// FEEL IS TUNABLE: the two scale tables below are the only knobs.  .hard is
+// the original pre-difficulty AI; .normal is the default.
+// ---------------------------------------------------------------------------
+enum MinigameDifficulty: String, CaseIterable, Identifiable {
+    case easy, normal, hard
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .easy:   return "Easy"
+        case .normal: return "Normal"
+        case .hard:   return "Hard"
+        }
+    }
+
+    /// Multiplier on rival steering acceleration — lower means lazier
+    /// course-corrections and wider cornering.
+    var aiAccelScale: CGFloat {
+        switch self {
+        case .easy:   return 0.55
+        case .normal: return 0.78
+        case .hard:   return 1.0
+        }
+    }
+
+    /// Multiplier on rival top speed — the main handicap: below 1.0 the
+    /// player can simply outrun the AI in a straight line.
+    var aiSpeedScale: CGFloat {
+        switch self {
+        case .easy:   return 0.72
+        case .normal: return 0.85
+        case .hard:   return 1.0
+        }
     }
 }

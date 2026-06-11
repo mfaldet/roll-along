@@ -463,6 +463,31 @@ struct SettingsView: View {
                 }
                 .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
                 .padding()
+
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Minigame Difficulty")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.75))
+                            Text("How hard the AI rivals play in competitive modes")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
+                    } icon: {
+                        Image(systemName: "speedometer")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                    Picker("Minigame Difficulty", selection: $gameState.minigameDifficulty) {
+                        ForEach(MinigameDifficulty.allCases) { d in
+                            Text(d.displayName).tag(d)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .padding()
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
         }
