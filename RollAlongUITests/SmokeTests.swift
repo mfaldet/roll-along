@@ -39,6 +39,18 @@ final class SmokeTests: XCTestCase {
         app = nil
     }
 
+    // MARK: - Helpers
+
+    /// Look an element up by accessibility identifier across ALL element
+    /// types.  SwiftUI's exposure of a modified NavigationLink can shift
+    /// between .button and .otherElement (e.g. when background modifiers
+    /// like the home ball's collider reporter are attached), and a
+    /// type-restricted query like app.buttons[...] silently misses the
+    /// re-typed element even though the identifier is present.
+    private func element(_ id: String) -> XCUIElement {
+        app.descendants(matching: .any)[id].firstMatch
+    }
+
     // MARK: - Launch
 
     func testApp_launchesAndShowsHomeView() throws {
@@ -55,18 +67,23 @@ final class SmokeTests: XCTestCase {
         let homeView = app.otherElements["HomeView"]
         XCTAssertTrue(homeView.waitForExistence(timeout: 10))
 
-        // 2. Navigate to Game Modes hub
-        let gameModeButton = app.buttons["GameModesButton"]
-        XCTAssertTrue(gameModeButton.waitForExistence(timeout: 5))
+        // 2. Navigate to Game Modes hub (any-type query — see element(_:))
+        let gameModeButton = element("GameModesButton")
+        XCTAssertTrue(gameModeButton.waitForExistence(timeout: 5),
+                      "GameModesButton should be on the home screen")
         gameModeButton.tap()
 
-        // 3. Tap Gold Rush in the mode list
-        let goldRushButton = app.buttons["goldrush"]
-        XCTAssertTrue(goldRushButton.waitForExistence(timeout: 5))
+        // 3. Tap the competitive coin scramble in the mode list (id
+        // "goldrush"; displayed as "Coin Pit").  It sits a few cards down
+        // the hub — scroll once if it's below the fold on small screens.
+        let goldRushButton = element("goldrush")
+        XCTAssertTrue(goldRushButton.waitForExistence(timeout: 5),
+                      "goldrush mode card should be in the Games hub")
+        if !goldRushButton.isHittable { app.swipeUp() }
         goldRushButton.tap()
 
-        // 4. Gold Rush view is on screen
-        let goldRushView = app.otherElements["GoldRushView"]
+        // 4. The scramble's view is on screen
+        let goldRushView = element("GoldRushView")
         XCTAssertTrue(goldRushView.waitForExistence(timeout: 5))
 
         // 5. Navigate back to home (Back button in navigation bar)
