@@ -310,7 +310,8 @@ final class GameState: ObservableObject {
     ///   • JSON-backed dicts use `try?` so a bad blob returns `[:]`.
     init() {
         let saved = UserDefaults.standard.integer(forKey: "ra_level")
-        currentLevel = max(1, saved)
+        let level = max(1, saved)
+        currentLevel = level
         activeSkin = BallSkin(rawValue: UserDefaults.standard.string(forKey: "ra_skin") ?? "") ?? .red
         playerName = UserDefaults.standard.string(forKey: "ra_name") ?? ""
         hapticsEnabled = UserDefaults.standard.object(forKey: "ra_haptics") as? Bool ?? true
@@ -324,7 +325,7 @@ final class GameState: ObservableObject {
         bestTime        = Self.loadDoubleValueDict(key: "ra_bestTime")
         collectedCoins  = Self.loadSetDict(key: "ra_collectedCoins")
         let unlocked    = UserDefaults.standard.integer(forKey: "ra_highestUnlocked")
-        highestUnlocked = max(currentLevel, max(1, unlocked))  // never less than currentLevel
+        highestUnlocked = max(level, max(1, unlocked))  // never less than currentLevel
 
         // Lives — default to a full bar.  `as? Int ?? Self.livesMax` covers
         // the case where no key has been written yet (fresh install).
