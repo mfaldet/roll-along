@@ -468,6 +468,10 @@ struct GoldRushView: View {
 
     // MARK: - Simulation
 
+    // NOTE: This tick() is mirrored by GoldRushEngine (a headless copy used by
+    // the performance test, QE3 §7).  Until the view adopts that engine, keep
+    // the two in sync — any change here should be reflected in
+    // GoldRushEngine.tick(), and vice versa.
     private func tick() {
         localTick &+= 1
         prunePoofs()
