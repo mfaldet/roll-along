@@ -65,7 +65,7 @@ struct ChallengeTrackView: View {
     private var heroSection: some View {
         VStack(spacing: 10) {
             // Ball skin preview
-            BallSkinView(skin: heroSkin, size: 80)
+            BallSkinView(skin: heroSkin, diameter: 80)
                 .shadow(color: heroGlowColor.opacity(0.40), radius: 20, x: 0, y: 6)
 
             Text(track.tagline)
@@ -83,7 +83,7 @@ struct ChallengeTrackView: View {
     }
 
     private var heroGlowColor: Color {
-        heroSkin.gradient(endRadius: 40).stops.first?.color ?? .white
+        heroSkin.highlightColor
     }
 
     // MARK: - Progress bar
@@ -186,7 +186,7 @@ struct ChallengeTrackView: View {
             if !bundle.balls.isEmpty {
                 HStack(spacing: 8) {
                     ForEach(bundle.balls, id: \.rawValue) { skin in
-                        BallSkinView(skin: skin, size: 32)
+                        BallSkinView(skin: skin, diameter: 32)
                     }
                     Spacer()
                 }

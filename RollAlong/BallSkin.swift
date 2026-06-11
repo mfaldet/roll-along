@@ -205,6 +205,10 @@ enum BallSkin: String, CaseIterable, Identifiable {
         )
     }
 
+    /// First (highlight) colour of the skin's radial palette.  Handy as a
+    /// lightweight tint / glow accent without constructing a full gradient.
+    var highlightColor: Color { colors.first ?? .white }
+
     /// 4-stop radial palette: light highlight → mid → shadow → deep
     /// shadow.  Picked to read clearly on every BackgroundTheme.
     private var colors: [Color] {
