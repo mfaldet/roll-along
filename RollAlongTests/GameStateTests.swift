@@ -4,26 +4,48 @@ import XCTest
 // ---------------------------------------------------------------------------
 // GameStateTests — unit tests for the most business-critical class.
 //
-// GameState persists to UserDefaults in didSet observers; tests that mutate
-// state will write to the standard suite.  Each test creates a fresh
-// GameState() so they are isolated from each other (GameState.init() reads
-// from UserDefaults, so tests share the stored suite — reset sensitive fields
-// in setUp if needed for test ordering sensitivity).
+// Each test runs against a private, throwaway UserDefaults suite (see setUp),
+// injected via GameState(defaults:).  Tests never touch the real "standard"
+// save, so they are fully isolated from each other and never disturb the
+// app's actual game state on the simulator.
 // ---------------------------------------------------------------------------
 
 final class GameStateTests: XCTestCase {
 
+    // Every test runs against a throwaway UserDefaults suite, wiped in setUp,
+    // so GameState never reads or writes the real save — tests are isolated
+    // from each other and never disturb the app's actual game state.
+    private var defaults: UserDefaults!
+    private let suiteName = "GameStateTests.isolated"
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        super.tearDown()
+    }
+
+    /// A GameState backed by the isolated suite (starts from fresh, empty state).
+    private func makeGameState() -> GameState {
+        GameState(defaults: defaults)
+    }
+
     // MARK: - addCoins — normal cases
 
     func testAddCoins_positiveAmount_increasesBalance() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 100
         gs.addCoins(50)
         XCTAssertEqual(gs.coinBalance, 150)
     }
 
     func testAddCoins_zeroAmount_noChange() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 200
         gs.addCoins(0)
         XCTAssertEqual(gs.coinBalance, 200)
@@ -32,21 +54,21 @@ final class GameStateTests: XCTestCase {
     // MARK: - addCoins — ceiling
 
     func testAddCoins_exactlyAtCeiling_noChange() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = GameState.maxCoinBalance
         gs.addCoins(1)
         XCTAssertEqual(gs.coinBalance, GameState.maxCoinBalance)
     }
 
     func testAddCoins_wouldExceedCeiling_clampsToMax() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = GameState.maxCoinBalance - 5
         gs.addCoins(50)
         XCTAssertEqual(gs.coinBalance, GameState.maxCoinBalance)
     }
 
     func testAddCoins_largeAmountFromZero_clampsToMax() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 0
         gs.addCoins(999_999_999)   // way over maxSingleAward → clamped to maxSingleAward, then balance ceiling
         XCTAssertLessThanOrEqual(gs.coinBalance, GameState.maxCoinBalance)
@@ -56,7 +78,7 @@ final class GameStateTests: XCTestCase {
     // MARK: - spendCoins
 
     func testSpendCoins_sufficientBalance_deductsAndReturnsTrue() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 500
         let success = gs.spendCoins(200)
         XCTAssertTrue(success)
@@ -64,7 +86,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testSpendCoins_exactBalance_deductsToZero() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 100
         let success = gs.spendCoins(100)
         XCTAssertTrue(success)
@@ -72,7 +94,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testSpendCoins_insufficientBalance_returnsFalseNoChange() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 100
         let success = gs.spendCoins(200)
         XCTAssertFalse(success)
@@ -80,7 +102,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testSpendCoins_zeroAmount_returnsTrueNoChange() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 100
         let success = gs.spendCoins(0)
         XCTAssertTrue(success)
@@ -88,7 +110,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testSpendCoins_negativeAmount_returnsFalse() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 100
         let success = gs.spendCoins(-50)
         XCTAssertFalse(success, "Negative spend amount should always fail")
@@ -97,7 +119,7 @@ final class GameStateTests: XCTestCase {
     // MARK: - addCoins / spendCoins round-trip
 
     func testCoinRoundTrip_addThenSpend_correctBalance() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.coinBalance = 0
         gs.addCoins(300)
         _ = gs.spendCoins(100)
@@ -107,7 +129,7 @@ final class GameStateTests: XCTestCase {
     // MARK: - Review prompt gating
 
     func testMaybeRequestReview_belowLevel5_doesNotSetPromptDate() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.highestUnlocked = 4
         gs.lastReviewPromptDate = nil
         gs.maybeRequestReview(after: true)
@@ -116,7 +138,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testMaybeRequestReview_winFalse_doesNotFire() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.highestUnlocked = 10
         gs.lastReviewPromptDate = nil
         gs.maybeRequestReview(after: false)   // after: false means no win
@@ -125,7 +147,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testMaybeRequestReview_recentPrompt_doesNotFire() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.highestUnlocked = 20
         let recentDate = Date()
         gs.lastReviewPromptDate = recentDate
@@ -137,7 +159,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testMaybeRequestReview_eligiblePlayer_setsPromptDate() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.highestUnlocked = 10
         // Simulate last prompt far in the past (well beyond 30-day cooldown)
         gs.lastReviewPromptDate = Date(timeIntervalSinceNow: -(40 * 86_400))
@@ -149,7 +171,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testMaybeRequestReview_noPreviousPrompt_eligiblePlayer_setsPromptDate() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.highestUnlocked = 10
         gs.lastReviewPromptDate = nil
         gs.maybeRequestReview(after: true)
@@ -160,14 +182,14 @@ final class GameStateTests: XCTestCase {
     // MARK: - Track progression
 
     func testAdvanceTrackProgress_newHighWaterMark_advances() {
-        let gs = GameState()
+        let gs = makeGameState()
         let trackID = "test-track-\(UUID().uuidString)"  // unique to avoid state pollution
         gs.advanceTrackProgress(trackID: trackID, to: 5)
         XCTAssertEqual(gs.trackProgress[trackID], 5)
     }
 
     func testAdvanceTrackProgress_lowerLevel_doesNotRegress() {
-        let gs = GameState()
+        let gs = makeGameState()
         let trackID = "test-track-\(UUID().uuidString)"
         gs.advanceTrackProgress(trackID: trackID, to: 10)
         gs.advanceTrackProgress(trackID: trackID, to: 3)   // lower than stored high
@@ -176,7 +198,7 @@ final class GameStateTests: XCTestCase {
     }
 
     func testAdvanceTrackProgress_sameLevel_noChange() {
-        let gs = GameState()
+        let gs = makeGameState()
         let trackID = "test-track-\(UUID().uuidString)"
         gs.advanceTrackProgress(trackID: trackID, to: 7)
         gs.advanceTrackProgress(trackID: trackID, to: 7)
@@ -186,13 +208,13 @@ final class GameStateTests: XCTestCase {
     // MARK: - Cosmetic ownership
 
     func testGrantBallSkin_ownedAfterGrant() {
-        let gs = GameState()
+        let gs = makeGameState()
         gs.grant(BallSkin.green)
         XCTAssertTrue(gs.isOwned(BallSkin.green))
     }
 
     func testStarterSkin_alwaysOwned() {
-        let gs = GameState()
+        let gs = makeGameState()
         // Starter items are owned regardless of the owned set
         XCTAssertTrue(gs.isOwned(BallSkin.red),
                       "The starter ball skin should always be owned")
@@ -201,7 +223,7 @@ final class GameStateTests: XCTestCase {
     // MARK: - Lives
 
     func testAddLives_increasesLives() {
-        let gs = GameState()
+        let gs = makeGameState()
         // addLives is a no-op under unlimited lives, and commitRegen() can fold
         // in regenerated lives when lastLifeLostAt is set — pin both so the
         // assertion is deterministic regardless of any persisted state.
@@ -210,5 +232,25 @@ final class GameStateTests: XCTestCase {
         gs.lives = 3
         gs.addLives(3)
         XCTAssertEqual(gs.lives, 6)
+    }
+
+    // MARK: - Persistence isolation (injected suite)
+
+    func testInjectedSuite_persistsAcrossInstances() {
+        let a = makeGameState()
+        a.coinBalance = 4321
+        // A second GameState on the SAME suite reads the saved value back.
+        let b = GameState(defaults: defaults)
+        XCTAssertEqual(b.coinBalance, 4321,
+                       "A GameState on the same suite should read back the saved balance")
+    }
+
+    func testInjectedSuite_doesNotTouchStandard() {
+        let key = "ra_coinBalance"
+        let standardBefore = UserDefaults.standard.integer(forKey: key)
+        let gs = makeGameState()
+        gs.addCoins(777)
+        XCTAssertEqual(UserDefaults.standard.integer(forKey: key), standardBefore,
+                       "Mutating an isolated GameState must not write to UserDefaults.standard")
     }
 }

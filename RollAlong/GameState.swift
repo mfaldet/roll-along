@@ -27,34 +27,34 @@ final class GameState: ObservableObject {
     // MARK: - Published state
 
     @Published var currentLevel: Int {
-        didSet { UserDefaults.standard.set(currentLevel, forKey: "ra_level") }
+        didSet { defaults.set(currentLevel, forKey: "ra_level") }
     }
     @Published var activeSkin: BallSkin {
-        didSet { UserDefaults.standard.set(activeSkin.rawValue, forKey: "ra_skin") }
+        didSet { defaults.set(activeSkin.rawValue, forKey: "ra_skin") }
     }
     @Published var playerName: String {
-        didSet { UserDefaults.standard.set(playerName, forKey: "ra_name") }
+        didSet { defaults.set(playerName, forKey: "ra_name") }
     }
     @Published var hapticsEnabled: Bool {
-        didSet { UserDefaults.standard.set(hapticsEnabled, forKey: "ra_haptics") }
+        didSet { defaults.set(hapticsEnabled, forKey: "ra_haptics") }
     }
     @Published var soundEnabled: Bool {
-        didSet { UserDefaults.standard.set(soundEnabled, forKey: "ra_sound") }
+        didSet { defaults.set(soundEnabled, forKey: "ra_sound") }
     }
     @Published var ballStartsAtTop: Bool {
-        didSet { UserDefaults.standard.set(ballStartsAtTop, forKey: "ra_startAtTop") }
+        didSet { defaults.set(ballStartsAtTop, forKey: "ra_startAtTop") }
     }
 
     // One-time UX moments — survive resetProgress() so a returning player
     // who resets level progress isn't shown the intro/welcome again.
     @Published var seenOnboarding: Bool {
-        didSet { UserDefaults.standard.set(seenOnboarding, forKey: "ra_seenOnboarding") }
+        didSet { defaults.set(seenOnboarding, forKey: "ra_seenOnboarding") }
     }
     @Published var seenWelcomeMoment: Bool {
-        didSet { UserDefaults.standard.set(seenWelcomeMoment, forKey: "ra_seenWelcomeMoment") }
+        didSet { defaults.set(seenWelcomeMoment, forKey: "ra_seenWelcomeMoment") }
     }
     @Published var seenTutorialReward: Bool {
-        didSet { UserDefaults.standard.set(seenTutorialReward, forKey: "ra_seenTutorialReward") }
+        didSet { defaults.set(seenTutorialReward, forKey: "ra_seenTutorialReward") }
     }
     // (`seenTutorialL1` removed — the L1 phased intro is now keyed
     //  off `time(for: 1) == nil`, so it correctly re-runs after
@@ -66,16 +66,16 @@ final class GameState: ObservableObject {
     // collectedCoins[level]: Set of coin indices (0…2) the player has banked
     // highestUnlocked     : highest level the player has unlocked (>= 1)
     @Published var bestStars: [Int: Int] {
-        didSet { Self.save(bestStars, intValueDict: "ra_bestStars") }
+        didSet { save(bestStars, intValueDict: "ra_bestStars") }
     }
     @Published var bestTime: [Int: TimeInterval] {
-        didSet { Self.save(bestTime, doubleValueDict: "ra_bestTime") }
+        didSet { save(bestTime, doubleValueDict: "ra_bestTime") }
     }
     @Published var collectedCoins: [Int: Set<Int>] {
-        didSet { Self.save(collectedCoins, setDict: "ra_collectedCoins") }
+        didSet { save(collectedCoins, setDict: "ra_collectedCoins") }
     }
     @Published var highestUnlocked: Int {
-        didSet { UserDefaults.standard.set(highestUnlocked, forKey: "ra_highestUnlocked") }
+        didSet { defaults.set(highestUnlocked, forKey: "ra_highestUnlocked") }
     }
 
     // ── Lives system (Sprint 4c) ───────────────────────────────────────────
@@ -90,19 +90,19 @@ final class GameState: ObservableObject {
     static let tutorialLevelCount: Int = 10             // L1-10 don't consume lives
 
     @Published var lives: Int {
-        didSet { UserDefaults.standard.set(lives, forKey: "ra_lives") }
+        didSet { defaults.set(lives, forKey: "ra_lives") }
     }
     @Published var lastLifeLostAt: Date? {
         didSet {
             if let d = lastLifeLostAt {
-                UserDefaults.standard.set(d, forKey: "ra_lastLifeLostAt")
+                defaults.set(d, forKey: "ra_lastLifeLostAt")
             } else {
-                UserDefaults.standard.removeObject(forKey: "ra_lastLifeLostAt")
+                defaults.removeObject(forKey: "ra_lastLifeLostAt")
             }
         }
     }
     @Published var unlimitedLives: Bool {
-        didSet { UserDefaults.standard.set(unlimitedLives, forKey: "ra_unlimitedLives") }
+        didSet { defaults.set(unlimitedLives, forKey: "ra_unlimitedLives") }
     }
 
     // ── Daily reward / login streak ────────────────────────────────────────
@@ -113,14 +113,14 @@ final class GameState: ObservableObject {
     //                  claim.  Drives both "is a reward available today" and
     //                  whether the streak is still alive (claimed yesterday).
     @Published var dailyStreak: Int {
-        didSet { UserDefaults.standard.set(dailyStreak, forKey: "ra_dailyStreak") }
+        didSet { defaults.set(dailyStreak, forKey: "ra_dailyStreak") }
     }
     @Published var lastDailyClaim: Date? {
         didSet {
             if let d = lastDailyClaim {
-                UserDefaults.standard.set(d, forKey: "ra_lastDailyClaim")
+                defaults.set(d, forKey: "ra_lastDailyClaim")
             } else {
-                UserDefaults.standard.removeObject(forKey: "ra_lastDailyClaim")
+                defaults.removeObject(forKey: "ra_lastDailyClaim")
             }
         }
     }
@@ -135,14 +135,14 @@ final class GameState: ObservableObject {
     @Published var starterPackShownAt: Date? {
         didSet {
             if let d = starterPackShownAt {
-                UserDefaults.standard.set(d, forKey: "ra_starterPackShownAt")
+                defaults.set(d, forKey: "ra_starterPackShownAt")
             } else {
-                UserDefaults.standard.removeObject(forKey: "ra_starterPackShownAt")
+                defaults.removeObject(forKey: "ra_starterPackShownAt")
             }
         }
     }
     @Published var starterPackClaimed: Bool {
-        didSet { UserDefaults.standard.set(starterPackClaimed, forKey: "ra_starterPackClaimed") }
+        didSet { defaults.set(starterPackClaimed, forKey: "ra_starterPackClaimed") }
     }
 
     // ── Ratings prompt ────────────────────────────────────────────────────
@@ -153,9 +153,9 @@ final class GameState: ObservableObject {
     @Published var lastReviewPromptDate: Date? {
         didSet {
             if let d = lastReviewPromptDate {
-                UserDefaults.standard.set(d, forKey: "ra_lastReviewPromptDate")
+                defaults.set(d, forKey: "ra_lastReviewPromptDate")
             } else {
-                UserDefaults.standard.removeObject(forKey: "ra_lastReviewPromptDate")
+                defaults.removeObject(forKey: "ra_lastReviewPromptDate")
             }
         }
     }
@@ -165,43 +165,43 @@ final class GameState: ObservableObject {
     // shop to unlock cosmetic items.  Also purchasable in coin packs via
     // StoreKit (PR 4h).  No cap on balance.
     @Published var coinBalance: Int {
-        didSet { UserDefaults.standard.set(coinBalance, forKey: "ra_coinBalance") }
+        didSet { defaults.set(coinBalance, forKey: "ra_coinBalance") }
     }
 
     // Owned cosmetic items per category, stored as sets of raw strings so
     // JSON round-trip is trivial.  Default ("starter") items are always
     // implicitly owned via `isOwned(_:)`, regardless of set membership.
     @Published var ownedBallSkins:   Set<String> {
-        didSet { Self.saveStringSet(ownedBallSkins, forKey: "ra_ownedBallSkins") }
+        didSet { saveStringSet(ownedBallSkins, forKey: "ra_ownedBallSkins") }
     }
     @Published var ownedGoals:       Set<String> {
-        didSet { Self.saveStringSet(ownedGoals, forKey: "ra_ownedGoals") }
+        didSet { saveStringSet(ownedGoals, forKey: "ra_ownedGoals") }
     }
     @Published var ownedTrails:      Set<String> {
-        didSet { Self.saveStringSet(ownedTrails, forKey: "ra_ownedTrails") }
+        didSet { saveStringSet(ownedTrails, forKey: "ra_ownedTrails") }
     }
     /// Owned Floor cosmetics (the surface the ball rolls on).
     @Published var ownedFloors: Set<String> {
-        didSet { Self.saveStringSet(ownedFloors, forKey: "ra_ownedFloors") }
+        didSet { saveStringSet(ownedFloors, forKey: "ra_ownedFloors") }
     }
     /// Owned Pit cosmetics (the holes the ball falls into).
     @Published var ownedPits: Set<String> {
-        didSet { Self.saveStringSet(ownedPits, forKey: "ra_ownedPits") }
+        didSet { saveStringSet(ownedPits, forKey: "ra_ownedPits") }
     }
     /// Owned bundle IDs (for the shop's "OWNED" badge — items inside
     /// each bundle are also added to their individual owned sets at
     /// purchase time, so this is purely for UI state).
     @Published var ownedBundles: Set<String> {
-        didSet { Self.saveStringSet(ownedBundles, forKey: "ra_ownedBundles") }
+        didSet { saveStringSet(ownedBundles, forKey: "ra_ownedBundles") }
     }
     /// Owned Ball-Pack IDs.  Buying a Pack also adds its member skins to
     /// `ownedBallSkins` (so they're individually equippable); this set
     /// is for the shop's "OWNED" state + the equip-the-whole-Pack flow.
     @Published var ownedPacks: Set<String> {
-        didSet { Self.saveStringSet(ownedPacks, forKey: "ra_ownedPacks") }
+        didSet { saveStringSet(ownedPacks, forKey: "ra_ownedPacks") }
     }
     @Published var ownedMusic:       Set<String> {
-        didSet { Self.saveStringSet(ownedMusic, forKey: "ra_ownedMusic") }
+        didSet { saveStringSet(ownedMusic, forKey: "ra_ownedMusic") }
     }
 
     // ── Challenge Track progress ─────────────────────────────────────────
@@ -213,13 +213,13 @@ final class GameState: ObservableObject {
     /// Highest level cleared per Challenge Track: [trackID: level (1…100)].
     /// Missing key = track not yet started.  Level 100 = track complete.
     @Published var trackProgress: [String: Int] {
-        didSet { Self.save(trackProgress, trackProgressKey: "ra_trackProgress") }
+        didSet { save(trackProgress, trackProgressKey: "ra_trackProgress") }
     }
 
     /// Set of Challenge Track IDs fully completed (level 100 cleared).
     /// The reward bundle is granted exactly once when a track enters this set.
     @Published var completedTracks: Set<String> {
-        didSet { Self.saveStringSet(completedTracks, forKey: "ra_completedTracks") }
+        didSet { saveStringSet(completedTracks, forKey: "ra_completedTracks") }
     }
 
     // ── Challenge Track active session (transient — not persisted) ──────────
@@ -265,19 +265,19 @@ final class GameState: ObservableObject {
     // Currently-equipped cosmetic per category.  Always defaults to the
     // starter on a fresh install.
     @Published var equippedGoal: GoalSkin {
-        didSet { UserDefaults.standard.set(equippedGoal.rawValue, forKey: "ra_equippedGoal") }
+        didSet { defaults.set(equippedGoal.rawValue, forKey: "ra_equippedGoal") }
     }
     @Published var equippedTrail: TrailColor {
-        didSet { UserDefaults.standard.set(equippedTrail.rawValue, forKey: "ra_equippedTrail") }
+        didSet { defaults.set(equippedTrail.rawValue, forKey: "ra_equippedTrail") }
     }
     @Published var equippedFloor: Floor {
-        didSet { UserDefaults.standard.set(equippedFloor.rawValue, forKey: "ra_equippedFloor") }
+        didSet { defaults.set(equippedFloor.rawValue, forKey: "ra_equippedFloor") }
     }
     @Published var equippedPit: Pit {
-        didSet { UserDefaults.standard.set(equippedPit.rawValue, forKey: "ra_equippedPit") }
+        didSet { defaults.set(equippedPit.rawValue, forKey: "ra_equippedPit") }
     }
     @Published var equippedMusic: MusicTrack {
-        didSet { UserDefaults.standard.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
+        didSet { defaults.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
     }
     // equippedBall lives on `activeSkin` — already defined above.
 
@@ -288,9 +288,9 @@ final class GameState: ObservableObject {
     @Published var equippedPackID: String? {
         didSet {
             if let id = equippedPackID {
-                UserDefaults.standard.set(id, forKey: "ra_equippedPack")
+                defaults.set(id, forKey: "ra_equippedPack")
             } else {
-                UserDefaults.standard.removeObject(forKey: "ra_equippedPack")
+                defaults.removeObject(forKey: "ra_equippedPack")
             }
         }
     }
@@ -308,42 +308,47 @@ final class GameState: ObservableObject {
     ///   • `integer(forKey:)` returns 0 for missing/wrong-type keys — clamped to safe ranges.
     ///   • `object(forKey:) as? T` returns nil for wrong-type keys — nil-coalesced to defaults.
     ///   • JSON-backed dicts use `try?` so a bad blob returns `[:]`.
-    init() {
-        let saved = UserDefaults.standard.integer(forKey: "ra_level")
+    /// The persistence store.  Production uses `.standard`; tests inject a
+    /// throwaway suite so they never read or scribble on the real save.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
-        activeSkin = BallSkin(rawValue: UserDefaults.standard.string(forKey: "ra_skin") ?? "") ?? .red
-        playerName = UserDefaults.standard.string(forKey: "ra_name") ?? ""
-        hapticsEnabled = UserDefaults.standard.object(forKey: "ra_haptics") as? Bool ?? true
-        soundEnabled = UserDefaults.standard.object(forKey: "ra_sound") as? Bool ?? true
-        ballStartsAtTop = UserDefaults.standard.object(forKey: "ra_startAtTop") as? Bool ?? true
-        seenOnboarding = UserDefaults.standard.bool(forKey: "ra_seenOnboarding")
-        seenWelcomeMoment = UserDefaults.standard.bool(forKey: "ra_seenWelcomeMoment")
-        seenTutorialReward = UserDefaults.standard.bool(forKey: "ra_seenTutorialReward")
+        activeSkin = BallSkin(rawValue: defaults.string(forKey: "ra_skin") ?? "") ?? .red
+        playerName = defaults.string(forKey: "ra_name") ?? ""
+        hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
+        soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
+        ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
+        seenOnboarding = defaults.bool(forKey: "ra_seenOnboarding")
+        seenWelcomeMoment = defaults.bool(forKey: "ra_seenWelcomeMoment")
+        seenTutorialReward = defaults.bool(forKey: "ra_seenTutorialReward")
 
-        bestStars       = Self.loadIntValueDict(key: "ra_bestStars")
-        bestTime        = Self.loadDoubleValueDict(key: "ra_bestTime")
-        collectedCoins  = Self.loadSetDict(key: "ra_collectedCoins")
-        let unlocked    = UserDefaults.standard.integer(forKey: "ra_highestUnlocked")
+        bestStars       = Self.loadIntValueDict(key: "ra_bestStars", defaults)
+        bestTime        = Self.loadDoubleValueDict(key: "ra_bestTime", defaults)
+        collectedCoins  = Self.loadSetDict(key: "ra_collectedCoins", defaults)
+        let unlocked    = defaults.integer(forKey: "ra_highestUnlocked")
         highestUnlocked = max(level, max(1, unlocked))  // never less than currentLevel
 
         // Lives — default to a full bar.  `as? Int ?? Self.livesMax` covers
         // the case where no key has been written yet (fresh install).
         // `max(0, ...)` guards against a corrupt negative value.
-        lives          = max(0, UserDefaults.standard.object(forKey: "ra_lives") as? Int ?? Self.livesMax)
-        lastLifeLostAt = UserDefaults.standard.object(forKey: "ra_lastLifeLostAt") as? Date
-        unlimitedLives = UserDefaults.standard.bool(forKey: "ra_unlimitedLives")
+        lives          = max(0, defaults.object(forKey: "ra_lives") as? Int ?? Self.livesMax)
+        lastLifeLostAt = defaults.object(forKey: "ra_lastLifeLostAt") as? Date
+        unlimitedLives = defaults.bool(forKey: "ra_unlimitedLives")
 
         // Daily reward / login streak.
-        dailyStreak    = UserDefaults.standard.integer(forKey: "ra_dailyStreak")
-        lastDailyClaim = UserDefaults.standard.object(forKey: "ra_lastDailyClaim") as? Date
+        dailyStreak    = defaults.integer(forKey: "ra_dailyStreak")
+        lastDailyClaim = defaults.object(forKey: "ra_lastDailyClaim") as? Date
 
         // Starter Pack offer state.
-        starterPackShownAt = UserDefaults.standard.object(forKey: "ra_starterPackShownAt") as? Date
-        starterPackClaimed = UserDefaults.standard.bool(forKey: "ra_starterPackClaimed")
+        starterPackShownAt = defaults.object(forKey: "ra_starterPackShownAt") as? Date
+        starterPackClaimed = defaults.bool(forKey: "ra_starterPackClaimed")
 
         // Ratings prompt.
-        lastReviewPromptDate = UserDefaults.standard.object(forKey: "ra_lastReviewPromptDate") as? Date
+        lastReviewPromptDate = defaults.object(forKey: "ra_lastReviewPromptDate") as? Date
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -353,16 +358,16 @@ final class GameState: ObservableObject {
         // Clamp both sides: floor of 0, ceiling of maxCoinBalance.
         // A corrupted save with a huge value is silently reset rather than
         // displaying an absurd balance.
-        coinBalance = min(max(0, UserDefaults.standard.integer(forKey: "ra_coinBalance")),
+        coinBalance = min(max(0, defaults.integer(forKey: "ra_coinBalance")),
                           Self.maxCoinBalance)
-        let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins")
-        let loadedOwnedGoals   = Self.loadStringSet(forKey: "ra_ownedGoals")
-        let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails")
-        let loadedOwnedFloors  = Self.loadStringSet(forKey: "ra_ownedFloors")
-        let loadedOwnedPits    = Self.loadStringSet(forKey: "ra_ownedPits")
-        let loadedOwnedMusic   = Self.loadStringSet(forKey: "ra_ownedMusic")
-        let loadedOwnedBundles = Self.loadStringSet(forKey: "ra_ownedBundles")
-        let loadedOwnedPacks   = Self.loadStringSet(forKey: "ra_ownedPacks")
+        let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins", defaults)
+        let loadedOwnedGoals   = Self.loadStringSet(forKey: "ra_ownedGoals", defaults)
+        let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails", defaults)
+        let loadedOwnedFloors  = Self.loadStringSet(forKey: "ra_ownedFloors", defaults)
+        let loadedOwnedPits    = Self.loadStringSet(forKey: "ra_ownedPits", defaults)
+        let loadedOwnedMusic   = Self.loadStringSet(forKey: "ra_ownedMusic", defaults)
+        let loadedOwnedBundles = Self.loadStringSet(forKey: "ra_ownedBundles", defaults)
+        let loadedOwnedPacks   = Self.loadStringSet(forKey: "ra_ownedPacks", defaults)
         ownedBallSkins = loadedOwnedBalls
         ownedGoals     = loadedOwnedGoals
         ownedTrails    = loadedOwnedTrails
@@ -371,19 +376,19 @@ final class GameState: ObservableObject {
         ownedMusic     = loadedOwnedMusic
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
-        trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress")
-        completedTracks = Self.loadStringSet(forKey: "ra_completedTracks")
+        trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
+        completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
         // `BackgroundTheme` (any saved ra_equippedBackground value is
         // simply discarded — Mac requested reset-to-defaults for the
         // single existing tester).
-        let savedGoal  = GoalSkin(rawValue:   UserDefaults.standard.string(forKey: "ra_equippedGoal")  ?? "")
-        let savedTrail = TrailColor(rawValue: UserDefaults.standard.string(forKey: "ra_equippedTrail") ?? "")
-        let savedFloor = Floor(rawValue:      UserDefaults.standard.string(forKey: "ra_equippedFloor") ?? "")
-        let savedPit   = Pit(rawValue:        UserDefaults.standard.string(forKey: "ra_equippedPit")   ?? "")
-        let savedMusic = MusicTrack(rawValue: UserDefaults.standard.string(forKey: "ra_equippedMusic") ?? "")
+        let savedGoal  = GoalSkin(rawValue:   defaults.string(forKey: "ra_equippedGoal")  ?? "")
+        let savedTrail = TrailColor(rawValue: defaults.string(forKey: "ra_equippedTrail") ?? "")
+        let savedFloor = Floor(rawValue:      defaults.string(forKey: "ra_equippedFloor") ?? "")
+        let savedPit   = Pit(rawValue:        defaults.string(forKey: "ra_equippedPit")   ?? "")
+        let savedMusic = MusicTrack(rawValue: defaults.string(forKey: "ra_equippedMusic") ?? "")
         equippedGoal  = Self.legitimise(savedGoal,  owned: loadedOwnedGoals,  starter: GoalSkin.starter)
         equippedTrail = Self.legitimise(savedTrail, owned: loadedOwnedTrails, starter: TrailColor.starter)
         equippedFloor = Self.legitimise(savedFloor, owned: loadedOwnedFloors, starter: Floor.starter)
@@ -393,7 +398,7 @@ final class GameState: ObservableObject {
         // Restore the equipped Ball Pack only if it's still owned;
         // otherwise leave it nil so the individual `activeSkin` (loaded
         // above) stays in effect.
-        let savedPack  = UserDefaults.standard.string(forKey: "ra_equippedPack")
+        let savedPack  = defaults.string(forKey: "ra_equippedPack")
         equippedPackID = savedPack.flatMap { loadedOwnedPacks.contains($0) ? $0 : nil }
     }
 
@@ -903,40 +908,40 @@ final class GameState: ObservableObject {
 
     // MARK: - Persistence helpers (UserDefaults can't store [Int: T] directly)
 
-    private static func saveStringSet(_ set: Set<String>, forKey key: String) {
-        UserDefaults.standard.set(Array(set), forKey: key)
+    private func saveStringSet(_ set: Set<String>, forKey key: String) {
+        defaults.set(Array(set), forKey: key)
     }
 
-    private static func loadStringSet(forKey key: String) -> Set<String> {
-        guard let arr = UserDefaults.standard.array(forKey: key) as? [String] else {
+    private static func loadStringSet(forKey key: String, _ defaults: UserDefaults) -> Set<String> {
+        guard let arr = defaults.array(forKey: key) as? [String] else {
             return []
         }
         return Set(arr)
     }
 
-    private static func save(_ dict: [Int: Int], intValueDict key: String) {
+    private func save(_ dict: [Int: Int], intValueDict key: String) {
         let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), $0.value) })
         if let data = try? JSONEncoder().encode(stringKeyed) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 
-    private static func save(_ dict: [Int: Double], doubleValueDict key: String) {
+    private func save(_ dict: [Int: Double], doubleValueDict key: String) {
         let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), $0.value) })
         if let data = try? JSONEncoder().encode(stringKeyed) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 
-    private static func save(_ dict: [Int: Set<Int>], setDict key: String) {
+    private func save(_ dict: [Int: Set<Int>], setDict key: String) {
         let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), Array($0.value)) })
         if let data = try? JSONEncoder().encode(stringKeyed) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 
-    private static func loadIntValueDict(key: String) -> [Int: Int] {
-        guard let data = UserDefaults.standard.data(forKey: key),
+    private static func loadIntValueDict(key: String, _ defaults: UserDefaults) -> [Int: Int] {
+        guard let data = defaults.data(forKey: key),
               let stringKeyed = try? JSONDecoder().decode([String: Int].self, from: data)
         else { return [:] }
         return Dictionary(uniqueKeysWithValues: stringKeyed.compactMap { entry in
@@ -944,8 +949,8 @@ final class GameState: ObservableObject {
         })
     }
 
-    private static func loadDoubleValueDict(key: String) -> [Int: Double] {
-        guard let data = UserDefaults.standard.data(forKey: key),
+    private static func loadDoubleValueDict(key: String, _ defaults: UserDefaults) -> [Int: Double] {
+        guard let data = defaults.data(forKey: key),
               let stringKeyed = try? JSONDecoder().decode([String: Double].self, from: data)
         else { return [:] }
         return Dictionary(uniqueKeysWithValues: stringKeyed.compactMap { entry in
@@ -953,8 +958,8 @@ final class GameState: ObservableObject {
         })
     }
 
-    private static func loadSetDict(key: String) -> [Int: Set<Int>] {
-        guard let data = UserDefaults.standard.data(forKey: key),
+    private static func loadSetDict(key: String, _ defaults: UserDefaults) -> [Int: Set<Int>] {
+        guard let data = defaults.data(forKey: key),
               let stringKeyed = try? JSONDecoder().decode([String: [Int]].self, from: data)
         else { return [:] }
         return Dictionary(uniqueKeysWithValues: stringKeyed.compactMap { entry in
@@ -964,15 +969,15 @@ final class GameState: ObservableObject {
 
     /// Persist a [String: Int] dictionary (e.g. trackProgress) to UserDefaults.
     /// Keys are already strings so no conversion is needed.
-    private static func save(_ dict: [String: Int], trackProgressKey key: String) {
+    private func save(_ dict: [String: Int], trackProgressKey key: String) {
         if let data = try? JSONEncoder().encode(dict) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 
     /// Load a [String: Int] dictionary from UserDefaults.
-    private static func loadTrackProgress(key: String) -> [String: Int] {
-        guard let data = UserDefaults.standard.data(forKey: key),
+    private static func loadTrackProgress(key: String, _ defaults: UserDefaults) -> [String: Int] {
+        guard let data = defaults.data(forKey: key),
               let dict = try? JSONDecoder().decode([String: Int].self, from: data)
         else { return [:] }
         return dict
