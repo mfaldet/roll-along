@@ -67,12 +67,12 @@ struct BuyLivesSheet: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            ForEach(0..<6) { i in
+        HStack(spacing: 6) {
+            ForEach(0..<GameState.livesMax, id: \.self) { i in
                 lifeMarble(filled: i < gameState.displayedLives)
             }
             Spacer()
-            Text("\(gameState.displayedLives) / 6")
+            Text("\(gameState.displayedLives) / \(GameState.livesMax)")
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Color(white: 0.75))
         }
@@ -108,9 +108,9 @@ struct BuyLivesSheet: View {
         .frame(width: size, height: size)
     }
 
-    /// Live status + explanation block under the 6-marble header.  Shows
+    /// Live status + explanation block under the marble-row header.  Shows
     /// the next-life countdown when regen is active and the standing rule
-    /// (1 life every 10 min, up to 6).  Hidden for unlimited subscribers
+    /// (1 life every 6 min, up to 10).  Hidden for unlimited subscribers
     /// — we tell them they're set instead.
     private var statusBlock: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
@@ -143,7 +143,7 @@ struct BuyLivesSheet: View {
                         }
                         .foregroundStyle(Color(white: 0.78))
                     }
-                    Text("You earn 1 life every 10 minutes, up to 6.")
+                    Text("You earn 1 life every 6 minutes, up to \(GameState.livesMax).")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundStyle(Color(white: 0.55))
                 }

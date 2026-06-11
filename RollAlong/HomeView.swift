@@ -307,7 +307,7 @@ struct HomeView: View {
             }
             // Sheet driven by tapping the top-left lives pill.  Re-uses
             // the existing BuyLivesSheet (which itself has been extended
-            // with a regen-countdown + "1 life per 10 min" explanation
+            // with a regen-countdown + "1 life per 6 min" explanation
             // block in its header).
             .sheet(isPresented: $showBuyLivesSheet) {
                 BuyLivesSheet()

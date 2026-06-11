@@ -84,14 +84,16 @@ final class GameState: ObservableObject {
     }
 
     // ── Lives system (Sprint 4c) ───────────────────────────────────────────
-    // lives             : stored count, 0…6.  May be stale w.r.t. regen —
+    // lives             : stored count, 0…10.  May be stale w.r.t. regen —
     //                     use displayedLives for the live value.
     // lastLifeLostAt    : timestamp of the most recent life consumption.
     //                     Drives regen.  nil when lives == max.
     // unlimitedLives    : true if the $20 unlimited subscription is active.
     //                     Set by the StoreKit layer in a later PR.
-    static let livesMax: Int = 6
-    static let livesRegenInterval: TimeInterval = 600   // 10 minutes
+    // ECONOMY: flipped 2026-06-11 from 1-per-10-min / cap 6 to a friendlier
+    // 1-per-6-min / cap 10 — faster comebacks, bigger passive bank.
+    static let livesMax: Int = 10
+    static let livesRegenInterval: TimeInterval = 360   // 6 minutes
     static let tutorialLevelCount: Int = 10             // L1-10 don't consume lives
 
     @Published var lives: Int {
