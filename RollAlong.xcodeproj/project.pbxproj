@@ -47,12 +47,14 @@
 		QE3B0101000000000000AA01 /* GameStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0101000000000000AA00 /* GameStateTests.swift */; };
 		QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */; };
 		QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0103000000000000AA00 /* CosmeticsTests.swift */; };
+		FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */; };
 		QE3C0101000000000000AA01 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3C0101000000000000AA00 /* SmokeTests.swift */; };
 		FA000001000000000000FA01 /* MinigameMaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000001000000000000FA00 /* MinigameMaps.swift */; };
 		FA000002000000000000FA01 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000002000000000000FA00 /* Constants.swift */; };
 		FA000003000000000000FA01 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000003000000000000FA00 /* ProfileView.swift */; };
 		FA000004000000000000FA01 /* ChallengeTrackSelectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000004000000000000FA00 /* ChallengeTrackSelectView.swift */; };
 		FA000005000000000000FA01 /* ChallengeTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000005000000000000FA00 /* ChallengeTrackView.swift */; };
+		FB000003000000000000FB01 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = FB000002000000000000FB00 /* SnapshotTesting */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -116,6 +118,7 @@
 		QE3B0101000000000000AA00 /* GameStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStateTests.swift; sourceTree = "<group>"; };
 		QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsHelpersTests.swift; sourceTree = "<group>"; };
 		QE3B0103000000000000AA00 /* CosmeticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmeticsTests.swift; sourceTree = "<group>"; };
+		FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkinSnapshotTests.swift; sourceTree = "<group>"; };
 		QE3C0001000000000000AA00 /* RollAlongUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollAlongUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		QE3C0101000000000000AA00 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
 		FA000001000000000000FA00 /* MinigameMaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinigameMaps.swift; sourceTree = "<group>"; };
@@ -138,6 +141,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FB000003000000000000FB01 /* SnapshotTesting in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -227,6 +231,7 @@
 				QE3B0101000000000000AA00 /* GameStateTests.swift */,
 				QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */,
 				QE3B0103000000000000AA00 /* CosmeticsTests.swift */,
+				FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -275,6 +280,9 @@
 				QE3B0018000000000000AA00 /* PBXTargetDependency */,
 			);
 			name = RollAlongTests;
+			packageProductDependencies = (
+				FB000002000000000000FB00 /* SnapshotTesting */,
+			);
 			productName = RollAlongTests;
 			productReference = QE3B0001000000000000AA00 /* RollAlongTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -316,6 +324,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AA000010000000000000AA00 /* Products */;
@@ -395,6 +404,7 @@
 				QE3B0101000000000000AA01 /* GameStateTests.swift in Sources */,
 				QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */,
 				QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */,
+				FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -720,6 +730,14 @@
 				minimumVersion = 13.4.0;
 			};
 		};
+		FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.15.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -727,6 +745,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		FB000002000000000000FB00 /* SnapshotTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
+			productName = SnapshotTesting;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
