@@ -198,7 +198,9 @@ struct HomeView: View {
                 }
 
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 90)
+                    // Hug the top pills — the greeting + title sit right
+                    // below the lives / coins indicators.
+                    Spacer().frame(height: 48)
 
                     greeting
                         .homeBallCollider()
@@ -210,11 +212,10 @@ struct HomeView: View {
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
 
-                    playButton
-                        .homeBallCollider()
-                        .padding(.horizontal, 40)
-                        .padding(.bottom, 12)
-
+                    // Game Modes sits ABOVE Play.  The capsule is narrow and
+                    // centred, so the ball can roll down past it on either
+                    // side (each gap is wider than the ball) — but never
+                    // through it: it's a collider like every other control.
                     // One tap to every non-climb experience — Zen Garden,
                     // Coin Pit, and the competitive modes as they come online.
                     NavigationLink(value: HomeRoute.games) {
@@ -239,7 +240,12 @@ struct HomeView: View {
                     // which accessibility element receives the identifier.
                     .accessibilityIdentifier("GameModesButton")  // UI smoke test
                     .homeBallCollider()
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 12)
+
+                    playButton
+                        .homeBallCollider()
+                        .padding(.horizontal, 40)
+                        .padding(.bottom, 16)
 
                     // Five square, icon-only buttons hugging the bottom edge.
                     // Equal slots via maxWidth so the spacing is uniform on
