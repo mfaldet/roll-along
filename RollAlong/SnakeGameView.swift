@@ -635,17 +635,8 @@ struct SnakeGameView: View {
     }
 
     private func bounceWalls(_ c: inout Cycle) {
-        let r = headRadius
-        if c.pos.x < r {
-            c.pos.x = r; c.vel.dx = abs(c.vel.dx) * wallBounce
-        } else if c.pos.x > arena.width - r {
-            c.pos.x = arena.width - r; c.vel.dx = -abs(c.vel.dx) * wallBounce
-        }
-        if c.pos.y < r {
-            c.pos.y = r; c.vel.dy = abs(c.vel.dy) * wallBounce
-        } else if c.pos.y > arena.height - r {
-            c.pos.y = arena.height - r; c.vel.dy = -abs(c.vel.dy) * wallBounce
-        }
+        bounceEdges(pos: &c.pos, vel: &c.vel,
+                    radius: headRadius, arena: arena, restitution: wallBounce)
     }
 
     private func clampInside(_ p: CGPoint) -> CGPoint {
@@ -660,36 +651,17 @@ struct SnakeGameView: View {
     private func resolveWallCollision(_ c: inout Cycle, seg: WallSegFrac) {
         let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
         let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
-        let dx = p2.x - p1.x, dy = p2.y - p1.y
-        let lenSq = dx * dx + dy * dy
-        guard lenSq > 0 else { return }
-        let t = max(0, min(1, ((c.pos.x - p1.x) * dx + (c.pos.y - p1.y) * dy) / lenSq))
-        let nx = c.pos.x - (p1.x + t * dx), ny = c.pos.y - (p1.y + t * dy)
-        let dist = hypot(nx, ny)
-        guard dist < headRadius, dist > 0 else { return }
-        let inv = 1 / dist
-        let nnx = nx * inv, nny = ny * inv
-        c.pos.x += nnx * (headRadius - dist)
-        c.pos.y += nny * (headRadius - dist)
-        let dot = c.vel.dx * nnx + c.vel.dy * nny
-        c.vel.dx -= 2 * dot * nnx * wallBounce
-        c.vel.dy -= 2 * dot * nny * wallBounce
+        resolveWallSegment(pos: &c.pos, vel: &c.vel,
+                           p1: p1, p2: p2,
+                           radius: headRadius, restitution: wallBounce)
     }
 
     /// Reflect a comet off a circular asteroid rock.
     private func resolveAsteroidCollision(_ c: inout Cycle, ast: PillarFrac) {
-        let cx = ast.cx * arena.width, cy = ast.cy * arena.height
-        let dx = c.pos.x - cx, dy = c.pos.y - cy
-        let dist = hypot(dx, dy)
-        let minD = headRadius + ast.r
-        guard dist < minD, dist > 0 else { return }
-        let inv = 1 / dist
-        let nx = dx * inv, ny = dy * inv
-        c.pos.x += nx * (minD - dist)
-        c.pos.y += ny * (minD - dist)
-        let dot = c.vel.dx * nx + c.vel.dy * ny
-        c.vel.dx -= 2 * dot * nx * wallBounce
-        c.vel.dy -= 2 * dot * ny * wallBounce
+        let centre = CGPoint(x: ast.cx * arena.width, y: ast.cy * arena.height)
+        resolveCircleObstacle(pos: &c.pos, vel: &c.vel,
+                              centre: centre, obstacleRadius: ast.r,
+                              ballRadius: headRadius, restitution: wallBounce)
     }
 
     /// True if an orb spawn candidate is too close to a wall or asteroid.

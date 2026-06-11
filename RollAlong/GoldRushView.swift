@@ -549,39 +549,20 @@ struct GoldRushView: View {
     }
 
     private func bounceWalls(_ r: inout Racer) {
-        if r.pos.x < marbleRadius {
-            r.pos.x = marbleRadius; r.vel.dx = -r.vel.dx * wallBounce
-        } else if r.pos.x > arena.width - marbleRadius {
-            r.pos.x = arena.width - marbleRadius; r.vel.dx = -r.vel.dx * wallBounce
-        }
-        if r.pos.y < marbleRadius {
-            r.pos.y = marbleRadius; r.vel.dy = -r.vel.dy * wallBounce
-        } else if r.pos.y > arena.height - marbleRadius {
-            r.pos.y = arena.height - marbleRadius; r.vel.dy = -r.vel.dy * wallBounce
-        }
+        bounceEdges(pos: &r.pos, vel: &r.vel,
+                    radius: marbleRadius, arena: arena, restitution: wallBounce)
     }
 
     // MARK: - Static wall collision (S24)
 
-    /// Reflect a marble off an interior wall segment.
+    /// Reflect a marble off interior wall segments.
     private func bounceStaticWalls(_ r: inout Racer) {
         for seg in walls {
             let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
             let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
-            let dx = p2.x - p1.x, dy = p2.y - p1.y
-            let lenSq = dx * dx + dy * dy
-            guard lenSq > 0 else { continue }
-            let t = max(0, min(1, ((r.pos.x - p1.x) * dx + (r.pos.y - p1.y) * dy) / lenSq))
-            let nx = r.pos.x - (p1.x + t * dx), ny = r.pos.y - (p1.y + t * dy)
-            let dist = hypot(nx, ny)
-            guard dist < marbleRadius, dist > 0 else { continue }
-            let inv = 1 / dist
-            let nnx = nx * inv, nny = ny * inv
-            r.pos.x += nnx * (marbleRadius - dist)
-            r.pos.y += nny * (marbleRadius - dist)
-            let dot = r.vel.dx * nnx + r.vel.dy * nny
-            r.vel.dx -= 2 * dot * nnx * wallBounce
-            r.vel.dy -= 2 * dot * nny * wallBounce
+            resolveWallSegment(pos: &r.pos, vel: &r.vel,
+                               p1: p1, p2: p2,
+                               radius: marbleRadius, restitution: wallBounce)
         }
     }
 
