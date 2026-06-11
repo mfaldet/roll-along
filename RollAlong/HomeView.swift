@@ -104,7 +104,7 @@ struct HomeView: View {
     /// in-game trail mechanic — only populated when the player has a
     /// non-`.none` TrailColor equipped.
     @State private var trailPoints: [CGPoint] = []
-    private let homeTrailMaxLength = 60         // ~1.0s at 60fps
+    private let homeTrailMaxLength = 120        // ~2.0s at 60fps — doubled so the streak reads across the full-screen arena
     private let homeTrailMinStep:  CGFloat = 1.5
 
     /// Hue assigned to `trailPoints[0]` (the visible tail end).  Each
@@ -115,10 +115,16 @@ struct HomeView: View {
     /// we advance this offset by `removed × step` so the surviving
     /// segments keep their original hues.
     @State private var trailHueOffset: Double = 0.0
+
+    /// Frames (in the arena coordinate space) of every UI element the
+    /// free-roaming ball bounces off — reported by `.homeBallCollider()`
+    /// on the title, buttons, and pills; consumed each tick.
+    @State private var colliders: [CGRect] = []
+
     /// One full ROYGBIV cycle every `homeTrailMaxLength` segments.
     /// At less than full length the trail covers a partial slice of
     /// the spectrum; at full length it shows the whole rainbow.
-    private let homeTrailHueStep: Double = 1.0 / 60.0
+    private var homeTrailHueStep: Double { 1.0 / Double(homeTrailMaxLength) }
 
     // Lives sheet (top-left pill → BuyLivesSheet, which also serves as
     // the "lives status / explanation" screen).
@@ -136,63 +142,76 @@ struct HomeView: View {
 
     private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
+    /// Named coordinate space the collider frames are reported in — owned by
+    /// the root ZStack, which the ball's GeometryReader fills exactly, so
+    /// collider rects and `ballPos` share one origin.
+    static let arenaSpaceName = "homeArena"
+
     var body: some View {
         NavigationStack(path: $nav.path) {
             ZStack {
                 background
 
+                // ── Live physics layer — the ball roams the WHOLE screen ────
+                // Sits under every UI element; the UI reports its frames via
+                // HomeColliderKey and tickBall() bounces the ball off them,
+                // so the ball can roll anywhere and caroms off the title,
+                // buttons, pills, and screen edges.
+                GeometryReader { geo in
+                    ZStack {
+                        // Forces the ZStack to fill the GeometryReader.
+                        // Without this the ZStack collapsed to the ball's
+                        // frame and ballPos coords were wrong, pinning
+                        // the ball off the left edge of the screen.
+                        Color.clear
+
+                        // Equipped trail — same rendering rules as the
+                        // in-game trail (segment opacity ramps from
+                        // 0.10 at the tail to 1.0 at the head;
+                        // `.rainbow` gets a per-segment hue cycle).
+                        if gameState.equippedTrail != .none {
+                            homeTrailLayer
+                                .allowsHitTesting(false)
+                        }
+
+                        liveBall
+                            .position(ballPos)
+                    }
+                    .contentShape(Rectangle())
+                    .onAppear {
+                        arenaSize = geo.size
+                        respawnBall(in: geo.size)
+                        spawned = true
+                    }
+                    .onChange(of: geo.size) { _, newSize in
+                        arenaSize = newSize
+                        if !spawned {
+                            respawnBall(in: newSize)
+                            spawned = true
+                        }
+                    }
+                    // Tap any open space to respawn the ball at centre —
+                    // buttons sit above this layer and keep their taps.
+                    .onTapGesture {
+                        respawnBall(in: arenaSize)
+                    }
+                }
+
                 VStack(spacing: 0) {
                     Spacer().frame(height: 90)
 
                     greeting
+                        .homeBallCollider()
 
                     titleText
+                        .homeBallCollider()
                         .padding(.bottom, 20)
 
-                    // ── Live physics arena ──────────────────────────────────
-                    GeometryReader { geo in
-                        ZStack {
-                            // Forces the ZStack to fill the GeometryReader.
-                            // Without this the ZStack collapsed to the ball's
-                            // frame and ballPos coords were wrong, pinning
-                            // the ball off the left edge of the screen.
-                            Color.clear
-
-                            // Equipped trail — same rendering rules as the
-                            // in-game trail (segment opacity ramps from
-                            // 0.10 at the tail to 1.0 at the head;
-                            // `.rainbow` gets a per-segment hue cycle).
-                            if gameState.equippedTrail != .none {
-                                homeTrailLayer
-                                    .allowsHitTesting(false)
-                            }
-
-                            liveBall
-                                .position(ballPos)
-                        }
-                        .contentShape(Rectangle())
-                        .onAppear {
-                            arenaSize = geo.size
-                            respawnBall(in: geo.size)
-                            spawned = true
-                        }
-                        .onChange(of: geo.size) { _, newSize in
-                            arenaSize = newSize
-                            if !spawned {
-                                respawnBall(in: newSize)
-                                spawned = true
-                            }
-                        }
-                        // Tap anywhere in the arena to respawn ball at centre
-                        .onTapGesture {
-                            respawnBall(in: arenaSize)
-                        }
-                    }
-                    .frame(maxHeight: .infinity)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                    // Open roaming space — the ball lives on the layer behind.
+                    Spacer()
 
                     playButton
+                        .homeBallCollider()
                         .padding(.horizontal, 40)
                         .padding(.bottom, 12)
 
@@ -214,38 +233,22 @@ struct HomeView: View {
                                 .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
                         )
                     }
+                    .homeBallCollider()
                     .accessibilityIdentifier("GameModesButton")  // UI smoke test
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 16)
 
-                    // Secondary navigation in two strips: social, then account
-                    // & app settings.  All game content (Levels, Tracks, and
-                    // the minigames) lives behind the Game Modes hub above.
-                    // Max three items per row so labels never wrap.
-                    navGroupCaption("SOCIAL")
-                    HStack(spacing: 28) {
-                        NavigationLink(value: HomeRoute.friends) {
-                            homeNavLabel("person.2.fill", "Friends")
-                        }
-                        NavigationLink(value: HomeRoute.clans) {
-                            homeNavLabel("person.3.fill", "Clans")
-                        }
-                        NavigationLink(value: HomeRoute.leaderboard) {
-                            homeNavLabel("trophy.fill", "Ranks")
-                        }
+                    // Five square, icon-only buttons hugging the bottom edge.
+                    // Equal slots via maxWidth so the spacing is uniform on
+                    // every device width.
+                    HStack(spacing: 0) {
+                        squareNavButton("trophy.fill",    "Ranks",    HomeRoute.leaderboard)
+                        squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
+                        squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
+                        squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
+                        squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
                     }
-                    .padding(.bottom, 14)
-
-                    navGroupCaption("ACCOUNT")
-                    HStack(spacing: 28) {
-                        NavigationLink(value: HomeRoute.profile) {
-                            homeNavLabel("person.fill", "Profile")
-                        }
-                        NavigationLink(value: HomeRoute.settings) {
-                            homeNavLabel("gearshape.fill", "Settings")
-                        }
-                    }
-
-                    Spacer().frame(height: 36)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
                 }
 
                 // Coin balance pill — top-right, always visible (except
@@ -263,6 +266,13 @@ struct HomeView: View {
                 }
             }
             .accessibilityIdentifier("HomeView")  // UI smoke test anchor
+            .coordinateSpace(name: Self.arenaSpaceName)
+            .onPreferenceChange(HomeColliderKey.self) { rects in
+                // Drop degenerate frames — e.g. the greeting collapses to
+                // zero when no player name is set — so they can't act as
+                // invisible point obstacles.
+                colliders = rects.filter { $0.width > 1 && $0.height > 1 }
+            }
             .onReceive(clock.$tickCount) { _ in tickBall() }
             .onAppear    { motion.start(); clock.start(); maybeAutoPresentDailyReward() }
             .onDisappear { motion.stop();  clock.stop()  }
@@ -444,6 +454,13 @@ struct HomeView: View {
         if ballPos.y < r                    { ballPos.y = r;                    ballVel.dy = -ballVel.dy * 0.65 }
         if ballPos.y > arenaSize.height - r { ballPos.y = arenaSize.height - r; ballVel.dy = -ballVel.dy * 0.65 }
 
+        // Bounce off the on-screen UI — title, Play, Game Modes, the nav
+        // squares, and the top pills all report their frames as colliders.
+        for rect in colliders {
+            resolveRectObstacle(pos: &ballPos, vel: &ballVel,
+                                rect: rect, radius: r, restitution: 0.65)
+        }
+
         // Hard safety clamp — guarantees the ball can never escape the arena
         ballPos.x = min(max(ballPos.x, r), arenaSize.width  - r)
         ballPos.y = min(max(ballPos.y, r), arenaSize.height - r)
@@ -520,27 +537,28 @@ struct HomeView: View {
 
     // MARK: - Sub-views
 
-    /// One entry in the secondary navigation rows below the Play button —
-    /// an icon over-under a label in the muted home-screen grey.
-    private func homeNavLabel(_ icon: String, _ title: String) -> some View {
-        HStack(spacing: 6) {
+    /// One of the five square, icon-only nav buttons hugging the bottom
+    /// edge (Ranks / Clans / Friends / Profile / Settings).  Equal-width
+    /// slots (maxWidth: .infinity) keep the row evenly spaced on any
+    /// device; the name is exposed to accessibility instead of drawn.
+    private func squareNavButton(_ icon: String, _ label: String, _ route: HomeRoute) -> some View {
+        NavigationLink(value: route) {
             Image(systemName: icon)
-                .font(.system(size: 14))
-            Text(title)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color(white: 0.75))
+                .frame(width: 52, height: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(white: 0.14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color(white: 0.26), lineWidth: 0.8)
+                        )
+                )
         }
-        .foregroundStyle(Color(white: 0.5))
-        .fixedSize()   // a nav label never wraps mid-word
-    }
-
-    /// Tiny tracked caption above a secondary-nav strip ("SOCIAL", "ACCOUNT")
-    /// — names the group without competing with the buttons themselves.
-    private func navGroupCaption(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 9, weight: .bold, design: .rounded))
-            .foregroundStyle(Color(white: 0.35))
-            .tracking(2.2)
-            .padding(.bottom, 6)
+        .homeBallCollider()
+        .accessibilityLabel(label)
+        .frame(maxWidth: .infinity)
     }
 
     private var background: some View {
@@ -604,6 +622,7 @@ struct HomeView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .homeBallCollider()
                 .accessibilityLabel("Daily reward available")
                 .accessibilityHint("Opens the daily reward.")
                 Spacer()
@@ -682,6 +701,7 @@ struct HomeView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .homeBallCollider()
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(gameState.coinBalance) coins")
                 .accessibilityHint("Opens the cosmetic shop.")
@@ -736,6 +756,7 @@ struct HomeView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .homeBallCollider()
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(livesAccessibilityLabel)
                     .accessibilityHint("Opens the lives status and purchase sheet.")
@@ -1008,6 +1029,37 @@ struct BottomFillRect: Shape {
                 width:  rect.width,
                 height: h
             )
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Home-ball collider plumbing — the free-roaming home ball bounces off any
+// UI element tagged with `.homeBallCollider()`.  Each tagged view reports its
+// frame (in HomeView's arena coordinate space) through this preference; the
+// root ZStack collects them and tickBall() resolves circle-vs-rect contacts
+// via PhysicsHelpers.resolveRectObstacle.
+// ---------------------------------------------------------------------------
+
+private struct HomeColliderKey: PreferenceKey {
+    static var defaultValue: [CGRect] = []
+    static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+private extension View {
+    /// Report this view's frame as an obstacle for the home screen's
+    /// free-roaming ball.  Apply BEFORE padding so the collider hugs the
+    /// visible element rather than its breathing room.
+    func homeBallCollider() -> some View {
+        background(
+            GeometryReader { g in
+                Color.clear.preference(
+                    key: HomeColliderKey.self,
+                    value: [g.frame(in: .named(HomeView.arenaSpaceName))]
+                )
+            }
         )
     }
 }
