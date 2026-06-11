@@ -43,7 +43,29 @@
 		D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */; };
 		D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */; };
 		D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF42FD5024E00CA86BD /* PinballView.swift */; };
+		QE3A0001000000000000AA01 /* PhysicsHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3A0001000000000000AA00 /* PhysicsHelpers.swift */; };
+		QE3B0101000000000000AA01 /* GameStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0101000000000000AA00 /* GameStateTests.swift */; };
+		QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */; };
+		QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0103000000000000AA00 /* CosmeticsTests.swift */; };
+		QE3C0101000000000000AA01 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3C0101000000000000AA00 /* SmokeTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		QE3B0017000000000000AA00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA000040000000000000AA00 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA000020000000000000AA00;
+			remoteInfo = RollAlong;
+		};
+		QE3C0017000000000000AA00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA000040000000000000AA00 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA000020000000000000AA00;
+			remoteInfo = RollAlong;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		AA000001000000000000AA00 /* RollAlongApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollAlongApp.swift; sourceTree = "<group>"; };
@@ -84,6 +106,13 @@
 		D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KingOfTheHillView.swift; sourceTree = "<group>"; };
 		D502FEF42FD5024E00CA86BD /* PinballView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinballView.swift; sourceTree = "<group>"; };
 		D569BB962FD5B4AB008E91A6 /* RollAlong.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RollAlong.entitlements; sourceTree = "<group>"; };
+		QE3A0001000000000000AA00 /* PhysicsHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsHelpers.swift; sourceTree = "<group>"; };
+		QE3B0001000000000000AA00 /* RollAlongTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollAlongTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		QE3B0101000000000000AA00 /* GameStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStateTests.swift; sourceTree = "<group>"; };
+		QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsHelpersTests.swift; sourceTree = "<group>"; };
+		QE3B0103000000000000AA00 /* CosmeticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmeticsTests.swift; sourceTree = "<group>"; };
+		QE3C0001000000000000AA00 /* RollAlongUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollAlongUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		QE3C0101000000000000AA00 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +124,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		QE3B0012000000000000AA00 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		QE3C0012000000000000AA00 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -102,6 +145,8 @@
 			isa = PBXGroup;
 			children = (
 				AA000005000000000000AA00 /* RollAlong.app */,
+				QE3B0001000000000000AA00 /* RollAlongTests.xctest */,
+				QE3C0001000000000000AA00 /* RollAlongUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -142,6 +187,7 @@
 				AA000015000000000000AA00 /* PurchaseSheets.swift */,
 				AA000016000000000000AA00 /* Products.storekit */,
 				AA000017000000000000AA00 /* AdManager.swift */,
+				QE3A0001000000000000AA00 /* PhysicsHelpers.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 				AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */,
@@ -154,8 +200,28 @@
 			children = (
 				D502FED72FD52BAB00CA86BD /* AppleAuthManager.swift */,
 				AA000011000000000000AA00 /* RollAlong */,
+				QE3B0016000000000000AA00 /* RollAlongTests */,
+				QE3C0016000000000000AA00 /* RollAlongUITests */,
 				AA000010000000000000AA00 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		QE3B0016000000000000AA00 /* RollAlongTests */ = {
+			isa = PBXGroup;
+			children = (
+				QE3B0101000000000000AA00 /* GameStateTests.swift */,
+				QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */,
+				QE3B0103000000000000AA00 /* CosmeticsTests.swift */,
+			);
+			path = RollAlongTests;
+			sourceTree = "<group>";
+		};
+		QE3C0016000000000000AA00 /* RollAlongUITests */ = {
+			isa = PBXGroup;
+			children = (
+				QE3C0101000000000000AA00 /* SmokeTests.swift */,
+			);
+			path = RollAlongUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -180,6 +246,40 @@
 			productName = RollAlong;
 			productReference = AA000005000000000000AA00 /* RollAlong.app */;
 			productType = "com.apple.product-type.application";
+		};
+		QE3B0010000000000000AA00 /* RollAlongTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = QE3B0013000000000000AA00 /* Build configuration list for PBXNativeTarget "RollAlongTests" */;
+			buildPhases = (
+				QE3B0011000000000000AA00 /* Sources */,
+				QE3B0012000000000000AA00 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				QE3B0018000000000000AA00 /* PBXTargetDependency */,
+			);
+			name = RollAlongTests;
+			productName = RollAlongTests;
+			productReference = QE3B0001000000000000AA00 /* RollAlongTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		QE3C0010000000000000AA00 /* RollAlongUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = QE3C0013000000000000AA00 /* Build configuration list for PBXNativeTarget "RollAlongUITests" */;
+			buildPhases = (
+				QE3C0011000000000000AA00 /* Sources */,
+				QE3C0012000000000000AA00 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				QE3C0018000000000000AA00 /* PBXTargetDependency */,
+			);
+			name = RollAlongUITests;
+			productName = RollAlongUITests;
+			productReference = QE3C0001000000000000AA00 /* RollAlongUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -208,6 +308,8 @@
 			projectRoot = "";
 			targets = (
 				AA000020000000000000AA00 /* RollAlong */,
+				QE3B0010000000000000AA00 /* RollAlongTests */,
+				QE3C0010000000000000AA00 /* RollAlongUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -262,10 +364,42 @@
 				D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */,
 				D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */,
 				D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */,
+				QE3A0001000000000000AA01 /* PhysicsHelpers.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		QE3B0011000000000000AA00 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				QE3B0101000000000000AA01 /* GameStateTests.swift in Sources */,
+				QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */,
+				QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		QE3C0011000000000000AA00 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				QE3C0101000000000000AA01 /* SmokeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		QE3B0018000000000000AA00 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA000020000000000000AA00 /* RollAlong */;
+			targetProxy = QE3B0017000000000000AA00 /* PBXContainerItemProxy */;
+		};
+		QE3C0018000000000000AA00 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA000020000000000000AA00 /* RollAlong */;
+			targetProxy = QE3C0017000000000000AA00 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA000050000000000000AA00 /* Debug */ = {
@@ -454,6 +588,68 @@
 			};
 			name = Release;
 		};
+		QE3B0014000000000000AA00 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7YLKJ5CLUU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.macfaldet.RollAlongTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RollAlong.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RollAlong";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		QE3B0015000000000000AA00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7YLKJ5CLUU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.macfaldet.RollAlongTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RollAlong.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RollAlong";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		QE3C0014000000000000AA00 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7YLKJ5CLUU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.macfaldet.RollAlongUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TEST_TARGET_NAME = RollAlong;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		QE3C0015000000000000AA00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7YLKJ5CLUU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.macfaldet.RollAlongUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TEST_TARGET_NAME = RollAlong;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -471,6 +667,24 @@
 			buildConfigurations = (
 				AA000052000000000000AA00 /* Debug */,
 				AA000053000000000000AA00 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		QE3B0013000000000000AA00 /* Build configuration list for PBXNativeTarget "RollAlongTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				QE3B0014000000000000AA00 /* Debug */,
+				QE3B0015000000000000AA00 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		QE3C0013000000000000AA00 /* Build configuration list for PBXNativeTarget "RollAlongUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				QE3C0014000000000000AA00 /* Debug */,
+				QE3C0015000000000000AA00 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
