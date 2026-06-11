@@ -29,6 +29,28 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "QE3B0010000000000000AA00"
+               BuildableName = "RollAlongTests.xctest"
+               BlueprintName = "RollAlongTests"
+               ReferencedContainer = "container:RollAlong.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "QE3C0010000000000000AA00"
+               BuildableName = "RollAlongUITests.xctest"
+               BlueprintName = "RollAlongUITests"
+               ReferencedContainer = "container:RollAlong.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

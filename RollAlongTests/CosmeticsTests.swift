@@ -30,33 +30,30 @@ final class CosmeticsTests: XCTestCase {
 
     // MARK: - isBundleExclusive consistency
 
-    /// Bundle-exclusive skins must have coinCost == 0 — they are not purchasable
-    /// individually in the coin shop, so their coinCost is irrelevant, but it
-    /// should not misleadingly imply a purchase path.
-    func testBundleExclusiveSkins_areNotCoinPurchasable() {
+    /// Bundle-exclusive skins are always top-tier (`.exclusive`).  They're kept
+    /// out of the coin shop by CosmeticShopView's owned-or-hidden filter, NOT by
+    /// price — `coinCost` reads through to `tier.basePrice` (500), so asserting a
+    /// price of 0 would be wrong.  This guards against an event skin being
+    /// mis-tiered into a cheap, coin-buyable slot.
+    func testBundleExclusiveSkins_areExclusiveTier() {
         for skin in BallSkin.allCases where skin.isBundleExclusive {
-            // Starter tier has basePrice = 0; exclusive tier also has basePrice = 0
-            // because bundle-exclusive skins are never sold for coins.
-            // This test guards against accidentally setting them to a coin tier.
-            XCTAssertEqual(skin.coinCost, 0,
-                           "Bundle-exclusive skin \(skin.rawValue) should have coinCost == 0")
+            XCTAssertEqual(skin.tier, .exclusive,
+                           "Bundle-exclusive skin \(skin.rawValue) must be .exclusive tier")
         }
     }
 
-    /// Bundle-exclusive skins must not appear in `BallSkin.allCases` with
-    /// `isBundleExclusive == false` — consistency check.
+    /// The bundle-exclusive roster must exactly match the known event /
+    /// bundle-locked set — catches a skin silently gaining or losing the flag.
+    /// Note: rawValues are the *display* spellings, e.g. "Beach Ball" and
+    /// "Speckled Egg" carry a space.
     func testBundleExclusiveSkins_flagIsConsistent() {
-        let exclusiveSkins: Set<String> = [
-            "Pluto", "Aurora", "BeachBall", "Pumpkin", "Ornament",
-            "Heartstone", "Shamrock", "Confetti", "SpeckledEgg", "Trophy"
+        let expected: Set<String> = [
+            "Pluto", "Aurora", "Beach Ball", "Pumpkin", "Ornament",
+            "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy"
         ]
-        for skin in BallSkin.allCases {
-            let shouldBeExclusive = exclusiveSkins.contains(skin.rawValue)
-            if shouldBeExclusive {
-                XCTAssertTrue(skin.isBundleExclusive,
-                              "\(skin.rawValue) should be isBundleExclusive = true")
-            }
-        }
+        let actual = Set(BallSkin.allCases.filter { $0.isBundleExclusive }.map { $0.rawValue })
+        XCTAssertEqual(actual, expected,
+                       "Bundle-exclusive roster drifted from the expected set")
     }
 
     // MARK: - CosmeticBundle catalogue

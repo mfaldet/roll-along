@@ -48,7 +48,7 @@ final class BallSkinSnapshotTests: XCTestCase {
         )
     }
 
-    func testRedSkin()     { assertSkin(.red) }
-    func testBlueSkin()    { assertSkin(.blue) }
-    func testEmeraldSkin() { assertSkin(.emerald) }
+    func testRedSkin()   { assertSkin(.red) }
+    func testBlueSkin()  { assertSkin(.blue) }
+    func testGreenSkin() { assertSkin(.green) }
 }

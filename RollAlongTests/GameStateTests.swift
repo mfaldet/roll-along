@@ -187,8 +187,8 @@ final class GameStateTests: XCTestCase {
 
     func testGrantBallSkin_ownedAfterGrant() {
         let gs = GameState()
-        gs.grant(BallSkin.emerald)
-        XCTAssertTrue(gs.isOwned(BallSkin.emerald))
+        gs.grant(BallSkin.green)
+        XCTAssertTrue(gs.isOwned(BallSkin.green))
     }
 
     func testStarterSkin_alwaysOwned() {
@@ -202,8 +202,13 @@ final class GameStateTests: XCTestCase {
 
     func testAddLives_increasesLives() {
         let gs = GameState()
-        let before = gs.lives
+        // addLives is a no-op under unlimited lives, and commitRegen() can fold
+        // in regenerated lives when lastLifeLostAt is set — pin both so the
+        // assertion is deterministic regardless of any persisted state.
+        gs.unlimitedLives = false
+        gs.lastLifeLostAt = nil
+        gs.lives = 3
         gs.addLives(3)
-        XCTAssertEqual(gs.lives, before + 3)
+        XCTAssertEqual(gs.lives, 6)
     }
 }
