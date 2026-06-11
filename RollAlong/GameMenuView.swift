@@ -38,6 +38,9 @@ struct GameMenuView: View {
                             modeCard(mode)
                         }
                         .buttonStyle(.plain)
+                        // accessibility identifier = mode id ("goldrush", "snake", …)
+                        // used by UI smoke tests: app.buttons["goldrush"].tap()
+                        .accessibilityIdentifier(mode.id)
                     }
                 }
                 .padding(.horizontal, 20)

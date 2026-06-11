@@ -214,6 +214,7 @@ struct HomeView: View {
                                 .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
                         )
                     }
+                    .accessibilityIdentifier("GameModesButton")  // UI smoke test
                     .padding(.bottom, 14)
 
                     // Social — connect with other climbers.  Friends and
@@ -264,6 +265,7 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
             }
+            .accessibilityIdentifier("HomeView")  // UI smoke test anchor
             .onReceive(clock.$tickCount) { _ in tickBall() }
             .onAppear    { motion.start(); clock.start(); maybeAutoPresentDailyReward() }
             .onDisappear { motion.stop();  clock.stop()  }

@@ -7,9 +7,19 @@ struct RollAlongApp: App {
     @StateObject private var ads       = AdManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
+    /// True when launched by the UI test runner with `--skip-onboarding`.
+    /// Setting `seenOnboarding = true` in the GameState before the first
+    /// frame prevents the onboarding overlay from blocking UI test navigation.
+    private var isUITesting: Bool {
+        CommandLine.arguments.contains("--skip-onboarding")
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    if isUITesting { gameState.seenOnboarding = true }
+                }
                 .environmentObject(gameState)
                 .environmentObject(store)
                 .environmentObject(ads)

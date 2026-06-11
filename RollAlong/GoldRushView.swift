@@ -157,6 +157,7 @@ struct GoldRushView: View {
             if showMapName && started { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
+        .accessibilityIdentifier("GoldRushView")  // UI smoke test anchor
         .toolbar(.hidden, for: .navigationBar)
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
