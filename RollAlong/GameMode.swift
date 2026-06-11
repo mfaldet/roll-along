@@ -264,11 +264,14 @@ struct ZenGardenMode: GameMode {
     let leavesPersistentTrail        = true
 }
 
-/// Coin Pit — the 30-second reward mini-game.  Roll to gather up to 100 coins
-/// raining down the screen.  No hazards, no lives; a pure payout round.
+/// The 30-second reward mini-game (displayed as "Gold Rush").  Roll to gather
+/// up to 100 coins raining down the screen.  No hazards, no lives; a pure
+/// payout round.
 struct CoinPitMode: GameMode {
+    // Display name swapped with the goldrush mode (2026-06-11, Mac's call) —
+    // ids stay put: they're analytics keys, routes, and test anchors.
     let id          = "coinpit"
-    let displayName = "Coin Pit"
+    let displayName = "Gold Rush"
     let tagline     = "Thirty seconds. Up to a hundred coins. Go."
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .collectCount(100)
@@ -336,8 +339,10 @@ struct PaintBallMode: GameMode {
 /// ramming a rival knocks coins loose for anyone to snatch.  Your final count
 /// is paid into your real balance, plus a win bonus.
 struct GoldRushMode: GameMode {
+    // Display name swapped with the coinpit mode (2026-06-11, Mac's call) —
+    // ids stay put: they're analytics keys, routes, and test anchors.
     let id          = "goldrush"
-    let displayName = "Gold Rush"
+    let displayName = "Coin Pit"
     let tagline     = "Grab the most coins in a minute. Bump rivals to make them spill."
     let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel

@@ -1,7 +1,9 @@
 import SwiftUI
 
 // ===========================================================================
-// GoldRushView — the "Gold Rush" competitive mode.
+// GoldRushView — the competitive coin-scramble mode, DISPLAYED as "Coin Pit"
+// (display names swapped with the coinpit mode 2026-06-11; code/id/analytics
+// names keep "goldrush").
 //
 // A 60-second coin scramble.  Coins keep scattering across the floor; roll over
 // them to bank them.  Slam into a rival hard enough and they SPILL some of their
@@ -220,7 +222,7 @@ struct GoldRushView: View {
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundStyle(secondsLeft <= 10 ? Color(red: 1.0, green: 0.45, blue: 0.4) : .white)
                         .monospacedDigit()
-                    Text("GOLD RUSH")
+                    Text("COIN PIT")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .tracking(2)
@@ -283,7 +285,7 @@ struct GoldRushView: View {
                     .multilineTextAlignment(.center)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Gold Rush. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
+            .accessibilityLabel("Coin Pit. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
 
             // The card sits above the arena's tap-to-start gesture, so
             // adjusting difficulty here never accidentally starts the round.
