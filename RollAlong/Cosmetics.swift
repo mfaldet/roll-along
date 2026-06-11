@@ -459,8 +459,8 @@ enum GoalSkin: String, CosmeticItem {
 // MARK: - Trail colors (the streak left behind the ball)
 enum TrailColor: String, CosmeticItem {
     // Starter
-    case none           // no trail — silent default
-    case graphite       // Paper-world's lead trail; default visible trail
+    case none           // no trail — free "Off" option in the shop
+    case graphite       // Paper-world's lead trail; THE default — equipped from first launch
 
     // Standard (50 coins) — solid mono-coloured streaks
     case ink
@@ -515,7 +515,11 @@ enum TrailColor: String, CosmeticItem {
     }
     var coinCost: Int { tier.basePrice }
     var unlockLevel: Int { 0 }
-    static var starter: TrailColor { .none }
+    /// The default-equipped trail.  Graphite (not .none) so a brand-new
+    /// player sees a trail behind their ball from the very first roll;
+    /// "Off" stays a free starter-tier choice in the shop for players
+    /// who prefer no trail.
+    static var starter: TrailColor { .graphite }
     /// Tier rule:
     ///   • Standard  — solid mono-colour trails.
     ///   • Epic      — multi-colour trails (per-segment hue cycle).
