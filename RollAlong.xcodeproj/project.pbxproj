@@ -44,10 +44,12 @@
 		D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */; };
 		D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF42FD5024E00CA86BD /* PinballView.swift */; };
 		QE3A0001000000000000AA01 /* PhysicsHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3A0001000000000000AA00 /* PhysicsHelpers.swift */; };
+		FC000001000000000000FC01 /* GoldRushEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC000001000000000000FC00 /* GoldRushEngine.swift */; };
 		QE3B0101000000000000AA01 /* GameStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0101000000000000AA00 /* GameStateTests.swift */; };
 		QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */; };
 		QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0103000000000000AA00 /* CosmeticsTests.swift */; };
 		FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */; };
+		FC000002000000000000FC01 /* PerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC000002000000000000FC00 /* PerformanceTests.swift */; };
 		QE3C0101000000000000AA01 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3C0101000000000000AA00 /* SmokeTests.swift */; };
 		FA000001000000000000FA01 /* MinigameMaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000001000000000000FA00 /* MinigameMaps.swift */; };
 		FA000002000000000000FA01 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000002000000000000FA00 /* Constants.swift */; };
@@ -114,11 +116,13 @@
 		D502FEF42FD5024E00CA86BD /* PinballView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinballView.swift; sourceTree = "<group>"; };
 		D569BB962FD5B4AB008E91A6 /* RollAlong.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RollAlong.entitlements; sourceTree = "<group>"; };
 		QE3A0001000000000000AA00 /* PhysicsHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsHelpers.swift; sourceTree = "<group>"; };
+		FC000001000000000000FC00 /* GoldRushEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldRushEngine.swift; sourceTree = "<group>"; };
 		QE3B0001000000000000AA00 /* RollAlongTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollAlongTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		QE3B0101000000000000AA00 /* GameStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStateTests.swift; sourceTree = "<group>"; };
 		QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsHelpersTests.swift; sourceTree = "<group>"; };
 		QE3B0103000000000000AA00 /* CosmeticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmeticsTests.swift; sourceTree = "<group>"; };
 		FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkinSnapshotTests.swift; sourceTree = "<group>"; };
+		FC000002000000000000FC00 /* PerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTests.swift; sourceTree = "<group>"; };
 		QE3C0001000000000000AA00 /* RollAlongUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollAlongUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		QE3C0101000000000000AA00 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
 		FA000001000000000000FA00 /* MinigameMaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinigameMaps.swift; sourceTree = "<group>"; };
@@ -202,6 +206,7 @@
 				AA000016000000000000AA00 /* Products.storekit */,
 				AA000017000000000000AA00 /* AdManager.swift */,
 				QE3A0001000000000000AA00 /* PhysicsHelpers.swift */,
+				FC000001000000000000FC00 /* GoldRushEngine.swift */,
 				FA000001000000000000FA00 /* MinigameMaps.swift */,
 				FA000002000000000000FA00 /* Constants.swift */,
 				FA000003000000000000FA00 /* ProfileView.swift */,
@@ -232,6 +237,7 @@
 				QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */,
 				QE3B0103000000000000AA00 /* CosmeticsTests.swift */,
 				FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */,
+				FC000002000000000000FC00 /* PerformanceTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -389,6 +395,7 @@
 				D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */,
 				D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */,
 				QE3A0001000000000000AA01 /* PhysicsHelpers.swift in Sources */,
+				FC000001000000000000FC01 /* GoldRushEngine.swift in Sources */,
 				FA000001000000000000FA01 /* MinigameMaps.swift in Sources */,
 				FA000002000000000000FA01 /* Constants.swift in Sources */,
 				FA000003000000000000FA01 /* ProfileView.swift in Sources */,
@@ -405,6 +412,7 @@
 				QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */,
 				QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */,
 				FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */,
+				FC000002000000000000FC01 /* PerformanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
