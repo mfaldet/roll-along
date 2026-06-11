@@ -207,6 +207,12 @@ struct HomeView: View {
 
                     titleText
                         .homeBallCollider()
+                        // Smoke-test anchor.  Deliberately on this LEAF, not
+                        // the root ZStack: a container's accessibilityIdentifier
+                        // propagates to every descendant and CLOBBERS their own
+                        // identifiers (verified via AX-tree dump — every home
+                        // element read 'HomeView' and per-button ids vanished).
+                        .accessibilityIdentifier("HomeView")
                         .padding(.bottom, 20)
 
                     // Open roaming space — the ball lives on the layer behind.
@@ -279,7 +285,9 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
             }
-            .accessibilityIdentifier("HomeView")  // UI smoke test anchor
+            // NOTE: no accessibilityIdentifier here — the "HomeView" anchor
+            // lives on titleText.  An identifier on this root ZStack would
+            // propagate to and overwrite every child's identifier.
             .coordinateSpace(name: Self.arenaSpaceName)
             .onPreferenceChange(HomeColliderKey.self) { rects in
                 // Drop degenerate frames — e.g. the greeting collapses to

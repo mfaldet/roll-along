@@ -124,7 +124,9 @@ struct GoldRushView: View {
             if showMapName && started { mapNameLabel }
         }
         .navigationBarBackButtonHidden(true)
-        .accessibilityIdentifier("GoldRushView")  // UI smoke test anchor
+        // NOTE: no accessibilityIdentifier here — the "GoldRushView" anchor
+        // lives on the HUD's caps label.  A container identifier propagates
+        // to and overwrites every child's identifier (incl. the close button).
         .toolbar(.hidden, for: .navigationBar)
         .onReceive(clock.$tickCount) { _ in tick() }
         .onAppear { motion.start(); clock.start() }
@@ -216,6 +218,8 @@ struct GoldRushView: View {
                         .padding(10)
                         .background(Circle().fill(Color(white: 0.16)))
                 }
+                .accessibilityLabel("Close")
+                .accessibilityIdentifier("GoldRushCloseButton")  // smoke test exits via this (nav bar is hidden, so no swipe-back)
                 Spacer()
                 VStack(spacing: 1) {
                     Text(timeString)
@@ -226,6 +230,7 @@ struct GoldRushView: View {
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .tracking(2)
+                        .accessibilityIdentifier("GoldRushView")  // smoke-test anchor (leaf, not root — see body note)
                 }
                 Spacer()
                 Color.clear.frame(width: 38, height: 38)

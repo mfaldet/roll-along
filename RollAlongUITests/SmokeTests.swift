@@ -80,8 +80,10 @@ final class SmokeTests: XCTestCase {
     // MARK: - Launch
 
     func testApp_launchesAndShowsHomeView() throws {
+        // The HomeView anchor lives on the title text (any-type query —
+        // container identifiers clobber children, so the anchor is a leaf).
         XCTAssertTrue(
-            app.otherElements["HomeView"].waitForExistence(timeout: 10),
+            element("HomeView").waitForExistence(timeout: 10),
             "HomeView should be visible within 10s of launch"
         )
     }
@@ -89,8 +91,8 @@ final class SmokeTests: XCTestCase {
     // MARK: - Home → Game Modes → Gold Rush
 
     func testHomeToGoldRushAndBack() throws {
-        // 1. Home screen is visible
-        let homeView = app.otherElements["HomeView"]
+        // 1. Home screen is visible (leaf anchor on the title text)
+        let homeView = element("HomeView")
         XCTAssertTrue(homeView.waitForExistence(timeout: 10))
 
         // 2. Navigate to Game Modes hub — by identifier, else by its
@@ -111,27 +113,17 @@ final class SmokeTests: XCTestCase {
         if !goldRushButton.isHittable { app.swipeUp() }
         goldRushButton.tap()
 
-        // 4. The scramble's view is on screen
+        // 4. The scramble's view is on screen (leaf anchor on its HUD label)
         let goldRushView = element("GoldRushView")
         XCTAssertTrue(goldRushView.waitForExistence(timeout: 5))
 
-        // 5. Navigate back to home (Back button in navigation bar)
-        // GoldRushView hides the navigation bar; it exposes its own back
-        // mechanism.  Use the swipe-back gesture as a fallback.
-        let backButton = app.buttons["Back"]
-        if backButton.waitForExistence(timeout: 3) {
-            backButton.tap()
-        } else {
-            app.swipeRight()    // swipe-back gesture
-        }
-
-        // Back to Game Modes
-        let secondBack = app.buttons["Back"]
-        if secondBack.waitForExistence(timeout: 3) {
-            secondBack.tap()
-        } else {
-            app.swipeRight()
-        }
+        // 5. Exit via the game's own close (✕) button — the nav bar is
+        // hidden in-game, so there is no Back button and the swipe-back
+        // gesture is disabled.  nav.goHome() pops straight to the root.
+        let closeButton = entry("GoldRushCloseButton", labeled: "Close")
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 5),
+                      "The scramble's close button should be on screen — see the AX-tree attachment if missing")
+        closeButton.tap()
 
         // 6. Home screen is visible again
         XCTAssertTrue(
@@ -143,7 +135,7 @@ final class SmokeTests: XCTestCase {
     // MARK: - Home screen elements
 
     func testHomeView_showsCoinBalance() throws {
-        XCTAssertTrue(app.otherElements["HomeView"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element("HomeView").waitForExistence(timeout: 10))
         // The coin balance pill should be visible (skipped onboarding → seenOnboarding=true)
         // It appears as a text label containing a number.  We don't assert a
         // specific value — just that some coin-related element is present.
