@@ -431,6 +431,11 @@ struct GoldRushView: View {
                          "coins": .int(banked),
                          "map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
         )
+        if engine.playerWon {
+            gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+            AnalyticsClient.shared.track("ticket_earned",
+                                         properties: ["source": .string("goldrush")])
+        }
         if gameState.hapticsEnabled {
             if engine.playerWon { Haptics.success() } else { Haptics.warning() }
         }

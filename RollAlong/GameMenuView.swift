@@ -24,6 +24,7 @@ import SwiftUI
 
 struct GameMenuView: View {
     @EnvironmentObject var nav: Navigator
+    @EnvironmentObject var gameState: GameState
     @Environment(\.dismiss) var dismiss
 
     /// Every enabled, individually-listed mode (the climb spine and the
@@ -121,22 +122,47 @@ struct GameMenuView: View {
             .padding(.top, 10)
     }
 
+    @ViewBuilder
     private func modeRow(_ mode: GameMode) -> some View {
         let style = Self.style(for: mode.id)
-        return NavigationLink(value: HomeRoute.mode(mode.id)) {
-            hubCard(icon: style.icon, accent: style.accent,
-                    title: mode.displayName, tagline: mode.tagline)
+        if mode.id == "coinpit" {
+            // Gold Rush costs tickets to play — gate entry when broke and
+            // show the live balance on the card otherwise.
+            if gameState.tickets > 0 {
+                NavigationLink(value: HomeRoute.mode(mode.id)) {
+                    hubCard(icon: style.icon, accent: style.accent,
+                            title: mode.displayName, tagline: mode.tagline,
+                            ticketBadge: gameState.tickets)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(mode.id)
+            } else {
+                hubCard(icon: style.icon, accent: style.accent,
+                        title: mode.displayName,
+                        tagline: "Needs a ticket — win a competitive game to earn one.",
+                        ticketBadge: 0)
+                    .opacity(0.45)
+                    .accessibilityIdentifier(mode.id)
+                    .accessibilityLabel("\(mode.displayName). Locked. Win a competitive game to earn a ticket.")
+            }
+        } else {
+            NavigationLink(value: HomeRoute.mode(mode.id)) {
+                hubCard(icon: style.icon, accent: style.accent,
+                        title: mode.displayName, tagline: mode.tagline)
+            }
+            .buttonStyle(.plain)
+            // accessibility identifier = mode id ("goldrush", "snake", …)
+            // used by UI smoke tests: app.buttons["goldrush"].tap()
+            .accessibilityIdentifier(mode.id)
         }
-        .buttonStyle(.plain)
-        // accessibility identifier = mode id ("goldrush", "snake", …)
-        // used by UI smoke tests: app.buttons["goldrush"].tap()
-        .accessibilityIdentifier(mode.id)
     }
 
     /// The shared card chrome for every hub entry — mode rows and the
-    /// THE CLIMB cards alike.
+    /// THE CLIMB cards alike.  `ticketBadge` (Gold Rush) shows the player's
+    /// live ticket balance in a small gold capsule before the chevron.
     private func hubCard(icon: String, accent: Color,
-                         title: String, tagline: String) -> some View {
+                         title: String, tagline: String,
+                         ticketBadge: Int? = nil) -> some View {
         HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
@@ -159,6 +185,21 @@ struct GameMenuView: View {
                 }
             }
             Spacer(minLength: 8)
+            if let tickets = ticketBadge {
+                HStack(spacing: 3) {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("\(tickets)")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(Color(red: 1.00, green: 0.82, blue: 0.28).opacity(0.12))
+                )
+            }
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Color(white: 0.4))
@@ -195,6 +236,8 @@ struct GameMenuView: View {
 
 #Preview {
     NavigationStack {
-        GameMenuView().environmentObject(Navigator())
+        GameMenuView()
+            .environmentObject(Navigator())
+            .environmentObject(GameState())
     }
 }

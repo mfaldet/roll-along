@@ -447,6 +447,11 @@ struct KingOfTheHillView: View {
                              "coins": .int(banked),
                              "map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
             )
+            if playerWon {
+                gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+                AnalyticsClient.shared.track("ticket_earned",
+                                             properties: ["source": .string("koth")])
+            }
             if gameState.hapticsEnabled {
                 if playerWon { Haptics.success() } else { Haptics.warning() }
             }

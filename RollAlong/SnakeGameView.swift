@@ -478,6 +478,11 @@ struct SnakeGameView: View {
                              "coins": .int(banked),
                              "map_name": .string(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)]
             )
+            if didWin {
+                gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+                AnalyticsClient.shared.track("ticket_earned",
+                                             properties: ["source": .string("snake")])
+            }
             if gameState.hapticsEnabled {
                 if didWin { Haptics.success() } else { Haptics.warning() }
             }

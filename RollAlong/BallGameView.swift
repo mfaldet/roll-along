@@ -204,7 +204,6 @@ struct BallGameView: View {
         let size:  CGFloat
         let phase: Double    // spin phase so coins don't pulse in unison
     }
-    private let coinPitDuration: TimeInterval = 30
     private let coinPitPayoutPerCoin = 1
     @State private var fallingCoins:       [FallingCoin] = []
     @State private var coinPitDeadline:    Date? = nil
@@ -213,6 +212,19 @@ struct BallGameView: View {
     @State private var coinPitScore:       Int = 0
     @State private var coinPitOver:        Bool = false
 
+    // Ticket staking (Gold Rush economy) — the round is bought up front on
+    // the stake overlay: every TIME ticket buys 30 s on the clock, every
+    // COIN ticket adds +1x to the coins dropped (1 → x2 … 9 → x10), max 10
+    // tickets per round.  Tickets are consumed on Start; quitting early
+    // refunds one ticket per FULL un-played 30 s block (coin tickets never
+    // refund).  Entering with zero tickets is blocked at the Games hub and
+    // again on the stake overlay.
+    @State private var coinPitStaked            = false   // round paid & live
+    @State private var coinPitStakeTime         = 1       // picker: time tickets (≥1)
+    @State private var coinPitStakeCoins        = 0       // picker: coin tickets
+    @State private var coinPitTimeTicketsStaked = 0       // frozen at Start (refund math)
+    @State private var coinPitStakedMultiplier  = 1       // frozen at Start
+
     /// The catch target if the active mode is a collect-count round, else nil.
     private var coinPitTarget: Int? {
         if case let .collectCount(n) = activeMode.goal { return n }
@@ -220,6 +232,18 @@ struct BallGameView: View {
     }
     /// True only while presenting a Coin Pit round.
     private var isCoinPit: Bool { coinPitTarget != nil }
+
+    /// Round length bought at Start: time-tickets × 30 s.
+    private var coinPitStakedDuration: TimeInterval {
+        Double(max(1, coinPitTimeTicketsStaked)) * GameState.goldRushSecondsPerTicket
+    }
+    /// Total coins dropped this round: the base per-30 s target × time
+    /// blocks bought × the coin multiplier.
+    private var coinPitEffectiveTarget: Int? {
+        coinPitTarget.map {
+            $0 * max(1, coinPitTimeTicketsStaked) * max(1, coinPitStakedMultiplier)
+        }
+    }
 
     // Last-completion results (for the win overlay)
     @State private var lastClearedTime:        TimeInterval = 0
@@ -516,8 +540,9 @@ struct BallGameView: View {
                 }
 
                 // Coin Pit: live round HUD — seconds remaining + coins caught.
-                // Gated to the reward round; every other mode renders nothing.
-                if isCoinPit {
+                // Gated to the reward round, and only once the round has been
+                // bought (the stake overlay owns the screen before that).
+                if isCoinPit && coinPitStaked {
                     coinPitHUDOverlay(safeTop: geo.safeAreaInsets.top)
                 }
 
@@ -539,6 +564,11 @@ struct BallGameView: View {
                 // Coin Pit never uses .fell/.levelComplete, so this is its
                 // only end screen.  Gated so no other mode can surface it.
                 if isCoinPit && coinPitOver { coinPitPayoutOverlay }
+
+                // Gold Rush stake screen — buy the round with tickets before
+                // the clock starts.  The home button (below) stays on top so
+                // the player can back out without spending anything.
+                if isCoinPit && !coinPitStaked && !coinPitOver { coinPitStakeOverlay }
 
                 // Out-of-lives overlay — shown when the player tries to play
                 // with zero lives.  Sits above the Oops/Win overlays.
@@ -595,7 +625,11 @@ struct BallGameView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear  { motion.start(); clock.start(); AudioManager.shared.prepareIfNeeded() }
-        .onDisappear { motion.stop();  clock.stop()  }
+        .onDisappear {
+            motion.stop()
+            clock.stop()
+            refundUnplayedCoinPitBlocks()   // Gold Rush early-exit refund
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { clock.stop(); motion.stop() }
             else if phase == .active && self.phase == .playing { clock.start(); motion.start() }
@@ -1931,11 +1965,11 @@ struct BallGameView: View {
     /// observed @State.  Dormant outside the Coin Pit (gated by the caller).
     private func coinPitHUDOverlay(safeTop: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { context in
-            let target = coinPitTarget ?? 0
-            // Show the full duration until the first tick arms the clock, then
-            // the live remaining time to the deadline (never negative).
+            let target = coinPitEffectiveTarget ?? 0
+            // Show the full bought duration until the first tick arms the
+            // clock, then the live remaining time (never negative).
             let remaining: TimeInterval = {
-                guard let deadline = coinPitDeadline else { return coinPitDuration }
+                guard let deadline = coinPitDeadline else { return coinPitStakedDuration }
                 return max(0, deadline.timeIntervalSince(context.date))
             }()
             let urgent = remaining <= 5
@@ -1955,13 +1989,18 @@ struct BallGameView: View {
                     .fill(Color.white.opacity(0.25))
                     .frame(width: 1, height: 16)
 
-                // Haul so far.
+                // Haul so far (plus the coin multiplier when one was staked).
                 HStack(spacing: 5) {
                     CoinIcon(size: 16)
                     Text("\(coinPitScore)/\(target)")
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.white)
+                    if coinPitStakedMultiplier > 1 {
+                        Text("×\(coinPitStakedMultiplier)")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -2565,7 +2604,7 @@ struct BallGameView: View {
     // spawnBall, whose reset block clears the round state for a fresh start;
     // the new round's clock arms only once the player taps to begin.
     private var coinPitPayoutOverlay: some View {
-        let target  = coinPitTarget ?? 0
+        let target  = coinPitEffectiveTarget ?? 0
         let perfect = target > 0 && coinPitScore >= target
         let banked  = coinPitScore * coinPitPayoutPerCoin
 
@@ -2601,6 +2640,17 @@ struct BallGameView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
                     .accessibilityLabel("Plus \(banked) coins banked.")
 
+                // Remaining stake — Play Again leads back to the stake
+                // screen, which handles the out-of-tickets case itself.
+                HStack(spacing: 5) {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("\(gameState.tickets) ticket\(gameState.tickets == 1 ? "" : "s") left")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(Color(white: 0.65))
+
                 // Actions
                 VStack(spacing: 12) {
                     Button { spawnBall(in: arenaSize) } label: {
@@ -2632,6 +2682,194 @@ struct BallGameView: View {
             .padding(.horizontal, 24)
         }
         .transition(.opacity)
+    }
+
+    // MARK: - Gold Rush stake overlay (ticket economy)
+
+    /// Pre-roll for the Gold Rush reward round — the round is bought with
+    /// tickets before the clock starts:
+    ///   • every TIME ticket buys 30 s on the clock (at least 1 required)
+    ///   • every COIN ticket adds +1x to the coins dropped (1 → x2 … 9 → x10)
+    ///   • at most 10 tickets total per round
+    /// With exactly 1 ticket the pickers are skipped — Start stakes it for a
+    /// straight 30 s round.  With none, the round can't begin (the Games hub
+    /// also gates entry; this covers deep links and Play Again when broke).
+    private var coinPitStakeOverlay: some View {
+        let balance  = gameState.tickets
+        let maxTotal = min(balance, GameState.goldRushMaxStake)
+        let total    = coinPitStakeTime + coinPitStakeCoins
+
+        return ZStack {
+            Color.black.opacity(0.72).ignoresSafeArea()
+
+            VStack(spacing: 18) {
+                VStack(spacing: 6) {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
+                    Text("Gold Rush")
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(balance == 0
+                         ? "You're out of tickets."
+                         : "You have \(balance) ticket\(balance == 1 ? "" : "s")")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.65))
+                        .monospacedDigit()
+                }
+
+                if balance == 0 {
+                    Text("Win a competitive game to earn a ticket, then come back for the rush.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                } else if balance == 1 {
+                    Text("Your ticket buys 30 seconds of raining coins — everything you catch is yours.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                } else {
+                    VStack(spacing: 10) {
+                        stakeRow("Time",  "+30 s each",
+                                 value: $coinPitStakeTime,
+                                 lo: 1, hi: max(1, maxTotal - coinPitStakeCoins))
+                        stakeRow("Coins", "+1× drops each",
+                                 value: $coinPitStakeCoins,
+                                 lo: 0, hi: max(0, maxTotal - coinPitStakeTime))
+                    }
+
+                    // What the stake buys, at a glance.
+                    HStack(spacing: 14) {
+                        Label("\(coinPitStakeTime * 30) s", systemImage: "clock.fill")
+                        Label("×\(coinPitStakeCoins + 1) coins", systemImage: "dollarsign.circle.fill")
+                        Label("\(total)/\(maxTotal)", systemImage: "ticket.fill")
+                    }
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
+                }
+
+                if balance > 0 {
+                    Button { startCoinPitRound() } label: {
+                        Text(total == 1 ? "Start — 1 ticket" : "Start — \(total) tickets")
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .fill(Color(red: 1.00, green: 0.82, blue: 0.28))
+                            )
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 4)
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+        .onAppear { clampCoinPitStakes() }
+    }
+
+    /// One stake picker row — minus/plus around the current value, clamped
+    /// to [lo, hi] (the bounds shrink as the other row eats the budget).
+    private func stakeRow(_ title: String, _ detail: String,
+                          value: Binding<Int>, lo: Int, hi: Int) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            Spacer()
+            HStack(spacing: 14) {
+                Button {
+                    value.wrappedValue = max(lo, value.wrappedValue - 1)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(value.wrappedValue > lo ? Color.white : Color(white: 0.35))
+                }
+                .disabled(value.wrappedValue <= lo)
+
+                Text("\(value.wrappedValue)")
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 30)
+
+                Button {
+                    value.wrappedValue = min(hi, value.wrappedValue + 1)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(value.wrappedValue < hi ? Color.white : Color(white: 0.35))
+                }
+                .disabled(value.wrappedValue >= hi)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(white: 0.13))
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title): \(value.wrappedValue) tickets. \(detail).")
+    }
+
+    /// Consume the staked tickets and arm the round.  The clock itself
+    /// starts on the next physics tick (coinPitTick arms the deadline).
+    private func startCoinPitRound() {
+        clampCoinPitStakes()
+        let time  = max(1, coinPitStakeTime)
+        let coins = max(0, coinPitStakeCoins)
+        let total = time + coins
+        guard total <= GameState.goldRushMaxStake,
+              gameState.spendTickets(total) else { return }
+        coinPitTimeTicketsStaked = time
+        coinPitStakedMultiplier  = coins + 1
+        coinPitStaked = true
+        AnalyticsClient.shared.track(
+            "goldrush_round_staked",
+            properties: ["time_tickets": .int(time), "coin_tickets": .int(coins)]
+        )
+    }
+
+    /// Keep the pickers inside the live budget — the balance can shrink
+    /// between rounds (Play Again after spending), so re-clamp on entry.
+    private func clampCoinPitStakes() {
+        let maxTotal = min(gameState.tickets, GameState.goldRushMaxStake)
+        coinPitStakeCoins = min(max(0, coinPitStakeCoins), max(0, maxTotal - 1))
+        coinPitStakeTime  = min(max(1, coinPitStakeTime),  max(1, maxTotal - coinPitStakeCoins))
+    }
+
+    /// Early-exit refund: leaving mid-round returns one ticket per FULL
+    /// 30 s block still un-played (coin tickets never refund).  No-op once
+    /// the round finished, or before anything was staked.
+    private func refundUnplayedCoinPitBlocks() {
+        guard isCoinPit, coinPitStaked, !coinPitOver else { return }
+        let unplayed: Int
+        if let deadline = coinPitDeadline {
+            let remaining = max(0, deadline.timeIntervalSinceNow)
+            unplayed = Int(remaining / GameState.goldRushSecondsPerTicket)
+        } else {
+            // Staked but the clock never armed — nothing was played.
+            unplayed = coinPitTimeTicketsStaked
+        }
+        coinPitStaked = false
+        let refund = min(unplayed, coinPitTimeTicketsStaked)
+        guard refund > 0 else { return }
+        gameState.addTickets(refund)
+        AnalyticsClient.shared.track(
+            "goldrush_ticket_refund",
+            properties: ["tickets": .int(refund)]
+        )
     }
 
     // MARK: - Tutorial reward modal (one-time, after first L10 clear)
@@ -3063,7 +3301,9 @@ struct BallGameView: View {
         coinsPickedThisAttempt = []
         trailPoints.removeAll(keepingCapacity: true)
         trailHueOffset = 0.0
-        // Coin Pit: a fresh ball means a fresh round — clear the rain & clock.
+        // Coin Pit: a fresh ball means a fresh round — clear the rain, the
+        // clock, and the stake (the stake overlay re-appears for the next
+        // round; defaults reset to the minimum 1-time-ticket buy).
         if isCoinPit {
             fallingCoins.removeAll()
             coinPitDeadline    = nil
@@ -3071,6 +3311,11 @@ struct BallGameView: View {
             coinPitReleased    = 0
             coinPitScore       = 0
             coinPitOver        = false
+            coinPitStaked            = false
+            coinPitTimeTicketsStaked = 0
+            coinPitStakedMultiplier  = 1
+            coinPitStakeTime         = 1
+            coinPitStakeCoins        = 0
         }
         // Engage the spawn lock — physics is paused, border shows the
         // "armed" white state, and a "Tap to start" hint sits above the
@@ -3437,18 +3682,19 @@ struct BallGameView: View {
     // empty), advances each coin's fall, catches any that overlap the ball,
     // banks the haul as real currency, and ends the round on target-or-timeout.
     private func coinPitTick(ballPos: CGPoint, size: CGSize, dt: CGFloat) {
-        guard let target = coinPitTarget, !coinPitOver else { return }
+        // No clock, no rain until the round is bought on the stake overlay.
+        guard coinPitStaked, let target = coinPitEffectiveTarget, !coinPitOver else { return }
         let now = Date.now
 
         // First tick of the round arms the clock and the release pacing.
         if coinPitDeadline == nil {
-            coinPitDeadline    = now.addingTimeInterval(coinPitDuration)
+            coinPitDeadline    = now.addingTimeInterval(coinPitStakedDuration)
             coinPitLastRelease = now
         }
 
         // Drip the full target out over the first 85% of the round so the
         // closing seconds are about catching stragglers, not waiting on spawns.
-        let interval = (coinPitDuration * 0.85) / Double(target)
+        let interval = (coinPitStakedDuration * 0.85) / Double(target)
         if coinPitReleased < target,
            now.timeIntervalSince(coinPitLastRelease ?? now) >= interval {
             spawnFallingCoin(in: size)

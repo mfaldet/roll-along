@@ -234,6 +234,34 @@ final class GameStateTests: XCTestCase {
         XCTAssertEqual(gs.lives, 6)
     }
 
+    // MARK: - Gold Rush tickets
+
+    func testAddTickets_increasesBalance() {
+        let gs = makeGameState()
+        gs.addTickets(3)
+        XCTAssertEqual(gs.tickets, 3)
+    }
+
+    func testSpendTickets_sufficientBalance_deductsAndReturnsTrue() {
+        let gs = makeGameState()
+        gs.addTickets(5)
+        XCTAssertTrue(gs.spendTickets(3))
+        XCTAssertEqual(gs.tickets, 2)
+    }
+
+    func testSpendTickets_insufficientBalance_returnsFalseNoChange() {
+        let gs = makeGameState()
+        gs.addTickets(2)
+        XCTAssertFalse(gs.spendTickets(3))
+        XCTAssertEqual(gs.tickets, 2, "Balance should be unchanged on failure")
+    }
+
+    func testAddTickets_clampsToCeiling() {
+        let gs = makeGameState()
+        gs.addTickets(GameState.maxTicketBalance + 50)
+        XCTAssertEqual(gs.tickets, GameState.maxTicketBalance)
+    }
+
     // MARK: - Persistence isolation (injected suite)
 
     func testInjectedSuite_persistsAcrossInstances() {

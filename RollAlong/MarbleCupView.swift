@@ -493,6 +493,11 @@ struct MarbleCupView: View {
                              "coins": .int(banked),
                              "map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
             )
+            if playerWon {
+                gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+                AnalyticsClient.shared.track("ticket_earned",
+                                             properties: ["source": .string("marblecup")])
+            }
             if gameState.hapticsEnabled {
                 if playerWon { Haptics.success() } else { Haptics.warning() }
             }

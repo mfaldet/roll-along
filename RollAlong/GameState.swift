@@ -10,7 +10,7 @@ import SwiftUI
 //   ra_bestStars, ra_bestTime, ra_collectedCoins, ra_highestUnlocked,
 //   ra_lives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
-//   ra_lastReviewPromptDate, ra_coinBalance, ra_ownedBallSkins, ra_ownedGoals,
+//   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
 //   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBundles, ra_ownedPacks,
 //   ra_ownedMusic, ra_trackProgress, ra_completedTracks, ra_equippedGoal,
 //   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedMusic,
@@ -173,6 +173,13 @@ final class GameState: ObservableObject {
     // StoreKit (PR 4h).  No cap on balance.
     @Published var coinBalance: Int {
         didSet { defaults.set(coinBalance, forKey: "ra_coinBalance") }
+    }
+
+    /// Gold Rush tickets — earned one per competitive-minigame win, staked
+    /// up front to buy a Gold Rush round (every time-ticket = 30 s on the
+    /// clock; every coin-ticket adds +1x to the coins dropped).
+    @Published var tickets: Int {
+        didSet { defaults.set(tickets, forKey: "ra_tickets") }
     }
 
     // Owned cosmetic items per category, stored as sets of raw strings so
@@ -369,6 +376,8 @@ final class GameState: ObservableObject {
         // displaying an absurd balance.
         coinBalance = min(max(0, defaults.integer(forKey: "ra_coinBalance")),
                           Self.maxCoinBalance)
+        tickets = min(max(0, defaults.integer(forKey: "ra_tickets")),
+                      Self.maxTicketBalance)
         let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins", defaults)
         let loadedOwnedGoals   = Self.loadStringSet(forKey: "ra_ownedGoals", defaults)
         let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails", defaults)
@@ -662,6 +671,33 @@ final class GameState: ObservableObject {
         guard amount >= 0 else { return false }
         guard coinBalance >= amount else { return false }
         coinBalance -= amount
+        return true
+    }
+
+    // ── Gold Rush tickets ───────────────────────────────────────────────
+    /// ECONOMY: one ticket per competitive-minigame win.  A Gold Rush round
+    /// is bought up front: each TIME ticket = 30 s of play, each COIN ticket
+    /// adds +1x to the coins dropped (1 → x2 … 9 → x10), at most
+    /// `goldRushMaxStake` tickets per round.  Quitting early refunds one
+    /// ticket per FULL un-played 30 s block (coin tickets never refund).
+    static let maxTicketBalance = 999
+    static let goldRushMaxStake = 10
+    static let goldRushSecondsPerTicket: TimeInterval = 30
+
+    /// Award tickets (competitive win; future promos).  Mirrors addCoins'
+    /// guardrails — negative amounts are a programming error.
+    func addTickets(_ amount: Int) {
+        assert(amount >= 0, "addTickets: negative amount — use spendTickets(_:)")
+        guard amount > 0 else { return }
+        tickets = min(tickets + amount, Self.maxTicketBalance)
+    }
+
+    /// Spend tickets.  Returns false (no-op) if the balance is short.
+    @discardableResult
+    func spendTickets(_ amount: Int) -> Bool {
+        guard amount >= 0 else { return false }
+        guard tickets >= amount else { return false }
+        tickets -= amount
         return true
     }
 
