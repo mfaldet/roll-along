@@ -14,12 +14,15 @@ import XCTest
 //
 // Runs against GoldRushEngine — now GoldRushView's production simulation —
 // driven headless here, without a view, accelerometer, or run loop.
-// Reference environment: iPhone 16 Pro, iOS 18 (see SmokeTests).
+// Reference environment: iPhone 17 Pro (see SmokeTests).
 // ---------------------------------------------------------------------------
 
 final class PerformanceTests: XCTestCase {
 
-    private let arena = CGSize(width: 390, height: 844)   // iPhone 16 Pro points
+    // Fixed reference arena (iPhone-class portrait points).  Deliberately
+    // pinned — resizing it would change the measured workload and quietly
+    // shift the established performance baseline.
+    private let arena = CGSize(width: 390, height: 844)
 
     func testGoldRushTick_performance() {
         let engine = GoldRushEngine(arena: arena)

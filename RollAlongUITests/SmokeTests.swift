@@ -15,9 +15,9 @@ import XCTest
 //   • accessibilityIdentifier(mode.id) on each GameMenuView mode card.
 //   • accessibilityIdentifier("GoldRushView") on GoldRushView root ZStack.
 //
-// Run on: iPhone 16 Pro simulator, iOS 18.  Snapshot tests (§5) also pin
-// to this target — document the device/OS in the scheme's Run → Arguments
-// so future contributors know the reference environment.
+// Run on: iPhone 17 Pro simulator.  Snapshot tests (§5) also pin to this
+// target — document the device/OS in the scheme's Run → Arguments so future
+// contributors know the reference environment.
 // ---------------------------------------------------------------------------
 
 final class SmokeTests: XCTestCase {

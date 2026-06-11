@@ -15,9 +15,10 @@ import SnapshotTesting
 //   To intentionally re-record after a palette change, set
 //   `isRecording = true` in setUp (or delete the stale reference images).
 //
-// REFERENCE ENVIRONMENT: iPhone 16 Pro, iOS 18 (matches SmokeTests).  Pixel
+// REFERENCE ENVIRONMENT: iPhone 17 Pro simulator (matches SmokeTests).  Pixel
 //   output is device/OS/scale dependent — always run snapshots on this one
-//   pinned simulator or they will fail spuriously across machines.  A 0.98
+//   pinned simulator or they will fail spuriously across machines; if the
+//   pinned device ever changes, re-record the references (see above).  A 0.98
 //   precision tolerance below absorbs sub-pixel anti-aliasing noise.
 // ---------------------------------------------------------------------------
 
