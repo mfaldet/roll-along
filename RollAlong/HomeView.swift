@@ -692,30 +692,14 @@ struct HomeView: View {
         }
     }
 
-    /// Floating lives pill in the top-LEFT corner — sized to match the
-    /// coin balance pill on the right.  Tapping it opens BuyLivesSheet
-    /// (which doubles as the "lives status + explanation + purchase"
-    /// screen).
-    ///
-    /// Spec recap:
-    ///   • 6 marbles always rendered.
-    ///   • Filled red = active lives (clamped to 6).
-    ///   • Next-empty marble shows regen progress as a bottom-up
-    ///     partial fill — 80% elapsed in the 10-min cycle = bottom 4/5
-    ///     of the marble is coloured.  No separate countdown text.
-    ///   • Stockpile above 6 → "+N" trailing the row.
-    ///   • Unlimited-lives subscribers → 6 gold marbles + ∞ glyph.
+    /// Floating lives pill in the top-LEFT corner — a mirror of the coin
+    /// pill on the right: one red marble + the live count + a chevron.
+    /// Unlimited-lives subscribers see one gold marble + an ∞ glyph.
+    /// Tapping it opens BuyLivesSheet (which doubles as the "lives status
+    /// + explanation + purchase" screen, including the regen countdown).
     private var livesMarblePill: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-            let unlimited     = gameState.unlimitedLives
-            let display       = gameState.displayedLives
-            let filledMarbles = unlimited ? GameState.livesMax : min(display, GameState.livesMax)
-            let stockpile     = unlimited ? 0 : max(0, display - GameState.livesMax)
-            // The first empty marble (index == filledMarbles) shows regen
-            // progress; marbles past it stay fully hollow.  When the bar
-            // is already full (filledMarbles == livesMax) there's no
-            // regen and no partial fill.
-            let regen         = unlimited ? nil : gameState.regenProgress()
+            let unlimited = gameState.unlimitedLives
 
             VStack {
                 HStack {
@@ -724,29 +708,22 @@ struct HomeView: View {
                         showBuyLivesSheet = true
                     } label: {
                         HStack(spacing: 6) {
-                            ForEach(0..<GameState.livesMax, id: \.self) { i in
-                                let isFilled = i < filledMarbles
-                                let partial: Double = (!isFilled
-                                                       && i == filledMarbles
-                                                       && regen != nil) ? (regen ?? 0) : 0
-                                marbleIcon(
-                                    filled:      isFilled,
-                                    gold:        unlimited,
-                                    partialFill: partial,
-                                    size:        20
-                                )
-                            }
+                            marbleIcon(filled: true, gold: unlimited, size: 18)
+
                             if unlimited {
                                 Image(systemName: "infinity")
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(Self.goldLifeGradient)
-                                    .padding(.leading, 2)
-                            } else if stockpile > 0 {
-                                Text("+\(stockpile)")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                            } else {
+                                Text("\(gameState.displayedLives)")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white)
-                                    .padding(.leading, 2)
+                                    .monospacedDigit()
                             }
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color(white: 0.55))
                         }
                         .padding(.horizontal, 11)
                         .padding(.vertical, 6)
