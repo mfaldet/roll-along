@@ -217,20 +217,10 @@ struct HomeView: View {
                     .accessibilityIdentifier("GameModesButton")  // UI smoke test
                     .padding(.bottom, 14)
 
-                    // Secondary navigation, grouped into three clear strips:
-                    // more game content (reads as part of the Play / Game
-                    // Modes cluster above), then social, then account & app
-                    // settings.  Max three items per row so labels never wrap.
-                    HStack(spacing: 28) {
-                        NavigationLink(value: HomeRoute.levels) {
-                            homeNavLabel("square.grid.3x3.fill", "Levels")
-                        }
-                        NavigationLink(value: HomeRoute.challengeTracks) {
-                            homeNavLabel("flag.checkered", "Tracks")
-                        }
-                    }
-                    .padding(.bottom, 18)
-
+                    // Secondary navigation in two strips: social, then account
+                    // & app settings.  All game content (Levels, Tracks, and
+                    // the minigames) lives behind the Game Modes hub above.
+                    // Max three items per row so labels never wrap.
                     navGroupCaption("SOCIAL")
                     HStack(spacing: 28) {
                         NavigationLink(value: HomeRoute.friends) {

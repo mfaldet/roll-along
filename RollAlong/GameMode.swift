@@ -100,6 +100,16 @@ enum LivesPolicy: String, Codable {
 
 // MARK: - GameMode protocol
 
+/// Which designated area of the Games hub (GameMenuView) a mode belongs to.
+/// `.climb` content (the adventure spine and its Challenge Tracks) is reached
+/// through dedicated cards rather than per-mode rows, so the hub renders only
+/// `.competitive` and `.solo` modes as individual entries.
+enum GameModeSection {
+    case climb          // the main adventure + its 100-level Challenge Tracks
+    case competitive    // vs AI rivals — a winner is declared
+    case solo           // self-paced, no rivals
+}
+
 /// A self-contained game mode: a strategy layered on the shared physics engine.
 ///
 /// Conformers are tiny value types — pure configuration.  The engine asks the
@@ -111,6 +121,8 @@ protocol GameMode {
     var displayName: String { get }
     /// One-line pitch for the mode-select UI.
     var tagline: String { get }
+    /// Which designated area of the Games hub this mode is listed under.
+    var section: GameModeSection { get }
 
     var control:     ControlScheme  { get }
     var goal:        GoalKind       { get }
@@ -135,6 +147,7 @@ protocol GameMode {
 // Sensible defaults so each mode struct only states what makes it distinct.
 extension GameMode {
     var tagline:     String { "" }
+    var section:     GameModeSection { .solo }
     var leavesPersistentTrail: Bool { false }
     var showsStars:  Bool   { false }
     var showsTimer:  Bool   { false }
@@ -150,6 +163,7 @@ struct ClimbMode: GameMode {
     let id          = "climb"
     let displayName = "Adventure"
     let tagline     = "Climb the endless tower, one level at a time."
+    let section:     GameModeSection = .climb
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .reachGoal
     let onFail:      FailKind        = .loseLifeAndRetry
@@ -186,6 +200,7 @@ struct ChallengeTrackMode: GameMode {
     let tagline: String
 
     var id: String { "challenge.\(trackID)" }
+    let section:     GameModeSection = .climb
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .reachGoal
     let onFail:      FailKind        = .loseLifeAndRetry
@@ -272,6 +287,7 @@ struct SnakeMode: GameMode {
     let id          = "snake"
     let displayName = "Comet Clash"
     let tagline     = "Leave a glowing wall. Grab sparks to extend it. Touch any trail and you're out."
+    let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .endRun
@@ -288,6 +304,7 @@ struct SumoSurvivalMode: GameMode {
     let id          = "sumo"
     let displayName = "Sumo Survival"
     let tagline     = "Shove rivals off a shrinking ring. Survive the waves."
+    let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .endRun
@@ -304,6 +321,7 @@ struct PaintBallMode: GameMode {
     let id          = "paintball"
     let displayName = "Paint Ball"
     let tagline     = "Sixty seconds. Splash the most paint. Mind the puddles."
+    let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .none   // pits penalise, they don't end the run
@@ -321,6 +339,7 @@ struct GoldRushMode: GameMode {
     let id          = "goldrush"
     let displayName = "Gold Rush"
     let tagline     = "Grab the most coins in a minute. Bump rivals to make them spill."
+    let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .none
@@ -338,6 +357,7 @@ struct MarbleCupMode: GameMode {
     let id          = "marblecup"
     let displayName = "Marble Cup"
     let tagline     = "Marble soccer. Roll the ball into their net before the whistle."
+    let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .none
@@ -355,6 +375,7 @@ struct KingOfTheHillMode: GameMode {
     let id          = "koth"
     let displayName = "King of the Hill"
     let tagline     = "Hold the moving zone — alone. Most time on the hill wins."
+    let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .none

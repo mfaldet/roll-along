@@ -1,28 +1,39 @@
 import SwiftUI
 
 // ===========================================================================
-// GameMenuView — the hub for every mode that ISN'T the main climb.
+// GameMenuView — the hub for ALL game content, in designated areas.
 //
-// The home Play button is the 5,000-level Adventure climb (the spine).  Every
-// other experience — Zen Garden, Coin Pit, and the competitive modes (Snake,
-// Bumper Cars) as they come online — lives here, one tap off the main menu.
+// THE CLIMB   — the adventure spine's deeper cuts: the Levels grid (replay any
+//               unlocked floor) and the Challenge Tracks (themed 100-level
+//               gauntlets with bundle rewards).  These route to their own
+//               select pages, not straight into an engine.
+// COMPETITIVE — vs AI rivals; a winner is declared (Comet Clash, Sumo,
+//               Paint Ball, Gold Rush, Marble Cup, King of the Hill).
+// SOLO        — self-paced, no rivals (Zen Garden, Coin Pit, Pinball).
 //
-// DATA-DRIVEN: the list is `GameModeCatalogue.enabled` minus the climb, so
-// flagging a new mode on in the catalogue makes it appear here automatically —
-// no edits to this file.  A mode that's still gated off simply doesn't show.
+// DATA-DRIVEN: the two mode areas group `GameModeCatalogue.enabled` by each
+// mode's `section`, so flagging a new mode on in the catalogue makes it appear
+// in the right area automatically — no edits to this file.  Challenge Tracks
+// are deliberately NOT listed as individual rows (their `section` is .climb);
+// they're reached through the Tracks card so progress and rewards show on the
+// proper select page.
 //
-// Each row routes through the existing `HomeRoute.mode(id)` destination, so the
-// engine (BallGameView) launches the mode exactly as the old home capsules did.
+// Each mode row routes through the existing `HomeRoute.mode(id)` destination,
+// so the engine launches the mode exactly as before.
 // ===========================================================================
 
 struct GameMenuView: View {
     @EnvironmentObject var nav: Navigator
     @Environment(\.dismiss) var dismiss
 
-    /// Every enabled mode except the climb spine (which is the home Play button).
-    private var modes: [GameMode] {
-        GameModeCatalogue.enabled.filter { $0.id != GameModeCatalogue.climb.id }
+    /// Every enabled, individually-listed mode (the climb spine and the
+    /// Challenge Tracks live behind the THE CLIMB cards instead).
+    private var minigames: [GameMode] {
+        GameModeCatalogue.enabled.filter { $0.section != .climb }
     }
+
+    private var competitive: [GameMode] { minigames.filter { $0.section == .competitive } }
+    private var solo:        [GameMode] { minigames.filter { $0.section == .solo } }
 
     var body: some View {
         ZStack {
@@ -31,16 +42,36 @@ struct GameMenuView: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     header
-                    ForEach(modes, id: \.id) { mode in
-                        NavigationLink(value: HomeRoute.mode(mode.id)) {
-                            modeCard(mode)
-                        }
-                        .buttonStyle(.plain)
-                        // accessibility identifier = mode id ("goldrush", "snake", …)
-                        // used by UI smoke tests: app.buttons["goldrush"].tap()
-                        .accessibilityIdentifier(mode.id)
+
+                    sectionCaption("THE CLIMB")
+                    NavigationLink(value: HomeRoute.levels) {
+                        hubCard(icon: "square.grid.3x3.fill",
+                                accent: Color(red: 0.55, green: 0.78, blue: 1.0),
+                                title: "Levels",
+                                tagline: "Replay any floor of the adventure you've reached.")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("levels")
+
+                    NavigationLink(value: HomeRoute.challengeTracks) {
+                        hubCard(icon: "flag.checkered",
+                                accent: Color(red: 0.95, green: 0.62, blue: 0.30),
+                                title: "Challenge Tracks",
+                                tagline: "Themed hundred-level gauntlets. Clear one for its cosmetic bundle.")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("tracks")
+
+                    sectionCaption("COMPETITIVE")
+                    ForEach(competitive, id: \.id) { mode in
+                        modeRow(mode)
+                    }
+
+                    sectionCaption("SOLO")
+                    ForEach(solo, id: \.id) { mode in
+                        modeRow(mode)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -71,7 +102,7 @@ struct GameMenuView: View {
             Text("Game Modes")
                 .font(.system(size: 30, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
-            Text("Take a break from the climb.")
+            Text("Every way to roll.")
                 .font(.system(.subheadline, design: .rounded))
                 .foregroundStyle(Color(white: 0.55))
         }
@@ -79,23 +110,48 @@ struct GameMenuView: View {
         .padding(.bottom, 2)
     }
 
-    private func modeCard(_ mode: GameMode) -> some View {
+    /// Tiny tracked caption naming a designated area — same recipe as the
+    /// home screen's SOCIAL / ACCOUNT strips, sized for the hub list.
+    private func sectionCaption(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundStyle(Color(white: 0.45))
+            .tracking(2.4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 10)
+    }
+
+    private func modeRow(_ mode: GameMode) -> some View {
         let style = Self.style(for: mode.id)
-        return HStack(spacing: 16) {
+        return NavigationLink(value: HomeRoute.mode(mode.id)) {
+            hubCard(icon: style.icon, accent: style.accent,
+                    title: mode.displayName, tagline: mode.tagline)
+        }
+        .buttonStyle(.plain)
+        // accessibility identifier = mode id ("goldrush", "snake", …)
+        // used by UI smoke tests: app.buttons["goldrush"].tap()
+        .accessibilityIdentifier(mode.id)
+    }
+
+    /// The shared card chrome for every hub entry — mode rows and the
+    /// THE CLIMB cards alike.
+    private func hubCard(icon: String, accent: Color,
+                         title: String, tagline: String) -> some View {
+        HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(style.accent.opacity(0.18))
+                    .fill(accent.opacity(0.18))
                     .frame(width: 56, height: 56)
-                Image(systemName: style.icon)
+                Image(systemName: icon)
                     .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(style.accent)
+                    .foregroundStyle(accent)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(mode.displayName)
+                Text(title)
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
-                if !mode.tagline.isEmpty {
-                    Text(mode.tagline)
+                if !tagline.isEmpty {
+                    Text(tagline)
                         .font(.system(.subheadline, design: .rounded))
                         .foregroundStyle(Color(white: 0.6))
                         .multilineTextAlignment(.leading)
@@ -114,7 +170,7 @@ struct GameMenuView: View {
                 .fill(Color(white: 0.13))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .stroke(style.accent.opacity(0.18), lineWidth: 1)
+                        .stroke(accent.opacity(0.18), lineWidth: 1)
                 )
         )
     }
