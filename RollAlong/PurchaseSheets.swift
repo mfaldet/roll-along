@@ -69,14 +69,7 @@ struct BuyLivesSheet: View {
     private var header: some View {
         HStack(spacing: 10) {
             ForEach(0..<6) { i in
-                Circle()
-                    .fill(i < gameState.displayedLives
-                          ? Self.redLifeGradient
-                          : Self.dimGradient)
-                    .frame(width: 18, height: 18)
-                    .overlay(
-                        Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.6)
-                    )
+                lifeMarble(filled: i < gameState.displayedLives)
             }
             Spacer()
             Text("\(gameState.displayedLives) / 6")
@@ -84,6 +77,35 @@ struct BuyLivesSheet: View {
                 .foregroundStyle(Color(white: 0.75))
         }
         .padding(.bottom, 6)
+    }
+
+    /// One life as a glossy marble — the same highlight-dot-and-rim recipe as
+    /// the home screen's lives pill (HomeView.marbleIcon), so lives read as
+    /// the familiar red ball here too instead of a flat disc.  An empty slot
+    /// is a hollow outline, also matching the pill.
+    private func lifeMarble(filled: Bool) -> some View {
+        let size: CGFloat = 18
+        return ZStack {
+            Circle()
+                .stroke(Color(white: 0.40).opacity(0.7), lineWidth: 1.0)
+                .frame(width: size, height: size)
+            if filled {
+                Circle()
+                    .fill(Self.redLifeGradient)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Circle()
+                            .fill(Color.white.opacity(0.55))
+                            .frame(width: size * 0.28, height: size * 0.28)
+                            .offset(x: -size * 0.18, y: -size * 0.18)
+                    )
+                    .overlay(
+                        Circle().stroke(Color.black.opacity(0.40), lineWidth: 0.6)
+                    )
+                    .shadow(color: Color.black.opacity(0.22), radius: 1.5, y: 1)
+            }
+        }
+        .frame(width: size, height: size)
     }
 
     /// Live status + explanation block under the 6-marble header.  Shows
@@ -245,10 +267,6 @@ struct BuyLivesSheet: View {
     private static let redLifeGradient = LinearGradient(
         colors: [Color(red: 1.00, green: 0.32, blue: 0.32),
                  Color(red: 0.78, green: 0.14, blue: 0.14)],
-        startPoint: .top, endPoint: .bottom
-    )
-    private static let dimGradient = LinearGradient(
-        colors: [Color(white: 0.25), Color(white: 0.18)],
         startPoint: .top, endPoint: .bottom
     )
 }
