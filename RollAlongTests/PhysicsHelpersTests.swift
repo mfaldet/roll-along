@@ -160,4 +160,62 @@ final class PhysicsHelpersTests: XCTestCase {
         XCTAssertEqual(vel.dx, 3.0, accuracy: 0.001)
         XCTAssertEqual(vel.dy, 0.0, accuracy: 0.001)
     }
+
+    // MARK: - resolveRectObstacle
+
+    func testResolveRectObstacle_ballAboveRect_pushesUpAndReflects() {
+        // Rect spans (100…300, 400…456); ball centre 5pt above the top edge,
+        // inside radius 10 → overlap, moving down into the rect.
+        let rect = CGRect(x: 100, y: 400, width: 200, height: 56)
+        var pos = CGPoint(x: 200, y: 395)
+        var vel = CGVector(dx: 0, dy: 4)
+        resolveRectObstacle(pos: &pos, vel: &vel, rect: rect, radius: 10, restitution: 0.65)
+        XCTAssertLessThanOrEqual(pos.y, 390 + 0.01, "Ball should rest at least radius above the rect")
+        XCTAssertLessThan(vel.dy, 0, "Downward velocity should reflect upward")
+    }
+
+    func testResolveRectObstacle_noOverlap_noChange() {
+        let rect = CGRect(x: 100, y: 400, width: 200, height: 56)
+        var pos = CGPoint(x: 200, y: 300)   // 100pt above — far away
+        var vel = CGVector(dx: 1, dy: 1)
+        let beforePos = pos, beforeVel = vel
+        resolveRectObstacle(pos: &pos, vel: &vel, rect: rect, radius: 10, restitution: 0.65)
+        XCTAssertEqual(pos.x, beforePos.x)
+        XCTAssertEqual(pos.y, beforePos.y)
+        XCTAssertEqual(vel.dx, beforeVel.dx)
+        XCTAssertEqual(vel.dy, beforeVel.dy)
+    }
+
+    func testResolveRectObstacle_cornerContact_reflectsAlongCornerNormal() {
+        // Ball overlapping the top-left corner diagonally.
+        let rect = CGRect(x: 100, y: 400, width: 200, height: 56)
+        var pos = CGPoint(x: 96, y: 396)    // hypot(4,4) ≈ 5.66 < radius 10
+        var vel = CGVector(dx: 3, dy: 3)    // moving into the corner
+        resolveRectObstacle(pos: &pos, vel: &vel, rect: rect, radius: 10, restitution: 1.0)
+        let d = hypot(pos.x - 100, pos.y - 400)
+        XCTAssertGreaterThanOrEqual(d, 10 - 0.01, "Ball should be pushed to radius from the corner")
+        XCTAssertLessThan(vel.dx, 0, "x velocity should reflect away from the corner")
+        XCTAssertLessThan(vel.dy, 0, "y velocity should reflect away from the corner")
+    }
+
+    func testResolveRectObstacle_centreInsideRect_ejectsAlongLeastPenetrationAxis() {
+        // Centre just inside the left edge → least penetration is left.
+        let rect = CGRect(x: 100, y: 400, width: 200, height: 56)
+        var pos = CGPoint(x: 103, y: 428)   // 3pt in from the left, mid-height
+        var vel = CGVector(dx: 2, dy: 0)
+        resolveRectObstacle(pos: &pos, vel: &vel, rect: rect, radius: 10, restitution: 0.65)
+        XCTAssertEqual(pos.x, 90, accuracy: 0.01, "Ejected to rect.minX - radius")
+        XCTAssertLessThanOrEqual(vel.dx, 0, "Velocity forced away from the rect")
+    }
+
+    func testResolveRectObstacle_ballSeparating_velocityUnchanged() {
+        // Overlapping from above but already moving away (upward) — position
+        // corrects, velocity untouched (dot >= 0 guard).
+        let rect = CGRect(x: 100, y: 400, width: 200, height: 56)
+        var pos = CGPoint(x: 200, y: 395)
+        var vel = CGVector(dx: 0, dy: -6)
+        resolveRectObstacle(pos: &pos, vel: &vel, rect: rect, radius: 10, restitution: 0.65)
+        XCTAssertLessThanOrEqual(pos.y, 390 + 0.01)
+        XCTAssertEqual(vel.dy, -6.0, accuracy: 0.001)
+    }
 }

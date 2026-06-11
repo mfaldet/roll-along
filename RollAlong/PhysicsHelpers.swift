@@ -9,6 +9,9 @@ import CoreGraphics
 // Extracted from:
 //   • SnakeGameView  (bounceEdges, resolveWallSegment, resolveCircleObstacle)
 //   • GoldRushView   (bounceEdges, resolveWallSegment)
+// Plus:
+//   • resolveRectObstacle — circle-vs-rounded-UI collisions for the home
+//     screen's free-roaming ball (HomeView).
 //
 // KingOfTheHillView.resolvePillarCollisions handles a whole-racer-array
 // loop with a different impulse formula and is intentionally not extracted.
@@ -123,4 +126,67 @@ func resolveCircleObstacle(pos: inout CGPoint,
     guard dot < 0 else { return }
     vel.dx -= 2 * dot * nx * restitution
     vel.dy -= 2 * dot * ny * restitution
+}
+
+// MARK: - resolveRectObstacle
+
+/// Push a ball out of an axis-aligned rectangle and reflect its velocity —
+/// circle-vs-AABB, used by the home screen's free-roaming ball to bounce
+/// off UI elements (title, buttons, pills).
+///
+/// Outside-the-rect contact resolves along the closest-point normal with the
+/// usual `dot < 0` anti-stick guard.  If the centre is ever fully inside the
+/// rect (e.g. a frame appeared on top of the ball), it ejects along the
+/// least-penetration axis so the ball can't get trapped.
+///
+/// No-op when the ball is not overlapping the rect.
+///
+/// - Parameters:
+///   - pos:         Ball centre (mutated).
+///   - vel:         Ball velocity (mutated).
+///   - rect:        Obstacle rectangle in the same coordinate space as `pos`.
+///   - radius:      Ball radius in pixels.
+///   - restitution: Fraction of speed retained after reflection (0…1).
+func resolveRectObstacle(pos: inout CGPoint,
+                         vel: inout CGVector,
+                         rect: CGRect,
+                         radius: CGFloat,
+                         restitution: CGFloat) {
+    let closest = CGPoint(x: min(max(pos.x, rect.minX), rect.maxX),
+                          y: min(max(pos.y, rect.minY), rect.maxY))
+    let dx = pos.x - closest.x, dy = pos.y - closest.y
+    let dist = hypot(dx, dy)
+
+    if dist > 0 {
+        // Centre is outside the rect — standard closest-point resolution.
+        guard dist < radius else { return }
+        let inv = 1 / dist
+        let nx = dx * inv, ny = dy * inv
+        pos.x += nx * (radius - dist)
+        pos.y += ny * (radius - dist)
+        let dot = vel.dx * nx + vel.dy * ny
+        guard dot < 0 else { return }
+        vel.dx -= 2 * dot * nx * restitution
+        vel.dy -= 2 * dot * ny * restitution
+    } else {
+        // Centre is inside the rect — eject along the least-penetration axis.
+        let left   = pos.x - rect.minX
+        let right  = rect.maxX - pos.x
+        let top    = pos.y - rect.minY
+        let bottom = rect.maxY - pos.y
+        let m = min(min(left, right), min(top, bottom))
+        if m == left {
+            pos.x = rect.minX - radius
+            vel.dx = -abs(vel.dx) * restitution
+        } else if m == right {
+            pos.x = rect.maxX + radius
+            vel.dx = abs(vel.dx) * restitution
+        } else if m == top {
+            pos.y = rect.minY - radius
+            vel.dy = -abs(vel.dy) * restitution
+        } else {
+            pos.y = rect.maxY + radius
+            vel.dy = abs(vel.dy) * restitution
+        }
+    }
 }
