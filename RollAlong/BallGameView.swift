@@ -549,6 +549,11 @@ struct BallGameView: View {
                     coinPitHUDOverlay(safeTop: geo.safeAreaInsets.top)
                 }
 
+                // Coin Pit: optional in-round ×2-coins boost (flat 2 tickets).
+                if isCoinPit && coinPitStaked && !coinPitOver {
+                    coinPitDoubleButton
+                }
+
                 // Spawn-lock "Tap to start" hint — only shown while the
                 // lock is engaged.  Sits below the lives HUD, above the
                 // home button.  Tap anywhere to release the lock.
@@ -2696,6 +2701,51 @@ struct BallGameView: View {
             .padding(.horizontal, 24)
         }
         .transition(.opacity)
+    }
+
+    // MARK: - Gold Rush in-round ×2 boost
+
+    /// The only mid-round upsell: a flat 2 tickets to double your coins for the
+    /// rest of the round.  Buying it retroactively doubles everything caught so
+    /// far (one extra payout of the current haul), then `coinPitStakedMultiplier`
+    /// makes every later catch worth ×2.  Disappears once bought (the HUD then
+    /// shows the ×2 badge), and greys out when you can't afford it.
+    @ViewBuilder
+    private var coinPitDoubleButton: some View {
+        if coinPitStakedMultiplier == 1 {
+            let canAfford = gameState.tickets >= 2
+            Button {
+                guard coinPitStakedMultiplier == 1, gameState.spendTickets(2) else { return }
+                gameState.addCoins(coinPitScore * coinPitPayoutPerCoin)   // back-pay the haul
+                coinPitStakedMultiplier = 2
+                fireCoinPickup()
+                AnalyticsClient.shared.track("goldrush_double_bought",
+                    properties: ["score_at_buy": .int(coinPitScore)])
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                    Text("×2 Coins").fontWeight(.heavy)
+                    HStack(spacing: 3) {
+                        Image(systemName: "ticket.fill").font(.system(size: 11))
+                        Text("2").fontWeight(.bold)
+                    }
+                    .opacity(0.8)
+                }
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(Capsule().fill(canAfford
+                    ? Color(red: 1.00, green: 0.82, blue: 0.28)
+                    : Color(white: 0.45)))
+                .shadow(color: .black.opacity(0.30), radius: 6, y: 2)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canAfford)
+            .opacity(canAfford ? 1 : 0.6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 40)
+        }
     }
 
     // MARK: - Gold Rush stake overlay (ticket economy)
