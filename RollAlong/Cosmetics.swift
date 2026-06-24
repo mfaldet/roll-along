@@ -1751,3 +1751,55 @@ struct BallPack: Identifiable {
         ),
     ]
 }
+
+// ---------------------------------------------------------------------------
+// RivalCosmetics — shared "keystone" looks for the competitive minigames.
+//
+// Each AI rival shows off a desirable ball skin + trail and a fun nickname, so
+// competitive play doubles as a catalogue ad ("ooh, I want that one") and you
+// can always tell who's who.  (When real multiplayer lands, rivals will instead
+// wear their OWN equipped gear + real display name, fetched from their profile.)
+// Used by GoldRushView and the other competitive views.
+// ---------------------------------------------------------------------------
+enum RivalCosmetics {
+    struct Look { let skin: BallSkin; let trail: TrailColor; let name: String }
+
+    /// Desirable (skin, trail) pairs — easily edited; add/swap any pair.
+    static let showcase: [(skin: BallSkin, trail: TrailColor)] = [
+        (.galaxy, .rainbow), (.nebula, .stardust), (.lava,   .fire),
+        (.aurora, .cometTrail), (.neon, .raybeam), (.gold,   .gilded),
+        (.saturn, .sky), (.opal, .air), (.storm, .ice), (.ghost, .mist),
+    ]
+
+    static let names: [String] = [
+        "Pip", "Ace", "Bolt", "Nova", "Zip", "Echo", "Dash", "Fizz",
+        "Quill", "Bandit", "Comet", "Jinx", "Rook", "Sly", "Pixel",
+    ]
+
+    /// Deal `count` distinct rival looks (skin + trail + nickname), shuffled.
+    static func deal(_ count: Int) -> [Look] {
+        let s = showcase.shuffled(), n = names.shuffled()
+        return (0..<max(0, count)).map { i in
+            let p = s[i % s.count]
+            return Look(skin: p.skin, trail: p.trail, name: n[i % n.count])
+        }
+    }
+}
+
+/// A small floating tag above a competitive marble — a bold "YOU" for the
+/// player, the rival's nickname otherwise.  `color` is the racer's identity rim.
+struct RivalNameTag: View {
+    let label: String
+    let color: Color
+    let isPlayer: Bool
+    var body: some View {
+        Text(label)
+            .font(.system(size: isPlayer ? 11 : 10,
+                          weight: isPlayer ? .heavy : .bold, design: .rounded))
+            .foregroundStyle(isPlayer ? Color.white : color)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Capsule().fill(Color.black.opacity(isPlayer ? 0.6 : 0.42)))
+            .overlay(Capsule().stroke(color.opacity(0.95), lineWidth: isPlayer ? 1.5 : 1))
+            .fixedSize()
+    }
+}

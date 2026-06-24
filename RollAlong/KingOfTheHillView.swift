@@ -70,6 +70,8 @@ struct KingOfTheHillView: View {
     // MARK: - State
 
     @State private var racers: [Racer] = []
+    /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
+    @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     @State private var arena:  CGSize  = .zero
     @State private var field:  CGRect  = .zero
     @State private var zoneCenter: CGPoint = .zero
@@ -118,7 +120,14 @@ struct KingOfTheHillView: View {
                         .allowsHitTesting(false)
                     zoneView
                     ForEach(racers) { r in
-                        marble(r).position(r.pos)
+                        marble(r)
+                            .overlay(alignment: .top) {
+                                RivalNameTag(label: r.isPlayer ? "YOU" : (rivalLooks[r.colorIndex]?.name ?? "Rival"),
+                                             color: r.isPlayer ? Self.playerColor : Self.palette[r.colorIndex % Self.palette.count],
+                                             isPlayer: r.isPlayer)
+                                    .offset(y: -13).allowsHitTesting(false)
+                            }
+                            .position(r.pos)
                     }
                 }
                 .contentShape(Rectangle())
@@ -220,9 +229,10 @@ struct KingOfTheHillView: View {
                     .overlay(Circle().stroke(Self.playerColor, lineWidth: 2.5))
                     .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             } else {
-                Circle().fill(RadialGradient(colors: [color, color.opacity(0.7)],
-                                             center: .init(x: 0.35, y: 0.32),
-                                             startRadius: 1, endRadius: marbleRadius * 1.4))
+                // Keystone: each rival shows off a real, desirable ball skin.
+                let skin = rivalLooks[r.colorIndex]?.skin ?? .red
+                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+                    .overlay(Circle().stroke(color.opacity(0.9), lineWidth: 2))
                     .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
             }
         }
@@ -427,6 +437,9 @@ struct KingOfTheHillView: View {
                                colorIndex: (i % (Self.palette.count - 1)) + 1,
                                isPlayer: false))
         }
+        let rivals = fresh.filter { !$0.isPlayer }
+        rivalLooks = Dictionary(uniqueKeysWithValues:
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         racers = fresh
         showMapName = true
     }
