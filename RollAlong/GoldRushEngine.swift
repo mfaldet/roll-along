@@ -47,6 +47,10 @@ final class GoldRushEngine {
     private let ramSeekRange: CGFloat = 220
     private let winBonus           = 15
     private let topReserve: CGFloat = Layout.topReserve
+
+    /// Width of the edge band rivals are pushed out of (see `edgeRepulsion`).
+    /// Coins never spawn inside it, so every coin is reachable by every ball.
+    private var edgeBand: CGFloat { marbleRadius * 4 }
     private var roundTicks: Int { roundSeconds * 60 }
 
     // MARK: - Model
@@ -259,11 +263,12 @@ final class GoldRushEngine {
     /// at the wall (and stacks on both axes in a corner), keeping rivals from
     /// pinning themselves against an edge.  Rivals only; the player is immune.
     private func edgeRepulsion(for r: Racer, accel: CGFloat) -> CGVector {
-        let margin: CGFloat = marbleRadius * 4
+        let margin = edgeBand
         let strength = accel * 1.1            // beats the steering force at the wall
         var fx: CGFloat = 0, fy: CGFloat = 0
         let left = r.pos.x, right = arena.width - r.pos.x
-        let top  = r.pos.y, bottom = arena.height - r.pos.y
+        // The top edge is the playfield top (below the HUD), not y = 0.
+        let top  = r.pos.y - topReserve, bottom = arena.height - r.pos.y
         if left   < margin { fx += (1 - left   / margin) * strength }
         if right  < margin { fx -= (1 - right  / margin) * strength }
         if top    < margin { fy += (1 - top    / margin) * strength }
@@ -294,6 +299,13 @@ final class GoldRushEngine {
     private func bounceWalls(_ r: inout Racer) {
         bounceEdges(pos: &r.pos, vel: &r.vel,
                     radius: marbleRadius, arena: arena, restitution: wallBounce)
+        // Keep balls below the HUD strip — the playfield top is `topReserve`,
+        // not y = 0, so they can't wander up where coins never spawn.
+        let topLimit = topReserve + marbleRadius
+        if r.pos.y < topLimit {
+            r.pos.y = topLimit
+            r.vel.dy = abs(r.vel.dy) * wallBounce
+        }
     }
 
     private func bounceStaticWalls(_ r: inout Racer) {
@@ -386,11 +398,15 @@ final class GoldRushEngine {
     }
 
     private func spawnCoin() {
-        guard arena.width > 0 else { return }
-        let margin: CGFloat = 34
+        // Spawn only where rivals move freely — outside the edge-repulsion band
+        // and below the HUD — so a coin can never sit out of reach (where bots
+        // would pile up uselessly trying to grab it).
+        let margin = edgeBand
+        let topMargin = topReserve + edgeBand
+        guard arena.width > 2 * margin, arena.height > topMargin + margin else { return }
         for _ in 0..<8 {
             let x = CGFloat.random(in: margin...(arena.width - margin))
-            let y = CGFloat.random(in: topReserve...(arena.height - margin))
+            let y = CGFloat.random(in: topMargin...(arena.height - margin))
             let pt = CGPoint(x: x, y: y)
             if racers.contains(where: { hypot($0.pos.x - x, $0.pos.y - y) < marbleRadius * 2 }) { continue }
             if isNearWall(pt) { continue }
@@ -403,8 +419,8 @@ final class GoldRushEngine {
         let angle = Double.random(in: 0..<(2 * .pi))
         let r = CGFloat.random(in: 18...34)
         var p = CGPoint(x: pos.x + CGFloat(cos(angle)) * r, y: pos.y + CGFloat(sin(angle)) * r)
-        p.x = min(max(marbleRadius, p.x), arena.width - marbleRadius)
-        p.y = min(max(topReserve, p.y), arena.height - marbleRadius)
+        p.x = min(max(edgeBand, p.x), arena.width - edgeBand)
+        p.y = min(max(topReserve + edgeBand, p.y), arena.height - edgeBand)
         return Coin(pos: p, value: 1, ignoreRacer: who, ignoreUntil: localTick + spillImmunityTicks, born: localTick)
     }
 
