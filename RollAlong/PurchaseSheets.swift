@@ -44,18 +44,8 @@ struct BuyLivesSheet: View {
             .navigationTitle("Get Lives")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(.white)
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Restore") {
-                        Task { await store.restore() }
-                    }
-                    .foregroundStyle(.white)
-                }
-            }
+            // No Restore/Done buttons — swipe down (or tap above) to close.
+            // Restore Purchases lives in Settings.
         }
         // Open tall enough that the Diamond Balls offer is fully visible at
         // rest (medium clipped its bottom); still draggable to full height.
@@ -411,18 +401,8 @@ struct BuyCoinsSheet: View {
             .navigationTitle("Get Coins")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(.white)
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Restore") {
-                        Task { await store.restore() }
-                    }
-                    .foregroundStyle(.white)
-                }
-            }
+            // No Restore/Done buttons — swipe down (or tap above) to close.
+            // Restore Purchases lives in Settings.
         }
         .presentationDetents([.medium, .large])
         .onChange(of: store.lastError) { _, err in purchaseError = err }
