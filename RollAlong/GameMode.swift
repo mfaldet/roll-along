@@ -829,20 +829,22 @@ struct LaunchBall: View {
     let since: Date
     private static let turns: Double = 3.0
 
+    /// Whirlpool path position at progress `pp` (0…1): slow loops out wide,
+    /// whipping faster as the inward pull (spin = pp²) drags it to the centre.
+    /// A method (not a closure-local func) so it lives outside the ViewBuilder.
+    private func pos(_ pp: Double) -> CGPoint {
+        let r0 = hypot(start.x - center.x, start.y - center.y)
+        let a0 = Double(atan2(start.y - center.y, start.x - center.x))
+        let spin = pow(pp, 2.0)
+        let rad  = r0 * CGFloat(1 - spin)
+        let ang  = a0 + spin * 2 * .pi * Self.turns
+        return CGPoint(x: center.x + CGFloat(cos(ang)) * rad,
+                       y: center.y + CGFloat(sin(ang)) * rad)
+    }
+
     var body: some View {
         TimelineView(.animation) { tl in
             let p  = min(1.0, tl.date.timeIntervalSince(since) / LaunchTransition.duration)
-            let r0 = hypot(start.x - center.x, start.y - center.y)
-            let a0 = Double(atan2(start.y - center.y, start.x - center.x))
-            // Whirlpool path: slow loops out wide, whipping faster as the inward
-            // pull (spin = p²) drags it down to the centre.
-            func pos(_ pp: Double) -> CGPoint {
-                let spin = pow(pp, 2.0)
-                let rad  = r0 * CGFloat(1 - spin)
-                let ang  = a0 + spin * 2 * .pi * Self.turns
-                return CGPoint(x: center.x + CGFloat(cos(ang)) * rad,
-                               y: center.y + CGFloat(sin(ang)) * rad)
-            }
             let here     = pos(p)
             let ballSize = max(7, diameter * (1 - CGFloat(pow(p, 2.0))))
             let blackP   = max(0.0, (p - 0.62) / 0.30)
