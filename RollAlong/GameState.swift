@@ -235,6 +235,11 @@ final class GameState: ObservableObject {
     @Published var completedTracks: Set<String> {
         didSet { saveStringSet(completedTracks, forKey: "ra_completedTracks") }
     }
+    /// Mode ids the player has launched at least once — drives the one-time
+    /// "how to play" tutorial shown the first time each mode is opened.
+    @Published var playedModeIDs: Set<String> {
+        didSet { saveStringSet(playedModeIDs, forKey: "ra_playedModeIDs") }
+    }
 
     // ── Challenge Track active session (transient — not persisted) ──────────
     //
@@ -396,6 +401,7 @@ final class GameState: ObservableObject {
         ownedPacks     = loadedOwnedPacks
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
+        playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -530,6 +536,14 @@ final class GameState: ObservableObject {
     /// True iff this level number consumes a life on failure.  Tutorial
     /// (L1-10) is exempt so new players can learn without pressure.
     func isTutorialLevel(_ level: Int) -> Bool { level <= Self.tutorialLevelCount }
+
+    /// Has this game mode been launched before?  (Drives the first-play tutorial.)
+    func hasPlayedMode(_ id: String) -> Bool { playedModeIDs.contains(id) }
+
+    /// Record that a mode has been launched so its tutorial won't show again.
+    func markModePlayed(_ id: String) {
+        if !playedModeIDs.contains(id) { playedModeIDs.insert(id) }
+    }
 
     /// Current life count including any regen that has accumulated since
     /// `lastLifeLostAt`.  Read this for display + gating.  Stored `lives`

@@ -288,29 +288,37 @@ struct HomeView: View {
                 case .mode("snake"):
                     SnakeGameView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("snake")]) }
+                        .firstPlayTutorial("snake")
                 case .mode("sumo"):
                     SumoSurvivalView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("sumo")]) }
+                        .firstPlayTutorial("sumo")
                 case .mode("paintball"):
                     PaintBallView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("paintball")]) }
+                        .firstPlayTutorial("paintball")
                 case .mode("goldrush"):
                     GoldRushView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("goldrush")]) }
+                        .firstPlayTutorial("goldrush")
                 case .mode("marblecup"):
                     MarbleCupView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("marblecup")]) }
+                        .firstPlayTutorial("marblecup")
                 case .mode("koth"):
                     KingOfTheHillView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("koth")]) }
+                        .firstPlayTutorial("koth")
                 case .mode("pinball"):
                     PinballView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("pinball")]) }
+                        .firstPlayTutorial("pinball")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)
+                        .firstPlayTutorial(id)
                 }
             }
             // Sheet driven by tapping the top-left lives pill.  Re-uses

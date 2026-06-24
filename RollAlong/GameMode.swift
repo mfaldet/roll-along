@@ -521,3 +521,189 @@ enum GameModeCatalogue {
         registry.first { $0.mode.id == id }?.mode
     }
 }
+
+// ===========================================================================
+// ModeTutorial — the one-time "how to play" card shown the first time a player
+// opens a given mode (Nintendo-style: controls · goal · hazard · reward).  The
+// climb is excluded: it has its own phased L1–L10 intro.
+// ===========================================================================
+
+struct ModeTutorial {
+    let controls: String
+    let goal: String
+    let hazard: String?     // the obstacle to avoid (nil = nothing can hurt you)
+    let reward: String
+
+    /// Authored copy per catalogue id (not display name).  Returns nil for
+    /// modes that don't need a card (the climb, the challenge tracks).
+    static func `for`(_ id: String) -> ModeTutorial? {
+        switch id {
+        case "zen":
+            return .init(controls: "Tilt to roll. There's no rush.",
+                         goal: "There's no goal — just roll and breathe.",
+                         hazard: nil,
+                         reward: "A calm, perfect line carved in the sand.")
+        case "coinpit":   // displayed "Gold Rush" — the 30s reward run
+            return .init(controls: "Tilt to roll around the floor.",
+                         goal: "Scoop up as many coins as you can in 30 seconds.",
+                         hazard: "Only the clock — nothing can hurt you.",
+                         reward: "Every coin you grab banks straight to your balance.")
+        case "goldrush":  // displayed "Coin Pit" — the 60s competitive scramble
+            return .init(controls: "Tilt to roll and chase the coins.",
+                         goal: "Grab the most coins of anyone in 60 seconds.",
+                         hazard: "Rivals ram you to knock your coins loose.",
+                         reward: "Your haul banks as coins — win to earn a ticket.")
+        case "snake":     // Comet Clash
+            return .init(controls: "Tilt to steer your comet.",
+                         goal: "Be the last comet still glowing.",
+                         hazard: "Touch ANY glowing wall — yours or theirs — and you're out.",
+                         reward: "Grab sparks to extend your wall and outlast everyone.")
+        case "sumo":
+            return .init(controls: "Tilt to charge and ram.",
+                         goal: "Survive the endless waves of rivals.",
+                         hazard: "Get shoved off the shrinking ring and it's over.",
+                         reward: "Coins for every knockout and every second survived.")
+        case "paintball":
+            return .init(controls: "Tilt to roll — you paint the floor as you go.",
+                         goal: "Cover the most floor in your colour in 60 seconds.",
+                         hazard: "Roll through a puddle and you're frozen for 3 seconds.",
+                         reward: "Coins for your coverage, plus a bonus for first place.")
+        case "marblecup":
+            return .init(controls: "Tilt to roll into the ball.",
+                         goal: "Knock the ball into their net — most goals in 90s wins.",
+                         hazard: "A defending AI guards the goal and counterattacks.",
+                         reward: "Coins for every goal, plus a bonus if you win.")
+        case "koth":      // King of the Hill
+            return .init(controls: "Tilt to roll into the glowing zone.",
+                         goal: "Hold the moving hill — alone — the longest.",
+                         hazard: "A rival in the zone makes it contested: nobody scores.",
+                         reward: "Coins for your hold time, plus a win bonus.")
+        case "pinball":
+            return .init(controls: "No tilt — tap the LEFT or RIGHT half to flick that flipper.",
+                         goal: "Bash the bumpers up top for the highest score.",
+                         hazard: "Don't let all three balls drain past the flippers.",
+                         reward: "Your final score banks as coins.")
+        default:
+            return nil
+        }
+    }
+}
+
+/// Full-screen "how to play" card: dimmed background, labelled rows, and a big
+/// "Got it — Play" button.  `onPlay` dismisses it and reveals the mode beneath.
+struct ModeTutorialOverlay: View {
+    let title: String
+    let tutorial: ModeTutorial
+    let onPlay: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.80).ignoresSafeArea()
+            VStack(spacing: 0) {
+                Text("HOW TO PLAY")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .tracking(3)
+                    .foregroundStyle(Color(white: 0.55))
+                Text(title)
+                    .font(.system(size: 30, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
+                    .padding(.bottom, 22)
+
+                VStack(spacing: 14) {
+                    row("hand.draw.fill", "CONTROLS", tutorial.controls,
+                        Color(red: 0.40, green: 0.62, blue: 1.0))
+                    row("flag.checkered", "GOAL", tutorial.goal,
+                        Color(red: 0.40, green: 0.82, blue: 0.52))
+                    if let hazard = tutorial.hazard {
+                        row("exclamationmark.triangle.fill", "WATCH OUT", hazard,
+                            Color(red: 0.98, green: 0.55, blue: 0.35))
+                    }
+                    row("gift.fill", "REWARD", tutorial.reward,
+                        Color(red: 1.0, green: 0.82, blue: 0.30))
+                }
+
+                Button(action: onPlay) {
+                    Text("Got it — Play")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(LinearGradient(colors: [.white, Color(white: 0.85)],
+                                                     startPoint: .top, endPoint: .bottom))
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 26)
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 26)
+                    .fill(Color(white: 0.12))
+                    .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color(white: 0.24), lineWidth: 1))
+            )
+            .padding(.horizontal, 28)
+        }
+    }
+
+    private func row(_ icon: String, _ label: String, _ text: String, _ color: Color) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 30, height: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .tracking(1.5)
+                    .foregroundStyle(color)
+                Text(text)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Gates a mode's view behind its one-time how-to-play card.  Applied to each
+/// mode destination: `SnakeGameView().firstPlayTutorial("snake")`.  No-ops for
+/// ids without an authored ModeTutorial (the climb, challenge tracks).
+private struct FirstPlayTutorialModifier: ViewModifier {
+    let modeID: String
+    @EnvironmentObject var gameState: GameState
+    @State private var show = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if show, let tut = ModeTutorial.for(modeID) {
+                    ModeTutorialOverlay(
+                        title: GameModeCatalogue.mode(id: modeID)?.displayName ?? "Play",
+                        tutorial: tut,
+                        onPlay: {
+                            gameState.markModePlayed(modeID)
+                            withAnimation(.easeOut(duration: 0.22)) { show = false }
+                        }
+                    )
+                    .transition(.opacity)
+                    .zIndex(100)
+                }
+            }
+            .onAppear {
+                if !gameState.hasPlayedMode(modeID), ModeTutorial.for(modeID) != nil {
+                    show = true
+                }
+            }
+    }
+}
+
+extension View {
+    func firstPlayTutorial(_ modeID: String) -> some View {
+        modifier(FirstPlayTutorialModifier(modeID: modeID))
+    }
+}
