@@ -91,6 +91,8 @@ struct PaintBallView: View {
     // MARK: - State
 
     @State private var painters: [Painter] = []
+    /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
+    @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     @State private var pits:     [Pit]     = []
     @State private var splashes: [Splash]  = []
 
@@ -135,7 +137,14 @@ struct PaintBallView: View {
                     pitLayer.allowsHitTesting(false)
                     splashLayer.allowsHitTesting(false)
                     ForEach(painters) { p in
-                        marble(p).position(p.pos)
+                        marble(p)
+                            .overlay(alignment: .top) {
+                                RivalNameTag(label: p.isPlayer ? "YOU" : (rivalLooks[p.colorIndex]?.name ?? "Rival"),
+                                             color: Self.paintColors[p.colorIndex],
+                                             isPlayer: p.isPlayer)
+                                    .offset(y: -13).allowsHitTesting(false)
+                            }
+                            .position(p.pos)
                     }
                 }
                 .contentShape(Rectangle())
@@ -229,10 +238,12 @@ struct PaintBallView: View {
                     .overlay(Circle().stroke(paint, lineWidth: 3))
                     .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             } else {
-                Circle().fill(RadialGradient(
-                    colors: [paint, paint.opacity(0.7)],
-                    center: .init(x: 0.35, y: 0.32),
-                    startRadius: 1, endRadius: marbleRadius * 1.4))
+                // Keystone: rival shows off a real ball skin, but keeps a thick
+                // PAINT-COLOUR rim — in Paint Ball the colour is the gameplay
+                // identity (whose paint is whose), so it must stay legible.
+                let skin = rivalLooks[p.colorIndex]?.skin ?? .red
+                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+                    .overlay(Circle().stroke(paint, lineWidth: 3))
                     .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
             }
         }
@@ -500,6 +511,9 @@ struct PaintBallView: View {
             fresh.append(Painter(pos: p, colorIndex: i + 1, isPlayer: false,
                                  target: p, immuneUntil: localTick + 45))
         }
+        let rivals = fresh.filter { !$0.isPlayer }
+        rivalLooks = Dictionary(uniqueKeysWithValues:
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         painters = fresh
     }
 

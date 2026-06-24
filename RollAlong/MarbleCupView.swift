@@ -71,6 +71,8 @@ struct MarbleCupView: View {
     // MARK: - State
 
     @State private var movers: [Mover] = []
+    /// The single AI rival's keystone look (skin+trail+name), dealt in reset().
+    @State private var rivalLook: RivalCosmetics.Look?
     @State private var arena:  CGSize  = .zero
     @State private var field:  CGRect  = .zero
 
@@ -115,7 +117,14 @@ struct MarbleCupView: View {
                         moverView(ball).position(ball.pos)
                     }
                     ForEach(movers.filter { $0.role != .ball }) { m in
-                        moverView(m).position(m.pos)
+                        moverView(m)
+                            .overlay(alignment: .top) {
+                                RivalNameTag(label: m.role == .player ? "YOU" : (rivalLook?.name ?? "Rival"),
+                                             color: m.role == .player ? Self.playerAccent : Self.aiAccent,
+                                             isPlayer: m.role == .player)
+                                    .offset(y: -13).allowsHitTesting(false)
+                            }
+                            .position(m.pos)
                     }
                 }
                 .contentShape(Rectangle())
@@ -251,9 +260,9 @@ struct MarbleCupView: View {
                     .overlay(Circle().stroke(Self.playerAccent, lineWidth: 3))
                     .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             case .ai:
-                Circle().fill(RadialGradient(colors: [Self.aiAccent, Self.aiAccent.opacity(0.7)],
-                                             center: .init(x: 0.35, y: 0.32),
-                                             startRadius: 1, endRadius: m.radius * 1.4))
+                // Keystone: the rival shows off a real, desirable ball skin.
+                Circle().fill((rivalLook?.skin ?? .red).gradient(endRadius: m.radius * 1.4))
+                    .overlay(Circle().stroke(Self.aiAccent.opacity(0.9), lineWidth: 2))
                     .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
             }
         }
@@ -475,6 +484,7 @@ struct MarbleCupView: View {
         let b = Mover(pos: CGPoint(x: field.midX, y: field.midY),
                       role: .ball, radius: ballRadius, mass: ballMass)
         movers = [p, a, b]
+        rivalLook = RivalCosmetics.deal(1).first   // keystone: deal the AI rival a showcase look
     }
 
     private func endMatch() {
