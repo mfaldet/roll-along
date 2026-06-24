@@ -193,8 +193,10 @@ struct BallSkinView: View {
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
             metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
-        case .jade, .ruby, .diamond:
+        case .jade, .ruby:
             gemMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+        case .diamond:
+            diamondCanvas.clipShape(Circle()).overlay(planetRim)
 
         // ── Gradient-based (any remaining / future skin) ───────────────
         default:
@@ -1566,6 +1568,108 @@ struct BallSkinView: View {
         ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.5, y: cy - r * 0.82, width: r * 0.5, height: r * 0.30)),
             with: .radialGradient(Gradient(colors: [.white.opacity(0.4), .clear]),
                 center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.35))
+    }
+
+    // =========================================================================
+    // MARK: - Diamond (Diamond Balls IAP exclusive)
+    // The showpiece skin: a brilliant-cut gem with a faceted crown that
+    // shimmers facet-by-facet, slowly rotating spectral "fire" (refracted
+    // rainbow light), and twinkling 4-point sparkle flares.  Reduce Motion
+    // freezes all three.
+    // =========================================================================
+    private var diamondCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+                // Brilliant icy base.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [.white,
+                                      Color(red: 0.80, green: 0.95, blue: 1.0),
+                                      Color(red: 0.50, green: 0.78, blue: 0.98),
+                                      Color(red: 0.20, green: 0.42, blue: 0.72)]),
+                    center: CGPoint(x: cx - r * 0.26, y: cy - r * 0.30), startRadius: 0, endRadius: r * 1.30))
+
+                // Spectral fire — drifting refracted rainbow, additively blended.
+                ctx.blendMode = .plusLighter
+                for i in 0..<6 {
+                    let a   = t * 0.5 + Double(i) * .pi / 3
+                    let hue = (t * 0.06 + Double(i) / 6.0).truncatingRemainder(dividingBy: 1.0)
+                    let col = Color(hue: hue, saturation: 0.62, brightness: 1.0)
+                    let px  = cx + CGFloat(cos(a)) * r * 0.34
+                    let py  = cy + CGFloat(sin(a)) * r * 0.34
+                    let br  = r * 0.42
+                    ctx.fill(Path(ellipseIn: CGRect(x: px - br, y: py - br, width: br * 2, height: br * 2)),
+                        with: .radialGradient(Gradient(colors: [col.opacity(0.28), .clear]),
+                            center: CGPoint(x: px, y: py), startRadius: 0, endRadius: br))
+                }
+                ctx.blendMode = .normal
+
+                // Faceted brilliant cut — radiating triangles, each shimmering
+                // on its own phase, plus a central table.
+                let facets = 10
+                let tableR = r * 0.40
+                for k in 0..<facets {
+                    let a0 = Double(k)     / Double(facets) * 2 * .pi - .pi / 2
+                    let a1 = Double(k + 1) / Double(facets) * 2 * .pi - .pi / 2
+                    let am = (a0 + a1) / 2
+                    let in0 = CGPoint(x: cx + CGFloat(cos(a0)) * tableR, y: cy + CGFloat(sin(a0)) * tableR)
+                    let in1 = CGPoint(x: cx + CGFloat(cos(a1)) * tableR, y: cy + CGFloat(sin(a1)) * tableR)
+                    let out = CGPoint(x: cx + CGFloat(cos(am)) * r * 0.97, y: cy + CGFloat(sin(am)) * r * 0.97)
+                    var f = Path(); f.move(to: in0); f.addLine(to: in1); f.addLine(to: out); f.closeSubpath()
+                    let shimmer = 0.5 + 0.5 * sin(t * 2.0 + Double(k) * 0.9)
+                    ctx.fill(f, with: .color(.white.opacity(0.10 + 0.22 * shimmer)))
+                    ctx.stroke(f, with: .color(.white.opacity(0.16)), lineWidth: max(0.4, r * 0.009))
+                }
+                var table = Path()
+                for k in 0...facets {
+                    let a = Double(k) / Double(facets) * 2 * .pi - .pi / 2
+                    let p = CGPoint(x: cx + CGFloat(cos(a)) * tableR, y: cy + CGFloat(sin(a)) * tableR)
+                    if k == 0 { table.move(to: p) } else { table.addLine(to: p) }
+                }
+                let tableShim = 0.5 + 0.5 * sin(t * 1.5)
+                ctx.fill(table, with: .color(.white.opacity(0.12 + 0.16 * tableShim)))
+                ctx.stroke(table, with: .color(.white.opacity(0.30)), lineWidth: max(0.5, r * 0.012))
+
+                // Twinkling 4-point sparkle flares.
+                ctx.blendMode = .plusLighter
+                for (i, s) in [(-0.30, -0.22, 0.0), (0.26, -0.12, 0.4), (0.06, 0.30, 0.7),
+                               (0.34, 0.24, 0.2), (-0.16, 0.12, 0.9)].enumerated() {
+                    let tw = 0.5 + 0.5 * sin(t * 3.0 + s.2 * 6.283 + Double(i))
+                    if tw < 0.18 { continue }
+                    diamondSparkle(ctx, at: CGPoint(x: cx + CGFloat(s.0) * r, y: cy + CGFloat(s.1) * r),
+                                   size: r * (0.09 + 0.10 * CGFloat(tw)), opacity: tw)
+                }
+                ctx.blendMode = .normal
+
+                // Crisp top-left specular + cool bright rim.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.50, y: cy - r * 0.74, width: r * 0.42, height: r * 0.28)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.9), .clear]),
+                        center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.58), startRadius: 0, endRadius: r * 0.32))
+                ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.02, dy: r * 0.02)),
+                    with: .color(Color(red: 0.85, green: 0.95, blue: 1.0).opacity(0.6)), lineWidth: max(0.6, r * 0.04))
+            }
+        }
+    }
+
+    /// A bright 4-point sparkle flare with a soft bloom.
+    private func diamondSparkle(_ ctx: GraphicsContext, at c: CGPoint, size: CGFloat, opacity: Double) {
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - size, y: c.y - size, width: size * 2, height: size * 2)),
+            with: .radialGradient(Gradient(colors: [.white.opacity(0.5 * opacity), .clear]),
+                center: c, startRadius: 0, endRadius: size))
+        var star = Path()
+        let L = size, inr = size * 0.16
+        for k in 0..<8 {
+            let a   = Double(k) * .pi / 4 - .pi / 2
+            let rad = (k % 2 == 0) ? L : inr
+            let p   = CGPoint(x: c.x + CGFloat(cos(a)) * rad, y: c.y + CGFloat(sin(a)) * rad)
+            if k == 0 { star.move(to: p) } else { star.addLine(to: p) }
+        }
+        star.closeSubpath()
+        ctx.fill(star, with: .color(.white.opacity(min(1.0, 0.95 * opacity))))
     }
 
     // =========================================================================
