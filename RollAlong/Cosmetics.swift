@@ -1809,3 +1809,45 @@ struct RivalNameTag: View {
             .fixedSize()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Competitive trails — shared so the keystone "opponents' trails are visible"
+// streak is one implementation across every competitive view.
+// ---------------------------------------------------------------------------
+
+/// Append a position to a per-key trail buffer (min-step gate + length cap).
+/// Call once per racer each tick; the buffer feeds `drawTrails`.
+func recordTrail<K: Hashable>(_ trails: inout [K: [CGPoint]], _ key: K, _ pos: CGPoint,
+                              maxLen: Int = 14, minStep: CGFloat = 3) {
+    var pts = trails[key] ?? []
+    if let last = pts.last {
+        if hypot(pos.x - last.x, pos.y - last.y) > minStep { pts.append(pos) }
+    } else {
+        pts.append(pos)
+    }
+    if pts.count > maxLen { pts.removeFirst(pts.count - maxLen) }
+    trails[key] = pts
+}
+
+/// Draw fading competitive trails into a Canvas `ctx`.  Each entry is one
+/// racer's recent points + the TrailColor to draw it in (`.rainbow` → a
+/// per-segment hue cycle; `.none` and <2-point trails are skipped).
+func drawTrails(_ ctx: GraphicsContext,
+                _ entries: [(points: [CGPoint], trail: TrailColor)]) {
+    for e in entries {
+        let pts = e.points
+        guard pts.count >= 2, e.trail != .none else { continue }
+        let rainbow = e.trail == .rainbow
+        let solid = e.trail.color
+        for i in 1..<pts.count {
+            let age = Double(i) / Double(pts.count - 1)
+            let segColor: Color = rainbow
+                ? Color(hue: (Double(i) / Double(pts.count)).truncatingRemainder(dividingBy: 1),
+                        saturation: 1, brightness: 1)
+                : solid
+            var path = Path(); path.move(to: pts[i - 1]); path.addLine(to: pts[i])
+            ctx.stroke(path, with: .color(segColor.opacity(0.10 + 0.55 * age)),
+                       style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+        }
+    }
+}

@@ -72,6 +72,8 @@ struct KingOfTheHillView: View {
     @State private var racers: [Racer] = []
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
+    /// Recent positions per racer (colorIndex → points) for the trail layer.
+    @State private var trails: [Int: [CGPoint]] = [:]
     @State private var arena:  CGSize  = .zero
     @State private var field:  CGRect  = .zero
     @State private var zoneCenter: CGPoint = .zero
@@ -119,6 +121,7 @@ struct KingOfTheHillView: View {
                         .equatable()
                         .allowsHitTesting(false)
                     zoneView
+                    trailsLayer.allowsHitTesting(false)
                     ForEach(racers) { r in
                         marble(r)
                             .overlay(alignment: .top) {
@@ -219,6 +222,19 @@ struct KingOfTheHillView: View {
             return Color(white: 0.45)
         }
         return Self.palette[r.colorIndex % Self.palette.count]
+    }
+
+    /// The TrailColor a racer renders with — own for the player, dealt for rivals.
+    private func trailFor(_ r: Racer) -> TrailColor {
+        r.isPlayer ? gameState.equippedTrail : (rivalLooks[r.colorIndex]?.trail ?? .none)
+    }
+
+    /// Keystone: every racer's equipped trail, visible to all (player's own,
+    /// each rival's the one dealt in reset()).
+    private var trailsLayer: some View {
+        Canvas { ctx, _ in
+            drawTrails(ctx, racers.map { (trails[$0.colorIndex] ?? [], trailFor($0)) })
+        }
     }
 
     private func marble(_ r: Racer) -> some View {
@@ -441,6 +457,7 @@ struct KingOfTheHillView: View {
         rivalLooks = Dictionary(uniqueKeysWithValues:
             zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         racers = fresh
+        trails.removeAll()
         showMapName = true
     }
 
@@ -504,6 +521,8 @@ struct KingOfTheHillView: View {
         resolveCollisions()
         resolvePillarCollisions()
         scoreHill()
+
+        for r in racers { recordTrail(&trails, r.colorIndex, r.pos) }
 
         if roundTick >= roundTicks { endRun() }
     }
