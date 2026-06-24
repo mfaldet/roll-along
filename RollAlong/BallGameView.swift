@@ -4299,61 +4299,6 @@ struct SpinningCoinView: View {
 }
 
 // ---------------------------------------------------------------------------
-// CatPawPrint — stylised paw silhouette used as the mint mark on every
-// Roll Along coin (both the in-game spinning coin and the static menu
-// coin icon).  Built from five overlapping ellipses inside a Shape so
-// the path is a single fillable region with no internal seams:
-//
-//   • 1 main pad — wide ellipse at the bottom-centre
-//   • 4 toe beans — smaller ellipses fanned across the top, outer
-//     toes slightly lower than inner toes (mimics a real paw print)
-//
-// Star symbolism is reserved for level-completion stars (speed/skill
-// awards) — keeping that meaning distinct from the coin currency is
-// why we mint the coin with a paw instead.
-// ---------------------------------------------------------------------------
-struct CatPawPrint: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w  = rect.width
-        let h  = rect.height
-        let cx = rect.midX
-
-        // Main pad — rounded shape occupying the lower band.  Slightly
-        // wider than tall to read as the heel pad rather than another toe.
-        let padW = w * 0.62
-        let padH = h * 0.46
-        path.addEllipse(in: CGRect(
-            x:      cx - padW / 2,
-            y:      rect.minY + h * 0.46,
-            width:  padW,
-            height: padH
-        ))
-
-        // 4 toe beans across the top.  Outer toes are wider apart and
-        // sit slightly lower; inner toes are closer together and sit
-        // higher, giving the silhouette a natural fan.
-        let toeW: CGFloat = w * 0.22
-        let toeH: CGFloat = h * 0.26
-        let toes: [CGPoint] = [
-            CGPoint(x: cx - w * 0.30, y: rect.minY + h * 0.32),  // outer left
-            CGPoint(x: cx - w * 0.10, y: rect.minY + h * 0.14),  // inner left
-            CGPoint(x: cx + w * 0.10, y: rect.minY + h * 0.14),  // inner right
-            CGPoint(x: cx + w * 0.30, y: rect.minY + h * 0.32),  // outer right
-        ]
-        for t in toes {
-            path.addEllipse(in: CGRect(
-                x:      t.x - toeW / 2,
-                y:      t.y - toeH / 2,
-                width:  toeW,
-                height: toeH
-            ))
-        }
-        return path
-    }
-}
-
-// ---------------------------------------------------------------------------
 // CoinIcon — the single source of truth for what a Roll Along coin
 // looks like everywhere outside the gameplay arena (home page lives /
 // coin pill, level-clear summary, level-select stats, cosmetic shop
@@ -4362,11 +4307,10 @@ struct CatPawPrint: Shape {
 // just with an animated rim.
 //
 // Anatomy (all scaled by `size`):
-//   • Outer face gradient (bright top → deep amber bottom)
+//   • Outer face gradient (bright top → deep amber bottom; silver for platinum)
 //   • Dark outline stroke
-//   • Recessed inner ring — deeper gold w/ etched dark outline, sells
-//     the "minted" feel even at small sizes
-//   • CatPawPrint mark — dark embossed silhouette centred
+//   • Squiggle engraving traced along the outer rim (CoinSquiggle)
+//   • Triangle hole punched out of the middle (CoinTriangle), dark + recessed
 //   • Upper-left highlight crescent — catches the light
 //   • Subtle drop shadow
 // ---------------------------------------------------------------------------
