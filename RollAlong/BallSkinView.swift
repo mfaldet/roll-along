@@ -1061,73 +1061,73 @@ struct BallSkinView: View {
                     )
                 )
 
-                // ── 2. Teal-green aurora band ───────────────────────────
-                // Drifts ±12% of the sphere height on a ~16-second cycle.
-                let greenFraction = CGFloat(0.47 + 0.12 * sin(t * 0.40))
-                let greenY  = cy - r + r * 2 * greenFraction
-                let greenBW = r * 1.85
-                let greenBH = r * 0.36
-                let greenRect = CGRect(x: cx - greenBW / 2, y: greenY - greenBH / 2,
-                                       width: greenBW, height: greenBH)
-                ctx.fill(
-                    Path(ellipseIn: greenRect),
-                    with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.00), location: 0.0),
-                            .init(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.72), location: 0.5),
-                            .init(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.00), location: 1.0),
-                        ]),
-                        startPoint: CGPoint(x: cx, y: greenRect.minY),
-                        endPoint:   CGPoint(x: cx, y: greenRect.maxY)
-                    )
-                )
-
-                // ── 3. Violet aurora band ───────────────────────────────
-                // Slower drift, offset phase so the two bands never align.
-                let violetFraction = CGFloat(0.65 + 0.10 * sin(t * 0.28 + 1.2))
-                let violetY  = cy - r + r * 2 * violetFraction
-                let violetBW = r * 1.60
-                let violetBH = r * 0.28
-                let violetRect = CGRect(x: cx - violetBW / 2, y: violetY - violetBH / 2,
-                                        width: violetBW, height: violetBH)
-                ctx.fill(
-                    Path(ellipseIn: violetRect),
-                    with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: Color(red: 0.62, green: 0.18, blue: 0.92).opacity(0.00), location: 0.0),
-                            .init(color: Color(red: 0.62, green: 0.18, blue: 0.92).opacity(0.58), location: 0.5),
-                            .init(color: Color(red: 0.62, green: 0.18, blue: 0.92).opacity(0.00), location: 1.0),
-                        ]),
-                        startPoint: CGPoint(x: cx, y: violetRect.minY),
-                        endPoint:   CGPoint(x: cx, y: violetRect.maxY)
-                    )
-                )
-
-                // ── 4. Star specks (twinkling when not Reduce Motion) ───
-                // Fixed (fx, fy) fractions in the upper hemisphere.
-                // Each star's phase is offset by its index so they don't
-                // all pulse together.
+                // ── 2. Stars (behind the curtains) ──────────────────────
                 let stars: [(Double, Double)] = [
-                    (0.22, 0.18), (0.68, 0.12), (0.44, 0.28), (0.78, 0.24),
-                    (0.14, 0.32), (0.58, 0.08), (0.82, 0.34), (0.36, 0.15),
-                    (0.52, 0.40), (0.74, 0.39), (0.28, 0.06), (0.62, 0.35),
+                    (0.22, 0.18), (0.68, 0.14), (0.44, 0.26), (0.80, 0.30),
+                    (0.16, 0.40), (0.58, 0.10), (0.84, 0.52), (0.34, 0.62),
+                    (0.50, 0.44), (0.72, 0.70), (0.28, 0.74), (0.62, 0.36),
                 ]
-                let sr = r * 0.030
+                let sr = r * 0.026
                 for (idx, (fx, fy)) in stars.enumerated() {
                     let sx = cx - r + CGFloat(fx) * r * 2
                     let sy = cy - r + CGFloat(fy) * r * 2
-                    guard hypot(sx - cx, sy - cy) < r * 0.88 else { continue }
+                    guard hypot(sx - cx, sy - cy) < r * 0.90 else { continue }
                     let twinkle: CGFloat = reduceMotion
-                        ? 0.80
-                        : CGFloat(0.40 + 0.60 * sin(t * 2.1 + Double(idx) * 1.3))
+                        ? 0.70
+                        : CGFloat(0.35 + 0.55 * sin(t * 2.1 + Double(idx) * 1.3))
                     ctx.fill(
-                        Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr,
-                                               width: sr * 2, height: sr * 2)),
-                        with: .color(.white.opacity(twinkle))
-                    )
+                        Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr, width: sr * 2, height: sr * 2)),
+                        with: .color(.white.opacity(twinkle)))
                 }
 
-                // ── 5. Specular highlight — sells the spherical form ────
+                // ── 3. Flowing aurora curtains — wavy vertical ribbons that
+                //    undulate and shimmer, additively blended so they GLOW
+                //    over the night sky (this is what reads as real aurora,
+                //    not horizontal stripes).
+                ctx.blendMode = .plusLighter
+                let curtains: [(x: CGFloat, width: CGFloat, color: Color, speed: Double, phase: Double, freq: Double)] = [
+                    (0.34, 0.26, Color(red: 0.25, green: 0.95, blue: 0.62), 0.70, 0.0, 3.0),  // green
+                    (0.52, 0.22, Color(red: 0.30, green: 0.85, blue: 0.96), 0.50, 1.7, 3.6),  // teal
+                    (0.66, 0.20, Color(red: 0.66, green: 0.32, blue: 0.96), 0.60, 3.4, 2.6),  // violet
+                    (0.46, 0.15, Color(red: 0.96, green: 0.42, blue: 0.80), 0.42, 5.1, 4.2),  // pink
+                ]
+                let steps = 26
+                for cu in curtains {
+                    let xc  = cx - r + cu.x * r * 2
+                    let ph  = t * cu.speed + cu.phase
+                    let amp = r * 0.16
+                    let halfW = cu.width * r * 0.5
+                    func waveX(_ yf: CGFloat) -> CGFloat {
+                        xc + CGFloat(sin(Double(yf) * cu.freq + ph)) * amp
+                           + CGFloat(sin(Double(yf) * cu.freq * 2.3 + ph * 1.4)) * (amp * 0.4)
+                    }
+                    var path = Path()
+                    for i in 0...steps {
+                        let yf = CGFloat(i) / CGFloat(steps)
+                        let y  = cy - r - r * 0.2 + yf * (r * 2.4)   // overshoot; clipped to the circle
+                        let x  = waveX(yf) - halfW
+                        if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+                    }
+                    for i in stride(from: steps, through: 0, by: -1) {
+                        let yf = CGFloat(i) / CGFloat(steps)
+                        let y  = cy - r - r * 0.2 + yf * (r * 2.4)
+                        path.addLine(to: CGPoint(x: waveX(yf) + halfW, y: y))
+                    }
+                    path.closeSubpath()
+                    let shimmer = reduceMotion ? 0.60 : 0.45 + 0.25 * sin(t * 1.3 + cu.phase)
+                    ctx.fill(path, with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: cu.color.opacity(0.0), location: 0.00),
+                            .init(color: cu.color.opacity(0.75 * shimmer), location: 0.30),
+                            .init(color: cu.color.opacity(0.42 * shimmer), location: 0.62),
+                            .init(color: cu.color.opacity(0.0), location: 1.00),
+                        ]),
+                        startPoint: CGPoint(x: xc, y: cy - r),
+                        endPoint:   CGPoint(x: xc, y: cy + r)))
+                }
+                ctx.blendMode = .normal
+
+                // ── 4. Specular highlight — sells the spherical form ────
                 let hlRect = CGRect(x: cx - r * 0.40, y: cy - r * 0.78,
                                     width: r * 0.50, height: r * 0.32)
                 ctx.fill(
