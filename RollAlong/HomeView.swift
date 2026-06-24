@@ -779,7 +779,7 @@ struct HomeView: View {
                 .accessibilityLabel("\(gameState.coinBalance) coins")
                 .accessibilityHint("Opens the get-coins shop.")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 30)
             .padding(.top, 8)
             Spacer()
         }
