@@ -238,21 +238,12 @@ struct KingOfTheHillView: View {
     }
 
     private func marble(_ r: Racer) -> some View {
-        let color = Self.palette[r.colorIndex % Self.palette.count]
-        return ZStack {
-            if r.isPlayer {
-                Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
-                    .overlay(Circle().stroke(Self.playerColor, lineWidth: 2.5))
-                    .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
-            } else {
-                // Keystone: each rival shows off a real, desirable ball skin.
-                let skin = rivalLooks[r.colorIndex]?.skin ?? .red
-                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
-                    .overlay(Circle().stroke(color.opacity(0.9), lineWidth: 2))
-                    .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
-            }
-        }
-        .frame(width: marbleRadius * 2, height: marbleRadius * 2)
+        // No per-racer colour highlight — the name tag identifies each ball, so
+        // every marble just wears its own skin (same neutral edge as solo play).
+        let skin = r.isPlayer ? gameState.activeSkin : (rivalLooks[r.colorIndex]?.skin ?? .red)
+        return Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+            .overlay(Circle().stroke(.white.opacity(0.30), lineWidth: 1))
+            .frame(width: marbleRadius * 2, height: marbleRadius * 2)
         .overlay(alignment: .topLeading) {
             Circle().fill(.white.opacity(0.5))
                 .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)

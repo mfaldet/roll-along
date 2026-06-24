@@ -118,8 +118,9 @@ struct GoldRushView: View {
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: r.isPlayer ? "YOU" : (rivalLooks[r.colorIndex]?.name ?? "Rival"),
                                              color: Self.racerColors[r.colorIndex],
-                                             isPlayer: r.isPlayer)
-                                    .offset(y: -13).allowsHitTesting(false)
+                                             isPlayer: r.isPlayer,
+                                             isLeader: isLeader(r))
+                                    .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(r.pos)
                     }
@@ -238,30 +239,23 @@ struct GoldRushView: View {
     }
 
     private func marble(_ r: GoldRushEngine.Racer) -> some View {
-        let rim = Self.racerColors[r.colorIndex]   // thin per-racer identity tag
-        return ZStack {
-            if r.isPlayer {
-                // The player always wears their OWN equipped ball skin.
-                Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
-                    .overlay(Circle().stroke(rim, lineWidth: 3))
-                    .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
-            } else {
-                // Keystone: each rival shows off a real, desirable ball skin
-                // (dealt in reset()).  A thin colored rim keeps rivals tell-apart
-                // and matches their dot in the standings row.
-                let skin = rivalLooks[r.colorIndex]?.skin ?? .red
-                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
-                    .overlay(Circle().stroke(rim.opacity(0.9), lineWidth: 2))
-                    .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
+        // No per-racer colour highlight — the name tag identifies each ball, so
+        // every marble just wears its own skin (same neutral edge as solo play).
+        return Circle().fill(skinFor(r).gradient(endRadius: marbleRadius * 1.4))
+            .overlay(Circle().stroke(.white.opacity(0.30), lineWidth: 1))
+            .frame(width: marbleRadius * 2, height: marbleRadius * 2)
+            .overlay(alignment: .topLeading) {
+                Circle().fill(.white.opacity(0.5))
+                    .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
+                    .offset(x: marbleRadius * 0.35, y: marbleRadius * 0.35)
             }
-        }
-        .frame(width: marbleRadius * 2, height: marbleRadius * 2)
-        .overlay(alignment: .topLeading) {
-            Circle().fill(.white.opacity(0.5))
-                .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
-                .offset(x: marbleRadius * 0.35, y: marbleRadius * 0.35)
-        }
-        .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
+            .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
+    }
+
+    /// The skin a racer renders with — the player's equipped skin, each rival's
+    /// dealt showcase skin.
+    private func skinFor(_ r: GoldRushEngine.Racer) -> BallSkin {
+        r.isPlayer ? gameState.activeSkin : (rivalLooks[r.colorIndex]?.skin ?? .red)
     }
 
     // MARK: - HUD / overlays
@@ -306,13 +300,12 @@ struct GoldRushView: View {
         HStack(spacing: 8) {
             ForEach(racers.sorted { $0.colorIndex < $1.colorIndex }) { r in
                 HStack(spacing: 4) {
-                    if r.isPlayer {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Self.racerColors[r.colorIndex])
-                    } else {
-                        Circle().fill(Self.racerColors[r.colorIndex]).frame(width: 10, height: 10)
+                    if isLeader(r) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
                     }
+                    MiniBall(skin: skinFor(r), size: 14)   // each racer's real ball decal
                     Text("\(r.score)")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
@@ -322,10 +315,6 @@ struct GoldRushView: View {
                 .padding(.vertical, 4)
                 .background(
                     Capsule().fill(isLeader(r) ? Color.white.opacity(0.20) : Color.white.opacity(0.06))
-                )
-                .overlay(
-                    Capsule().stroke(isLeader(r) ? Self.racerColors[r.colorIndex].opacity(0.9) : .clear,
-                                     lineWidth: 1.5)
                 )
             }
         }

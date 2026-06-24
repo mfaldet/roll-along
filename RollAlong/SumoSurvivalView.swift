@@ -241,18 +241,11 @@ struct SumoSurvivalView: View {
     }
 
     private func marble(_ b: Bumper) -> some View {
-        ZStack {
-            if b.isPlayer {
-                Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
-            } else {
-                // Keystone: each rival shows off a real, desirable ball skin.
-                let skin = rivalLooks[b.id]?.skin ?? .red
-                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
-                    .overlay(Circle().stroke(b.color.opacity(0.9), lineWidth: 2))
-            }
-        }
-        .frame(width: marbleRadius * 2, height: marbleRadius * 2)
-        .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.5))
+        // No per-racer colour highlight — the name tag identifies each ball.
+        let skin = b.isPlayer ? gameState.activeSkin : (rivalLooks[b.id]?.skin ?? .red)
+        return Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+            .frame(width: marbleRadius * 2, height: marbleRadius * 2)
+            .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.5))
         .overlay(alignment: .topLeading) {
             Circle().fill(.white.opacity(0.5))
                 .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)

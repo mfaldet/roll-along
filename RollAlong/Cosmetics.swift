@@ -1799,15 +1799,37 @@ struct RivalNameTag: View {
     let label: String
     let color: Color
     let isPlayer: Bool
+    var isLeader: Bool = false      // draws a crown above the tag (current leader)
     var body: some View {
-        Text(label)
-            .font(.system(size: isPlayer ? 11 : 10,
-                          weight: isPlayer ? .heavy : .bold, design: .rounded))
-            .foregroundStyle(isPlayer ? Color.white : color)
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Capsule().fill(Color.black.opacity(isPlayer ? 0.6 : 0.42)))
-            .overlay(Capsule().stroke(color.opacity(0.95), lineWidth: isPlayer ? 1.5 : 1))
-            .fixedSize()
+        VStack(spacing: 1) {
+            if isLeader {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 9, weight: .black))
+                    .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
+                    .shadow(color: .black.opacity(0.55), radius: 1, y: 0.5)
+            }
+            Text(label)
+                .font(.system(size: isPlayer ? 11 : 10,
+                              weight: isPlayer ? .heavy : .bold, design: .rounded))
+                .foregroundStyle(isPlayer ? Color.white : color)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill(Color.black.opacity(isPlayer ? 0.6 : 0.42)))
+                .overlay(Capsule().stroke(color.opacity(0.95), lineWidth: isPlayer ? 1.5 : 1))
+        }
+        .fixedSize()
+    }
+}
+
+/// A tiny ball-decal chip — a racer's actual equipped skin, for HUDs/standings
+/// (replaces flat colored dots so players see real cosmetics up top too).
+struct MiniBall: View {
+    let skin: BallSkin
+    var size: CGFloat = 14
+    var body: some View {
+        Circle()
+            .fill(skin.gradient(endRadius: size * 0.7))
+            .frame(width: size, height: size)
+            .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 0.5))
     }
 }
 
