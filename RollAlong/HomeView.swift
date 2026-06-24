@@ -971,11 +971,12 @@ struct HomeView: View {
         Button {
             guard !launching else { return }
             launching = true
-            // Brief launch flourish, then push into the current mode.  Reset
-            // after the push so the overlay isn't lingering on pop-back.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+            // Spiral-into-portal flourish; push once the screen has gone black,
+            // so the game reveals from under it.  Reset after the push so the
+            // overlay isn't lingering on pop-back.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
                 nav.path.append(currentModeRoute)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { launching = false }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { launching = false }
             }
         } label: {
             playButtonBody

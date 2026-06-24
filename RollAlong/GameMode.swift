@@ -773,34 +773,59 @@ extension View {
     }
 }
 
-/// Brief "launch" flourish played over the home screen when Play is pressed:
-/// the player's ball dives toward the viewer as the screen dims, then the game
-/// pushes in underneath.  Self-contained one-shot animation.
+/// Launch flourish played over the home screen when Play is pressed: the
+/// player's ball spirals INWARD and shrinks into a glowing goal/portal at the
+/// centre — like draining down a bowl, the same goal/portal on every Roll Along
+/// map — then the camera is sucked into the portal (black expands from centre)
+/// and the game pushes in underneath.  Self-contained; driven by a TimelineView
+/// so the ball follows a true spiral path.
 struct LaunchTransition: View {
     let skin: BallSkin
-    @State private var scale: CGFloat = 0.35
-    @State private var dim: Double = 0
+    private static let duration: Double = 0.62
+    @State private var start = Date()
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(dim * 0.9).ignoresSafeArea()
-            Circle()
-                .fill(skin.gradient(endRadius: 70))
-                .overlay(
-                    Circle().fill(Color.white.opacity(0.5))
-                        .frame(width: 34, height: 34)
-                        .offset(x: -24, y: -26)
-                )
-                .frame(width: 140, height: 140)
-                .scaleEffect(scale)
-                .shadow(color: .black.opacity(0.5), radius: 20)
-        }
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.easeIn(duration: 0.42)) {
-                scale = 12
-                dim = 1
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            let c = CGPoint(x: w / 2, y: h / 2)
+            let maxOrbit = min(w, h) * 0.34
+            TimelineView(.animation) { tl in
+                let p = min(1.0, tl.date.timeIntervalSince(start) / Self.duration)  // 0→1
+                let ease = p * p                                   // accelerate inward
+                let angle = ease * 2 * .pi * 2.4                   // ~2.4 spirals
+                let orbit = maxOrbit * CGFloat(1 - ease)
+                let bx = c.x + CGFloat(cos(angle)) * orbit
+                let by = c.y + CGFloat(sin(angle)) * orbit
+                let ballSize = max(8, 132 * (1 - CGFloat(ease)))
+                let blackP = max(0.0, (p - 0.60) / 0.40)           // black takes over last 40%
+                let blackSize = CGFloat(blackP) * hypot(w, h) * 1.2
+
+                ZStack {
+                    // Glowing goal/portal at centre — brightens as the ball nears.
+                    Circle()
+                        .fill(RadialGradient(
+                            colors: [Color(red: 0.45, green: 0.78, blue: 1.0).opacity(0.55 * ease),
+                                     Color(red: 0.30, green: 0.55, blue: 0.95).opacity(0.25 * ease),
+                                     .clear],
+                            center: .center, startRadius: 0, endRadius: 70))
+                        .frame(width: 150, height: 150)
+                        .position(c)
+
+                    // The ball, spiralling + shrinking into the portal.
+                    BallSkinView(skin: skin, diameter: ballSize)
+                        .frame(width: ballSize, height: ballSize)
+                        .shadow(color: .black.opacity(0.5), radius: 8)
+                        .position(x: bx, y: by)
+                        .opacity(1 - Double(blackP))
+
+                    // Camera sucked into the portal — black expands from centre.
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: blackSize, height: blackSize)
+                        .position(c)
+                }
             }
         }
+        .ignoresSafeArea()
     }
 }
