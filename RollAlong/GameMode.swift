@@ -779,34 +779,24 @@ extension View {
 /// map — then the camera is sucked into the portal (black expands from centre)
 /// and the game pushes in underneath.  Self-contained; driven by a TimelineView
 /// so the ball follows a true spiral path.
+/// Full-screen portal glow + the "camera sucked down the drain" black wipe.
+/// The spiralling ball itself is drawn separately by `LaunchBall`, in the home
+/// ball's own coordinate space, so the two are layered but independent.
 struct LaunchTransition: View {
-    let skin: BallSkin
-    private static let duration: Double = 1.15
-    @State private var start = Date()
+    let since: Date
+    static let duration: Double = 2.30
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             let c = CGPoint(x: w / 2, y: h / 2)
-            let maxOrbit = min(w, h) * 0.34
             TimelineView(.animation) { tl in
-                let p = min(1.0, tl.date.timeIntervalSince(start) / Self.duration)  // 0→1
-                // Whirlpool: angular progress is heavily back-loaded, so the ball
-                // makes slow loops out at the rim and then whips faster and faster
-                // as it spirals down into the centre — like a coin in a wishing
-                // well.  Both the turn rate and the inward pull track `spin`.
-                let spin  = pow(p, 2.0)
-                let angle = spin * 2 * .pi * 4.0                   // ~4 turns, accelerating
-                let orbit = maxOrbit * CGFloat(1 - spin)
-                let bx = c.x + CGFloat(cos(angle)) * orbit
-                let by = c.y + CGFloat(sin(angle)) * orbit
-                let ballSize = max(7, 132 * (1 - CGFloat(spin)))
-                let glow = Double(spin)                            // portal brightens as it nears
+                let p = min(1.0, tl.date.timeIntervalSince(since) / Self.duration)  // 0→1
+                let glow   = Double(pow(p, 2.0))                   // portal brightens as ball nears
                 let blackP = max(0.0, (p - 0.62) / 0.30)           // black covers by p≈0.92
                 let blackSize = CGFloat(blackP) * hypot(w, h) * 1.2
 
                 ZStack {
-                    // Glowing goal/portal at centre — brightens as the ball nears.
                     Circle()
                         .fill(RadialGradient(
                             colors: [Color(red: 0.45, green: 0.78, blue: 1.0).opacity(0.55 * glow),
@@ -816,14 +806,6 @@ struct LaunchTransition: View {
                         .frame(width: 150, height: 150)
                         .position(c)
 
-                    // The ball, spiralling + shrinking into the portal.
-                    BallSkinView(skin: skin, diameter: ballSize)
-                        .frame(width: ballSize, height: ballSize)
-                        .shadow(color: .black.opacity(0.5), radius: 8)
-                        .position(x: bx, y: by)
-                        .opacity(1 - Double(blackP))
-
-                    // Camera sucked into the portal — black expands from centre.
                     Circle()
                         .fill(Color.black)
                         .frame(width: blackSize, height: blackSize)
@@ -832,5 +814,64 @@ struct LaunchTransition: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+/// The equipped ball spiralling from its current home position down into the
+/// centre, leaving a fading vortex trail.  Rendered INSIDE the home ball's
+/// coordinate space, so `start` lines up exactly with where the roaming ball
+/// sits — it visually replaces it.
+struct LaunchBall: View {
+    let skin: BallSkin
+    let start: CGPoint        // current ball centre (arena space)
+    let center: CGPoint       // arena centre — the drain
+    let diameter: CGFloat     // starting size (matches the home ball)
+    let since: Date
+    private static let turns: Double = 3.0
+
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let p  = min(1.0, tl.date.timeIntervalSince(since) / LaunchTransition.duration)
+            let r0 = hypot(start.x - center.x, start.y - center.y)
+            let a0 = Double(atan2(start.y - center.y, start.x - center.x))
+            // Whirlpool path: slow loops out wide, whipping faster as the inward
+            // pull (spin = p²) drags it down to the centre.
+            func pos(_ pp: Double) -> CGPoint {
+                let spin = pow(pp, 2.0)
+                let rad  = r0 * CGFloat(1 - spin)
+                let ang  = a0 + spin * 2 * .pi * Self.turns
+                return CGPoint(x: center.x + CGFloat(cos(ang)) * rad,
+                               y: center.y + CGFloat(sin(ang)) * rad)
+            }
+            let here     = pos(p)
+            let ballSize = max(7, diameter * (1 - CGFloat(pow(p, 2.0))))
+            let blackP   = max(0.0, (p - 0.62) / 0.30)
+
+            ZStack {
+                // Fading vortex trail — sample the spiral path just behind the ball.
+                Canvas { ctx, _ in
+                    let steps = 22
+                    var prev: CGPoint? = nil
+                    for j in stride(from: steps, through: 0, by: -1) {
+                        let frac = Double(j) / Double(steps)
+                        let pt = pos(max(0, p - 0.16 * frac))
+                        if let pv = prev {
+                            let op = (1 - frac) * 0.55 * (1 - Double(blackP))
+                            let lw = ballSize * CGFloat(0.40 + (1 - frac) * 0.55)
+                            var seg = Path(); seg.move(to: pv); seg.addLine(to: pt)
+                            ctx.stroke(seg, with: .color(Color(red: 0.62, green: 0.86, blue: 1.0).opacity(op)),
+                                       style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
+                        }
+                        prev = pt
+                    }
+                }
+                BallSkinView(skin: skin, diameter: ballSize)
+                    .frame(width: ballSize, height: ballSize)
+                    .shadow(color: .black.opacity(0.5), radius: 8)
+                    .position(here)
+                    .opacity(1 - Double(blackP))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }

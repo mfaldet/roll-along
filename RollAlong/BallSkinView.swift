@@ -761,8 +761,9 @@ struct BallSkinView: View {
 
     // =========================================================================
     // MARK: - Snowglobe
-    // Frosted-glass sphere with ~14 white snowflakes that drift downward with
-    // a gentle sine x-oscillation.  Pure Canvas + TimelineView.
+    // Frosted-glass sphere packed with ~22 white snowflakes that swirl
+    // vigorously around the dome (orbit + turbulence), like a freshly shaken
+    // globe.  Pure Canvas + TimelineView.
     // =========================================================================
     private var snowglobeCanvas: some View {
         TimelineView(.animation) { timeline in
@@ -793,16 +794,21 @@ struct BallSkinView: View {
 
                 // ── Snow — crisp 6-armed, feathered flakes drifting, swaying,
                 //    rotating, and twinkling inside the dome.
-                for i in 0..<9 {
-                    let seed = Double(i) * 0.713 + 0.21
-                    let fall = (t * 0.18 + seed).truncatingRemainder(dividingBy: 1.0)
-                    let sway = sin(t * 0.6 + seed * 5.3)
-                    let px = w * CGFloat(0.22 + 0.56 * (0.5 + 0.5 * sway))
-                    let py = h * CGFloat(0.12 + 0.74 * fall)
-                    if hypot(px - cx, py - cy) > r * 0.86 { continue }
-                    let twinkle = 0.6 + 0.4 * sin(t * 1.5 + seed * 7)
-                    let fr  = r * CGFloat(0.085 + Double(i % 3) * 0.02)
-                    let rot = t * 0.5 + seed * 6
+                for i in 0..<22 {
+                    let seed = Double(i) * 0.618 + 0.13
+                    let f1 = (seed * 1.7).truncatingRemainder(dividingBy: 1.0)
+                    let f2 = (seed * 3.1).truncatingRemainder(dividingBy: 1.0)
+                    // Vigorous orbit around the dome — each flake at its own
+                    // radius + speed — plus a fast little epicycle so the swirl
+                    // churns and tumbles instead of tracing clean circles.
+                    let swirl = t * (1.3 + 0.9 * f1) + seed * 6.283
+                    let rad   = r * CGFloat(0.16 + 0.66 * f2)
+                    let px = cx + CGFloat(cos(swirl)) * rad + CGFloat(cos(t * 2.1 + seed * 4)) * r * 0.10
+                    let py = cy + CGFloat(sin(swirl)) * rad + CGFloat(sin(t * 1.8 + seed * 5)) * r * 0.10
+                    if hypot(px - cx, py - cy) > r * 0.88 { continue }
+                    let twinkle = 0.55 + 0.45 * sin(t * 1.8 + seed * 7)
+                    let fr  = r * CGFloat(0.05 + Double(i % 4) * 0.018)
+                    let rot = t * 0.9 + seed * 6
 
                     var flake = Path()
                     for k in 0..<3 {                      // 3 lines → 6 arms

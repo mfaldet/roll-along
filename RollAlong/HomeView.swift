@@ -143,6 +143,7 @@ struct HomeView: View {
 
     /// Drives the Play→game launch animation (the ball dives at the viewer).
     @State private var launching: Bool = false
+    @State private var launchStart: Date = .now
 
     private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
@@ -173,13 +174,25 @@ struct HomeView: View {
                         // in-game trail (segment opacity ramps from
                         // 0.10 at the tail to 1.0 at the head;
                         // `.rainbow` gets a per-segment hue cycle).
-                        if gameState.equippedTrail != .none {
+                        if gameState.equippedTrail != .none && !launching {
                             homeTrailLayer
                                 .allowsHitTesting(false)
                         }
 
-                        liveBall
-                            .position(ballPos)
+                        if launching {
+                            // The spiralling launch ball REPLACES the roaming
+                            // ball — same coordinate space, so it starts exactly
+                            // where the ball currently sits (no second ball).
+                            LaunchBall(skin: gameState.activeSkin,
+                                       start: ballPos,
+                                       center: CGPoint(x: geo.size.width / 2,
+                                                       y: geo.size.height / 2),
+                                       diameter: ballRadius * 2,
+                                       since: launchStart)
+                        } else {
+                            liveBall
+                                .position(ballPos)
+                        }
                     }
                     .contentShape(Rectangle())
                     .onAppear {
@@ -200,6 +213,8 @@ struct HomeView: View {
                         respawnBall(in: arenaSize)
                     }
                 }
+                // During launch the spiralling ball rides above the UI.
+                .zIndex(launching ? 60 : 0)
 
                 VStack(spacing: 0) {
                     // Hug the top pills — the greeting + title sit right
@@ -266,9 +281,9 @@ struct HomeView: View {
 
                 // Play → game launch transition (the ball dives at the viewer).
                 if launching {
-                    LaunchTransition(skin: gameState.activeSkin)
+                    LaunchTransition(since: launchStart)
                         .transition(.opacity)
-                        .zIndex(50)
+                        .zIndex(70)
                 }
             }
             // NOTE: no accessibilityIdentifier here — the "HomeView" anchor
@@ -959,11 +974,12 @@ struct HomeView: View {
     private var playButton: some View {
         Button {
             guard !launching else { return }
+            launchStart = .now
             launching = true
             // Whirlpool-into-portal flourish; push once the screen has gone black
-            // (~1.06s into the 1.15s spiral), so the game reveals from under it.
+            // (~2.1s into the 2.30s spiral), so the game reveals from under it.
             // Reset after the push so the overlay isn't lingering on pop-back.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.10) {
                 nav.path.append(currentModeRoute)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { launching = false }
             }
