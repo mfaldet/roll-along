@@ -60,6 +60,24 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.28), lineWidth: 0.5))
 
+        // ── Planets — textured spheres, not flat gradients ───────────────
+        case .earth:
+            planet(Self.earthPalette, mottle: true).clipShape(Circle()).overlay(planetRim)
+        case .mars:
+            planet(Self.marsPalette, mottle: true, poles: true).clipShape(Circle()).overlay(planetRim)
+        case .mercury:
+            planet(Self.mercuryPalette, mottle: true).clipShape(Circle()).overlay(planetRim)
+        case .jupiter:
+            planet(Self.jupiterPalette, bands: true,
+                   spot: Color(red: 0.82, green: 0.30, blue: 0.16)).clipShape(Circle()).overlay(planetRim)
+        case .neptune:
+            planet(Self.neptunePalette, bands: true,
+                   spot: Color(red: 0.05, green: 0.10, blue: 0.40)).clipShape(Circle()).overlay(planetRim)
+        case .venus:
+            planet(Self.venusPalette, bands: true).clipShape(Circle()).overlay(planetRim)
+        case .uranus:
+            planet(Self.uranusPalette, bands: true).clipShape(Circle()).overlay(planetRim)
+
         case .aquarium:
             aquariumCanvas
                 .clipShape(Circle())
@@ -1205,6 +1223,96 @@ struct BallSkinView: View {
                     center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.64), startRadius: 0, endRadius: r * 0.4))
         }
     }
+
+    // =========================================================================
+    // MARK: - Planets (shared renderer)
+    // A textured sphere — lit base, optional latitude bands (gas giants),
+    // surface mottle (rocky worlds), polar caps, a storm spot, plus a
+    // terminator + specular that sell the 3-D read.  Clipped to a circle by
+    // the caller.  Far richer than the old flat radial gradient.
+    // =========================================================================
+    private var planetRim: some View { Circle().stroke(.black.opacity(0.28), lineWidth: 0.5) }
+
+    private func planet(_ colors: [Color], bands: Bool = false, mottle: Bool = false,
+                        spot: Color? = nil, poles: Bool = false) -> some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2
+            let r  = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+            // Lit base sphere.
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: colors),
+                center: CGPoint(x: cx - r * 0.28, y: cy - r * 0.30),
+                startRadius: 0, endRadius: r * 1.28))
+
+            // Latitude bands (gas giants).
+            if bands {
+                let n = 8
+                for i in 0..<n {
+                    let yf = (Double(i) + 0.5) / Double(n)
+                    let by = cy - r + CGFloat(yf) * r * 2
+                    let bh = r * 2 / CGFloat(n)
+                    let tint = (i % 2 == 0) ? colors[1].opacity(0.30) : colors[2].opacity(0.30)
+                    ctx.fill(Path(roundedRect: CGRect(x: cx - r, y: by - bh / 2, width: r * 2, height: bh),
+                                  cornerRadius: 0), with: .color(tint))
+                }
+            }
+
+            // Surface mottle (continents / craters) — seeded blobs, dark tone.
+            if mottle {
+                var s: UInt64 = 0xA17C5
+                func rnd() -> CGFloat { s = s &* 6364136223846793005 &+ 1442695040888963407; return CGFloat(s >> 40) / CGFloat(1 << 24) }
+                for _ in 0..<11 {
+                    let bx = cx + (rnd() - 0.5) * r * 1.5
+                    let by = cy + (rnd() - 0.5) * r * 1.5
+                    let br = r * (0.10 + rnd() * 0.18)
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                        with: .radialGradient(Gradient(colors: [colors[2].opacity(0.55), .clear]),
+                            center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
+                }
+            }
+
+            // Polar caps (Mars).
+            if poles {
+                for fy in [CGFloat(0.07), CGFloat(0.93)] {
+                    let py = cy - r + fy * r * 2
+                    ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.45, y: py - r * 0.14, width: r * 0.9, height: r * 0.28)),
+                        with: .radialGradient(Gradient(colors: [.white.opacity(0.85), .clear]),
+                            center: CGPoint(x: cx, y: py), startRadius: 0, endRadius: r * 0.5))
+                }
+            }
+
+            // Storm spot (Jupiter red / Neptune dark).
+            if let spot {
+                let sx = cx + r * 0.28, sy = cy + r * 0.16
+                ctx.fill(Path(ellipseIn: CGRect(x: sx - r * 0.20, y: sy - r * 0.12, width: r * 0.40, height: r * 0.24)),
+                    with: .radialGradient(Gradient(colors: [spot, spot.opacity(0.0)]),
+                        center: CGPoint(x: sx, y: sy), startRadius: 0, endRadius: r * 0.22))
+            }
+
+            // Terminator — night-side darkening, bottom-right.
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(stops: [.init(color: .clear, location: 0.0),
+                                 .init(color: .clear, location: 0.55),
+                                 .init(color: .black.opacity(0.50), location: 1.0)]),
+                center: CGPoint(x: cx + r * 0.34, y: cy + r * 0.36), startRadius: 0, endRadius: r * 1.25))
+
+            // Specular highlight.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.46, y: cy - r * 0.80, width: r * 0.5, height: r * 0.34)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.45), .clear]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.64), startRadius: 0, endRadius: r * 0.4))
+        }
+    }
+
+    private static let earthPalette   = [Color(red: 0.72, green: 0.90, blue: 1.00), Color(red: 0.20, green: 0.52, blue: 0.85), Color(red: 0.10, green: 0.46, blue: 0.24), Color(red: 0.02, green: 0.10, blue: 0.26)]
+    private static let marsPalette    = [Color(red: 1.00, green: 0.78, blue: 0.58), Color(red: 0.86, green: 0.42, blue: 0.22), Color(red: 0.55, green: 0.20, blue: 0.10), Color(red: 0.26, green: 0.08, blue: 0.04)]
+    private static let mercuryPalette = [Color(red: 0.88, green: 0.84, blue: 0.78), Color(red: 0.60, green: 0.56, blue: 0.50), Color(red: 0.36, green: 0.32, blue: 0.28), Color(red: 0.14, green: 0.12, blue: 0.10)]
+    private static let jupiterPalette = [Color(red: 1.00, green: 0.92, blue: 0.78), Color(red: 0.90, green: 0.68, blue: 0.44), Color(red: 0.70, green: 0.34, blue: 0.20), Color(red: 0.42, green: 0.14, blue: 0.10)]
+    private static let neptunePalette = [Color(red: 0.66, green: 0.84, blue: 1.00), Color(red: 0.20, green: 0.42, blue: 0.92), Color(red: 0.08, green: 0.18, blue: 0.62), Color(red: 0.02, green: 0.06, blue: 0.30)]
+    private static let venusPalette   = [Color(red: 1.00, green: 0.96, blue: 0.80), Color(red: 0.96, green: 0.82, blue: 0.42), Color(red: 0.78, green: 0.54, blue: 0.18), Color(red: 0.42, green: 0.26, blue: 0.06)]
+    private static let uranusPalette  = [Color(red: 0.82, green: 1.00, blue: 1.00), Color(red: 0.46, green: 0.86, blue: 0.88), Color(red: 0.16, green: 0.56, blue: 0.62), Color(red: 0.04, green: 0.26, blue: 0.32)]
 
     // =========================================================================
     // MARK: - Beach Ball  (Summer 2026 seasonal exclusive)
