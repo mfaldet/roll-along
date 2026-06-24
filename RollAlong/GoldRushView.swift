@@ -49,31 +49,8 @@ struct GoldRushView: View {
         Color(red: 1.00, green: 0.60, blue: 0.20),   // orange
     ]
 
-    /// KEYSTONE — desirable looks the AI rivals show off, so competitive play
-    /// doubles as a catalogue ad ("ooh, I want that one").  A shuffled slice is
-    /// dealt to the rivals each round in `reset()`.  Easily edited — add/swap
-    /// any (skin, trail) pair.  (When real multiplayer lands, rivals will
-    /// instead wear their OWN equipped gear, fetched from their profile.)
-    private static let rivalShowcase: [(skin: BallSkin, trail: TrailColor)] = [
-        (.galaxy, .rainbow),
-        (.nebula, .stardust),
-        (.lava,   .fire),
-        (.aurora, .cometTrail),
-        (.neon,   .raybeam),
-        (.gold,   .gilded),
-        (.saturn, .sky),
-        (.opal,   .air),
-        (.storm,  .ice),
-        (.ghost,  .mist),
-    ]
-
-    /// Fun bot nicknames dealt to rivals alongside their looks, so it's clear
-    /// who's who and the arena feels populated.  (Real opponents will show
-    /// their actual display name once multiplayer lands.)
-    private static let rivalNamePool: [String] = [
-        "Pip", "Ace", "Bolt", "Nova", "Zip", "Echo", "Dash", "Fizz",
-        "Quill", "Bandit", "Comet", "Jinx", "Rook", "Sly", "Pixel",
-    ]
+    // Rival looks + nicknames come from the shared RivalCosmetics helper
+    // (see Cosmetics.swift) — same pool every competitive view uses.
 
     // Per-racer home-style trail (the keystone: opponents' trails are visible).
     private let trailMaxLen = 14
@@ -103,13 +80,11 @@ struct GoldRushView: View {
     @State private var showMapName = false
     @State private var walls: [WallSegFrac] = []
 
-    /// Each rival's shown-off look (colorIndex → skin+trail), dealt in reset().
+    /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     /// The player always renders their OWN equipped skin/trail.
-    @State private var rivalLooks: [Int: (skin: BallSkin, trail: TrailColor)] = [:]
+    @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     /// Recent positions per racer (colorIndex → points) for the trail layer.
     @State private var trails: [Int: [CGPoint]] = [:]
-    /// Each rival's dealt nickname (colorIndex → name).  The player shows "YOU".
-    @State private var rivalNames: [Int: String] = [:]
 
     // MARK: - Computed (thin forwards onto the engine — the source of truth)
 
@@ -141,7 +116,10 @@ struct GoldRushView: View {
                     ForEach(racers) { r in
                         marble(r)
                             .overlay(alignment: .top) {
-                                nameTag(r).fixedSize().offset(y: -13).allowsHitTesting(false)
+                                RivalNameTag(label: r.isPlayer ? "YOU" : (rivalLooks[r.colorIndex]?.name ?? "Rival"),
+                                             color: Self.racerColors[r.colorIndex],
+                                             isPlayer: r.isPlayer)
+                                    .offset(y: -13).allowsHitTesting(false)
                             }
                             .position(r.pos)
                     }
@@ -257,21 +235,6 @@ struct GoldRushView: View {
     /// The TrailColor a racer renders with — own for the player, dealt for rivals.
     private func trailFor(_ r: GoldRushEngine.Racer) -> TrailColor {
         r.isPlayer ? gameState.equippedTrail : (rivalLooks[r.colorIndex]?.trail ?? .none)
-    }
-
-    /// A small floating tag above each marble — a bold "YOU" for the player (so
-    /// you can always find yourself) and the dealt nickname for each rival.
-    private func nameTag(_ r: GoldRushEngine.Racer) -> some View {
-        let color = Self.racerColors[r.colorIndex]
-        let label = r.isPlayer ? "YOU" : (rivalNames[r.colorIndex] ?? "Rival")
-        return Text(label)
-            .font(.system(size: r.isPlayer ? 11 : 10,
-                          weight: r.isPlayer ? .heavy : .bold, design: .rounded))
-            .foregroundStyle(r.isPlayer ? Color.white : color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.black.opacity(r.isPlayer ? 0.6 : 0.42)))
-            .overlay(Capsule().stroke(color.opacity(0.95), lineWidth: r.isPlayer ? 1.5 : 1))
     }
 
     private func marble(_ r: GoldRushEngine.Racer) -> some View {
@@ -528,16 +491,9 @@ struct GoldRushView: View {
     /// the showcase pool, so competitive play shows off the catalogue.  (Real
     /// opponents will wear their own equipped gear once multiplayer lands.)
     private func dealRivalLooks() {
-        let picks = Self.rivalShowcase.shuffled()
-        let names = Self.rivalNamePool.shuffled()
-        var looks: [Int: (skin: BallSkin, trail: TrailColor)] = [:]
-        var dealt: [Int: String] = [:]
-        for r in engine.racers where !r.isPlayer {
-            looks[r.colorIndex] = picks[(r.colorIndex - 1) % picks.count]
-            dealt[r.colorIndex] = names[(r.colorIndex - 1) % names.count]
-        }
-        rivalLooks = looks
-        rivalNames = dealt
+        let rivals = engine.racers.filter { !$0.isPlayer }
+        rivalLooks = Dictionary(uniqueKeysWithValues:
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
     }
 
     private func loadMap() {
