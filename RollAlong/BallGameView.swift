@@ -4246,41 +4246,27 @@ struct SpinningCoinView: View {
             // Outer face stroke
             Ellipse().stroke(Color.black.opacity(0.45), lineWidth: 1)
 
-            // INNER RECESSED RING — the most "minted" cue.  A second
-            // ellipse drawn slightly smaller with the deeper gold gradient,
-            // outlined in dark to read as an etched border.
-            Ellipse()
-                .fill(Self.goldenFaceDeep)
-                .scaleEffect(0.78)
-                .overlay(
-                    Ellipse()
-                        .stroke(Color.black.opacity(0.38), lineWidth: 0.9)
-                        .scaleEffect(0.78)
-                )
+            // Squiggle engraving along the rim — identical to the static
+            // CoinIcon; foreshortens with the spin via the parent's X scale.
+            CoinSquiggle()
+                .stroke(Color(red: 0.58, green: 0.38, blue: 0.05).opacity(0.9),
+                        lineWidth: 0.9)
 
-            // Centred paw-print mint mark — gives the coin its unique
-            // Roll Along identity (stars belong to skill/speed awards,
-            // not currency).  Same silhouette as the menu CoinIcon.
-            CatPawPrint()
+            // Triangle hole punched out of the middle — the new shared mark.
+            CoinTriangle()
                 .fill(
                     LinearGradient(
-                        colors: [
-                            Color(red: 0.55, green: 0.34, blue: 0.04),
-                            Color(red: 0.30, green: 0.18, blue: 0.02),
-                        ],
+                        colors: [Color(red: 0.46, green: 0.30, blue: 0.03),
+                                 Color(red: 0.24, green: 0.15, blue: 0.01)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
-                .frame(width: size * 0.55, height: size * 0.55)
-                // A tiny white highlight on the upper-left edge sells
-                // the embossed, raised feel — fades as the coin spins
-                // edge-on.
+                .frame(width: size * 0.40, height: size * 0.40)
                 .overlay(
-                    CatPawPrint()
-                        .stroke(Color.white.opacity(0.35 * spinRaw),
-                                lineWidth: 0.5)
-                        .frame(width: size * 0.55, height: size * 0.55)
-                        .offset(x: -0.5, y: -0.5)
+                    CoinTriangle()
+                        .stroke(Color.white.opacity(0.35 * spinRaw), lineWidth: 0.5)
+                        .frame(width: size * 0.40, height: size * 0.40)
+                        .offset(x: -0.4, y: -0.5)
                 )
 
             // Inner highlight crescent on the face — catches the "light"
@@ -4384,6 +4370,46 @@ struct CatPawPrint: Shape {
 //   • Upper-left highlight crescent — catches the light
 //   • Subtle drop shadow
 // ---------------------------------------------------------------------------
+/// A wavy ring traced near the coin's outer edge — the "squiggle" engraving
+/// shared by every coin (static icon + in-game spinning coin).
+struct CoinSquiggle: Shape {
+    var waves: Int = 28
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let dim = min(rect.width, rect.height)
+        let baseR = dim * 0.405
+        let amp = dim * 0.022
+        let steps = 220
+        for i in 0...steps {
+            let ang = Double(i) / Double(steps) * 2 * .pi
+            let r = baseR + CGFloat(sin(ang * Double(waves))) * amp
+            let pt = CGPoint(x: c.x + CGFloat(cos(ang)) * r,
+                             y: c.y + CGFloat(sin(ang)) * r)
+            if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// An equilateral triangle (point up) — the "hole" punched in the coin's centre.
+struct CoinTriangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let r = min(rect.width, rect.height) * 0.5
+        for i in 0..<3 {
+            let a = -Double.pi / 2 + Double(i) * (2 * .pi / 3)
+            let pt = CGPoint(x: c.x + CGFloat(cos(a)) * r,
+                             y: c.y + CGFloat(sin(a)) * r)
+            if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        p.closeSubpath()
+        return p
+    }
+}
+
 struct CoinIcon: View {
     let size: CGFloat
     let platinum: Bool
@@ -4395,12 +4421,15 @@ struct CoinIcon: View {
 
     var body: some View {
         let face = platinum ? Self.platinumFace : Self.goldenFace
-        let faceDeep = platinum ? Self.platinumFaceDeep : Self.goldenFaceDeep
-        let pawColors: [Color] = platinum
-            ? [Color(red: 0.34, green: 0.40, blue: 0.50), Color(red: 0.18, green: 0.22, blue: 0.30)]
-            : [Color(red: 0.55, green: 0.34, blue: 0.04), Color(red: 0.30, green: 0.18, blue: 0.02)]
+        let engrave: Color = platinum
+            ? Color(red: 0.42, green: 0.50, blue: 0.62)
+            : Color(red: 0.58, green: 0.38, blue: 0.05)
+        let holeColors: [Color] = platinum
+            ? [Color(red: 0.45, green: 0.52, blue: 0.62), Color(red: 0.24, green: 0.30, blue: 0.40)]
+            : [Color(red: 0.46, green: 0.30, blue: 0.03), Color(red: 0.24, green: 0.15, blue: 0.01)]
+        let tri = size * 0.40
         return ZStack {
-            // Base face + dark outline
+            // Gold (or platinum) body + dark outline.
             Circle()
                 .fill(face)
                 .overlay(
@@ -4408,32 +4437,28 @@ struct CoinIcon: View {
                                     lineWidth: max(0.5, size * 0.04))
                 )
 
-            // Recessed inner ring — etched darker gold + dark stroke
-            Circle()
-                .fill(faceDeep)
-                .scaleEffect(0.78)
+            // Squiggle engraving traced along the outer rim.
+            CoinSquiggle()
+                .stroke(engrave.opacity(0.9), lineWidth: max(0.5, size * 0.04))
+
+            // Triangle hole punched out of the middle (dark + recessed; a
+            // top-left lip sells the "punched" depth).
+            CoinTriangle()
+                .fill(LinearGradient(colors: holeColors, startPoint: .top, endPoint: .bottom))
+                .frame(width: tri, height: tri)
                 .overlay(
-                    Circle()
-                        .stroke(Color.black.opacity(0.38),
-                                lineWidth: max(0.4, size * 0.035))
-                        .scaleEffect(0.78)
+                    CoinTriangle()
+                        .stroke(Color.white.opacity(platinum ? 0.5 : 0.3), lineWidth: 0.6)
+                        .frame(width: tri, height: tri)
+                        .offset(x: -0.4, y: -0.5)
                 )
 
-            // Paw print mint mark
-            CatPawPrint()
-                .fill(
-                    LinearGradient(colors: pawColors, startPoint: .top, endPoint: .bottom)
-                )
-                .frame(width: size * 0.58, height: size * 0.58)
-
-            // Inner highlight crescent
+            // Top-left highlight crescent — brighter on platinum (extra shiny).
             Circle()
-                .stroke(Color.white.opacity(0.55),
+                .stroke(Color.white.opacity(platinum ? 0.72 : 0.5),
                         lineWidth: max(0.5, size * 0.05))
-                .scaleEffect(0.70)
+                .scaleEffect(0.78)
                 .offset(x: -size * 0.10, y: -size * 0.10)
-                // Clip the highlight to the recessed ring so it doesn't
-                // overflow into the outer rim area.
                 .clipShape(Circle())
         }
         .frame(width: size, height: size)
