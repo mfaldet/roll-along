@@ -112,6 +112,8 @@ struct SnakeGameView: View {
     // MARK: - State
 
     @State private var cycles: [Cycle] = []
+    /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
+    @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     @State private var orbs:   [Orb]   = []
     @State private var poofs:  [Poof]  = []
     @State private var arena:  CGSize  = .zero
@@ -152,7 +154,14 @@ struct SnakeGameView: View {
                     trailsLayer.allowsHitTesting(false)
                     orbsLayer.allowsHitTesting(false)
                     ForEach(cycles.filter { $0.alive }) { c in
-                        headView(c).position(c.pos)
+                        headView(c)
+                            .overlay(alignment: .top) {
+                                RivalNameTag(label: c.isPlayer ? "YOU" : (rivalLooks[c.colorIndex]?.name ?? "Rival"),
+                                             color: Self.palette[c.colorIndex % Self.palette.count],
+                                             isPlayer: c.isPlayer)
+                                    .offset(y: -12).allowsHitTesting(false)
+                            }
+                            .position(c.pos)
                     }
                     poofLayer.allowsHitTesting(false)
                 }
@@ -236,9 +245,11 @@ struct SnakeGameView: View {
                     .overlay(Circle().stroke(col, lineWidth: 2.5))
                     .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             } else {
-                Circle().fill(RadialGradient(colors: [col, col.opacity(0.65)],
-                                             center: .init(x: 0.35, y: 0.32),
-                                             startRadius: 1, endRadius: headRadius * 1.4))
+                // Keystone: each rival comet shows off a real ball skin (its
+                // lethal wall stays palette-coloured — that's a game mechanic).
+                let skin = rivalLooks[c.colorIndex]?.skin ?? .red
+                Circle().fill(skin.gradient(endRadius: headRadius * 1.4))
+                    .overlay(Circle().stroke(col.opacity(0.9), lineWidth: 2))
                     .overlay(Circle().stroke(.white.opacity(0.4), lineWidth: 1))
             }
         }
@@ -444,6 +455,9 @@ struct SnakeGameView: View {
                                colorIndex: (i % (Self.palette.count - 1)) + 1,
                                isPlayer: false))
         }
+        let rivals = fresh.filter { !$0.isPlayer }
+        rivalLooks = Dictionary(uniqueKeysWithValues:
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         cycles = fresh
 
         loadMap()

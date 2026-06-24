@@ -1784,6 +1784,12 @@ enum RivalCosmetics {
             return Look(skin: p.skin, trail: p.trail, name: n[i % n.count])
         }
     }
+
+    /// One random look — for modes that spawn rivals one at a time (waves).
+    static func random() -> Look {
+        let p = showcase.randomElement()!
+        return Look(skin: p.skin, trail: p.trail, name: names.randomElement()!)
+    }
 }
 
 /// A small floating tag above a competitive marble — a bold "YOU" for the

@@ -78,6 +78,9 @@ struct SumoSurvivalView: View {
 
     @State private var bumpers: [Bumper] = []
     @State private var poofs:   [Poof]   = []
+    /// Each rival's keystone look (bumper id → skin+trail+name); dealt on spawn
+    /// (Sumo feeds rivals in waves, so looks are keyed by id, not colorIndex).
+    @State private var rivalLooks: [UUID: RivalCosmetics.Look] = [:]
     @State private var arena:   CGSize = .zero
     @State private var center:  CGPoint = .zero
     @State private var baseRadius: CGFloat = 0
@@ -117,7 +120,14 @@ struct SumoSurvivalView: View {
                     pillarsLayer.allowsHitTesting(false)
                     poofLayer.allowsHitTesting(false)
                     ForEach(bumpers) { b in
-                        marble(b).position(b.pos)
+                        marble(b)
+                            .overlay(alignment: .top) {
+                                RivalNameTag(label: b.isPlayer ? "YOU" : (rivalLooks[b.id]?.name ?? "Rival"),
+                                             color: b.isPlayer ? .white : b.color,
+                                             isPlayer: b.isPlayer)
+                                    .offset(y: -13).allowsHitTesting(false)
+                            }
+                            .position(b.pos)
                     }
                 }
                 .contentShape(Rectangle())
@@ -220,10 +230,10 @@ struct SumoSurvivalView: View {
             if b.isPlayer {
                 Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
             } else {
-                Circle().fill(RadialGradient(
-                    colors: [b.color, b.color.opacity(0.7)],
-                    center: .init(x: 0.35, y: 0.32),
-                    startRadius: 1, endRadius: marbleRadius * 1.4))
+                // Keystone: each rival shows off a real, desirable ball skin.
+                let skin = rivalLooks[b.id]?.skin ?? .red
+                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+                    .overlay(Circle().stroke(b.color.opacity(0.9), lineWidth: 2))
             }
         }
         .frame(width: marbleRadius * 2, height: marbleRadius * 2)
@@ -388,6 +398,8 @@ struct SumoSurvivalView: View {
                                 isPlayer: false))
         }
         bumpers = fresh
+        rivalLooks = [:]
+        for b in bumpers where !b.isPlayer { rivalLooks[b.id] = RivalCosmetics.random() }
         showMapName = true
     }
 
@@ -554,7 +566,9 @@ struct SumoSurvivalView: View {
         let p = CGPoint(x: center.x + CGFloat(cos(angle)) * r,
                         y: center.y + CGFloat(sin(angle)) * r)
         let color = Self.rivalColors[Int.random(in: 0..<Self.rivalColors.count)]
-        bumpers.append(Bumper(pos: p, color: color, isPlayer: false))
+        let rival = Bumper(pos: p, color: color, isPlayer: false)
+        bumpers.append(rival)
+        rivalLooks[rival.id] = RivalCosmetics.random()   // keystone: deal the wave rival a look
     }
 
     private func prunePoofs() {
