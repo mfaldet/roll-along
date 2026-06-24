@@ -198,11 +198,9 @@ struct BallSkinView: View {
         case .diamond:
             diamondCanvas.clipShape(Circle()).overlay(planetRim)
 
-        // ── Gradient-based (any remaining / future skin) ───────────────
-        default:
-            Circle()
-                .fill(skin.gradient(endRadius: diameter * 0.70))
-                .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.6))
+        // No `default`: every BallSkin has an explicit renderer above, so the
+        // switch is exhaustive.  Adding a new skin will (intentionally) fail to
+        // compile here until it's given a case — same as the colors/tier switches.
         }
     }
 
