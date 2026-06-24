@@ -272,21 +272,41 @@ struct BuyLivesSheet: View {
                 pid: .livesPack5,
                 title: "6 full reloads",
                 subtitle: "60 lives — best value casual",
+                bonus: lifeBonus(.livesPack5, lives: 60),
                 buttonLabel: store.displayPrice(for: .livesPack5, fallback: "$4.99")
             )
             productCard(
                 pid: .livesPack10,
                 title: "13 full reloads",
                 subtitle: "130 lives — for chasers",
+                bonus: lifeBonus(.livesPack10, lives: 130),
                 buttonLabel: store.displayPrice(for: .livesPack10, fallback: "$9.99")
             )
         }
+    }
+
+    /// % more lives than buying the same spend as base 10-life ($0.99) packs,
+    /// rounded to the nearest 10%.  Nil for the base pack (it IS the base rate).
+    /// Mirrors `coinBonus` so the Get Lives sheet reads like Get Coins.
+    private func lifeBonus(_ pid: StoreKitManager.ProductID, lives: Int) -> String? {
+        let baseRate = 10.0 / 0.99           // lives per dollar at the base pack
+        let price: Double
+        switch pid {
+        case .livesPack5:  price = 4.99
+        case .livesPack10: price = 9.99
+        default:           return nil
+        }
+        let livesIfBoughtAsBase = baseRate * price
+        let pct = (Double(lives) / livesIfBoughtAsBase - 1.0) * 100.0
+        let rounded = Int((pct / 10.0).rounded()) * 10
+        return rounded > 0 ? "+\(rounded)% lives" : nil
     }
 
     private func productCard(
         pid: StoreKitManager.ProductID,
         title: String,
         subtitle: String,
+        bonus: String? = nil,
         badge: String? = nil,
         badgeColor: Color = .clear,
         buttonLabel: String,
@@ -314,6 +334,12 @@ struct BuyLivesSheet: View {
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(white: 0.65))
+                // Free-lives bonus vs. the base pack — green, mirrors Get Coins.
+                if let bonus {
+                    Text(bonus)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.40, green: 0.82, blue: 0.52))
+                }
             }
             Spacer()
             Button {
