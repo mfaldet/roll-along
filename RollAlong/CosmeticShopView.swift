@@ -303,6 +303,10 @@ struct CosmeticShopView: View {
                         RoundedRectangle(cornerRadius: 14)
                             .fill(Color(white: 0.10))
                     )
+                    .overlay(alignment: .topTrailing) {
+                        TierBadge(tier: item.tier, compact: true)
+                            .padding(6)
+                    }
 
                 Text(item.displayName)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
