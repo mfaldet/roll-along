@@ -127,8 +127,9 @@ struct KingOfTheHillView: View {
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: r.isPlayer ? "YOU" : (rivalLooks[r.colorIndex]?.name ?? "Rival"),
                                              color: r.isPlayer ? Self.playerColor : Self.palette[r.colorIndex % Self.palette.count],
-                                             isPlayer: r.isPlayer)
-                                    .offset(y: -13).allowsHitTesting(false)
+                                             isPlayer: r.isPlayer,
+                                             isLeader: isLeader(r))
+                                    .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(r.pos)
                     }
@@ -235,6 +236,12 @@ struct KingOfTheHillView: View {
         Canvas { ctx, _ in
             drawTrails(ctx, racers.map { (trails[$0.colorIndex] ?? [], trailFor($0)) })
         }
+    }
+
+    /// The current hill leader (most accumulated hold time) — wears the crown.
+    private func isLeader(_ r: Racer) -> Bool {
+        let top = racers.map(\.holdTicks).max() ?? 0
+        return top > 0 && r.holdTicks == top
     }
 
     private func marble(_ r: Racer) -> some View {

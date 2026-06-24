@@ -144,8 +144,9 @@ struct PaintBallView: View {
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: p.isPlayer ? "YOU" : (rivalLooks[p.colorIndex]?.name ?? "Rival"),
                                              color: Self.paintColors[p.colorIndex],
-                                             isPlayer: p.isPlayer)
-                                    .offset(y: -13).allowsHitTesting(false)
+                                             isPlayer: p.isPlayer,
+                                             isLeader: isLeader(p))
+                                    .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(p.pos)
                     }
@@ -243,6 +244,14 @@ struct PaintBallView: View {
         Canvas { ctx, _ in
             drawTrails(ctx, painters.map { (trails[$0.colorIndex] ?? [], trailFor($0)) })
         }
+    }
+
+    /// The current coverage leader — wears the crown.
+    private func isLeader(_ p: Painter) -> Bool {
+        guard !coverage.isEmpty else { return false }
+        var best = 0
+        for i in 1..<coverage.count where coverage[i] > coverage[best] { best = i }
+        return coverage[best] > 0 && p.colorIndex == best
     }
 
     private func marble(_ p: Painter) -> some View {

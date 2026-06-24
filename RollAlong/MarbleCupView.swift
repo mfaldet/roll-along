@@ -124,8 +124,9 @@ struct MarbleCupView: View {
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: m.role == .player ? "YOU" : (rivalLook?.name ?? "Rival"),
                                              color: m.role == .player ? Self.playerAccent : Self.aiAccent,
-                                             isPlayer: m.role == .player)
-                                    .offset(y: -13).allowsHitTesting(false)
+                                             isPlayer: m.role == .player,
+                                             isLeader: isLeader(m))
+                                    .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(m.pos)
                     }
@@ -265,6 +266,15 @@ struct MarbleCupView: View {
         Canvas { ctx, _ in
             drawTrails(ctx, movers.filter { $0.role != .ball }
                                   .map { (trails[$0.id] ?? [], trailFor($0)) })
+        }
+    }
+
+    /// The current match leader (more goals) — wears the crown; tie → neither.
+    private func isLeader(_ m: Mover) -> Bool {
+        switch m.role {
+        case .player: return playerGoals > aiGoals
+        case .ai:     return aiGoals > playerGoals
+        case .ball:   return false
         }
     }
 
