@@ -174,39 +174,60 @@ struct GameMenuView: View {
     // MARK: - Challenge of the Day (skinny banner)
 
     private var challengeOfTheDay: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Challenge of the Day")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+        let ch = gameState.todaysDailyChallenge
+        let done = gameState.dailyChallengeDoneToday
+        return NavigationLink(value: HomeRoute.mode("daily")) {
+            HStack(spacing: 14) {
+                Image(systemName: done ? "checkmark.seal.fill" : "bolt.fill")
+                    .font(.system(size: 26, weight: .bold))
                     .foregroundStyle(.white)
-                Text("A short, brutal gauntlet. Resets every day.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CHALLENGE OF THE DAY")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .tracking(1.5)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(ch.title)
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(done
+                         ? "Cleared! Come back tomorrow."
+                         : "\(ch.levelCount) brutal level\(ch.levelCount == 1 ? "" : "s") · +\(ch.rewardCoins) coins")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+                Spacer()
+                if done {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(.white)
+                } else {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(11)
+                        .background(Circle().fill(.white))
+                }
             }
-            Spacer()
-            Text("SOON")
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .tracking(1)
-                .foregroundStyle(.black)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Capsule().fill(.white.opacity(0.92)))
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: done
+                            ? [Color(white: 0.22), Color(white: 0.14)]
+                            : [Color(red: 0.96, green: 0.34, blue: 0.24),
+                               Color(red: 0.99, green: 0.63, blue: 0.20)],
+                        startPoint: .leading, endPoint: .trailing))
+            )
+            .shadow(color: Color(red: 0.96, green: 0.4, blue: 0.2).opacity(done ? 0 : 0.35), radius: 8, y: 4)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(LinearGradient(
-                    colors: [Color(red: 0.96, green: 0.34, blue: 0.24),
-                             Color(red: 0.99, green: 0.63, blue: 0.20)],
-                    startPoint: .leading, endPoint: .trailing))
-        )
-        .shadow(color: Color(red: 0.96, green: 0.4, blue: 0.2).opacity(0.35), radius: 8, y: 4)
+        .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Challenge of the Day. Coming soon.")
+        .accessibilityLabel("Challenge of the Day: \(ch.title). "
+                            + (done ? "Cleared today."
+                                    : "\(ch.levelCount) levels for \(ch.rewardCoins) coins."))
+        .accessibilityIdentifier("dailyChallenge")
     }
 
     // MARK: - Shelves

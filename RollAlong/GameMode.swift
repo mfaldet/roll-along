@@ -409,6 +409,71 @@ struct PinballMode: GameMode {
     let showsScore                   = true
 }
 
+/// Challenge of the Day — a short (1–3 level), brutally hard daily gauntlet that
+/// rotates every day, deterministically derived from the date so every player
+/// gets the same one.  Reuses the climb's level generator at very high level
+/// numbers (= maximum difficulty); failing just retries (no life cost).
+struct DailyChallengeMode: GameMode {
+    let id          = "daily"
+    let displayName = "Challenge of the Day"
+    let tagline     = "A short, brutal daily gauntlet."
+    let section:     GameModeSection = .climb   // hidden from hub shelves; shown via the CotD banner
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .reachGoal
+    let onFail:      FailKind        = .loseLifeAndRetry
+    let progression: ProgressionKind = .oneShot
+    let lives:       LivesPolicy     = .unlimited   // retries are free — it's hard enough
+    let hasHoles                     = true
+    let showsStars                   = false
+    let showsTimer                   = true
+}
+
+/// The deterministic content for a given day's Challenge of the Day.  There's no
+/// hand-authored list — the date seeds a title, a length (1–3 levels), a base
+/// difficulty (a high climb level), and a reward, so it's populated every day
+/// through 2026 and beyond.
+struct DailyChallenge {
+    let dateKey: String     // "2026-06-24" — the completion key
+    let title: String       // a punchy daily name
+    let levelCount: Int      // 1…3 super-hard levels
+    let baseLevel: Int       // climb level number to generate from (brutal)
+    let rewardCoins: Int
+
+    /// The climb level number for the `index`-th level of this challenge —
+    /// each one a notch harder than the last.
+    func levelNumber(for index: Int) -> Int { baseLevel + index * 45 }
+
+    /// "YYYY-MM-DD" for a date — the per-day completion key.
+    static func key(_ date: Date = Date()) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// The deterministic challenge for a given day (defaults to today).
+    static func current(_ date: Date = Date()) -> DailyChallenge {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        let dayNum = (c.year ?? 2026) * 10000 + (c.month ?? 1) * 100 + (c.day ?? 1)
+        // Self-contained deterministic stream seeded by the calendar day.
+        var h = UInt64(bitPattern: Int64(dayNum)) &* 2654435761
+        func next(_ mod: Int) -> Int {
+            h = h &* 6364136223846793005 &+ 1442695040888963407
+            return Int(h >> 33) % mod
+        }
+        let titlePool = [
+            "No Mercy", "The Gauntlet", "Hole Hell", "Knife's Edge", "Brutal Mile",
+            "The Crucible", "Iron Path", "Pure Pain", "The Meatgrinder", "Sweat Test",
+            "Nightmare Lane", "The Long Drop", "Last Nerve", "Precision Run",
+            "Hard Reset", "The Grind",
+        ]
+        let title      = titlePool[next(titlePool.count)]
+        let levelCount = 1 + next(3)              // 1…3
+        let baseLevel  = 600 + next(360)          // 600…959 — maximum-difficulty climb
+        let reward     = 120 + levelCount * 60    // 180 / 240 / 300
+        return DailyChallenge(dateKey: key(date), title: title,
+                              levelCount: levelCount, baseLevel: baseLevel, rewardCoins: reward)
+    }
+}
+
 // MARK: - Catalogue + feature flags
 
 /// The registry of game modes and whether each is live.
@@ -484,6 +549,7 @@ enum GameModeCatalogue {
     /// behavior is implemented.
     static let registry: [(mode: GameMode, isEnabled: Bool)] = [
         (climb,              true),
+        (DailyChallengeMode(), true),  // section .climb → hidden from shelves; launched via the CotD banner
         (ZenGardenMode(),    true),    // engine behavior implemented — live
         (CoinPitMode(),      true),    // engine behavior implemented — live
         (SnakeMode(),        true),    // self-contained SnakeGameView — live

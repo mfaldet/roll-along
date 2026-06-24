@@ -287,7 +287,7 @@ struct HomeView: View {
                 // reflects it (and later, so the home aesthetic can theme off it).
                 guard let last = path.last else { return }
                 if case .game = last { gameState.currentModeID = "climb" }
-                else if case .mode(let id) = last { gameState.currentModeID = id }
+                else if case .mode(let id) = last, id != "daily" { gameState.currentModeID = id }
             }
             .onAppear    { motion.start(); clock.start(); maybeAutoPresentDailyReward() }
             .onDisappear { motion.stop();  clock.stop()  }
@@ -332,6 +332,13 @@ struct HomeView: View {
                         .firstPlayTutorial("pinball")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
+                case .mode("daily"):
+                    BallGameView(activeMode: GameModeCatalogue.mode(id: "daily")
+                                 ?? GameModeCatalogue.climb)
+                        .onAppear {
+                            gameState.startDailyChallenge()
+                            AnalyticsClient.shared.track("daily_challenge_started")
+                        }
                 case .mode(let id):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                  ?? GameModeCatalogue.climb)

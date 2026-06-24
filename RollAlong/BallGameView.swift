@@ -293,7 +293,10 @@ struct BallGameView: View {
             return LevelLayout.openArena
         }
         let base: LevelLayout
-        if case .challengeTrack(let id) = activeMode.progression {
+        if case .oneShot = activeMode.progression {
+            // Challenge of the Day — a date-seeded, maximum-difficulty climb level.
+            base = LevelLayout.layout(for: gameState.dailyChallengeLevelNumber)
+        } else if case .challengeTrack(let id) = activeMode.progression {
             base = LevelLayout.trackLayout(trackID: id, level: gameState.activeTrackLevel)
         } else {
             base = LevelLayout.layout(for: gameState.currentLevel)
@@ -1823,6 +1826,9 @@ struct BallGameView: View {
         if case .challengeTrack = activeMode.progression {
             return "\(activeMode.displayName.uppercased())  \(gameState.activeTrackLevel) / 100"
         }
+        if case .oneShot = activeMode.progression {
+            return "CHALLENGE  \(gameState.dailyChallengeIndex + 1) / \(gameState.todaysDailyChallenge.levelCount)"
+        }
         return activeMode.displayName.uppercased()
     }
 
@@ -3205,6 +3211,18 @@ struct BallGameView: View {
     /// moments (welcome after L1, tutorial reward after L10) when applicable;
     /// otherwise just advances + respawns.
     private func advanceFromLevelClear() {
+        // Challenge of the Day — advance through its 1-3 levels; on the last,
+        // bank the reward, mark today done, and pop home.
+        if case .oneShot = activeMode.progression {
+            if gameState.advanceDailyChallenge() {
+                gameState.completeTodaysDailyChallenge()
+                AnalyticsClient.shared.track("daily_challenge_completed")
+                nav.goHome()
+            } else {
+                spawnBall(in: arenaSize)
+            }
+            return
+        }
         // Challenge tracks bypass the climb's welcome/tutorial moments.
         if case .challengeTrack = activeMode.progression {
             let completed = gameState.advanceTrackLevel()

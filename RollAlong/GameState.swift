@@ -246,6 +246,13 @@ final class GameState: ObservableObject {
     @Published var currentModeID: String {
         didSet { defaults.set(currentModeID, forKey: "ra_currentModeID") }
     }
+    /// Dates ("YYYY-MM-DD") whose Challenge of the Day the player has cleared.
+    @Published var dailyChallengeCompletions: Set<String> {
+        didSet { saveStringSet(dailyChallengeCompletions, forKey: "ra_dailyChallengeDone") }
+    }
+    /// Which sub-level (0-based) of today's Challenge the player is on.  Session
+    /// state — reset by `startDailyChallenge()` when the challenge is launched.
+    @Published var dailyChallengeIndex: Int = 0
 
     // ── Challenge Track active session (transient — not persisted) ──────────
     //
@@ -409,6 +416,7 @@ final class GameState: ObservableObject {
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
+        dailyChallengeCompletions = Self.loadStringSet(forKey: "ra_dailyChallengeDone", defaults)
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -555,6 +563,38 @@ final class GameState: ObservableObject {
     /// The currently-selected GameMode (resolves `currentModeID`; climb fallback).
     var currentMode: GameMode {
         GameModeCatalogue.mode(id: currentModeID) ?? GameModeCatalogue.climb
+    }
+
+    // MARK: - Challenge of the Day
+
+    /// Today's deterministic challenge.
+    var todaysDailyChallenge: DailyChallenge { DailyChallenge.current() }
+
+    /// Has the player already cleared today's challenge?
+    var dailyChallengeDoneToday: Bool {
+        dailyChallengeCompletions.contains(DailyChallenge.key())
+    }
+
+    /// The climb level number to generate for the current sub-level of the run.
+    var dailyChallengeLevelNumber: Int {
+        todaysDailyChallenge.levelNumber(for: dailyChallengeIndex)
+    }
+
+    /// Begin a fresh run of today's challenge (called when it's launched).
+    func startDailyChallenge() { dailyChallengeIndex = 0 }
+
+    /// Advance to the next sub-level; returns true when the gauntlet is cleared.
+    func advanceDailyChallenge() -> Bool {
+        dailyChallengeIndex += 1
+        return dailyChallengeIndex >= todaysDailyChallenge.levelCount
+    }
+
+    /// Mark today's challenge done (once) and grant its coin reward.
+    func completeTodaysDailyChallenge() {
+        let key = DailyChallenge.key()
+        guard !dailyChallengeCompletions.contains(key) else { return }
+        dailyChallengeCompletions.insert(key)
+        addCoins(todaysDailyChallenge.rewardCoins)
     }
 
     /// Current life count including any regen that has accumulated since
