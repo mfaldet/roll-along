@@ -1,25 +1,23 @@
 import SwiftUI
 
 // ===========================================================================
-// GameMenuView — the hub for ALL game content, in designated areas.
+// GameMenuView — the game hub, styled like a content storefront (Netflix /
+// the App Store widget grid): a saturated, browseable shelf of games.
 //
-// THE CLIMB   — the adventure spine's deeper cuts: the Levels grid (replay any
-//               unlocked floor) and the Challenge Tracks (themed 100-level
-//               gauntlets with bundle rewards).  These route to their own
-//               select pages, not straight into an engine.
-// COMPETITIVE — vs AI rivals; a winner is declared (Comet Clash, Sumo,
-//               Paint Ball, Gold Rush, Marble Cup, King of the Hill).
-// SOLO        — self-paced, no rivals (Zen Garden, Coin Pit, Pinball).
+// LAYOUT (top → bottom)
+//   • ROLL ALONG  — the core climb, always the largest widget, always on top.
+//   • Challenge of the Day — a skinny banner (a short, brutal daily gauntlet).
+//   • CHALLENGE PACKS — themed 100-level gauntlets (cosmetic rewards).
+//   • COMPETITIVE     — mini-games vs. rivals (tickets, boards, a winner).
+//   • NEW WAYS TO PLAY— a change of pace (Zen Garden, Pinball, the reward runs).
 //
-// DATA-DRIVEN: the two mode areas group `GameModeCatalogue.enabled` by each
-// mode's `section`, so flagging a new mode on in the catalogue makes it appear
-// in the right area automatically — no edits to this file.  Challenge Tracks
-// are deliberately NOT listed as individual rows (their `section` is .climb);
-// they're reached through the Tracks card so progress and rewards show on the
-// proper select page.
+// Each category is a horizontal shelf of equal rounded-square widgets — the
+// same fabric the home screen + Apple widgets use — so games can be reordered
+// (popularity, launches, marketing) without changing how players navigate.
 //
-// Each mode row routes through the existing `HomeRoute.mode(id)` destination,
-// so the engine launches the mode exactly as before.
+// DATA-DRIVEN: shelves group `GameModeCatalogue.enabled` by `section`, so
+// flagging a new mode on makes it appear in the right shelf automatically.
+// Every widget routes through the existing HomeRoute destinations.
 // ===========================================================================
 
 struct GameMenuView: View {
@@ -27,56 +25,48 @@ struct GameMenuView: View {
     @EnvironmentObject var gameState: GameState
     @Environment(\.dismiss) var dismiss
 
-    /// Every enabled, individually-listed mode (the climb spine and the
-    /// Challenge Tracks live behind the THE CLIMB cards instead).
-    private var minigames: [GameMode] {
-        GameModeCatalogue.enabled.filter { $0.section != .climb }
+    private var competitive: [GameMode] {
+        GameModeCatalogue.enabled.filter { $0.section == .competitive }
     }
-
-    private var competitive: [GameMode] { minigames.filter { $0.section == .competitive } }
-    private var solo:        [GameMode] { minigames.filter { $0.section == .solo } }
+    private var newWays: [GameMode] {
+        GameModeCatalogue.enabled.filter { $0.section == .solo }
+    }
+    private var packs: [ChallengeTrackMode] { GameModeCatalogue.challengeTracks }
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(white: 0.06), Color(white: 0.13)],
+            LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 20) {
                     header
 
-                    sectionCaption("THE CLIMB")
-                    NavigationLink(value: HomeRoute.levels) {
-                        hubCard(icon: "square.grid.3x3.fill",
-                                accent: Color(red: 0.55, green: 0.78, blue: 1.0),
-                                title: "Levels",
-                                tagline: "Replay any floor of the adventure you've reached.")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("levels")
+                    rollAlongHero
+                    levelsLink
+                    challengeOfTheDay
 
-                    NavigationLink(value: HomeRoute.challengeTracks) {
-                        hubCard(icon: "flag.checkered",
-                                accent: Color(red: 0.95, green: 0.62, blue: 0.30),
-                                title: "Challenge Tracks",
-                                tagline: "Themed hundred-level gauntlets. Clear one for its cosmetic bundle.")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("tracks")
-
-                    sectionCaption("COMPETITIVE")
-                    ForEach(competitive, id: \.id) { mode in
-                        modeRow(mode)
+                    shelf("CHALLENGE PACKS",
+                          "Themed hundred-level gauntlets — clear one for its cosmetics.") {
+                        ForEach(packs, id: \.id) { packWidget($0) }
+                        allPacksWidget
                     }
 
-                    sectionCaption("SOLO")
-                    ForEach(solo, id: \.id) { mode in
-                        modeRow(mode)
+                    shelf("COMPETITIVE",
+                          "Mini-games vs. rivals — climb the boards, earn tickets.") {
+                        ForEach(competitive, id: \.id) { modeWidget($0) }
                     }
+
+                    shelf("NEW WAYS TO PLAY",
+                          "A change of pace — different rules, different vibe.") {
+                        ForEach(newWays, id: \.id) { modeWidget($0) }
+                    }
+
+                    Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 18)
+                .padding(.vertical, 16)
             }
         }
         .navigationTitle("Games")
@@ -96,141 +86,296 @@ struct GameMenuView: View {
         }
     }
 
-    // MARK: - Sub-views
+    // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 6) {
-            Text("Game Modes")
-                .font(.system(size: 30, weight: .black, design: .rounded))
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Games")
+                .font(.system(size: 32, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
             Text("Every way to roll.")
                 .font(.system(.subheadline, design: .rounded))
                 .foregroundStyle(Color(white: 0.55))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 2)
     }
 
-    /// Tiny tracked caption naming a designated area — same recipe as the
-    /// home screen's SOCIAL / ACCOUNT strips, sized for the hub list.
-    private func sectionCaption(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(Color(white: 0.45))
-            .tracking(2.4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 10)
-    }
+    // MARK: - ROLL ALONG hero (the core game — biggest, on top)
 
-    @ViewBuilder
-    private func modeRow(_ mode: GameMode) -> some View {
-        let style = Self.style(for: mode.id)
-        if mode.id == "coinpit" {
-            // Gold Rush costs tickets to play — gate entry when broke and
-            // show the live balance on the card otherwise.
-            if gameState.tickets > 0 {
-                NavigationLink(value: HomeRoute.mode(mode.id)) {
-                    hubCard(icon: style.icon, accent: style.accent,
-                            title: mode.displayName, tagline: mode.tagline,
-                            ticketBadge: gameState.tickets)
+    private var rollAlongHero: some View {
+        NavigationLink(value: HomeRoute.game) {
+            ZStack(alignment: .bottomLeading) {
+                LinearGradient(
+                    colors: [Color(red: 0.42, green: 0.30, blue: 0.96),
+                             Color(red: 0.95, green: 0.42, blue: 0.74),
+                             Color(red: 0.99, green: 0.78, blue: 0.42)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing)
+
+                // A big glossy ball nestled in the corner.
+                Circle()
+                    .fill(RadialGradient(
+                        colors: [Color.white.opacity(0.95), Color.white.opacity(0.0)],
+                        center: .init(x: 0.35, y: 0.30), startRadius: 2, endRadius: 90))
+                    .frame(width: 150, height: 150)
+                    .offset(x: 150, y: -28)
+                    .blendMode(.plusLighter)
+
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("CORE GAME")
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .tracking(2)
+                            .foregroundStyle(.white.opacity(0.85))
+                        Text("Roll Along")
+                            .font(.system(size: 34, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("The endless climb · Level \(gameState.currentLevel)")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+                    Spacer()
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier(mode.id)
-            } else {
-                hubCard(icon: style.icon, accent: style.accent,
-                        title: mode.displayName,
-                        tagline: "Needs a ticket — win a competitive game to earn one.",
-                        ticketBadge: 0)
-                    .opacity(0.45)
-                    .accessibilityIdentifier(mode.id)
-                    .accessibilityLabel("\(mode.displayName). Locked. Win a competitive game to earn a ticket.")
+                .padding(20)
             }
-        } else {
-            NavigationLink(value: HomeRoute.mode(mode.id)) {
-                hubCard(icon: style.icon, accent: style.accent,
-                        title: mode.displayName, tagline: mode.tagline)
-            }
-            .buttonStyle(.plain)
-            // accessibility identifier = mode id ("goldrush", "snake", …)
-            // used by UI smoke tests: app.buttons["goldrush"].tap()
-            .accessibilityIdentifier(mode.id)
+            .frame(height: 184)
+            .clipShape(RoundedRectangle(cornerRadius: 26))
+            .shadow(color: Color(red: 0.6, green: 0.3, blue: 0.9).opacity(0.55), radius: 22, y: 9)
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("rollAlong")
+        .accessibilityLabel("Roll Along, the core game. Level \(gameState.currentLevel).")
     }
 
-    /// The shared card chrome for every hub entry — mode rows and the
-    /// THE CLIMB cards alike.  `ticketBadge` (Gold Rush) shows the player's
-    /// live ticket balance in a small gold capsule before the chevron.
-    private func hubCard(icon: String, accent: Color,
-                         title: String, tagline: String,
-                         ticketBadge: Int? = nil) -> some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(accent.opacity(0.18))
-                    .frame(width: 56, height: 56)
-                Image(systemName: icon)
-                    .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(accent)
+    /// Small secondary affordance — replay any unlocked floor.
+    private var levelsLink: some View {
+        NavigationLink(value: HomeRoute.levels) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.3x3.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Replay levels")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(.title3, design: .rounded).weight(.bold))
+            .foregroundStyle(Color(white: 0.7))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.12)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("levels")
+    }
+
+    // MARK: - Challenge of the Day (skinny banner)
+
+    private var challengeOfTheDay: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Challenge of the Day")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                if !tagline.isEmpty {
-                    Text(tagline)
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(Color(white: 0.6))
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text("A short, brutal gauntlet. Resets every day.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
             }
-            Spacer(minLength: 8)
-            if let tickets = ticketBadge {
-                HStack(spacing: 3) {
-                    Image(systemName: "ticket.fill")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("\(tickets)")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                }
-                .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule().fill(Color(red: 1.00, green: 0.82, blue: 0.28).opacity(0.12))
-                )
-            }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color(white: 0.4))
+            Spacer()
+            Text("SOON")
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .tracking(1)
+                .foregroundStyle(.black)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Capsule().fill(.white.opacity(0.92)))
         }
         .padding(16)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(Color(white: 0.13))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(accent.opacity(0.18), lineWidth: 1)
-                )
+                .fill(LinearGradient(
+                    colors: [Color(red: 0.96, green: 0.34, blue: 0.24),
+                             Color(red: 0.99, green: 0.63, blue: 0.20)],
+                    startPoint: .leading, endPoint: .trailing))
         )
+        .shadow(color: Color(red: 0.96, green: 0.4, blue: 0.2).opacity(0.35), radius: 8, y: 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Challenge of the Day. Coming soon.")
     }
 
-    /// Per-mode icon + accent, keyed by the catalogue id.  Unknown ids fall
-    /// back to a generic controller glyph so a newly-flagged mode still renders.
-    private static func style(for id: String) -> (icon: String, accent: Color) {
-        switch id {
-        case "zen":     return ("leaf.fill",             Color(red: 0.45, green: 0.80, blue: 0.55))
-        case "coinpit": return ("dollarsign.circle.fill", Color(red: 1.00, green: 0.82, blue: 0.28))
-        case "snake":   return ("sparkles",               Color(red: 0.30, green: 0.72, blue: 1.00))
-        case "sumo":    return ("circle.dashed",          Color(red: 0.98, green: 0.45, blue: 0.40))
-        case "paintball": return ("paintbrush.pointed.fill", Color(red: 0.25, green: 0.62, blue: 1.0))
-        case "goldrush": return ("bag.fill",              Color(red: 1.00, green: 0.82, blue: 0.28))
-        case "marblecup": return ("soccerball",           Color(red: 0.30, green: 0.62, blue: 1.0))
-        case "koth":    return ("flag.fill",              Color(red: 0.30, green: 0.80, blue: 0.70))
-        case "pinball": return ("hand.tap.fill",          Color(red: 0.78, green: 0.42, blue: 0.95))
-        default:        return ("gamecontroller.fill",    Color(red: 0.55, green: 0.78, blue: 1.0))
+    // MARK: - Shelves
+
+    /// A captioned, horizontally-scrolling shelf of equal widgets.
+    @ViewBuilder
+    private func shelf<Content: View>(_ title: String, _ subtitle: String,
+                                      @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .tracking(2)
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5))
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) { content() }
+                    .padding(.vertical, 2)
+            }
         }
+    }
+
+    // MARK: - Widgets
+
+    @ViewBuilder
+    private func modeWidget(_ mode: GameMode) -> some View {
+        let s = Self.style(for: mode.id)
+        let locked = mode.id == "coinpit" && gameState.tickets <= 0
+        if locked {
+            widgetCard(icon: s.icon, colors: s.colors, title: mode.displayName,
+                       locked: true)
+                .accessibilityIdentifier(mode.id)
+                .accessibilityLabel("\(mode.displayName). Locked. Win a competitive game to earn a ticket.")
+        } else {
+            NavigationLink(value: HomeRoute.mode(mode.id)) {
+                widgetCard(icon: s.icon, colors: s.colors, title: mode.displayName,
+                           ticket: mode.id == "coinpit" ? gameState.tickets : nil)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(mode.id)
+        }
+    }
+
+    private func packWidget(_ track: ChallengeTrackMode) -> some View {
+        let s = Self.packStyle(for: track.trackID)
+        return NavigationLink(value: HomeRoute.challengeTracks) {
+            widgetCard(icon: s.icon, colors: s.colors, title: track.displayName)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("pack.\(track.trackID)")
+    }
+
+    /// Tail widget on the packs shelf — opens the full Challenge Tracks page
+    /// (also carries the "tracks" smoke-test anchor).
+    private var allPacksWidget: some View {
+        NavigationLink(value: HomeRoute.challengeTracks) {
+            VStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(Color(white: 0.8))
+                Text("See all")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 150, height: 142)
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color(white: 0.14))
+                    .overlay(RoundedRectangle(cornerRadius: 22)
+                        .stroke(Color(white: 0.26), lineWidth: 1))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("tracks")
+    }
+
+    /// The shared rounded-square widget chrome.
+    private func widgetCard(icon: String, colors: [Color], title: String,
+                            locked: Bool = false, ticket: Int? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                Image(systemName: icon)
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
+                Spacer()
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.9))
+                } else if let ticket {
+                    HStack(spacing: 2) {
+                        Image(systemName: "ticket.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("\(ticket)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Capsule().fill(.black.opacity(0.28)))
+                }
+            }
+            Spacer()
+            Text(title)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(15)
+        .frame(width: 150, height: 142, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(LinearGradient(colors: colors,
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        // Glossy sheen — a soft radial highlight in the top-right, the same
+        // ball-gloss motif as the hero, so every tile reads as a marble.
+        .overlay(
+            RadialGradient(colors: [.white.opacity(0.40), .clear],
+                           center: .init(x: 0.82, y: 0.12), startRadius: 2, endRadius: 95)
+                .blendMode(.plusLighter)
+                .allowsHitTesting(false)
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.16), lineWidth: 1))
+        .opacity(locked ? 0.5 : 1.0)
+        .shadow(color: (colors.first ?? .black).opacity(0.5), radius: 12, y: 6)
+    }
+
+    // MARK: - Per-mode art (icon + saturated gradient), keyed by catalogue id
+
+    private static func style(for id: String) -> (icon: String, colors: [Color]) {
+        switch id {
+        case "zen":      return ("leaf.fill",                [c(0.20, 0.72, 0.52), c(0.10, 0.50, 0.55)])
+        case "coinpit":  return ("dollarsign.circle.fill",   [c(1.00, 0.80, 0.28), c(0.95, 0.55, 0.12)])
+        case "snake":    return ("sparkles",                 [c(0.32, 0.55, 1.00), c(0.58, 0.30, 0.95)])
+        case "sumo":     return ("circle.dashed",            [c(0.98, 0.45, 0.40), c(0.92, 0.30, 0.45)])
+        case "paintball":return ("paintbrush.pointed.fill",  [c(0.30, 0.62, 1.00), c(0.90, 0.40, 0.80)])
+        case "goldrush": return ("bag.fill",                 [c(1.00, 0.78, 0.30), c(0.90, 0.50, 0.15)])
+        case "marblecup":return ("soccerball",               [c(0.30, 0.72, 0.55), c(0.22, 0.50, 0.85)])
+        case "koth":     return ("flag.fill",                [c(0.25, 0.78, 0.70), c(0.20, 0.55, 0.60)])
+        case "pinball":  return ("hand.tap.fill",            [c(0.74, 0.40, 0.96), c(0.92, 0.30, 0.70)])
+        default:         return ("gamecontroller.fill",      [c(0.40, 0.55, 0.95), c(0.30, 0.35, 0.80)])
+        }
+    }
+
+    /// Themed gradient per Challenge Pack, matched to its cosmetic-reward theme.
+    private static func packStyle(for trackID: String) -> (icon: String, colors: [Color]) {
+        switch trackID {
+        case "frozen-peaks":   return ("snowflake",          [c(0.55, 0.82, 1.00), c(0.30, 0.55, 0.92)])
+        case "deep-cosmos":    return ("moon.stars.fill",    [c(0.42, 0.32, 0.85), c(0.20, 0.18, 0.55)])
+        case "inferno-run":    return ("flame.fill",         [c(0.98, 0.45, 0.18), c(0.85, 0.18, 0.20)])
+        case "neon-arcade":    return ("gamecontroller.fill",[c(0.95, 0.30, 0.80), c(0.30, 0.85, 0.95)])
+        case "haunted-manor":  return ("moon.fill",          [c(0.50, 0.32, 0.72), c(0.18, 0.30, 0.28)])
+        case "ancient-temple": return ("building.columns.fill", [c(0.92, 0.72, 0.30), c(0.62, 0.42, 0.18)])
+        case "abyssal-depths": return ("water.waves",        [c(0.18, 0.45, 0.65), c(0.08, 0.22, 0.42)])
+        case "golden-gauntlet":return ("crown.fill",         [c(1.00, 0.82, 0.30), c(0.72, 0.50, 0.12)])
+        default:               return ("flag.checkered",     [c(0.95, 0.62, 0.30), c(0.80, 0.45, 0.20)])
+        }
+    }
+
+    private static func c(_ r: Double, _ g: Double, _ b: Double) -> Color {
+        Color(red: r, green: g, blue: b)
     }
 }
 
