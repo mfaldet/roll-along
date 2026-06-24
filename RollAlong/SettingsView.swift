@@ -336,9 +336,7 @@ struct SettingsView: View {
     private func cosmeticPreview<Item: CosmeticItem>(for item: Item) -> some View {
         switch item {
         case let s as BallSkin:
-            Circle()
-                .fill(s.gradient(endRadius: 28))
-                .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+            BallSkinView(skin: s, diameter: 48)
                 .padding(8)
         case let g as GoalSkin:
             Circle()

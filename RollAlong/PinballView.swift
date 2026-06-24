@@ -195,14 +195,7 @@ struct PinballView: View {
     }
 
     private var ballView: some View {
-        Circle()
-            .fill(gameState.activeSkin.gradient(endRadius: ballRadius * 1.5))
-            .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
-            .overlay(alignment: .topLeading) {
-                Circle().fill(.white.opacity(0.6))
-                    .frame(width: ballRadius * 0.55, height: ballRadius * 0.55)
-                    .offset(x: ballRadius * 0.35, y: ballRadius * 0.35)
-            }
+        BallSkinView(skin: gameState.activeSkin, diameter: ballRadius * 2)
             .frame(width: ballRadius * 2, height: ballRadius * 2)
             .shadow(color: .black.opacity(0.5), radius: 4, x: 1, y: 2)
             .position(ball.pos)
