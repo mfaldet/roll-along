@@ -27,13 +27,13 @@ struct BuyLivesSheet: View {
                     VStack(alignment: .leading, spacing: 16) {
                         header
                         statusBlock
-                        unlimitedCard
-                        Text("OR PACKS")
+                        lifePackCards
+                        Text("OR NEVER RUN OUT")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .kerning(1.5)
                             .foregroundStyle(Color(white: 0.45))
                             .padding(.top, 6)
-                        lifePackCards
+                        diamondBallsCard
                         Spacer().frame(height: 24)
                     }
                     .padding(.horizontal, 18)
@@ -156,40 +156,111 @@ struct BuyLivesSheet: View {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
+    /// The headline one-time unlock — indestructible "Diamond Balls" = unlimited
+    /// lives, forever.  Deliberately the shiniest thing in the sheet, shown last.
     @ViewBuilder
-    private var unlimitedCard: some View {
+    private var diamondBallsCard: some View {
         let pid: StoreKitManager.ProductID = .unlimited
         let isOwned = gameState.unlimitedLives
-        productCard(
-            pid: pid,
-            title: "Unlimited Lives",
-            subtitle: isOwned ? "Active" : "One-time purchase. Never run out.",
-            badge: "BEST",
-            badgeColor: Color(red: 1.00, green: 0.84, blue: 0.30),
-            buttonLabel: isOwned ? "Owned" : store.displayPrice(for: pid, fallback: "$19.99"),
-            isDisabled: isOwned,
-            isLarge: true
+        let inProgress = store.purchaseInProgress == pid
+        HStack(alignment: .center, spacing: 14) {
+            diamondBall(size: 42)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Diamond Balls")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(Self.diamondGradient)
+                Text(isOwned ? "Active — indestructible, never run out."
+                             : "Indestructible. Unlimited lives, forever.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.72))
+            }
+            Spacer()
+            Button {
+                Task { await store.purchase(pid) }
+            } label: {
+                if inProgress {
+                    ProgressView()
+                        .progressViewStyle(.circular).tint(.black)
+                        .frame(width: 56, height: 30)
+                        .background(Capsule().fill(Color.white))
+                } else {
+                    Text(isOwned ? "Owned" : store.displayPrice(for: pid, fallback: "$19.99"))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(isOwned ? Color(white: 0.45) : .black)
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .background(Capsule().fill(isOwned ? Color(white: 0.25) : Color.white))
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(isOwned || inProgress)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.10, green: 0.17, blue: 0.26),
+                                 Color(red: 0.17, green: 0.24, blue: 0.36)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Self.diamondGradient, lineWidth: 1.5)
+                )
         )
+        .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.30), radius: 10, y: 2)
     }
+
+    /// A super-shiny diamond marble — cool white→cyan, a bright specular, and a
+    /// sparkle.  The visual identity for indestructible lives (was "golden ball").
+    private func diamondBall(size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.white,
+                                 Color(red: 0.74, green: 0.93, blue: 1.0),
+                                 Color(red: 0.45, green: 0.72, blue: 0.96)],
+                        center: .init(x: 0.34, y: 0.30),
+                        startRadius: 1, endRadius: size * 0.75)
+                )
+                .frame(width: size, height: size)
+                .overlay(Circle().stroke(Color.white.opacity(0.8), lineWidth: 1))
+            Circle().fill(Color.white.opacity(0.9))
+                .frame(width: size * 0.26, height: size * 0.26)
+                .offset(x: -size * 0.18, y: -size * 0.20)
+            Image(systemName: "sparkle")
+                .font(.system(size: size * 0.28, weight: .bold))
+                .foregroundStyle(.white)
+                .offset(x: size * 0.22, y: size * 0.20)
+        }
+        .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.6), radius: 6)
+    }
+
+    private static let diamondGradient = LinearGradient(
+        colors: [Color(red: 0.86, green: 0.96, blue: 1.0),
+                 Color(red: 0.55, green: 0.80, blue: 1.0),
+                 Color(red: 0.80, green: 0.92, blue: 1.0)],
+        startPoint: .leading, endPoint: .trailing)
 
     private var lifePackCards: some View {
         VStack(spacing: 10) {
             productCard(
                 pid: .livesPack1,
                 title: "1 full reload",
-                subtitle: "6 lives",
+                subtitle: "10 lives",
                 buttonLabel: store.displayPrice(for: .livesPack1, fallback: "$0.99")
             )
             productCard(
                 pid: .livesPack5,
                 title: "6 full reloads",
-                subtitle: "36 lives — best value casual",
+                subtitle: "60 lives — best value casual",
                 buttonLabel: store.displayPrice(for: .livesPack5, fallback: "$4.99")
             )
             productCard(
                 pid: .livesPack10,
                 title: "13 full reloads",
-                subtitle: "78 lives — for chasers",
+                subtitle: "130 lives — for chasers",
                 buttonLabel: store.displayPrice(for: .livesPack10, fallback: "$9.99")
             )
         }
@@ -320,7 +391,7 @@ struct BuyCoinsSheet: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(alignment: .center) {
             HStack(spacing: 6) {
                 CoinIcon(size: 22)
                 Text("\(gameState.coinBalance)")
@@ -332,30 +403,49 @@ struct BuyCoinsSheet: View {
                     .foregroundStyle(Color(white: 0.55))
             }
             Spacer()
+            Text("Buy a pack below —\nor just play to earn more.")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+                .multilineTextAlignment(.trailing)
+                .fixedSize()
         }
         .padding(.bottom, 6)
     }
 
     private var coinPackCards: some View {
         VStack(spacing: 10) {
-            coinCard(pid: .coins100,  amount: 100,   bonus: nil)
-            coinCard(pid: .coins600,  amount: 600,   bonus: "+100 bonus")
-            coinCard(pid: .coins1300, amount: 1300,  bonus: "+300 bonus", isFeatured: true)
-            coinCard(pid: .coins3000, amount: 3000,  bonus: "biggest pack")
+            coinCard(pid: .coins100,  amount: 100)
+            coinCard(pid: .coins600,  amount: 600)
+            coinCard(pid: .coins1300, amount: 1300)
+            coinCard(pid: .coins3000, amount: 3000)
         }
+    }
+
+    /// % more coins than buying the same spend as base 100-coin ($0.99) packs,
+    /// rounded to the nearest 10%.  Nil for the base pack (it IS the base rate).
+    private func coinBonus(_ pid: StoreKitManager.ProductID, amount: Int) -> String? {
+        let baseRate = 100.0 / 0.99          // coins per dollar at the base pack
+        let price: Double
+        switch pid {
+        case .coins600:  price = 4.99
+        case .coins1300: price = 9.99
+        case .coins3000: price = 19.99
+        default:         return nil
+        }
+        let coinsIfBoughtAsBase = baseRate * price
+        let pct = (Double(amount) / coinsIfBoughtAsBase - 1.0) * 100.0
+        let rounded = Int((pct / 10.0).rounded()) * 10
+        return rounded > 0 ? "+\(rounded)% coins" : nil
     }
 
     private func coinCard(
         pid: StoreKitManager.ProductID,
-        amount: Int,
-        bonus: String?,
-        isFeatured: Bool = false
+        amount: Int
     ) -> some View {
         let inProgress = store.purchaseInProgress == pid
+        let bonus = coinBonus(pid, amount: amount)
         return HStack(alignment: .center, spacing: 12) {
-            // Stacked coin icons — three CoinIcons offset to suggest a
-            // small pile.  Same paw-print minted graphic as everywhere
-            // else in the app.
+            // Stacked coin icons — a small pile of the shared coin graphic.
             ZStack {
                 ForEach(0..<3) { i in
                     CoinIcon(size: 24)
@@ -365,26 +455,13 @@ struct BuyCoinsSheet: View {
             .frame(width: 34, height: 30)
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text("\(amount.formatted(.number)) coins")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                    if isFeatured {
-                        Text("BEST VALUE")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .kerning(0.8)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule().fill(Color(red: 1.00, green: 0.84, blue: 0.30))
-                            )
-                    }
-                }
+                Text("\(amount.formatted(.number)) coins")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
                 if let bonus {
                     Text(bonus)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.65))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.40, green: 0.82, blue: 0.52))
                 }
             }
             Spacer()
@@ -413,13 +490,7 @@ struct BuyCoinsSheet: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(isFeatured ? Color(white: 0.16) : Color(white: 0.13))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(isFeatured
-                                ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.5)
-                                : Color.clear, lineWidth: 1.0)
-                )
+                .fill(Color(white: 0.13))
         )
     }
 

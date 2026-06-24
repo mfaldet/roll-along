@@ -108,9 +108,9 @@ final class StoreKitManager: ObservableObject {
         /// Lives granted by this purchase.  Zero for non-life products.
         var rewardLives: Int {
             switch self {
-            case .livesPack1:  return 6    // 1 full reload
-            case .livesPack5:  return 36   // 6 reloads
-            case .livesPack10: return 78   // 13 reloads
+            case .livesPack1:  return 10    // 1 full reload (10-life cap)
+            case .livesPack5:  return 60    // 6 reloads
+            case .livesPack10: return 130   // 13 reloads
             default:           return 0
             }
         }
