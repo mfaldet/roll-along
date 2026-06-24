@@ -731,50 +731,75 @@ struct BallSkinView: View {
         TimelineView(.animation) { timeline in
             Canvas { ctx, size in
                 let t  = timeline.date.timeIntervalSinceReferenceDate
-                let w  = size.width
-                let h  = size.height
-                let cx = w / 2
-                let cy = h / 2
+                let w  = size.width, h = size.height
+                let cx = w / 2, cy = h / 2
                 let r  = min(w, h) / 2
+                let rect = CGRect(x: 0, y: 0, width: w, height: h)
 
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                // ── Glass body — translucent, so the dark background shows
+                //    through the middle (see-through), with a frosted, light-
+                //    catching rim.  This is what reads as "glass", not a fill.
+                ctx.fill(Path(ellipseIn: rect), with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.20, green: 0.32, blue: 0.48).opacity(0.14), location: 0.00),
+                        .init(color: Color(red: 0.40, green: 0.56, blue: 0.74).opacity(0.22), location: 0.66),
+                        .init(color: Color(red: 0.84, green: 0.93, blue: 1.00).opacity(0.62), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+
+                // Bottom-right refraction glow — light bending through the glass.
+                ctx.fill(Path(ellipseIn: rect.insetBy(dx: r * 0.05, dy: r * 0.05)),
                     with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(red: 0.96, green: 0.98, blue: 1.00), location: 0.00),
-                            .init(color: Color(red: 0.78, green: 0.88, blue: 0.98), location: 0.55),
-                            .init(color: Color(red: 0.18, green: 0.30, blue: 0.50), location: 1.00),
-                        ]),
-                        center: CGPoint(x: w * 0.32, y: h * 0.32),
-                        startRadius: 0, endRadius: r * 1.40))
+                        Gradient(colors: [.clear, Color(red: 0.72, green: 0.88, blue: 1.0).opacity(0.45)]),
+                        center: CGPoint(x: w * 0.70, y: h * 0.74),
+                        startRadius: r * 0.2, endRadius: r * 0.95))
 
-                let flakeCount = 14
-                for i in 0..<flakeCount {
-                    let seed    = Double(i) * 0.713 + 0.21
-                    let fall    = (t * 0.22 + seed).truncatingRemainder(dividingBy: 1.0)
-                    let xOsc    = sin(t * 0.65 + seed * 5.3)
-                    let xN      = 0.18 + 0.64 * (0.5 + 0.5 * xOsc)
-                    let yN      = 0.10 + 0.80 * fall
-                    let px      = w * CGFloat(xN)
-                    let py      = h * CGFloat(yN)
-                    let dx      = px - cx
-                    let dy      = py - cy
-                    if sqrt(dx * dx + dy * dy) > r * 0.90 { continue }
-                    let twinkle = 0.65 + 0.35 * sin(t * 1.4 + seed * 7)
-                    let flakeR  = r * (0.045 + Double(i % 3) * 0.012)
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(x: px - flakeR, y: py - flakeR,
-                                               width: flakeR * 2, height: flakeR * 2)),
-                        with: .color(Color.white.opacity(twinkle)))
+                // ── Snow — crisp 6-armed, feathered flakes drifting, swaying,
+                //    rotating, and twinkling inside the dome.
+                for i in 0..<9 {
+                    let seed = Double(i) * 0.713 + 0.21
+                    let fall = (t * 0.18 + seed).truncatingRemainder(dividingBy: 1.0)
+                    let sway = sin(t * 0.6 + seed * 5.3)
+                    let px = w * CGFloat(0.22 + 0.56 * (0.5 + 0.5 * sway))
+                    let py = h * CGFloat(0.12 + 0.74 * fall)
+                    if hypot(px - cx, py - cy) > r * 0.86 { continue }
+                    let twinkle = 0.6 + 0.4 * sin(t * 1.5 + seed * 7)
+                    let fr  = r * CGFloat(0.085 + Double(i % 3) * 0.02)
+                    let rot = t * 0.5 + seed * 6
+
+                    var flake = Path()
+                    for k in 0..<3 {                      // 3 lines → 6 arms
+                        let a = rot + Double(k) * Double.pi / 3
+                        let ex = CGFloat(cos(a)) * fr, ey = CGFloat(sin(a)) * fr
+                        flake.move(to: CGPoint(x: px - ex, y: py - ey))
+                        flake.addLine(to: CGPoint(x: px + ex, y: py + ey))
+                    }
+                    for k in 0..<6 {                      // feathered branches
+                        let a = rot + Double(k) * Double.pi / 3
+                        let root = CGPoint(x: px + CGFloat(cos(a)) * fr * 0.58,
+                                           y: py + CGFloat(sin(a)) * fr * 0.58)
+                        for s in [Double.pi / 4, -Double.pi / 4] {
+                            flake.move(to: root)
+                            flake.addLine(to: CGPoint(x: root.x + CGFloat(cos(a + s)) * fr * 0.34,
+                                                      y: root.y + CGFloat(sin(a + s)) * fr * 0.34))
+                        }
+                    }
+                    ctx.stroke(flake, with: .color(.white.opacity(twinkle)),
+                               lineWidth: max(0.6, r * 0.022))
                 }
 
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: w * 0.10, y: h * 0.08,
-                                           width: w * 0.34, height: h * 0.28)),
+                // ── Glass edge — the rim catching light (sells the sphere).
+                ctx.stroke(Path(ellipseIn: rect.insetBy(dx: r * 0.04, dy: r * 0.04)),
+                           with: .color(Color(red: 0.86, green: 0.94, blue: 1.0).opacity(0.55)),
+                           lineWidth: max(0.8, r * 0.05))
+
+                // ── Specular highlight — top-left glossy reflection.
+                ctx.fill(Path(ellipseIn: CGRect(x: w * 0.16, y: h * 0.12,
+                                                width: w * 0.30, height: h * 0.24)),
                     with: .radialGradient(
-                        Gradient(colors: [Color.white.opacity(0.45), .clear]),
-                        center: CGPoint(x: w * 0.27, y: h * 0.22),
-                        startRadius: 0, endRadius: r * 0.45))
+                        Gradient(colors: [Color.white.opacity(0.9), .clear]),
+                        center: CGPoint(x: w * 0.27, y: h * 0.20),
+                        startRadius: 0, endRadius: r * 0.40))
             }
         }
     }
