@@ -232,14 +232,43 @@ final class GoldRushEngine {
     /// current leader when they're close, to bump coins loose.
     private func botSteer(_ r: Racer) -> CGVector {
         let accel = aiAccel * aiAccelScale
+
+        // Primary goal: harass the leader (if aggro + close), else nearest coin,
+        // else drift back to center.
+        let base: CGVector
         if r.aggro, let leader = leaderToHarass(than: r),
            hypot(leader.pos.x - r.pos.x, leader.pos.y - r.pos.y) < ramSeekRange {
-            return unit(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y, scale: accel)
+            base = unit(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y, scale: accel)
+        } else if let coin = nearestCoin(to: r) {
+            base = unit(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y, scale: accel)
+        } else {
+            base = unit(dx: center.x - r.pos.x, dy: center.y - r.pos.y, scale: accel * 0.5)
         }
-        if let coin = nearestCoin(to: r) {
-            return unit(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y, scale: accel)
-        }
-        return unit(dx: center.x - r.pos.x, dy: center.y - r.pos.y, scale: accel * 0.5)
+
+        // Always layer on a push away from nearby edges.  Without it a strong
+        // steering force (high difficulty) presses a rival into a wall faster
+        // than the bounce recovers — two aggro rivals could chase each other
+        // into a corner and stay pinned, making Hard play easier than Medium.
+        // The push scales WITH `accel`, so it stays ahead of steering at every
+        // difficulty.
+        let push = edgeRepulsion(for: r, accel: accel)
+        return CGVector(dx: base.dx + push.dx, dy: base.dy + push.dy)
+    }
+
+    /// Outward force that ramps from 0 at the band edge to its strongest right
+    /// at the wall (and stacks on both axes in a corner), keeping rivals from
+    /// pinning themselves against an edge.  Rivals only; the player is immune.
+    private func edgeRepulsion(for r: Racer, accel: CGFloat) -> CGVector {
+        let margin: CGFloat = marbleRadius * 4
+        let strength = accel * 1.1            // beats the steering force at the wall
+        var fx: CGFloat = 0, fy: CGFloat = 0
+        let left = r.pos.x, right = arena.width - r.pos.x
+        let top  = r.pos.y, bottom = arena.height - r.pos.y
+        if left   < margin { fx += (1 - left   / margin) * strength }
+        if right  < margin { fx -= (1 - right  / margin) * strength }
+        if top    < margin { fy += (1 - top    / margin) * strength }
+        if bottom < margin { fy -= (1 - bottom / margin) * strength }
+        return CGVector(dx: fx, dy: fy)
     }
 
     private func nearestCoin(to r: Racer) -> Coin? {
