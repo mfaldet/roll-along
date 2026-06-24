@@ -3029,9 +3029,7 @@ struct BallGameView: View {
     private func rewardPreview<Item: CosmeticItem>(for item: Item) -> some View {
         switch item {
         case let s as BallSkin:
-            Circle()
-                .fill(s.gradient(endRadius: 30))
-                .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.5))
+            BallSkinView(skin: s, diameter: 48)
                 .padding(6)
         case let g as GoalSkin:
             Circle()
