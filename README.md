@@ -26,7 +26,7 @@ A tilt-driven iOS marble game for the App Store. Tilt the device to roll your ma
 8 handcrafted skill tracks (Beginner → Elite → Legendary), each with 100 levels and exclusive cosmetic rewards on completion.
 
 ### Cosmetics shop
-Ball skins, goal skins, trail colours, floor themes, pit styles, and music tracks — all earnable with in-game coins or purchasable as seasonal bundles.
+Ball skins, goal skins, trail colours, floor themes, pit styles, and music tracks — earnable with in-game coins, won from challenge tracks, or purchased as seasonal/IAP bundles. All 52 ball skins are drawn by a single Canvas renderer (`BallSkinView`) so a skin looks identical everywhere; several are animated. See [`docs/cosmetics-rendering.md`](docs/cosmetics-rendering.md).
 
 ### Social
 Clans, friends, global leaderboards via Supabase backend.
@@ -67,8 +67,19 @@ For IAP testing, select the `Products.storekit` configuration under the scheme's
 - **Physics clock:** `PhysicsClock` (CADisplayLink-backed, 60 fps) drives all minigames via `onReceive(clock.$tickCount)`. Paused automatically on `scenePhase == .background`.
 - **Motion:** `BallMotion` wraps `CMMotionManager`, publishes a 2D gravity vector at 60 Hz with a ~3° deadband.
 - **Canvas rendering:** All game art (marbles, trails, arenas, cosmetics) is drawn with SwiftUI `Canvas` — no image assets.
+- **One ball renderer:** every ball is drawn by `BallSkinView` (exhaustive `switch` over `BallSkin`, no `default`), so a skin is pixel-identical across home, launch, shop, and gameplay. Animated skins use `TimelineView` and honour Reduce Motion.
 - **Persistence:** All player state persists in `UserDefaults` via `@Published` `didSet` observers in `GameState`. JSON-encoded for complex types (`[Int: Int]`, sets).
 - **Analytics:** `AnalyticsClient` batches events and flushes on background transition.
+
+---
+
+## Documentation
+
+- [`CHANGELOG.md`](CHANGELOG.md) — notable changes, newest first.
+- [`docs/cosmetics-rendering.md`](docs/cosmetics-rendering.md) — ball-skin system + how to add a skin.
+- [`docs/gold-rush-economy.md`](docs/gold-rush-economy.md) — Gold Rush ticket economy + the ×2 boost.
+- [`docs/AppStore.md`](docs/AppStore.md), [`docs/TestFlight.md`](docs/TestFlight.md) — release/distribution.
+- [`docs/research/`](docs/research) — market teardown, roadmap, soft-launch plan.
 
 ---
 
