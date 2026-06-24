@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit   // ImageRenderer.uiImage / Image(uiImage:) for the share card
 
 // ---------------------------------------------------------------------------
 // Cosmetic system — types
@@ -1849,5 +1850,148 @@ func drawTrails(_ ctx: GraphicsContext,
             ctx.stroke(path, with: .color(segColor.opacity(0.10 + 0.55 * age)),
                        style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shareable result card — the cheapest virality unlock (roadmap Phase 1).
+// A round-over overlay builds a ShareableResult and drops in a
+// ResultShareButton; the card rasterises to an image and goes out the system
+// share sheet, carrying the player's cosmetics + a "beat me" hook.
+// ---------------------------------------------------------------------------
+
+/// The data a round-over share card needs.  Mode-agnostic so every competitive
+/// (and solo) overlay can build one from its own final state + the player's gear.
+struct ShareableResult {
+    let mode: String        // "Gold Rush", "King of the Hill", …
+    let headline: String    // the big number/verdict, e.g. "1,240 coins"
+    let subtitle: String?   // optional flavour, e.g. "2nd of 4"
+    let skin: BallSkin      // the player's equipped skin — their identity
+    let trail: TrailColor   // the player's equipped trail
+    let won: Bool           // tints the card gold on a win
+}
+
+/// The visual shared on a win/round-over: the player's ball + their result +
+/// a "can you beat me?" hook.  Fixed size so it rasterises predictably.
+struct ResultShareCard: View {
+    let result: ShareableResult
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(result.mode.uppercased())
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .tracking(2)
+                .foregroundStyle(.white.opacity(0.85))
+
+            ZStack {
+                // A few fading dots trailing into the ball, in the equipped trail.
+                if result.trail != .none {
+                    ForEach(0..<6) { i in
+                        Circle()
+                            .fill(result.trail.color.opacity(0.10 + Double(i) * 0.07))
+                            .frame(width: 26, height: 26)
+                            .offset(x: CGFloat(i - 5) * 17)
+                    }
+                }
+                Circle()
+                    .fill(result.skin.gradient(endRadius: 70))
+                    .frame(width: 116, height: 116)
+                    .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 3))
+                    .shadow(color: .black.opacity(0.45), radius: 14, y: 7)
+            }
+            .frame(height: 130)
+
+            VStack(spacing: 4) {
+                Text(result.headline)
+                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                if let sub = result.subtitle {
+                    Text(sub)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            VStack(spacing: 3) {
+                HStack(spacing: 7) {
+                    Image(systemName: "circle.circle.fill").font(.system(size: 18))
+                    Text("ROLL ALONG")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .tracking(1)
+                }
+                .foregroundStyle(.white)
+                Text("Can you beat me?")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .padding(26)
+        .frame(width: 320, height: 400)
+        .background(
+            LinearGradient(
+                colors: result.won
+                    ? [Color(red: 0.22, green: 0.17, blue: 0.02), Color(red: 0.48, green: 0.36, blue: 0.05)]
+                    : [Color(red: 0.07, green: 0.09, blue: 0.16), Color(red: 0.14, green: 0.17, blue: 0.30)],
+                startPoint: .top, endPoint: .bottom)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28)
+                .stroke(result.won ? Color(red: 1.0, green: 0.84, blue: 0.30).opacity(0.6)
+                                   : .white.opacity(0.15), lineWidth: 1.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+    }
+}
+
+/// Renders a ShareableResult to a shareable SwiftUI Image (≈3× for crispness).
+@MainActor
+func renderResultCard(_ result: ShareableResult) -> Image? {
+    let renderer = ImageRenderer(content: ResultShareCard(result: result))
+    renderer.scale = 3
+    guard let ui = renderer.uiImage else { return nil }
+    return Image(uiImage: ui)
+}
+
+/// A drop-in Share button for round-over overlays: renders the card once, shares
+/// it via the system sheet, and fires the `result_shared` analytics event.
+struct ResultShareButton: View {
+    let result: ShareableResult
+    @State private var card: Image?
+
+    var body: some View {
+        Group {
+            if let card {
+                ShareLink(
+                    item: card,
+                    subject: Text("Roll Along — \(result.mode)"),
+                    message: Text("I just scored \(result.headline) in \(result.mode) on Roll Along. Can you beat me?"),
+                    preview: SharePreview("Roll Along — \(result.mode)", image: card)
+                ) { shareLabel }
+                .simultaneousGesture(TapGesture().onEnded {
+                    AnalyticsClient.shared.track("result_shared",
+                                                 properties: ["mode": .string(result.mode)])
+                })
+            } else {
+                shareLabel.opacity(0.5)   // brief moment while the card renders
+            }
+        }
+        .onAppear { if card == nil { card = renderResultCard(result) } }
+    }
+
+    private var shareLabel: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "square.and.arrow.up")
+            Text("Share")
+        }
+        .font(.system(size: 17, weight: .semibold, design: .rounded))
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.25), lineWidth: 1))
     }
 }

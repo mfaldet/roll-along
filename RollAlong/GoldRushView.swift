@@ -428,6 +428,13 @@ struct GoldRushView: View {
                             .background(RoundedRectangle(cornerRadius: 18)
                                 .fill(Color(red: 1.0, green: 0.82, blue: 0.30)))
                     }
+                    ResultShareButton(result: ShareableResult(
+                        mode: "Gold Rush",
+                        headline: "\(playerScore) coins",
+                        subtitle: "\(ordinal(placement)) of \(racers.count)",
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        won: playerWon))
                     Button { nav.goHome() } label: {
                         Text("Home")
                             .font(.system(size: 17, weight: .semibold, design: .rounded))
