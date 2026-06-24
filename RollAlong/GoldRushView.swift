@@ -40,13 +40,36 @@ struct GoldRushView: View {
 
     private var roundTicks: Int { roundSeconds * 60 }
 
-    /// Marble palette — index 0 is always the player (blue).
+    /// Marble palette — index 0 is always the player (blue).  Now used only as
+    /// a thin per-racer identity *rim* (the fill shows the actual ball skin).
     private static let racerColors: [Color] = [
         Color(red: 0.25, green: 0.62, blue: 1.00),   // you — blue
         Color(red: 1.00, green: 0.35, blue: 0.62),   // pink
         Color(red: 0.55, green: 0.86, blue: 0.32),   // green
         Color(red: 1.00, green: 0.60, blue: 0.20),   // orange
     ]
+
+    /// KEYSTONE — desirable looks the AI rivals show off, so competitive play
+    /// doubles as a catalogue ad ("ooh, I want that one").  A shuffled slice is
+    /// dealt to the rivals each round in `reset()`.  Easily edited — add/swap
+    /// any (skin, trail) pair.  (When real multiplayer lands, rivals will
+    /// instead wear their OWN equipped gear, fetched from their profile.)
+    private static let rivalShowcase: [(skin: BallSkin, trail: TrailColor)] = [
+        (.galaxy, .rainbow),
+        (.nebula, .stardust),
+        (.lava,   .fire),
+        (.aurora, .cometTrail),
+        (.neon,   .raybeam),
+        (.gold,   .gilded),
+        (.saturn, .sky),
+        (.opal,   .air),
+        (.storm,  .ice),
+        (.ghost,  .mist),
+    ]
+
+    // Per-racer home-style trail (the keystone: opponents' trails are visible).
+    private let trailMaxLen = 14
+    private let trailMinStep: CGFloat = 3
 
     // MARK: - State
 
@@ -71,6 +94,12 @@ struct GoldRushView: View {
     @State private var mapIndex   = 0
     @State private var showMapName = false
     @State private var walls: [WallSegFrac] = []
+
+    /// Each rival's shown-off look (colorIndex → skin+trail), dealt in reset().
+    /// The player always renders their OWN equipped skin/trail.
+    @State private var rivalLooks: [Int: (skin: BallSkin, trail: TrailColor)] = [:]
+    /// Recent positions per racer (colorIndex → points) for the trail layer.
+    @State private var trails: [Int: [CGPoint]] = [:]
 
     // MARK: - Computed (thin forwards onto the engine — the source of truth)
 
@@ -98,6 +127,7 @@ struct GoldRushView: View {
                     wallsLayer.allowsHitTesting(false)
                     ForEach(coins) { c in coinView(c) }
                     poofLayer.allowsHitTesting(false)
+                    trailsLayer.allowsHitTesting(false)
                     ForEach(racers) { r in marble(r).position(r.pos) }
                 }
                 .contentShape(Rectangle())
@@ -182,18 +212,52 @@ struct GoldRushView: View {
         }
     }
 
+    /// KEYSTONE — every racer's equipped TRAIL, visible to all: the player's
+    /// own, each rival's the one dealt in `reset()`.  Fading home-style streak;
+    /// rainbow gets a per-segment hue cycle.
+    private var trailsLayer: some View {
+        Canvas { ctx, _ in
+            for r in racers {
+                let pts = trails[r.colorIndex] ?? []
+                guard pts.count >= 2 else { continue }
+                let trail = trailFor(r)
+                guard trail != .none else { continue }
+                let rainbow = trail == .rainbow
+                let solid = trail.color
+                for i in 1..<pts.count {
+                    let age = Double(i) / Double(pts.count - 1)
+                    let segColor: Color = rainbow
+                        ? Color(hue: (Double(i) / Double(pts.count)).truncatingRemainder(dividingBy: 1),
+                                saturation: 1, brightness: 1)
+                        : solid
+                    var path = Path(); path.move(to: pts[i - 1]); path.addLine(to: pts[i])
+                    ctx.stroke(path, with: .color(segColor.opacity(0.10 + 0.55 * age)),
+                               style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                }
+            }
+        }
+    }
+
+    /// The TrailColor a racer renders with — own for the player, dealt for rivals.
+    private func trailFor(_ r: GoldRushEngine.Racer) -> TrailColor {
+        r.isPlayer ? gameState.equippedTrail : (rivalLooks[r.colorIndex]?.trail ?? .none)
+    }
+
     private func marble(_ r: GoldRushEngine.Racer) -> some View {
-        let paint = Self.racerColors[r.colorIndex]
+        let rim = Self.racerColors[r.colorIndex]   // thin per-racer identity tag
         return ZStack {
             if r.isPlayer {
+                // The player always wears their OWN equipped ball skin.
                 Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
-                    .overlay(Circle().stroke(paint, lineWidth: 3))
+                    .overlay(Circle().stroke(rim, lineWidth: 3))
                     .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             } else {
-                Circle().fill(RadialGradient(
-                    colors: [paint, paint.opacity(0.7)],
-                    center: .init(x: 0.35, y: 0.32),
-                    startRadius: 1, endRadius: marbleRadius * 1.4))
+                // Keystone: each rival shows off a real, desirable ball skin
+                // (dealt in reset()).  A thin colored rim keeps rivals tell-apart
+                // and matches their dot in the standings row.
+                let skin = rivalLooks[r.colorIndex]?.skin ?? .red
+                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+                    .overlay(Circle().stroke(rim.opacity(0.9), lineWidth: 2))
                     .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
             }
         }
@@ -407,8 +471,22 @@ struct GoldRushView: View {
         engine.loadMap(index: mapIndex)   // engine's simulation walls (coin spawns avoid them)
         engine.resetBoard()               // fresh board, round left un-started
         loadMap()                         // view's render walls + map-name banner
+        dealRivalLooks()                  // keystone: deal each rival a showcase look
+        trails.removeAll()                // fresh trails for the new round
         prevPlayerScore = 0
         syncFromEngine()
+    }
+
+    /// Deal each AI rival a distinct, desirable look from a shuffled slice of
+    /// the showcase pool, so competitive play shows off the catalogue.  (Real
+    /// opponents will wear their own equipped gear once multiplayer lands.)
+    private func dealRivalLooks() {
+        let picks = Self.rivalShowcase.shuffled()
+        var looks: [Int: (skin: BallSkin, trail: TrailColor)] = [:]
+        for r in engine.racers where !r.isPlayer {
+            looks[r.colorIndex] = picks[(r.colorIndex - 1) % picks.count]
+        }
+        rivalLooks = looks
     }
 
     private func loadMap() {
@@ -422,6 +500,22 @@ struct GoldRushView: View {
         racers = engine.racers
         coins  = engine.coins
         poofs  = engine.poofs
+        accumulateTrails()
+    }
+
+    /// Append each racer's current position to its trail buffer (min-step +
+    /// cap) so `trailsLayer` can draw a fading streak behind every marble.
+    private func accumulateTrails() {
+        for r in engine.racers {
+            var pts = trails[r.colorIndex] ?? []
+            if let last = pts.last {
+                if hypot(r.pos.x - last.x, r.pos.y - last.y) > trailMinStep { pts.append(r.pos) }
+            } else {
+                pts.append(r.pos)
+            }
+            if pts.count > trailMaxLen { pts.removeFirst(pts.count - trailMaxLen) }
+            trails[r.colorIndex] = pts
+        }
     }
 
     /// Round-end side effects the headless engine intentionally omits: pay the
