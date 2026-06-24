@@ -42,6 +42,7 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
+                    loadoutCard
                     progressCard
                     statsGrid
                     badgesCard
@@ -195,6 +196,90 @@ struct ProfileView: View {
     // MARK: - Progress card
     // Three animated bars: stars earned, levels cleared, perfect (3-star) levels
     // =========================================================================
+    // =========================================================================
+    // MARK: - Loadout showcase
+    // The player's equipped cosmetics as social capital — each with its rarity,
+    // so the profile shows off what you've earned/collected at a glance.
+    // =========================================================================
+    private var loadoutCard: some View {
+        VStack(spacing: 14) {
+            sectionLabel("My Loadout")
+
+            VStack(spacing: 10) {
+                loadoutRow(category: "Ball",
+                           name: gameState.activeSkin.displayName,
+                           tier: gameState.activeSkin.tier) {
+                    MiniBall(skin: gameState.activeSkin, size: 26)
+                }
+                loadoutRow(category: "Trail",
+                           name: gameState.equippedTrail.displayName,
+                           tier: gameState.equippedTrail.tier) {
+                    Capsule()
+                        .fill(gameState.equippedTrail == .none
+                              ? Color(white: 0.30)
+                              : gameState.equippedTrail.color)
+                        .frame(width: 24, height: 7)
+                }
+                loadoutRow(category: "Goal",
+                           name: gameState.equippedGoal.displayName,
+                           tier: gameState.equippedGoal.tier) {
+                    Image(systemName: "flag.checkered")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(gameState.equippedGoal.tier.color)
+                }
+                loadoutRow(category: "Floor",
+                           name: gameState.equippedFloor.displayName,
+                           tier: gameState.equippedFloor.tier) {
+                    Image(systemName: "square.grid.3x3.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(gameState.equippedFloor.tier.color)
+                }
+                loadoutRow(category: "Pit",
+                           name: gameState.equippedPit.displayName,
+                           tier: gameState.equippedPit.tier) {
+                    Image(systemName: "circle.bottomhalf.filled")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(gameState.equippedPit.tier.color)
+                }
+                loadoutRow(category: "Music",
+                           name: gameState.equippedMusic.displayName,
+                           tier: gameState.equippedMusic.tier) {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(gameState.equippedMusic.tier.color)
+                }
+            }
+        }
+        .padding(18)
+        .profileCard()
+    }
+
+    /// One equipped-cosmetic row: a small preview, the category + item name,
+    /// and its rarity badge (right-aligned).
+    private func loadoutRow<Leading: View>(
+        category: String,
+        name: String,
+        tier: CosmeticTier,
+        @ViewBuilder leading: () -> Leading
+    ) -> some View {
+        HStack(spacing: 12) {
+            leading()
+                .frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(category.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5))
+                    .tracking(1)
+                Text(name)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+            Spacer()
+            TierBadge(tier: tier)
+        }
+    }
+
     private var progressCard: some View {
         VStack(spacing: 16) {
             sectionLabel("Progress")
