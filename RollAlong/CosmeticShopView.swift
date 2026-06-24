@@ -61,7 +61,6 @@ struct CosmeticShopView: View {
             Color(white: 0.08).ignoresSafeArea()
 
             VStack(spacing: 0) {
-                headerBar
                 tabBar
                 ScrollView {
                     grid
@@ -125,6 +124,10 @@ struct CosmeticShopView: View {
                     .foregroundStyle(.white)
                 }
             }
+            // Coin pill, top-right — tap to summon the Get Coins sheet.
+            ToolbarItem(placement: .navigationBarTrailing) {
+                coinPill
+            }
         }
         .alert("Heads up", isPresented: $showAlert) {
             Button("Get more coins") {
@@ -147,43 +150,40 @@ struct CosmeticShopView: View {
         message: { Text(purchaseError ?? "") })
     }
 
-    // MARK: - Header (coin balance)
+    // MARK: - Coin pill (top-right, summons Get Coins)
 
-    private var headerBar: some View {
-        HStack {
+    /// The same coin pill as the home screen — shows the balance and opens the
+    /// Get Coins sheet on tap.  Lives in the nav bar's trailing slot here.
+    private var coinPill: some View {
+        Button {
+            showBuyCoinsSheet = true
+            AnalyticsClient.shared.track("buy_coins_sheet_opened",
+                                         properties: ["from": .string("shop_pill")])
+        } label: {
             HStack(spacing: 6) {
-                CoinIcon(size: 22)
+                CoinIcon(size: 16)
                 Text("\(gameState.coinBalance)")
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .monospacedDigit()
                     .contentTransition(.numericText(value: Double(gameState.coinBalance)))
                     .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
-                Text("coins")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(Color(white: 0.55))
             }
-            Spacer()
-            Button {
-                showBuyCoinsSheet = true
-                AnalyticsClient.shared.track("buy_coins_sheet_opened",
-                                             properties: ["from": .string("shop_header")])
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("Get more")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                }
-                .foregroundStyle(.black)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(.white))
-            }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color(white: 0.18))
+                    .overlay(Capsule().stroke(Color(white: 0.30), lineWidth: 0.8))
+            )
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(gameState.coinBalance) coins")
+        .accessibilityHint("Opens the get-coins shop.")
     }
 
     // MARK: - Tab bar
