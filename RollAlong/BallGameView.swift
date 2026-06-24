@@ -1907,61 +1907,60 @@ struct BallGameView: View {
     /// without us having to manually call `commitRegen` on a timer.
     private func livesHUDOverlay(safeTop: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-            // Per the agreed spec:
-            //   • Always render 6 marbles.
-            //   • Filled red marbles = your active lives (clamped to 6 max for
-            //     the bar).
-            //   • Stockpiled lives above 6 show as "+N" to the right of the
-            //     6th marble.
-            //   • Unlimited-lives subscribers get 6 gold marbles + an
-            //     infinity symbol instead of "+N".
-            let unlimited     = gameState.unlimitedLives
-            let display       = gameState.displayedLives   // may be > 6 with stockpile
-            let filledMarbles = unlimited ? GameState.livesMax : min(display, GameState.livesMax)
-            let stockpile     = unlimited ? 0 : max(0, display - GameState.livesMax)
+            // One marble + the live count.  When running low (< 6 lives) a
+            // countdown to the next free life appears beside it.  Unlimited-
+            // lives subscribers see a gold marble + ∞.
+            let unlimited = gameState.unlimitedLives
+            let display   = gameState.displayedLives
 
-            HStack(spacing: 5) {
-                ForEach(0..<GameState.livesMax, id: \.self) { i in
-                    lifeIcon(filled: i < filledMarbles, gold: unlimited)
-                }
-                // Trailing indicator — either the stockpile counter or
-                // the infinity glyph for unlimited subscribers.
+            HStack(spacing: 6) {
+                lifeIcon(filled: true, gold: unlimited)
+
                 if unlimited {
                     Image(systemName: "infinity")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.00, green: 0.86, blue: 0.36),
-                                    Color(red: 0.93, green: 0.65, blue: 0.10),
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
-                        .padding(.leading, 2)
-                } else if stockpile > 0 {
-                    Text("+\(stockpile)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(LinearGradient(
+                            colors: [Color(red: 1.00, green: 0.86, blue: 0.36),
+                                     Color(red: 0.93, green: 0.65, blue: 0.10)],
+                            startPoint: .top, endPoint: .bottom))
+                } else {
+                    Text("\(display)")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
+                        .monospacedDigit()
+
+                    if display < 6, let secs = gameState.timeToNextLife() {
+                        HStack(spacing: 3) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(Self.mmss(secs))
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(Color(white: 0.62))
                         .padding(.leading, 2)
+                    }
                 }
             }
-            .padding(.leading, 18)
-            // Drop well below the system status bar / Dynamic Island.
-            // safeTop alone wasn't enough on test runs — the marbles
-            // landed under the clock glyphs.  Minimum 50pt ensures the
-            // row clears a standard status bar (~20pt) plus the Dynamic
-            // Island visual (~37pt) regardless of what safeAreaInsets
-            // reports inside this GeometryReader.
-            //
-            // Per-spec the regen countdown text is no longer shown here;
-            // on the home screen it's visualised by the partial-fill
-            // marble instead.
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(Color.black.opacity(0.35))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+            )
+            .padding(.leading, 16)
+            // Clear the status bar / Dynamic Island (min 50pt, per earlier runs).
             .padding(.top, max(safeTop + 4, 50))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(livesAccessibilityLabel)
         }
+    }
+
+    /// "M:SS" for a seconds interval (the lives regen countdown).
+    private static func mmss(_ secs: TimeInterval) -> String {
+        let s = max(0, Int(secs.rounded()))
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     // MARK: - Coin Pit live HUD

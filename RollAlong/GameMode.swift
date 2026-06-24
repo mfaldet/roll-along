@@ -781,7 +781,7 @@ extension View {
 /// so the ball follows a true spiral path.
 struct LaunchTransition: View {
     let skin: BallSkin
-    private static let duration: Double = 0.62
+    private static let duration: Double = 1.15
     @State private var start = Date()
 
     var body: some View {
@@ -791,21 +791,26 @@ struct LaunchTransition: View {
             let maxOrbit = min(w, h) * 0.34
             TimelineView(.animation) { tl in
                 let p = min(1.0, tl.date.timeIntervalSince(start) / Self.duration)  // 0→1
-                let ease = p * p                                   // accelerate inward
-                let angle = ease * 2 * .pi * 2.4                   // ~2.4 spirals
-                let orbit = maxOrbit * CGFloat(1 - ease)
+                // Whirlpool: angular progress is heavily back-loaded, so the ball
+                // makes slow loops out at the rim and then whips faster and faster
+                // as it spirals down into the centre — like a coin in a wishing
+                // well.  Both the turn rate and the inward pull track `spin`.
+                let spin  = pow(p, 2.0)
+                let angle = spin * 2 * .pi * 4.0                   // ~4 turns, accelerating
+                let orbit = maxOrbit * CGFloat(1 - spin)
                 let bx = c.x + CGFloat(cos(angle)) * orbit
                 let by = c.y + CGFloat(sin(angle)) * orbit
-                let ballSize = max(8, 132 * (1 - CGFloat(ease)))
-                let blackP = max(0.0, (p - 0.60) / 0.40)           // black takes over last 40%
+                let ballSize = max(7, 132 * (1 - CGFloat(spin)))
+                let glow = Double(spin)                            // portal brightens as it nears
+                let blackP = max(0.0, (p - 0.62) / 0.30)           // black covers by p≈0.92
                 let blackSize = CGFloat(blackP) * hypot(w, h) * 1.2
 
                 ZStack {
                     // Glowing goal/portal at centre — brightens as the ball nears.
                     Circle()
                         .fill(RadialGradient(
-                            colors: [Color(red: 0.45, green: 0.78, blue: 1.0).opacity(0.55 * ease),
-                                     Color(red: 0.30, green: 0.55, blue: 0.95).opacity(0.25 * ease),
+                            colors: [Color(red: 0.45, green: 0.78, blue: 1.0).opacity(0.55 * glow),
+                                     Color(red: 0.30, green: 0.55, blue: 0.95).opacity(0.25 * glow),
                                      .clear],
                             center: .center, startRadius: 0, endRadius: 70))
                         .frame(width: 150, height: 150)
