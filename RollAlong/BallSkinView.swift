@@ -193,7 +193,7 @@ struct BallSkinView: View {
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
             metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
-        case .jade, .ruby:
+        case .jade, .ruby, .diamond:
             gemMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
 
         // ── Gradient-based (any remaining / future skin) ───────────────

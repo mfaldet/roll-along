@@ -172,6 +172,12 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     never coin-purchasable and hidden from the regular shop grid.
     case speckledEgg = "Speckled Egg"
 
+    // ── Diamond Balls IAP exclusive ──────────────────────────────────────
+    //   • diamond — brilliant white-cyan cut gem.  Granted ONLY by the
+    //     one-time "Diamond Balls" unlimited-lives purchase; never coin-
+    //     purchasable and hidden from the regular shop grid.
+    case diamond = "Diamond"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -190,7 +196,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
         switch self {
         case .pluto, .aurora, .beachBall, .pumpkin, .ornament,
              .heartstone, .shamrock, .confetti, .speckledEgg,
-             .trophy:   // Golden Gauntlet completion exclusive
+             .trophy,    // Golden Gauntlet completion exclusive
+             .diamond:   // Diamond Balls IAP exclusive
             return true
         default:                          return false
         }
@@ -693,6 +700,17 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.46, green: 0.82, blue: 0.90),
                 Color(red: 0.22, green: 0.60, blue: 0.76),
                 Color(red: 0.08, green: 0.28, blue: 0.44),
+            ]
+
+        // ── Diamond Balls IAP exclusive ──
+        case .diamond:
+            // Brilliant white → ice-blue → cyan → deep blue.  A cut-gem
+            // renderer (facets + glints) paints on top in BallSkinView.
+            return [
+                Color.white,
+                Color(red: 0.80, green: 0.95, blue: 1.00),
+                Color(red: 0.50, green: 0.78, blue: 0.98),
+                Color(red: 0.22, green: 0.45, blue: 0.74),
             ]
         }
     }

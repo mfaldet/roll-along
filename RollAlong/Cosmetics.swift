@@ -124,7 +124,8 @@ extension BallSkin: CosmeticItem {
              .heartstone,      // valentines-2027-exclusive; never coin-purchasable
              .shamrock,        // stpatricks-2027-exclusive; never coin-purchasable
              .confetti,        // newyear-2027-exclusive; never coin-purchasable
-             .speckledEgg:     // spring-2027-exclusive; never coin-purchasable
+             .speckledEgg,     // spring-2027-exclusive; never coin-purchasable
+             .diamond:         // Diamond Balls IAP-exclusive; never coin-purchasable
             return .exclusive  // 500 coins — animated / special / bundle-only
         }
     }

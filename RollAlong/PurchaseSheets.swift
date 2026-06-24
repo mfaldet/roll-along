@@ -57,7 +57,9 @@ struct BuyLivesSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        // Open tall enough that the Diamond Balls offer is fully visible at
+        // rest (medium clipped its bottom); still draggable to full height.
+        .presentationDetents([.fraction(0.85), .large])
         .onChange(of: store.lastError) { _, err in purchaseError = err }
         .alert("Purchase Failed", isPresented: Binding(
             get: { purchaseError != nil },
@@ -163,52 +165,67 @@ struct BuyLivesSheet: View {
         let pid: StoreKitManager.ProductID = .unlimited
         let isOwned = gameState.unlimitedLives
         let inProgress = store.purchaseInProgress == pid
-        HStack(alignment: .center, spacing: 14) {
-            diamondBall(size: 42)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Diamond Balls")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(Self.diamondGradient)
-                Text(isOwned ? "Active — indestructible, never run out."
-                             : "Indestructible. Unlimited lives, forever.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.72))
-            }
-            Spacer()
-            Button {
-                Task { await store.purchase(pid) }
-            } label: {
-                if inProgress {
-                    ProgressView()
-                        .progressViewStyle(.circular).tint(.black)
-                        .frame(width: 56, height: 30)
-                        .background(Capsule().fill(Color.white))
-                } else {
-                    Text(isOwned ? "Owned" : store.displayPrice(for: pid, fallback: "$19.99"))
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(isOwned ? Color(white: 0.45) : .black)
-                        .padding(.horizontal, 16).padding(.vertical, 9)
-                        .background(Capsule().fill(isOwned ? Color(white: 0.25) : Color.white))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 14) {
+                diamondBall(size: 42)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Diamond Balls")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(Self.diamondGradient)
+                    Text(isOwned ? "Active — indestructible, never run out."
+                                 : "Indestructible.\nUnlimited lives, forever.")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.72))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer()
+                Button {
+                    Task { await store.purchase(pid) }
+                } label: {
+                    if inProgress {
+                        ProgressView()
+                            .progressViewStyle(.circular).tint(.black)
+                            .frame(width: 56, height: 30)
+                            .background(Capsule().fill(Color.white))
+                    } else {
+                        Text(isOwned ? "Owned" : store.displayPrice(for: pid, fallback: "$19.99"))
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(isOwned ? Color(white: 0.45) : .black)
+                            .padding(.horizontal, 16).padding(.vertical, 9)
+                            .background(Capsule().fill(isOwned ? Color(white: 0.25) : Color.white))
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isOwned || inProgress)
             }
-            .buttonStyle(.plain)
-            .disabled(isOwned || inProgress)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 0.10, green: 0.17, blue: 0.26),
+                                     Color(red: 0.17, green: 0.24, blue: 0.36)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Self.diamondGradient, lineWidth: 1.5)
+                    )
+            )
+            .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.30), radius: 10, y: 2)
+
+            // Exclusive cosmetic — obtainable ONLY through this purchase.
+            HStack(alignment: .top, spacing: 5) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Self.diamondGradient)
+                Text("Also unlocks the exclusive Diamond ball skin — available only here.")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 4)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.10, green: 0.17, blue: 0.26),
-                                 Color(red: 0.17, green: 0.24, blue: 0.36)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Self.diamondGradient, lineWidth: 1.5)
-                )
-        )
-        .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.30), radius: 10, y: 2)
     }
 
     /// A super-shiny diamond marble — cool white→cyan, a bright specular, and a

@@ -237,7 +237,7 @@ final class StoreKitManager: ObservableObject {
             default: break
             }
         }
-        if unlimitedSeen   { gameState?.unlimitedLives = true }
+        if unlimitedSeen   { gameState?.unlimitedLives = true; gameState?.grant(BallSkin.diamond) }
         if starterPackSeen {
             guard let gs = gameState, !gs.starterPackClaimed else { return }
             gs.addCoins(ProductID.starterPack.rewardCoins)
@@ -365,6 +365,7 @@ final class StoreKitManager: ObservableObject {
 
         case .unlimitedUnlock:
             gameState.unlimitedLives = true
+            gameState.grant(BallSkin.diamond)   // exclusive Diamond ball skin
 
         case .starterPackUnlock:
             // Only deliver once — guard lets restore calls be idempotent.
