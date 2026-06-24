@@ -211,7 +211,10 @@ enum BallSkin: String, CaseIterable, Identifiable {
 
     /// 4-stop radial palette: light highlight → mid → shadow → deep
     /// shadow.  Picked to read clearly on every BackgroundTheme.
-    private var colors: [Color] {
+    /// The skin's gradient palette (highlight → mid → dark → deep).  Exposed so
+    /// BallSkinView's premium renderers (gloss / metal / gem) can build a richer
+    /// marble than a flat gradient from the same colours.
+    var colors: [Color] {
         switch self {
         case .red:
             return [

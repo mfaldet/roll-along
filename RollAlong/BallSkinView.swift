@@ -182,7 +182,15 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.20), lineWidth: 0.5))
 
-        // ── Gradient-based (all remaining skins) ───────────────────────
+        // ── Polished marbles / metals / gems — richer than a flat gradient ─
+        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon, .pastel, .dune:
+            glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+        case .gold, .silver, .copper:
+            metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+        case .jade, .ruby:
+            gemMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+
+        // ── Gradient-based (any remaining / future skin) ───────────────
         default:
             Circle()
                 .fill(skin.gradient(endRadius: diameter * 0.70))
@@ -1313,6 +1321,96 @@ struct BallSkinView: View {
     private static let neptunePalette = [Color(red: 0.66, green: 0.84, blue: 1.00), Color(red: 0.20, green: 0.42, blue: 0.92), Color(red: 0.08, green: 0.18, blue: 0.62), Color(red: 0.02, green: 0.06, blue: 0.30)]
     private static let venusPalette   = [Color(red: 1.00, green: 0.96, blue: 0.80), Color(red: 0.96, green: 0.82, blue: 0.42), Color(red: 0.78, green: 0.54, blue: 0.18), Color(red: 0.42, green: 0.26, blue: 0.06)]
     private static let uranusPalette  = [Color(red: 0.82, green: 1.00, blue: 1.00), Color(red: 0.46, green: 0.86, blue: 0.88), Color(red: 0.16, green: 0.56, blue: 0.62), Color(red: 0.04, green: 0.26, blue: 0.32)]
+
+    // =========================================================================
+    // MARK: - Premium marble / metal / gem (shared renderers)
+    // Turn a flat 4-stop palette into a believable polished sphere — a glowing
+    // Fresnel rim, a soft + sharp specular, two-tone metal reflections, or cut-
+    // gem facets.  Clipped to a circle by the caller.
+    // =========================================================================
+
+    /// Polished glass marble — lit base + glowing rim light + soft & sharp speculars.
+    private func glossMarble(_ colors: [Color]) -> some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(colors: colors),
+                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32), startRadius: 0, endRadius: r * 1.25))
+
+            // Fresnel rim — the colour glows where light wraps the lower-right edge.
+            ctx.blendMode = .plusLighter
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(stops: [.init(color: .clear, location: 0.0),
+                                 .init(color: .clear, location: 0.80),
+                                 .init(color: (colors.first ?? .white).opacity(0.70), location: 1.0)]),
+                center: CGPoint(x: cx + r * 0.42, y: cy + r * 0.46), startRadius: 0, endRadius: r * 1.05))
+            ctx.blendMode = .normal
+
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.82, width: r * 0.72, height: r * 0.50)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.60), .clear]),
+                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.52), startRadius: 0, endRadius: r * 0.55))
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.40, y: cy - r * 0.54, width: r * 0.18, height: r * 0.18)),
+                with: .color(.white.opacity(0.90)))
+        }
+    }
+
+    /// Polished metal — base + bright sky / dark ground reflection + specular streak.
+    private func metalMarble(_ colors: [Color]) -> some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(colors: colors),
+                center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.26), startRadius: 0, endRadius: r * 1.25))
+            // Two-tone reflection: bright sky up top, dark ground below.
+            ctx.fill(Path(ellipseIn: sphere), with: .linearGradient(
+                Gradient(stops: [.init(color: (colors.first ?? .white).opacity(0.85), location: 0.0),
+                                 .init(color: .clear, location: 0.42),
+                                 .init(color: .clear, location: 0.58),
+                                 .init(color: (colors.last ?? .black).opacity(0.70), location: 1.0)]),
+                startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r)))
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.45, y: cy - r * 0.60, width: r * 0.34, height: r * 0.14)),
+                with: .color(.white.opacity(0.92)))
+            ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.03, dy: r * 0.03)),
+                with: .color((colors.first ?? .white).opacity(0.45)), lineWidth: max(0.6, r * 0.045))
+        }
+    }
+
+    /// Cut gemstone — deep translucent body, inner glow, facet glints, bright rim.
+    private func gemMarble(_ colors: [Color]) -> some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+            let mid = colors.count > 1 ? colors[1] : (colors.first ?? .white)
+
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(colors: colors),
+                center: CGPoint(x: cx - r * 0.26, y: cy - r * 0.28), startRadius: 0, endRadius: r * 1.30))
+
+            ctx.blendMode = .plusLighter
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.5, y: cy - r * 0.4, width: r, height: r)),
+                with: .radialGradient(Gradient(colors: [mid.opacity(0.70), .clear]),
+                    center: CGPoint(x: cx, y: cy + r * 0.10), startRadius: 0, endRadius: r * 0.60))
+            for (fx, fy, fr) in [(-0.28, -0.10, 0.10), (0.20, 0.24, 0.08), (0.05, -0.30, 0.07), (-0.10, 0.34, 0.06)] {
+                let gx = cx + CGFloat(fx) * r, gy = cy + CGFloat(fy) * r, gr = CGFloat(fr) * r
+                var d = Path()
+                d.move(to: CGPoint(x: gx, y: gy - gr));        d.addLine(to: CGPoint(x: gx + gr * 0.6, y: gy))
+                d.addLine(to: CGPoint(x: gx, y: gy + gr));     d.addLine(to: CGPoint(x: gx - gr * 0.6, y: gy))
+                d.closeSubpath()
+                ctx.fill(d, with: .color(.white.opacity(0.80)))
+            }
+            ctx.blendMode = .normal
+
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.46, y: cy - r * 0.66, width: r * 0.34, height: r * 0.22)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.85), .clear]),
+                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.56), startRadius: 0, endRadius: r * 0.30))
+            ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.02, dy: r * 0.02)),
+                with: .color(mid.opacity(0.55)), lineWidth: max(0.6, r * 0.04))
+        }
+    }
 
     // =========================================================================
     // MARK: - Beach Ball  (Summer 2026 seasonal exclusive)
