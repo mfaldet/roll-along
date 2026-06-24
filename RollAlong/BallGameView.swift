@@ -2664,6 +2664,13 @@ struct BallGameView: View {
                                     .fill(Color(red: 1.00, green: 0.70, blue: 0.20))
                             )
                     }
+                    ResultShareButton(result: ShareableResult(
+                        mode: "Gold Rush",   // the coin-pit mode is DISPLAYED as Gold Rush
+                        headline: "\(coinPitScore) coins",
+                        subtitle: perfect ? "Cleared the pit 💰" : "\(coinPitScore) of \(target)",
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        won: perfect))
                     Button { nav.goHome() } label: {
                         Text("Home")
                             .font(.system(size: 17, weight: .semibold, design: .rounded))

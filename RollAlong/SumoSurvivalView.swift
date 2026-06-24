@@ -367,6 +367,13 @@ struct SumoSurvivalView: View {
                             .background(RoundedRectangle(cornerRadius: 18)
                                 .fill(Color(red: 0.98, green: 0.55, blue: 0.45)))
                     }
+                    ResultShareButton(result: ShareableResult(
+                        mode: "Sumo Survival",
+                        headline: "\(knockouts) knockouts",
+                        subtitle: "survived \(timeString)",
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        won: knockouts >= 3))
                     Button { nav.goHome() } label: {
                         Text("Home")
                             .font(.system(size: 17, weight: .semibold, design: .rounded))

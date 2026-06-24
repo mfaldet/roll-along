@@ -406,6 +406,13 @@ struct KingOfTheHillView: View {
                             .padding(.vertical, 15)
                             .background(RoundedRectangle(cornerRadius: 18).fill(Self.playerColor))
                     }
+                    ResultShareButton(result: ShareableResult(
+                        mode: "King of the Hill",
+                        headline: String(format: "%d:%02d", holdSec / 60, holdSec % 60),
+                        subtitle: playerWon ? "Held the crown 👑" : "Held the hill",
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        won: playerWon))
                     Button { nav.goHome() } label: {
                         Text("Home")
                             .font(.system(size: 17, weight: .semibold, design: .rounded))

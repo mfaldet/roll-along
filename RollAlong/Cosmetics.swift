@@ -1968,7 +1968,9 @@ struct ResultShareButton: View {
                 ShareLink(
                     item: card,
                     subject: Text("Roll Along — \(result.mode)"),
-                    message: Text("I just scored \(result.headline) in \(result.mode) on Roll Along. Can you beat me?"),
+                    // The image carries the score + mode; the body is a warm,
+                    // social invite about the app's breadth, not this one round.
+                    message: Text("Come roll with me! 🌀 A whole pile of quick games to mess around in, your own marble to deck out, and clans so we can squad up. Fair warning: it's weirdly addictive."),
                     preview: SharePreview("Roll Along — \(result.mode)", image: card)
                 ) { shareLabel }
                 .simultaneousGesture(TapGesture().onEnded {

@@ -451,6 +451,14 @@ struct MarbleCupView: View {
                             .padding(.vertical, 15)
                             .background(RoundedRectangle(cornerRadius: 18).fill(Self.playerAccent))
                     }
+                    ResultShareButton(result: ShareableResult(
+                        mode: "Marble Cup",
+                        headline: "\(playerGoals) – \(aiGoals)",
+                        subtitle: playerWon ? "Marble Cup champ ⚽️"
+                                            : (playerGoals == aiGoals ? "Hard-fought draw" : "Good match"),
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        won: playerWon))
                     Button { nav.goHome() } label: {
                         Text("Home")
                             .font(.system(size: 17, weight: .semibold, design: .rounded))

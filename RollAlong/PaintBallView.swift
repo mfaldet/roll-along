@@ -443,6 +443,13 @@ struct PaintBallView: View {
                             .background(RoundedRectangle(cornerRadius: 18)
                                 .fill(Self.paintColors[0]))
                     }
+                    ResultShareButton(result: ShareableResult(
+                        mode: "Paint Ball",
+                        headline: "\(pct)% painted",
+                        subtitle: "\(ordinal(placement)) of \(painters.count)",
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        won: playerWon))
                     Button { nav.goHome() } label: {
                         Text("Home")
                             .font(.system(size: 17, weight: .semibold, design: .rounded))

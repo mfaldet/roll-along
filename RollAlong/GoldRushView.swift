@@ -429,7 +429,7 @@ struct GoldRushView: View {
                                 .fill(Color(red: 1.0, green: 0.82, blue: 0.30)))
                     }
                     ResultShareButton(result: ShareableResult(
-                        mode: "Gold Rush",
+                        mode: "Coin Pit",   // this view is DISPLAYED as Coin Pit
                         headline: "\(playerScore) coins",
                         subtitle: "\(ordinal(placement)) of \(racers.count)",
                         skin: gameState.activeSkin,
