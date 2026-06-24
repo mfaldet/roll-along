@@ -259,25 +259,18 @@ struct PaintBallView: View {
         let paint = Self.paintColors[p.colorIndex]
         return ZStack {
             if p.isPlayer {
-                Circle().fill(gameState.activeSkin.gradient(endRadius: marbleRadius * 1.4))
+                BallSkinView(skin: gameState.activeSkin, diameter: marbleRadius * 2)
                     .overlay(Circle().stroke(paint, lineWidth: 3))
-                    .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             } else {
                 // Keystone: rival shows off a real ball skin, but keeps a thick
                 // PAINT-COLOUR rim — in Paint Ball the colour is the gameplay
                 // identity (whose paint is whose), so it must stay legible.
                 let skin = rivalLooks[p.colorIndex]?.skin ?? .red
-                Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+                BallSkinView(skin: skin, diameter: marbleRadius * 2)
                     .overlay(Circle().stroke(paint, lineWidth: 3))
-                    .overlay(Circle().stroke(.black.opacity(0.3), lineWidth: 0.5))
             }
         }
         .frame(width: marbleRadius * 2, height: marbleRadius * 2)
-        .overlay(alignment: .topLeading) {
-            Circle().fill(.white.opacity(0.5))
-                .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
-                .offset(x: marbleRadius * 0.35, y: marbleRadius * 0.35)
-        }
         .opacity(stuck ? 0.5 : 1)
         .overlay {
             if stuck {

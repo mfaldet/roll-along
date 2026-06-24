@@ -245,18 +245,11 @@ struct KingOfTheHillView: View {
     }
 
     private func marble(_ r: Racer) -> some View {
-        // No per-racer colour highlight — the name tag identifies each ball, so
-        // every marble just wears its own skin (same neutral edge as solo play).
+        // Canonical ball renderer — identical to home/shop/climb; tag IDs who.
         let skin = r.isPlayer ? gameState.activeSkin : (rivalLooks[r.colorIndex]?.skin ?? .red)
-        return Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
-            .overlay(Circle().stroke(.white.opacity(0.30), lineWidth: 1))
+        return BallSkinView(skin: skin, diameter: marbleRadius * 2)
             .frame(width: marbleRadius * 2, height: marbleRadius * 2)
-        .overlay(alignment: .topLeading) {
-            Circle().fill(.white.opacity(0.5))
-                .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
-                .offset(x: marbleRadius * 0.32, y: marbleRadius * 0.32)
-        }
-        .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
+            .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
     }
 
     // MARK: - HUD / overlays

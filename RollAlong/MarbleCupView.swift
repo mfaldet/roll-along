@@ -287,20 +287,13 @@ struct MarbleCupView: View {
                                              startRadius: 1, endRadius: m.radius * 1.5))
                     .overlay(Circle().stroke(Color(white: 0.55), lineWidth: 1))
             case .player:
-                Circle().fill(gameState.activeSkin.gradient(endRadius: m.radius * 1.4))
-                    .overlay(Circle().stroke(.white.opacity(0.30), lineWidth: 1))
+                BallSkinView(skin: gameState.activeSkin, diameter: m.radius * 2)
             case .ai:
                 // Keystone: the rival shows off a real, desirable ball skin.
-                Circle().fill((rivalLook?.skin ?? .red).gradient(endRadius: m.radius * 1.4))
-                    .overlay(Circle().stroke(.white.opacity(0.30), lineWidth: 1))
+                BallSkinView(skin: rivalLook?.skin ?? .red, diameter: m.radius * 2)
             }
         }
         .frame(width: m.radius * 2, height: m.radius * 2)
-        .overlay(alignment: .topLeading) {
-            Circle().fill(.white.opacity(0.5))
-                .frame(width: m.radius * 0.5, height: m.radius * 0.5)
-                .offset(x: m.radius * 0.3, y: m.radius * 0.3)
-        }
         .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
     }
 

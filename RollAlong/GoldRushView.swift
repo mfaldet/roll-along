@@ -242,16 +242,10 @@ struct GoldRushView: View {
     }
 
     private func marble(_ r: GoldRushEngine.Racer) -> some View {
-        // No per-racer colour highlight — the name tag identifies each ball, so
-        // every marble just wears its own skin (same neutral edge as solo play).
-        return Circle().fill(skinFor(r).gradient(endRadius: marbleRadius * 1.4))
-            .overlay(Circle().stroke(.white.opacity(0.30), lineWidth: 1))
+        // Canonical ball renderer — a skin looks identical here and on the home
+        // screen, shop, and climb.  The name tag identifies who's who.
+        BallSkinView(skin: skinFor(r), diameter: marbleRadius * 2)
             .frame(width: marbleRadius * 2, height: marbleRadius * 2)
-            .overlay(alignment: .topLeading) {
-                Circle().fill(.white.opacity(0.5))
-                    .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
-                    .offset(x: marbleRadius * 0.35, y: marbleRadius * 0.35)
-            }
             .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
     }
 

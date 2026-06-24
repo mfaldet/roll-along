@@ -243,15 +243,9 @@ struct SumoSurvivalView: View {
     private func marble(_ b: Bumper) -> some View {
         // No per-racer colour highlight — the name tag identifies each ball.
         let skin = b.isPlayer ? gameState.activeSkin : (rivalLooks[b.id]?.skin ?? .red)
-        return Circle().fill(skin.gradient(endRadius: marbleRadius * 1.4))
+        return BallSkinView(skin: skin, diameter: marbleRadius * 2)
             .frame(width: marbleRadius * 2, height: marbleRadius * 2)
-            .overlay(Circle().stroke(.black.opacity(0.35), lineWidth: 0.5))
-        .overlay(alignment: .topLeading) {
-            Circle().fill(.white.opacity(0.5))
-                .frame(width: marbleRadius * 0.5, height: marbleRadius * 0.5)
-                .offset(x: marbleRadius * 0.35, y: marbleRadius * 0.35)
-        }
-        .shadow(color: .black.opacity(0.55), radius: 6, x: 2, y: 4)
+            .shadow(color: .black.opacity(0.55), radius: 6, x: 2, y: 4)
     }
 
     // MARK: - HUD / overlays

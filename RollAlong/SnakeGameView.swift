@@ -241,16 +241,14 @@ struct SnakeGameView: View {
         let col = Self.palette[c.colorIndex % Self.palette.count]
         return ZStack {
             if c.isPlayer {
-                Circle().fill(gameState.activeSkin.gradient(endRadius: headRadius * 1.4))
+                BallSkinView(skin: gameState.activeSkin, diameter: headRadius * 2)
                     .overlay(Circle().stroke(col, lineWidth: 2.5))
-                    .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 1))
             } else {
                 // Keystone: each rival comet shows off a real ball skin (its
                 // lethal wall stays palette-coloured — that's a game mechanic).
                 let skin = rivalLooks[c.colorIndex]?.skin ?? .red
-                Circle().fill(skin.gradient(endRadius: headRadius * 1.4))
+                BallSkinView(skin: skin, diameter: headRadius * 2)
                     .overlay(Circle().stroke(col.opacity(0.9), lineWidth: 2))
-                    .overlay(Circle().stroke(.white.opacity(0.4), lineWidth: 1))
             }
         }
         .frame(width: headRadius * 2, height: headRadius * 2)

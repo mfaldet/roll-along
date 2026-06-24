@@ -1851,10 +1851,9 @@ struct MiniBall: View {
     let skin: BallSkin
     var size: CGFloat = 14
     var body: some View {
-        Circle()
-            .fill(skin.gradient(endRadius: size * 0.7))
+        // The one canonical ball renderer, so a skin looks identical everywhere.
+        BallSkinView(skin: skin, diameter: size)
             .frame(width: size, height: size)
-            .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 0.5))
     }
 }
 
@@ -1961,8 +1960,7 @@ struct ResultShareCard: View {
                             .offset(x: CGFloat(i - 5) * 17)
                     }
                 }
-                Circle()
-                    .fill(result.skin.gradient(endRadius: 70))
+                BallSkinView(skin: result.skin, diameter: 116)
                     .frame(width: 116, height: 116)
                     .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 3))
                     .shadow(color: .black.opacity(0.45), radius: 14, y: 7)
