@@ -58,6 +58,31 @@ extension CosmeticTier {
         case .exclusive: return 500
         }
     }
+
+    /// Player-facing rarity name (shop / profile badges).  starter is implicit
+    /// ("Free") and normally renders no badge — see `showsBadge`.
+    var label: String {
+        switch self {
+        case .starter:   return "Free"
+        case .standard:  return "Standard"
+        case .premium:   return "Epic"
+        case .exclusive: return "Legendary"
+        }
+    }
+
+    /// Rarity accent — gray → cool blue → epic purple → legendary gold, the
+    /// conventional rarity ramp players already read at a glance.
+    var color: Color {
+        switch self {
+        case .starter:   return Color(white: 0.55)
+        case .standard:  return Color(red: 0.45, green: 0.62, blue: 0.85)
+        case .premium:   return Color(red: 0.72, green: 0.45, blue: 0.95)
+        case .exclusive: return Color(red: 1.00, green: 0.78, blue: 0.28)
+        }
+    }
+
+    /// starter/free items don't earn a badge (it's the implicit default).
+    var showsBadge: Bool { self != .starter }
 }
 
 // MARK: - Ball skins
@@ -1830,6 +1855,27 @@ struct MiniBall: View {
             .fill(skin.gradient(endRadius: size * 0.7))
             .frame(width: size, height: size)
             .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 0.5))
+    }
+}
+
+/// A small rarity pill — "Standard" / "Epic" / "Legendary" in the tier's accent
+/// colour.  Surfaces rarity-as-status in the shop and profile.  Renders nothing
+/// for starter/free items.
+struct TierBadge: View {
+    let tier: CosmeticTier
+    var compact: Bool = false
+    var body: some View {
+        if tier.showsBadge {
+            Text(tier.label.uppercased())
+                .font(.system(size: compact ? 8 : 9, weight: .black, design: .rounded))
+                .tracking(0.5)
+                .foregroundStyle(tier.color)
+                .padding(.horizontal, compact ? 5 : 7)
+                .padding(.vertical, compact ? 2 : 3)
+                .background(Capsule().fill(tier.color.opacity(0.16)))
+                .overlay(Capsule().stroke(tier.color.opacity(0.55), lineWidth: 1))
+                .fixedSize()
+        }
     }
 }
 
