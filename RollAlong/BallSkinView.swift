@@ -182,6 +182,12 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.20), lineWidth: 0.5))
 
+        // ── Cosmic / electric — bespoke animated ───────────────────────
+        case .galaxy:  galaxyCanvas.clipShape(Circle()).overlay(planetRim)
+        case .nebula:  nebulaCanvas.clipShape(Circle()).overlay(planetRim)
+        case .opal:    opalCanvas.clipShape(Circle()).overlay(planetRim)
+        case .neon:    neonCanvas.clipShape(Circle()).overlay(planetRim)
+
         // ── Polished marbles / metals / gems — richer than a flat gradient ─
         case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon, .pastel, .dune:
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
@@ -1410,6 +1416,150 @@ struct BallSkinView: View {
             ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.02, dy: r * 0.02)),
                 with: .color(mid.opacity(0.55)), lineWidth: max(0.6, r * 0.04))
         }
+    }
+
+    // =========================================================================
+    // MARK: - Cosmic / electric (bespoke animated)
+    // Galaxy spiral, drifting nebula clouds, shifting opal iridescence, and a
+    // pulsing neon orb — far beyond a flat gradient.  Reduce Motion freezes them.
+    // =========================================================================
+
+    private var galaxyCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.14, green: 0.10, blue: 0.30), Color(red: 0.03, green: 0.02, blue: 0.12)]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r * 1.2))
+                ctx.blendMode = .plusLighter
+                for i in 0..<55 {                       // two spiral arms of stars
+                    let f = Double(i) / 55.0
+                    let ang = f * 5.5 + t * 0.25 + Double(i % 2) * .pi
+                    let rad = r * CGFloat(pow(f, 0.85)) * 0.96
+                    let sx = cx + CGFloat(cos(ang)) * rad
+                    let sy = cy + CGFloat(sin(ang)) * rad
+                    if hypot(sx - cx, sy - cy) > r * 0.95 { continue }
+                    let ss = r * CGFloat(0.012 + (1 - f) * 0.02)
+                    let col = f < 0.4 ? Color(red: 1, green: 0.95, blue: 0.85) : Color(red: 0.72, green: 0.82, blue: 1.0)
+                    let tw = reduceMotion ? 0.85 : 0.5 + 0.5 * sin(t * 3 + Double(i))
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - ss, y: sy - ss, width: ss * 2, height: ss * 2)),
+                             with: .color(col.opacity(tw)))
+                }
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.4, y: cy - r * 0.4, width: r * 0.8, height: r * 0.8)),
+                    with: .radialGradient(Gradient(colors: [Color(red: 1, green: 0.95, blue: 0.8).opacity(0.9),
+                                                            Color(red: 0.8, green: 0.6, blue: 1).opacity(0.3), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r * 0.45))
+                ctx.blendMode = .normal
+                galaxySpecular(ctx, cx: cx, cy: cy, r: r)
+            }
+        }
+    }
+
+    private var nebulaCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.16, green: 0.06, blue: 0.22), Color(red: 0.04, green: 0.02, blue: 0.10)]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r * 1.2))
+                ctx.blendMode = .plusLighter
+                let blobs: [(CGFloat, CGFloat, Color)] = [
+                    (-0.30, -0.20, Color(red: 0.95, green: 0.30, blue: 0.70)),
+                    ( 0.28,  0.10, Color(red: 0.55, green: 0.30, blue: 0.95)),
+                    ( 0.00,  0.35, Color(red: 0.30, green: 0.70, blue: 0.95)),
+                    ( 0.15, -0.30, Color(red: 0.95, green: 0.55, blue: 0.40)),
+                ]
+                for (i, blob) in blobs.enumerated() {
+                    let bx = cx + blob.0 * r + CGFloat(sin(t * 0.4 + Double(i) * 1.7)) * r * 0.08
+                    let by = cy + blob.1 * r + CGFloat(cos(t * 0.3 + Double(i))) * r * 0.06
+                    let br = r * (0.45 + 0.10 * CGFloat(sin(t * 0.5 + Double(i))))
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                        with: .radialGradient(Gradient(colors: [blob.2.opacity(0.55), .clear]),
+                            center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
+                }
+                for (idx, s) in [(0.30, 0.20), (0.70, 0.30), (0.50, 0.60), (0.22, 0.70),
+                                 (0.80, 0.60), (0.45, 0.40), (0.60, 0.16)].enumerated() {
+                    let sx = cx - r + CGFloat(s.0) * r * 2, sy = cy - r + CGFloat(s.1) * r * 2
+                    if hypot(sx - cx, sy - cy) > r * 0.9 { continue }
+                    let tw = reduceMotion ? 0.7 : 0.4 + 0.5 * sin(t * 2.5 + Double(idx))
+                    let ss = r * 0.02
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - ss, y: sy - ss, width: ss * 2, height: ss * 2)),
+                             with: .color(.white.opacity(tw)))
+                }
+                ctx.blendMode = .normal
+                galaxySpecular(ctx, cx: cx, cy: cy, r: r)
+            }
+        }
+    }
+
+    private var opalCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.96, green: 0.97, blue: 1.0), Color(red: 0.70, green: 0.74, blue: 0.86),
+                                      Color(red: 0.40, green: 0.44, blue: 0.60)]),
+                    center: CGPoint(x: cx - r * 0.28, y: cy - r * 0.30), startRadius: 0, endRadius: r * 1.25))
+                ctx.blendMode = .plusLighter
+                let patches: [(CGFloat, CGFloat, Double)] = [(-0.25, -0.15, 0.0), (0.22, 0.05, 0.3),
+                                                             (0.0, 0.30, 0.55), (-0.15, 0.30, 0.75), (0.30, -0.25, 0.9)]
+                for (i, p) in patches.enumerated() {
+                    let hue = (t * 0.08 + p.2).truncatingRemainder(dividingBy: 1.0)
+                    let col = Color(hue: hue, saturation: 0.75, brightness: 1.0)
+                    let bx = cx + p.0 * r, by = cy + p.1 * r
+                    let br = r * (0.30 + 0.06 * CGFloat(sin(t * 0.6 + Double(i))))
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                        with: .radialGradient(Gradient(colors: [col.opacity(0.5), .clear]),
+                            center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
+                }
+                ctx.blendMode = .normal
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.80, width: r * 0.55, height: r * 0.34)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.70), .clear]),
+                        center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.60), startRadius: 0, endRadius: r * 0.4))
+            }
+        }
+    }
+
+    private var neonCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                let pulse = reduceMotion ? 0.8 : 0.6 + 0.4 * sin(t * 2.4)
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 1.0, green: 0.30, blue: 0.95), Color(red: 0.55, green: 0.10, blue: 0.92),
+                                      Color(red: 0.10, green: 0.20, blue: 0.85), Color(red: 0.05, green: 0.02, blue: 0.30)]),
+                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.24), startRadius: 0, endRadius: r * 1.25))
+                ctx.blendMode = .plusLighter
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 1.0, green: 0.30, blue: 0.95).opacity(0.5 * pulse), .clear]),
+                    center: CGPoint(x: cx - r * 0.15, y: cy - r * 0.18), startRadius: 0, endRadius: r * 0.9))
+                ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.04, dy: r * 0.04)),
+                    with: .color(Color(red: 0.4, green: 0.9, blue: 1.0).opacity(0.6 * pulse)), lineWidth: max(0.8, r * 0.06))
+                ctx.blendMode = .normal
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.46, y: cy - r * 0.74, width: r * 0.4, height: r * 0.26)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.8), .clear]),
+                        center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.58), startRadius: 0, endRadius: r * 0.3))
+            }
+        }
+    }
+
+    /// Shared top-left gloss for the dark cosmic skins.
+    private func galaxySpecular(_ ctx: GraphicsContext, cx: CGFloat, cy: CGFloat, r: CGFloat) {
+        ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.5, y: cy - r * 0.82, width: r * 0.5, height: r * 0.30)),
+            with: .radialGradient(Gradient(colors: [.white.opacity(0.4), .clear]),
+                center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.35))
     }
 
     // =========================================================================
