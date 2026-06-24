@@ -425,7 +425,7 @@ struct DailyChallengeMode: GameMode {
     let lives:       LivesPolicy     = .unlimited   // retries are free — it's hard enough
     let hasHoles                     = true
     let showsStars                   = false
-    let showsTimer                   = true
+    let showsTimer                   = false         // not time-scored — pure survival
 }
 
 /// The deterministic content for a given day's Challenge of the Day.  There's no
@@ -435,13 +435,13 @@ struct DailyChallengeMode: GameMode {
 struct DailyChallenge {
     let dateKey: String     // "2026-06-24" — the completion key
     let title: String       // a punchy daily name
-    let levelCount: Int      // 1…3 super-hard levels
-    let baseLevel: Int       // climb level number to generate from (brutal)
+    let levelCount: Int      // 1…3 brutal levels
+    let seed: Int            // the calendar day number — seeds the brutal layouts
     let rewardCoins: Int
 
-    /// The climb level number for the `index`-th level of this challenge —
-    /// each one a notch harder than the last.
-    func levelNumber(for index: Int) -> Int { baseLevel + index * 45 }
+    /// A distinct brutal-layout seed for the `index`-th level of the gauntlet
+    /// (fed to `LevelLayout.dailyChallenge(seed:)`).
+    func layoutSeed(for index: Int) -> Int { seed &* 101 &+ index }
 
     /// "YYYY-MM-DD" for a date — the per-day completion key.
     static func key(_ date: Date = Date()) -> String {
@@ -466,11 +466,10 @@ struct DailyChallenge {
             "Hard Reset", "The Grind",
         ]
         let title      = titlePool[next(titlePool.count)]
-        let levelCount = 1 + next(3)              // 1…3
-        let baseLevel  = 600 + next(360)          // 600…959 — maximum-difficulty climb
+        let levelCount = 1 + next(3)              // 1…3 brutal levels
         let reward     = 120 + levelCount * 60    // 180 / 240 / 300
         return DailyChallenge(dateKey: key(date), title: title,
-                              levelCount: levelCount, baseLevel: baseLevel, rewardCoins: reward)
+                              levelCount: levelCount, seed: dayNum, rewardCoins: reward)
     }
 }
 

@@ -294,8 +294,9 @@ struct BallGameView: View {
         }
         let base: LevelLayout
         if case .oneShot = activeMode.progression {
-            // Challenge of the Day — a date-seeded, maximum-difficulty climb level.
-            base = LevelLayout.layout(for: gameState.dailyChallengeLevelNumber)
+            // Challenge of the Day — a date-seeded BRUTAL gauntlet, far harder
+            // than any climb level (and not a climb level number).
+            base = LevelLayout.dailyChallenge(seed: gameState.dailyChallengeLayoutSeed)
         } else if case .challengeTrack(let id) = activeMode.progression {
             base = LevelLayout.trackLayout(trackID: id, level: gameState.activeTrackLevel)
         } else {

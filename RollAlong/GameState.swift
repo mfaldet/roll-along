@@ -575,9 +575,9 @@ final class GameState: ObservableObject {
         dailyChallengeCompletions.contains(DailyChallenge.key())
     }
 
-    /// The climb level number to generate for the current sub-level of the run.
-    var dailyChallengeLevelNumber: Int {
-        todaysDailyChallenge.levelNumber(for: dailyChallengeIndex)
+    /// The brutal-layout seed for the current sub-level of the run.
+    var dailyChallengeLayoutSeed: Int {
+        todaysDailyChallenge.layoutSeed(for: dailyChallengeIndex)
     }
 
     /// Begin a fresh run of today's challenge (called when it's launched).
