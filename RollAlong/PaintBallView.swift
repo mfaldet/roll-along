@@ -93,6 +93,8 @@ struct PaintBallView: View {
     @State private var painters: [Painter] = []
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
+    /// Recent positions per painter (colorIndex → points) for the trail layer.
+    @State private var trails: [Int: [CGPoint]] = [:]
     @State private var pits:     [Pit]     = []
     @State private var splashes: [Splash]  = []
 
@@ -136,6 +138,7 @@ struct PaintBallView: View {
                     paintLayer.allowsHitTesting(false)
                     pitLayer.allowsHitTesting(false)
                     splashLayer.allowsHitTesting(false)
+                    trailsLayer.allowsHitTesting(false)
                     ForEach(painters) { p in
                         marble(p)
                             .overlay(alignment: .top) {
@@ -226,6 +229,19 @@ struct PaintBallView: View {
                            height: marbleRadius * 2 * (1 + age * 2.4))
                     .position(s.pos)
             }
+        }
+    }
+
+    /// The TrailColor a painter renders with — own for the player, dealt for rivals.
+    private func trailFor(_ p: Painter) -> TrailColor {
+        p.isPlayer ? gameState.equippedTrail : (rivalLooks[p.colorIndex]?.trail ?? .none)
+    }
+
+    /// Keystone: each painter's equipped trail — a flair streak, distinct from
+    /// the paint coverage that drives scoring.
+    private var trailsLayer: some View {
+        Canvas { ctx, _ in
+            drawTrails(ctx, painters.map { (trails[$0.colorIndex] ?? [], trailFor($0)) })
         }
     }
 
@@ -514,6 +530,7 @@ struct PaintBallView: View {
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
             zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
+        trails = [:]
         painters = fresh
     }
 
@@ -597,6 +614,8 @@ struct PaintBallView: View {
 
         resolvePits()
         paintPass()
+
+        for p in painters { recordTrail(&trails, p.colorIndex, p.pos) }
 
         if roundTick >= roundTicks { endRound() }
     }
