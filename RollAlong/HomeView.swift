@@ -129,6 +129,7 @@ struct HomeView: View {
     // Lives sheet (top-left pill → BuyLivesSheet, which also serves as
     // the "lives status / explanation" screen).
     @State private var showBuyLivesSheet: Bool = false
+    @State private var showBuyCoinsSheet: Bool = false
 
     // Daily-reward sheet — the gift pill opens it, and it auto-presents once
     // per launch when a reward is unclaimed.  `autoPresentedDaily` guards the
@@ -218,54 +219,29 @@ struct HomeView: View {
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
 
-                    // Game Modes sits ABOVE Play.  The capsule is narrow and
-                    // centred, so the ball can roll down past it on either
-                    // side (each gap is wider than the ball) — but never
-                    // through it: it's a collider like every other control.
-                    // One tap to every non-climb experience — Zen Garden,
-                    // Coin Pit, and the competitive modes as they come online.
-                    NavigationLink(value: HomeRoute.games) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "gamecontroller.fill")
-                                .font(.system(size: 15))
-                            Text("Game Modes")
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    // Bottom control grid — 3 rows, up to 4 columns wide:
+                    //   • Play (full width)
+                    //   • Leaderboard · Game Modes (2-wide) · Shop
+                    //   • Profile · Friends · Clans · Settings
+                    // Every cell is a collider like the rest of the home UI, so
+                    // the roaming ball bounces off them.
+                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                        GridRow {
+                            playButton
+                                .homeBallCollider()
+                                .gridCellColumns(4)
                         }
-                        .foregroundStyle(Color(white: 0.85))
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 11)
-                        .background(
-                            Capsule()
-                                .fill(Color(white: 0.14))
-                                .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8))
-                        )
-                    }
-                    .homeBallCollider()
-                    // One stable accessibility element for the UI smoke
-                    // test: combining collapses the link + label into a
-                    // single button-traited element that reliably carries
-                    // the identifier, however SwiftUI shuffles the
-                    // modified link's internal AX structure.
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Game Modes")
-                    .accessibilityIdentifier("GameModesButton")  // UI smoke test
-                    .padding(.bottom, 12)
-
-                    playButton
-                        .homeBallCollider()
-                        .padding(.horizontal, 40)
-                        .padding(.bottom, 16)
-
-                    // Five square, icon-only buttons hugging the bottom edge.
-                    // Equal slots via maxWidth so the spacing is uniform on
-                    // every device width.
-                    HStack(spacing: 0) {
-                        squareNavButton("trophy.fill",    "Ranks",    HomeRoute.leaderboard)
-                        squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
-                        squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
-                        squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
-                        squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
+                        GridRow {
+                            squareNavButton("trophy.fill", "Leaderboard", HomeRoute.leaderboard)
+                            gameModesGridButton.gridCellColumns(2)
+                            squareNavButton("bag.fill", "Shop", HomeRoute.shop)
+                        }
+                        GridRow {
+                            squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
+                            squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
+                            squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
+                            squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 6)
@@ -344,6 +320,11 @@ struct HomeView: View {
             .sheet(isPresented: $showBuyLivesSheet) {
                 BuyLivesSheet()
                     .environmentObject(gameState)
+            }
+            .sheet(isPresented: $showBuyCoinsSheet) {
+                BuyCoinsSheet()
+                    .environmentObject(gameState)
+                    .environmentObject(StoreKitManager.shared)
             }
             .sheet(isPresented: $showDailyRewardSheet) {
                 DailyRewardView()
@@ -568,7 +549,8 @@ struct HomeView: View {
             Image(systemName: icon)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color(white: 0.75))
-                .frame(width: 52, height: 52)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
                         .fill(Color(white: 0.14))
@@ -580,7 +562,35 @@ struct HomeView: View {
         }
         .homeBallCollider()
         .accessibilityLabel(label)
-        .frame(maxWidth: .infinity)
+    }
+
+    /// Wide "Game Modes" cell for the control grid (spans 2 columns).  Same
+    /// surface style as the square nav buttons, with an icon + label.
+    private var gameModesGridButton: some View {
+        NavigationLink(value: HomeRoute.games) {
+            HStack(spacing: 8) {
+                Image(systemName: "gamecontroller.fill")
+                    .font(.system(size: 17))
+                Text("Game Modes")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(Color(white: 0.82))
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(white: 0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color(white: 0.28), lineWidth: 0.8)
+                    )
+            )
+        }
+        .homeBallCollider()
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Game Modes")
+        .accessibilityIdentifier("GameModesButton")
     }
 
     private var background: some View {
@@ -612,8 +622,8 @@ struct HomeView: View {
     }
 
     /// Floating coin-balance pill in the top-right corner.  Tappable —
-    /// opens the Cosmetic Shop.  Uses the Navigator so the home path
-    /// becomes [.shop].
+    /// opens the Get Coins sheet (not the shop; the shop has its own button
+    /// in the bottom grid now).
     // Gift pill — top-centre call-to-action shown only while a daily reward is
     // unclaimed.  Tapping opens DailyRewardView; it vanishes once claimed
     // (until tomorrow).  Auto-present covers first-glance discovery; this is
@@ -703,12 +713,11 @@ struct HomeView: View {
         VStack {
             HStack {
                 Spacer()
-                Button { nav.goToShop() } label: {
+                Button { showBuyCoinsSheet = true } label: {
                     HStack(spacing: 6) {
-                        // Shared coin graphic — same paw-print minted
-                        // coin used on every screen.  Slightly larger
-                        // than a plain glyph so the detail reads inside
-                        // the small pill.
+                        // Shared coin graphic — the same minted coin used on
+                        // every screen.  Slightly larger than a plain glyph so
+                        // the detail reads inside the small pill.
                         CoinIcon(size: 18)
 
                         Text("\(gameState.coinBalance)")
@@ -736,7 +745,7 @@ struct HomeView: View {
                 .homeBallCollider()
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(gameState.coinBalance) coins")
-                .accessibilityHint("Opens the cosmetic shop.")
+                .accessibilityHint("Opens the get-coins shop.")
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -746,7 +755,7 @@ struct HomeView: View {
 
     /// Floating lives pill in the top-LEFT corner — a mirror of the coin
     /// pill on the right: one red marble + the live count + a chevron.
-    /// Unlimited-lives subscribers see one gold marble + an ∞ glyph.
+    /// Unlimited-lives subscribers see one diamond marble + an ∞ glyph.
     /// Tapping it opens BuyLivesSheet (which doubles as the "lives status
     /// + explanation + purchase" screen, including the regen countdown).
     private var livesMarblePill: some View {
@@ -765,7 +774,7 @@ struct HomeView: View {
                             if unlimited {
                                 Image(systemName: "infinity")
                                     .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(Self.goldLifeGradient)
+                                    .foregroundStyle(Self.diamondLifeGradient)
                             } else {
                                 Text("\(gameState.displayedLives)")
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -825,7 +834,7 @@ struct HomeView: View {
 
             if filled {
                 Circle()
-                    .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                    .fill(gold ? Self.diamondLifeGradient : Self.redLifeGradient)
                     .frame(width: size, height: size)
                     .overlay(
                         Circle()
@@ -844,7 +853,7 @@ struct HomeView: View {
                 // naturally curves along the circle's arc at the
                 // clip-line — exactly the look we want.
                 Circle()
-                    .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                    .fill(gold ? Self.diamondLifeGradient : Self.redLifeGradient)
                     .frame(width: size, height: size)
                     .clipShape(BottomFillRect(fraction: partialFill))
             }
@@ -876,10 +885,12 @@ struct HomeView: View {
         ],
         startPoint: .top, endPoint: .bottom
     )
-    private static let goldLifeGradient = LinearGradient(
+    /// The "diamond" marble gradient — indestructible / unlimited lives
+    /// (cool white→cyan; replaces the old golden-ball look).
+    private static let diamondLifeGradient = LinearGradient(
         colors: [
-            Color(red: 1.00, green: 0.86, blue: 0.36),
-            Color(red: 0.93, green: 0.65, blue: 0.10),
+            Color(red: 0.86, green: 0.96, blue: 1.00),
+            Color(red: 0.48, green: 0.74, blue: 0.97),
         ],
         startPoint: .top, endPoint: .bottom
     )
