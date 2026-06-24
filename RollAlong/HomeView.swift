@@ -141,6 +141,9 @@ struct HomeView: View {
     // reaches 50.  Also shown on re-launch while the 48-hour window is open.
     @State private var showStarterPackSheet: Bool = false
 
+    /// Drives the Play→game launch animation (the ball dives at the viewer).
+    @State private var launching: Bool = false
+
     private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
     /// Named coordinate space the collider frames are reported in — owned by
@@ -259,6 +262,13 @@ struct HomeView: View {
                 if !gameState.seenOnboarding {
                     onboardingOverlay
                         .transition(.opacity)
+                }
+
+                // Play → game launch transition (the ball dives at the viewer).
+                if launching {
+                    LaunchTransition(skin: gameState.activeSkin)
+                        .transition(.opacity)
+                        .zIndex(50)
                 }
             }
             // NOTE: no accessibilityIdentifier here — the "HomeView" anchor
@@ -931,9 +941,19 @@ struct HomeView: View {
 
     // ── AI gradient Play button ─────────────────────────────────────────────
     private var playButton: some View {
-        NavigationLink(value: HomeRoute.game) {
+        Button {
+            guard !launching else { return }
+            launching = true
+            // Brief launch flourish, then push into the climb.  Reset after the
+            // push so the overlay isn't lingering when the player pops back.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+                nav.goToGame()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { launching = false }
+            }
+        } label: {
             playButtonBody
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Play Level \(gameState.currentLevel)")
         .accessibilityHint("Starts the next unlocked level.")
     }

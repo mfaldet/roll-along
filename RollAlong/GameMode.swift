@@ -707,3 +707,35 @@ extension View {
         modifier(FirstPlayTutorialModifier(modeID: modeID))
     }
 }
+
+/// Brief "launch" flourish played over the home screen when Play is pressed:
+/// the player's ball dives toward the viewer as the screen dims, then the game
+/// pushes in underneath.  Self-contained one-shot animation.
+struct LaunchTransition: View {
+    let skin: BallSkin
+    @State private var scale: CGFloat = 0.35
+    @State private var dim: Double = 0
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(dim * 0.9).ignoresSafeArea()
+            Circle()
+                .fill(skin.gradient(endRadius: 70))
+                .overlay(
+                    Circle().fill(Color.white.opacity(0.5))
+                        .frame(width: 34, height: 34)
+                        .offset(x: -24, y: -26)
+                )
+                .frame(width: 140, height: 140)
+                .scaleEffect(scale)
+                .shadow(color: .black.opacity(0.5), radius: 20)
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeIn(duration: 0.42)) {
+                scale = 12
+                dim = 1
+            }
+        }
+    }
+}
