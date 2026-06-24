@@ -187,9 +187,12 @@ struct GoldRushView: View {
     }
 
     private func coinView(_ c: GoldRushEngine.Coin) -> some View {
-        CoinIcon(size: coinSize)
-            .scaleEffect(c.popScale)   // stabilises at 1.0 after 8 ticks — no localTick dependency
-            .shadow(color: .black.opacity(0.4), radius: 3, y: 2)
+        // All regular coins are identical; a platinum coin (value 3) is bigger
+        // with a cool silver face + bluish glow so it reads as worth more.
+        let platinum = c.value >= 3
+        return CoinIcon(size: platinum ? coinSize * 1.35 : coinSize, platinum: platinum)
+            .shadow(color: (platinum ? Color(red: 0.55, green: 0.78, blue: 1.0) : .black).opacity(0.45),
+                    radius: platinum ? 6 : 3, y: 2)
             .position(c.pos)
     }
 

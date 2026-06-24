@@ -51,6 +51,11 @@ final class GoldRushEngine {
     /// Width of the edge band rivals are pushed out of (see `edgeRepulsion`).
     /// Coins never spawn inside it, so every coin is reachable by every ball.
     private var edgeBand: CGFloat { marbleRadius * 4 }
+
+    /// Bottom safe-area clearance (home indicator) — coins keep this far off the
+    /// bottom, on top of `edgeBand`, so they never sit in the awkward, hard-to-
+    /// reach strip along the bottom border.
+    private let bottomReserve: CGFloat = 44
     private var roundTicks: Int { roundSeconds * 60 }
 
     // MARK: - Model
@@ -72,7 +77,6 @@ final class GoldRushEngine {
         var ignoreRacer: UUID? = nil
         var ignoreUntil: Int = 0
         let born: Int
-        var popScale: CGFloat = 0.6
     }
 
     struct Poof: Identifiable {
@@ -194,10 +198,9 @@ final class GoldRushEngine {
 
         if coins.count < maxCoins && localTick % spawnEveryTicks == 0 { spawnCoin() }
 
-        for i in coins.indices {
-            let age = localTick - coins[i].born
-            guard age <= 8 else { continue }
-            coins[i].popScale = CGFloat(0.6 + 0.4 * Double(age) / 8.0)
+        // A platinum coin (worth 3) every 10s of the round — at 10/20/30/40/50s.
+        if roundTick % (10 * 60) == 0 && roundTick > 0 && roundTick < roundTicks {
+            spawnCoin(value: 3)
         }
 
         let dt: CGFloat = 1.0 / 60.0
@@ -397,20 +400,21 @@ final class GoldRushEngine {
         if remaining.count != coins.count { coins = remaining }
     }
 
-    private func spawnCoin() {
-        // Spawn only where rivals move freely — outside the edge-repulsion band
-        // and below the HUD — so a coin can never sit out of reach (where bots
-        // would pile up uselessly trying to grab it).
+    private func spawnCoin(value: Int = 1) {
+        // Spawn only where rivals move freely — outside the edge-repulsion band,
+        // below the HUD, and clear of the bottom safe area — so a coin can never
+        // sit out of reach (where bots would pile up uselessly trying to grab it).
         let margin = edgeBand
         let topMargin = topReserve + edgeBand
-        guard arena.width > 2 * margin, arena.height > topMargin + margin else { return }
+        let bottomMargin = bottomReserve + edgeBand
+        guard arena.width > 2 * margin, arena.height > topMargin + bottomMargin else { return }
         for _ in 0..<8 {
             let x = CGFloat.random(in: margin...(arena.width - margin))
-            let y = CGFloat.random(in: topMargin...(arena.height - margin))
+            let y = CGFloat.random(in: topMargin...(arena.height - bottomMargin))
             let pt = CGPoint(x: x, y: y)
             if racers.contains(where: { hypot($0.pos.x - x, $0.pos.y - y) < marbleRadius * 2 }) { continue }
             if isNearWall(pt) { continue }
-            coins.append(Coin(pos: pt, value: 1, born: localTick))
+            coins.append(Coin(pos: pt, value: value, born: localTick))
             return
         }
     }
@@ -420,7 +424,7 @@ final class GoldRushEngine {
         let r = CGFloat.random(in: 18...34)
         var p = CGPoint(x: pos.x + CGFloat(cos(angle)) * r, y: pos.y + CGFloat(sin(angle)) * r)
         p.x = min(max(edgeBand, p.x), arena.width - edgeBand)
-        p.y = min(max(topReserve + edgeBand, p.y), arena.height - edgeBand)
+        p.y = min(max(topReserve + edgeBand, p.y), arena.height - bottomReserve - edgeBand)
         return Coin(pos: p, value: 1, ignoreRacer: who, ignoreUntil: localTick + spillImmunityTicks, born: localTick)
     }
 

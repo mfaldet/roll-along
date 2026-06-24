@@ -4386,14 +4386,23 @@ struct CatPawPrint: Shape {
 // ---------------------------------------------------------------------------
 struct CoinIcon: View {
     let size: CGFloat
+    let platinum: Bool
 
-    init(size: CGFloat = 18) { self.size = size }
+    init(size: CGFloat = 18, platinum: Bool = false) {
+        self.size = size
+        self.platinum = platinum
+    }
 
     var body: some View {
-        ZStack {
+        let face = platinum ? Self.platinumFace : Self.goldenFace
+        let faceDeep = platinum ? Self.platinumFaceDeep : Self.goldenFaceDeep
+        let pawColors: [Color] = platinum
+            ? [Color(red: 0.34, green: 0.40, blue: 0.50), Color(red: 0.18, green: 0.22, blue: 0.30)]
+            : [Color(red: 0.55, green: 0.34, blue: 0.04), Color(red: 0.30, green: 0.18, blue: 0.02)]
+        return ZStack {
             // Base face + dark outline
             Circle()
-                .fill(Self.goldenFace)
+                .fill(face)
                 .overlay(
                     Circle().stroke(Color.black.opacity(0.45),
                                     lineWidth: max(0.5, size * 0.04))
@@ -4401,7 +4410,7 @@ struct CoinIcon: View {
 
             // Recessed inner ring — etched darker gold + dark stroke
             Circle()
-                .fill(Self.goldenFaceDeep)
+                .fill(faceDeep)
                 .scaleEffect(0.78)
                 .overlay(
                     Circle()
@@ -4413,13 +4422,7 @@ struct CoinIcon: View {
             // Paw print mint mark
             CatPawPrint()
                 .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.55, green: 0.34, blue: 0.04),
-                            Color(red: 0.30, green: 0.18, blue: 0.02),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
+                    LinearGradient(colors: pawColors, startPoint: .top, endPoint: .bottom)
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
@@ -4454,6 +4457,23 @@ struct CoinIcon: View {
         stops: [
             .init(color: Color(red: 0.85, green: 0.70, blue: 0.18), location: 0.00),
             .init(color: Color(red: 0.72, green: 0.50, blue: 0.10), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    // Platinum variant — a cool silver face for the 3-point bonus coin.
+    static let platinumFace = LinearGradient(
+        stops: [
+            .init(color: Color(red: 0.93, green: 0.96, blue: 1.00), location: 0.00),
+            .init(color: Color(red: 0.74, green: 0.81, blue: 0.90), location: 0.45),
+            .init(color: Color(red: 0.47, green: 0.55, blue: 0.66), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom
+    )
+    static let platinumFaceDeep = LinearGradient(
+        stops: [
+            .init(color: Color(red: 0.80, green: 0.86, blue: 0.94), location: 0.00),
+            .init(color: Color(red: 0.55, green: 0.63, blue: 0.74), location: 1.00),
         ],
         startPoint: .top, endPoint: .bottom
     )
