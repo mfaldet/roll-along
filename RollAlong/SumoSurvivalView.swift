@@ -81,6 +81,8 @@ struct SumoSurvivalView: View {
     /// Each rival's keystone look (bumper id → skin+trail+name); dealt on spawn
     /// (Sumo feeds rivals in waves, so looks are keyed by id, not colorIndex).
     @State private var rivalLooks: [UUID: RivalCosmetics.Look] = [:]
+    /// Recent positions per bumper (id → points) for the trail layer.
+    @State private var trails: [UUID: [CGPoint]] = [:]
     @State private var arena:   CGSize = .zero
     @State private var center:  CGPoint = .zero
     @State private var baseRadius: CGFloat = 0
@@ -119,6 +121,7 @@ struct SumoSurvivalView: View {
                     platformLayer
                     pillarsLayer.allowsHitTesting(false)
                     poofLayer.allowsHitTesting(false)
+                    trailsLayer.allowsHitTesting(false)
                     ForEach(bumpers) { b in
                         marble(b)
                             .overlay(alignment: .top) {
@@ -222,6 +225,18 @@ struct SumoSurvivalView: View {
                            height: marbleRadius * 2 * (1 + age * 2.2))
                     .position(p.pos)
             }
+        }
+    }
+
+    /// The TrailColor a bumper renders with — own for the player, dealt for rivals.
+    private func trailFor(_ b: Bumper) -> TrailColor {
+        b.isPlayer ? gameState.equippedTrail : (rivalLooks[b.id]?.trail ?? .none)
+    }
+
+    /// Keystone: every bumper's equipped trail, visible to all.
+    private var trailsLayer: some View {
+        Canvas { ctx, _ in
+            drawTrails(ctx, bumpers.map { (trails[$0.id] ?? [], trailFor($0)) })
         }
     }
 
@@ -400,6 +415,7 @@ struct SumoSurvivalView: View {
         bumpers = fresh
         rivalLooks = [:]
         for b in bumpers where !b.isPlayer { rivalLooks[b.id] = RivalCosmetics.random() }
+        trails = [:]
         showMapName = true
     }
 
@@ -467,6 +483,12 @@ struct SumoSurvivalView: View {
 
         // 4) Eliminate anyone whose center crossed the rim.
         resolveEliminations()
+
+        // 4b) Grow each survivor's trail; prune dead bumpers so the dict stays
+        //     bounded across waves.
+        let liveIds = Set(bumpers.map(\.id))
+        for b in bumpers { recordTrail(&trails, b.id, b.pos) }
+        trails = trails.filter { liveIds.contains($0.key) }
 
         // 5) Feed the waves.
         spawnWaveIfNeeded()

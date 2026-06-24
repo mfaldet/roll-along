@@ -73,6 +73,8 @@ struct MarbleCupView: View {
     @State private var movers: [Mover] = []
     /// The single AI rival's keystone look (skin+trail+name), dealt in reset().
     @State private var rivalLook: RivalCosmetics.Look?
+    /// Recent positions per mover (id → points) for the trail layer (ball excluded).
+    @State private var trails: [UUID: [CGPoint]] = [:]
     @State private var arena:  CGSize  = .zero
     @State private var field:  CGRect  = .zero
 
@@ -113,6 +115,7 @@ struct MarbleCupView: View {
                 ZStack {
                     Color.clear
                     pitch
+                    trailsLayer.allowsHitTesting(false)
                     if let ball = movers.first(where: { $0.role == .ball }) {
                         moverView(ball).position(ball.pos)
                     }
@@ -244,6 +247,24 @@ struct MarbleCupView: View {
                 .position(x: field.midX - goalHalf, y: y)
             Circle().fill(.white).frame(width: 9, height: 9)
                 .position(x: field.midX + goalHalf, y: y)
+        }
+    }
+
+    /// The TrailColor a mover renders with — own for the player, dealt for the
+    /// AI rival, none for the neutral ball.
+    private func trailFor(_ m: Mover) -> TrailColor {
+        switch m.role {
+        case .player: return gameState.equippedTrail
+        case .ai:     return rivalLook?.trail ?? .none
+        case .ball:   return .none
+        }
+    }
+
+    /// Keystone: the player's own trail + the rival's dealt trail (not the ball).
+    private var trailsLayer: some View {
+        Canvas { ctx, _ in
+            drawTrails(ctx, movers.filter { $0.role != .ball }
+                                  .map { (trails[$0.id] ?? [], trailFor($0)) })
         }
     }
 
@@ -485,6 +506,7 @@ struct MarbleCupView: View {
                       role: .ball, radius: ballRadius, mass: ballMass)
         movers = [p, a, b]
         rivalLook = RivalCosmetics.deal(1).first   // keystone: deal the AI rival a showcase look
+        trails = [:]
     }
 
     private func endMatch() {
@@ -552,6 +574,8 @@ struct MarbleCupView: View {
         resolveCollisions()
         resolveBumperCollisions()
         checkGoal()
+
+        for m in movers where m.role != .ball { recordTrail(&trails, m.id, m.pos) }
 
         if !isOver && roundTick >= roundTicks { endMatch() }
     }
