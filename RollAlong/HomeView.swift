@@ -936,21 +936,10 @@ struct HomeView: View {
     /// completionist aura ring when the player has completed at least
     /// one bundle collection.  Green for 1–4 complete, gold for 5+.
     private var liveBall: some View {
-        let completedCount = gameState.completedBundleIDs.count
-        return ZStack {
-            if completedCount > 0 {
-                let ringColor: Color = completedCount >= 5
-                    ? Color(red: 1.00, green: 0.82, blue: 0.22)   // gold — 5+ collections
-                    : Color(red: 0.22, green: 0.88, blue: 0.46)   // green — 1–4
-                Circle()
-                    .stroke(ringColor, lineWidth: 2.5)
-                    .frame(width: ballRadius * 2 + 10, height: ballRadius * 2 + 10)
-                    .shadow(color: ringColor.opacity(0.55), radius: 10)
-            }
-            BallSkinView(skin: gameState.activeSkin, diameter: ballRadius * 2)
-                .frame(width: ballRadius * 2, height: ballRadius * 2)
-                .shadow(color: .black.opacity(0.65), radius: 14, x: 3, y: 9)
-        }
+        // Just the equipped ball — no completionist ring on the home screen.
+        BallSkinView(skin: gameState.activeSkin, diameter: ballRadius * 2)
+            .frame(width: ballRadius * 2, height: ballRadius * 2)
+            .shadow(color: .black.opacity(0.65), radius: 14, x: 3, y: 9)
     }
 
     // ── AI gradient Play button ─────────────────────────────────────────────
