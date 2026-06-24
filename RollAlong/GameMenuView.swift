@@ -89,15 +89,12 @@ struct GameMenuView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Games")
-                .font(.system(size: 32, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Every way to roll.")
-                .font(.system(.subheadline, design: .rounded))
-                .foregroundStyle(Color(white: 0.55))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text("Choose the way you want to roll.")
+            .font(.system(size: 22, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     // MARK: - ROLL ALONG hero (the core game — biggest, on top)

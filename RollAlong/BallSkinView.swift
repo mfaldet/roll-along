@@ -763,9 +763,9 @@ struct BallSkinView: View {
 
     // =========================================================================
     // MARK: - Snowglobe
-    // Frosted-glass sphere packed with ~22 white snowflakes that swirl
-    // vigorously around the dome (orbit + turbulence), like a freshly shaken
-    // globe.  Pure Canvas + TimelineView.
+    // Frosted-glass sphere caught mid-blizzard: ~22 detailed feathered flakes
+    // plus ~52 fine snow dots, all swirling vigorously around the dome (orbit +
+    // turbulence), like a hard-shaken globe.  Pure Canvas + TimelineView.
     // =========================================================================
     private var snowglobeCanvas: some View {
         TimelineView(.animation) { timeline in
@@ -831,6 +831,23 @@ struct BallSkinView: View {
                     }
                     ctx.stroke(flake, with: .color(.white.opacity(twinkle)),
                                lineWidth: max(0.6, r * 0.022))
+                }
+
+                // ── Fine blizzard snow — lots of cheap dots churning fast,
+                //    layered over the detailed flakes for whiteout density.
+                for i in 0..<52 {
+                    let seed = Double(i) * 0.371 + 0.07
+                    let f1 = (seed * 2.3).truncatingRemainder(dividingBy: 1.0)
+                    let f2 = (seed * 4.7).truncatingRemainder(dividingBy: 1.0)
+                    let swirl = t * (1.7 + 1.1 * f1) + seed * 6.283
+                    let rad   = r * CGFloat(0.08 + 0.80 * f2)
+                    let px = cx + CGFloat(cos(swirl)) * rad + CGFloat(cos(t * 2.6 + seed * 3)) * r * 0.09
+                    let py = cy + CGFloat(sin(swirl)) * rad + CGFloat(sin(t * 2.3 + seed * 4)) * r * 0.09
+                    if hypot(px - cx, py - cy) > r * 0.90 { continue }
+                    let sz = r * CGFloat(0.013 + 0.018 * f1)
+                    let tw = 0.45 + 0.45 * sin(t * 2.2 + seed * 5)
+                    ctx.fill(Path(ellipseIn: CGRect(x: px - sz, y: py - sz, width: sz * 2, height: sz * 2)),
+                             with: .color(.white.opacity(tw)))
                 }
 
                 // ── Glass edge — the rim catching light (sells the sphere).
