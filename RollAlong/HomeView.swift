@@ -246,7 +246,7 @@ struct HomeView: View {
                             squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 30)
                     .padding(.bottom, 6)
                 }
 
@@ -837,7 +837,7 @@ struct HomeView: View {
                 }
                 Spacer()
             }
-            .padding(.leading, 16)
+            .padding(.leading, 30)
             .padding(.top, 8)
         }
     }
