@@ -212,18 +212,17 @@ struct BallGameView: View {
     @State private var coinPitScore:       Int = 0
     @State private var coinPitOver:        Bool = false
 
-    // Ticket staking (Gold Rush economy) — the round is bought up front on
-    // the stake overlay: every TIME ticket buys 30 s on the clock, every
-    // COIN ticket adds +1x to the coins dropped (1 → x2 … 9 → x10), max 10
-    // tickets per round.  Tickets are consumed on Start; quitting early
-    // refunds one ticket per FULL un-played 30 s block (coin tickets never
-    // refund).  Entering with zero tickets is blocked at the Games hub and
-    // again on the stake overlay.
+    // Ticket staking (Gold Rush economy) — the round is bought up front on the
+    // stake overlay: every TIME ticket buys 30 s on the clock (stake as many
+    // as you hold).  Tickets are consumed on Start; quitting early refunds one
+    // ticket per FULL un-played 30 s block.  The optional ×2-coins boost is
+    // bought DURING the round for a flat 2 tickets (non-refundable) and doubles
+    // the PAYOUT, not the coin count.  Entering with zero tickets is blocked at
+    // the Games hub and again on the stake overlay.
     @State private var coinPitStaked            = false   // round paid & live
     @State private var coinPitStakeTime         = 1       // picker: time tickets (≥1)
-    @State private var coinPitStakeCoins        = 0       // picker: coin tickets
     @State private var coinPitTimeTicketsStaked = 0       // frozen at Start (refund math)
-    @State private var coinPitStakedMultiplier  = 1       // frozen at Start
+    @State private var coinPitStakedMultiplier  = 1       // 1, or 2 after the in-round buy
 
     /// The catch target if the active mode is a collect-count round, else nil.
     private var coinPitTarget: Int? {
@@ -237,12 +236,12 @@ struct BallGameView: View {
     private var coinPitStakedDuration: TimeInterval {
         Double(max(1, coinPitTimeTicketsStaked)) * GameState.goldRushSecondsPerTicket
     }
-    /// Total coins dropped this round: the base per-30 s target × time
-    /// blocks bought × the coin multiplier.
+    /// Coins dropped this round: the base per-30 s target × time blocks bought.
+    /// The ×2 boost deliberately does NOT scale the coin COUNT — flooding the
+    /// field with 4–5× coins tanked the frame rate — it doubles the PAYOUT
+    /// instead (see the live credit and the payout overlay).
     private var coinPitEffectiveTarget: Int? {
-        coinPitTarget.map {
-            $0 * max(1, coinPitTimeTicketsStaked) * max(1, coinPitStakedMultiplier)
-        }
+        coinPitTarget.map { $0 * max(1, coinPitTimeTicketsStaked) }
     }
 
     // Last-completion results (for the win overlay)
@@ -2612,7 +2611,9 @@ struct BallGameView: View {
     private var coinPitPayoutOverlay: some View {
         let target  = coinPitEffectiveTarget ?? 0
         let perfect = target > 0 && coinPitScore >= target
-        let banked  = coinPitScore * coinPitPayoutPerCoin
+        // ×2 buy retroactively credits already-caught coins, so every catch is
+        // worth the multiplier — this simple formula stays exact.
+        let banked  = coinPitScore * coinPitPayoutPerCoin * max(1, coinPitStakedMultiplier)
 
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
@@ -2700,17 +2701,15 @@ struct BallGameView: View {
     // MARK: - Gold Rush stake overlay (ticket economy)
 
     /// Pre-roll for the Gold Rush reward round — the round is bought with
-    /// tickets before the clock starts:
-    ///   • every TIME ticket buys 30 s on the clock (at least 1 required)
-    ///   • every COIN ticket adds +1x to the coins dropped (1 → x2 … 9 → x10)
-    ///   • at most 10 tickets total per round
-    /// With exactly 1 ticket the pickers are skipped — Start stakes it for a
-    /// straight 30 s round.  With none, the round can't begin (the Games hub
-    /// also gates entry; this covers deep links and Play Again when broke).
+    /// tickets before the clock starts: every TIME ticket buys 30 s, and you
+    /// can stake as many as you hold.  (The ×2-coins boost is a separate
+    /// in-round purchase, not part of the stake.)  With exactly 1 ticket the
+    /// picker is skipped — Start stakes it for a straight 30 s round.  With
+    /// none, the round can't begin (the Games hub also gates entry; this
+    /// covers deep links and Play Again when broke).
     private var coinPitStakeOverlay: some View {
-        let balance  = gameState.tickets
-        let maxTotal = min(balance, GameState.goldRushMaxStake)
-        let total    = coinPitStakeTime + coinPitStakeCoins
+        let balance = gameState.tickets
+        let total   = coinPitStakeTime          // time tickets only
 
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
@@ -2738,26 +2737,26 @@ struct BallGameView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
                 } else if balance == 1 {
-                    Text("Your ticket buys 30 seconds of raining coins — everything you catch is yours.")
+                    Text("Your ticket buys 30 seconds of raining coins — everything you catch is yours. Spend more to add time; double your coins mid-round for 2 tickets.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
                 } else {
-                    VStack(spacing: 10) {
-                        stakeRow("Time",  "+30 s each",
-                                 value: $coinPitStakeTime,
-                                 lo: 1, hi: max(1, maxTotal - coinPitStakeCoins))
-                        stakeRow("Coins", "+1× drops each",
-                                 value: $coinPitStakeCoins,
-                                 lo: 0, hi: max(0, maxTotal - coinPitStakeTime))
-                    }
+                    Text("Add as much time as you like — every ticket is another 30 seconds. You can double your coins mid-round for 2 tickets.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+
+                    stakeRow("Time", "+30 s each",
+                             value: $coinPitStakeTime,
+                             lo: 1, hi: max(1, balance))
 
                     // What the stake buys, at a glance.
                     HStack(spacing: 14) {
                         Label("\(coinPitStakeTime * 30) s", systemImage: "clock.fill")
-                        Label("×\(coinPitStakeCoins + 1) coins", systemImage: "dollarsign.circle.fill")
-                        Label("\(total)/\(maxTotal)", systemImage: "ticket.fill")
+                        Label("\(total)/\(balance) tickets", systemImage: "ticket.fill")
                     }
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .monospacedDigit()
@@ -2840,26 +2839,22 @@ struct BallGameView: View {
     /// starts on the next physics tick (coinPitTick arms the deadline).
     private func startCoinPitRound() {
         clampCoinPitStakes()
-        let time  = max(1, coinPitStakeTime)
-        let coins = max(0, coinPitStakeCoins)
-        let total = time + coins
-        guard total <= GameState.goldRushMaxStake,
-              gameState.spendTickets(total) else { return }
+        let time = max(1, coinPitStakeTime)
+        guard gameState.spendTickets(time) else { return }
         coinPitTimeTicketsStaked = time
-        coinPitStakedMultiplier  = coins + 1
+        coinPitStakedMultiplier  = 1          // ×2 is an optional in-round buy
         coinPitStaked = true
         AnalyticsClient.shared.track(
             "goldrush_round_staked",
-            properties: ["time_tickets": .int(time), "coin_tickets": .int(coins)]
+            properties: ["time_tickets": .int(time)]
         )
     }
 
     /// Keep the pickers inside the live budget — the balance can shrink
     /// between rounds (Play Again after spending), so re-clamp on entry.
     private func clampCoinPitStakes() {
-        let maxTotal = min(gameState.tickets, GameState.goldRushMaxStake)
-        coinPitStakeCoins = min(max(0, coinPitStakeCoins), max(0, maxTotal - 1))
-        coinPitStakeTime  = min(max(1, coinPitStakeTime),  max(1, maxTotal - coinPitStakeCoins))
+        // Time tickets are limited only by the player's balance now.
+        coinPitStakeTime = min(max(1, coinPitStakeTime), max(1, gameState.tickets))
     }
 
     /// Early-exit refund: leaving mid-round returns one ticket per FULL
@@ -3338,7 +3333,6 @@ struct BallGameView: View {
             coinPitTimeTicketsStaked = 0
             coinPitStakedMultiplier  = 1
             coinPitStakeTime         = 1
-            coinPitStakeCoins        = 0
         }
         // Engage the spawn lock — physics is paused, border shows the
         // "armed" white state, and a "Tap to start" hint sits above the
@@ -3743,7 +3737,7 @@ struct BallGameView: View {
 
         if caught > 0 {
             coinPitScore += caught
-            gameState.addCoins(caught * coinPitPayoutPerCoin)
+            gameState.addCoins(caught * coinPitPayoutPerCoin * max(1, coinPitStakedMultiplier))
             fireCoinPickup()
         }
 
