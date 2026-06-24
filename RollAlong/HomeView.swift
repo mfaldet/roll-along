@@ -282,6 +282,13 @@ struct HomeView: View {
                 colliders = rects.filter { $0.width > 1 && $0.height > 1 }
             }
             .onReceive(clock.$tickCount) { _ in tickBall() }
+            .onChange(of: nav.path) { _, path in
+                // Remember the last mode/game entered so the home Play button
+                // reflects it (and later, so the home aesthetic can theme off it).
+                guard let last = path.last else { return }
+                if case .game = last { gameState.currentModeID = "climb" }
+                else if case .mode(let id) = last { gameState.currentModeID = id }
+            }
             .onAppear    { motion.start(); clock.start(); maybeAutoPresentDailyReward() }
             .onDisappear { motion.stop();  clock.stop()  }
             .toolbar(.hidden, for: .navigationBar)
@@ -940,22 +947,35 @@ struct HomeView: View {
     }
 
     // ── AI gradient Play button ─────────────────────────────────────────────
+    /// The route the home Play button launches — the player's current mode
+    /// (climb by default, else the last mode they entered).
+    private var currentModeRoute: HomeRoute {
+        gameState.currentModeID == "climb" ? .game : .mode(gameState.currentModeID)
+    }
+
+    /// Play-button subtitle: the climb shows its level, other modes their name.
+    private var playSubtitle: String {
+        gameState.currentModeID == "climb"
+            ? "Level \(gameState.currentLevel)"
+            : gameState.currentMode.displayName
+    }
+
     private var playButton: some View {
         Button {
             guard !launching else { return }
             launching = true
-            // Brief launch flourish, then push into the climb.  Reset after the
-            // push so the overlay isn't lingering when the player pops back.
+            // Brief launch flourish, then push into the current mode.  Reset
+            // after the push so the overlay isn't lingering on pop-back.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
-                nav.goToGame()
+                nav.path.append(currentModeRoute)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { launching = false }
             }
         } label: {
             playButtonBody
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Play Level \(gameState.currentLevel)")
-        .accessibilityHint("Starts the next unlocked level.")
+        .accessibilityLabel("Play \(playSubtitle)")
+        .accessibilityHint("Launches your selected game mode.")
     }
 
     private var playButtonBody: some View {
@@ -973,7 +993,7 @@ struct HomeView: View {
             VStack(spacing: 2) {
                 Text("Play")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                Text("Level \(gameState.currentLevel)")
+                Text(playSubtitle)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .opacity(0.65)
             }

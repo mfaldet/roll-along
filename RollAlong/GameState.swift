@@ -240,6 +240,12 @@ final class GameState: ObservableObject {
     @Published var playedModeIDs: Set<String> {
         didSet { saveStringSet(playedModeIDs, forKey: "ra_playedModeIDs") }
     }
+    /// The mode the home "Play" button launches — the last mode the player
+    /// entered (climb by default).  Persisted across launches; the home screen's
+    /// aesthetic can later theme off it.
+    @Published var currentModeID: String {
+        didSet { defaults.set(currentModeID, forKey: "ra_currentModeID") }
+    }
 
     // ── Challenge Track active session (transient — not persisted) ──────────
     //
@@ -402,6 +408,7 @@ final class GameState: ObservableObject {
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
+        currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -543,6 +550,11 @@ final class GameState: ObservableObject {
     /// Record that a mode has been launched so its tutorial won't show again.
     func markModePlayed(_ id: String) {
         if !playedModeIDs.contains(id) { playedModeIDs.insert(id) }
+    }
+
+    /// The currently-selected GameMode (resolves `currentModeID`; climb fallback).
+    var currentMode: GameMode {
+        GameModeCatalogue.mode(id: currentModeID) ?? GameModeCatalogue.climb
     }
 
     /// Current life count including any regen that has accumulated since
