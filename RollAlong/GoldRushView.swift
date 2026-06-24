@@ -67,6 +67,14 @@ struct GoldRushView: View {
         (.ghost,  .mist),
     ]
 
+    /// Fun bot nicknames dealt to rivals alongside their looks, so it's clear
+    /// who's who and the arena feels populated.  (Real opponents will show
+    /// their actual display name once multiplayer lands.)
+    private static let rivalNamePool: [String] = [
+        "Pip", "Ace", "Bolt", "Nova", "Zip", "Echo", "Dash", "Fizz",
+        "Quill", "Bandit", "Comet", "Jinx", "Rook", "Sly", "Pixel",
+    ]
+
     // Per-racer home-style trail (the keystone: opponents' trails are visible).
     private let trailMaxLen = 14
     private let trailMinStep: CGFloat = 3
@@ -100,6 +108,8 @@ struct GoldRushView: View {
     @State private var rivalLooks: [Int: (skin: BallSkin, trail: TrailColor)] = [:]
     /// Recent positions per racer (colorIndex → points) for the trail layer.
     @State private var trails: [Int: [CGPoint]] = [:]
+    /// Each rival's dealt nickname (colorIndex → name).  The player shows "YOU".
+    @State private var rivalNames: [Int: String] = [:]
 
     // MARK: - Computed (thin forwards onto the engine — the source of truth)
 
@@ -128,7 +138,13 @@ struct GoldRushView: View {
                     ForEach(coins) { c in coinView(c) }
                     poofLayer.allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
-                    ForEach(racers) { r in marble(r).position(r.pos) }
+                    ForEach(racers) { r in
+                        marble(r)
+                            .overlay(alignment: .top) {
+                                nameTag(r).fixedSize().offset(y: -13).allowsHitTesting(false)
+                            }
+                            .position(r.pos)
+                    }
                 }
                 .contentShape(Rectangle())
                 .onAppear { layout(geo.size); reset() }
@@ -241,6 +257,21 @@ struct GoldRushView: View {
     /// The TrailColor a racer renders with — own for the player, dealt for rivals.
     private func trailFor(_ r: GoldRushEngine.Racer) -> TrailColor {
         r.isPlayer ? gameState.equippedTrail : (rivalLooks[r.colorIndex]?.trail ?? .none)
+    }
+
+    /// A small floating tag above each marble — a bold "YOU" for the player (so
+    /// you can always find yourself) and the dealt nickname for each rival.
+    private func nameTag(_ r: GoldRushEngine.Racer) -> some View {
+        let color = Self.racerColors[r.colorIndex]
+        let label = r.isPlayer ? "YOU" : (rivalNames[r.colorIndex] ?? "Rival")
+        return Text(label)
+            .font(.system(size: r.isPlayer ? 11 : 10,
+                          weight: r.isPlayer ? .heavy : .bold, design: .rounded))
+            .foregroundStyle(r.isPlayer ? Color.white : color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.black.opacity(r.isPlayer ? 0.6 : 0.42)))
+            .overlay(Capsule().stroke(color.opacity(0.95), lineWidth: r.isPlayer ? 1.5 : 1))
     }
 
     private func marble(_ r: GoldRushEngine.Racer) -> some View {
@@ -356,18 +387,34 @@ struct GoldRushView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Coin Pit. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
 
-            // The card sits above the arena's tap-to-start gesture, so
-            // adjusting difficulty here never accidentally starts the round.
-            Picker("Rival difficulty", selection: $gameState.minigameDifficulty) {
+            // Difficulty selector — custom Buttons, NOT a segmented Picker:
+            // the arena's full-screen tap-to-start gesture interferes with a
+            // UIKit-backed segmented control (that's why selection was stuck on
+            // the default).  SwiftUI Buttons consume their own taps cleanly, so
+            // they select without starting the round; tapping elsewhere starts.
+            Text("Rival difficulty")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.5))
+                .padding(.top, 8)
+            HStack(spacing: 8) {
                 ForEach(MinigameDifficulty.allCases) { d in
-                    Text(d.displayName).tag(d)
+                    let selected = gameState.minigameDifficulty == d
+                    Button { gameState.minigameDifficulty = d } label: {
+                        Text(d.displayName)
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(selected ? .black : Color(white: 0.82))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(selected
+                                          ? Color(red: 1.0, green: 0.82, blue: 0.30)
+                                          : Color(white: 0.18))
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(.top, 8)
-            Text("Rival difficulty")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.5))
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -482,11 +529,15 @@ struct GoldRushView: View {
     /// opponents will wear their own equipped gear once multiplayer lands.)
     private func dealRivalLooks() {
         let picks = Self.rivalShowcase.shuffled()
+        let names = Self.rivalNamePool.shuffled()
         var looks: [Int: (skin: BallSkin, trail: TrailColor)] = [:]
+        var dealt: [Int: String] = [:]
         for r in engine.racers where !r.isPlayer {
             looks[r.colorIndex] = picks[(r.colorIndex - 1) % picks.count]
+            dealt[r.colorIndex] = names[(r.colorIndex - 1) % names.count]
         }
         rivalLooks = looks
+        rivalNames = dealt
     }
 
     private func loadMap() {
