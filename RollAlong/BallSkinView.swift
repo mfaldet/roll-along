@@ -55,6 +55,11 @@ struct BallSkinView: View {
         case .saturn:
             saturnCanvas   // NOT clipped — rings extend beyond body
 
+        case .pluto:
+            plutoCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.28), lineWidth: 0.5))
+
         case .aquarium:
             aquariumCanvas
                 .clipShape(Circle())
@@ -1142,6 +1147,62 @@ struct BallSkinView: View {
                     )
                 )
             }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Pluto  (Legendary)
+    // Icy tan dwarf-planet: a warm beige surface reddening toward the limb,
+    // dark equatorial maculae, and the signature cream "heart" (Tombaugh Regio)
+    // — the one feature everyone recognises Pluto by.  Static, like the planets.
+    // =========================================================================
+    private var plutoCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2
+            let r  = min(w, h) / 2
+
+            // Surface — icy tan, reddening toward the limb.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.87, green: 0.77, blue: 0.63),
+                                      Color(red: 0.70, green: 0.52, blue: 0.40),
+                                      Color(red: 0.40, green: 0.25, blue: 0.19)]),
+                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.24),
+                    startRadius: 0, endRadius: r * 1.25))
+
+            // Dark maculae — soft reddish-brown blotches (Cthulhu Macula etc.).
+            for (fx, fy, fr) in [(0.28, 0.64, 0.30), (0.16, 0.42, 0.18), (0.76, 0.66, 0.22)] {
+                let bx = cx - r + CGFloat(fx) * r * 2
+                let by = cy - r + CGFloat(fy) * r * 2
+                let br = CGFloat(fr) * r
+                ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color(red: 0.30, green: 0.17, blue: 0.13).opacity(0.65), .clear]),
+                        center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
+            }
+
+            // Tombaugh Regio — the signature cream-white heart, lower-centre.
+            let hx = cx + r * 0.08, hy = cy + r * 0.16, hs = r * 0.60
+            var heart = Path()
+            let n = 44
+            for i in 0...n {
+                let a = Double(i) / Double(n) * 2 * .pi
+                let px = hx + CGFloat(16 * pow(sin(a), 3)) / 32 * hs
+                let py = hy - CGFloat(13 * cos(a) - 5 * cos(2*a) - 2 * cos(3*a) - cos(4*a)) / 32 * hs
+                if i == 0 { heart.move(to: CGPoint(x: px, y: py)) } else { heart.addLine(to: CGPoint(x: px, y: py)) }
+            }
+            heart.closeSubpath()
+            ctx.fill(heart, with: .radialGradient(
+                Gradient(colors: [Color(red: 0.97, green: 0.94, blue: 0.87),
+                                  Color(red: 0.84, green: 0.78, blue: 0.70).opacity(0.85)]),
+                center: CGPoint(x: hx, y: hy - hs * 0.2), startRadius: 0, endRadius: hs * 0.95))
+
+            // Cool ice specular (top-left).
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.46, y: cy - r * 0.80, width: r * 0.52, height: r * 0.34)),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.5), .clear]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.64), startRadius: 0, endRadius: r * 0.4))
         }
     }
 
