@@ -189,12 +189,13 @@ struct BallSkinView: View {
         case .neon:    neonCanvas.clipShape(Circle()).overlay(planetRim)
 
         // ── Polished marbles / metals / gems — richer than a flat gradient ─
-        // The basic solid colours use the SAME smooth, low-gloss renderer as
-        // Copper (per Mac) — clean two-tone shading, no hot white crescent.
+        // The basic solid colours get an understated plain marble — no rim
+        // highlight, just gentle shading (per Mac).  Metals keep their sheen.
         case .pastel, .dune:
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
-        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon,
-             .gold, .silver, .copper:
+        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon:
+            plainMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+        case .gold, .silver, .copper:
             metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .jade, .ruby:
             gemMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
@@ -1381,6 +1382,32 @@ struct BallSkinView: View {
             ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
                 with: .radialGradient(Gradient(colors: [.white.opacity(0.20), .clear]),
                     center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+        }
+    }
+
+    /// Plain solid marble — a cleanly lit sphere with gentle depth and only a
+    /// whisper of top sheen.  NO rim highlight, minimal glow.  Used by the basic
+    /// solid colours (red/blue/green/…), which Mac wants understated.
+    private func plainMarble(_ colors: [Color]) -> some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+            // Lit base sphere — highlight up top-left, deep colour toward the rim.
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(colors: colors),
+                center: CGPoint(x: cx - r * 0.26, y: cy - r * 0.30), startRadius: 0, endRadius: r * 1.28))
+
+            // Gentle bottom darkening for roundness — no bright top band, no rim.
+            ctx.fill(Path(ellipseIn: sphere), with: .linearGradient(
+                Gradient(stops: [.init(color: .clear, location: 0.52),
+                                 .init(color: (colors.last ?? .black).opacity(0.40), location: 1.0)]),
+                startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r)))
+
+            // A whisper of top-left sheen (much softer than the metal/gloss ones).
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.48, y: cy - r * 0.70, width: r * 0.46, height: r * 0.30)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.13), .clear]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.48), startRadius: 0, endRadius: r * 0.36))
         }
     }
 
