@@ -13,43 +13,55 @@ import SwiftUI
 
 // MARK: - Buy Lives Sheet
 
+/// Reports the natural height of a sheet's content so the sheet can size itself
+/// to fit exactly (no dead space below the last row).
+private struct SheetFitHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct BuyLivesSheet: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
     @State private var purchaseError: String? = nil
+    @State private var fitHeight: CGFloat = 560   // content height; set on first layout
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(white: 0.08).ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        header
-                        statusBlock
-                        lifePackCards
-                        Text("OR NEVER RUN OUT")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .kerning(1.5)
-                            .foregroundStyle(Color(white: 0.45))
-                            .padding(.top, 6)
-                        diamondBallsCard
-                        Spacer().frame(height: 24)
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
+        ZStack {
+            Color(white: 0.08).ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Title lives in the content now (no nav bar) so the sheet
+                    // can size itself to exactly fit the content.
+                    Text("Get Lives")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.bottom, 2)
+                    header
+                    statusBlock
+                    lifePackCards
+                    Text("OR NEVER RUN OUT")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .kerning(1.5)
+                        .foregroundStyle(Color(white: 0.45))
+                        .padding(.top, 6)
+                    diamondBallsCard
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 18)
+                .background(GeometryReader { geo in
+                    Color.clear.preference(key: SheetFitHeightKey.self, value: geo.size.height)
+                })
             }
-            .navigationTitle("Get Lives")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            // No Restore/Done buttons — swipe down (or tap above) to close.
-            // Restore Purchases lives in Settings.
+            // Swipe down (or tap above) to close. Restore Purchases is in Settings.
         }
-        // Open tall enough that the Diamond Balls offer is fully visible at
-        // rest (medium clipped its bottom); still draggable to full height.
-        .presentationDetents([.fraction(0.85), .large])
+        .preferredColorScheme(.dark)
+        // Size the sheet to its content — Diamond Balls fully visible, no gap below.
+        .presentationDetents([.height(fitHeight)])
+        .onPreferenceChange(SheetFitHeightKey.self) { fitHeight = max($0, 200) }
         .onChange(of: store.lastError) { _, err in purchaseError = err }
         .alert("Purchase Failed", isPresented: Binding(
             get: { purchaseError != nil },

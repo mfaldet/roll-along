@@ -172,13 +172,9 @@ struct CosmeticShopView: View {
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(Color(white: 0.55))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(Color(white: 0.18))
-                    .overlay(Capsule().stroke(Color(white: 0.30), lineWidth: 0.8))
-            )
+            // No custom capsule here — the nav-bar toolbar item already supplies
+            // its own pill background (same as the Home button). Adding our own
+            // produced a double border.
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
