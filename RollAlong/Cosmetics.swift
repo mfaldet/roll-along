@@ -109,13 +109,13 @@ extension BallSkin: CosmeticItem {
              .gold, .silver, .copper, .jade, .ruby:
             return .standard   //  50 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
-             .earth, .mars, .saturn, .mercury,
+             .pastel, .neon, .dune,
+             .basketball, .soccer, .baseball, .eightBall, .golfBall:
+            return .premium    // 200 coins (Epic) — colour blends + sports balls
+        case .snowglobe, .pluto, .ufo, .aquarium, .marble,
+             .storm, .candy, .ghost, .lava, .trench,
+             .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
-             .pastel, .neon, .dune:
-            return .premium    // 200 coins — multi-colour blends / planets
-        case .snowglobe, .golfBall, .pluto, .ufo, .soccer, .aquarium, .marble,
-             .storm, .candy, .ghost,
-             .basketball, .eightBall, .baseball, .lava, .trench,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
              .aurora,          // starter-pack-exclusive; never coin-purchasable
              .beachBall,       // summer-2026-exclusive; never coin-purchasable
@@ -126,7 +126,7 @@ extension BallSkin: CosmeticItem {
              .confetti,        // newyear-2027-exclusive; never coin-purchasable
              .speckledEgg,     // spring-2027-exclusive; never coin-purchasable
              .diamond:         // Diamond Balls IAP-exclusive; never coin-purchasable
-            return .exclusive  // 500 coins — animated / special / bundle-only
+            return .exclusive  // 500 coins (Legendary) — animated / special / planets
         }
     }
 }

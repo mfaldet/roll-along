@@ -86,8 +86,8 @@ switch — add new skins here too):
 |---|---|---|
 | `.starter` | free | red |
 | `.standard` | 50 | the 9 mono marbles, gold/silver/copper/jade/ruby |
-| `.premium` | 200 | galaxy, nebula, opal, the 8 planets, pastel, neon, dune |
-| `.exclusive` | 500 *(or bundle/IAP-only)* | animated/special + all bundle/seasonal/IAP skins |
+| `.premium` (Epic) | 200 | galaxy, nebula, opal, pastel, neon, dune, **sports balls** (basketball/soccer/baseball/8-ball/golf) |
+| `.exclusive` (Legendary) | 500 *(or bundle/IAP-only)* | the **8 planets**, animated/special skins + all bundle/seasonal/IAP skins |
 
 ---
 
