@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		AA000001000000000000AA01 /* RollAlongApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000AA00 /* RollAlongApp.swift */; };
 		AA000002000000000000AA01 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000AA00 /* ContentView.swift */; };
+		AA000099000000000000AA01 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000099000000000000AA00 /* IntroView.swift */; };
 		AA000003000000000000AA01 /* BallGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000AA00 /* BallGameView.swift */; };
 		AA000006000000000000AA01 /* BallSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000006000000000000AA00 /* BallSkin.swift */; };
 		AA000007000000000000AA01 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000007000000000000AA00 /* GameState.swift */; };
@@ -79,6 +80,7 @@
 /* Begin PBXFileReference section */
 		AA000001000000000000AA00 /* RollAlongApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollAlongApp.swift; sourceTree = "<group>"; };
 		AA000002000000000000AA00 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AA000099000000000000AA00 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		AA000003000000000000AA00 /* BallGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallGameView.swift; sourceTree = "<group>"; };
 		AA000004000000000000AA00 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AA000005000000000000AA00 /* RollAlong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -191,6 +193,7 @@
 				D502FEF42FD5024E00CA86BD /* PinballView.swift */,
 				AA000001000000000000AA00 /* RollAlongApp.swift */,
 				AA000002000000000000AA00 /* ContentView.swift */,
+				AA000099000000000000AA00 /* IntroView.swift */,
 				AA000003000000000000AA00 /* BallGameView.swift */,
 				AA000006000000000000AA00 /* BallSkin.swift */,
 				AA000007000000000000AA00 /* GameState.swift */,
@@ -365,6 +368,7 @@
 			files = (
 				AA000001000000000000AA01 /* RollAlongApp.swift in Sources */,
 				AA000002000000000000AA01 /* ContentView.swift in Sources */,
+				AA000099000000000000AA01 /* IntroView.swift in Sources */,
 				AA000003000000000000AA01 /* BallGameView.swift in Sources */,
 				AA000006000000000000AA01 /* BallSkin.swift in Sources */,
 				AA000007000000000000AA01 /* GameState.swift in Sources */,
