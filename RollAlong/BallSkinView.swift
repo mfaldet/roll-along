@@ -1362,20 +1362,22 @@ struct BallSkinView: View {
             ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(colors: colors),
                 center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32), startRadius: 0, endRadius: r * 1.25))
 
-            // Fresnel rim — the colour glows where light wraps the lower-right edge.
+            // Fresnel rim — a soft COLOURED glow where light wraps the edge
+            // (not white), kept gentle.
             ctx.blendMode = .plusLighter
             ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
                 Gradient(stops: [.init(color: .clear, location: 0.0),
-                                 .init(color: .clear, location: 0.80),
-                                 .init(color: (colors.first ?? .white).opacity(0.70), location: 1.0)]),
+                                 .init(color: .clear, location: 0.82),
+                                 .init(color: (colors.first ?? .white).opacity(0.38), location: 1.0)]),
                 center: CGPoint(x: cx + r * 0.42, y: cy + r * 0.46), startRadius: 0, endRadius: r * 1.05))
             ctx.blendMode = .normal
 
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.82, width: r * 0.72, height: r * 0.50)),
-                with: .radialGradient(Gradient(colors: [.white.opacity(0.60), .clear]),
-                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.52), startRadius: 0, endRadius: r * 0.55))
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.40, y: cy - r * 0.54, width: r * 0.18, height: r * 0.18)),
-                with: .color(.white.opacity(0.90)))
+            // Soft top-left sheen — a gentle highlight, NOT a hot white crescent.
+            // (The big 0.60 blob + 0.90 hotspot that read as a bright shiny
+            // streak are gone — this is just a subtle glossy lift.)
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.20), .clear]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
         }
     }
 
