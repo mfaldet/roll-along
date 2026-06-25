@@ -213,6 +213,11 @@ struct HomeView: View {
                     .onTapGesture {
                         respawnBall(in: arenaSize)
                     }
+                    // Re-centre the ball at intro hand-off so the opening
+                    // animation's settled ball lines up with the live ball.
+                    .onChange(of: gameState.homeBallRecenterSignal) { _, _ in
+                        respawnBall(in: arenaSize)
+                    }
                 }
                 // During launch the spiralling ball rides above the UI.
                 .zIndex(launching ? 60 : 0)

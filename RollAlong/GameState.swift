@@ -49,6 +49,10 @@ final class GameState: ObservableObject {
     @Published var introEnabled: Bool {
         didSet { defaults.set(introEnabled, forKey: "ra_introEnabled") }
     }
+    /// Transient UI signal (not persisted): bumped when the opening intro hands
+    /// off, so HomeView re-centres its roaming ball to line up with the intro's
+    /// settled ball. See IntroView / ContentView.
+    @Published var homeBallRecenterSignal: Int = 0
     @Published var ballStartsAtTop: Bool {
         didSet { defaults.set(ballStartsAtTop, forKey: "ra_startAtTop") }
     }

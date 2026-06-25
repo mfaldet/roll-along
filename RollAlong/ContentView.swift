@@ -24,7 +24,8 @@ struct ContentView: View {
             if showIntro {
                 IntroView(onComplete: {
                     ContentView.introHasPlayed = true
-                    withAnimation(.easeInOut(duration: 0.45)) { showIntro = false }
+                    gameState.homeBallRecenterSignal += 1   // align live ball with the settle
+                    withAnimation(.easeInOut(duration: 0.40)) { showIntro = false }
                 })
                 .transition(.opacity)
                 .zIndex(1)

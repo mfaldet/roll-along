@@ -3,7 +3,7 @@ import SwiftUI
 /// "Cold Open" — the cinematic opening-credits intro played over the dark
 /// stage on a cold launch (gated by `GameState.introEnabled`, default OFF).
 ///
-/// Four beats, ~3.7s, fully skippable (tap anywhere):
+/// Five beats, ~4.0s, fully skippable (tap anywhere):
 ///   1. The Roll   — the player's equipped ball rolls in from the edge with a
 ///                   fading trail, wandering like a tilt response, while dim
 ///                   ghost orbs tease the skin catalogue.
@@ -13,11 +13,16 @@ import SwiftUI
 ///   3. The Title  — "Roll Along" resolves above the drain; the ball pops back
 ///                   out of the portal with a spring, an aurora glow pulsing
 ///                   behind (the aurora vocabulary from BallGameView).
-///   4. Handoff    — the caller cross-fades to HomeView (its roaming ball is
-///                   already moving, so the hero ball appears to *become* it).
+///   4. The Settle — the ball rolls up and enlarges to the home ball's size at
+///                   screen centre, the title floats up to the home title line,
+///                   and the backdrop morphs to HomeView's gradient — so the
+///                   final frame already matches the home screen.
+///   5. Handoff    — the caller cross-fades to HomeView and re-centres its
+///                   roaming ball, so the settled ball simply *becomes* it.
 ///
-/// Reduce Motion collapses beats 1–3 to a static title card. Self-contained:
-/// reuses BallSkinView, Haptics and AudioManager but touches no game state.
+/// Reduce Motion collapses beats 1–4 to a static, home-matched title card.
+/// Self-contained: reuses BallSkinView, Haptics and AudioManager but touches
+/// no game state.
 struct IntroView: View {
     let onComplete: () -> Void
 
@@ -31,13 +36,24 @@ struct IntroView: View {
     // Beat durations (seconds).
     private let rollDur: Double = 1.40
     private let vortexDur: Double = 1.20
-    private let titleHold: Double = 1.10
-    private let reducedTotal: Double = 1.50
+    private let titleBeat: Double = 0.55    // title resolves & breathes before the settle
+    private let settleDur: Double = 0.85    // morph the intro into the home layout
+    private let reducedTotal: Double = 1.40
 
-    private var vortexStart: Double { rollDur }
-    private var vortexEnd: Double { rollDur + vortexDur }
-    private var titleStart: Double { vortexEnd - 0.20 }   // overlaps the flare
-    private var animTotal: Double { rollDur + vortexDur + titleHold }
+    private var vortexStart: Double { rollDur }                 // 1.40
+    private var vortexEnd: Double { rollDur + vortexDur }       // 2.60
+    private var titleStart: Double { vortexEnd - 0.20 }         // 2.40 — overlaps the flare
+    private var settleStart: Double { vortexEnd + titleBeat }   // 3.15
+    private var animTotal: Double { settleStart + settleDur }   // 4.00
+
+    // Settle targets — land exactly on the live HomeView layout so the
+    // cross-fade is seamless: the ball grows to HomeView.ballRadius*2 (84pt)
+    // at its respawn point (screen centre); the title floats up to just below
+    // the top pills/greeting (≈0.20 of height); the backdrop morphs to
+    // HomeView's [white 0.06 → white 0.13] vertical gradient.
+    private let homeBallDiameter: CGFloat = 84
+    private let homeBallCenterYFraction: Double = 0.515
+    private let homeTitleYFraction: Double = 0.20
 
     var body: some View {
         GeometryReader { geo in
@@ -73,36 +89,53 @@ struct IntroView: View {
             let baseD = heroBaseDiameter(size)
             let hc = heroCenter(t, size)
             let hs = heroSize(t, baseD)
+
             let titleOp = clamp01((t - titleStart) / 0.5)
-            let titleE = easeOut(clamp01((t - titleStart) / 0.6))
+            let titleResolve = easeOut(clamp01((t - titleStart) / 0.6))
+            let settleE = easeInOut(clamp01((t - settleStart) / settleDur))
+
+            // Title floats up from the intro's centre to the home title line.
+            let introTitleY = Double(d.y) - Double(size.height) * 0.17
+            let homeTitleY  = Double(size.height) * homeTitleYFraction
+            let titleCenterY = lerp(introTitleY, homeTitleY, settleE) - (1 - titleResolve) * 16
+
+            // Backdrop morphs from the dark stage to HomeView's gradient.
+            let bgTop = Color(white: lerp(0.04, 0.06, settleE))
+            let bgBot = Color(white: lerp(0.05, 0.13, settleE))
 
             ZStack {
-                auroraLayer(size: size, time: driftTime, opacity: 0.14 + 0.20 * titleOp)
+                LinearGradient(colors: [bgTop, bgBot], startPoint: .top, endPoint: .bottom)
+                auroraLayer(size: size, time: driftTime,
+                            opacity: (0.14 + 0.20 * titleOp) * (1 - settleE))
                 ghostLayer(size: size, t: t)
-                portalGlow(center: d, brightness: glow(t))
+                portalGlow(center: d, brightness: glow(t) * (1 - settleE))
                 trailLayer(size: size, t: t)
                 BallSkinView(skin: gameState.activeSkin, diameter: hs)
                     .frame(width: hs, height: hs)
+                    .rotationEffect(.degrees(settleE * 360))   // one gentle roll into place
                     .shadow(color: .black.opacity(0.5), radius: 8)
                     .position(hc)
                     .opacity(heroOpacity(t))
                 titleView(size: size,
                           opacity: titleOp,
-                          scale: 0.86 + 0.14 * titleE,
-                          yOffset: (1 - titleE) * 16)
+                          scale: 0.86 + 0.14 * titleResolve,
+                          centerY: titleCenterY)
             }
         }
     }
 
     private func staticCard(_ size: CGSize) -> some View {
-        let d = drain(size)
-        let baseD = heroBaseDiameter(size)
+        let homeC = CGPoint(x: size.width / 2,
+                            y: CGFloat(Double(size.height) * homeBallCenterYFraction))
         return ZStack {
-            titleView(size: size, opacity: 1, scale: 1, yOffset: 0)
-            BallSkinView(skin: gameState.activeSkin, diameter: baseD)
-                .frame(width: baseD, height: baseD)
+            LinearGradient(colors: [Color(white: 0.06), Color(white: 0.13)],
+                           startPoint: .top, endPoint: .bottom)
+            BallSkinView(skin: gameState.activeSkin, diameter: homeBallDiameter)
+                .frame(width: homeBallDiameter, height: homeBallDiameter)
                 .shadow(color: .black.opacity(0.5), radius: 8)
-                .position(d)
+                .position(homeC)
+            titleView(size: size, opacity: 1, scale: 1,
+                      centerY: Double(size.height) * homeTitleYFraction)
         }
     }
 
@@ -201,17 +234,18 @@ struct IntroView: View {
         .allowsHitTesting(false)
     }
 
-    private func titleView(size: CGSize, opacity: Double, scale: Double, yOffset: Double) -> some View {
-        let d = drain(size)
-        return Text("Roll Along")
-            .font(.system(size: min(size.width * 0.135, 56), weight: .black, design: .rounded))
+    private func titleView(size: CGSize, opacity: Double, scale: Double, centerY: Double) -> some View {
+        // Fixed 52pt to match HomeView.titleText exactly; the cinematic pop is
+        // carried by scaleEffect, which settles to 1.0 == the home title.
+        Text("Roll Along")
+            .font(.system(size: 52, weight: .black, design: .rounded))
             .foregroundStyle(
                 LinearGradient(colors: [.white, Color(white: 0.82)],
                                startPoint: .top, endPoint: .bottom))
             .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
             .opacity(opacity)
             .scaleEffect(scale)
-            .position(x: size.width / 2, y: d.y - size.height * 0.17 + CGFloat(yOffset))
+            .position(x: size.width / 2, y: CGFloat(centerY))
             .allowsHitTesting(false)
     }
 
@@ -250,8 +284,16 @@ struct IntroView: View {
             let ang = a0 + spin * 2 * .pi * turns
             return CGPoint(x: d.x + CGFloat(cos(ang)) * rad,
                            y: d.y + CGFloat(sin(ang)) * rad)
-        } else {
+        } else if t <= settleStart {
             return d
+        } else {
+            // Roll up to the home centre with a damped horizontal wobble.
+            let se = easeInOut(clamp01((t - settleStart) / settleDur))
+            let homeY = Double(size.height) * homeBallCenterYFraction
+            let x = lerp(Double(d.x), Double(size.width) * 0.5, se)
+                  + sin(se * .pi * 2) * Double(size.width) * 0.045 * (1 - se)
+            let y = lerp(Double(d.y), homeY, se)
+            return CGPoint(x: x, y: y)
         }
     }
 
@@ -262,9 +304,13 @@ struct IntroView: View {
         } else if t <= vortexEnd {
             let spin = pow(clamp01((t - vortexStart) / vortexDur), 1.8)
             return baseD * CGFloat(max(0.12, 1 - spin))
-        } else {
+        } else if t <= settleStart {
             let e = clamp01((t - vortexEnd) / 0.45)
             return baseD * CGFloat(0.12 + (1.0 - 0.12) * easeOutBack(e))
+        } else {
+            // Enlarge to the home ball's size as it rolls into place.
+            let se = easeInOut(clamp01((t - settleStart) / settleDur))
+            return baseD + (homeBallDiameter - baseD) * CGFloat(se)
         }
     }
 
@@ -321,8 +367,10 @@ struct IntroView: View {
             if gameState.hapticsEnabled { Haptics.success() }
             AudioManager.shared.playWin(enabled: gameState.soundEnabled)
 
-            try? await Task.sleep(nanoseconds: UInt64((animTotal - vortexEnd + 0.05) * 1_000_000_000))
+            // Soft landing tap as the ball settles into its home position.
+            try? await Task.sleep(nanoseconds: UInt64((animTotal - vortexEnd) * 1_000_000_000))
             guard !Task.isCancelled else { return }
+            if gameState.hapticsEnabled { Haptics.light() }
             finish()
         }
     }
