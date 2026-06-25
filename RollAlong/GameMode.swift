@@ -784,7 +784,7 @@ extension View {
 /// ball's own coordinate space, so the two are layered but independent.
 struct LaunchTransition: View {
     let since: Date
-    static let duration: Double = 2.30
+    static let duration: Double = 3.4
 
     var body: some View {
         GeometryReader { geo in
@@ -793,7 +793,7 @@ struct LaunchTransition: View {
             TimelineView(.animation) { tl in
                 let p = min(1.0, tl.date.timeIntervalSince(since) / Self.duration)  // 0→1
                 let glow   = Double(pow(p, 2.0))                   // portal brightens as ball nears
-                let blackP = max(0.0, (p - 0.62) / 0.30)           // black covers by p≈0.92
+                let blackP = max(0.0, (p - 0.78) / 0.18)           // black covers only at the very end (p≈0.96), after the long spiral
                 let blackSize = CGFloat(blackP) * hypot(w, h) * 1.2
 
                 ZStack {
@@ -827,7 +827,7 @@ struct LaunchBall: View {
     let center: CGPoint       // arena centre — the drain
     let diameter: CGFloat     // starting size (matches the home ball)
     let since: Date
-    private static let turns: Double = 3.0
+    private static let turns: Double = 5.5
 
     /// Whirlpool path position at progress `pp` (0…1): slow loops out wide,
     /// whipping faster as the inward pull (spin = pp²) drags it to the centre.
@@ -847,7 +847,7 @@ struct LaunchBall: View {
             let p  = min(1.0, tl.date.timeIntervalSince(since) / LaunchTransition.duration)
             let here     = pos(p)
             let ballSize = max(7, diameter * (1 - CGFloat(pow(p, 2.0))))
-            let blackP   = max(0.0, (p - 0.62) / 0.30)
+            let blackP   = max(0.0, (p - 0.78) / 0.18)
 
             ZStack {
                 // Fading vortex trail — sample the spiral path just behind the ball.

@@ -977,9 +977,9 @@ struct HomeView: View {
             launchStart = .now
             launching = true
             // Whirlpool-into-portal flourish; push once the screen has gone black
-            // (~2.1s into the 2.30s spiral), so the game reveals from under it.
+            // (~3.3s into the 3.4s spiral), so the game reveals from under it.
             // Reset after the push so the overlay isn't lingering on pop-back.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.10) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
                 nav.path.append(currentModeRoute)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { launching = false }
             }
