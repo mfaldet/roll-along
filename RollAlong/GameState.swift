@@ -878,10 +878,10 @@ final class GameState: ObservableObject {
               Date().timeIntervalSince(lastReviewPromptDate ?? .distantPast) > Timing.reviewCooldownSecs
         else { return }
         lastReviewPromptDate = Date()
-        DispatchQueue.main.async {
+        Task { @MainActor in
             if let scene = UIApplication.shared.connectedScenes
                 .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                SKStoreReviewController.requestReview(in: scene)
+                AppStore.requestReview(in: scene)   // iOS 16+ replacement for SKStoreReviewController
             }
         }
     }
