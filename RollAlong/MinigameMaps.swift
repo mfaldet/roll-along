@@ -65,7 +65,11 @@ struct PinballMap {
 }
 
 enum PinballMaps {
-    static let maps: [PinballMap] = [
+    /// Active catalogue: a bundled `pinball.json` (authored in Marble Mapper)
+    /// overrides the built-in list; absent/empty → built-in (unchanged).
+    static var maps: [PinballMap] { MinigameMapStore.pinball ?? builtin }
+
+    static let builtin: [PinballMap] = [
 
         // 1 — Classic (original 3-bumper layout)
         PinballMap(name: "Classic",
@@ -134,7 +138,9 @@ struct PaintBallMap {
 }
 
 enum PaintBallMaps {
-    static let maps: [PaintBallMap] = [
+    static var maps: [PaintBallMap] { MinigameMapStore.paintball ?? builtin }
+
+    static let builtin: [PaintBallMap] = [
 
         // 1 — Cross: 5 pits in a plus (+) pattern, centre-heavy
         PaintBallMap(name: "Cross",
@@ -200,7 +206,9 @@ struct CometClashMap {
 }
 
 enum CometClashMaps {
-    static let maps: [CometClashMap] = [
+    static var maps: [CometClashMap] { MinigameMapStore.cometClash ?? builtin }
+
+    static let builtin: [CometClashMap] = [
 
         // 1 — Open: classic arena, no obstacles
         CometClashMap(name: "Open",
@@ -277,7 +285,9 @@ struct GoldRushMap {
 }
 
 enum GoldRushMaps {
-    static let maps: [GoldRushMap] = [
+    static var maps: [GoldRushMap] { MinigameMapStore.goldRush ?? builtin }
+
+    static let builtin: [GoldRushMap] = [
 
         // 1 — Open: current layout, no barriers
         GoldRushMap(name: "Open", walls: []),
@@ -344,7 +354,9 @@ struct SumoMap {
 enum SumoMaps {
     private static let π = CGFloat.pi
 
-    static let maps: [SumoMap] = [
+    static var maps: [SumoMap] { MinigameMapStore.sumo ?? builtin }
+
+    static let builtin: [SumoMap] = [
 
         // 1 — Open: classic no-obstacle ring
         SumoMap(name: "Open", pillars: []),
@@ -408,7 +420,9 @@ struct KOTHMap {
 }
 
 enum KOTHMaps {
-    static let maps: [KOTHMap] = [
+    static var maps: [KOTHMap] { MinigameMapStore.koth ?? builtin }
+
+    static let builtin: [KOTHMap] = [
 
         // 1 — Open: classic open field
         KOTHMap(name: "Open", pillars: []),
@@ -480,7 +494,9 @@ struct MarbleCupMap {
 }
 
 enum MarbleCupMaps {
-    static let maps: [MarbleCupMap] = [
+    static var maps: [MarbleCupMap] { MinigameMapStore.marbleCup ?? builtin }
+
+    static let builtin: [MarbleCupMap] = [
 
         // 1 — Standard: default layout
         MarbleCupMap(name: "Standard",
@@ -530,4 +546,105 @@ enum MarbleCupMaps {
                                  (yFrac: 0.68, side: .both)],
                      midBumpers: [PillarFrac(cx: 0.50, cy: 0.50, r: 16)]),
     ]
+}
+
+// ===========================================================================
+// MinigameMapStore — JSON override seam for the minigame catalogues.
+//
+// Mirrors LevelOverrideStore (the climb's seam). If a bundled `<mode>.json`
+// authored by Marble Mapper is present and non-empty, it REPLACES that mode's
+// built-in catalogue; otherwise the built-in list is used unchanged. Files are
+// optional — absent/unparseable degrades gracefully to the built-ins.
+//
+// File shape (per mode), e.g. pinball.json:
+//   { "schemaVersion": 1,
+//     "maps": [ { "name": "Classic", "bumpers": [ {"x":0.3,"y":0.24} ], "verified": true } ] }
+// ===========================================================================
+
+// Shared JSON primitives (match Marble Mapper's export).
+private struct MMPoint:  Decodable { let x, y: CGFloat }
+private struct MMCircle: Decodable { let cx, cy, r: CGFloat }
+private struct MMWall:   Decodable { let x1, y1, x2, y2: CGFloat }
+private struct MMSumo:   Decodable { let radFrac, angle, r: CGFloat }
+private struct MMSide:   Decodable { let yFrac: CGFloat; let side: String }
+
+enum MinigameMapStore {
+    static let pinball:    [PinballMap]?    = loadPinball()
+    static let paintball:  [PaintBallMap]?  = loadPaintball()
+    static let cometClash: [CometClashMap]? = loadCometClash()
+    static let goldRush:   [GoldRushMap]?   = loadGoldRush()
+    static let sumo:       [SumoMap]?       = loadSumo()
+    static let koth:       [KOTHMap]?       = loadKOTH()
+    static let marbleCup:  [MarbleCupMap]?  = loadMarbleCup()
+
+    /// Decode a bundled `<name>.json` into `T`, or nil if missing/unparseable.
+    private static func loadJSON<T: Decodable>(_ name: String) -> T? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    private static func side(_ s: String) -> MarbleCupMap.Side {
+        s == "left" ? .left : (s == "right" ? .right : .both)
+    }
+
+    private struct PinballFile: Decodable { struct E: Decodable { let name: String; let bumpers: [MMPoint]? }; let maps: [E] }
+    private static func loadPinball() -> [PinballMap]? {
+        guard let f: PinballFile = loadJSON("pinball"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { PinballMap(name: $0.name, bumperFracs: ($0.bumpers ?? []).map { ($0.x, $0.y) }) }
+    }
+
+    private struct PaintBallFile: Decodable { struct E: Decodable { let name: String; let pits: [MMPoint]? }; let maps: [E] }
+    private static func loadPaintball() -> [PaintBallMap]? {
+        guard let f: PaintBallFile = loadJSON("paintball"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { PaintBallMap(name: $0.name, pitFracs: ($0.pits ?? []).map { ($0.x, $0.y) }) }
+    }
+
+    private struct CometClashFile: Decodable { struct E: Decodable { let name: String; let walls: [MMWall]?; let asteroids: [MMCircle]? }; let maps: [E] }
+    private static func loadCometClash() -> [CometClashMap]? {
+        guard let f: CometClashFile = loadJSON("cometClash"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { e in
+            CometClashMap(name: e.name,
+                          walls: (e.walls ?? []).map { WallSegFrac(x1: $0.x1, y1: $0.y1, x2: $0.x2, y2: $0.y2) },
+                          asteroids: (e.asteroids ?? []).map { PillarFrac(cx: $0.cx, cy: $0.cy, r: $0.r) })
+        }
+    }
+
+    private struct GoldRushFile: Decodable { struct E: Decodable { let name: String; let walls: [MMWall]? }; let maps: [E] }
+    private static func loadGoldRush() -> [GoldRushMap]? {
+        guard let f: GoldRushFile = loadJSON("goldRush"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { e in
+            GoldRushMap(name: e.name, walls: (e.walls ?? []).map { WallSegFrac(x1: $0.x1, y1: $0.y1, x2: $0.x2, y2: $0.y2) })
+        }
+    }
+
+    private struct SumoFile: Decodable { struct E: Decodable { let name: String; let pillars: [MMSumo]? }; let maps: [E] }
+    private static func loadSumo() -> [SumoMap]? {
+        guard let f: SumoFile = loadJSON("sumo"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { e in
+            SumoMap(name: e.name, pillars: (e.pillars ?? []).map { SumoPillar(radFrac: $0.radFrac, angle: $0.angle, r: $0.r) })
+        }
+    }
+
+    private struct KOTHFile: Decodable { struct E: Decodable { let name: String; let pillars: [MMCircle]? }; let maps: [E] }
+    private static func loadKOTH() -> [KOTHMap]? {
+        guard let f: KOTHFile = loadJSON("koth"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { e in
+            KOTHMap(name: e.name, pillars: (e.pillars ?? []).map { PillarFrac(cx: $0.cx, cy: $0.cy, r: $0.r) })
+        }
+    }
+
+    private struct MarbleCupFile: Decodable {
+        struct E: Decodable { let name: String; let goalWidth: CGFloat?; let sidePosts: [MMSide]?; let midBumpers: [MMCircle]? }
+        let maps: [E]
+    }
+    private static func loadMarbleCup() -> [MarbleCupMap]? {
+        guard let f: MarbleCupFile = loadJSON("marbleCup"), !f.maps.isEmpty else { return nil }
+        return f.maps.map { e in
+            MarbleCupMap(name: e.name,
+                         goalWidthFrac: e.goalWidth ?? 0.42,
+                         sidePosts: (e.sidePosts ?? []).map { (yFrac: $0.yFrac, side: side($0.side)) },
+                         midBumpers: (e.midBumpers ?? []).map { PillarFrac(cx: $0.cx, cy: $0.cy, r: $0.r) })
+        }
+    }
 }

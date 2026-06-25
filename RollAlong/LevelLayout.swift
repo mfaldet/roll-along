@@ -2574,9 +2574,34 @@ extension LevelLayout {
 
     // MARK: Public entry point
 
+    /// Data-driven track overrides: "<trackID>/<level>" → replacement DTO.
+    /// Loaded from the bundled `TrackOverrides.json` (authored in Marble Mapper);
+    /// absent/empty → no overrides → generated layouts, unchanged. Mirrors the
+    /// climb's `overrides` seam.
+    private(set) static var trackOverrides: [String: LevelDTO] = TrackOverrideStore.loadBundled()
+
     /// Return the LevelLayout for `level` (1–100) in the given Challenge Track.
     /// Always deterministic: same trackID + level → same arena every call.
     static func trackLayout(trackID: String, level: Int) -> LevelLayout {
+        // Authored override wins (hand-vetted / improved track level).
+        if let dto = trackOverrides["\(trackID)/\(level)"] {
+            let s = UnitPoint(x: dto.start.x, y: dto.start.y)
+            let g = UnitPoint(x: dto.goal.x,  y: dto.goal.y)
+            let designed = dto.holes.map { CGRect(x: $0.x, y: $0.y, width: $0.w, height: $0.h) }
+            let dt = defaultTimes(start: s, goal: g, holeCount: designed.count)
+            let pressure = trackTimePressure(trackID: trackID)
+            return LevelLayout(
+                holeRects:  sideWalls + designed,
+                start:      s,
+                goal:       g,
+                coins:      dto.coins.map { UnitPoint(x: $0.x, y: $0.y) },
+                targetTime: dto.targetTime ?? dt.target * pressure,
+                goldTime:   dto.goldTime   ?? dt.gold   * pressure,
+                tier:       trackDifficultyTier(for: level),
+                verified:   dto.verified ?? true
+            )
+        }
+
         let d    = difficultyFraction(for: level)
         let tier = trackDifficultyTier(for: level)
 
@@ -2975,5 +3000,36 @@ enum LevelOverrideStore {
             out[n] = dto.toLayout()
         }
         return out
+    }
+}
+
+// ===========================================================================
+// TrackOverrideStore — loads Challenge-Track override layouts from JSON.
+//
+// Mirrors LevelOverrideStore. Bundled `TrackOverrides.json` (authored in Marble
+// Mapper) is read once at launch; absent/empty → no overrides and tracks behave
+// EXACTLY as before. Keys are "<trackID>/<level>" (e.g. "frozen-peaks/42").
+// ===========================================================================
+enum TrackOverrideStore {
+    /// Resource name of the bundled overrides file (`TrackOverrides.json`).
+    static let bundledResource = "TrackOverrides"
+
+    /// On-disk shape: a schema version plus a "<trackID>/<level>"-keyed map.
+    struct File: Codable {
+        var schemaVersion: Int
+        var tracks: [String: LevelDTO]
+    }
+
+    /// Read the bundled overrides, or `[:]` if missing / unparseable.
+    static func loadBundled() -> [String: LevelDTO] {
+        guard let url = Bundle.main.url(forResource: bundledResource, withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return [:] }
+        return decode(data)
+    }
+
+    /// Decode a track-overrides JSON blob into "<trackID>/<level>" → DTO.
+    static func decode(_ data: Data) -> [String: LevelDTO] {
+        guard let file = try? JSONDecoder().decode(File.self, from: data) else { return [:] }
+        return file.tracks
     }
 }
