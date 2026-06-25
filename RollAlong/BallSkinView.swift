@@ -1408,16 +1408,6 @@ struct BallSkinView: View {
             ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.48, y: cy - r * 0.70, width: r * 0.46, height: r * 0.30)),
                 with: .radialGradient(Gradient(colors: [.white.opacity(0.13), .clear]),
                     center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.48), startRadius: 0, endRadius: r * 0.36))
-
-            // Soft rim light along the lower edge so the round silhouette reads
-            // against a dark background (subtle — not a bright encircling ring).
-            ctx.blendMode = .plusLighter
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                Gradient(stops: [.init(color: .clear, location: 0.0),
-                                 .init(color: .clear, location: 0.86),
-                                 .init(color: (colors.first ?? .white).opacity(0.20), location: 1.0)]),
-                center: CGPoint(x: cx + r * 0.28, y: cy + r * 0.40), startRadius: 0, endRadius: r))
-            ctx.blendMode = .normal
         }
     }
 
