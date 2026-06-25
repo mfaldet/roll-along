@@ -17,12 +17,37 @@ plan; update the status column + the per-sprint checklists as we go.
 
 ## The bar
 
-*3D Space Cadet* **stature** — used as a reference for table correctness +
-quality + mechanics, **not theme**. A curved, illustrated, **lit** playfield:
-top arch, shooter lane, thumper-bumper cluster, rebound slingshots,
-inlanes/outlanes, rollover lanes, drop/standup targets, a spinner, a center
-scoop, ranks + missions, multiball. Branded **Roll Along** (not space). We hit
-the *look + feel* in v1, then the *depth*.
+*3D Space Cadet* **stature** — a reference for table correctness + quality +
+mechanics, **not theme**. Branded **Roll Along** (not space). We hit the
+*look + feel* in v1, then the *depth*.
+
+## Layout reference & principles (Gottlieb EM wedgehead — *Circus / Big Show*)
+
+Mac's chosen layout reference is the 1970s Gottlieb electromechanical wedgehead
+*Circus / Big Show* (shared playfield; *Circus* is the add-a-ball twin of the
+replay *Big Show*). Hard principles taken from it:
+
+1. **Open lower-centre.** No obstacle parked in front of the flippers — the ball
+   returns down the middle where you can see it and take a clean swing. The
+   centre column is *flush rollover buttons*, not blockers. (This killed the
+   earlier "center scoop above the flippers" idea.)
+2. **Scoring lives up top + along the sides** — three pop ("thumper") bumpers in
+   a row up top, standup targets down both side walls, rollover lanes at the top.
+   "Many buttons and point systems."
+3. **Rounded top ball track** — a clean arch the ball rides around from the
+   shooter lane (through a one-way ball gate).
+4. **Two flippers only** (no upper flipper), slingshot rebounds above them.
+
+**EM point system** (period-accurate, what we'll emulate): pop bumpers 10 → **100
+when lit**; standup targets ~**500** + advance bonus; completing the top rollover
+lanes / target sequence **lights the "Special"** (free game on *Big Show*, an
+extra ball on add-a-ball *Circus*); slingshots 10; **moveable posts** tune
+difficulty. Play style: shoot up the open middle to feed the bumpers, work the
+side targets to light the bumpers + the Special, keep it alive off two flippers.
+
+Refs: [IPDB Gottlieb *Big Show*](https://www.ipdb.org/machine.cgi?id=277) ·
+[IPDB Gottlieb *Circus*](https://www.ipdb.org/machine.cgi?id=515) ·
+[Pinside rulesheet](https://pinside.com/pinball/forum/topic/gottliebs-circus).
 
 ## What we keep vs. throw away
 
@@ -70,14 +95,14 @@ the *look + feel* in v1, then the *depth*.
 - [ ] Drain detection, ball count (3), ball-save timer.
 
 ### Sprint 2 — Scoring hardware  ⚪
-- [ ] Pop bumpers: radial impulse + score + lamp flash + ding.
-- [ ] Slingshots: triangular kickers, impulse + score.
-- [ ] Drop-target bank (bank-clear bonus + multiplier), standup targets, spinner.
-- [ ] Rollover lanes (ROLL) → lane completion bonus / lane change.
-- [ ] Bonus counter + playfield multiplier; combos.
+- [ ] Pop bumpers (×3 row): radial impulse + score (10 → **100 when lit**) + lamp + ding.
+- [ ] Slingshots / rebounds: kicker impulse + score (10).
+- [ ] Standup targets (both sides): score (~500) + advance bonus / light Special.
+- [ ] Top rollover lanes (ROLL) + open-centre rollover buttons → light bumpers / advance bonus.
+- [ ] Bonus counter + Special (extra ball) when the sequence completes; combos.
 
 ### Sprint 3 — Art, lighting & theme  ⚪
-- [ ] Illustrated cosmic playfield background; inserts/lamps.
+- [ ] Illustrated Roll Along-themed playfield background; inserts/lamps.
 - [ ] Rails, lane guides, apron art, plastics.
 - [ ] `SKLightNode` / emissive lighting; lamps light per game state.
 - [ ] Particle FX (bumper sparks, ball trail, mode bursts); ball reflection.
@@ -91,15 +116,17 @@ the *look + feel* in v1, then the *depth*.
 
 ## Canonical element catalog (the blueprint, keyed)
 
-1. Plunger (variable-power launch) · 2. Shooter lane · 3. Top arch · 4. Rollover
-lanes (**ROLL**) · 5. Orbit / return lanes · 6. Pop bumpers (×3) · 7. Spinner ·
-8. Drop-target bank (spaced) · 9. Center scoop (saucer) · 10. Slingshots (×2) ·
-11. Inlanes / outlanes (+ kickback) · 12. Flippers (lower ×2 + 1 upper) ·
-13. Standup targets · 14. Posts / rubbers.
+Blueprint **rev 3** (EM-wedgehead style) parts: 1. Plunger (shooter) ·
+2. Shooter lane + ball gate · 3. Top arch (ball track) · 4. Top rollover lanes
+(**ROLL**) · 5. Thumper (pop) bumpers (×3, in a row) · 6. Standup targets (sides) ·
+7. Centre rollover buttons (**open** column) · 8. Slingshots / rebounds (×2) ·
+9. Inlanes / outlanes (+ kickback) · 10. Flippers (×2) · 11. Moveable posts ·
+12. Return / orbit lanes.
 
-Blueprint **rev 2** corrected the bottom-end geometry (flippers no longer cross;
-real inlane/outlane channels; slingshots in the proper rebound position),
-spaced the drop targets, reshaped the top arch, and dropped the space theme.
+Evolution: rev 1 (scrapped — wrong) → rev 2 (fixed bottom-end geometry, dropped
+space theme) → **rev 3** (re-laid to the open-centre EM-wedgehead philosophy:
+removed the centre scoop, opened the lower-middle, moved scoring up top + to the
+sides, three bumpers in a row, two flippers, clean top track).
 
 ## Tech notes (SpriteKit)
 
