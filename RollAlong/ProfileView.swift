@@ -22,13 +22,6 @@ struct ProfileView: View {
     private var totalPossibleStars: Int { levelsCompleted * 3 }
     private var threeStarCount: Int   { gameState.bestStars.values.filter { $0 == 3 }.count }
 
-    private var levelRecords: [(level: Int, stars: Int, time: TimeInterval?)] {
-        gameState.bestStars.keys.sorted().compactMap { lvl in
-            guard let stars = gameState.bestStars[lvl] else { return nil }
-            return (lvl, stars, gameState.bestTime[lvl])
-        }
-    }
-
     var body: some View {
         ZStack {
             // Background — same dark tone as the rest of the app.
@@ -42,13 +35,10 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
-                    loadoutCard
                     progressCard
                     statsGrid
                     badgesCard
-                    if !levelRecords.isEmpty {
-                        levelRecordsCard
-                    }
+                    loadoutCard
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 10)
@@ -72,18 +62,10 @@ struct ProfileView: View {
     // =========================================================================
     private var heroCard: some View {
         VStack(spacing: 14) {
-            // ── Ball preview with completionist ring ─────────────────────
-            let completed = gameState.completedBundleIDs.count
+            // ── Ball preview ─────────────────────────────────────────────
+            // No completionist ring here — that only appears in the Shop and
+            // the Settings cosmetics picker, not on the Profile.
             ZStack {
-                if completed > 0 {
-                    let ringColor: Color = completed >= 5
-                        ? Color(red: 1.00, green: 0.82, blue: 0.22)
-                        : Color(red: 0.22, green: 0.88, blue: 0.46)
-                    Circle()
-                        .stroke(ringColor, lineWidth: 3.0)
-                        .frame(width: 108, height: 108)
-                        .shadow(color: ringColor.opacity(0.55), radius: 14)
-                }
                 BallSkinView(skin: gameState.activeSkin, diameter: 88)
                     .frame(width: 88, height: 88)
                     .shadow(color: .black.opacity(0.72), radius: 18, x: 0, y: 10)
@@ -588,73 +570,6 @@ struct ProfileView: View {
     }
 
     // =========================================================================
-    // MARK: - Level records card
-    // Scrollable table: one row per beaten level, sorted ascending.
-    // Columns: level number badge · star icons (3 always rendered) · best time.
-    // =========================================================================
-    private var levelRecordsCard: some View {
-        VStack(spacing: 16) {
-            HStack {
-                sectionLabel("Level Records")
-                Spacer()
-                Text("\(levelRecords.count) cleared")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.40))
-            }
-
-            VStack(spacing: 6) {
-                ForEach(levelRecords, id: \.level) { record in
-                    levelRow(record)
-                }
-            }
-        }
-        .padding(18)
-        .profileCard()
-    }
-
-    private func levelRow(_ record: (level: Int, stars: Int, time: TimeInterval?)) -> some View {
-        HStack(spacing: 10) {
-            // Level badge
-            Text("L\(record.level)")
-                .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(Color(white: 0.68))
-                .frame(width: 32, alignment: .leading)
-
-            // 3 star icons
-            HStack(spacing: 3) {
-                ForEach(0..<3, id: \.self) { i in
-                    Image(systemName: i < record.stars ? "star.fill" : "star")
-                        .font(.system(size: 11))
-                        .foregroundStyle(
-                            i < record.stars
-                                ? Color(red: 1.0, green: 0.80, blue: 0.20)
-                                : Color(white: 0.24)
-                        )
-                }
-            }
-
-            Spacer()
-
-            // Best time
-            if let t = record.time {
-                Text(Self.formatTime(t))
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color(white: 0.58))
-            } else {
-                Text("—")
-                    .font(.system(size: 12, design: .rounded))
-                    .foregroundStyle(Color(white: 0.28))
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 9)
-                .fill(Color(white: 0.12))
-        )
-    }
-
-    // =========================================================================
     // MARK: - Helpers
     // =========================================================================
 
@@ -680,17 +595,6 @@ struct ProfileView: View {
             )
     }
 
-    /// Time interval → "42.3s" or "1:05.3" string.
-    private static func formatTime(_ t: TimeInterval) -> String {
-        let total   = max(0, t)
-        let minutes = Int(total) / 60
-        let secs    = total - Double(minutes * 60)
-        if minutes > 0 {
-            return String(format: "%d:%04.1f", minutes, secs)
-        } else {
-            return String(format: "%.1fs", secs)
-        }
-    }
 
     // =========================================================================
     // MARK: - Social rank loader
