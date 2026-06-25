@@ -26,6 +26,37 @@ struct LeaderboardView: View {
     @State private var isLoading  = false
     @State private var errorText: String?
 
+    @State private var sortKey:      SortKey    = .level
+    @State private var selectedGame: GameFilter = .rollAlong
+
+    /// Which Roll Along stat the board ranks by.  Coins + Speed are requested
+    /// too, but the players table stores neither yet (see docs) — they'll join
+    /// once the backend records them.
+    private enum SortKey: String, CaseIterable, Identifiable {
+        case level = "Level", stars = "Stars"
+        var id: String { rawValue }
+    }
+
+    /// Game whose board is shown.  Only Roll Along has data today; the rest are
+    /// scaffolded so the dropdown shows the full lineup (each shows a
+    /// "coming soon" state until its board is wired up).
+    private enum GameFilter: String, CaseIterable, Identifiable {
+        case rollAlong = "Roll Along"
+        case goldRush  = "Gold Rush"
+        case sumo      = "Sumo Survival"
+        case koth      = "King of the Hill"
+        case paint     = "Paint Ball"
+        var id: String { rawValue }
+    }
+
+    /// Rows re-sorted client-side by the active key.
+    private var sortedRows: [PlayerProfile] {
+        switch sortKey {
+        case .level: return rows.sorted { ($0.climbLevel, $0.totalStars) > ($1.climbLevel, $1.totalStars) }
+        case .stars: return rows.sorted { ($0.totalStars, $0.climbLevel) > ($1.totalStars, $1.climbLevel) }
+        }
+    }
+
     private var myId: UUID? { SocialClient.shared.currentUserId }
 
     var body: some View {
@@ -35,7 +66,11 @@ struct LeaderboardView: View {
             if !auth.isSignedIn {
                 signedOutState
             } else {
-                content
+                VStack(spacing: 0) {
+                    leaderboardHeader
+                    content
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .navigationTitle("Leaderboard")
@@ -60,7 +95,9 @@ struct LeaderboardView: View {
 
     @ViewBuilder
     private var content: some View {
-        if isLoading && rows.isEmpty {
+        if selectedGame != .rollAlong {
+            comingSoonState
+        } else if isLoading && rows.isEmpty {
             ProgressView()
                 .tint(.white)
                 .scaleEffect(1.2)
@@ -71,7 +108,7 @@ struct LeaderboardView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, profile in
+                    ForEach(Array(sortedRows.enumerated()), id: \.element.id) { index, profile in
                         leaderboardRow(rank: index + 1, profile: profile)
                     }
                 }
@@ -86,41 +123,37 @@ struct LeaderboardView: View {
         let isMe  = (profile.id == myId)
         let world = World.world(for: max(1, profile.climbLevel))
 
-        return HStack(spacing: 14) {
+        return HStack(spacing: 12) {
             rankBadge(rank)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(profile.displayName.isEmpty ? "Climber" : profile.displayName)
-                    .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(world.accent)
-                        .frame(width: 7, height: 7)
-                    Text(world.name)
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(Color(white: 0.5))
-                        .lineLimit(1)
-                }
-            }
+            // Name + top Roll Along level as a status chip — e.g. "Mac  20".
+            // No level word, no world name (those implied an XP/level system).
+            Text(profile.displayName.isEmpty ? "Climber" : profile.displayName)
+                .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Text("\(profile.climbLevel)")
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule().fill(world.accent.opacity(0.28))
+                        .overlay(Capsule().stroke(world.accent.opacity(0.65), lineWidth: 1))
+                )
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("LVL \(profile.climbLevel)")
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
-                    .foregroundStyle(.white)
+            // Stars — the secondary stat (and the key when sorting by stars).
+            HStack(spacing: 4) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                Text("\(profile.totalStars)")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color(white: 0.7))
                     .monospacedDigit()
-                HStack(spacing: 3) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                    Text("\(profile.totalStars)")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(Color(white: 0.6))
-                        .monospacedDigit()
-                }
             }
         }
         .padding(.horizontal, 14)
@@ -141,6 +174,74 @@ struct LeaderboardView: View {
             "Rank \(rank). \(profile.displayName.isEmpty ? "Climber" : profile.displayName), "
             + "level \(profile.climbLevel), \(profile.totalStars) stars."
             + (isMe ? " This is you." : "")
+        )
+    }
+
+    // MARK: - Header (game filter + sort)
+
+    private var leaderboardHeader: some View {
+        VStack(spacing: 12) {
+            // Game filter — a dropdown sitting just under the nav title.
+            Menu {
+                ForEach(GameFilter.allCases) { g in
+                    Button { selectedGame = g } label: {
+                        if selectedGame == g {
+                            Label(g.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(g.rawValue)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selectedGame.rawValue)
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .foregroundStyle(.white)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color(white: 0.6))
+                }
+            }
+
+            // Sort toggles — only meaningful for the Roll Along board.
+            if selectedGame == .rollAlong {
+                HStack(spacing: 8) {
+                    ForEach(SortKey.allCases) { key in
+                        sortChip(key)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 12)
+    }
+
+    private func sortChip(_ key: SortKey) -> some View {
+        let active = (sortKey == key)
+        return Button { sortKey = key } label: {
+            Text(key.rawValue)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(active ? .black : Color(white: 0.72))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(active
+                        ? Color(red: 1.00, green: 0.84, blue: 0.30)
+                        : Color(white: 0.16))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var comingSoonState: some View {
+        messageBlock(
+            icon: "hourglass",
+            title: "\(selectedGame.rawValue) board coming soon",
+            message: "Roll Along's global ranking is live now. Competitive-mode leaderboards are on the way.",
+            actionTitle: nil,
+            action: nil
         )
     }
 
