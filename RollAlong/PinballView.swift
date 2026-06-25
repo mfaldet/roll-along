@@ -33,7 +33,7 @@ struct PinballView: View {
 
     // MARK: - Tunables
 
-    private let ballRadius:    CGFloat = 11
+    private let ballRadius:    CGFloat = 8         // smaller ball → the playfield feels larger
     private let gravity:       CGFloat = 980        // downward pull, points per second^2
     private let drag:          CGFloat = 0.999      // gentle air damping per tick
     private let maxSpeed:      CGFloat = 1_400
@@ -44,12 +44,13 @@ struct PinballView: View {
     private let bumperPop:     CGFloat = 380         // floor on speed right after a bumper kick
     private let bumperScore         = 500
 
-    private let flipperLenFrac: CGFloat = 0.30       // of field width, per flipper
-    private let flipperThickness: CGFloat = 7
+    private let flipperLenFrac: CGFloat = 0.26       // of field width — shorter, so the flick can't slip past the ball
+    private let flipperThickness: CGFloat = 7         // visual half-thickness
+    private let flipperHitThickness: CGFloat = 11     // collision band (wider than the look) — resists tunnelling
     private let flipperRest:    CGFloat = 0.32        // restitution off a still flipper
     private let restAngleDeg:   CGFloat = 26          // tip down-and-inward at rest
     private let activeAngleDeg: CGFloat = -24         // tip swings up when flicked
-    private let flickStrength:  CGFloat = 980         // launch impulse near the tip
+    private let flickGain:      CGFloat = 2.6         // multiplier on the bat's upward surface speed (the kick)
     private let flickDuration       = 9               // ticks a flick stays "up"
 
     private let launchSpeed:    CGFloat = 1_180       // plunger kick up the lane
@@ -93,6 +94,7 @@ struct PinballView: View {
 
     @State private var leftFlickTicks  = 0
     @State private var rightFlickTicks = 0
+    @State private var touchActive     = false   // one flick per finger-press
 
     @State private var score      = 0
     @State private var ballsLeft  = 3
@@ -130,7 +132,15 @@ struct PinballView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .gesture(SpatialTapGesture().onEnded { handleTap(at: $0.location) })
+                .gesture(
+                    // Fire on touch-DOWN (not lift) so the flippers feel instant;
+                    // one action per touch via `touchActive`.
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { v in
+                            if !touchActive { touchActive = true; handleTap(at: v.startLocation) }
+                        }
+                        .onEnded { _ in touchActive = false }
+                )
             }
 
             topBar
@@ -356,7 +366,7 @@ struct PinballView: View {
 
         flipperLen = field.width * flipperLenFrac
         let flipperY = field.maxY - field.height * 0.10
-        let pivotInset = field.width * 0.14
+        let pivotInset = field.width * 0.17   // pivots nudged inward so the shorter bats still close the drain
         leftPivot  = CGPoint(x: field.minX + pivotInset, y: flipperY)
         rightPivot = CGPoint(x: field.maxX - pivotInset, y: flipperY)
 
@@ -577,22 +587,41 @@ struct PinballView: View {
         let qx = pivot.x + t * vx, qy = pivot.y + t * vy
         let dx = ball.pos.x - qx, dy = ball.pos.y - qy
         let dist = hypot(dx, dy)
-        let minD = ballRadius + flipperThickness
+        let minD = ballRadius + flipperHitThickness
         guard dist < minD else { return }
-        let nx = dist > 0 ? dx / dist : 0
-        let ny = dist > 0 ? dy / dist : -1
+
+        let active = (isLeft ? leftFlickTicks : rightFlickTicks) > 0
+
+        // Standard contact normal (segment → ball).
+        let snx = dist > 0 ? dx / dist : 0
+        let sny = dist > 0 ? dy / dist : -1
+        // The bat's UP normal — perpendicular to the flipper, pointing into the
+        // playfield.  While flicking we ALWAYS resolve the ball to this top side
+        // so it launches up, never spiked down off the underside (the old bug).
+        let segLen = max(0.001, hypot(vx, vy))
+        var unx = -vy / segLen, uny = vx / segLen
+        if uny > 0 { unx = -unx; uny = -uny }
+
+        let nx = active ? unx : snx
+        let ny = active ? uny : sny
         ball.pos.x = qx + nx * minD
         ball.pos.y = qy + ny * minD
+
         let vn = ball.vel.dx * nx + ball.vel.dy * ny
         if vn < 0 {
             ball.vel.dx -= (1 + flipperRest) * vn * nx
             ball.vel.dy -= (1 + flipperRest) * vn * ny
         }
-        let active = (isLeft ? leftFlickTicks : rightFlickTicks) > 0
+
         if active {
-            let imp = flickStrength * t      // strongest out near the tip
-            ball.vel.dx += nx * imp
-            ball.vel.dy += ny * imp
+            // The kick = the swinging bat's surface speed at the contact point,
+            // directed up.  ω = swing angle / swing time; further out = harder.
+            let restA = restAngleDeg * .pi / 180
+            let actA  = activeAngleDeg * .pi / 180
+            let omega = abs(actA - restA) / (CGFloat(flickDuration) * (1.0 / 60.0))
+            let kick  = omega * (t * flipperLen) * flickGain
+            ball.vel.dx += unx * kick
+            ball.vel.dy += uny * kick
         }
     }
 }
