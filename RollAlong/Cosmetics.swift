@@ -1014,15 +1014,7 @@ enum ShopRotation {
         if let t = item as? TrailColor  { if t == featuredTrail(at: date) { return true } }
         if let g = item as? GoalSkin    { if g == featuredGoal(at: date) { return true } }
         guard let bundle = featuredBundle(at: date) else { return false }
-        switch item {
-        case let s as BallSkin:   return bundle.balls.contains(s)
-        case let g as GoalSkin:   return bundle.goals.contains(g)
-        case let t as TrailColor: return bundle.trails.contains(t)
-        case let f as Floor:      return bundle.floors.contains(f)
-        case let p as Pit:        return bundle.pits.contains(p)
-        case let m as MusicTrack: return bundle.music.contains(m)
-        default:                  return false
-        }
+        return bundle.contains(item)
     }
 }
 
@@ -1124,6 +1116,19 @@ struct CosmeticBundle: Identifiable {
         // so every bundle lands on a clean price point (per Mac's spec).
         let discounted = Double(sum) * 0.66
         return Int(discounted / 20.0) * 20
+    }
+
+    /// True if this bundle includes `item` (any category).
+    func contains<Item: CosmeticItem>(_ item: Item) -> Bool {
+        switch item {
+        case let s as BallSkin:   return balls.contains(s)
+        case let g as GoalSkin:   return goals.contains(g)
+        case let t as TrailColor: return trails.contains(t)
+        case let f as Floor:      return floors.contains(f)
+        case let p as Pit:        return pits.contains(p)
+        case let m as MusicTrack: return music.contains(m)
+        default:                  return false
+        }
     }
 
     /// Add every contained item to the appropriate owned-set on

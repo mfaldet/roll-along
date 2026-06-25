@@ -362,6 +362,18 @@ struct CosmeticShopView: View {
     private func itemCell<Item: CosmeticItem>(item: Item) -> some View {
         let owned = gameState.isOwned(item)
         let equipped = isEquipped(item)
+        let inShop = ShopRotation.isFeatured(item)
+        let bundleComplete = owned && CosmeticBundle.catalogue.contains {
+            gameState.completedBundleIDs.contains($0.id) && $0.contains(item)
+        }
+        // In the Catalog, locked items grey out; the strongest status border
+        // wins: equipped (green) ▸ bundle-complete (gold) ▸ in-shop-now (blue).
+        let greyed = (mode == .catalog) && !owned
+        let border: Color? =
+            equipped         ? Color(red: 0.28, green: 0.85, blue: 0.45)
+            : bundleComplete ? Color(red: 1.00, green: 0.82, blue: 0.30)
+            : (mode == .catalog && !owned && inShop) ? Color(red: 0.30, green: 0.62, blue: 1.00)
+            : nil
         return Button {
             handleTap(item: item, owned: owned, equipped: equipped)
         } label: {
@@ -385,14 +397,14 @@ struct CosmeticShopView: View {
 
                 stateBadge(item: item, owned: owned, equipped: equipped)
             }
+            .opacity(greyed ? 0.5 : 1.0)
             .padding(10)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(white: 0.14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(equipped ? Color.white.opacity(0.55) : Color.clear,
-                                    lineWidth: 1.5)
+                            .stroke(border ?? .clear, lineWidth: border == nil ? 0 : 2)
                     )
             )
         }
@@ -855,7 +867,9 @@ struct CosmeticShopView: View {
 
     /// Border color for a collection card — priority: complete > seasonal > featured > none.
     private func borderColor(bundle: CosmeticBundle, isFeatured: Bool, bundleOwned: Bool) -> Color {
-        if bundleOwned                                       { return Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.35) }
+        // Owned/complete → gold.  Currently the Shop's featured (buyable) bundle → blue.
+        if bundleOwned                                       { return Color(red: 1.00, green: 0.82, blue: 0.30).opacity(0.85) }
+        if ShopRotation.featuredBundle()?.id == bundle.id    { return Color(red: 0.30, green: 0.62, blue: 1.00).opacity(0.85) }
         if bundle.isLimitedTime && bundle.isAvailable        { return limitedTimeColor(for: bundle).opacity(0.50) }
         if isFeatured                                        { return Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40) }
         return .clear
