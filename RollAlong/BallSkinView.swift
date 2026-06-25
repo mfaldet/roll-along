@@ -189,9 +189,12 @@ struct BallSkinView: View {
         case .neon:    neonCanvas.clipShape(Circle()).overlay(planetRim)
 
         // ── Polished marbles / metals / gems — richer than a flat gradient ─
-        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon, .pastel, .dune:
+        // The basic solid colours use the SAME smooth, low-gloss renderer as
+        // Copper (per Mac) — clean two-tone shading, no hot white crescent.
+        case .pastel, .dune:
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
-        case .gold, .silver, .copper:
+        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon,
+             .gold, .silver, .copper:
             metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .jade, .ruby:
             gemMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
