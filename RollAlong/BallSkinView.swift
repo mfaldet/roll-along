@@ -1092,51 +1092,79 @@ struct BallSkinView: View {
 
     // =========================================================================
     // MARK: - Aurora  (Starter Pack exclusive · Legendary)
-    // Flowing Northern Lights via an animated MeshGradient (iOS 18): greens,
-    // teals and violet drift and blend over a deep night sky as the mesh
-    // control points undulate.  A Canvas overlay adds limb-darkening (so the
-    // flat mesh reads as a lit sphere), a top-left sheen + specular, and
-    // twinkling stars.  Reduce Motion freezes the mesh and the stars.
+    // A dark night sky with Northern Lights that fade in and out and drift, the
+    // way they really do.  TWO MeshGradient layers: a constant dark-sky base,
+    // and an additive aurora layer whose green/teal/violet patches each pulse
+    // fully in and out on independent phases (so the lights come and go) while
+    // the control points sway (so they travel).  When all patches are low the
+    // sphere is just the dark starry sky.  A Canvas overlay adds limb-darkening,
+    // twinkling stars, and a small specular.  Reduce Motion freezes it.
     // =========================================================================
-    private static let auroraMesh: [Color] = [
-        Color(red: 0.02, green: 0.05, blue: 0.18), Color(red: 0.05, green: 0.22, blue: 0.30), Color(red: 0.03, green: 0.06, blue: 0.22),
-        Color(red: 0.10, green: 0.80, blue: 0.52), Color(red: 0.34, green: 0.96, blue: 0.78), Color(red: 0.55, green: 0.36, blue: 0.96),
-        Color(red: 0.06, green: 0.34, blue: 0.40), Color(red: 0.14, green: 0.52, blue: 0.55), Color(red: 0.22, green: 0.10, blue: 0.42),
+    private static let auroraGrid: [SIMD2<Float>] = [
+        [0, 0],   [0.5, 0],   [1, 0],
+        [0, 0.5], [0.5, 0.5], [1, 0.5],
+        [0, 1],   [0.5, 1],   [1, 1],
+    ]
+    /// Constant dark night sky — deep indigo up top fading to near-black.
+    private static let nightMesh: [Color] = [
+        Color(red: 0.06, green: 0.09, blue: 0.22), Color(red: 0.05, green: 0.08, blue: 0.20), Color(red: 0.06, green: 0.09, blue: 0.22),
+        Color(red: 0.03, green: 0.05, blue: 0.15), Color(red: 0.02, green: 0.04, blue: 0.12), Color(red: 0.03, green: 0.05, blue: 0.15),
+        Color(red: 0.01, green: 0.02, blue: 0.08), Color(red: 0.01, green: 0.02, blue: 0.07), Color(red: 0.01, green: 0.02, blue: 0.08),
     ]
 
     private var auroraCanvas: some View {
         TimelineView(.animation) { tl in
             let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
-            let a  = Float(sin(t * 0.50))       * 0.06
-            let b  = Float(sin(t * 0.43 + 1.0)) * 0.06
-            let mx = Float(sin(t * 0.60 + 2.0)) * 0.08
-            let my = Float(cos(t * 0.52))       * 0.08
-            let pts: [SIMD2<Float>] = [
-                [0, 0],         [0.5 + a, 0],          [1, 0],
-                [0, 0.5 + b],   [0.5 + mx, 0.5 + my],  [1, 0.5 - b],
-                [0, 1],         [0.5 - a, 1],          [1, 1],
+
+            // Each patch fades fully in and out (clamped sine → off about half
+            // its cycle) on its own slow phase, so the lights come and go and
+            // seem to travel.  Reduce Motion holds a gentle steady glow.
+            let i0 = reduceMotion ? 0.5 : max(0, sin(t * 0.33 + 0.0))
+            let i1 = reduceMotion ? 0.4 : max(0, sin(t * 0.27 + 1.7))
+            let i2 = reduceMotion ? 0.3 : max(0, sin(t * 0.31 + 3.1))
+            let i3 = reduceMotion ? 0.5 : max(0, sin(t * 0.23 + 4.6))
+            let i4 = reduceMotion ? 0.3 : max(0, sin(t * 0.29 + 5.9))
+            let green  = Color(red: 0.16, green: 0.95, blue: 0.55)
+            let aqua   = Color(red: 0.22, green: 0.82, blue: 0.80)
+            let violet = Color(red: 0.60, green: 0.34, blue: 0.98)
+            let pink   = Color(red: 0.95, green: 0.40, blue: 0.78)
+            let auroraColors: [Color] = [
+                .clear,                      green.opacity(0.85 * i0),    .clear,
+                green.opacity(0.80 * i1),    aqua.opacity(0.70 * i2),     violet.opacity(0.85 * i3),
+                pink.opacity(0.45 * i2),     violet.opacity(0.65 * i4),   .clear,
             ]
+            // Curtains sway — drift the aurora layer's interior + mid-edge
+            // points (corners stay pinned so it always covers the sphere).
+            let dx = Float(sin(t * 0.40))       * 0.08
+            let dy = Float(sin(t * 0.33 + 1.0)) * 0.06
+            let auroraPts: [SIMD2<Float>] = [
+                [0, 0],              [0.5 + dx, 0],          [1, 0],
+                [0, 0.45 + dy],      [0.5 - dx, 0.5 + dy],   [1, 0.45 - dy],
+                [0, 1],              [0.5 + dx, 1],          [1, 1],
+            ]
+
             ZStack {
-                MeshGradient(width: 3, height: 3, points: pts, colors: Self.auroraMesh)
+                // Constant dark sky.
+                MeshGradient(width: 3, height: 3, points: Self.auroraGrid, colors: Self.nightMesh)
+
+                // Aurora light — additive, so it glows over the night and is
+                // invisible where its colour is clear.
+                MeshGradient(width: 3, height: 3, points: auroraPts, colors: auroraColors)
+                    .blendMode(.plusLighter)
 
                 Canvas { ctx, size in
                     let w = size.width, h = size.height
                     let cx = w / 2, cy = h / 2, r = min(w, h) / 2
 
-                    // Limb darkening — turns the flat mesh into a lit sphere.
+                    // Limb darkening — reads as a lit sphere, keeps edges dark.
                     ctx.fill(Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
                         with: .radialGradient(Gradient(stops: [
-                            .init(color: .clear, location: 0.52),
-                            .init(color: .black.opacity(0.30), location: 0.82),
-                            .init(color: .black.opacity(0.70), location: 1.0)]),
+                            .init(color: .clear, location: 0.55),
+                            .init(color: .black.opacity(0.35), location: 0.84),
+                            .init(color: .black.opacity(0.75), location: 1.0)]),
                             center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
 
-                    // Top-left sheen.
-                    ctx.fill(Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                        with: .radialGradient(Gradient(colors: [.white.opacity(0.22), .clear]),
-                            center: CGPoint(x: w * 0.32, y: h * 0.27), startRadius: 0, endRadius: r * 0.95))
-
-                    // Twinkling stars.
+                    // Twinkling stars (seen through the dark sky).
                     for (i, s) in [(0.30, 0.30), (0.66, 0.24), (0.52, 0.60),
                                    (0.24, 0.60), (0.74, 0.56), (0.44, 0.42),
                                    (0.60, 0.72), (0.36, 0.20)].enumerated() {
@@ -1144,15 +1172,16 @@ struct BallSkinView: View {
                         if tw < 0.2 { continue }
                         let px = w * CGFloat(s.0), py = h * CGFloat(s.1)
                         if hypot(px - cx, py - cy) > r * 0.86 { continue }
-                        let ss = r * 0.02
+                        let ss = r * 0.018
                         ctx.fill(Path(ellipseIn: CGRect(x: px - ss, y: py - ss, width: ss * 2, height: ss * 2)),
                                  with: .color(.white.opacity(tw)))
                     }
 
-                    // Specular highlight.
-                    ctx.fill(Path(ellipseIn: CGRect(x: w * 0.18, y: h * 0.12, width: w * 0.30, height: h * 0.22)),
-                        with: .radialGradient(Gradient(colors: [.white.opacity(0.85), .clear]),
-                            center: CGPoint(x: w * 0.27, y: h * 0.19), startRadius: 0, endRadius: r * 0.34))
+                    // Small crisp specular — sells the glossy sphere without
+                    // washing the dark sky grey.
+                    ctx.fill(Path(ellipseIn: CGRect(x: w * 0.20, y: h * 0.13, width: w * 0.22, height: h * 0.16)),
+                        with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
+                            center: CGPoint(x: w * 0.28, y: h * 0.19), startRadius: 0, endRadius: r * 0.26))
                 }
             }
         }
