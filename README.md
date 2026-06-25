@@ -2,7 +2,7 @@
 
 A tilt-driven iOS marble game for the App Store. Tilt the device to roll your marble through 100 climb levels and 7 competitive minigames, collect cosmetics, and compete on leaderboards.
 
-**Platform:** iOS 17+ · **Language:** Swift / SwiftUI · **Physics:** CoreMotion + custom tick engine
+**Platform:** iOS 18+ · **Language:** Swift / SwiftUI · **Physics:** CoreMotion + custom tick engine
 
 ---
 
@@ -56,7 +56,7 @@ RollAlong/
 
 ## Running locally
 
-Open `RollAlong.xcodeproj` in Xcode 15+ and run on a **physical device** — `CMMotionManager` does not report device motion in the simulator. An iOS 17+ device is required.
+Open `RollAlong.xcodeproj` in Xcode 16+ and run on a **physical device** — `CMMotionManager` does not report device motion in the simulator. An iOS 18+ device is required (the rich ball skins use SwiftUI `MeshGradient`).
 
 For IAP testing, select the `Products.storekit` configuration under the scheme's **Run → Options → StoreKit Configuration**.
 
