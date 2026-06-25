@@ -72,6 +72,13 @@ create table if not exists public.players (
     -- Lifetime coins picked up across levels (the "coins collected" stat the
     -- client shows in Replay Levels) — powers the leaderboard's Coins sort.
     coins_collected      int         not null default 0,
+    -- Minigame leaderboards (client-synced):
+    --   pinball_best  — best single Pinball score
+    --   zen_seconds   — total seconds spent in Zen Garden
+    --   goldrush_best — most coins caught in one Gold Rush match
+    pinball_best         int         not null default 0,
+    zen_seconds          int         not null default 0,
+    goldrush_best        int         not null default 0,
 
     -- Lives economy mirror (the canonical timer still lives on-device; this is
     -- the shareable count clans/friends can top up via life_gifts).
@@ -82,6 +89,9 @@ create table if not exists public.players (
     constraint players_highest_pos        check (highest_unlocked >= 1),
     constraint players_stars_nonneg       check (total_stars      >= 0),
     constraint players_coins_nonneg       check (coins_collected  >= 0),
+    constraint players_pinball_nonneg     check (pinball_best     >= 0),
+    constraint players_zen_nonneg         check (zen_seconds      >= 0),
+    constraint players_goldrush_nonneg    check (goldrush_best    >= 0),
     constraint players_lives_nonneg       check (lives            >= 0)
 );
 
@@ -103,12 +113,20 @@ create index if not exists players_climb_level_idx
 create index if not exists players_coins_idx
     on public.players (coins_collected desc);
 
+-- Minigame leaderboard sorts.
+create index if not exists players_pinball_idx  on public.players (pinball_best  desc);
+create index if not exists players_zen_idx      on public.players (zen_seconds   desc);
+create index if not exists players_goldrush_idx on public.players (goldrush_best desc);
+
 -- ── Migration for existing deployments ───────────────────────────────────
--- Run once on databases created before coins_collected existed. Safe + additive
--- (the column defaults to 0). MUST be applied before shipping the client build
--- that writes/reads coins_collected.
+-- Run once on databases created before these columns existed. Safe + additive
+-- (each defaults to 0). MUST be applied before shipping the client build that
+-- writes/reads them.
 alter table public.players
-    add column if not exists coins_collected int not null default 0;
+    add column if not exists coins_collected int not null default 0,
+    add column if not exists pinball_best     int not null default 0,
+    add column if not exists zen_seconds      int not null default 0,
+    add column if not exists goldrush_best    int not null default 0;
 
 -- =============================================================================
 -- Table: public.clans  — collaborative groups.

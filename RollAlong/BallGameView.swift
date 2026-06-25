@@ -209,6 +209,7 @@ struct BallGameView: View {
     @State private var coinPitDeadline:    Date? = nil
     @State private var coinPitLastRelease: Date? = nil
     @State private var coinPitReleased:    Int = 0
+    @State private var zenStart:           Date? = nil   // Zen Garden session start (time leaderboard)
     @State private var coinPitScore:       Int = 0
     @State private var coinPitOver:        Bool = false
 
@@ -632,11 +633,18 @@ struct BallGameView: View {
         .ignoresSafeArea()
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear  { motion.start(); clock.start(); AudioManager.shared.prepareIfNeeded() }
+        .onAppear  {
+            motion.start(); clock.start(); AudioManager.shared.prepareIfNeeded()
+            if activeMode.id == "zen" { zenStart = Date() }
+        }
         .onDisappear {
             motion.stop()
             clock.stop()
             refundUnplayedCoinPitBlocks()   // Gold Rush early-exit refund
+            if activeMode.id == "zen", let z = zenStart {
+                gameState.addZenSeconds(Int(Date().timeIntervalSince(z)))   // Zen time leaderboard + reward
+                zenStart = nil
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { clock.stop(); motion.stop() }
@@ -3749,6 +3757,7 @@ struct BallGameView: View {
         // End on target reached or time up; freeze the field for the payout.
         if coinPitScore >= target || now >= (coinPitDeadline ?? now) {
             coinPitOver = true
+            gameState.recordGoldRushCoins(coinPitScore)   // leaderboard + new-best bonus
             fallingCoins.removeAll()
         }
     }

@@ -36,25 +36,48 @@ struct LeaderboardView: View {
         var id: String { rawValue }
     }
 
-    /// Game whose board is shown.  Only Roll Along has data today; the rest are
-    /// scaffolded so the dropdown shows the full lineup (each shows a
-    /// "coming soon" state until its board is wired up).
+    /// Game whose board is shown — the climb plus three minigame boards, each
+    /// ranked by its own stat.
     private enum GameFilter: String, CaseIterable, Identifiable {
         case rollAlong = "Roll Along"
+        case pinball   = "Pinball"
+        case zenGarden = "Zen Garden"
         case goldRush  = "Gold Rush"
-        case sumo      = "Sumo Survival"
-        case koth      = "King of the Hill"
-        case paint     = "Paint Ball"
         var id: String { rawValue }
+
+        /// PostgREST order clause for this board.
+        var order: String {
+            switch self {
+            case .rollAlong: return "climb_level.desc,total_stars.desc"
+            case .pinball:   return "pinball_best.desc"
+            case .zenGarden: return "zen_seconds.desc"
+            case .goldRush:  return "goldrush_best.desc"
+            }
+        }
+        /// The ranking stat for a row (0 = hasn't played this game yet).
+        func stat(_ p: PlayerProfile) -> Int {
+            switch self {
+            case .rollAlong: return p.climbLevel
+            case .pinball:   return p.pinballBest ?? 0
+            case .zenGarden: return p.zenSeconds ?? 0
+            case .goldRush:  return p.goldrushBest ?? 0
+            }
+        }
     }
 
-    /// Rows re-sorted client-side by the active key.
+    /// Rows re-sorted client-side by the active key (Roll Along only).
     private var sortedRows: [PlayerProfile] {
         switch sortKey {
         case .level: return rows.sorted { ($0.climbLevel, $0.totalStars) > ($1.climbLevel, $1.totalStars) }
         case .stars: return rows.sorted { ($0.totalStars, $0.climbLevel) > ($1.totalStars, $1.climbLevel) }
         case .coins: return rows.sorted { (($0.coinsCollected ?? 0), $0.climbLevel) > (($1.coinsCollected ?? 0), $1.climbLevel) }
         }
+    }
+
+    /// What the list shows: Roll Along uses the client sort; the minigame boards
+    /// keep the server order and drop players who haven't played (stat 0).
+    private var displayRows: [PlayerProfile] {
+        selectedGame == .rollAlong ? sortedRows : rows.filter { selectedGame.stat($0) > 0 }
     }
 
     private var myId: UUID? { SocialClient.shared.currentUserId }
@@ -89,26 +112,28 @@ struct LeaderboardView: View {
             }
         }
         .task { await load() }
+        .onChange(of: selectedGame) { _, _ in
+            rows = []
+            Task { await load() }
+        }
     }
 
     // MARK: - Signed-in content
 
     @ViewBuilder
     private var content: some View {
-        if selectedGame != .rollAlong {
-            comingSoonState
-        } else if isLoading && rows.isEmpty {
+        if isLoading && rows.isEmpty {
             ProgressView()
                 .tint(.white)
                 .scaleEffect(1.2)
         } else if let errorText, rows.isEmpty {
             errorState(errorText)
-        } else if rows.isEmpty {
+        } else if displayRows.isEmpty {
             emptyState
         } else {
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(Array(sortedRows.enumerated()), id: \.element.id) { index, profile in
+                    ForEach(Array(displayRows.enumerated()), id: \.element.id) { index, profile in
                         leaderboardRow(rank: index + 1, profile: profile)
                     }
                 }
@@ -126,46 +151,27 @@ struct LeaderboardView: View {
         return HStack(spacing: 12) {
             rankBadge(rank)
 
-            // Name + top Roll Along level as a status chip — e.g. "Mac  20".
-            // No level word, no world name (those implied an XP/level system).
             Text(profile.displayName.isEmpty ? "Climber" : profile.displayName)
                 .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
-            Text("\(profile.climbLevel)")
-                .font(.system(.subheadline, design: .rounded).weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule().fill(world.accent.opacity(0.28))
-                        .overlay(Capsule().stroke(world.accent.opacity(0.65), lineWidth: 1))
-                )
+            // Roll Along shows the player's top level as a status chip ("Mac 20").
+            if selectedGame == .rollAlong {
+                Text("\(profile.climbLevel)")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(world.accent.opacity(0.28))
+                            .overlay(Capsule().stroke(world.accent.opacity(0.65), lineWidth: 1))
+                    )
+            }
 
             Spacer()
 
-            // Trailing stat reflects the active sort: coins when sorting by
-            // coins, otherwise stars.
-            if sortKey == .coins {
-                HStack(spacing: 4) {
-                    CoinIcon(size: 13)
-                    Text("\(profile.coinsCollected ?? 0)")
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(Color(white: 0.7))
-                        .monospacedDigit()
-                }
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                    Text("\(profile.totalStars)")
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(Color(white: 0.7))
-                        .monospacedDigit()
-                }
-            }
+            statTrailing(profile)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -186,6 +192,52 @@ struct LeaderboardView: View {
             + "level \(profile.climbLevel), \(profile.totalStars) stars."
             + (isMe ? " This is you." : "")
         )
+    }
+
+    /// The per-game stat shown at the trailing edge of a row.
+    @ViewBuilder
+    private func statTrailing(_ p: PlayerProfile) -> some View {
+        switch selectedGame {
+        case .rollAlong:
+            if sortKey == .coins { coinStat(p.coinsCollected ?? 0) } else { starStat(p.totalStars) }
+        case .pinball:
+            valueStat((p.pinballBest ?? 0).formatted(), system: "gamecontroller.fill",
+                      tint: Color(red: 0.30, green: 0.62, blue: 1.0))
+        case .zenGarden:
+            valueStat(Self.zenTime(p.zenSeconds ?? 0), system: "leaf.fill",
+                      tint: Color(red: 0.40, green: 0.82, blue: 0.55))
+        case .goldRush:
+            coinStat(p.goldrushBest ?? 0)
+        }
+    }
+
+    private func starStat(_ v: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "star.fill").font(.system(size: 11))
+                .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
+            Text("\(v)").font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color(white: 0.7)).monospacedDigit()
+        }
+    }
+    private func coinStat(_ v: Int) -> some View {
+        HStack(spacing: 4) {
+            CoinIcon(size: 13)
+            Text("\(v)").font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color(white: 0.7)).monospacedDigit()
+        }
+    }
+    private func valueStat(_ text: String, system: String, tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: system).font(.system(size: 11)).foregroundStyle(tint)
+            Text(text).font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color(white: 0.75)).monospacedDigit()
+        }
+    }
+    /// Seconds → "1h 23m" / "45m" / "30s".
+    private static func zenTime(_ s: Int) -> String {
+        if s >= 3600 { return "\(s / 3600)h \((s % 3600) / 60)m" }
+        if s >= 60   { return "\(s / 60)m" }
+        return "\(s)s"
     }
 
     // MARK: - Header (game filter + sort)
@@ -244,16 +296,6 @@ struct LeaderboardView: View {
                 )
         }
         .buttonStyle(.plain)
-    }
-
-    private var comingSoonState: some View {
-        messageBlock(
-            icon: "hourglass",
-            title: "\(selectedGame.rawValue) board coming soon",
-            message: "Roll Along's global ranking is live now. Competitive-mode leaderboards are on the way.",
-            actionTitle: nil,
-            action: nil
-        )
     }
 
     /// Medal disc for the top 3, plain numeral otherwise.
@@ -350,7 +392,7 @@ struct LeaderboardView: View {
         isLoading = true
         errorText = nil
         do {
-            rows = try await SocialClient.shared.fetchLeaderboard()
+            rows = try await SocialClient.shared.fetchLeaderboard(order: selectedGame.order)
         } catch {
             errorText = "The ranking server is unreachable right now. Pull to refresh or try again."
         }

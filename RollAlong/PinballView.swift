@@ -510,6 +510,7 @@ struct PinballView: View {
             awarded = true
             let banked = score / coinsPerScore
             if banked > 0 { gameState.addCoins(banked) }
+            gameState.recordPinballScore(score)   // leaderboard + new-best bonus
             AnalyticsClient.shared.track(
                 "pinball_game_over",
                 properties: ["score": .int(score),

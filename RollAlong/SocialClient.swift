@@ -102,6 +102,19 @@ final class SocialClient: @unchecked Sendable {
                            prefer: "return=minimal")
     }
 
+    /// Sync the minigame leaderboard stats (best Pinball score, total Zen
+    /// seconds, best Gold Rush haul).  Client-trusted, like the climb stats.
+    func syncMinigameStats(pinballBest: Int, zenSeconds: Int, goldrushBest: Int) async throws {
+        let me = try requireSession()
+        let body = MinigamePatch(pinball_best: pinballBest,
+                                 zen_seconds: zenSeconds,
+                                 goldrush_best: goldrushBest)
+        _ = try await send(method: "PATCH", path: "players",
+                           query: "id=eq.\(me.userId.uuidString)",
+                           bodyData: try encoder.encode(body),
+                           prefer: "return=minimal")
+    }
+
     /// Fetch a single profile by id (e.g. to show a friend's climb level).
     func fetchProfile(id: UUID) async throws -> PlayerProfile? {
         let data = try await send(method: "GET", path: "players",
@@ -111,11 +124,13 @@ final class SocialClient: @unchecked Sendable {
 
     // MARK: - Leaderboard
 
-    /// Top climbers, highest first.  Ties broken by stars.
-    func fetchLeaderboard(limit: Int = 100) async throws -> [PlayerProfile] {
-        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,coins_collected,lives"
-            + "&order=climb_level.desc,total_stars.desc"
-            + "&limit=\(limit)"
+    /// Leaderboard rows, ordered by `order` (a PostgREST order clause).  The
+    /// default is the climb board; minigame boards pass e.g. "pinball_best.desc".
+    func fetchLeaderboard(order: String = "climb_level.desc,total_stars.desc",
+                          limit: Int = 100) async throws -> [PlayerProfile] {
+        let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
+                 + "coins_collected,pinball_best,zen_seconds,goldrush_best,lives"
+        let query = "select=\(cols)&order=\(order)&limit=\(limit)"
         let data = try await send(method: "GET", path: "players", query: query)
         return try decode([PlayerProfile].self, from: data)
     }
@@ -393,6 +408,13 @@ struct PlayerProfile: Codable, Identifiable {
     // Lifetime coins picked up across levels. Optional so reads still decode on
     // pre-migration rows / queries that don't select it (treated as 0).
     var coinsCollected: Int?
+    // Minigame leaderboards (all optional / decode-resilient like coins):
+    //   pinballBest  — best single Pinball score
+    //   zenSeconds   — total seconds spent in Zen Garden
+    //   goldrushBest — most coins caught in one Gold Rush match
+    var pinballBest: Int?
+    var zenSeconds: Int?
+    var goldrushBest: Int?
     // Server-managed timestamps; present on reads, omitted on writes.
     var createdAt: String?
     var updatedAt: String?
@@ -406,6 +428,9 @@ struct PlayerProfile: Codable, Identifiable {
         case totalStars       = "total_stars"
         case lives
         case coinsCollected   = "coins_collected"
+        case pinballBest      = "pinball_best"
+        case zenSeconds       = "zen_seconds"
+        case goldrushBest     = "goldrush_best"
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
@@ -516,6 +541,12 @@ private struct ProgressPatch: Encodable {
     let highest_unlocked: Int
     let total_stars: Int
     let coins_collected: Int
+}
+
+private struct MinigamePatch: Encodable {
+    let pinball_best: Int
+    let zen_seconds: Int
+    let goldrush_best: Int
 }
 
 private struct GiftInsert: Encodable {

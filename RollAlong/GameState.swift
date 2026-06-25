@@ -186,6 +186,20 @@ final class GameState: ObservableObject {
         didSet { defaults.set(coinBalance, forKey: "ra_coinBalance") }
     }
 
+    // ── Minigame personal bests (drive the per-game leaderboards) ──────────
+    // pinballBest  — best single Pinball score.
+    // zenSeconds   — total seconds spent in Zen Garden (accumulates).
+    // goldrushBest — most coins caught in one Gold Rush match.
+    @Published var pinballBest: Int {
+        didSet { defaults.set(pinballBest, forKey: "ra_pinballBest") }
+    }
+    @Published var zenSeconds: Int {
+        didSet { defaults.set(zenSeconds, forKey: "ra_zenSeconds") }
+    }
+    @Published var goldrushBest: Int {
+        didSet { defaults.set(goldrushBest, forKey: "ra_goldrushBest") }
+    }
+
     /// Gold Rush tickets — earned one per competitive-minigame win, staked
     /// up front to buy a Gold Rush round (every time-ticket = 30 s on the
     /// clock; every coin-ticket adds +1x to the coins dropped).
@@ -406,6 +420,9 @@ final class GameState: ObservableObject {
         // displaying an absurd balance.
         coinBalance = min(max(0, defaults.integer(forKey: "ra_coinBalance")),
                           Self.maxCoinBalance)
+        pinballBest  = max(0, defaults.integer(forKey: "ra_pinballBest"))
+        zenSeconds   = max(0, defaults.integer(forKey: "ra_zenSeconds"))
+        goldrushBest = max(0, defaults.integer(forKey: "ra_goldrushBest"))
         tickets = min(max(0, defaults.integer(forKey: "ra_tickets")),
                       Self.maxTicketBalance)
         let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins", defaults)
@@ -743,6 +760,48 @@ final class GameState: ObservableObject {
             clamped = amount
         }
         coinBalance = min(coinBalance + clamped, Self.maxCoinBalance)
+    }
+
+    // MARK: - Minigame results (leaderboards + rewards)
+
+    /// Coin bonus paid for a new personal best on a minigame.
+    static let minigameBestBonus = 100
+
+    /// Publish the minigame personal bests to the leaderboard (no-op signed out).
+    func syncMinigameStats() {
+        guard SocialClient.shared.isSignedIn else { return }
+        let p = pinballBest, z = zenSeconds, g = goldrushBest
+        Task { try? await SocialClient.shared.syncMinigameStats(pinballBest: p, zenSeconds: z, goldrushBest: g) }
+    }
+
+    /// Record a finished Pinball game — updates the best + pays a new-best bonus.
+    @discardableResult
+    func recordPinballScore(_ s: Int) -> Bool {
+        guard s > 0 else { return false }
+        let isBest = s > pinballBest
+        if isBest { pinballBest = s; addCoins(Self.minigameBestBonus) }
+        syncMinigameStats()
+        return isBest
+    }
+
+    /// Record a Gold Rush haul — updates the best + pays a new-best bonus.
+    @discardableResult
+    func recordGoldRushCoins(_ c: Int) -> Bool {
+        guard c > 0 else { return false }
+        let isBest = c > goldrushBest
+        if isBest { goldrushBest = c; addCoins(Self.minigameBestBonus) }
+        syncMinigameStats()
+        return isBest
+    }
+
+    /// Add seconds spent in Zen Garden, pay a small capped time reward, and
+    /// publish the total to the leaderboard.
+    func addZenSeconds(_ s: Int) {
+        guard s > 0 else { return }
+        zenSeconds += s
+        let reward = min(s / 60, 15)   // ≤ 15 coins per session — recognition, not a grind
+        if reward > 0 { addCoins(reward) }
+        syncMinigameStats()
     }
 
     /// Spend coins.  Returns false (no-op) if balance is insufficient.
