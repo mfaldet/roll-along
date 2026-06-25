@@ -161,10 +161,10 @@ struct PinballView: View {
 final class PinballScene: SKScene, SKPhysicsContactDelegate {
 
     // ── Tuning constants (playtest these) ──────────────────────────────────
-    private let ballRadiusFrac:  CGFloat = 0.020   // of width — small ball
-    private let gravityY:        CGFloat = -5.0    // table-slope gravity
+    private let ballRadiusFrac:  CGFloat = 0.018   // of width — small ball
+    private let gravityY:        CGFloat = -6.0    // table-slope gravity
     private let ballMass:        CGFloat = 0.06
-    private let launchImpulse:   CGFloat = 7.5     // up the shooter lane
+    private let launchSpeedFrac:  CGFloat = 1.25   // launch speed = this × scene height
     private let bumperImpulse:   CGFloat = 4.0     // pop-bumper kick
     private let slingImpulse:    CGFloat = 3.0     // slingshot kick
     private let flipDuration:    Double  = 0.04    // smaller = snappier/stronger
@@ -258,23 +258,45 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func buildWalls() {
-        // Left wall + arched top + down to the right of the playfield.
-        addWall([(0.38,0.95),(0.06,0.95),(0.06,0.12),(0.16,0.05),
-                 (0.30,0.025),(0.45,0.018),(0.60,0.03),(0.74,0.07),(0.80,0.12)])
-        // Bottom-right + shooter-lane inner wall (gap at top for ball entry).
-        addWall([(0.51,0.95),(0.83,0.95),(0.83,0.20)])
-        // Shooter-lane outer wall + cap that steers the ball left into play.
-        addWall([(0.92,0.95),(0.92,0.13),(0.84,0.075),(0.78,0.085)])
+        // Curved perimeter traced from the CIRCUS / Big Show outline. The ball is
+        // fully enclosed except the centre drain gap (0.40–0.50) and the shooter-
+        // lane top exit.
+
+        // P1 — centre-drain-left → curved bottom-left funnel → left rail →
+        //       arched top → down to the inside-rail top.
+        let p1 = CGMutablePath()
+        p1.move(to: pt(0.40, 0.965))
+        p1.addQuadCurve(to: pt(0.05, 0.78), control: pt(0.13, 0.95))
+        p1.addLine(to: pt(0.05, 0.16))
+        p1.addQuadCurve(to: pt(0.28, 0.020), control: pt(0.05, 0.03))
+        p1.addQuadCurve(to: pt(0.66, 0.025), control: pt(0.46, 0.004))
+        p1.addQuadCurve(to: pt(0.84, 0.160), control: pt(0.83, 0.05))
+        addWallPath(p1)
+
+        // P2 — inside rail down + curved bottom-right funnel → centre-drain-right.
+        let p2 = CGMutablePath()
+        p2.move(to: pt(0.84, 0.16))
+        p2.addLine(to: pt(0.84, 0.78))
+        p2.addQuadCurve(to: pt(0.50, 0.965), control: pt(0.80, 0.95))
+        addWallPath(p2)
+
+        // P3 — shooter lane: lower divider, FLOOR (the backstop the ball rests on),
+        //       outer wall, and a curved cap that steers the launched ball left.
+        let p3 = CGMutablePath()
+        p3.move(to: pt(0.84, 0.78))
+        p3.addLine(to: pt(0.84, 0.95))
+        p3.addLine(to: pt(0.95, 0.95))
+        p3.addLine(to: pt(0.95, 0.13))
+        p3.addQuadCurve(to: pt(0.855, 0.045), control: pt(0.95, 0.05))
+        addWallPath(p3)
     }
 
-    private func addWall(_ frac: [(CGFloat, CGFloat)]) {
-        let pts = frac.map { pt($0.0, $0.1) }
-        let path = CGMutablePath()
-        path.addLines(between: pts)
+    private func addWallPath(_ path: CGPath) {
         let node = SKShapeNode(path: path)
         node.strokeColor = cWall
         node.lineWidth = 3
         node.lineJoin = .round
+        node.lineCap = .round
         let body = SKPhysicsBody(edgeChainFrom: path)
         body.categoryBitMask = Cat.wall
         body.friction = 0.1
@@ -285,7 +307,7 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
 
     private func buildBumpers() {
         let r = size.width * 0.05
-        for (fx, fy) in [(0.27,0.25),(0.445,0.20),(0.62,0.25)] {
+        for (fx, fy) in [(0.26,0.22),(0.44,0.195),(0.62,0.22)] {
             let node = SKShapeNode(circleOfRadius: r)
             node.fillColor = cBumper
             node.strokeColor = .white
@@ -309,9 +331,9 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func buildSlingshots() {
-        // Triangles above each flipper; kicker face toward the centre.
-        addSling([(0.24,0.74),(0.34,0.80),(0.24,0.82)])   // left
-        addSling([(0.65,0.74),(0.55,0.80),(0.65,0.82)])   // right
+        // Smaller triangles sitting just above each flipper; kicker toward centre.
+        addSling([(0.22,0.78),(0.30,0.83),(0.22,0.85)])   // left
+        addSling([(0.66,0.78),(0.58,0.83),(0.66,0.85)])   // right
     }
 
     private func addSling(_ frac: [(CGFloat, CGFloat)]) {
@@ -336,7 +358,7 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
 
     private func buildTargets() {
         let w = size.width * 0.016, h = size.height * 0.035
-        for (fx, fy) in [(0.09,0.40),(0.09,0.50),(0.80,0.40),(0.80,0.50)] {
+        for (fx, fy) in [(0.10,0.42),(0.10,0.50),(0.78,0.42),(0.78,0.50)] {
             let node = SKShapeNode(rectOf: CGSize(width: w, height: h), cornerRadius: 2)
             node.fillColor = cTarget
             node.strokeColor = .white
@@ -358,8 +380,8 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
         let r = size.width * 0.018
         // Top rollover lanes + the open central column (flush — ball passes over).
         let fracs: [(CGFloat, CGFloat)] = [
-            (0.30,0.10),(0.445,0.085),(0.59,0.10),
-            (0.445,0.40),(0.445,0.47),(0.445,0.54),(0.445,0.61),(0.445,0.68)
+            (0.30,0.09),(0.44,0.075),(0.58,0.09),
+            (0.44,0.40),(0.44,0.45),(0.44,0.50),(0.44,0.55),(0.44,0.60),(0.44,0.65),(0.44,0.70)
         ]
         for (fx, fy) in fracs {
             let node = SKShapeNode(circleOfRadius: r)
@@ -379,14 +401,14 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func buildFlippers() {
-        leftFlipper  = makeFlipper(pivot: pt(0.30, 0.875), dir:  1, rest: leftRest)
-        rightFlipper = makeFlipper(pivot: pt(0.59, 0.875), dir: -1, rest: rightRest)
+        leftFlipper  = makeFlipper(pivot: pt(0.28, 0.86), dir:  1, rest: leftRest)
+        rightFlipper = makeFlipper(pivot: pt(0.60, 0.86), dir: -1, rest: rightRest)
     }
 
     /// `dir` = +1 → bat extends right of the pivot; −1 → extends left.
     private func makeFlipper(pivot: CGPoint, dir: CGFloat, rest: CGFloat) -> SKShapeNode {
-        let len = size.width * 0.16
-        let thick = ballRadius * 1.1
+        let len = size.width * 0.18
+        let thick = ballRadius * 1.2
         let rect = CGRect(x: dir > 0 ? 0 : -len, y: -thick / 2, width: len, height: thick)
         let node = SKShapeNode(rect: rect, cornerRadius: thick / 2)
         node.fillColor = cFlipper
@@ -405,9 +427,10 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func buildDrain() {
+        // ONLY the centre gap between the flipper tips — not the whole width.
         let node = SKNode()
-        node.position = pt(0.445, 0.985)
-        let body = SKPhysicsBody(rectangleOf: CGSize(width: size.width * 0.95, height: size.height * 0.02))
+        node.position = pt(0.45, 0.97)
+        let body = SKPhysicsBody(rectangleOf: CGSize(width: size.width * 0.14, height: size.height * 0.015))
         body.isDynamic = false
         body.categoryBitMask = Cat.drain
         body.collisionBitMask = 0
@@ -425,7 +448,7 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
         node.fillColor = .white
         node.strokeColor = SKColor(white: 0.65, alpha: 1)
         node.lineWidth = 1
-        node.position = pt(0.875, 0.90)
+        node.position = pt(0.895, 0.92)        // resting on the lane floor (backstop)
         node.zPosition = 5
         let body = SKPhysicsBody(circleOfRadius: r)
         body.isDynamic = true
@@ -433,6 +456,7 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
         body.restitution = 0.18
         body.friction = 0.1
         body.linearDamping = 0.1
+        body.usesPreciseCollisionDetection = true   // no tunnelling at launch speed
         body.categoryBitMask = Cat.ball
         body.collisionBitMask = Cat.wall | Cat.flipper | Cat.bumper | Cat.sling | Cat.target
         body.contactTestBitMask = Cat.bumper | Cat.sling | Cat.target | Cat.rollover | Cat.drain
@@ -446,7 +470,8 @@ final class PinballScene: SKScene, SKPhysicsContactDelegate {
     private func launch() {
         guard awaitingLaunch, let b = ball?.physicsBody else { return }
         awaitingLaunch = false
-        b.applyImpulse(CGVector(dx: 0, dy: launchImpulse))
+        // Velocity-based launch is predictable regardless of mass/gravity scale.
+        b.velocity = CGVector(dx: 0, dy: size.height * launchSpeedFrac)
         pushModel()
     }
 
