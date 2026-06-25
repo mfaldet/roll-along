@@ -465,6 +465,26 @@ struct SettingsView: View {
 
                 Divider().background(Color(white: 0.22)).padding(.leading, 16)
 
+                Toggle(isOn: $gameState.introEnabled) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Opening Animation")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.75))
+                            Text("Play the cinematic intro when the app opens")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
+                    } icon: {
+                        Image(systemName: "movieclapper")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
+                .padding()
+
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+
                 VStack(alignment: .leading, spacing: 10) {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {

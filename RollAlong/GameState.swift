@@ -5,6 +5,7 @@ import SwiftUI
 // UserDefaults audit (QE2 §7) — all ra_* keys are non-sensitive game state.
 //
 // Keys written: ra_level, ra_skin, ra_name, ra_haptics, ra_sound,
+//   ra_introEnabled,
 //   ra_startAtTop, ra_minigameDifficulty, ra_seenOnboarding, ra_seenWelcomeMoment,
 //   ra_seenTutorialReward,
 //   ra_bestStars, ra_bestTime, ra_collectedCoins, ra_highestUnlocked,
@@ -41,6 +42,12 @@ final class GameState: ObservableObject {
     }
     @Published var soundEnabled: Bool {
         didSet { defaults.set(soundEnabled, forKey: "ra_sound") }
+    }
+    /// Plays the cinematic opening-credits intro on cold launch.  Defaults
+    /// OFF — pre-launch feature flag, flipped on from Settings once vetted
+    /// on-device.  See IntroView / ContentView.
+    @Published var introEnabled: Bool {
+        didSet { defaults.set(introEnabled, forKey: "ra_introEnabled") }
     }
     @Published var ballStartsAtTop: Bool {
         didSet { defaults.set(ballStartsAtTop, forKey: "ra_startAtTop") }
@@ -353,6 +360,7 @@ final class GameState: ObservableObject {
         playerName = defaults.string(forKey: "ra_name") ?? ""
         hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
+        introEnabled = defaults.object(forKey: "ra_introEnabled") as? Bool ?? false
         ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
         minigameDifficulty = MinigameDifficulty(
             rawValue: defaults.string(forKey: "ra_minigameDifficulty") ?? "") ?? .normal
