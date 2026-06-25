@@ -356,26 +356,36 @@ struct BallSkinView: View {
                     center: CGPoint(x: w * 0.32, y: h * 0.32),
                     startRadius: 0, endRadius: r * 1.30))
 
-            let dimpleR  = r * 0.075
-            let spacing  = dimpleR * 2.4
-            let rowCount = Int(ceil(h / spacing)) + 1
+            // Dimples on a hex grid, FORESHORTENED toward the rim (smaller as
+            // they wrap away from the viewer) so they read as a sphere, not a
+            // flat polka-dot disc.  Each is a concave well: a recessed shadow
+            // with the catch-light on the far (bottom-right) interior wall —
+            // the inverse of a raised bump, which is what sells "dimple".
+            let baseR    = r * 0.072
+            let spacing  = baseR * 2.1
+            let rowCount = Int(ceil(h / spacing)) + 2
+            let colCount = Int(ceil(w / spacing)) + 2
             for row in 0..<rowCount {
-                let isOddRow = row % 2 == 1
-                let y = CGFloat(row) * spacing + (isOddRow ? spacing / 2 : 0) - spacing / 2
-                let xOffset: CGFloat = isOddRow ? spacing / 2 : 0
-                let colCount = Int(ceil(w / spacing)) + 1
+                let isOdd = row % 2 == 1
+                let y = CGFloat(row) * spacing - spacing + (isOdd ? spacing / 2 : 0)
                 for col in 0..<colCount {
-                    let x  = CGFloat(col) * spacing + xOffset - spacing / 2
-                    let dx = x - cx
-                    let dy = y - cy
-                    if sqrt(dx * dx + dy * dy) > r * 0.93 { continue }
-                    ctx.fill(Path(ellipseIn: CGRect(x: x - dimpleR, y: y - dimpleR,
-                                                    width: dimpleR * 2, height: dimpleR * 2)),
-                             with: .color(Color.black.opacity(0.10)))
-                    let rimR = dimpleR * 0.55
-                    ctx.fill(Path(ellipseIn: CGRect(x: x + dimpleR * 0.15, y: y + dimpleR * 0.15,
-                                                    width: rimR * 2, height: rimR * 2)),
-                             with: .color(Color.white.opacity(0.55)))
+                    let x  = CGFloat(col) * spacing - spacing + (isOdd ? spacing / 2 : 0)
+                    let dx = x - cx, dy = y - cy
+                    let d  = sqrt(dx * dx + dy * dy)
+                    guard d < r * 0.95 else { continue }
+                    // 1 at centre → 0 at the rim: shrink + dim dimples as they curve away.
+                    let f  = sqrt(max(0, 1 - (d / r) * (d / r)))
+                    let dr = baseR * (0.35 + 0.65 * f)
+                    guard dr > 0.5 else { continue }
+                    // Recessed well — darker in the middle.
+                    ctx.fill(Path(ellipseIn: CGRect(x: x - dr, y: y - dr, width: dr * 2, height: dr * 2)),
+                        with: .radialGradient(Gradient(colors: [Color.black.opacity(0.22), .clear]),
+                            center: CGPoint(x: x, y: y), startRadius: 0, endRadius: dr))
+                    // Catch-light on the lit far wall (bottom-right) → concave read.
+                    let hlr = dr * 0.30
+                    ctx.fill(Path(ellipseIn: CGRect(x: x + dr * 0.30 - hlr, y: y + dr * 0.30 - hlr,
+                                                    width: hlr * 2, height: hlr * 2)),
+                             with: .color(Color.white.opacity(0.5 * f)))
                 }
             }
 
@@ -903,32 +913,34 @@ struct BallSkinView: View {
 
             let style = StrokeStyle(lineWidth: seamWidth, lineCap: .round)
 
-            // Left bow-arc: top-centre → bottom-centre, bowing left
+            // Classic basketball: a straight vertical meridian + horizontal
+            // equator (the centre cross), plus two meridians bowing out to the
+            // left and right — the eight-panel look everyone recognises.
+
+            // Vertical meridian (front seam), straight down the centre.
+            var vLine = Path()
+            vLine.move(to: CGPoint(x: cx, y: cy - r * 0.97))
+            vLine.addLine(to: CGPoint(x: cx, y: cy + r * 0.97))
+            ctx.stroke(vLine, with: .color(seam), style: style)
+
+            // Horizontal equator, straight across.
+            var hLine = Path()
+            hLine.move(to: CGPoint(x: cx - r * 0.97, y: cy))
+            hLine.addLine(to: CGPoint(x: cx + r * 0.97, y: cy))
+            ctx.stroke(hLine, with: .color(seam), style: style)
+
+            // Left meridian — top pole → bottom pole, bowing left.
             ctx.stroke(
-                qbPath(CGPoint(x: cx, y: cy - r * 0.94),
-                       CGPoint(x: cx - r * 0.72, y: cy),
-                       CGPoint(x: cx, y: cy + r * 0.94)),
+                qbPath(CGPoint(x: cx, y: cy - r * 0.92),
+                       CGPoint(x: cx - r * 0.82, y: cy),
+                       CGPoint(x: cx, y: cy + r * 0.92)),
                 with: .color(seam), style: style)
 
-            // Right bow-arc: mirrors left, bowing right
+            // Right meridian — mirrors left, bowing right.
             ctx.stroke(
-                qbPath(CGPoint(x: cx, y: cy - r * 0.94),
-                       CGPoint(x: cx + r * 0.72, y: cy),
-                       CGPoint(x: cx, y: cy + r * 0.94)),
-                with: .color(seam), style: style)
-
-            // Upper horizontal seam: left edge → right edge, curving upward
-            ctx.stroke(
-                qbPath(CGPoint(x: cx - r * 0.94, y: cy - r * 0.12),
-                       CGPoint(x: cx,             y: cy - r * 0.52),
-                       CGPoint(x: cx + r * 0.94, y: cy - r * 0.12)),
-                with: .color(seam), style: style)
-
-            // Lower horizontal seam: mirrors upper, curving downward
-            ctx.stroke(
-                qbPath(CGPoint(x: cx - r * 0.94, y: cy + r * 0.12),
-                       CGPoint(x: cx,             y: cy + r * 0.52),
-                       CGPoint(x: cx + r * 0.94, y: cy + r * 0.12)),
+                qbPath(CGPoint(x: cx, y: cy - r * 0.92),
+                       CGPoint(x: cx + r * 0.82, y: cy),
+                       CGPoint(x: cx, y: cy + r * 0.92)),
                 with: .color(seam), style: style)
 
             // Top gloss crescent
