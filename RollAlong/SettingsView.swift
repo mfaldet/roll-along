@@ -41,6 +41,7 @@ struct SettingsView: View {
                         climbLevel:      gameState.highestUnlocked,
                         highestUnlocked: gameState.highestUnlocked,
                         totalStars:      gameState.totalStars,
+                        coinsCollected:  gameState.totalCoins,
                         lives:           gameState.lives
                     )
                 }

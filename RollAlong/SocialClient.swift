@@ -70,6 +70,7 @@ final class SocialClient: @unchecked Sendable {
                          climbLevel: Int,
                          highestUnlocked: Int,
                          totalStars: Int,
+                         coinsCollected: Int,
                          lives: Int) async throws -> PlayerProfile {
         let me = try requireSession()
         let body = ProfileUpsert(id: me.userId,
@@ -77,6 +78,7 @@ final class SocialClient: @unchecked Sendable {
                                  climb_level: climbLevel,
                                  highest_unlocked: highestUnlocked,
                                  total_stars: totalStars,
+                                 coins_collected: coinsCollected,
                                  lives: lives)
         let data = try await send(method: "POST", path: "players",
                                   bodyData: try encoder.encode([body]),
@@ -88,11 +90,12 @@ final class SocialClient: @unchecked Sendable {
 
     /// Sync just the progression counters — the cheap, frequent write made when
     /// the player advances a level.  Patches the player's own row only.
-    func syncProgress(climbLevel: Int, highestUnlocked: Int, totalStars: Int) async throws {
+    func syncProgress(climbLevel: Int, highestUnlocked: Int, totalStars: Int, coinsCollected: Int) async throws {
         let me = try requireSession()
         let body = ProgressPatch(climb_level: climbLevel,
                                  highest_unlocked: highestUnlocked,
-                                 total_stars: totalStars)
+                                 total_stars: totalStars,
+                                 coins_collected: coinsCollected)
         _ = try await send(method: "PATCH", path: "players",
                            query: "id=eq.\(me.userId.uuidString)",
                            bodyData: try encoder.encode(body),
@@ -110,7 +113,7 @@ final class SocialClient: @unchecked Sendable {
 
     /// Top climbers, highest first.  Ties broken by stars.
     func fetchLeaderboard(limit: Int = 100) async throws -> [PlayerProfile] {
-        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives"
+        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,coins_collected,lives"
             + "&order=climb_level.desc,total_stars.desc"
             + "&limit=\(limit)"
         let data = try await send(method: "GET", path: "players", query: query)
@@ -387,6 +390,9 @@ struct PlayerProfile: Codable, Identifiable {
     var highestUnlocked: Int
     var totalStars: Int
     var lives: Int
+    // Lifetime coins picked up across levels. Optional so reads still decode on
+    // pre-migration rows / queries that don't select it (treated as 0).
+    var coinsCollected: Int?
     // Server-managed timestamps; present on reads, omitted on writes.
     var createdAt: String?
     var updatedAt: String?
@@ -399,6 +405,7 @@ struct PlayerProfile: Codable, Identifiable {
         case highestUnlocked  = "highest_unlocked"
         case totalStars       = "total_stars"
         case lives
+        case coinsCollected   = "coins_collected"
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
@@ -500,6 +507,7 @@ private struct ProfileUpsert: Encodable {
     let climb_level: Int
     let highest_unlocked: Int
     let total_stars: Int
+    let coins_collected: Int
     let lives: Int
 }
 
@@ -507,6 +515,7 @@ private struct ProgressPatch: Encodable {
     let climb_level: Int
     let highest_unlocked: Int
     let total_stars: Int
+    let coins_collected: Int
 }
 
 private struct GiftInsert: Encodable {

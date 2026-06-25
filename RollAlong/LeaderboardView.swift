@@ -29,11 +29,10 @@ struct LeaderboardView: View {
     @State private var sortKey:      SortKey    = .level
     @State private var selectedGame: GameFilter = .rollAlong
 
-    /// Which Roll Along stat the board ranks by.  Coins + Speed are requested
-    /// too, but the players table stores neither yet (see docs) — they'll join
-    /// once the backend records them.
+    /// Which Roll Along stat the board ranks by.  (Speed was dropped — we lean
+    /// on stars for skill.)
     private enum SortKey: String, CaseIterable, Identifiable {
-        case level = "Level", stars = "Stars"
+        case level = "Level", stars = "Stars", coins = "Coins"
         var id: String { rawValue }
     }
 
@@ -54,6 +53,7 @@ struct LeaderboardView: View {
         switch sortKey {
         case .level: return rows.sorted { ($0.climbLevel, $0.totalStars) > ($1.climbLevel, $1.totalStars) }
         case .stars: return rows.sorted { ($0.totalStars, $0.climbLevel) > ($1.totalStars, $1.climbLevel) }
+        case .coins: return rows.sorted { (($0.coinsCollected ?? 0), $0.climbLevel) > (($1.coinsCollected ?? 0), $1.climbLevel) }
         }
     }
 
@@ -145,15 +145,26 @@ struct LeaderboardView: View {
 
             Spacer()
 
-            // Stars — the secondary stat (and the key when sorting by stars).
-            HStack(spacing: 4) {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                Text("\(profile.totalStars)")
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color(white: 0.7))
-                    .monospacedDigit()
+            // Trailing stat reflects the active sort: coins when sorting by
+            // coins, otherwise stars.
+            if sortKey == .coins {
+                HStack(spacing: 4) {
+                    CoinIcon(size: 13)
+                    Text("\(profile.coinsCollected ?? 0)")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color(white: 0.7))
+                        .monospacedDigit()
+                }
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                    Text("\(profile.totalStars)")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color(white: 0.7))
+                        .monospacedDigit()
+                }
             }
         }
         .padding(.horizontal, 14)

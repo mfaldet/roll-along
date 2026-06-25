@@ -69,6 +69,9 @@ create table if not exists public.players (
     -- Secondary stats, also client-synced.
     highest_unlocked     int         not null default 1,
     total_stars          int         not null default 0,
+    -- Lifetime coins picked up across levels (the "coins collected" stat the
+    -- client shows in Replay Levels) — powers the leaderboard's Coins sort.
+    coins_collected      int         not null default 0,
 
     -- Lives economy mirror (the canonical timer still lives on-device; this is
     -- the shareable count clans/friends can top up via life_gifts).
@@ -78,6 +81,7 @@ create table if not exists public.players (
     constraint players_climb_level_pos    check (climb_level      >= 1),
     constraint players_highest_pos        check (highest_unlocked >= 1),
     constraint players_stars_nonneg       check (total_stars      >= 0),
+    constraint players_coins_nonneg       check (coins_collected  >= 0),
     constraint players_lives_nonneg       check (lives            >= 0)
 );
 
@@ -94,6 +98,17 @@ create trigger players_set_updated_at
 -- Leaderboard scans: highest climbers first.
 create index if not exists players_climb_level_idx
     on public.players (climb_level desc);
+
+-- Leaderboard "Coins" sort.
+create index if not exists players_coins_idx
+    on public.players (coins_collected desc);
+
+-- ── Migration for existing deployments ───────────────────────────────────
+-- Run once on databases created before coins_collected existed. Safe + additive
+-- (the column defaults to 0). MUST be applied before shipping the client build
+-- that writes/reads coins_collected.
+alter table public.players
+    add column if not exists coins_collected int not null default 0;
 
 -- =============================================================================
 -- Table: public.clans  — collaborative groups.

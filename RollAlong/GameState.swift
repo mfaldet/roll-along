@@ -475,11 +475,13 @@ final class GameState: ObservableObject {
         let climb = highestUnlocked
         let unlocked = highestUnlocked
         let stars = totalStars
+        let coins = totalCoins
         Task {
             try? await SocialClient.shared.syncProgress(
                 climbLevel: climb,
                 highestUnlocked: unlocked,
-                totalStars: stars
+                totalStars: stars,
+                coinsCollected: coins
             )
         }
     }
