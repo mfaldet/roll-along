@@ -71,58 +71,60 @@ enum PinballMaps {
 
     static let builtin: [PinballMap] = [
 
-        // 1 — Classic (original 3-bumper layout)
+        // Every layout is mirror-symmetric about the playable centre (x≈0.44 —
+        // the launch lane occupies the right edge), so each table reads planned.
+
+        // 1 — Classic: a clean 3-bumper triangle
         PinballMap(name: "Classic",
-                   bumperFracs: [(0.30, 0.24), (0.58, 0.18), (0.42, 0.40)]),
+                   bumperFracs: [(0.44, 0.15), (0.29, 0.31), (0.59, 0.31)]),
 
-        // 2 — Diamond: 4 bumpers in a diamond shape
+        // 2 — Diamond: 4 bumpers in a diamond
         PinballMap(name: "Diamond",
-                   bumperFracs: [(0.40, 0.13), (0.22, 0.27), (0.58, 0.27), (0.40, 0.41)]),
+                   bumperFracs: [(0.44, 0.12), (0.26, 0.28), (0.62, 0.28), (0.44, 0.44)]),
 
-        // 3 — Spread: 5 bumpers in a wide fan across the top
+        // 3 — Spread: a symmetric fan across the top
         PinballMap(name: "Spread",
-                   bumperFracs: [(0.13, 0.22), (0.30, 0.14), (0.50, 0.20), (0.70, 0.14), (0.40, 0.36)]),
+                   bumperFracs: [(0.44, 0.13), (0.28, 0.20), (0.60, 0.20), (0.16, 0.30), (0.72, 0.30)]),
 
-        // 4 — Cluster: 6 bumpers tightly packed in the upper centre
+        // 4 — Cluster: a hexagon in the upper centre
         PinballMap(name: "Cluster",
-                   bumperFracs: [(0.30, 0.17), (0.50, 0.15), (0.70, 0.22),
-                                 (0.38, 0.30), (0.58, 0.30), (0.20, 0.32)]),
+                   bumperFracs: [(0.44, 0.12), (0.27, 0.18), (0.61, 0.18),
+                                 (0.27, 0.32), (0.61, 0.32), (0.44, 0.38)]),
 
-        // 5 — Cross: 4 bumpers in a plus (+) shape
+        // 5 — Cross: a plus (+)
         PinballMap(name: "Cross",
-                   bumperFracs: [(0.40, 0.13), (0.18, 0.26), (0.62, 0.26), (0.40, 0.39)]),
+                   bumperFracs: [(0.44, 0.13), (0.24, 0.27), (0.44, 0.27), (0.64, 0.27), (0.44, 0.41)]),
 
-        // 6 — Two Rows: 6 bumpers arranged in two horizontal rows of 3
+        // 6 — Two Rows: two horizontal rows of 3
         PinballMap(name: "Two Rows",
-                   bumperFracs: [(0.18, 0.16), (0.40, 0.16), (0.62, 0.16),
-                                 (0.18, 0.34), (0.40, 0.34), (0.62, 0.34)]),
+                   bumperFracs: [(0.26, 0.16), (0.44, 0.16), (0.62, 0.16),
+                                 (0.26, 0.33), (0.44, 0.33), (0.62, 0.33)]),
 
-        // 7 — Zigzag: 5 bumpers in a staggered column pattern
+        // 7 — Zigzag: top trio + a flanking lower pair
         PinballMap(name: "Zigzag",
-                   bumperFracs: [(0.15, 0.14), (0.35, 0.26), (0.55, 0.14), (0.72, 0.26), (0.38, 0.40)]),
+                   bumperFracs: [(0.20, 0.15), (0.44, 0.15), (0.68, 0.15), (0.32, 0.31), (0.56, 0.31)]),
 
-        // 8 — Centre Post: Classic 3 bumpers + one lone post mid-field
+        // 8 — Centre Post: a diamond with a lower post
         PinballMap(name: "Centre Post",
-                   bumperFracs: [(0.30, 0.24), (0.58, 0.18), (0.42, 0.40), (0.42, 0.58)]),
+                   bumperFracs: [(0.44, 0.14), (0.28, 0.28), (0.60, 0.28), (0.44, 0.46)]),
 
-        // 9 — Wide Ring: 6 bumpers around the outer ring of the play area
+        // 9 — Wide Ring: a hexagonal ring framing the play area
         PinballMap(name: "Wide Ring",
-                   bumperFracs: [(0.12, 0.16), (0.35, 0.10), (0.62, 0.14),
-                                 (0.72, 0.30), (0.62, 0.44), (0.12, 0.38)]),
+                   bumperFracs: [(0.44, 0.11), (0.22, 0.21), (0.66, 0.21),
+                                 (0.22, 0.37), (0.66, 0.37), (0.44, 0.45)]),
 
-        // 10 — Funnel: 4 bumpers forming two converging pairs
+        // 10 — Funnel: two converging pairs
         PinballMap(name: "Funnel",
-                   bumperFracs: [(0.15, 0.13), (0.65, 0.13), (0.28, 0.34), (0.55, 0.34)]),
+                   bumperFracs: [(0.22, 0.14), (0.66, 0.14), (0.32, 0.33), (0.56, 0.33)]),
 
-        // 11 — Triangle: 3 bumpers in an equilateral triangle
+        // 11 — Triangle: a wide-based triangle
         PinballMap(name: "Triangle",
-                   bumperFracs: [(0.40, 0.13), (0.22, 0.38), (0.58, 0.38)]),
+                   bumperFracs: [(0.44, 0.13), (0.24, 0.39), (0.64, 0.39)]),
 
-        // 12 — Chaos: 8 bumpers scattered across the field
-        PinballMap(name: "Chaos",
-                   bumperFracs: [(0.14, 0.13), (0.44, 0.11), (0.68, 0.18),
-                                 (0.26, 0.26), (0.58, 0.28), (0.18, 0.40),
-                                 (0.66, 0.42), (0.40, 0.50)]),
+        // 12 — Lattice: a symmetric six-bumper lattice
+        PinballMap(name: "Lattice",
+                   bumperFracs: [(0.30, 0.14), (0.58, 0.14), (0.44, 0.24),
+                                 (0.22, 0.32), (0.66, 0.32), (0.44, 0.43)]),
     ]
 }
 

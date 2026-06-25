@@ -33,13 +33,13 @@ struct PinballView: View {
 
     // MARK: - Tunables
 
-    private let ballRadius:    CGFloat = 8         // smaller ball → the playfield feels larger
+    private let ballRadius:    CGFloat = 9         // small ball → the playfield feels larger
     private let gravity:       CGFloat = 980        // downward pull, points per second^2
     private let drag:          CGFloat = 0.999      // gentle air damping per tick
     private let maxSpeed:      CGFloat = 1_400
     private let wallBounce:    CGFloat = 0.82
 
-    private let bumperRadius:  CGFloat = 27
+    private let bumperRadius:  CGFloat = 18         // smaller pop bumpers
     private let bumperRest:    CGFloat = 0.90
     private let bumperPop:     CGFloat = 380         // floor on speed right after a bumper kick
     private let bumperScore         = 500
@@ -52,9 +52,9 @@ struct PinballView: View {
     private let bankBonus            = 2500           // clearing the whole drop-target bank
     private let maxMultiplier        = 5
 
-    private let flipperLenFrac: CGFloat = 0.26       // of field width — shorter, so the flick can't slip past the ball
-    private let flipperThickness: CGFloat = 7         // visual half-thickness
-    private let flipperHitThickness: CGFloat = 11     // collision band (wider than the look) — resists tunnelling
+    private let flipperLenFrac: CGFloat = 0.21       // of field width — shorter, so the flick can't slip past the ball
+    private let flipperThickness: CGFloat = 6         // visual half-thickness
+    private let flipperHitThickness: CGFloat = 9      // collision band (wider than the look) — resists tunnelling
     private let flipperRest:    CGFloat = 0.32        // restitution off a still flipper
     private let restAngleDeg:   CGFloat = 26          // tip down-and-inward at rest
     private let activeAngleDeg: CGFloat = -24         // tip swings up when flicked
@@ -82,9 +82,10 @@ struct PinballView: View {
         var litTicks = 0
     }
 
-    /// An angled kicker just above each flipper — bounces the ball back into
-    /// play (keeps it alive) and scores.
-    private struct Sling { var a: CGPoint = .zero; var b: CGPoint = .zero; var litTicks = 0 }
+    /// A triangular slingshot above each flipper.  `a`→`b` is the kicker face
+    /// (the inner, ball-facing edge used for collision); `base` is the third
+    /// triangle vertex toward the wall, for rendering the solid rubber wedge.
+    private struct Sling { var a: CGPoint = .zero; var b: CGPoint = .zero; var base: CGPoint = .zero; var litTicks = 0 }
 
     /// A drop target in the upper bank.  Lighting the whole bank bumps the
     /// score multiplier and pays a bonus, then the bank resets.
@@ -93,7 +94,7 @@ struct PinballView: View {
     private static let ballTint   = Color(red: 0.85, green: 0.88, blue: 0.95)
     private static let flipperTint = Color(red: 0.25, green: 0.62, blue: 1.00)
     private static let bumperTint = Color(red: 1.00, green: 0.62, blue: 0.28)
-    private static let slingTint  = Color(red: 0.40, green: 0.85, blue: 0.55)
+    private static let slingTint  = Color(red: 0.90, green: 0.28, blue: 0.34)   // rubber-red kickers
     private static let targetTint = Color(red: 1.00, green: 0.85, blue: 0.30)
 
     // MARK: - State
@@ -141,6 +142,7 @@ struct PinballView: View {
                 ZStack {
                     Color.clear
                     playfield
+                    playfieldDetail
                     laneDivider
                     ForEach(targets) { targetView($0) }
                     ForEach(bumpers) { bumperView($0).position($0.pos) }
@@ -195,6 +197,49 @@ struct PinballView: View {
             .position(x: field.midX, y: field.midY)
     }
 
+    /// Cosmetic playfield art — depth glow, the top feeder arch, symmetric
+    /// rollover-lane guides and a framing arc.  Purely decorative (no physics).
+    private var playfieldDetail: some View {
+        let w = field.width, h = field.height
+        let cx = (field.minX + dividerX) / 2          // centre of the playable area
+        return ZStack {
+            Color.clear                                // fill geo so Paths use absolute coords
+            // Soft depth glow toward the upper-centre.
+            RoundedRectangle(cornerRadius: 16)
+                .fill(RadialGradient(colors: [Color(white: 0.18).opacity(0.7), .clear],
+                                     center: UnitPoint(x: 0.42, y: 0.26),
+                                     startRadius: 0, endRadius: max(w, h) * 0.7))
+                .frame(width: w, height: h)
+                .position(x: field.midX, y: field.midY)
+
+            // Top feeder arch — the curve the ball follows out of the launch lane.
+            Path { p in
+                p.move(to: CGPoint(x: dividerX, y: dividerTopY))
+                p.addQuadCurve(to: CGPoint(x: field.minX + w * 0.07, y: field.minY + h * 0.06),
+                               control: CGPoint(x: cx + w * 0.10, y: field.minY - h * 0.03))
+            }
+            .stroke(Color(white: 0.34), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+
+            // Rollover top-lane guides (decorative, symmetric about the centre).
+            ForEach(0..<3, id: \.self) { i in
+                let lx = cx + w * (CGFloat(i) - 1) * 0.16
+                Path { p in
+                    p.move(to: CGPoint(x: lx, y: field.minY + h * 0.085))
+                    p.addLine(to: CGPoint(x: lx, y: field.minY + h * 0.17))
+                }
+                .stroke(Color(white: 0.27), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+
+            // Faint arc framing the bumper zone.
+            Path { p in
+                p.addArc(center: CGPoint(x: cx, y: field.minY + h * 0.44), radius: w * 0.34,
+                         startAngle: .degrees(208), endAngle: .degrees(332), clockwise: false)
+            }
+            .stroke(Color(white: 0.17), lineWidth: 1.5)
+        }
+        .allowsHitTesting(false)
+    }
+
     private var laneDivider: some View {
         Path { p in
             p.move(to: CGPoint(x: dividerX, y: field.maxY))
@@ -205,10 +250,16 @@ struct PinballView: View {
 
     private func slingView(_ s: Sling) -> some View {
         let lit = s.litTicks > 0
-        return Path { p in p.move(to: s.a); p.addLine(to: s.b) }
-            .stroke(lit ? Color.white : Self.slingTint,
-                    style: StrokeStyle(lineWidth: slingThickness * 2, lineCap: .round))
-            .shadow(color: Self.slingTint.opacity(lit ? 0.9 : 0.4), radius: lit ? 8 : 3)
+        let tri = Path { p in p.move(to: s.a); p.addLine(to: s.b); p.addLine(to: s.base); p.closeSubpath() }
+        return tri
+            .fill(lit ? Color.white : Self.slingTint)
+            .overlay(tri.stroke(Color.white.opacity(0.40), lineWidth: 1))
+            .overlay(
+                Path { p in p.move(to: s.a); p.addLine(to: s.b) }   // the kicker face
+                    .stroke(lit ? Color.white : Color.white.opacity(0.85),
+                            style: StrokeStyle(lineWidth: slingThickness * 0.7, lineCap: .round))
+            )
+            .shadow(color: Self.slingTint.opacity(lit ? 0.8 : 0.35), radius: lit ? 8 : 3)
     }
 
     private func targetView(_ t: Target) -> some View {
@@ -417,8 +468,8 @@ struct PinballView: View {
                        height: size.height - topReserve - bottom)
 
         flipperLen = field.width * flipperLenFrac
-        let flipperY = field.maxY - field.height * 0.10
-        let pivotInset = field.width * 0.17   // pivots nudged inward so the shorter bats still close the drain
+        let flipperY = field.maxY - field.height * 0.095
+        let pivotInset = field.width * 0.21   // inset like a real table — leaves outlanes beside the flippers
         leftPivot  = CGPoint(x: field.minX + pivotInset, y: flipperY)
         rightPivot = CGPoint(x: field.maxX - pivotInset, y: flipperY)
 
@@ -427,24 +478,26 @@ struct PinballView: View {
         dividerTopY = field.minY + field.height * 0.32
         laneCenterX = field.maxX - laneWidth / 2
 
-        // Slingshots — angled kickers above + outboard of each flipper that
-        // throw the ball back into play.
-        let slBotY = flipperY - field.height * 0.05
-        let slTopY = flipperY - field.height * 0.17
-        leftSling  = Sling(a: CGPoint(x: field.minX + field.width * 0.05, y: slBotY),
-                           b: CGPoint(x: leftPivot.x + field.width * 0.03, y: slTopY))
-        rightSling = Sling(a: CGPoint(x: dividerX - field.width * 0.05, y: slBotY),
-                           b: CGPoint(x: rightPivot.x - field.width * 0.03, y: slTopY))
+        // Triangular slingshots above each flipper — the kicker face (a→b)
+        // faces up-and-inward, so the ball bounces off it back into the field.
+        let w = field.width, h = field.height
+        leftSling = Sling(
+            a:    CGPoint(x: leftPivot.x + w * 0.03, y: flipperY - h * 0.155),
+            b:    CGPoint(x: leftPivot.x + w * 0.09, y: flipperY - h * 0.03),
+            base: CGPoint(x: leftPivot.x - w * 0.07, y: flipperY - h * 0.05))
+        rightSling = Sling(
+            a:    CGPoint(x: rightPivot.x - w * 0.03, y: flipperY - h * 0.155),
+            b:    CGPoint(x: rightPivot.x - w * 0.09, y: flipperY - h * 0.03),
+            base: CGPoint(x: rightPivot.x + w * 0.07, y: flipperY - h * 0.05))
 
-        // Drop-target bank — a row across the mid-field; clearing every target
-        // bumps the score multiplier and pays a bonus, then resets.
-        let tW = field.width * 0.11, tH = field.height * 0.022
-        let tY = field.minY + field.height * 0.55
-        let span = field.width * 0.52
-        let startX = field.midX - span / 2
+        // Drop-target bank — a tidy row centred in the playable area (left of the
+        // launch lane).  Clearing it bumps the multiplier + pays a bonus.
+        let playMidX = (field.minX + dividerX) / 2
+        let tW = w * 0.075, tH = h * 0.016
+        let span = w * 0.46
         targets = (0..<4).map { i in
-            let cxp = startX + span * CGFloat(i) / 3.0
-            return Target(rect: CGRect(x: cxp - tW / 2, y: tY, width: tW, height: tH))
+            let cxp = playMidX - span / 2 + span * CGFloat(i) / 3.0
+            return Target(rect: CGRect(x: cxp - tW / 2, y: field.minY + h * 0.52, width: tW, height: tH))
         }
 
         applyBumpers()
