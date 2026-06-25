@@ -1,836 +1,564 @@
-import SwiftUI
+//  PinballView.swift
+//  Roll Along — Pinball minigame.
+//
+//  REBUILD (Sprint 1–2): scrapped the hand-rolled SwiftUI-Canvas version and
+//  rebuilt the table on SpriteKit's real 2D physics engine. The layout is a
+//  to-scale reading of the Gottlieb CIRCUS / BIG SHOW electromechanical
+//  wedgehead playfield chart: open lower-centre, three pop bumpers up top, a
+//  central column of flush rollover buttons, standup targets down the sides,
+//  rebound slingshots above two flippers, a shooter lane on the right, and a
+//  rounded top arch.
+//
+//  This file is intentionally self-contained (SwiftUI host + SKScene + model)
+//  so it needs no new project files. Physics feel is governed by the clearly
+//  marked tuning constants near the top of PinballScene — those want a
+//  device playtest pass (can't tune blind).
 
-// ===========================================================================
-// PinballView — the "Pinball" mode.
-//
-// Classic single-ball pinball, NO tilt.  Gravity pulls the ball down a vertical
-// playfield; you tap the LEFT half of the screen to flick the left flipper and
-// the RIGHT half to flick the right one.  Knock the ball into the pop bumpers
-// up top to rack up score, and keep it alive off the flippers.  Three balls,
-// then the run ends and your score converts to coins.
-//
-// Single-player by construction: there is no AI and no second device — it is
-// you against gravity and the drain.
-//
-// Copyright-safe: this is generic pinball (flippers, pop bumpers, a plunger
-// lane, a centre drain).  Game mechanics are not copyrightable; only specific
-// creative expression is.  No trademarked table names, manufacturer marks, or
-// licensed themes appear here, and all art is drawn from primitives.
-//
-// SAFE BY CONSTRUCTION: an isolated file.  It reuses only PhysicsClock and the
-// coin / skin economy on GameState; it touches nothing in the climb engine and
-// deliberately does NOT use BallMotion (this mode ignores tilt).  Reached only
-// when HomeView routes `.mode("pinball")` here and PinballMode is flagged on.
-//
-// FEEL IS TUNABLE: every gameplay number lives in the "Tunables" block.
-// ===========================================================================
+import SwiftUI
+import SpriteKit
+
+// MARK: - Observable bridge (scene → SwiftUI HUD)
+
+final class PinballModel: ObservableObject {
+    @Published var score          = 0
+    @Published var ballsLeft       = 3
+    @Published var awaitingLaunch  = true
+    @Published var isOver          = false
+}
+
+// MARK: - SwiftUI host
 
 struct PinballView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
-    @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var clock = PhysicsClock()
 
-    // MARK: - Tunables
-
-    private let ballRadius:    CGFloat = 9         // small ball → the playfield feels larger
-    private let gravity:       CGFloat = 980        // downward pull, points per second^2
-    private let drag:          CGFloat = 0.999      // gentle air damping per tick
-    private let maxSpeed:      CGFloat = 1_400
-    private let wallBounce:    CGFloat = 0.82
-
-    private let bumperRadius:  CGFloat = 18         // smaller pop bumpers
-    private let bumperRest:    CGFloat = 0.90
-    private let bumperPop:     CGFloat = 380         // floor on speed right after a bumper kick
-    private let bumperScore         = 500
-
-    private let slingThickness: CGFloat = 7
-    private let slingRest:      CGFloat = 0.55
-    private let slingPop:       CGFloat = 320         // outward kick off a slingshot
-    private let slingScore           = 150
-    private let targetScore          = 300
-    private let bankBonus            = 2500           // clearing the whole drop-target bank
-    private let maxMultiplier        = 5
-
-    private let flipperLenFrac: CGFloat = 0.21       // of field width — shorter, so the flick can't slip past the ball
-    private let flipperThickness: CGFloat = 6         // visual half-thickness
-    private let flipperHitThickness: CGFloat = 9      // collision band (wider than the look) — resists tunnelling
-    private let flipperRest:    CGFloat = 0.32        // restitution off a still flipper
-    private let restAngleDeg:   CGFloat = 26          // tip down-and-inward at rest
-    private let activeAngleDeg: CGFloat = -24         // tip swings up when flicked
-    private let flickGain:      CGFloat = 2.6         // multiplier on the bat's upward surface speed (the kick)
-    private let flickDuration       = 9               // ticks a flick stays "up"
-
-    private let launchSpeed:    CGFloat = 1_180       // plunger kick up the lane
-    private let curvePush:      CGFloat = 1_500       // curved lane top nudges ball into play
-
-    private let startingBalls       = 3
-    private let coinsPerScore       = 250             // coins = score / this
-
-    private let topReserve: CGFloat = 120             // HUD breathing room at the top
-
-    // MARK: - Model
-
-    private struct BallBody {
-        var pos: CGPoint = .zero
-        var vel: CGVector = .zero
-    }
-
-    private struct Bumper: Identifiable {
-        let id = UUID()
-        var pos: CGPoint
-        var litTicks = 0
-    }
-
-    /// A triangular slingshot above each flipper.  `a`→`b` is the kicker face
-    /// (the inner, ball-facing edge used for collision); `base` is the third
-    /// triangle vertex toward the wall, for rendering the solid rubber wedge.
-    private struct Sling { var a: CGPoint = .zero; var b: CGPoint = .zero; var base: CGPoint = .zero; var litTicks = 0 }
-
-    /// A drop target in the upper bank.  Lighting the whole bank bumps the
-    /// score multiplier and pays a bonus, then the bank resets.
-    private struct Target: Identifiable { let id = UUID(); var rect: CGRect; var lit = false; var litTicks = 0 }
-
-    private static let ballTint   = Color(red: 0.85, green: 0.88, blue: 0.95)
-    private static let flipperTint = Color(red: 0.25, green: 0.62, blue: 1.00)
-    private static let bumperTint = Color(red: 1.00, green: 0.62, blue: 0.28)
-    private static let slingTint  = Color(red: 0.90, green: 0.28, blue: 0.34)   // rubber-red kickers
-    private static let targetTint = Color(red: 1.00, green: 0.85, blue: 0.30)
-
-    // MARK: - State
-
-    @State private var field: CGRect = .zero
-    @State private var ball = BallBody()
-    @State private var bumpers: [Bumper] = []
-    @State private var leftSling  = Sling()
-    @State private var rightSling = Sling()
-    @State private var targets: [Target] = []
-    @State private var multiplier = 1
-
-    // Derived geometry, filled by layout().
-    @State private var leftPivot:   CGPoint = .zero
-    @State private var rightPivot:  CGPoint = .zero
-    @State private var flipperLen:  CGFloat = 0
-    @State private var dividerX:    CGFloat = 0
-    @State private var dividerTopY: CGFloat = 0
-    @State private var laneCenterX: CGFloat = 0
-
-    @State private var leftFlickTicks  = 0
-    @State private var rightFlickTicks = 0
-    @State private var touchActive     = false   // one flick per finger-press
-
-    @State private var score      = 0
-    @State private var ballsLeft  = 3
-    @State private var ballInPlay = false
-
-    @State private var started = false
-    @State private var isOver  = false
-    @State private var awarded = false
-    @State private var localTick = 0
-
-    @State private var mapIndex    = 0
-    @State private var showMapName = false
-
-    // MARK: - Body
+    @StateObject private var model = PinballModel()
+    @State private var scene = PinballScene(size: CGSize(width: 393, height: 760))
+    @State private var didSubmit = false
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(white: 0.07), Color(white: 0.03)],
-                           startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            Color(white: 0.05).ignoresSafeArea()
 
-            GeometryReader { geo in
-                ZStack {
-                    Color.clear
-                    playfield
-                    playfieldDetail
-                    laneDivider
-                    ForEach(targets) { targetView($0) }
-                    ForEach(bumpers) { bumperView($0).position($0.pos) }
-                    slingView(leftSling)
-                    slingView(rightSling)
-                    flipperPath(isLeft: true)
-                    flipperPath(isLeft: false)
-                    ballView
+            SpriteView(scene: scene, options: [.ignoresSiblingOrder])
+                .ignoresSafeArea()
+
+            VStack {
+                topBar
+                Spacer()
+                if model.awaitingLaunch && !model.isOver {
+                    Text("Tap to launch")
+                        .font(.system(.headline, design: .rounded).weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .background(Capsule().fill(.black.opacity(0.5)))
+                        .padding(.bottom, 60)
                 }
-                .contentShape(Rectangle())
-                .onAppear { layout(geo.size); reset() }
-                .onChange(of: geo.size) { _, newSize in
-                    let wasEmpty = bumpers.isEmpty
-                    layout(newSize)
-                    if wasEmpty { reset() }
-                }
-                .gesture(
-                    // Fire on touch-DOWN (not lift) so the flippers feel instant;
-                    // one action per touch via `touchActive`.
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { v in
-                            if !touchActive { touchActive = true; handleTap(at: v.startLocation) }
-                        }
-                        .onEnded { _ in touchActive = false }
-                )
             }
 
-            topBar
-            if !started && !isOver { startPrompt }
-            if isOver { gameOverOverlay }
-            if showMapName && !isOver { mapNameLabel }
+            if model.isOver { gameOverOverlay }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .onReceive(clock.$tickCount) { _ in tick() }
-        .onAppear { clock.start() }
-        .onDisappear { clock.stop() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { clock.stop() }
-            else if phase == .active && started && !isOver { clock.start() }
+        .onAppear {
+            scene.scaleMode = .resizeFill
+            scene.model = model
+            scene.hapticsEnabled = gameState.hapticsEnabled
+        }
+        .onChange(of: model.isOver) { _, over in
+            if over { submitScore() }
         }
     }
-
-    // MARK: - Render
-
-    private var playfield: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(LinearGradient(colors: [Color(white: 0.12), Color(white: 0.08)],
-                                 startPoint: .top, endPoint: .bottom))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(white: 0.22), lineWidth: 1.5))
-            .frame(width: field.width, height: field.height)
-            .position(x: field.midX, y: field.midY)
-    }
-
-    /// Cosmetic playfield art — depth glow, the top feeder arch, symmetric
-    /// rollover-lane guides and a framing arc.  Purely decorative (no physics).
-    private var playfieldDetail: some View {
-        let w = field.width, h = field.height
-        let cx = (field.minX + dividerX) / 2          // centre of the playable area
-        return ZStack {
-            Color.clear                                // fill geo so Paths use absolute coords
-            // Soft depth glow toward the upper-centre.
-            RoundedRectangle(cornerRadius: 16)
-                .fill(RadialGradient(colors: [Color(white: 0.18).opacity(0.7), .clear],
-                                     center: UnitPoint(x: 0.42, y: 0.26),
-                                     startRadius: 0, endRadius: max(w, h) * 0.7))
-                .frame(width: w, height: h)
-                .position(x: field.midX, y: field.midY)
-
-            // Top feeder arch — the curve the ball follows out of the launch lane.
-            Path { p in
-                p.move(to: CGPoint(x: dividerX, y: dividerTopY))
-                p.addQuadCurve(to: CGPoint(x: field.minX + w * 0.07, y: field.minY + h * 0.06),
-                               control: CGPoint(x: cx + w * 0.10, y: field.minY - h * 0.03))
-            }
-            .stroke(Color(white: 0.34), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-
-            // Rollover top-lane guides (decorative, symmetric about the centre).
-            ForEach(0..<3, id: \.self) { i in
-                let lx = cx + w * (CGFloat(i) - 1) * 0.16
-                Path { p in
-                    p.move(to: CGPoint(x: lx, y: field.minY + h * 0.085))
-                    p.addLine(to: CGPoint(x: lx, y: field.minY + h * 0.17))
-                }
-                .stroke(Color(white: 0.27), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            }
-
-            // Faint arc framing the bumper zone.
-            Path { p in
-                p.addArc(center: CGPoint(x: cx, y: field.minY + h * 0.44), radius: w * 0.34,
-                         startAngle: .degrees(208), endAngle: .degrees(332), clockwise: false)
-            }
-            .stroke(Color(white: 0.17), lineWidth: 1.5)
-        }
-        .allowsHitTesting(false)
-    }
-
-    private var laneDivider: some View {
-        Path { p in
-            p.move(to: CGPoint(x: dividerX, y: field.maxY))
-            p.addLine(to: CGPoint(x: dividerX, y: dividerTopY))
-        }
-        .stroke(Color(white: 0.30), style: StrokeStyle(lineWidth: 5, lineCap: .round))
-    }
-
-    private func slingView(_ s: Sling) -> some View {
-        let lit = s.litTicks > 0
-        let tri = Path { p in p.move(to: s.a); p.addLine(to: s.b); p.addLine(to: s.base); p.closeSubpath() }
-        return tri
-            .fill(lit ? Color.white : Self.slingTint)
-            .overlay(tri.stroke(Color.white.opacity(0.40), lineWidth: 1))
-            .overlay(
-                Path { p in p.move(to: s.a); p.addLine(to: s.b) }   // the kicker face
-                    .stroke(lit ? Color.white : Color.white.opacity(0.85),
-                            style: StrokeStyle(lineWidth: slingThickness * 0.7, lineCap: .round))
-            )
-            .shadow(color: Self.slingTint.opacity(lit ? 0.8 : 0.35), radius: lit ? 8 : 3)
-    }
-
-    private func targetView(_ t: Target) -> some View {
-        let on = t.lit || t.litTicks > 0
-        return RoundedRectangle(cornerRadius: 3)
-            .fill(on ? Self.targetTint : Color(white: 0.28))
-            .frame(width: t.rect.width, height: t.rect.height)
-            .overlay(RoundedRectangle(cornerRadius: 3)
-                .stroke(Self.targetTint.opacity(on ? 0.95 : 0.40), lineWidth: 1))
-            .shadow(color: Self.targetTint.opacity(on ? 0.7 : 0), radius: on ? 6 : 0)
-            .position(x: t.rect.midX, y: t.rect.midY)
-    }
-
-    private func bumperView(_ b: Bumper) -> some View {
-        let lit = b.litTicks > 0
-        return ZStack {
-            Circle()
-                .fill(RadialGradient(colors: [Self.bumperTint.opacity(lit ? 1.0 : 0.85),
-                                              Self.bumperTint.opacity(0.35)],
-                                     center: .init(x: 0.4, y: 0.35),
-                                     startRadius: 1, endRadius: bumperRadius * 1.3))
-            Circle().stroke(.white.opacity(lit ? 0.95 : 0.45), lineWidth: lit ? 4 : 2)
-        }
-        .frame(width: bumperRadius * 2, height: bumperRadius * 2)
-        .shadow(color: Self.bumperTint.opacity(lit ? 0.7 : 0.0), radius: lit ? 14 : 0)
-    }
-
-    private func flipperPath(isLeft: Bool) -> some View {
-        let pivot = isLeft ? leftPivot : rightPivot
-        let tip = currentTip(isLeft: isLeft)
-        return Path { p in
-            p.move(to: pivot)
-            p.addLine(to: tip)
-        }
-        .stroke(Self.flipperTint,
-                style: StrokeStyle(lineWidth: flipperThickness * 2, lineCap: .round))
-        .shadow(color: Self.flipperTint.opacity(0.5), radius: 4)
-    }
-
-    private var ballView: some View {
-        BallSkinView(skin: gameState.activeSkin, diameter: ballRadius * 2)
-            .frame(width: ballRadius * 2, height: ballRadius * 2)
-            .shadow(color: .black.opacity(0.5), radius: 4, x: 1, y: 2)
-            .position(ball.pos)
-            .opacity(ballInPlay ? 1 : (started ? 0.85 : 1))
-    }
-
-    // MARK: - HUD / overlays
 
     private var topBar: some View {
-        VStack {
-            HStack(alignment: .top) {
-                Button { nav.goHome() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(Circle().fill(Color(white: 0.16)))
-                }
-                Spacer()
-                VStack(spacing: 3) {
-                    Text("\(score)")
-                        .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .monospacedDigit()
-                    Text("SCORE")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .tracking(2)
-                        .foregroundStyle(Color(white: 0.5))
-                    if multiplier > 1 {
-                        Text("×\(multiplier)")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(Self.targetTint)
-                            .padding(.horizontal, 8).padding(.vertical, 2)
-                            .background(Capsule().fill(Self.targetTint.opacity(0.18)))
-                            .padding(.top, 2)
-                    }
-                }
-                Spacer()
-                ballsPip
+        HStack {
+            Button { nav.goHome() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(.black.opacity(0.45)))
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 8)
             Spacer()
-        }
-    }
-
-    private var ballsPip: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            HStack(spacing: 4) {
-                ForEach(0..<startingBalls, id: \.self) { i in
+            VStack(spacing: 0) {
+                Text("\(model.score)")
+                    .font(.system(.title2, design: .rounded).weight(.heavy))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                Text("SCORE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(Color(white: 0.6))
+            }
+            Spacer()
+            HStack(spacing: 5) {
+                ForEach(0..<3, id: \.self) { i in
                     Circle()
-                        .fill(i < ballsLeft ? Self.ballTint : Color(white: 0.22))
+                        .fill(i < model.ballsLeft ? Color.white : Color(white: 0.3))
                         .frame(width: 9, height: 9)
                 }
             }
-            Text("BALLS")
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                .tracking(2)
-                .foregroundStyle(Color(white: 0.5))
+            .frame(width: 34)
         }
-        .frame(width: 52, alignment: .trailing)
-    }
-
-    private var mapNameLabel: some View {
-        VStack {
-            Spacer().frame(height: topReserve + 6)
-            Text(PinballMaps.maps[mapIndex % PinballMaps.maps.count].name)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(white: 0.60))
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(Capsule().fill(Color(white: 0.14)))
-            Spacer()
-        }
-        .transition(.opacity)
-        .allowsHitTesting(false)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation(.easeOut(duration: 0.5)) { showMapName = false }
-            }
-        }
-    }
-
-    private var startPrompt: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "hand.tap.fill")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(.white)
-            Text("Tap to launch")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Tap LEFT for the left flipper,\nRIGHT for the right.  No tilt — keep it alive!")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .multilineTextAlignment(.center)
-        }
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Pinball. Tap the left side of the screen for the left flipper, the right side for the right flipper. Keep the ball alive and score as high as you can. Tap anywhere to launch.")
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     private var gameOverOverlay: some View {
-        let banked = score / coinsPerScore
-        return ZStack {
-            Color.black.opacity(0.72).ignoresSafeArea()
-            VStack(spacing: 22) {
-                VStack(spacing: 6) {
-                    Text("Game Over")
-                        .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text("final score \(score)")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(white: 0.65))
+        ZStack {
+            Color.black.opacity(0.7).ignoresSafeArea()
+            VStack(spacing: 18) {
+                Text("Game Over")
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                    .foregroundStyle(.white)
+                VStack(spacing: 2) {
+                    Text("\(model.score)")
+                        .font(.system(size: 52, design: .rounded).weight(.black))
                         .monospacedDigit()
+                        .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
+                    Text("FINAL SCORE")
+                        .font(.system(size: 11, weight: .bold)).tracking(2)
+                        .foregroundStyle(Color(white: 0.6))
                 }
-
-                HStack(spacing: 12) {
-                    CoinIcon(size: 44)
-                        .shadow(color: Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.5), radius: 10)
-                    Text("+\(banked)")
-                        .font(.system(size: 52, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Plus \(banked) coins banked")
-                Text("coins banked")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                    .accessibilityHidden(true)
-
-                VStack(spacing: 12) {
-                    Button {
-                        mapIndex = (mapIndex + 1) % PinballMaps.maps.count
-                        reset()
-                    } label: {
-                        Text("Play Again")
-                            .font(.system(size: 21, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 15)
-                            .background(RoundedRectangle(cornerRadius: 18).fill(Self.flipperTint))
+                HStack(spacing: 14) {
+                    Button { playAgain() } label: {
+                        Text("Play again")
+                            .font(.system(.body, design: .rounded).weight(.bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 22).padding(.vertical, 12)
+                            .background(Capsule().fill(.white))
                     }
                     Button { nav.goHome() } label: {
                         Text("Home")
-                            .font(.system(size: 17, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(white: 0.85))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .font(.system(.body, design: .rounded).weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 22).padding(.vertical, 12)
+                            .background(Capsule().fill(Color(white: 0.22)))
                     }
                 }
-                .padding(.horizontal, 40)
             }
-            .padding(.horizontal, 28)
         }
     }
 
-    // MARK: - Geometry
-
-    private func layout(_ size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
-        let side: CGFloat = 12, bottom: CGFloat = 28
-        field = CGRect(x: side, y: topReserve,
-                       width: size.width - side * 2,
-                       height: size.height - topReserve - bottom)
-
-        flipperLen = field.width * flipperLenFrac
-        let flipperY = field.maxY - field.height * 0.095
-        let pivotInset = field.width * 0.21   // inset like a real table — leaves outlanes beside the flippers
-        leftPivot  = CGPoint(x: field.minX + pivotInset, y: flipperY)
-        rightPivot = CGPoint(x: field.maxX - pivotInset, y: flipperY)
-
-        let laneWidth = field.width * 0.11
-        dividerX = field.maxX - laneWidth
-        dividerTopY = field.minY + field.height * 0.32
-        laneCenterX = field.maxX - laneWidth / 2
-
-        // Triangular slingshots above each flipper — the kicker face (a→b)
-        // faces up-and-inward, so the ball bounces off it back into the field.
-        let w = field.width, h = field.height
-        leftSling = Sling(
-            a:    CGPoint(x: leftPivot.x + w * 0.03, y: flipperY - h * 0.155),
-            b:    CGPoint(x: leftPivot.x + w * 0.09, y: flipperY - h * 0.03),
-            base: CGPoint(x: leftPivot.x - w * 0.07, y: flipperY - h * 0.05))
-        rightSling = Sling(
-            a:    CGPoint(x: rightPivot.x - w * 0.03, y: flipperY - h * 0.155),
-            b:    CGPoint(x: rightPivot.x - w * 0.09, y: flipperY - h * 0.03),
-            base: CGPoint(x: rightPivot.x + w * 0.07, y: flipperY - h * 0.05))
-
-        // Drop-target bank — a tidy row centred in the playable area (left of the
-        // launch lane).  Clearing it bumps the multiplier + pays a bonus.
-        let playMidX = (field.minX + dividerX) / 2
-        let tW = w * 0.075, tH = h * 0.016
-        let span = w * 0.46
-        targets = (0..<4).map { i in
-            let cxp = playMidX - span / 2 + span * CGFloat(i) / 3.0
-            return Target(rect: CGRect(x: cxp - tW / 2, y: field.minY + h * 0.52, width: tW, height: tH))
-        }
-
-        applyBumpers()
+    private func submitScore() {
+        guard !didSubmit else { return }
+        didSubmit = true
+        let s = model.score
+        let banked = s / 250
+        if banked > 0 { gameState.addCoins(banked) }
+        gameState.recordPinballScore(s)
+        if gameState.hapticsEnabled { Haptics.success() }
     }
 
-    // MARK: - Lifecycle
-
-    private func reset() {
-        guard field.width > 0 else { return }
-        started = false
-        isOver = false
-        awarded = false
-        score = 0
-        ballsLeft = startingBalls
-        leftFlickTicks = 0
-        rightFlickTicks = 0
-        multiplier = 1
-        for i in targets.indices { targets[i].lit = false; targets[i].litTicks = 0 }
-        leftSling.litTicks = 0
-        rightSling.litTicks = 0
-        applyBumpers()
-        showMapName = true
-        placeBallInLane()
-    }
-
-    private func applyBumpers() {
-        guard field.width > 0 else { return }
-        let map = PinballMaps.maps[mapIndex % PinballMaps.maps.count]
-        bumpers = map.bumperFracs.map { xf, yf in
-            Bumper(pos: CGPoint(x: field.minX + field.width  * xf,
-                                y: field.minY + field.height * yf))
-        }
-    }
-
-    private func placeBallInLane() {
-        ball.pos = CGPoint(x: laneCenterX, y: field.maxY - ballRadius - 4)
-        ball.vel = .zero
-        ballInPlay = false
-    }
-
-    private func launchBall() {
-        ball.pos = CGPoint(x: laneCenterX, y: field.maxY - ballRadius - 4)
-        ball.vel = CGVector(dx: 0, dy: -launchSpeed)
-        ballInPlay = true
-        if gameState.hapticsEnabled { Haptics.medium() }
-    }
-
-    private func loseBall() {
-        ballInPlay = false
-        ballsLeft -= 1
-        if ballsLeft <= 0 {
-            endGame()
-        } else {
-            placeBallInLane()
-            if gameState.hapticsEnabled { Haptics.warning() }
-        }
-    }
-
-    private func endGame() {
-        guard !isOver else { return }
-        isOver = true
-        if !awarded {
-            awarded = true
-            let banked = score / coinsPerScore
-            if banked > 0 { gameState.addCoins(banked) }
-            gameState.recordPinballScore(score)   // leaderboard + new-best bonus
-            AnalyticsClient.shared.track(
-                "pinball_game_over",
-                properties: ["score": .int(score),
-                             "coins": .int(banked),
-                             "map_name": .string(PinballMaps.maps[mapIndex % PinballMaps.maps.count].name)]
-            )
-            if gameState.hapticsEnabled { Haptics.success() }
-        }
-    }
-
-    // MARK: - Input
-
-    private func handleTap(at p: CGPoint) {
-        if isOver { return }
-        if !started {
-            started = true
-            AnalyticsClient.shared.track(
-                "pinball_game_started",
-                properties: ["map_name": .string(PinballMaps.maps[mapIndex % PinballMaps.maps.count].name)]
-            )
-            launchBall()
-            return
-        }
-        if !ballInPlay { launchBall(); return }
-        if p.x < field.midX { flick(isLeft: true) } else { flick(isLeft: false) }
-    }
-
-    private func flick(isLeft: Bool) {
-        if isLeft { leftFlickTicks = flickDuration } else { rightFlickTicks = flickDuration }
-        if gameState.hapticsEnabled { Haptics.soft() }
-    }
-
-    // MARK: - Flipper geometry
-
-    private func currentTip(isLeft: Bool) -> CGPoint {
-        let ticks = isLeft ? leftFlickTicks : rightFlickTicks
-        let frac = CGFloat(ticks) / CGFloat(flickDuration)
-        return flipperTip(isLeft: isLeft, frac: frac)
-    }
-
-    private func flipperTip(isLeft: Bool, frac: CGFloat) -> CGPoint {
-        let pivot = isLeft ? leftPivot : rightPivot
-        let restA = restAngleDeg * .pi / 180
-        let actA  = activeAngleDeg * .pi / 180
-        let ang = restA + (actA - restA) * frac
-        let dx = cos(ang) * flipperLen * (isLeft ? 1 : -1)
-        let dy = sin(ang) * flipperLen
-        return CGPoint(x: pivot.x + dx, y: pivot.y + dy)
-    }
-
-    // MARK: - Simulation
-
-    private func tick() {
-        localTick &+= 1
-        guard started, !isOver, field.width > 0 else { return }
-
-        if leftFlickTicks > 0  { leftFlickTicks -= 1 }
-        if rightFlickTicks > 0 { rightFlickTicks -= 1 }
-        for i in bumpers.indices where bumpers[i].litTicks > 0 { bumpers[i].litTicks -= 1 }
-        if leftSling.litTicks > 0  { leftSling.litTicks -= 1 }
-        if rightSling.litTicks > 0 { rightSling.litTicks -= 1 }
-        for i in targets.indices where targets[i].litTicks > 0 { targets[i].litTicks -= 1 }
-
-        guard ballInPlay else { return }
-        let dt: CGFloat = 1.0 / 60.0
-
-        // Gravity + the curved lane top that feeds the ball into play.
-        ball.vel.dy += gravity * dt
-        if ball.pos.x > dividerX && ball.pos.y < dividerTopY {
-            ball.vel.dx -= curvePush * dt
-        }
-        ball.vel.dx *= drag
-        ball.vel.dy *= drag
-
-        let sp = hypot(ball.vel.dx, ball.vel.dy)
-        if sp > maxSpeed { let k = maxSpeed / sp; ball.vel.dx *= k; ball.vel.dy *= k }
-
-        ball.pos.x += ball.vel.dx * dt
-        ball.pos.y += ball.vel.dy * dt
-
-        collideWalls()
-        collideDivider()
-        collideBumpers()
-        collideSlings()
-        collideTargets()
-        collideFlipper(isLeft: true)
-        collideFlipper(isLeft: false)
-
-        if ball.pos.y - ballRadius > field.maxY { loseBall() }
-    }
-
-    private func collideWalls() {
-        let r = ballRadius
-        if ball.pos.x < field.minX + r {
-            ball.pos.x = field.minX + r; ball.vel.dx = abs(ball.vel.dx) * wallBounce
-        } else if ball.pos.x > field.maxX - r {
-            ball.pos.x = field.maxX - r; ball.vel.dx = -abs(ball.vel.dx) * wallBounce
-        }
-        if ball.pos.y < field.minY + r {
-            ball.pos.y = field.minY + r; ball.vel.dy = abs(ball.vel.dy) * wallBounce
-        }
-    }
-
-    /// One-way-ish lane wall: keeps the launching ball in the lane until it
-    /// clears the top, then keeps it in the playfield once it's crossed over.
-    private func collideDivider() {
-        guard ball.pos.y > dividerTopY else { return }
-        let r = ballRadius
-        let d = ball.pos.x - dividerX
-        guard abs(d) < r else { return }
-        if d >= 0 {
-            ball.pos.x = dividerX + r; ball.vel.dx = abs(ball.vel.dx) * wallBounce
-        } else {
-            ball.pos.x = dividerX - r; ball.vel.dx = -abs(ball.vel.dx) * wallBounce
-        }
-    }
-
-    /// Ball-vs-bumper overlap resolution.  O(n) in bumper count — see
-    /// `PinballMap` doc comment for the ≤ 8 cap rationale.
-    private func collideBumpers() {
-        let r = ballRadius
-        for i in bumpers.indices {
-            let dx = ball.pos.x - bumpers[i].pos.x
-            let dy = ball.pos.y - bumpers[i].pos.y
-            let dist = hypot(dx, dy)
-            let minD = r + bumperRadius
-            guard dist > 0, dist < minD else { continue }
-            let nx = dx / dist, ny = dy / dist
-            ball.pos.x = bumpers[i].pos.x + nx * minD
-            ball.pos.y = bumpers[i].pos.y + ny * minD
-            let vn = ball.vel.dx * nx + ball.vel.dy * ny
-            if vn < 0 {
-                ball.vel.dx -= (1 + bumperRest) * vn * nx
-                ball.vel.dy -= (1 + bumperRest) * vn * ny
-            }
-            let sp = hypot(ball.vel.dx, ball.vel.dy)
-            if sp < bumperPop {
-                let k = bumperPop / max(sp, 0.001)
-                ball.vel.dx *= k; ball.vel.dy *= k
-            }
-            score += bumperScore * multiplier
-            bumpers[i].litTicks = 12
-            if gameState.hapticsEnabled { Haptics.light() }
-        }
-    }
-
-    /// Slingshots — angled kickers that actively throw the ball back into play.
-    private func collideSlings() {
-        collideSling(&leftSling)
-        collideSling(&rightSling)
-    }
-
-    private func collideSling(_ s: inout Sling) {
-        let a = s.a, b = s.b
-        let vx = b.x - a.x, vy = b.y - a.y
-        let len2 = vx * vx + vy * vy
-        guard len2 > 0 else { return }
-        let wx = ball.pos.x - a.x, wy = ball.pos.y - a.y
-        let t = max(0, min(1, (wx * vx + wy * vy) / len2))
-        let qx = a.x + t * vx, qy = a.y + t * vy
-        let dx = ball.pos.x - qx, dy = ball.pos.y - qy
-        let dist = hypot(dx, dy)
-        let minD = ballRadius + slingThickness
-        guard dist > 0, dist < minD else { return }
-        let nx = dx / dist, ny = dy / dist
-        ball.pos.x = qx + nx * minD
-        ball.pos.y = qy + ny * minD
-        let vn = ball.vel.dx * nx + ball.vel.dy * ny
-        if vn < 0 {
-            ball.vel.dx -= (1 + slingRest) * vn * nx
-            ball.vel.dy -= (1 + slingRest) * vn * ny
-        }
-        // Active pop — kicks the ball off the face every time it touches.
-        ball.vel.dx += nx * slingPop
-        ball.vel.dy += ny * slingPop
-        score += slingScore * multiplier
-        s.litTicks = 10
-        if gameState.hapticsEnabled { Haptics.light() }
-    }
-
-    /// Drop targets — light one per hit; clearing the whole bank bumps the
-    /// multiplier, pays a bonus, and resets the bank for another go.
-    private func collideTargets() {
-        for i in targets.indices {
-            let rect = targets[i].rect
-            let cxp = min(max(ball.pos.x, rect.minX), rect.maxX)
-            let cyp = min(max(ball.pos.y, rect.minY), rect.maxY)
-            let dx = ball.pos.x - cxp, dy = ball.pos.y - cyp
-            let dist = hypot(dx, dy)
-            guard dist < ballRadius else { continue }
-            let nx = dist > 0 ? dx / dist : 0
-            let ny = dist > 0 ? dy / dist : -1
-            ball.pos.x = cxp + nx * ballRadius
-            ball.pos.y = cyp + ny * ballRadius
-            let vn = ball.vel.dx * nx + ball.vel.dy * ny
-            if vn < 0 {
-                ball.vel.dx -= 1.6 * vn * nx
-                ball.vel.dy -= 1.6 * vn * ny
-            }
-            targets[i].litTicks = 10
-            guard !targets[i].lit else { continue }
-            targets[i].lit = true
-            score += targetScore * multiplier
-            if targets.allSatisfy({ $0.lit }) {
-                multiplier = min(multiplier + 1, maxMultiplier)
-                score += bankBonus * multiplier
-                for j in targets.indices { targets[j].lit = false }
-            }
-            if gameState.hapticsEnabled { Haptics.light() }
-        }
-    }
-
-    /// Closest-point-on-segment collision against a flipper, plus a launch
-    /// impulse along the contact normal while the flipper is mid-flick.
-    private func collideFlipper(isLeft: Bool) {
-        let pivot = isLeft ? leftPivot : rightPivot
-        let tip = currentTip(isLeft: isLeft)
-        let vx = tip.x - pivot.x, vy = tip.y - pivot.y
-        let wx = ball.pos.x - pivot.x, wy = ball.pos.y - pivot.y
-        let len2 = vx * vx + vy * vy
-        let t = len2 > 0 ? max(0, min(1, (wx * vx + wy * vy) / len2)) : 0
-        let qx = pivot.x + t * vx, qy = pivot.y + t * vy
-        let dx = ball.pos.x - qx, dy = ball.pos.y - qy
-        let dist = hypot(dx, dy)
-        let minD = ballRadius + flipperHitThickness
-        guard dist < minD else { return }
-
-        let active = (isLeft ? leftFlickTicks : rightFlickTicks) > 0
-
-        // Standard contact normal (segment → ball).
-        let snx = dist > 0 ? dx / dist : 0
-        let sny = dist > 0 ? dy / dist : -1
-        // The bat's UP normal — perpendicular to the flipper, pointing into the
-        // playfield.  While flicking we ALWAYS resolve the ball to this top side
-        // so it launches up, never spiked down off the underside (the old bug).
-        let segLen = max(0.001, hypot(vx, vy))
-        var unx = -vy / segLen, uny = vx / segLen
-        if uny > 0 { unx = -unx; uny = -uny }
-
-        let nx = active ? unx : snx
-        let ny = active ? uny : sny
-        ball.pos.x = qx + nx * minD
-        ball.pos.y = qy + ny * minD
-
-        let vn = ball.vel.dx * nx + ball.vel.dy * ny
-        if vn < 0 {
-            ball.vel.dx -= (1 + flipperRest) * vn * nx
-            ball.vel.dy -= (1 + flipperRest) * vn * ny
-        }
-
-        if active {
-            // The kick = the swinging bat's surface speed at the contact point,
-            // directed up.  ω = swing angle / swing time; further out = harder.
-            let restA = restAngleDeg * .pi / 180
-            let actA  = activeAngleDeg * .pi / 180
-            let omega = abs(actA - restA) / (CGFloat(flickDuration) * (1.0 / 60.0))
-            let kick  = omega * (t * flipperLen) * flickGain
-            ball.vel.dx += unx * kick
-            ball.vel.dy += uny * kick
-        }
+    private func playAgain() {
+        didSubmit = false
+        scene.resetGame()
     }
 }
 
-#Preview {
-    NavigationStack {
-        PinballView()
-            .environmentObject(GameState())
-            .environmentObject(Navigator())
+// MARK: - SpriteKit scene (the table + physics)
+
+final class PinballScene: SKScene, SKPhysicsContactDelegate {
+
+    // ── Tuning constants (playtest these) ──────────────────────────────────
+    private let ballRadiusFrac:  CGFloat = 0.020   // of width — small ball
+    private let gravityY:        CGFloat = -5.0    // table-slope gravity
+    private let ballMass:        CGFloat = 0.06
+    private let launchImpulse:   CGFloat = 7.5     // up the shooter lane
+    private let bumperImpulse:   CGFloat = 4.0     // pop-bumper kick
+    private let slingImpulse:    CGFloat = 3.0     // slingshot kick
+    private let flipDuration:    Double  = 0.04    // smaller = snappier/stronger
+    // Flipper swing angles (radians). Left bat extends +x, right bat extends −x.
+    private let leftRest:  CGFloat = -0.50, leftFlip:  CGFloat =  0.34
+    private let rightRest: CGFloat =  0.50, rightFlip: CGFloat = -0.34
+
+    // ── Scoring (EM-style) ─────────────────────────────────────────────────
+    private let bumperScore   = 100
+    private let slingScore    = 10
+    private let targetScore   = 500
+    private let rolloverScore = 50
+
+    // ── Physics categories ─────────────────────────────────────────────────
+    private struct Cat {
+        static let ball:     UInt32 = 0x1 << 0
+        static let wall:     UInt32 = 0x1 << 1
+        static let flipper:  UInt32 = 0x1 << 2
+        static let bumper:   UInt32 = 0x1 << 3
+        static let sling:    UInt32 = 0x1 << 4
+        static let target:   UInt32 = 0x1 << 5
+        static let rollover: UInt32 = 0x1 << 6
+        static let drain:    UInt32 = 0x1 << 7
+    }
+
+    // ── Colours ────────────────────────────────────────────────────────────
+    private let cWall     = SKColor(white: 0.55, alpha: 1)
+    private let cBumper   = SKColor(red: 0.95, green: 0.55, blue: 0.15, alpha: 1)
+    private let cSling    = SKColor(red: 0.90, green: 0.28, blue: 0.34, alpha: 1)
+    private let cTarget   = SKColor(red: 0.30, green: 0.70, blue: 1.00, alpha: 1)
+    private let cRollover = SKColor(white: 0.80, alpha: 1)
+    private let cFlipper  = SKColor(red: 0.25, green: 0.55, blue: 1.00, alpha: 1)
+
+    // ── State ──────────────────────────────────────────────────────────────
+    weak var model: PinballModel?
+    var hapticsEnabled = true
+
+    private var score = 0
+    private var ballsLeft = 3
+    private var awaitingLaunch = true
+    private var isOver = false
+    private var built = false
+
+    private var ball: SKShapeNode?
+    private var leftFlipper: SKShapeNode?
+    private var rightFlipper: SKShapeNode?
+
+    // Normalised → scene point. fx: 0..1 left→right, fy: 0..1 TOP→bottom.
+    private func pt(_ fx: CGFloat, _ fy: CGFloat) -> CGPoint {
+        CGPoint(x: size.width * fx, y: size.height * (1 - fy))
+    }
+    private var ballRadius: CGFloat { size.width * ballRadiusFrac }
+
+    // MARK: Lifecycle
+
+    override func didMove(to view: SKView) {
+        backgroundColor = SKColor(red: 0.10, green: 0.11, blue: 0.16, alpha: 1)
+        physicsWorld.gravity = CGVector(dx: 0, dy: gravityY)
+        physicsWorld.contactDelegate = self
+    }
+
+    override func update(_ currentTime: TimeInterval) {
+        // Build once the view has given us a real size.
+        if !built && size.width > 4 {
+            built = true
+            buildTable()
+            spawnBall()
+            pushModel()
+        }
+    }
+
+    func resetGame() {
+        removeAllChildren()
+        ball = nil; leftFlipper = nil; rightFlipper = nil
+        score = 0; ballsLeft = 3; awaitingLaunch = true; isOver = false
+        buildTable()
+        spawnBall()
+        pushModel()
+    }
+
+    // MARK: Build
+
+    private func buildTable() {
+        buildWalls()
+        buildBumpers()
+        buildSlingshots()
+        buildTargets()
+        buildRollovers()
+        buildFlippers()
+        buildDrain()
+    }
+
+    private func buildWalls() {
+        // Left wall + arched top + down to the right of the playfield.
+        addWall([(0.38,0.95),(0.06,0.95),(0.06,0.12),(0.16,0.05),
+                 (0.30,0.025),(0.45,0.018),(0.60,0.03),(0.74,0.07),(0.80,0.12)])
+        // Bottom-right + shooter-lane inner wall (gap at top for ball entry).
+        addWall([(0.51,0.95),(0.83,0.95),(0.83,0.20)])
+        // Shooter-lane outer wall + cap that steers the ball left into play.
+        addWall([(0.92,0.95),(0.92,0.13),(0.84,0.075),(0.78,0.085)])
+    }
+
+    private func addWall(_ frac: [(CGFloat, CGFloat)]) {
+        let pts = frac.map { pt($0.0, $0.1) }
+        let path = CGMutablePath()
+        path.addLines(between: pts)
+        let node = SKShapeNode(path: path)
+        node.strokeColor = cWall
+        node.lineWidth = 3
+        node.lineJoin = .round
+        let body = SKPhysicsBody(edgeChainFrom: path)
+        body.categoryBitMask = Cat.wall
+        body.friction = 0.1
+        body.restitution = 0.2
+        node.physicsBody = body
+        addChild(node)
+    }
+
+    private func buildBumpers() {
+        let r = size.width * 0.05
+        for (fx, fy) in [(0.27,0.25),(0.445,0.20),(0.62,0.25)] {
+            let node = SKShapeNode(circleOfRadius: r)
+            node.fillColor = cBumper
+            node.strokeColor = .white
+            node.lineWidth = 2
+            node.position = pt(fx, fy)
+            node.name = "bumper"
+            // inner cap
+            let cap = SKShapeNode(circleOfRadius: r * 0.42)
+            cap.fillColor = SKColor(white: 0.12, alpha: 1)
+            cap.strokeColor = .clear
+            node.addChild(cap)
+            let body = SKPhysicsBody(circleOfRadius: r)
+            body.isDynamic = false
+            body.restitution = 0.5
+            body.categoryBitMask = Cat.bumper
+            body.collisionBitMask = Cat.ball
+            body.contactTestBitMask = Cat.ball
+            node.physicsBody = body
+            addChild(node)
+        }
+    }
+
+    private func buildSlingshots() {
+        // Triangles above each flipper; kicker face toward the centre.
+        addSling([(0.24,0.74),(0.34,0.80),(0.24,0.82)])   // left
+        addSling([(0.65,0.74),(0.55,0.80),(0.65,0.82)])   // right
+    }
+
+    private func addSling(_ frac: [(CGFloat, CGFloat)]) {
+        let pts = frac.map { pt($0.0, $0.1) }
+        let path = CGMutablePath()
+        path.addLines(between: pts)
+        path.closeSubpath()
+        let node = SKShapeNode(path: path)
+        node.fillColor = cSling
+        node.strokeColor = .white
+        node.lineWidth = 1
+        node.name = "sling"
+        let body = SKPhysicsBody(polygonFrom: path)
+        body.isDynamic = false
+        body.restitution = 0.4
+        body.categoryBitMask = Cat.sling
+        body.collisionBitMask = Cat.ball
+        body.contactTestBitMask = Cat.ball
+        node.physicsBody = body
+        addChild(node)
+    }
+
+    private func buildTargets() {
+        let w = size.width * 0.016, h = size.height * 0.035
+        for (fx, fy) in [(0.09,0.40),(0.09,0.50),(0.80,0.40),(0.80,0.50)] {
+            let node = SKShapeNode(rectOf: CGSize(width: w, height: h), cornerRadius: 2)
+            node.fillColor = cTarget
+            node.strokeColor = .white
+            node.lineWidth = 1
+            node.position = pt(fx, fy)
+            node.name = "target"
+            let body = SKPhysicsBody(rectangleOf: CGSize(width: w, height: h))
+            body.isDynamic = false
+            body.restitution = 0.3
+            body.categoryBitMask = Cat.target
+            body.collisionBitMask = Cat.ball
+            body.contactTestBitMask = Cat.ball
+            node.physicsBody = body
+            addChild(node)
+        }
+    }
+
+    private func buildRollovers() {
+        let r = size.width * 0.018
+        // Top rollover lanes + the open central column (flush — ball passes over).
+        let fracs: [(CGFloat, CGFloat)] = [
+            (0.30,0.10),(0.445,0.085),(0.59,0.10),
+            (0.445,0.40),(0.445,0.47),(0.445,0.54),(0.445,0.61),(0.445,0.68)
+        ]
+        for (fx, fy) in fracs {
+            let node = SKShapeNode(circleOfRadius: r)
+            node.fillColor = .clear
+            node.strokeColor = cRollover
+            node.lineWidth = 2
+            node.position = pt(fx, fy)
+            node.name = "rollover"
+            let body = SKPhysicsBody(circleOfRadius: r)
+            body.isDynamic = false
+            body.categoryBitMask = Cat.rollover
+            body.collisionBitMask = 0          // ball rolls over it
+            body.contactTestBitMask = Cat.ball
+            node.physicsBody = body
+            addChild(node)
+        }
+    }
+
+    private func buildFlippers() {
+        leftFlipper  = makeFlipper(pivot: pt(0.30, 0.875), dir:  1, rest: leftRest)
+        rightFlipper = makeFlipper(pivot: pt(0.59, 0.875), dir: -1, rest: rightRest)
+    }
+
+    /// `dir` = +1 → bat extends right of the pivot; −1 → extends left.
+    private func makeFlipper(pivot: CGPoint, dir: CGFloat, rest: CGFloat) -> SKShapeNode {
+        let len = size.width * 0.16
+        let thick = ballRadius * 1.1
+        let rect = CGRect(x: dir > 0 ? 0 : -len, y: -thick / 2, width: len, height: thick)
+        let node = SKShapeNode(rect: rect, cornerRadius: thick / 2)
+        node.fillColor = cFlipper
+        node.strokeColor = .white
+        node.lineWidth = 1
+        node.position = pivot
+        node.zRotation = rest
+        let body = SKPhysicsBody(rectangleOf: CGSize(width: len, height: thick),
+                                 center: CGPoint(x: dir * len / 2, y: 0))
+        body.isDynamic = false            // kinematic: we rotate it, it kicks the ball
+        body.categoryBitMask = Cat.flipper
+        body.collisionBitMask = Cat.ball
+        node.physicsBody = body
+        addChild(node)
+        return node
+    }
+
+    private func buildDrain() {
+        let node = SKNode()
+        node.position = pt(0.445, 0.985)
+        let body = SKPhysicsBody(rectangleOf: CGSize(width: size.width * 0.95, height: size.height * 0.02))
+        body.isDynamic = false
+        body.categoryBitMask = Cat.drain
+        body.collisionBitMask = 0
+        body.contactTestBitMask = Cat.ball
+        node.physicsBody = body
+        addChild(node)
+    }
+
+    // MARK: Ball
+
+    private func spawnBall() {
+        ball?.removeFromParent()
+        let r = ballRadius
+        let node = SKShapeNode(circleOfRadius: r)
+        node.fillColor = .white
+        node.strokeColor = SKColor(white: 0.65, alpha: 1)
+        node.lineWidth = 1
+        node.position = pt(0.875, 0.90)
+        node.zPosition = 5
+        let body = SKPhysicsBody(circleOfRadius: r)
+        body.isDynamic = true
+        body.mass = ballMass
+        body.restitution = 0.18
+        body.friction = 0.1
+        body.linearDamping = 0.1
+        body.categoryBitMask = Cat.ball
+        body.collisionBitMask = Cat.wall | Cat.flipper | Cat.bumper | Cat.sling | Cat.target
+        body.contactTestBitMask = Cat.bumper | Cat.sling | Cat.target | Cat.rollover | Cat.drain
+        node.physicsBody = body
+        ball = node
+        addChild(node)
+        awaitingLaunch = true
+        pushModel()
+    }
+
+    private func launch() {
+        guard awaitingLaunch, let b = ball?.physicsBody else { return }
+        awaitingLaunch = false
+        b.applyImpulse(CGVector(dx: 0, dy: launchImpulse))
+        pushModel()
+    }
+
+    // MARK: Flippers
+
+    private func flip(left: Bool, up: Bool) {
+        guard let node = left ? leftFlipper : rightFlipper else { return }
+        let rest = left ? leftRest : rightRest
+        let flipped = left ? leftFlip : rightFlip
+        node.removeAllActions()
+        node.run(.rotate(toAngle: up ? flipped : rest, duration: flipDuration, shortestUnitArc: true))
+        if up && hapticsEnabled { Haptics.light() }
+    }
+
+    // MARK: Touch input
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        for t in touches {
+            if awaitingLaunch { launch(); continue }
+            let x = t.location(in: self).x
+            flip(left: x < size.width / 2, up: true)
+        }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        for t in touches {
+            let x = t.location(in: self).x
+            flip(left: x < size.width / 2, up: false)
+        }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        flip(left: true, up: false)
+        flip(left: false, up: false)
+    }
+
+    // MARK: Contacts
+
+    func didBegin(_ contact: SKPhysicsContact) {
+        let a = contact.bodyA, b = contact.bodyB
+        let other = (a.categoryBitMask == Cat.ball) ? b : a
+        switch other.categoryBitMask {
+        case Cat.bumper:   hitBumper(other.node)
+        case Cat.sling:    hitSling(other.node)
+        case Cat.target:   hitScorer(other.node, points: targetScore, cooldown: 0.4)
+        case Cat.rollover: hitScorer(other.node, points: rolloverScore, cooldown: 0.4)
+        case Cat.drain:    drainBall()
+        default: break
+        }
+    }
+
+    private func hitBumper(_ node: SKNode?) {
+        guard let node = node, let bb = ball?.physicsBody, let ballNode = ball else { return }
+        kick(from: node.position, to: ballNode.position, body: bb, magnitude: bumperImpulse)
+        addScore(bumperScore)
+        flash(node)
+        if hapticsEnabled { Haptics.light() }
+    }
+
+    private func hitSling(_ node: SKNode?) {
+        guard let node = node, let bb = ball?.physicsBody, let ballNode = ball else { return }
+        kick(from: node.position, to: ballNode.position, body: bb, magnitude: slingImpulse)
+        addScore(slingScore)
+        flash(node)
+    }
+
+    /// Score a standup target / rollover, then briefly disable it so an
+    /// overlapping ball doesn't re-trigger every frame.
+    private func hitScorer(_ node: SKNode?, points: Int, cooldown: Double) {
+        guard let node = node, node.physicsBody?.contactTestBitMask != 0 else { return }
+        addScore(points)
+        flash(node)
+        node.physicsBody?.contactTestBitMask = 0
+        node.run(.sequence([.wait(forDuration: cooldown),
+                            .run { [weak node] in node?.physicsBody?.contactTestBitMask = Cat.ball }]))
+    }
+
+    private func drainBall() {
+        guard let b = ball else { return }
+        b.removeFromParent()
+        ball = nil
+        ballsLeft -= 1
+        if ballsLeft <= 0 {
+            isOver = true
+            pushModel()
+        } else {
+            spawnBall()
+        }
+    }
+
+    // MARK: Helpers
+
+    private func kick(from origin: CGPoint, to target: CGPoint, body: SKPhysicsBody, magnitude: CGFloat) {
+        let dx = target.x - origin.x, dy = target.y - origin.y
+        let len = max(hypot(dx, dy), 0.001)
+        body.applyImpulse(CGVector(dx: dx / len * magnitude, dy: dy / len * magnitude))
+    }
+
+    private func addScore(_ n: Int) {
+        score += n
+        model?.score = score
+    }
+
+    private func flash(_ node: SKNode) {
+        node.run(.sequence([.scale(to: 1.18, duration: 0.05),
+                            .scale(to: 1.0, duration: 0.09)]))
+    }
+
+    private func pushModel() {
+        model?.score = score
+        model?.ballsLeft = ballsLeft
+        model?.awaitingLaunch = awaitingLaunch
+        model?.isOver = isOver
     }
 }

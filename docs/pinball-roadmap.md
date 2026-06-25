@@ -1,11 +1,29 @@
 # Pinball Rebuild — Sprint Roadmap
 
-> Status: **Sprint 0 (Research & Blueprint) — in progress**
+> Status: **Sprints 1–2 — first working model committed (needs device build + feel tuning)**
 > Last updated: 2026-06-25
 
 The first pinball minigame (hand-rolled physics + primitive shapes in a SwiftUI
-`Canvas`) is being **scrapped and rebuilt from scratch**. This doc is the living
-plan; update the status column + the per-sprint checklists as we go.
+`Canvas`) was **scrapped and rebuilt from scratch on SpriteKit**. This doc is the
+living plan; update the status column + per-sprint checklists as we go.
+
+## v1 working model (built 2026-06-25)
+
+`RollAlong/PinballView.swift` was fully replaced with a self-contained SpriteKit
+build (SwiftUI host + `PinballScene` + `PinballModel` in one file — no new
+project files). The layout is a **to-scale reading of the CIRCUS / BIG SHOW
+chart**: open lower-centre, three pop bumpers up top, a central column of flush
+rollover buttons, standup targets down the sides, slingshot rebounds above two
+flippers, a right shooter lane, arched top. Real physics: `SKPhysicsBody` ball,
+edge-chain walls, kinematic flippers (tap left/right half), pop-bumper +
+slingshot impulses, drain + 3-ball loop, EM scoring (bumper 100 / sling 10 /
+target 500 / rollover 50) wired to `recordPinballScore`.
+
+**Open items (Mac builds + playtests, then we tune):** the physics-feel
+constants at the top of `PinballScene` (gravity, launch/bumper/sling impulses,
+flipper swing) are first-pass guesses — they need a device pass. Likely
+follow-ups: exact element positions vs. the chart, side outlanes, lit-bumper
+logic, art/lighting (Sprint 3).
 
 ## Locked decisions (2026-06-25)
 
@@ -62,9 +80,9 @@ Refs: [IPDB Gottlieb *Big Show*](https://www.ipdb.org/machine.cgi?id=277) ·
 
 | # | Sprint | Exit criteria | Status |
 |---|--------|---------------|--------|
-| 0 | Research & Blueprint | SpriteKit spike *feels* right; table blueprint + theme approved | 🟡 in progress |
-| 1 | Physics core & table shell | 3-ball loop (launch → flip → drain) on the real outline; tilt/nudge | ⚪ not started |
-| 2 | Scoring hardware | Bumpers, slingshots, drop/standup targets, spinner, rollovers all react + score | ⚪ not started |
+| 0 | Research & Blueprint | SpriteKit spike *feels* right; table blueprint + theme approved | 🟢 done |
+| 1 | Physics core & table shell | 3-ball loop (launch → flip → drain) on the real outline; tilt/nudge | 🟡 built (tuning + tilt pending) |
+| 2 | Scoring hardware | Bumpers, slingshots, standup targets, rollovers all react + score | 🟡 built (lit-bumper/bonus pending) |
 | 3 | Art, lighting & theme | Illustrated, lit playfield with inserts, rails, plastics, particle FX | ⚪ not started |
 | 4 | Modes, missions & depth | Rank progression, lit-sequence modes, multiball, jackpots | ⚪ fast-follow |
 | 5 | Audio, haptics & juice | Flipper clack, bumper ding, mode music, haptics, screen-shake | ⚪ fast-follow |
