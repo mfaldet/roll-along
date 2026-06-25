@@ -186,22 +186,21 @@ struct ClansView: View {
         let isMe  = (member.playerId == myId)
         return HStack(spacing: 14) {
             avatar(name, tint: world.accent)
-            VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
                 Text(name)
                     .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                HStack(spacing: 5) {
-                    Text("LVL \(level)")
-                        .font(.system(.caption, design: .rounded).weight(.bold))
-                        .foregroundStyle(Color(white: 0.6))
-                        .monospacedDigit()
-                    Circle().fill(world.accent).frame(width: 6, height: 6)
-                    Text(world.name)
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(Color(white: 0.5))
-                        .lineLimit(1)
-                }
+                Text("\(level)")
+                    .font(.system(.caption, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule().fill(world.accent.opacity(0.28))
+                            .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
+                    )
             }
             Spacer(minLength: 8)
             roleBadge(member.role)

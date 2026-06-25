@@ -98,7 +98,7 @@ struct ProfileView: View {
             // ── Badges row ───────────────────────────────────────────────
             HStack(spacing: 8) {
                 pillBadge(
-                    text: "Level \(gameState.currentLevel)",
+                    text: "\(gameState.currentLevel)",
                     bg: Color(red: 0.26, green: 0.16, blue: 0.58),
                     border: Color(red: 0.50, green: 0.38, blue: 0.90).opacity(0.55),
                     fg: .white
@@ -185,7 +185,7 @@ struct ProfileView: View {
     private var shareText: String {
         """
         My Roll Along stats 🎱
-        Level \(gameState.currentLevel) Climber
+        Top level \(gameState.currentLevel)
         ⭐ \(gameState.totalStars) stars earned
         🔥 \(gameState.liveStreak)-day streak
         🎨 \(gameState.completedBundleIDs.count) bundle\(gameState.completedBundleIDs.count == 1 ? "" : "s") complete

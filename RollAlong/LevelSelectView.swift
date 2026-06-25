@@ -224,7 +224,7 @@ struct LevelSelectView: View {
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                Text("\(world.name) · World \(world.index)")
+                Text("World \(world.index)")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(world.accent)
                     .lineLimit(1)
@@ -237,7 +237,7 @@ struct LevelSelectView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(name.isEmpty ? "Climber" : name), climb level \(level), "
-            + "World \(world.index), \(world.name)."
+            + "World \(world.index)."
         )
     }
 
@@ -273,15 +273,9 @@ struct LevelSelectView: View {
             RoundedRectangle(cornerRadius: 3)
                 .fill(world.accent)
                 .frame(width: 5, height: 34)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("WORLD \(world.index)")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .kerning(1.5)
-                    .foregroundStyle(Color(white: 0.55))
-                Text(world.name)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-            }
+            Text("World \(world.index)")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
             Spacer()
             Text("\(world.levelRange.lowerBound)–\(world.levelRange.upperBound)")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
