@@ -13,14 +13,16 @@ plan; update the status column + the per-sprint checklists as we go.
 |---|---|---|
 | **Engine** | **SpriteKit** (hosted in SwiftUI via `SpriteView`) | A real 2D physics engine — `SKPhysicsBody`, pinned-joint flippers, restitution, lighting, particles. The hand-rolled Canvas physics is the root cause of the bad feel/look. |
 | **Ambition** | **One great table first** | Sprints 0–3 + light modes → ship a polished single table. Modes/missions/multiball are a fast-follow (Sprint 4+). Quality on screen soonest. |
-| **Theme** | **Cosmic / space** | Homage to *3D Space Cadet* (Full Tilt! Pinball, Cinematronics/Maxis) and a match for Roll Along's planet / galaxy / nebula ball skins. |
+| **Theme** | **Roll Along brand** (NOT space) | *3D Space Cadet* is our reference for **how to build a correct, high-quality table** — its mechanics and polish — **not** a theme cue. The table wears Roll Along's own identity (e.g. the rollover lanes spell **ROLL**), not sci-fi/space. |
 
 ## The bar
 
-*3D Space Cadet* stature: a curved, illustrated, **lit** playfield — top arch,
-shooter lane, thumper-bumper cluster, rebound slingshots, inlanes/outlanes,
-rollover lanes, drop/standup targets, a spinner, a center sink ("wormhole"),
-ranks + missions, multiball. We hit the *look + feel* in v1, then the *depth*.
+*3D Space Cadet* **stature** — used as a reference for table correctness +
+quality + mechanics, **not theme**. A curved, illustrated, **lit** playfield:
+top arch, shooter lane, thumper-bumper cluster, rebound slingshots,
+inlanes/outlanes, rollover lanes, drop/standup targets, a spinner, a center
+scoop, ranks + missions, multiball. Branded **Roll Along** (not space). We hit
+the *look + feel* in v1, then the *depth*.
 
 ## What we keep vs. throw away
 
@@ -71,7 +73,7 @@ ranks + missions, multiball. We hit the *look + feel* in v1, then the *depth*.
 - [ ] Pop bumpers: radial impulse + score + lamp flash + ding.
 - [ ] Slingshots: triangular kickers, impulse + score.
 - [ ] Drop-target bank (bank-clear bonus + multiplier), standup targets, spinner.
-- [ ] Rollover lanes (W-A-R-P) → lane completion bonus / lane change.
+- [ ] Rollover lanes (ROLL) → lane completion bonus / lane change.
 - [ ] Bonus counter + playfield multiplier; combos.
 
 ### Sprint 3 — Art, lighting & theme  ⚪
@@ -89,10 +91,15 @@ ranks + missions, multiball. We hit the *look + feel* in v1, then the *depth*.
 
 ## Canonical element catalog (the blueprint, keyed)
 
-1. Plunger (variable-power launch) · 2. Shooter lane · 3. Top arch / ball guide ·
-4. Rollover lanes (W-A-R-P) · 5. Left & right orbits · 6. Pop bumpers (×3) ·
-7. Spinner lane · 8. Drop-target bank · 9. Wormhole (center sink) ·
-10. Slingshots (×2) · 11. Inlanes / outlanes · 12. Flippers (lower ×2 + 1 upper).
+1. Plunger (variable-power launch) · 2. Shooter lane · 3. Top arch · 4. Rollover
+lanes (**ROLL**) · 5. Orbit / return lanes · 6. Pop bumpers (×3) · 7. Spinner ·
+8. Drop-target bank (spaced) · 9. Center scoop (saucer) · 10. Slingshots (×2) ·
+11. Inlanes / outlanes (+ kickback) · 12. Flippers (lower ×2 + 1 upper) ·
+13. Standup targets · 14. Posts / rubbers.
+
+Blueprint **rev 2** corrected the bottom-end geometry (flippers no longer cross;
+real inlane/outlane channels; slingshots in the proper rebound position),
+spaced the drop targets, reshaped the top arch, and dropped the space theme.
 
 ## Tech notes (SpriteKit)
 
