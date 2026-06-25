@@ -44,6 +44,14 @@ struct PinballView: View {
     private let bumperPop:     CGFloat = 380         // floor on speed right after a bumper kick
     private let bumperScore         = 500
 
+    private let slingThickness: CGFloat = 7
+    private let slingRest:      CGFloat = 0.55
+    private let slingPop:       CGFloat = 320         // outward kick off a slingshot
+    private let slingScore           = 150
+    private let targetScore          = 300
+    private let bankBonus            = 2500           // clearing the whole drop-target bank
+    private let maxMultiplier        = 5
+
     private let flipperLenFrac: CGFloat = 0.26       // of field width — shorter, so the flick can't slip past the ball
     private let flipperThickness: CGFloat = 7         // visual half-thickness
     private let flipperHitThickness: CGFloat = 11     // collision band (wider than the look) — resists tunnelling
@@ -74,15 +82,29 @@ struct PinballView: View {
         var litTicks = 0
     }
 
+    /// An angled kicker just above each flipper — bounces the ball back into
+    /// play (keeps it alive) and scores.
+    private struct Sling { var a: CGPoint = .zero; var b: CGPoint = .zero; var litTicks = 0 }
+
+    /// A drop target in the upper bank.  Lighting the whole bank bumps the
+    /// score multiplier and pays a bonus, then the bank resets.
+    private struct Target: Identifiable { let id = UUID(); var rect: CGRect; var lit = false; var litTicks = 0 }
+
     private static let ballTint   = Color(red: 0.85, green: 0.88, blue: 0.95)
     private static let flipperTint = Color(red: 0.25, green: 0.62, blue: 1.00)
     private static let bumperTint = Color(red: 1.00, green: 0.62, blue: 0.28)
+    private static let slingTint  = Color(red: 0.40, green: 0.85, blue: 0.55)
+    private static let targetTint = Color(red: 1.00, green: 0.85, blue: 0.30)
 
     // MARK: - State
 
     @State private var field: CGRect = .zero
     @State private var ball = BallBody()
     @State private var bumpers: [Bumper] = []
+    @State private var leftSling  = Sling()
+    @State private var rightSling = Sling()
+    @State private var targets: [Target] = []
+    @State private var multiplier = 1
 
     // Derived geometry, filled by layout().
     @State private var leftPivot:   CGPoint = .zero
@@ -120,7 +142,10 @@ struct PinballView: View {
                     Color.clear
                     playfield
                     laneDivider
+                    ForEach(targets) { targetView($0) }
                     ForEach(bumpers) { bumperView($0).position($0.pos) }
+                    slingView(leftSling)
+                    slingView(rightSling)
                     flipperPath(isLeft: true)
                     flipperPath(isLeft: false)
                     ballView
@@ -176,6 +201,25 @@ struct PinballView: View {
             p.addLine(to: CGPoint(x: dividerX, y: dividerTopY))
         }
         .stroke(Color(white: 0.30), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+    }
+
+    private func slingView(_ s: Sling) -> some View {
+        let lit = s.litTicks > 0
+        return Path { p in p.move(to: s.a); p.addLine(to: s.b) }
+            .stroke(lit ? Color.white : Self.slingTint,
+                    style: StrokeStyle(lineWidth: slingThickness * 2, lineCap: .round))
+            .shadow(color: Self.slingTint.opacity(lit ? 0.9 : 0.4), radius: lit ? 8 : 3)
+    }
+
+    private func targetView(_ t: Target) -> some View {
+        let on = t.lit || t.litTicks > 0
+        return RoundedRectangle(cornerRadius: 3)
+            .fill(on ? Self.targetTint : Color(white: 0.28))
+            .frame(width: t.rect.width, height: t.rect.height)
+            .overlay(RoundedRectangle(cornerRadius: 3)
+                .stroke(Self.targetTint.opacity(on ? 0.95 : 0.40), lineWidth: 1))
+            .shadow(color: Self.targetTint.opacity(on ? 0.7 : 0), radius: on ? 6 : 0)
+            .position(x: t.rect.midX, y: t.rect.midY)
     }
 
     private func bumperView(_ b: Bumper) -> some View {
@@ -234,6 +278,14 @@ struct PinballView: View {
                         .font(.system(size: 10, weight: .heavy, design: .rounded))
                         .tracking(2)
                         .foregroundStyle(Color(white: 0.5))
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(Self.targetTint)
+                            .padding(.horizontal, 8).padding(.vertical, 2)
+                            .background(Capsule().fill(Self.targetTint.opacity(0.18)))
+                            .padding(.top, 2)
+                    }
                 }
                 Spacer()
                 ballsPip
@@ -375,6 +427,26 @@ struct PinballView: View {
         dividerTopY = field.minY + field.height * 0.32
         laneCenterX = field.maxX - laneWidth / 2
 
+        // Slingshots — angled kickers above + outboard of each flipper that
+        // throw the ball back into play.
+        let slBotY = flipperY - field.height * 0.05
+        let slTopY = flipperY - field.height * 0.17
+        leftSling  = Sling(a: CGPoint(x: field.minX + field.width * 0.05, y: slBotY),
+                           b: CGPoint(x: leftPivot.x + field.width * 0.03, y: slTopY))
+        rightSling = Sling(a: CGPoint(x: dividerX - field.width * 0.05, y: slBotY),
+                           b: CGPoint(x: rightPivot.x - field.width * 0.03, y: slTopY))
+
+        // Drop-target bank — a row across the mid-field; clearing every target
+        // bumps the score multiplier and pays a bonus, then resets.
+        let tW = field.width * 0.11, tH = field.height * 0.022
+        let tY = field.minY + field.height * 0.55
+        let span = field.width * 0.52
+        let startX = field.midX - span / 2
+        targets = (0..<4).map { i in
+            let cxp = startX + span * CGFloat(i) / 3.0
+            return Target(rect: CGRect(x: cxp - tW / 2, y: tY, width: tW, height: tH))
+        }
+
         applyBumpers()
     }
 
@@ -389,6 +461,10 @@ struct PinballView: View {
         ballsLeft = startingBalls
         leftFlickTicks = 0
         rightFlickTicks = 0
+        multiplier = 1
+        for i in targets.indices { targets[i].lit = false; targets[i].litTicks = 0 }
+        leftSling.litTicks = 0
+        rightSling.litTicks = 0
         applyBumpers()
         showMapName = true
         placeBallInLane()
@@ -493,6 +569,9 @@ struct PinballView: View {
         if leftFlickTicks > 0  { leftFlickTicks -= 1 }
         if rightFlickTicks > 0 { rightFlickTicks -= 1 }
         for i in bumpers.indices where bumpers[i].litTicks > 0 { bumpers[i].litTicks -= 1 }
+        if leftSling.litTicks > 0  { leftSling.litTicks -= 1 }
+        if rightSling.litTicks > 0 { rightSling.litTicks -= 1 }
+        for i in targets.indices where targets[i].litTicks > 0 { targets[i].litTicks -= 1 }
 
         guard ballInPlay else { return }
         let dt: CGFloat = 1.0 / 60.0
@@ -514,6 +593,8 @@ struct PinballView: View {
         collideWalls()
         collideDivider()
         collideBumpers()
+        collideSlings()
+        collideTargets()
         collideFlipper(isLeft: true)
         collideFlipper(isLeft: false)
 
@@ -569,8 +650,74 @@ struct PinballView: View {
                 let k = bumperPop / max(sp, 0.001)
                 ball.vel.dx *= k; ball.vel.dy *= k
             }
-            score += bumperScore
+            score += bumperScore * multiplier
             bumpers[i].litTicks = 12
+            if gameState.hapticsEnabled { Haptics.light() }
+        }
+    }
+
+    /// Slingshots — angled kickers that actively throw the ball back into play.
+    private func collideSlings() {
+        collideSling(&leftSling)
+        collideSling(&rightSling)
+    }
+
+    private func collideSling(_ s: inout Sling) {
+        let a = s.a, b = s.b
+        let vx = b.x - a.x, vy = b.y - a.y
+        let len2 = vx * vx + vy * vy
+        guard len2 > 0 else { return }
+        let wx = ball.pos.x - a.x, wy = ball.pos.y - a.y
+        let t = max(0, min(1, (wx * vx + wy * vy) / len2))
+        let qx = a.x + t * vx, qy = a.y + t * vy
+        let dx = ball.pos.x - qx, dy = ball.pos.y - qy
+        let dist = hypot(dx, dy)
+        let minD = ballRadius + slingThickness
+        guard dist > 0, dist < minD else { return }
+        let nx = dx / dist, ny = dy / dist
+        ball.pos.x = qx + nx * minD
+        ball.pos.y = qy + ny * minD
+        let vn = ball.vel.dx * nx + ball.vel.dy * ny
+        if vn < 0 {
+            ball.vel.dx -= (1 + slingRest) * vn * nx
+            ball.vel.dy -= (1 + slingRest) * vn * ny
+        }
+        // Active pop — kicks the ball off the face every time it touches.
+        ball.vel.dx += nx * slingPop
+        ball.vel.dy += ny * slingPop
+        score += slingScore * multiplier
+        s.litTicks = 10
+        if gameState.hapticsEnabled { Haptics.light() }
+    }
+
+    /// Drop targets — light one per hit; clearing the whole bank bumps the
+    /// multiplier, pays a bonus, and resets the bank for another go.
+    private func collideTargets() {
+        for i in targets.indices {
+            let rect = targets[i].rect
+            let cxp = min(max(ball.pos.x, rect.minX), rect.maxX)
+            let cyp = min(max(ball.pos.y, rect.minY), rect.maxY)
+            let dx = ball.pos.x - cxp, dy = ball.pos.y - cyp
+            let dist = hypot(dx, dy)
+            guard dist < ballRadius else { continue }
+            let nx = dist > 0 ? dx / dist : 0
+            let ny = dist > 0 ? dy / dist : -1
+            ball.pos.x = cxp + nx * ballRadius
+            ball.pos.y = cyp + ny * ballRadius
+            let vn = ball.vel.dx * nx + ball.vel.dy * ny
+            if vn < 0 {
+                ball.vel.dx -= 1.6 * vn * nx
+                ball.vel.dy -= 1.6 * vn * ny
+            }
+            targets[i].litTicks = 10
+            guard !targets[i].lit else { continue }
+            targets[i].lit = true
+            score += targetScore * multiplier
+            if targets.allSatisfy({ $0.lit }) {
+                multiplier = min(multiplier + 1, maxMultiplier)
+                score += bankBonus * multiplier
+                for j in targets.indices { targets[j].lit = false }
+            }
             if gameState.hapticsEnabled { Haptics.light() }
         }
     }
