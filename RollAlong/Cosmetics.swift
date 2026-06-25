@@ -960,6 +960,72 @@ enum MusicTrack: String, CosmeticItem {
 // the nearest multiple of 20.  Per Mac's spec.
 // ---------------------------------------------------------------------------
 
+// ===========================================================================
+// Shop rotation — the curated storefront refreshes every 2 hours.  A
+// deterministic window index seeds which bundle + odds-and-ends cosmetics are
+// featured, so the selection is stable within a window and identical
+// everywhere (the Shop display AND the Catalog's "available now" markers).
+// ===========================================================================
+enum ShopRotation {
+    static let windowSeconds: TimeInterval = 2 * 60 * 60   // 2 hours
+
+    static func window(at date: Date = Date()) -> Int {
+        Int(date.timeIntervalSince1970 / windowSeconds)
+    }
+    static func refreshDate(at date: Date = Date()) -> Date {
+        Date(timeIntervalSince1970: Double(window(at: date) + 1) * windowSeconds)
+    }
+    /// "1:59:42" until the next refresh.
+    static func countdown(at date: Date = Date()) -> String {
+        let s = max(0, Int(refreshDate(at: date).timeIntervalSince(date)))
+        return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
+    }
+
+    // Pools of coin-purchasable items eligible to be featured.
+    static var bundlePool: [CosmeticBundle] {
+        CosmeticBundle.catalogue.filter { $0.isAvailable && !$0.isExpired }
+    }
+    static var ballPool: [BallSkin] {
+        BallSkin.allCases.filter { !$0.isBundleExclusive && $0.tier != .starter }
+    }
+    static var trailPool: [TrailColor] {
+        TrailColor.allCases.filter { $0.tier != .starter && $0 != .air && $0 != .raybeam }
+    }
+    static var goalPool: [GoalSkin] {
+        GoalSkin.allCases.filter { $0.tier != .starter }
+    }
+
+    private static func pick<T>(_ pool: [T], _ window: Int, salt: Int) -> T? {
+        guard !pool.isEmpty else { return nil }
+        let h = window &* 31 &+ salt
+        return pool[((h % pool.count) + pool.count) % pool.count]
+    }
+
+    static func featuredBundle(at date: Date = Date()) -> CosmeticBundle? { pick(bundlePool, window(at: date), salt: 0) }
+    static func featuredBall(at date: Date = Date())   -> BallSkin?       { pick(ballPool,   window(at: date), salt: 7) }
+    static func featuredTrail(at date: Date = Date())  -> TrailColor?     { pick(trailPool,  window(at: date), salt: 13) }
+    static func featuredGoal(at date: Date = Date())   -> GoalSkin?       { pick(goalPool,   window(at: date), salt: 19) }
+
+    /// True if `item` is one of the individually-featured odds-and-ends OR a
+    /// member of the featured bundle — i.e. buyable in the Shop right now.
+    /// (Used by the Catalog to draw the blue "available now" border.)
+    static func isFeatured<Item: CosmeticItem>(_ item: Item, at date: Date = Date()) -> Bool {
+        if let b = item as? BallSkin    { if b == featuredBall(at: date) { return true } }
+        if let t = item as? TrailColor  { if t == featuredTrail(at: date) { return true } }
+        if let g = item as? GoalSkin    { if g == featuredGoal(at: date) { return true } }
+        guard let bundle = featuredBundle(at: date) else { return false }
+        switch item {
+        case let s as BallSkin:   return bundle.balls.contains(s)
+        case let g as GoalSkin:   return bundle.goals.contains(g)
+        case let t as TrailColor: return bundle.trails.contains(t)
+        case let f as Floor:      return bundle.floors.contains(f)
+        case let p as Pit:        return bundle.pits.contains(p)
+        case let m as MusicTrack: return bundle.music.contains(m)
+        default:                  return false
+        }
+    }
+}
+
 struct CosmeticBundle: Identifiable {
     /// Stable persistence key.
     let id: String

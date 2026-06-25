@@ -9,6 +9,7 @@ enum HomeRoute: Hashable {
     case levels
     case settings
     case shop
+    case catalog
     case leaderboard
     case friends
     case clans
@@ -312,7 +313,8 @@ struct HomeView: View {
                 case .game:        BallGameView()
                 case .levels:      LevelSelectView()
                 case .settings:    SettingsView()
-                case .shop:        CosmeticShopView()
+                case .shop:        CosmeticShopView(mode: .shop)
+                case .catalog:     CosmeticShopView(mode: .catalog)
                 case .leaderboard: LeaderboardView()
                 case .friends:     FriendsView()
                 case .clans:       ClansView()

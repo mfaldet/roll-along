@@ -39,9 +39,19 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
     }
 }
 
+/// The store has two faces:
+///   • `.shop`    — a curated front: the 2-hour rotating featured bundle + a
+///                  few odds-and-ends cosmetics.  The ONLY place to buy.
+///   • `.catalog` — the full browsable grid (reached from the Shop).  Browse +
+///                  equip-owned only; purchasing happens in the Shop.
+enum ShopMode { case shop, catalog }
+
 struct CosmeticShopView: View {
+    var mode: ShopMode = .catalog
+
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav:       Navigator
+    @Environment(\.dismiss) private var dismiss
     /// Observed for purchase-in-progress state on seasonal IAP buttons (S8).
     @ObservedObject private var store = StoreKitManager.shared
 
@@ -60,13 +70,17 @@ struct CosmeticShopView: View {
         ZStack {
             Color(white: 0.08).ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                tabBar
-                ScrollView {
-                    grid
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 36)
+            if mode == .shop {
+                shopFront
+            } else {
+                VStack(spacing: 0) {
+                    tabBar
+                    ScrollView {
+                        grid
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 36)
+                    }
                 }
             }
 
@@ -108,17 +122,18 @@ struct CosmeticShopView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.72), value: completionToastBundle)
-        .navigationTitle("Shop")
+        .navigationTitle(mode == .shop ? "Shop" : "Catalog")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button { nav.goHome() } label: {
+                // Shop returns Home; Catalog (pushed from the Shop) pops back.
+                Button { if mode == .shop { nav.goHome() } else { dismiss() } } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 16, weight: .semibold))
-                        Text("Home")
+                        Text(mode == .shop ? "Home" : "Shop")
                             .font(.system(size: 16, weight: .medium, design: .rounded))
                     }
                     .foregroundStyle(.white)
@@ -148,6 +163,65 @@ struct CosmeticShopView: View {
             set: { _ in purchaseError = nil; store.clearLastError() }
         ), actions: { Button("OK", role: .cancel) {} },
         message: { Text(purchaseError ?? "") })
+    }
+
+    // MARK: - Shop front (curated, rotating storefront)
+
+    private var shopFront: some View {
+        ScrollView {
+            VStack(spacing: 22) {
+                // Refresh countdown — the whole shop rotates every 2 hours.
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Refreshes in \(ShopRotation.countdown(at: ctx.date))")
+                            .monospacedDigit()
+                    }
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+                    .frame(maxWidth: .infinity)
+                }
+
+                // The single bundle buyable right now.
+                if let bundle = ShopRotation.featuredBundle() {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionLabel("FEATURED BUNDLE")
+                        collectionCard(bundle, isFeatured: true)
+                    }
+                }
+
+                // A few odds-and-ends — one ball, one trail, one goal.
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionLabel("TODAY'S PICKS")
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14),
+                                        GridItem(.flexible(), spacing: 14),
+                                        GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                        if let b  = ShopRotation.featuredBall()  { itemCell(item: b) }
+                        if let tr = ShopRotation.featuredTrail() { itemCell(item: tr) }
+                        if let g  = ShopRotation.featuredGoal()  { itemCell(item: g) }
+                    }
+                }
+
+                // Everything else lives in the browsable Catalog.
+                NavigationLink(value: HomeRoute.catalog) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.grid.2x2.fill")
+                        Text("Browse Full Catalog")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                    }
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 14)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 36)
+        }
     }
 
     // MARK: - Coin pill (top-right, summons Get Coins)
@@ -384,6 +458,12 @@ struct CosmeticShopView: View {
                     "tier":     .string(item.tier.rawValue),
                 ]
             )
+            return
+        }
+        // Catalog is browse-only — buying happens in the Shop.
+        if mode == .catalog {
+            alertMessage = "Pick this up in the Shop when it's featured."
+            showAlert = true
             return
         }
         // Buy + equip
@@ -977,6 +1057,12 @@ struct CosmeticShopView: View {
 
     private func handleBundleTap(_ bundle: CosmeticBundle, owned: Bool) {
         if owned { return }
+        // Catalog is browse-only — bundles are bought in the Shop when featured.
+        if mode == .catalog {
+            alertMessage = "This bundle is buyable in the Shop while it's featured."
+            showAlert = true
+            return
+        }
         let cost = bundle.price(in: gameState)
         guard gameState.coinBalance >= cost else {
             alertMessage = "You need \(cost - gameState.coinBalance) more coins for the \(bundle.displayName) bundle.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
