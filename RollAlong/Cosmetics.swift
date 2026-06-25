@@ -560,10 +560,8 @@ enum TrailColor: String, CosmeticItem {
              .bubblegum, .smoke, .gilded, .gold, .stardust, .phoenix,
              .cometTrail:
             return .standard   //  50 coins — solid mono colour
-        case .rainbow:
-            return .premium    // 200 coins — per-segment hue cycle
-        case .snake, .air, .raybeam:
-            return .exclusive  // 500 coins — animated / special-effect
+        case .snake, .air, .raybeam, .rainbow:
+            return .exclusive  // 500 coins — animated / special-effect (rainbow promoted to Legendary)
         }
     }
 
@@ -1919,6 +1917,257 @@ func drawTrails(_ ctx: GraphicsContext,
                        style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
         }
     }
+}
+
+// ===========================================================================
+// Rich per-trail rendering — bespoke, animated effects for the player's
+// equipped trail (snow trench for ice, fire→smoke for comet, scales for snake,
+// twinkling stars for stardust, a jet-stream for air, …).  Drawn for ONE ball
+// at a time (home + climb), so it can afford the detail.  `pts` runs
+// oldest→newest (the ball sits at pts.last); `t` is a time value for animation.
+// ===========================================================================
+func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
+                   trail: TrailColor, t: Double, baseWidth: CGFloat = 6) {
+    guard pts.count >= 2, trail != .none else { return }
+    let n = pts.count
+    switch trail {
+    case .snake:           trailSnake(ctx, pts, n, baseWidth)
+    case .cometTrail:      trailComet(ctx, pts, n, t, baseWidth)
+    case .ice:             trailIce(ctx, pts, n, baseWidth)
+    case .fire, .phoenix:  trailFire(ctx, pts, n, t, baseWidth)
+    case .mist, .smoke:    trailMist(ctx, pts, n, t, baseWidth, base: trail.color)
+    case .stardust:        trailStardust(ctx, pts, n, t, baseWidth)
+    case .air:             trailAir(ctx, pts, n, t, baseWidth)
+    case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth)
+    default:
+        trailTapered(ctx, pts, n, baseWidth, color: trail.color,
+                     glow: trail == .raybeam || trail == .gold || trail == .gilded || trail == .ember)
+    }
+}
+
+/// Tapered, optionally-glowing streak — the default for the simple colour trails.
+private func trailTapered(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int,
+                          _ baseWidth: CGFloat, color: Color, glow: Bool) {
+    var ctx = ctx
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)
+        let w   = baseWidth * CGFloat(0.30 + 0.70 * age)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        if glow {
+            ctx.blendMode = .plusLighter
+            ctx.stroke(p, with: .color(color.opacity(0.16 * age)),
+                       style: StrokeStyle(lineWidth: w * 2.4, lineCap: .round))
+            ctx.blendMode = .normal
+        }
+        ctx.stroke(p, with: .color(color.opacity(0.12 + 0.70 * age)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+}
+
+/// Snake — a fat scaled body that tapers to the tail, with a head + eyes + tongue.
+private func trailSnake(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+    let dark = Color(red: 0.09, green: 0.38, blue: 0.15)
+    let mid  = Color(red: 0.18, green: 0.64, blue: 0.24)
+    let lite = Color(red: 0.50, green: 0.90, blue: 0.42)
+    let headW = baseWidth * 2.0
+    for i in 1..<n {
+        let age = CGFloat(i) / CGFloat(n - 1)
+        let w = headW * (0.30 + 0.70 * age)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(dark), style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(mid),  style: StrokeStyle(lineWidth: w * 0.72, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(lite.opacity(0.5)), style: StrokeStyle(lineWidth: w * 0.24, lineCap: .round, lineJoin: .round))
+        // Scale chevron across the body at this segment.
+        let dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y
+        let len = max(0.001, hypot(dx, dy))
+        let ux = dx / len, uy = dy / len, px = -uy, py = ux
+        let h = w * 0.42, b = pts[i]
+        var chev = Path()
+        chev.move(to: CGPoint(x: b.x + px * h - ux * h, y: b.y + py * h - uy * h))
+        chev.addLine(to: CGPoint(x: b.x, y: b.y))
+        chev.addLine(to: CGPoint(x: b.x - px * h - ux * h, y: b.y - py * h - uy * h))
+        ctx.stroke(chev, with: .color(dark.opacity(0.45)),
+                   style: StrokeStyle(lineWidth: max(0.6, w * 0.09), lineCap: .round, lineJoin: .round))
+    }
+    // Head.
+    let head = pts[n - 1], prev = pts[n - 2]
+    let hdx = head.x - prev.x, hdy = head.y - prev.y, hlen = max(0.001, hypot(hdx, hdy))
+    let ux = hdx / hlen, uy = hdy / hlen, ex = -uy, ey = ux
+    let hr = headW * 0.62
+    ctx.fill(Path(ellipseIn: CGRect(x: head.x - hr, y: head.y - hr, width: hr * 2, height: hr * 2)), with: .color(mid))
+    ctx.fill(Path(ellipseIn: CGRect(x: head.x - hr, y: head.y - hr, width: hr * 2, height: hr * 2)),
+        with: .radialGradient(Gradient(colors: [lite.opacity(0.6), .clear]),
+            center: CGPoint(x: head.x - hr * 0.3, y: head.y - hr * 0.3), startRadius: 0, endRadius: hr))
+    let er = hr * 0.22
+    for s in [CGFloat(1), -1] {
+        let cxp = head.x + ux * hr * 0.2 + ex * hr * 0.45 * s
+        let cyp = head.y + uy * hr * 0.2 + ey * hr * 0.45 * s
+        ctx.fill(Path(ellipseIn: CGRect(x: cxp - er, y: cyp - er, width: er * 2, height: er * 2)), with: .color(.white))
+        ctx.fill(Path(ellipseIn: CGRect(x: cxp - er * 0.5, y: cyp - er * 0.5, width: er, height: er)), with: .color(.black))
+    }
+    var tongue = Path()
+    tongue.move(to: CGPoint(x: head.x + ux * hr, y: head.y + uy * hr))
+    tongue.addLine(to: CGPoint(x: head.x + ux * hr * 2.1, y: head.y + uy * hr * 2.1))
+    ctx.stroke(tongue, with: .color(Color(red: 0.9, green: 0.12, blue: 0.30)),
+               style: StrokeStyle(lineWidth: max(0.8, hr * 0.16), lineCap: .round))
+}
+
+/// Comet — bright yellow/white fire at the head, bleeding to deep red, then a
+/// long tail of dissipating grey smoke.
+private func trailComet(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    var ctx = ctx
+    // Smoke on the older portion — soft grey puffs that spread + drift.
+    for i in 0..<n {
+        let age = Double(i) / Double(n - 1)
+        guard age <= 0.6 else { continue }
+        let f = age / 0.6                         // 0 tail → 1 mid
+        let p = pts[i]
+        let pr = baseWidth * CGFloat(1.4 + 3.0 * (1 - f))
+        let drift = CGFloat(sin(t * 1.2 + Double(i))) * baseWidth * 0.5
+        ctx.fill(Path(ellipseIn: CGRect(x: p.x - pr + drift, y: p.y - pr, width: pr * 2, height: pr * 2)),
+            with: .radialGradient(Gradient(colors: [Color(white: 0.55).opacity(0.18 * f), .clear]),
+                center: CGPoint(x: p.x + drift, y: p.y), startRadius: 0, endRadius: pr))
+    }
+    // Fire near the head — additive, yellow/white → orange → deep red.
+    ctx.blendMode = .plusLighter
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)
+        guard age >= 0.45 else { continue }
+        let f = (age - 0.45) / 0.55               // 0 mid → 1 head
+        let col = f > 0.7 ? Color(red: 1, green: 0.96, blue: 0.65)
+                : (f > 0.4 ? Color(red: 1, green: 0.55, blue: 0.12)
+                           : Color(red: 0.82, green: 0.12, blue: 0.05))
+        let w = baseWidth * CGFloat(0.5 + 1.7 * f)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(col.opacity(0.25 + 0.6 * f)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+}
+
+/// Ice — a carved trench: a faint cut down the middle with snow mounds piled
+/// on each side.
+private func trailIce(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(Color(red: 0.55, green: 0.75, blue: 0.95).opacity(0.08 + 0.30 * age)),
+                   style: StrokeStyle(lineWidth: baseWidth * 0.7, lineCap: .round))
+    }
+    for i in 1..<n {
+        let age = CGFloat(i) / CGFloat(n - 1)
+        let dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y
+        let len = max(0.001, hypot(dx, dy)), px = -dy / len, py = dx / len
+        let off = baseWidth * (0.7 + 0.5 * age), mr = baseWidth * (0.35 + 0.45 * age)
+        for s in [CGFloat(1), -1] {
+            let mx = pts[i].x + px * off * s, my = pts[i].y + py * off * s
+            ctx.fill(Path(ellipseIn: CGRect(x: mx - mr, y: my - mr, width: mr * 2, height: mr * 2)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.85 * Double(age) + 0.15), .clear]),
+                    center: CGPoint(x: mx, y: my), startRadius: 0, endRadius: mr))
+        }
+    }
+}
+
+/// Fire — flickering little flames left along the trail.
+private func trailFire(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    var ctx = ctx
+    ctx.blendMode = .plusLighter
+    for i in 0..<n {
+        let age = CGFloat(i) / CGFloat(n - 1)
+        let p = pts[i]
+        let flick = 0.6 + 0.4 * sin(t * 8 + Double(i) * 1.7)
+        let h = baseWidth * CGFloat(1.3 + 1.1 * flick) * (0.4 + 0.6 * age)
+        let w = baseWidth * 0.8 * (0.4 + 0.6 * age)
+        let sway = CGFloat(sin(t * 6 + Double(i))) * w * 0.4
+        var flame = Path()
+        flame.move(to: CGPoint(x: p.x, y: p.y + w * 0.5))
+        flame.addQuadCurve(to: CGPoint(x: p.x + sway, y: p.y - h), control: CGPoint(x: p.x + w, y: p.y))
+        flame.addQuadCurve(to: CGPoint(x: p.x, y: p.y + w * 0.5), control: CGPoint(x: p.x - w + sway, y: p.y))
+        ctx.fill(flame, with: .color(Color(red: 1, green: 0.45, blue: 0.05).opacity(0.5 * Double(age) + 0.15)))
+        var inner = Path()
+        inner.move(to: CGPoint(x: p.x, y: p.y + w * 0.2))
+        inner.addQuadCurve(to: CGPoint(x: p.x + sway * 0.7, y: p.y - h * 0.6), control: CGPoint(x: p.x + w * 0.5, y: p.y))
+        inner.addQuadCurve(to: CGPoint(x: p.x, y: p.y + w * 0.2), control: CGPoint(x: p.x - w * 0.5 + sway * 0.7, y: p.y))
+        ctx.fill(inner, with: .color(Color(red: 1, green: 0.9, blue: 0.4).opacity(0.5 * Double(age) + 0.2)))
+    }
+}
+
+/// Mist / smoke — soft cloud puffs spreading in all directions.
+private func trailMist(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat, base: Color) {
+    for i in 0..<n {
+        let age = Double(i) / Double(n - 1)
+        let p = pts[i]
+        for k in 0..<3 {
+            let ang = Double(k) * 2.1 + t * 0.5 + Double(i)
+            let spread = baseWidth * CGFloat(1.0 + 2.0 * (1 - age))
+            let ox = CGFloat(cos(ang)) * spread * 0.5, oy = CGFloat(sin(ang)) * spread * 0.5
+            let pr = baseWidth * CGFloat(1.0 + 1.5 * age)
+            ctx.fill(Path(ellipseIn: CGRect(x: p.x + ox - pr, y: p.y + oy - pr, width: pr * 2, height: pr * 2)),
+                with: .radialGradient(Gradient(colors: [base.opacity(0.08 * age + 0.04), .clear]),
+                    center: CGPoint(x: p.x + ox, y: p.y + oy), startRadius: 0, endRadius: pr))
+        }
+    }
+}
+
+/// Stardust — twinkling stars spinning off the trail.
+private func trailStardust(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    trailTapered(ctx, pts, n, baseWidth * 0.5, color: Color(red: 0.85, green: 0.82, blue: 1.0), glow: true)
+    var ctx = ctx
+    ctx.blendMode = .plusLighter
+    for i in 0..<n {
+        let age = Double(i) / Double(n - 1)
+        let tw = 0.4 + 0.6 * sin(t * 4 + Double(i) * 1.3)
+        guard tw > 0.25 else { continue }
+        let ang = t * 1.2 + Double(i) * 1.9
+        let off = baseWidth * CGFloat(0.6 + 2.2 * (1 - age))
+        let sx = pts[i].x + CGFloat(cos(ang)) * off, sy = pts[i].y + CGFloat(sin(ang)) * off
+        let sz = baseWidth * CGFloat(0.22 + 0.30 * age)
+        trailStar(ctx, CGPoint(x: sx, y: sy), sz, Color(red: 1, green: 0.98, blue: 0.85).opacity(tw * (0.3 + 0.6 * age)))
+    }
+}
+
+/// Air — pillowy puffs that billow behind the ball and sway like a jet stream.
+private func trailAir(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    for i in 0..<n {
+        let age = Double(i) / Double(n - 1)
+        let a = pts[max(0, i - 1)], b = pts[min(n - 1, i + 1)]
+        let dx = b.x - a.x, dy = b.y - a.y, len = max(0.001, hypot(dx, dy))
+        let px = -dy / len, py = dx / len
+        let sway = CGFloat(sin(t * 2.0 + Double(i) * 0.6)) * baseWidth * 1.2 * CGFloat(1 - age)
+        let pr = baseWidth * CGFloat(1.2 + 1.6 * (1 - age))
+        let cxp = pts[i].x + px * sway, cyp = pts[i].y + py * sway
+        ctx.fill(Path(ellipseIn: CGRect(x: cxp - pr, y: cyp - pr, width: pr * 2, height: pr * 2)),
+            with: .radialGradient(Gradient(colors: [Color(red: 0.85, green: 0.93, blue: 1.0).opacity(0.14 * age + 0.05), .clear]),
+                center: CGPoint(x: cxp, y: cyp), startRadius: 0, endRadius: pr))
+    }
+}
+
+/// Rainbow — a glowing, hue-cycling streak (now a Legendary).
+private func trailRainbow(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    var ctx = ctx
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)
+        let hue = (Double(i) / Double(n) + t * 0.15).truncatingRemainder(dividingBy: 1)
+        let col = Color(hue: hue, saturation: 1, brightness: 1)
+        let w = baseWidth * CGFloat(0.4 + 0.8 * age)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.blendMode = .plusLighter
+        ctx.stroke(p, with: .color(col.opacity(0.20 * age)), style: StrokeStyle(lineWidth: w * 2.2, lineCap: .round))
+        ctx.blendMode = .normal
+        ctx.stroke(p, with: .color(col.opacity(0.20 + 0.7 * age)), style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+}
+
+/// A small 4-point sparkle star (used by the stardust trail).
+private func trailStar(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ color: Color) {
+    var star = Path()
+    for k in 0..<8 {
+        let a = Double(k) * .pi / 4 - .pi / 2
+        let rad = (k % 2 == 0) ? s : s * 0.4
+        let p = CGPoint(x: c.x + CGFloat(cos(a)) * rad, y: c.y + CGFloat(sin(a)) * rad)
+        if k == 0 { star.move(to: p) } else { star.addLine(to: p) }
+    }
+    star.closeSubpath()
+    ctx.fill(star, with: .color(color))
 }
 
 // ---------------------------------------------------------------------------

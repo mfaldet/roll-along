@@ -1171,57 +1171,12 @@ struct BallGameView: View {
                 )
                 return
             }
-            let isRainbow = gameState.equippedTrail == .rainbow
-            let isAir     = gameState.equippedTrail == .air
-            let isRaybeam = gameState.equippedTrail == .raybeam
-            // Air trail — overall opacity decays as the trail grows
-            // longer, giving the "moving air" effect Mac specified.
-            // Cap at the base trail length (90); above that the air
-            // is already ~vanished.
-            let airDecay: Double = isAir
-                ? max(0.10, 1.0 - Double(n) / Double(trailMaxLength) * 0.85)
-                : 1.0
-            for i in 1..<n {
-                let prev = trailPoints[i - 1]
-                let curr = trailPoints[i]
-                // Fade from 0.10 (tail) → 1.0 (head)
-                let age = Double(i) / Double(n - 1)
-                let opacity = (0.10 + 0.90 * age) * airDecay
-                var path = Path()
-                path.move(to: prev)
-                path.addLine(to: curr)
-                var rainbowHue: Double {
-                    var h = (trailHueOffset + Double(i) * trailHueStep)
-                        .truncatingRemainder(dividingBy: 1.0)
-                    if h < 0 { h += 1.0 }
-                    return h
-                }
-                let segmentColor: Color = isRainbow
-                    ? Color(hue: rainbowHue,
-                            saturation: 1.0,
-                            brightness: 1.0)
-                    : gameState.equippedTrail.color
-                if isRaybeam {
-                    // Laser look — a wide soft glow under a bright thin
-                    // core, both fading along the trail.
-                    ctx.stroke(
-                        path,
-                        with: .color(Color(red: 0.20, green: 1.00, blue: 0.70).opacity(opacity * 0.35)),
-                        style: StrokeStyle(lineWidth: 8.0, lineCap: .round, lineJoin: .round)
-                    )
-                    ctx.stroke(
-                        path,
-                        with: .color(Color(red: 0.85, green: 1.00, blue: 0.92).opacity(opacity)),
-                        style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round)
-                    )
-                } else {
-                    ctx.stroke(
-                        path,
-                        with: .color(segmentColor.opacity(opacity)),
-                        style: StrokeStyle(lineWidth: 3.2, lineCap: .round, lineJoin: .round)
-                    )
-                }
-            }
+            // Bespoke, animated per-trail rendering (scales, fire→smoke, snow
+            // trench, jet-stream, …) — the same renderer the home trail uses,
+            // so a trail looks identical everywhere.
+            drawRichTrail(ctx, points: trailPoints,
+                          trail: gameState.equippedTrail,
+                          t: Date().timeIntervalSinceReferenceDate)
         }
     }
 

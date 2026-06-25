@@ -549,39 +549,13 @@ struct HomeView: View {
     /// keeps its colour as the ball moves on — the spectrum follows
     /// the ball rather than redistributing across the active count.
     private var homeTrailLayer: some View {
+        // Bespoke, animated per-trail rendering (snow trench, fire→smoke,
+        // scales, twinkling stars, jet-stream, …) — the same renderer the
+        // in-game trail will use, so a trail looks identical everywhere.
         Canvas { ctx, _ in
-            let n = trailPoints.count
-            guard n >= 2 else { return }
-            let isRainbow = gameState.equippedTrail == .rainbow
-            let isAir     = gameState.equippedTrail == .air
-            // Air trail — overall opacity decays as the streak grows
-            // longer, matching the in-game air effect.
-            let airDecay: Double = isAir
-                ? max(0.10, 1.0 - Double(n) / Double(homeTrailMaxLength) * 0.85)
-                : 1.0
-            for i in 1..<n {
-                let prev = trailPoints[i - 1]
-                let curr = trailPoints[i]
-                let age = Double(i) / Double(n - 1)
-                let opacity = (0.10 + 0.90 * age) * airDecay
-                var path = Path()
-                path.move(to: prev)
-                path.addLine(to: curr)
-                let segmentColor: Color
-                if isRainbow {
-                    var hue = (trailHueOffset + Double(i) * homeTrailHueStep)
-                        .truncatingRemainder(dividingBy: 1.0)
-                    if hue < 0 { hue += 1.0 }
-                    segmentColor = Color(hue: hue, saturation: 1.0, brightness: 1.0)
-                } else {
-                    segmentColor = gameState.equippedTrail.color
-                }
-                ctx.stroke(
-                    path,
-                    with: .color(segmentColor.opacity(opacity)),
-                    style: StrokeStyle(lineWidth: 5.0, lineCap: .round, lineJoin: .round)
-                )
-            }
+            drawRichTrail(ctx, points: trailPoints,
+                          trail: gameState.equippedTrail,
+                          t: Date().timeIntervalSinceReferenceDate)
         }
     }
 
