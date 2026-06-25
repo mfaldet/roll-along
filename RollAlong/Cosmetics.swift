@@ -981,7 +981,8 @@ enum ShopRotation {
         BallSkin.allCases.filter { !$0.isBundleExclusive && $0.tier != .starter }
     }
     static var trailPool: [TrailColor] {
-        TrailColor.allCases.filter { $0.tier != .starter && $0 != .air && $0 != .raybeam }
+        // Exclude the free default (graphite) and the bundle-only trails.
+        TrailColor.allCases.filter { $0.tier != .starter && $0 != .graphite && $0 != .air && $0 != .raybeam }
     }
     static var goalPool: [GoalSkin] {
         GoalSkin.allCases.filter { $0.tier != .starter }
