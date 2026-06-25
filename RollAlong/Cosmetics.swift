@@ -37,11 +37,13 @@ protocol CosmeticItem: Hashable, Identifiable, CaseIterable, Codable
 ///
 /// Naming convention exposed to players (in the shop UI) maps to:
 ///   • standard   → "Standard"
+///   • rare       → "Rare"
 ///   • premium    → "Epic"
 ///   • exclusive  → "Legendary"
 enum CosmeticTier: String, Codable {
     case starter        // free, always owned
     case standard       // 50  coins — entry-level skins, tutorial-reward eligible
+    case rare           // 100 coins — a notch up; distinctive but not flashy
     case premium        // 200 coins — flashier visuals, mid-grind
     case exclusive      // 500 coins — top-tier, multi-week grind or IAP territory
 }
@@ -54,6 +56,7 @@ extension CosmeticTier {
         switch self {
         case .starter:   return 0
         case .standard:  return 50
+        case .rare:      return 100
         case .premium:   return 200
         case .exclusive: return 500
         }
@@ -65,6 +68,7 @@ extension CosmeticTier {
         switch self {
         case .starter:   return "Free"
         case .standard:  return "Standard"
+        case .rare:      return "Rare"
         case .premium:   return "Epic"
         case .exclusive: return "Legendary"
         }
@@ -76,6 +80,7 @@ extension CosmeticTier {
         switch self {
         case .starter:   return Color(white: 0.55)
         case .standard:  return Color(red: 0.45, green: 0.62, blue: 0.85)
+        case .rare:      return Color(red: 0.28, green: 0.78, blue: 0.95)
         case .premium:   return Color(red: 0.72, green: 0.45, blue: 0.95)
         case .exclusive: return Color(red: 1.00, green: 0.78, blue: 0.28)
         }
@@ -489,11 +494,10 @@ enum TrailColor: String, CosmeticItem {
     case none           // no trail — free "Off" option in the shop
     case graphite       // Paper-world's lead trail; THE default — equipped from first launch
 
-    // Standard (50 coins) — solid mono-coloured streaks
+    // Tiers are assigned in `tier` below (Standard / Rare / Legendary).
     case ink
     case fire
     case ice
-    case mist
     case ember
     case sky
     case roseTrail      // raw "roseTrail" to disambiguate from BallSkin.rose
@@ -501,18 +505,12 @@ enum TrailColor: String, CosmeticItem {
     case bubblegum
     case smoke
     case gilded
-    case gold
     case stardust
-    case phoenix
     case cometTrail     // disambiguate from GoalSkin.comet
-
-    // Premium / Epic (200 coins) — multi-colour per-segment streak
-    case rainbow        // each segment hue derived from its position
-
-    // Exclusive / Legendary (500 coins) — animated / special-effect
+    case rainbow        // glowing per-segment hue cycle
     case snake          // grows longer every coin you pick up
-    case air            // semi-translucent, extra fade on length (Golf bundle)
-    case raybeam        // ★ NEW (Space Travel bundle) — glowing laser streak
+    case air            // pillowy jet-stream (Golf bundle)
+    case raybeam        // glowing laser streak (Space Travel bundle)
 
     var id: String { rawValue }
     var displayName: String {
@@ -522,7 +520,6 @@ enum TrailColor: String, CosmeticItem {
         case .ink:         return "Ink"
         case .fire:        return "Fire"
         case .ice:         return "Ice"
-        case .mist:        return "Mist"
         case .ember:       return "Ember"
         case .sky:         return "Sky"
         case .roseTrail:   return "Rose"
@@ -530,9 +527,7 @@ enum TrailColor: String, CosmeticItem {
         case .bubblegum:   return "Bubblegum"
         case .smoke:       return "Smoke"
         case .gilded:      return "Gilded"
-        case .gold:        return "Gold"
         case .stardust:    return "Stardust"
-        case .phoenix:     return "Phoenix"
         case .cometTrail:  return "Comet"
         case .rainbow:     return "Rainbow"
         case .snake:       return "Snake"
@@ -554,14 +549,14 @@ enum TrailColor: String, CosmeticItem {
     ///                 coins, sparkle, etc.).
     var tier: CosmeticTier {
         switch self {
-        case .none, .graphite:
+        case .none:
             return .starter
-        case .ink, .fire, .ice, .mist, .ember, .sky, .roseTrail, .forest,
-             .bubblegum, .smoke, .gilded, .gold, .stardust, .phoenix,
-             .cometTrail:
+        case .ink, .ember, .sky, .forest, .bubblegum:
             return .standard   //  50 coins — solid mono colour
-        case .snake, .air, .raybeam, .rainbow:
-            return .exclusive  // 500 coins — animated / special-effect (rainbow promoted to Legendary)
+        case .snake, .raybeam, .gilded, .graphite, .roseTrail:
+            return .rare       // 100 coins — distinctive textured trails
+        case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air:
+            return .exclusive  // 500 coins — animated / special-effect
         }
     }
 
@@ -575,19 +570,16 @@ enum TrailColor: String, CosmeticItem {
         case .ink:         return Color(red: 0.09, green: 0.09, blue: 0.14).opacity(0.80)
         case .fire:        return Color(red: 0.95, green: 0.42, blue: 0.10).opacity(0.75)
         case .ice:         return Color(red: 0.55, green: 0.78, blue: 1.00).opacity(0.75)
-        case .mist:        return Color(red: 0.75, green: 0.82, blue: 0.88).opacity(0.55)
         case .ember:       return Color(red: 0.92, green: 0.32, blue: 0.10).opacity(0.78)
         case .sky:         return Color(red: 0.40, green: 0.82, blue: 1.00).opacity(0.75)
-        case .roseTrail:   return Color(red: 0.95, green: 0.40, blue: 0.62).opacity(0.78)
+        case .roseTrail:   return Color(red: 0.52, green: 0.08, blue: 0.22).opacity(0.92)   // dark rose; petals in renderer
         case .forest:      return Color(red: 0.12, green: 0.42, blue: 0.18).opacity(0.78)
         case .rainbow:     return .pink   // placeholder; Canvas does the real thing
         case .bubblegum:   return Color(red: 1.00, green: 0.30, blue: 0.78).opacity(0.85)
         case .smoke:       return Color(red: 0.40, green: 0.42, blue: 0.45).opacity(0.65)
         case .cometTrail:  return Color(red: 0.85, green: 0.92, blue: 1.00).opacity(0.85)
         case .gilded:      return Color(red: 0.92, green: 0.78, blue: 0.32).opacity(0.85)
-        case .gold:        return Color(red: 0.95, green: 0.70, blue: 0.20).opacity(0.90)
         case .stardust:    return Color(red: 0.92, green: 0.88, blue: 1.00).opacity(0.85)
-        case .phoenix:     return Color(red: 1.00, green: 0.35, blue: 0.05).opacity(0.92)
         case .snake:       return Color(red: 0.20, green: 0.65, blue: 0.22).opacity(0.92)
         case .air:         return Color.white.opacity(0.65)   // additional decay in trail renderer
         case .raybeam:     return Color(red: 0.20, green: 1.00, blue: 0.70).opacity(0.95)  // glow added in renderer
@@ -1155,10 +1147,10 @@ struct CosmeticBundle: Identifiable {
             id:             "hellfire",
             displayName:    "Hellfire",
             tagline:        "Roll a ruby through the inferno.",
-            contentSummary: "Ruby ball · Ember floor · Evil pit · Phoenix trail",
+            contentSummary: "Ruby ball · Ember floor · Evil pit · Fire trail",
             balls:  [.ruby],
             goals:  [],
-            trails: [.phoenix],
+            trails: [.fire],
             floors: [.ember],
             pits:   [.evil],
             music:  []
@@ -1360,10 +1352,10 @@ struct CosmeticBundle: Identifiable {
             id:             "aurora",
             displayName:    "Aurora",
             tagline:        "Northern lights over a shimmering field.",
-            contentSummary: "Galaxy ball · Prism goal · Mist trail · Aurora floor · Aurora pit · Celestial music",
+            contentSummary: "Galaxy ball · Prism goal · Smoke trail · Aurora floor · Aurora pit · Celestial music",
             balls:  [.galaxy],
             goals:  [.prism],
-            trails: [.mist],
+            trails: [.smoke],
             floors: [.aurora],
             pits:   [.aurora],
             music:  [.celestial]
@@ -1425,10 +1417,10 @@ struct CosmeticBundle: Identifiable {
             id:             "eclipse",
             displayName:    "Eclipse",
             tagline:        "A golden corona around the dark.",
-            contentSummary: "Blue ball · Eclipse goal · Gold trail · Mysterium music",
+            contentSummary: "Blue ball · Eclipse goal · Gilded trail · Mysterium music",
             balls:  [.blue],
             goals:  [.eclipse],
-            trails: [.gold],
+            trails: [.gilded],
             floors: [],
             pits:   [],
             music:  [.mysterium]
@@ -1461,10 +1453,10 @@ struct CosmeticBundle: Identifiable {
             id:             "soccer",
             displayName:    "Soccer",
             tagline:        "Hit the pitch — hex-stitched ball on fresh turf.",
-            contentSummary: "Soccer Ball · Mist trail · Grass floor · Meadow pit · Synthwave music",
+            contentSummary: "Soccer Ball · Smoke trail · Grass floor · Meadow pit · Synthwave music",
             balls:  [.soccer],
             goals:  [],
-            trails: [.mist],
+            trails: [.smoke],
             floors: [.grass],
             pits:   [.meadow],
             music:  [.synthwave]
@@ -1511,10 +1503,10 @@ struct CosmeticBundle: Identifiable {
             id:             "tempest",
             displayName:    "Tempest",
             tagline:        "Lightning sealed inside a marble.",
-            contentSummary: "Storm ball · Plasma goal · Mist trail · Stormcloud floor · Downpour pit · Retrowave music",
+            contentSummary: "Storm ball · Plasma goal · Smoke trail · Stormcloud floor · Downpour pit · Retrowave music",
             balls:  [.storm],
             goals:  [.plasma],
-            trails: [.mist],
+            trails: [.smoke],
             floors: [.stormcloud],
             pits:   [.downpour],
             music:  [.retrowave]
@@ -1624,10 +1616,10 @@ struct CosmeticBundle: Identifiable {
             id:             "newyear-2027",
             displayName:    "Countdown",
             tagline:        "Three, two, one — roll.",
-            contentSummary: "Confetti ball · Rainbow goal · Gold trail · Disco floor · Midnight pit · Electronic music",
+            contentSummary: "Confetti ball · Rainbow goal · Gilded trail · Disco floor · Midnight pit · Electronic music",
             balls:  [.confetti],
             goals:  [.rainbow],
-            trails: [.gold],
+            trails: [.gilded],
             floors: [.disco],
             pits:   [.midnight],
             music:  [.electronic],
@@ -1732,10 +1724,10 @@ struct CosmeticBundle: Identifiable {
             id:             "champion",
             displayName:    "Champion",
             tagline:        "No tutorial. No mercy. A hundred flawless rooms.",
-            contentSummary: "Trophy ball (exclusive) · Quasar goal · Gold trail · Mirage floor · Mirage pit · Orchestral music",
+            contentSummary: "Trophy ball (exclusive) · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music",
             balls:  [.trophy],
             goals:  [.quasar],
-            trails: [.gold],
+            trails: [.gilded],
             floors: [.mirage],
             pits:   [.mirage],
             music:  [.orchestral]
@@ -1760,10 +1752,10 @@ struct CosmeticBundle: Identifiable {
             id:             "midnight-carnival",
             displayName:    "Midnight Carnival",
             tagline:        "The rides never stop when the sun goes down.",
-            contentSummary: "Copper ball · Neon goal · Phoenix trail · Midnight floor · Velvet pit · Retrowave music",
+            contentSummary: "Copper ball · Neon goal · Fire trail · Midnight floor · Velvet pit · Retrowave music",
             balls:  [.copper],
             goals:  [.neon],
-            trails: [.phoenix],
+            trails: [.fire],
             floors: [.midnight],
             pits:   [.velvet],
             music:  [.retrowave]
@@ -1864,7 +1856,7 @@ enum RivalCosmetics {
     static let showcase: [(skin: BallSkin, trail: TrailColor)] = [
         (.galaxy, .rainbow), (.nebula, .stardust), (.lava,   .fire),
         (.aurora, .cometTrail), (.neon, .raybeam), (.gold,   .gilded),
-        (.saturn, .sky), (.opal, .air), (.storm, .ice), (.ghost, .mist),
+        (.saturn, .sky), (.opal, .air), (.storm, .ice), (.ghost, .smoke),
     ]
 
     static let names: [String] = [
@@ -2004,15 +1996,17 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     switch trail {
     case .snake:           trailSnake(ctx, pts, n, baseWidth)
     case .cometTrail:      trailComet(ctx, pts, n, t, baseWidth)
-    case .ice:             trailIce(ctx, pts, n, baseWidth)
-    case .fire, .phoenix:  trailFire(ctx, pts, n, t, baseWidth)
-    case .mist, .smoke:    trailMist(ctx, pts, n, t, baseWidth, base: trail.color)
+    case .ice:             trailIce(ctx, pts, n, t, baseWidth)
+    case .fire:            trailFire(ctx, pts, n, t, baseWidth)
+    case .smoke:           trailMist(ctx, pts, n, t, baseWidth, base: trail.color)
     case .stardust:        trailStardust(ctx, pts, n, t, baseWidth)
     case .air:             trailAir(ctx, pts, n, t, baseWidth)
     case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth)
+    case .graphite:        trailGraphite(ctx, pts, n, baseWidth)
+    case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth)
     default:
         trailTapered(ctx, pts, n, baseWidth, color: trail.color,
-                     glow: trail == .raybeam || trail == .gold || trail == .gilded || trail == .ember)
+                     glow: trail == .raybeam || trail == .gilded || trail == .ember)
     }
 }
 
@@ -2117,25 +2111,118 @@ private func trailComet(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t:
 
 /// Ice — a carved trench: a faint cut down the middle with snow mounds piled
 /// on each side.
-private func trailIce(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+/// Ice — an icy-blue trench the ball cuts through, with irregular snow piles
+/// heaped on each side.  The piles are DISCRETE clumps (not continuous rails)
+/// with seeded varying size and a little settling "life", so it reads as snow
+/// shoved aside rather than three coloured lines.
+private func trailIce(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    // The icy trail itself — a soft blue glow under a bright cut line.
     for i in 1..<n {
         let age = Double(i) / Double(n - 1)
         var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(Color(red: 0.55, green: 0.75, blue: 0.95).opacity(0.08 + 0.30 * age)),
-                   style: StrokeStyle(lineWidth: baseWidth * 0.7, lineCap: .round))
+        ctx.stroke(p, with: .color(Color(red: 0.55, green: 0.80, blue: 1.0).opacity(0.10 + 0.30 * age)),
+                   style: StrokeStyle(lineWidth: baseWidth * 1.3, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(Color(red: 0.85, green: 0.94, blue: 1.0).opacity(0.15 + 0.45 * age)),
+                   style: StrokeStyle(lineWidth: baseWidth * 0.5, lineCap: .round))
     }
-    for i in 1..<n {
+    // Snow piles — clumps on both sides, every couple of points.
+    for i in stride(from: 1, to: n, by: 2) {
         let age = CGFloat(i) / CGFloat(n - 1)
         let dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y
         let len = max(0.001, hypot(dx, dy)), px = -dy / len, py = dx / len
-        let off = baseWidth * (0.7 + 0.5 * age), mr = baseWidth * (0.35 + 0.45 * age)
-        for s in [CGFloat(1), -1] {
-            let mx = pts[i].x + px * off * s, my = pts[i].y + py * off * s
-            ctx.fill(Path(ellipseIn: CGRect(x: mx - mr, y: my - mr, width: mr * 2, height: mr * 2)),
-                with: .radialGradient(Gradient(colors: [.white.opacity(0.85 * Double(age) + 0.15), .clear]),
-                    center: CGPoint(x: mx, y: my), startRadius: 0, endRadius: mr))
+        let baseOff = baseWidth * (0.85 + 0.5 * age)
+        for side in [CGFloat(1), -1] {
+            let seed = Double(i) * 0.6180339 + (side > 0 ? 0.0 : 0.37)
+            let r1 = seed.truncatingRemainder(dividingBy: 1.0)            // 0…1, stable per pile
+            let life = 0.85 + 0.15 * sin(t * 1.6 + seed * 6.283)          // gentle settling
+            let pileR = baseWidth * (0.30 + 0.65 * CGFloat(r1)) * age * CGFloat(life)
+            if pileR < 0.6 { continue }
+            let cx = pts[i].x + px * baseOff * side, cy = pts[i].y + py * baseOff * side
+            let op = 0.85 * Double(age) + 0.10
+            // Lumpy clump — three overlapping blobs of varying size.
+            for k in 0..<3 {
+                let kk = Double(k)
+                let bx = cx + CGFloat(cos(kk * 2.1 + seed * 3)) * pileR * 0.6
+                let by = cy + CGFloat(sin(kk * 2.1 + seed * 3)) * pileR * 0.6 - pileR * 0.2
+                let br = pileR * CGFloat(0.55 + 0.45 * (kk / 3))
+                ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(op),
+                                                            Color(red: 0.86, green: 0.93, blue: 1.0).opacity(0)]),
+                        center: CGPoint(x: bx - br * 0.3, y: by - br * 0.3), startRadius: 0, endRadius: br))
+            }
+            // Cool shadow where the pile meets the trench.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - pileR * 0.8, y: cy + pileR * 0.3, width: pileR * 1.6, height: pileR * 0.7)),
+                with: .color(Color(red: 0.5, green: 0.66, blue: 0.88).opacity(0.12 * Double(age))))
         }
     }
+}
+
+/// Graphite — pencil on paper: a faint base line broken up by short, jittered,
+/// uneven strokes so it reads as scratchy lead catching the paper's tooth (not
+/// a solid ink line).  Static — the jitter is seeded per segment so it holds.
+private func trailGraphite(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+    let lead = Color(red: 0.20, green: 0.20, blue: 0.22)
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)
+        let a = pts[i - 1], b = pts[i]
+        var base = Path(); base.move(to: a); base.addLine(to: b)
+        ctx.stroke(base, with: .color(lead.opacity(0.10 + 0.30 * age)),
+                   style: StrokeStyle(lineWidth: baseWidth * 0.6, lineCap: .round))
+        let dx = b.x - a.x, dy = b.y - a.y, len = max(0.001, hypot(dx, dy))
+        let ux = dx / len, uy = dy / len, px = -uy, py = ux
+        let seed = Double(i) * 12.9898
+        for k in 0..<3 {
+            let f = (Double(k) + 0.5) / 3.0
+            let jit = CGFloat((seed * Double(k + 1)).truncatingRemainder(dividingBy: 1.0) - 0.5) * baseWidth * 0.7
+            let mx = a.x + dx * CGFloat(f) + px * jit, my = a.y + dy * CGFloat(f) + py * jit
+            let l2 = baseWidth * 0.55
+            var m = Path()
+            m.move(to: CGPoint(x: mx - ux * l2, y: my - uy * l2))
+            m.addLine(to: CGPoint(x: mx + ux * l2, y: my + uy * l2))
+            let op = (0.10 + 0.5 * age) * (0.4 + 0.6 * (seed * Double(k + 3)).truncatingRemainder(dividingBy: 1.0))
+            ctx.stroke(m, with: .color(lead.opacity(op)),
+                       style: StrokeStyle(lineWidth: max(0.5, baseWidth * 0.16), lineCap: .round))
+        }
+    }
+}
+
+/// Rose — a dark rose streak that sheds drifting, spinning rose petals.
+private func trailRose(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+    let dark = Color(red: 0.42, green: 0.06, blue: 0.18)
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(dark.opacity(0.20 + 0.60 * age)),
+                   style: StrokeStyle(lineWidth: baseWidth * CGFloat(0.40 + 0.50 * age), lineCap: .round, lineJoin: .round))
+    }
+    let petals = [Color(red: 0.85, green: 0.20, blue: 0.40),
+                  Color(red: 0.95, green: 0.45, blue: 0.60),
+                  Color(red: 0.62, green: 0.10, blue: 0.28)]
+    for i in 0..<n {
+        let age = Double(i) / Double(n - 1)
+        let seed = Double(i) * 0.6180339
+        let driftAng = t * 0.8 + seed * 6.283
+        let off = baseWidth * CGFloat(0.8 + 2.0 * (1 - age))
+        let cx = pts[i].x + CGFloat(cos(driftAng)) * off
+        let cy = pts[i].y + CGFloat(sin(driftAng)) * off + CGFloat(1 - age) * baseWidth * 0.8
+        let sz = baseWidth * CGFloat(0.32 + 0.26 * seed.truncatingRemainder(dividingBy: 1.0))
+        drawPetal(ctx, CGPoint(x: cx, y: cy), sz, t * 1.5 + seed * 6,
+                  petals[i % 3].opacity(0.40 * age + 0.25))
+    }
+}
+
+/// One rotated rose petal (a pointed leaf shape).
+private func drawPetal(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ rot: Double, _ color: Color) {
+    let ca = CGFloat(cos(rot)), sa = CGFloat(sin(rot))
+    func rp(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        CGPoint(x: c.x + x * ca - y * sa, y: c.y + x * sa + y * ca)
+    }
+    var petal = Path()
+    petal.move(to: rp(0, -s))
+    petal.addQuadCurve(to: rp(0, s), control: rp(s * 0.9, 0))
+    petal.addQuadCurve(to: rp(0, -s), control: rp(-s * 0.9, 0))
+    petal.closeSubpath()
+    ctx.fill(petal, with: .color(color))
 }
 
 /// Fire — flickering little flames left along the trail.
