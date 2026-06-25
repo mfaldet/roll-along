@@ -582,41 +582,36 @@ struct CosmeticShopView: View {
             .shadow(color: Color.black.opacity(0.40), radius: 6, x: 0, y: 4)
     }
 
+    @ViewBuilder
     private func trailPreview(_ trail: TrailColor) -> some View {
-        // A short streak in the trail's color, from lower-left to upper-right.
-        Canvas { ctx, size in
-            var path = Path()
-            let pts = 14
-            for i in 0..<pts {
-                let t = Double(i) / Double(pts - 1)
-                let x = size.width * CGFloat(0.15 + t * 0.7)
-                let y = size.height * CGFloat(0.85 - t * 0.7)
-                if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                else      { path.addLine(to: CGPoint(x: x, y: y)) }
+        if trail == .none {
+            Canvas { ctx, size in
+                var p = Path()
+                p.move(to: CGPoint(x: size.width * 0.18, y: size.height * 0.80))
+                p.addLine(to: CGPoint(x: size.width * 0.82, y: size.height * 0.22))
+                ctx.stroke(p, with: .color(Color(white: 0.30)),
+                           style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [2, 5]))
             }
-            if trail == .rainbow {
-                // Render rainbow as multiple short segments
-                let segs = pts - 1
-                for i in 0..<segs {
-                    let t1 = Double(i) / Double(segs)
-                    let t2 = Double(i+1) / Double(segs)
-                    let x1 = size.width * CGFloat(0.15 + t1 * 0.7)
-                    let y1 = size.height * CGFloat(0.85 - t1 * 0.7)
-                    let x2 = size.width * CGFloat(0.15 + t2 * 0.7)
-                    let y2 = size.height * CGFloat(0.85 - t2 * 0.7)
-                    var s = Path()
-                    s.move(to: CGPoint(x: x1, y: y1))
-                    s.addLine(to: CGPoint(x: x2, y: y2))
-                    let hue = t1
-                    ctx.stroke(s, with: .color(Color(hue: hue, saturation: 1.0, brightness: 1.0)),
-                               style: StrokeStyle(lineWidth: 5, lineCap: .round))
+            .padding(8)
+        } else {
+            // Render the actual trail effect along a gentle sample curve so the
+            // cell sells what the trail really does.  Animated like in-game.
+            TimelineView(.animation) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                Canvas { ctx, size in
+                    let n = 18
+                    var pts: [CGPoint] = []
+                    for i in 0..<n {
+                        let f = Double(i) / Double(n - 1)
+                        let x = size.width  * CGFloat(0.14 + f * 0.72)
+                        let y = size.height * CGFloat(0.50 + 0.30 * sin(f * .pi * 1.4))
+                        pts.append(CGPoint(x: x, y: y))
+                    }
+                    drawRichTrail(ctx, points: pts, trail: trail, t: t, baseWidth: 5)
                 }
-            } else {
-                ctx.stroke(path, with: .color(trail == .none ? Color(white: 0.30) : trail.color),
-                           style: StrokeStyle(lineWidth: 5, lineCap: .round))
             }
+            .padding(8)
         }
-        .padding(8)
     }
 
     private func floorPreview(_ floor: Floor) -> some View {
