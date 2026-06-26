@@ -195,6 +195,23 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     a sparkly druzy (crystalline) centre catching light; purples + quartz
     //     white.  Static-but-twinkling.  Geode bundle (Epic).
     case geode       = "Geode"
+    //   • lavaLamp — retro lava lamp: fat warm-orange/coral wax blobs slowly
+    //     rising, merging and splitting inside a magenta-violet fluid with a
+    //     soft glow.  Animated.  Lava Lamp bundle (Epic).
+    case lavaLamp    = "Lava Lamp"
+    //   • plasmaGlobe — Tesla plasma globe: electric magenta/cyan tendrils
+    //     arcing from a bright central electrode to the glass, flickering and
+    //     rerouting over a dark interior.  Animated.  Plasma Globe bundle (Legendary).
+    case plasmaGlobe = "Plasma Globe"
+    //   • cathedral — stained-glass rosette window: jewel-tone panes (ruby,
+    //     cobalt, emerald, amber) divided by dark leaded cames radiating from
+    //     the centre, with light glinting through.  Subtle shimmer.  Cathedral
+    //     bundle (Epic).
+    case cathedral   = "Cathedral"
+    //   • magmaCore — dark obsidian/basalt shell with glowing molten-orange
+    //     fracture seams pulsing as if lava flows beneath; drifting embers.
+    //     Animated.  Magma Core bundle (Legendary).
+    case magmaCore   = "Magma Core"
 
     var id: String { rawValue }
 
@@ -774,6 +791,50 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.74, green: 0.52, blue: 0.86),
                 Color(red: 0.46, green: 0.24, blue: 0.62),
                 Color(red: 0.20, green: 0.08, blue: 0.34),
+            ]
+
+        case .lavaLamp:
+            // Warm coral-orange wax highlight → orange → magenta-violet fluid →
+            // deep purple.  The rising/merging wax blobs paint on top via the
+            // bespoke lavaLampCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.76, blue: 0.46),
+                Color(red: 0.98, green: 0.46, blue: 0.30),
+                Color(red: 0.58, green: 0.14, blue: 0.52),
+                Color(red: 0.18, green: 0.04, blue: 0.26),
+            ]
+
+        case .plasmaGlobe:
+            // Bright electrode magenta-white highlight → magenta → cyan-violet →
+            // near-black interior.  The arcing electric tendrils paint on top via
+            // the bespoke plasmaGlobeCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.80, blue: 1.00),
+                Color(red: 0.82, green: 0.24, blue: 0.92),
+                Color(red: 0.24, green: 0.28, blue: 0.70),
+                Color(red: 0.03, green: 0.02, blue: 0.10),
+            ]
+
+        case .cathedral:
+            // Amber-gold glint → ruby → cobalt → deep leaded-black.  The radiating
+            // stained-glass rosette of jewel-tone panes paints on top via the
+            // bespoke cathedralCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 0.42),
+                Color(red: 0.82, green: 0.14, blue: 0.22),
+                Color(red: 0.14, green: 0.24, blue: 0.66),
+                Color(red: 0.06, green: 0.05, blue: 0.10),
+            ]
+
+        case .magmaCore:
+            // Molten-orange seam glow → ember orange → basalt grey → obsidian
+            // black.  The cracked crust + pulsing molten fracture seams paint on
+            // top via the bespoke magmaCoreCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.78, blue: 0.30),
+                Color(red: 0.96, green: 0.42, blue: 0.10),
+                Color(red: 0.26, green: 0.22, blue: 0.22),
+                Color(red: 0.05, green: 0.04, blue: 0.05),
             ]
         }
     }

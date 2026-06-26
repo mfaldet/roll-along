@@ -116,13 +116,17 @@ extension BallSkin: CosmeticItem {
         case .galaxy, .nebula, .opal,
              .pastel, .neon, .dune,
              .basketball, .soccer, .baseball, .eightBall, .golfBall,
-             .geode:           // Geode bundle — Epic (banded agate + druzy core)
+             .geode,           // Geode bundle — Epic (banded agate + druzy core)
+             .lavaLamp,        // Lava Lamp bundle — Epic (animated wax blobs)
+             .cathedral:       // Cathedral bundle — Epic (stained-glass rosette)
             return .premium    // 200 coins (Epic) — colour blends + sports balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
              .storm, .candy, .ghost, .lava, .trench,
              .highRoller,      // High Roller bundle — coin/bundle purchasable
              .quicksilver,     // Quicksilver bundle — coin/bundle purchasable
              .oracle,          // Oracle bundle — coin/bundle purchasable
+             .plasmaGlobe,     // Plasma Globe bundle — coin/bundle purchasable
+             .magmaCore,       // Magma Core bundle — coin/bundle purchasable
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -1941,6 +1945,54 @@ struct CosmeticBundle: Identifiable {
             floors: [.velvet],
             pits:   [.velvet],
             music:  [.classical]
+        ),
+        CosmeticBundle(
+            id:             "lava-lamp",
+            displayName:    "Lava Lamp",
+            tagline:        "Slow, warm, and a little groovy.",
+            contentSummary: "Lava Lamp ball · Plasma goal · Ember trail · Disco floor · Midnight pit · Retrowave music",
+            balls:  [.lavaLamp],
+            goals:  [.plasma],
+            trails: [.ember],
+            floors: [.disco],
+            pits:   [.midnight],
+            music:  [.retrowave]
+        ),
+        CosmeticBundle(
+            id:             "plasma-globe",
+            displayName:    "Plasma Globe",
+            tagline:        "Touch the glass. Feel the charge.",
+            contentSummary: "Plasma Globe ball · Neon goal · Raybeam trail · Midnight floor · Space pit · Synthwave music",
+            balls:  [.plasmaGlobe],
+            goals:  [.neon],
+            trails: [.raybeam],
+            floors: [.midnight],
+            pits:   [.space],
+            music:  [.synthwave]
+        ),
+        CosmeticBundle(
+            id:             "cathedral",
+            displayName:    "Cathedral",
+            tagline:        "Light through a thousand panes.",
+            contentSummary: "Cathedral ball · Prism goal · Smoke trail · Velvet floor · Velvet pit · Orchestral music",
+            balls:  [.cathedral],
+            goals:  [.prism],
+            trails: [.smoke],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.orchestral]
+        ),
+        CosmeticBundle(
+            id:             "magma-core",
+            displayName:    "Magma Core",
+            tagline:        "A cracked shell over a molten heart.",
+            contentSummary: "Magma Core ball · Eclipse goal · Fire trail · Stormcloud floor · Downpour pit · Cinematic music",
+            balls:  [.magmaCore],
+            goals:  [.eclipse],
+            trails: [.fire],
+            floors: [.stormcloud],
+            pits:   [.downpour],
+            music:  [.cinematic]
         ),
     ]
 }

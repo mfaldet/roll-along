@@ -223,6 +223,26 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color(red: 0.36, green: 0.18, blue: 0.50).opacity(0.55), lineWidth: 0.5))
 
+        case .lavaLamp:
+            lavaLampCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.40, green: 0.10, blue: 0.42).opacity(0.55), lineWidth: 0.5))
+
+        case .plasmaGlobe:
+            plasmaGlobeCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.60, green: 0.30, blue: 0.90).opacity(0.50), lineWidth: 0.5))
+
+        case .cathedral:
+            cathedralCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.45), lineWidth: 0.8))
+
+        case .magmaCore:
+            magmaCoreCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.55, green: 0.20, blue: 0.04).opacity(0.55), lineWidth: 0.5))
+
         // No `default`: every BallSkin has an explicit renderer above, so the
         // switch is exhaustive.  Adding a new skin will (intentionally) fail to
         // compile here until it's given a case — same as the colors/tier switches.
@@ -2015,6 +2035,369 @@ struct BallSkinView: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.48, y: cy - r * 0.76, width: r * 0.44, height: r * 0.28)),
                     with: .radialGradient(Gradient(colors: [.white.opacity(0.6), .clear]),
                         center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.60), startRadius: 0, endRadius: r * 0.32))
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Lava Lamp  (Lava Lamp bundle · Epic)
+    // A retro 70s lava lamp: a magenta-violet fluid field with fat warm
+    // orange/coral wax blobs that slowly rise, drift, and pulse in size as if
+    // merging and splitting.  A MeshGradient supplies the moody fluid; the wax
+    // blobs and soft glow paint on top via Canvas with .plusLighter so they
+    // bloom.  Reduce Motion freezes the rise and pulse to a still warm frame.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var lavaLampCanvas: some View {
+        TimelineView(.animation) { tl in
+            let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+
+            // Magenta-violet fluid base — gently shifting MeshGradient so the
+            // fluid itself glows and breathes behind the wax.
+            let drift = Float(0.5 + 0.5 * sin(t * 0.4))
+            let fluidHi  = Color(red: 0.70, green: 0.18, blue: 0.62)
+            let fluidMid = Color(red: 0.44, green: 0.10, blue: 0.48)
+            let fluidLo  = Color(red: 0.16, green: 0.03, blue: 0.24)
+            let warmGlow = Color(red: 0.62 + 0.10 * Double(drift),
+                                 green: 0.20, blue: 0.40)
+            let mesh: [Color] = [
+                fluidLo,  fluidMid, fluidLo,
+                fluidMid, warmGlow, fluidMid,
+                fluidLo,  fluidMid, fluidHi,
+            ]
+            let mdx = Float(sin(t * 0.5)) * 0.05
+            let mdy = Float(cos(t * 0.4)) * 0.05
+            let pts: [SIMD2<Float>] = [
+                [0, 0],          [0.5 + mdx, 0],        [1, 0],
+                [0, 0.5 - mdy],  [0.5 - mdx, 0.5 + mdy], [1, 0.5 + mdy],
+                [0, 1],          [0.5 + mdx, 1],        [1, 1],
+            ]
+
+            ZStack {
+                MeshGradient(width: 3, height: 3, points: pts, colors: mesh)
+
+                Canvas { ctx, size in
+                    let w = size.width, h = size.height
+                    let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+
+                    // Warm wax blobs — each rises slowly, wrapping top→bottom,
+                    // and pulses in radius so they appear to merge and split.
+                    // (xBase, phase, baseSize, speed)
+                    let blobs: [(CGFloat, Double, CGFloat, Double)] = [
+                        (-0.22, 0.0, 0.30, 0.14),
+                        ( 0.20, 1.9, 0.26, 0.11),
+                        ( 0.02, 3.4, 0.34, 0.09),
+                        (-0.10, 5.0, 0.22, 0.16),
+                        ( 0.26, 2.4, 0.20, 0.13),
+                    ]
+                    ctx.blendMode = .plusLighter
+                    for (i, b) in blobs.enumerated() {
+                        // Vertical position cycles 0→1 then wraps; map to y in
+                        // the sphere with a gentle horizontal sway.
+                        let prog = (t * b.3 + b.1).truncatingRemainder(dividingBy: 1.0)
+                        let by = cy + r * (0.85 - 1.7 * CGFloat(prog))
+                        let bx = cx + b.0 * r + CGFloat(sin(t * 0.5 + Double(i) * 1.3)) * r * 0.10
+                        let pulse = 0.85 + 0.30 * CGFloat(sin(t * 0.9 + Double(i) * 1.7))
+                        let br = b.2 * r * pulse
+                        // Two-tone wax: bright coral core fading to deep orange.
+                        ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                            with: .radialGradient(
+                                Gradient(colors: [Color(red: 1.0, green: 0.74, blue: 0.42).opacity(0.92),
+                                                  Color(red: 0.98, green: 0.42, blue: 0.24).opacity(0.55),
+                                                  .clear]),
+                                center: CGPoint(x: bx - br * 0.2, y: by - br * 0.2),
+                                startRadius: 0, endRadius: br))
+                    }
+                    ctx.blendMode = .normal
+
+                    // Soft overall warm glow from the centre — the lamp's lit body.
+                    ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color(red: 1.0, green: 0.50, blue: 0.30).opacity(0.18), .clear]),
+                            center: CGPoint(x: cx, y: cy + r * 0.2), startRadius: 0, endRadius: r * 1.1))
+
+                    // Glassy top-left specular sells the lamp glass.
+                    ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.50, y: cy - r * 0.80, width: r * 0.46, height: r * 0.30)),
+                        with: .radialGradient(Gradient(colors: [.white.opacity(0.50), .clear]),
+                            center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.34))
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Plasma Globe  (Plasma Globe bundle · Legendary)
+    // A Tesla plasma globe: a dark interior with a bright central electrode from
+    // which electric magenta/cyan tendrils arc out to the glass, flickering and
+    // rerouting over time.  Each tendril is a jagged poly-line whose mid-points
+    // jitter; their brightness flickers and they occasionally re-aim.  Drawn
+    // with .plusLighter for an additive electric glow.  Reduce Motion freezes
+    // the arcs and flicker to a steady lit frame.  Clipped to a circle by the
+    // body switch caller.
+    // =========================================================================
+    private var plasmaGlobeCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+                // Dark glass interior with a faint violet vignette.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.10, green: 0.06, blue: 0.22),
+                                      Color(red: 0.05, green: 0.02, blue: 0.12),
+                                      Color(red: 0.01, green: 0.00, blue: 0.05)]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r * 1.1))
+
+                ctx.blendMode = .plusLighter
+
+                // Electric tendrils arcing from the central electrode to the glass.
+                let count = 7
+                for i in 0..<count {
+                    // Each tendril slowly sweeps and occasionally re-aims.
+                    let baseAng = Double(i) / Double(count) * 2 * .pi
+                    let aim = baseAng + sin(t * 0.5 + Double(i) * 2.1) * 0.6
+                    let endR = r * 0.92
+                    let endP = CGPoint(x: cx + CGFloat(cos(aim)) * endR,
+                                       y: cy + CGFloat(sin(aim)) * endR)
+                    let start = CGPoint(x: cx, y: cy)
+
+                    // Jagged poly-line: interpolate start→end, jitter the mids.
+                    let segs = 6
+                    var path = Path()
+                    path.move(to: start)
+                    for s in 1...segs {
+                        let f = CGFloat(s) / CGFloat(segs)
+                        let lx = start.x + (endP.x - start.x) * f
+                        let ly = start.y + (endP.y - start.y) * f
+                        // Perpendicular jitter that shrinks toward the endpoint.
+                        let perp = aim + .pi / 2
+                        let jAmp = r * 0.16 * Double(f) * (1 - Double(f) + 0.25)
+                        let jit = CGFloat(sin(t * 6 + Double(i) * 3 + Double(s) * 1.9)) * CGFloat(jAmp)
+                        let px = lx + CGFloat(cos(perp)) * jit
+                        let py = ly + CGFloat(sin(perp)) * jit
+                        path.addLine(to: CGPoint(x: px, y: py))
+                    }
+                    // Flicker — some arcs dim and brighten independently.
+                    let flick = reduceMotion ? 0.8 : 0.45 + 0.55 * abs(sin(t * 4 + Double(i) * 1.3))
+                    // Alternate magenta / cyan tendrils.
+                    let col = (i % 2 == 0)
+                        ? Color(red: 0.96, green: 0.34, blue: 0.96)
+                        : Color(red: 0.42, green: 0.86, blue: 1.0)
+                    ctx.stroke(path, with: .color(col.opacity(flick)), lineWidth: max(0.8, r * 0.04))
+                    ctx.stroke(path, with: .color(.white.opacity(flick * 0.6)), lineWidth: max(0.4, r * 0.015))
+                }
+
+                // Bright central electrode bloom.
+                let eR = r * 0.30
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - eR, y: cy - eR, width: eR * 2, height: eR * 2)),
+                    with: .radialGradient(
+                        Gradient(colors: [.white,
+                                          Color(red: 0.95, green: 0.55, blue: 1.0).opacity(0.7),
+                                          .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: eR))
+                ctx.blendMode = .normal
+
+                // Glass rim sheen + top-left specular.
+                ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.04, dy: r * 0.04)),
+                    with: .color(Color(red: 0.70, green: 0.80, blue: 1.0).opacity(0.35)),
+                    lineWidth: max(0.6, r * 0.03))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.50, y: cy - r * 0.82, width: r * 0.42, height: r * 0.26)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.40), .clear]),
+                        center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.66), startRadius: 0, endRadius: r * 0.30))
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Cathedral  (Cathedral bundle · Epic)
+    // A stained-glass rosette window: jewel-tone panes (ruby, cobalt, emerald,
+    // amber, violet) arranged in two radial rings, divided by dark leaded
+    // "cames", with a small central boss.  A slow shimmer of light sweeps the
+    // panes (a moving bright wedge with .plusLighter) so it reads as sunlight
+    // passing through.  Reduce Motion holds the shimmer at a flattering angle.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var cathedralCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+
+                // Jewel palette for the panes.
+                let jewels: [Color] = [
+                    Color(red: 0.82, green: 0.12, blue: 0.20),   // ruby
+                    Color(red: 0.12, green: 0.26, blue: 0.74),   // cobalt
+                    Color(red: 0.10, green: 0.56, blue: 0.34),   // emerald
+                    Color(red: 0.92, green: 0.66, blue: 0.16),   // amber
+                    Color(red: 0.50, green: 0.16, blue: 0.62),   // violet
+                ]
+                let lead = Color(red: 0.05, green: 0.04, blue: 0.06)
+
+                // Dark leaded background fills any gaps.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                         with: .color(lead))
+
+                // Helper: draw one wedge pane between two angles, inner→outer radii.
+                func pane(a0: Double, a1: Double, r0: CGFloat, r1: CGFloat, color: Color) {
+                    var p = Path()
+                    p.move(to: CGPoint(x: cx + CGFloat(cos(a0)) * r0, y: cy + CGFloat(sin(a0)) * r0))
+                    p.addLine(to: CGPoint(x: cx + CGFloat(cos(a0)) * r1, y: cy + CGFloat(sin(a0)) * r1))
+                    // Arc the outer edge for a rounded rosette look.
+                    let steps = 5
+                    for s in 1...steps {
+                        let a = a0 + (a1 - a0) * Double(s) / Double(steps)
+                        p.addLine(to: CGPoint(x: cx + CGFloat(cos(a)) * r1, y: cy + CGFloat(sin(a)) * r1))
+                    }
+                    p.addLine(to: CGPoint(x: cx + CGFloat(cos(a1)) * r0, y: cy + CGFloat(sin(a1)) * r0))
+                    p.closeSubpath()
+                    // Pane fill with a slight radial brighten toward the rim.
+                    ctx.fill(p, with: .radialGradient(
+                        Gradient(colors: [color.opacity(0.78), color]),
+                        center: CGPoint(x: cx, y: cy), startRadius: r0, endRadius: r1))
+                    ctx.stroke(p, with: .color(lead), lineWidth: max(1.0, r * 0.05))
+                }
+
+                // Outer ring of 12 panes.
+                let outerN = 12
+                let gap = 0.04
+                for i in 0..<outerN {
+                    let a0 = Double(i) / Double(outerN) * 2 * .pi + gap
+                    let a1 = Double(i + 1) / Double(outerN) * 2 * .pi - gap
+                    pane(a0: a0, a1: a1, r0: r * 0.50, r1: r * 0.98,
+                         color: jewels[i % jewels.count])
+                }
+                // Inner ring of 6 panes, offset half a step for a woven look.
+                let innerN = 6
+                for i in 0..<innerN {
+                    let off = Double.pi / Double(innerN)
+                    let a0 = Double(i) / Double(innerN) * 2 * .pi + gap + off
+                    let a1 = Double(i + 1) / Double(innerN) * 2 * .pi - gap + off
+                    pane(a0: a0, a1: a1, r0: r * 0.18, r1: r * 0.50,
+                         color: jewels[(i + 2) % jewels.count])
+                }
+
+                // Central boss — a small bright amber roundel.
+                let bR = r * 0.18
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - bR, y: cy - bR, width: bR * 2, height: bR * 2)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color(red: 1.0, green: 0.92, blue: 0.62),
+                                          Color(red: 0.86, green: 0.56, blue: 0.12)]),
+                        center: CGPoint(x: cx - bR * 0.2, y: cy - bR * 0.2), startRadius: 0, endRadius: bR))
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - bR, y: cy - bR, width: bR * 2, height: bR * 2)),
+                           with: .color(lead), lineWidth: max(1.0, r * 0.05))
+
+                // Shimmer — a slowly sweeping bright wedge of "sunlight" through
+                // the glass, additive so it lights whichever panes it crosses.
+                let sweep = reduceMotion ? (-0.7) : t * 0.5
+                ctx.blendMode = .plusLighter
+                var beam = Path()
+                let half = 0.55
+                beam.move(to: CGPoint(x: cx, y: cy))
+                let bs = 6
+                for s in 0...bs {
+                    let a = sweep - half + Double(s) / Double(bs) * (half * 2)
+                    beam.addLine(to: CGPoint(x: cx + CGFloat(cos(a)) * r * 1.1,
+                                             y: cy + CGFloat(sin(a)) * r * 1.1))
+                }
+                beam.closeSubpath()
+                ctx.fill(beam, with: .radialGradient(
+                    Gradient(colors: [.white.opacity(0.30), .clear]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r * 1.1))
+                ctx.blendMode = .normal
+
+                // Subtle top-left glass specular.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.82, width: r * 0.42, height: r * 0.26)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.28), .clear]),
+                        center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.66), startRadius: 0, endRadius: r * 0.30))
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Magma Core  (Magma Core bundle · Legendary)
+    // A dark obsidian/basalt shell cracked by glowing molten-orange fracture
+    // seams that pulse (brighten/dim) as if lava flows beneath the crust, plus
+    // a few drifting embers rising off the surface.  The seams are a fixed
+    // branching network whose glow is driven by a per-seam sine so the lava
+    // "breathes".  Drawn with .plusLighter for the molten bloom.  Reduce Motion
+    // holds the seams at a warm steady glow and stills the embers.  Clipped to
+    // a circle by the body switch caller.
+    // =========================================================================
+    private var magmaCoreCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+                // Dark basalt/obsidian shell with a subtle top-left sheen.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.30, green: 0.27, blue: 0.27),
+                                      Color(red: 0.12, green: 0.11, blue: 0.12),
+                                      Color(red: 0.03, green: 0.03, blue: 0.04)]),
+                    center: CGPoint(x: cx - r * 0.26, y: cy - r * 0.30), startRadius: 0, endRadius: r * 1.2))
+
+                // A faint deep-orange glow from the molten heart, leaking through.
+                ctx.blendMode = .plusLighter
+                let heart = reduceMotion ? 0.5 : 0.45 + 0.35 * (0.5 + 0.5 * sin(t * 1.1))
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.95, green: 0.30, blue: 0.05).opacity(heart * 0.5), .clear]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r * 0.9))
+
+                // Fracture seams — a fixed network of crooked cracks.  Each is a
+                // poly-line of normalized points (unit-circle space) with its own
+                // pulse phase so different seams glow at different times.
+                let seams: [(phase: Double, pts: [(CGFloat, CGFloat)])] = [
+                    (0.0, [(-0.78, -0.10), (-0.40, -0.04), (-0.12, -0.18), (0.18, -0.10), (0.52, -0.24), (0.82, -0.16)]),
+                    (1.6, [(-0.60, 0.40), (-0.30, 0.18), (-0.04, 0.30), (0.26, 0.16), (0.50, 0.34), (0.78, 0.22)]),
+                    (3.1, [(-0.10, -0.80), (-0.02, -0.40), (-0.14, -0.06), (0.04, 0.24), (-0.06, 0.56), (0.06, 0.82)]),
+                    (4.4, [(0.30, -0.70), (0.18, -0.34), (0.34, -0.02), (0.20, 0.30), (0.36, 0.62)]),
+                    (5.2, [(-0.34, -0.62), (-0.20, -0.28), (-0.36, 0.02), (-0.22, 0.34), (-0.34, 0.60)]),
+                ]
+                for seam in seams {
+                    var path = Path()
+                    for (j, p) in seam.pts.enumerated() {
+                        let pt = CGPoint(x: cx + p.0 * r, y: cy + p.1 * r)
+                        if j == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+                    }
+                    let glow = reduceMotion ? 0.7 : 0.40 + 0.60 * (0.5 + 0.5 * sin(t * 1.6 + seam.phase))
+                    // Wide soft molten under-glow.
+                    ctx.stroke(path, with: .color(Color(red: 1.0, green: 0.34, blue: 0.04).opacity(glow * 0.55)),
+                               lineWidth: max(2.0, r * 0.11))
+                    // Brighter inner seam.
+                    ctx.stroke(path, with: .color(Color(red: 1.0, green: 0.60, blue: 0.16).opacity(glow * 0.9)),
+                               lineWidth: max(1.0, r * 0.05))
+                    // Hot white-yellow core line.
+                    ctx.stroke(path, with: .color(Color(red: 1.0, green: 0.92, blue: 0.66).opacity(glow)),
+                               lineWidth: max(0.5, r * 0.02))
+                }
+
+                // Drifting embers rising off the crust.
+                let embers = 7
+                for i in 0..<embers {
+                    let seed = Double(i) * 1.7
+                    let prog = (t * 0.35 + seed).truncatingRemainder(dividingBy: 1.0)
+                    let ex = cx + CGFloat(sin(seed * 2.3)) * r * 0.6 + CGFloat(sin(t * 0.8 + seed)) * r * 0.06
+                    let ey = cy + r * (0.7 - 1.4 * CGFloat(prog))
+                    let life = 1.0 - prog            // fade as they rise
+                    let es = r * 0.035 * CGFloat(0.6 + 0.4 * sin(t * 3 + seed))
+                    ctx.fill(Path(ellipseIn: CGRect(x: ex - es, y: ey - es, width: es * 2, height: es * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color(red: 1.0, green: 0.78, blue: 0.30).opacity(life),
+                                              Color(red: 1.0, green: 0.35, blue: 0.05).opacity(life * 0.5),
+                                              .clear]),
+                            center: CGPoint(x: ex, y: ey), startRadius: 0, endRadius: es * 1.6))
+                }
+                ctx.blendMode = .normal
+
+                // Cool top-left specular on the glassy obsidian crust.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.82, width: r * 0.40, height: r * 0.26)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.32), .clear]),
+                        center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.66), startRadius: 0, endRadius: r * 0.28))
             }
         }
     }
