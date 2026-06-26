@@ -129,6 +129,9 @@ extension BallSkin: CosmeticItem {
              .magmaCore,       // Magma Core bundle — coin/bundle purchasable
              .hologram,        // Neon City bundle — coin/bundle purchasable (animated)
              .clockwork,       // Clockwork bundle — coin/bundle purchasable (animated)
+             .fireworks,       // Star-Spangled seasonal — coin/bundle purchasable (animated)
+             .sugarSkull,      // Día de los Muertos seasonal — coin/bundle purchasable
+             .harvest,         // Harvest Moon seasonal — coin/bundle purchasable
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -1771,6 +1774,48 @@ struct CosmeticBundle: Identifiable {
             music:  [.acoustic],
             availableFrom:  CosmeticBundle.date(2027, 3, 20),
             availableUntil: CosmeticBundle.date(2027, 5,  1)
+        ),
+        CosmeticBundle(
+            id:             "july4-2026",
+            displayName:    "Star-Spangled",
+            tagline:        "Light up the night sky.",
+            contentSummary: "Fireworks ball · Rainbow goal · Stardust trail · Midnight floor · Midnight pit · Orchestral music",
+            balls:  [.fireworks],
+            goals:  [.rainbow],
+            trails: [.stardust],
+            floors: [.midnight],
+            pits:   [.midnight],
+            music:  [.orchestral],
+            availableFrom:  CosmeticBundle.date(2026, 6, 28),
+            availableUntil: CosmeticBundle.date(2026, 7,  6)
+        ),
+        CosmeticBundle(
+            id:             "muertos-2026",
+            displayName:    "Día de los Muertos",
+            tagline:        "Roll bright, remember well.",
+            contentSummary: "Sugar Skull ball · Blossom goal · Rose trail · Velvet floor · Graveyard pit · Downtempo music",
+            balls:  [.sugarSkull],
+            goals:  [.blossom],
+            trails: [.roseTrail],
+            floors: [.velvet],
+            pits:   [.graveyard],
+            music:  [.downtempo],
+            availableFrom:  CosmeticBundle.date(2026, 10, 28),
+            availableUntil: CosmeticBundle.date(2026, 11,  3)
+        ),
+        CosmeticBundle(
+            id:             "harvest-2026",
+            displayName:    "Harvest Moon",
+            tagline:        "Gather the golden hour in.",
+            contentSummary: "Harvest Moon ball · Flame goal · Ember trail · Desert floor · Canyon pit · Lo-fi music",
+            balls:  [.harvest],
+            goals:  [.flame],
+            trails: [.ember],
+            floors: [.desert],
+            pits:   [.canyon],
+            music:  [.lofi],
+            availableFrom:  CosmeticBundle.date(2026, 11, 1),
+            availableUntil: CosmeticBundle.date(2026, 11, 30)
         ),
 
         // ── Sports bundles ──────────────────────────────────────────────

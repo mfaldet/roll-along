@@ -221,6 +221,19 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     Animated rotation.  Clockwork bundle (Legendary).
     case clockwork   = "Clockwork"
 
+    // ── Seasonal bundle skins (catalogue + real-money IAP — NOT bundle-exclusive) ─
+    //   • fireworks — dark night-sky sphere with bursting red / white / blue
+    //     firework shells and falling sparks; celebratory.  Animated, Reduce-
+    //     Motion-safe.  Star-Spangled bundle (Legendary).
+    case fireworks   = "Fireworks"
+    //   • sugarSkull — ornate white calavera (sugar skull) decorated with
+    //     marigold-orange and rose floral patterns; bright and festive.  Static.
+    //     Día de los Muertos bundle (Legendary).
+    case sugarSkull  = "Sugar Skull"
+    //   • harvest — warm amber-to-maple gradient sphere with a subtle autumn-
+    //     leaf motif; cozy fall tones.  Static.  Harvest Moon bundle (Legendary).
+    case harvest     = "Harvest Moon"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -866,6 +879,40 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.84, green: 0.58, blue: 0.24),
                 Color(red: 0.52, green: 0.34, blue: 0.14),
                 Color(red: 0.18, green: 0.12, blue: 0.07),
+            ]
+
+        // ── Seasonal bundle skins ─────────────────────────────────────────────
+        case .fireworks:
+            // Dark indigo night sky — faint top glow → deep navy → near-black
+            // horizon.  The bursting red/white/blue shells and falling sparks
+            // paint on top via the bespoke fireworksCanvas in BallSkinView.
+            return [
+                Color(red: 0.18, green: 0.20, blue: 0.42),
+                Color(red: 0.06, green: 0.08, blue: 0.24),
+                Color(red: 0.02, green: 0.03, blue: 0.12),
+                Color(red: 0.00, green: 0.01, blue: 0.05),
+            ]
+
+        case .sugarSkull:
+            // Bright bone-white calavera — pure white highlight → ivory → warm
+            // shadow.  The marigold-orange and rose floral decorations paint on
+            // top via the bespoke sugarSkullCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 1.00, blue: 0.99),
+                Color(red: 0.96, green: 0.95, blue: 0.90),
+                Color(red: 0.80, green: 0.76, blue: 0.68),
+                Color(red: 0.48, green: 0.42, blue: 0.36),
+            ]
+
+        case .harvest:
+            // Warm autumn moon — pale gold highlight → amber → maple-orange →
+            // deep russet shadow.  The subtle autumn-leaf motif paints on top
+            // via the bespoke harvestCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.90, blue: 0.62),
+                Color(red: 0.94, green: 0.66, blue: 0.28),
+                Color(red: 0.74, green: 0.40, blue: 0.14),
+                Color(red: 0.38, green: 0.18, blue: 0.06),
             ]
         }
     }
