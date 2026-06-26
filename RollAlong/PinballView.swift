@@ -22,8 +22,14 @@ struct CleanTable: Codable {
     struct Flip: Codable { let pivot: [Double]; let tip: [Double]; let side: String }
     struct P: Codable { let x, y: Double }
     struct Drain: Codable { let x, y, w, h: Double }
+    struct Physics: Codable {
+        let gravityFrac, launchFrac, ballRadiusFrac, ballMass, wallRestitution, wallFriction, ballRestitution: Double
+        static let `default` = Physics(gravityFrac: 0.60, launchFrac: 2.07, ballRadiusFrac: 0.018,
+                                       ballMass: 1.0, wallRestitution: 0.30, wallFriction: 0.20, ballRestitution: 0.35)
+    }
 
     let aspect: Double
+    let physics: Physics?          // absent in the embedded default → Physics.default
     let walls: [[[Double]]]
     let bumpers: [Bumper]
     let slings: [[[Double]]]
@@ -33,6 +39,15 @@ struct CleanTable: Codable {
 
     static let shared: CleanTable = {
         try! JSONDecoder().decode(CleanTable.self, from: Data(json.utf8))
+    }()
+    /// A Marble Mapper export (Bundle `pinball-table.json`) if present, else the embedded default.
+    static let resolved: CleanTable = {
+        if let url = Bundle.main.url(forResource: "pinball-table", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let table = try? JSONDecoder().decode(CleanTable.self, from: data) {
+            return table
+        }
+        return shared
     }()
     static let json = #"""
 {"aspect":1.9,"walls":[[[0.4,0.95],[0.4,0.95],[0.3754,0.948],[0.3517,0.9455],[0.3289,0.9423],[0.3069,0.9386],[0.2859,0.9343],[0.2656,0.9294],[0.2463,0.9239],[0.2278,0.9178],[0.2102,0.9111],[0.1934,0.9038],[0.1775,0.896],[0.1625,0.8875],[0.1484,0.8785],[0.1351,0.8688],[0.1227,0.8586],[0.1111,0.8478],[0.1004,0.8364],[0.0906,0.8244],[0.0817,0.8118],[0.0736,0.7986],[0.0664,0.7848],[0.0601,0.7705],[0.0546,0.7555],[0.05,0.74],[0.05,0.16],[0.05,0.16],[0.0504,0.1498],[0.0515,0.1399],[0.0533,0.1305],[0.0558,0.1214],[0.0591,0.1128],[0.0631,0.1045],[0.0679,0.0966],[0.0733,0.0891],[0.0795,0.082],[0.0865,0.0753],[0.0941,0.0689],[0.1025,0.063],[0.1116,0.0574],[0.1215,0.0523],[0.132,0.0475],[0.1433,0.0431],[0.1554,0.0391],[0.1681,0.0355],[0.1816,0.0323],[0.1958,0.0294],[0.2108,0.027],[0.2265,0.0249],[0.2429,0.0233],[0.26,0.022],[0.26,0.022],[0.28,0.0206],[0.3,0.0192],[0.32,0.0181],[0.34,0.017],[0.36,0.0161],[0.38,0.0152],[0.4,0.0146],[0.42,0.014],[0.44,0.0136],[0.46,0.0132],[0.48,0.0131],[0.5,0.013],[0.52,0.0131],[0.54,0.0132],[0.56,0.0136],[0.58,0.014],[0.6,0.0146],[0.62,0.0152],[0.64,0.0161],[0.66,0.017],[0.68,0.0181],[0.7,0.0192],[0.72,0.0206],[0.74,0.022],[0.74,0.022],[0.7555,0.0254],[0.7703,0.0292],[0.7845,0.0334],[0.7981,0.0381],[0.8109,0.0431],[0.8231,0.0486],[0.8347,0.0545],[0.8456,0.0609],[0.8558,0.0677],[0.8653,0.0748],[0.8743,0.0825],[0.8825,0.0905],[0.8901,0.099],[0.897,0.1078],[0.9033,0.1172],[0.9089,0.1269],[0.9138,0.137],[0.9181,0.1476],[0.9218,0.1586],[0.9247,0.1701],[0.927,0.1819],[0.9287,0.1942],[0.9297,0.2069],[0.93,0.22],[0.93,0.95],[0.84,0.95]],[[0.84,0.95],[0.84,0.25]],[[0.5,0.95],[0.5,0.95],[0.5245,0.9488],[0.5482,0.9469],[0.5709,0.9442],[0.5928,0.9408],[0.6137,0.9367],[0.6338,0.9319],[0.6529,0.9263],[0.6711,0.92],[0.6884,0.913],[0.7049,0.9052],[0.7204,0.8967],[0.735,0.8875],[0.7487,0.8776],[0.7615,0.8669],[0.7734,0.8555],[0.7844,0.8433],[0.7945,0.8305],[0.8037,0.8169],[0.812,0.8026],[0.8194,0.7875],[0.8259,0.7717],[0.8315,0.7552],[0.8362,0.738],[0.84,0.72]]],"bumpers":[{"x":0.3,"y":0.3,"r":0.046},{"x":0.57,"y":0.3,"r":0.046},{"x":0.435,"y":0.22,"r":0.046}],"slings":[[[0.2,0.78],[0.3,0.83],[0.2,0.85]],[[0.64,0.78],[0.54,0.83],[0.64,0.85]]],"flippers":[{"pivot":[0.27,0.865],"tip":[0.42,0.915],"side":"L"},{"pivot":[0.61,0.865],"tip":[0.45,0.915],"side":"R"}],"ballStart":{"x":0.885,"y":0.92},"drain":{"x":0.45,"y":0.965,"w":0.12,"h":0.02}}
@@ -144,11 +159,14 @@ struct PinballView: View {
 final class PinballScene: SKScene {
 
     // Tuning as fractions of the field (resolution-independent; matches harness).
-    private let gravFrac:    CGFloat = 0.60   // gentle table-slope gravity (pinball isn't free-fall); harness GRAV = gravFrac*1064 ≈ 640
-    private let ballRadFrac: CGFloat = 0.018
-    private let launchFrac:  CGFloat = 2.07   // launch speed = this × field height (harness 2200 / 1064)
-    private let wallElast:   Double = 0.30
-    private let wallFric:    Double = 0.20
+    // Feel constants come from the resolved table's physics block (mapper-authored
+    // or the embedded default), so tuning in Marble Mapper ships straight through.
+    private var phys: CleanTable.Physics { CleanTable.resolved.physics ?? .default }
+    private var gravFrac:    CGFloat { CGFloat(phys.gravityFrac) }
+    private var ballRadFrac: CGFloat { CGFloat(phys.ballRadiusFrac) }
+    private var launchFrac:  CGFloat { CGFloat(phys.launchFrac) }
+    private var wallElast:   Double { phys.wallRestitution }
+    private var wallFric:    Double { phys.wallFriction }
 
     private var space: OpaquePointer?
     private var ballBody: OpaquePointer?
@@ -229,7 +247,7 @@ final class PinballScene: SKScene {
     }
 
     private func computeField() {
-        let a = CGFloat(CleanTable.shared.aspect)     // height / width
+        let a = CGFloat(CleanTable.resolved.aspect)     // height / width
         var w = size.width, h = w * a
         if h > size.height { h = size.height; w = h / a }
         field = CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h)
@@ -241,7 +259,7 @@ final class PinballScene: SKScene {
         cpSpaceSetGravity(space, cpVect(x: 0, y: Double(-field.height * gravFrac)))
         let sb = cpSpaceGetStaticBody(space)
 
-        for wall in CleanTable.shared.walls where wall.count >= 2 {
+        for wall in CleanTable.resolved.walls where wall.count >= 2 {
             // physics segments
             for i in 0..<(wall.count - 1) {
                 let a = pt(wall[i][0], wall[i][1])
@@ -268,10 +286,11 @@ final class PinballScene: SKScene {
     private func spawnBall() {
         guard let space = space else { return }
         let r = Double(ballRadius)
-        let body = cpBodyNew(1.0, cpMomentForCircle(1.0, 0, r, cpVect(x: 0, y: 0)))
+        let m = phys.ballMass
+        let body = cpBodyNew(m, cpMomentForCircle(m, 0, r, cpVect(x: 0, y: 0)))
         cpSpaceAddBody(space, body)
         let shape = cpCircleShapeNew(body, r, cpVect(x: 0, y: 0))
-        cpShapeSetElasticity(shape, 0.35); cpShapeSetFriction(shape, 0.2)
+        cpShapeSetElasticity(shape, phys.ballRestitution); cpShapeSetFriction(shape, 0.2)
         cpSpaceAddShape(space, shape)
         ballBody = body
 
@@ -286,7 +305,7 @@ final class PinballScene: SKScene {
 
     private func resetBall() {
         guard let ballBody = ballBody else { return }
-        let s = CleanTable.shared.ballStart
+        let s = CleanTable.resolved.ballStart
         cpBodySetPosition(ballBody, v(pt(s.x, s.y)))         // rest in the shooter lane
         cpBodySetVelocity(ballBody, cpVect(x: 0, y: 0))
         awaitingLaunch = true
@@ -304,7 +323,7 @@ final class PinballScene: SKScene {
         guard let space = space else { return }
         let sb = cpSpaceGetStaticBody(space)
         let swing = 0.95, mass = 0.5, thick = Double(ballRadius * 1.3)
-        for f in CleanTable.shared.flippers {
+        for f in CleanTable.resolved.flippers {
             let pivot = pt(f.pivot[0], f.pivot[1]), tip = pt(f.tip[0], f.tip[1])
             let len = Double(max(hypot(tip.x - pivot.x, tip.y - pivot.y), 1))
             let rest = atan2(Double(tip.y - pivot.y), Double(tip.x - pivot.x))
@@ -333,7 +352,7 @@ final class PinballScene: SKScene {
     private func buildBumpers() {
         guard let space = space else { return }
         let sb = cpSpaceGetStaticBody(space)
-        for b in CleanTable.shared.bumpers {
+        for b in CleanTable.resolved.bumpers {
             let c = pt(b.x, b.y), r = CGFloat(b.r) * fw
             let shape = cpCircleShapeNew(sb, Double(r), v(c))
             cpShapeSetElasticity(shape, 1.05); cpShapeSetFriction(shape, 0.2)
@@ -351,7 +370,7 @@ final class PinballScene: SKScene {
     private func buildSlings() {
         guard let space = space else { return }
         let sb = cpSpaceGetStaticBody(space)
-        for tri in CleanTable.shared.slings where tri.count == 3 {
+        for tri in CleanTable.resolved.slings where tri.count == 3 {
             let pts = tri.map { pt($0[0], $0[1]) }
             for i in 0..<3 {
                 let a = pts[i], b = pts[(i + 1) % 3]
