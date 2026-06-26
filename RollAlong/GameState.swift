@@ -199,6 +199,11 @@ final class GameState: ObservableObject {
     @Published var goldrushBest: Int {
         didSet { defaults.set(goldrushBest, forKey: "ra_goldrushBest") }
     }
+    // goldrushCoinsTotal — lifetime coins caught across all Gold Rush runs
+    // (accumulates; powers the home "coins earned" readout).
+    @Published var goldrushCoinsTotal: Int {
+        didSet { defaults.set(goldrushCoinsTotal, forKey: "ra_goldrushCoinsTotal") }
+    }
 
     /// Gold Rush tickets — earned one per competitive-minigame win, staked
     /// up front to buy a Gold Rush round (every time-ticket = 30 s on the
@@ -423,6 +428,7 @@ final class GameState: ObservableObject {
         pinballBest  = max(0, defaults.integer(forKey: "ra_pinballBest"))
         zenSeconds   = max(0, defaults.integer(forKey: "ra_zenSeconds"))
         goldrushBest = max(0, defaults.integer(forKey: "ra_goldrushBest"))
+        goldrushCoinsTotal = max(0, defaults.integer(forKey: "ra_goldrushCoinsTotal"))
         tickets = min(max(0, defaults.integer(forKey: "ra_tickets")),
                       Self.maxTicketBalance)
         let loadedOwnedBalls   = Self.loadStringSet(forKey: "ra_ownedBallSkins", defaults)
@@ -788,6 +794,7 @@ final class GameState: ObservableObject {
     @discardableResult
     func recordGoldRushCoins(_ c: Int) -> Bool {
         guard c > 0 else { return false }
+        goldrushCoinsTotal += c   // lifetime tally (called once per run; tick guards re-entry)
         let isBest = c > goldrushBest
         if isBest { goldrushBest = c; addCoins(Self.minigameBestBonus) }
         syncMinigameStats()
