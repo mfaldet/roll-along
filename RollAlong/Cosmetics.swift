@@ -1043,6 +1043,15 @@ enum ShopRotation {
     static var goalPool: [GoalSkin] {
         GoalSkin.allCases.filter { $0.tier != .starter }
     }
+    static var floorPool: [Floor] {
+        Floor.allCases.filter { $0.tier != .starter }
+    }
+    static var pitPool: [Pit] {
+        Pit.allCases.filter { $0.tier != .starter }
+    }
+    static var musicPool: [MusicTrack] {
+        MusicTrack.allCases.filter { $0.tier != .starter }
+    }
 
     private static func pick<T>(_ pool: [T], _ window: Int, salt: Int) -> T? {
         guard !pool.isEmpty else { return nil }
@@ -1054,6 +1063,9 @@ enum ShopRotation {
     static func featuredBall(at date: Date = Date())   -> BallSkin?       { pick(ballPool,   window(at: date), salt: 7) }
     static func featuredTrail(at date: Date = Date())  -> TrailColor?     { pick(trailPool,  window(at: date), salt: 13) }
     static func featuredGoal(at date: Date = Date())   -> GoalSkin?       { pick(goalPool,   window(at: date), salt: 19) }
+    static func featuredFloor(at date: Date = Date())  -> Floor?          { pick(floorPool,  window(at: date), salt: 29) }
+    static func featuredPit(at date: Date = Date())    -> Pit?            { pick(pitPool,    window(at: date), salt: 37) }
+    static func featuredMusic(at date: Date = Date())  -> MusicTrack?     { pick(musicPool,  window(at: date), salt: 41) }
 
     /// The randomized discount applied to the featured bundle this window.
     /// Loot-weighted (see `BundleDiscount.weight`) so deep discounts are
@@ -1076,6 +1088,9 @@ enum ShopRotation {
         if let b = item as? BallSkin    { if b == featuredBall(at: date) { return true } }
         if let t = item as? TrailColor  { if t == featuredTrail(at: date) { return true } }
         if let g = item as? GoalSkin    { if g == featuredGoal(at: date) { return true } }
+        if let f = item as? Floor       { if f == featuredFloor(at: date) { return true } }
+        if let p = item as? Pit         { if p == featuredPit(at: date) { return true } }
+        if let m = item as? MusicTrack  { if m == featuredMusic(at: date) { return true } }
         guard let bundle = featuredBundle(at: date) else { return false }
         return bundle.contains(item)
     }

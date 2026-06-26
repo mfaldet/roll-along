@@ -191,7 +191,8 @@ struct CosmeticShopView: View {
                     }
                 }
 
-                // A few odds-and-ends — one ball, one trail, one goal.
+                // Odds-and-ends — one featured pick from each of the six
+                // cosmetic categories (ball · trail · goal · floor · pit · music).
                 VStack(alignment: .leading, spacing: 10) {
                     sectionLabel("TODAY'S PICKS")
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 14),
@@ -200,23 +201,59 @@ struct CosmeticShopView: View {
                         if let b  = ShopRotation.featuredBall()  { itemCell(item: b) }
                         if let tr = ShopRotation.featuredTrail() { itemCell(item: tr) }
                         if let g  = ShopRotation.featuredGoal()  { itemCell(item: g) }
+                        if let f  = ShopRotation.featuredFloor() { itemCell(item: f) }
+                        if let p  = ShopRotation.featuredPit()   { itemCell(item: p) }
+                        if let m  = ShopRotation.featuredMusic() { itemCell(item: m) }
                     }
                 }
 
-                // Everything else lives in the browsable Catalog.
+                // Everything else lives in the browsable Catalog — a big,
+                // gradient call-to-action so it reads as the next thing to do.
                 NavigationLink(value: HomeRoute.catalog) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.grid.2x2.fill")
-                        Text("Browse Full Catalog")
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.white.opacity(0.18))
+                                .frame(width: 58, height: 58)
+                            Image(systemName: "square.grid.2x2.fill")
+                                .font(.system(size: 27, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Browse Full Catalog")
+                                .font(.system(size: 20, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                            Text("Every ball, trail, goal, floor & more — buy complete sets")
+                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.82))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(.white.opacity(0.9))
                     }
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(LinearGradient(
+                                colors: [Color(red: 0.30, green: 0.42, blue: 0.95),
+                                         Color(red: 0.56, green: 0.30, blue: 0.95)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(.white.opacity(0.20), lineWidth: 1)
+                    )
+                    .shadow(color: Color(red: 0.42, green: 0.34, blue: 0.95).opacity(0.45),
+                            radius: 16, y: 7)
                 }
                 .buttonStyle(.plain)
+                .padding(.top, 4)
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
