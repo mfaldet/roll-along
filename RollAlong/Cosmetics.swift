@@ -1261,61 +1261,61 @@ struct CosmeticBundle: Identifiable {
             id:             "hellfire",
             displayName:    "Hellfire",
             tagline:        "Roll a ruby through the inferno.",
-            contentSummary: "Ruby ball · Ember floor · Evil pit · Fire trail",
+            contentSummary: "Ruby ball · Ember floor · Evil pit · Fire trail · Synthwave music",
             balls:  [.ruby],
             goals:  [],
             trails: [.fire],
             floors: [.ember],
             pits:   [.evil],
-            music:  []
+            music:  [.synthwave]
         ),
         CosmeticBundle(
             id:             "heavens",
             displayName:    "Heavens",
             tagline:        "Drift the sky on opal lustre.",
-            contentSummary: "Opal ball · Classic floor · Sky pit · Stardust trail",
+            contentSummary: "Opal ball · Classic floor · Sky pit · Stardust trail · Celestial music",
             balls:  [.opal],
             goals:  [],
             trails: [.stardust],
             floors: [.classic],
             pits:   [.sky],
-            music:  []
+            music:  [.celestial]
         ),
         CosmeticBundle(
             id:             "nightclub",
             displayName:    "Nightclub",
             tagline:        "Disco lights, neon goal, bubblegum streak.",
-            contentSummary: "Disco floor · Neon goal · Bubblegum trail",
+            contentSummary: "Disco floor · Neon goal · Bubblegum trail · Retrowave music",
             balls:  [],
             goals:  [.neon],
             trails: [.bubblegum],
             floors: [.disco],
             pits:   [],
-            music:  []
+            music:  [.retrowave]
         ),
         CosmeticBundle(
             id:             "paper-world",
             displayName:    "Paper World",
             tagline:        "The full Notebook + Graphite-trail pack.",
-            contentSummary: "Notebook floor · Notebook pit · Graphite trail (starter)",
+            contentSummary: "Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
             balls:  [],
             goals:  [],
             trails: [],   // graphite is starter; included by default
             floors: [.notebook],
             pits:   [.notebook],
-            music:  []
+            music:  [.lofi]
         ),
         CosmeticBundle(
             id:             "golf",
             displayName:    "Golf",
             tagline:        "Dimpled ball, fairway green, lily-pad pond, hole-in-one flag.",
-            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal",
+            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal · Jazz music",
             balls:  [.golfBall],
             goals:  [.holeInOne],
             trails: [.air],
             floors: [.grass],
             pits:   [.pond],
-            music:  []
+            music:  [.jazz]
         ),
 
         CosmeticBundle(
@@ -1336,78 +1336,78 @@ struct CosmeticBundle: Identifiable {
             id:             "space-travel",
             displayName:    "Space Travel",
             tagline:        "Pilot a saucer across the moon and into the void.",
-            contentSummary: "UFO ball · Moon floor · Space pit · Tractor Beam goal · Raybeam trail",
+            contentSummary: "UFO ball · Moon floor · Space pit · Tractor Beam goal · Raybeam trail · Retrowave music",
             balls:  [.ufo],
             goals:  [.tractorBeam],
             trails: [.raybeam],
             floors: [.moon],
             pits:   [.space],
-            music:  []
+            music:  [.retrowave]
         ),
 
         CosmeticBundle(
             id:             "winter",
             displayName:    "Winter",
             tagline:        "A snowglobe marble through crystal frost.",
-            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit",
+            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Classical music",
             balls:  [.snowglobe],
             goals:  [.crystal],
             trails: [.ice],
             floors: [.twilight],
             pits:   [.twilight],
-            music:  []
+            music:  [.classical]
         ),
 
         CosmeticBundle(
             id:             "cosmos",
             displayName:    "Cosmos",
             tagline:        "Drift the deep with a nebula in hand.",
-            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit",
+            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Celestial music",
             balls:  [.nebula],
             goals:  [.galaxy],
             trails: [.stardust],
             floors: [.midnight],
             pits:   [.midnight],
-            music:  []
+            music:  [.celestial]
         ),
 
         CosmeticBundle(
             id:             "nature",
             displayName:    "Nature",
             tagline:        "Jade and blossoms over a meadow green.",
-            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit",
+            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Acoustic music",
             balls:  [.jade],
             goals:  [.blossom],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],
-            music:  []
+            music:  [.acoustic]
         ),
 
         CosmeticBundle(
             id:             "ocean",
             displayName:    "Ocean",
             tagline:        "Ride the tide on a wave of mint.",
-            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit",
+            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music",
             balls:  [.mint],
             goals:  [.ripple],
             trails: [.sky],
             floors: [.blueprint],
             pits:   [.blueprint],
-            music:  []
+            music:  [.lofi]
         ),
 
         CosmeticBundle(
             id:             "velvet-night",
             displayName:    "Velvet Night",
             tagline:        "Plasma and rainbow over deep velvet.",
-            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit",
+            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit · Downtempo music",
             balls:  [.purple],
             goals:  [.plasma],
             trails: [.rainbow],
             floors: [.velvet],
             pits:   [.velvet],
-            music:  []
+            music:  [.downtempo]
         ),
 
         CosmeticBundle(
