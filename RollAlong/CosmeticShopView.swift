@@ -395,6 +395,15 @@ struct CosmeticShopView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
 
+                // Catalog: surface the set(s) this cosmetic was released with.
+                if mode == .catalog {
+                    let caption = bundleCaption(for: item)
+                    Text(caption.isEmpty ? "Daily picks only" : caption)
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.50))
+                        .lineLimit(1)
+                }
+
                 stateBadge(item: item, owned: owned, equipped: equipped)
             }
             .opacity(greyed ? 0.5 : 1.0)
@@ -432,18 +441,24 @@ struct CosmeticShopView: View {
                     .padding(.vertical, 4)
                     .background(Capsule().fill(Color(white: 0.22)))
             } else {
+                // Catalog shows the individual price as information only — you
+                // buy the bundle, not the item — so it's a neutral pill there.
+                // The Shop keeps the green "affordable / buy" pill.
+                let inCatalog = (mode == .catalog)
                 HStack(spacing: 4) {
                     CoinIcon(size: 13)
                     Text("\(item.coinCost)")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(canAfford(item) ? .white : Color(white: 0.45))
+                        .foregroundStyle(inCatalog ? Color(white: 0.82)
+                                                   : (canAfford(item) ? .white : Color(white: 0.45)))
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(
                     Capsule()
-                        .fill(canAfford(item) ? Color(red: 0.20, green: 0.78, blue: 0.38).opacity(0.85)
-                                              : Color(white: 0.22))
+                        .fill(inCatalog ? Color(white: 0.20)
+                                        : (canAfford(item) ? Color(red: 0.20, green: 0.78, blue: 0.38).opacity(0.85)
+                                                           : Color(white: 0.22)))
                 )
             }
         }
@@ -453,6 +468,9 @@ struct CosmeticShopView: View {
         let category = String(describing: type(of: item))
         if equipped { return "\(item.displayName) \(category), equipped." }
         if owned    { return "\(item.displayName) \(category), owned. Double-tap to equip." }
+        if mode == .catalog {
+            return "\(item.displayName) \(category), \(item.coinCost) coins. Sold as part of a bundle — double-tap for details."
+        }
         return "\(item.displayName) \(category), \(item.coinCost) coins. Double-tap to buy."
     }
 
@@ -472,10 +490,23 @@ struct CosmeticShopView: View {
             )
             return
         }
-        // Catalog is browse-only — buying happens in the Shop.
+        // Catalog: individuals aren't bought directly — you buy the bundle.
+        // EXCEPTION: when this is the last unowned item of a set, buying it
+        // completes that set, so route straight to that bundle purchase.
         if mode == .catalog {
-            alertMessage = "Pick this up in the Shop when it's featured."
-            showAlert = true
+            if let bundle = lastItemBundle(for: item) {
+                handleBundleTap(bundle, owned: false)
+            } else {
+                let names = CosmeticBundle.bundles(containing: item).map(\.displayName)
+                if names.isEmpty {
+                    alertMessage = "\(item.displayName) shows up in the Shop's daily picks — grab it there."
+                } else {
+                    let list = names.joined(separator: ", ")
+                    let noun = names.count > 1 ? "bundles" : "bundle"
+                    alertMessage = "\(item.displayName) is part of the \(list) \(noun). Buy the \(noun) from the Collections tab to unlock it."
+                }
+                showAlert = true
+            }
             return
         }
         // Buy + equip
@@ -1080,6 +1111,25 @@ struct CosmeticShopView: View {
         n += bundle.pits.filter   { gameState.isOwned($0) }.count
         n += bundle.music.filter  { gameState.isOwned($0) }.count
         return n
+    }
+
+    /// The bundle for which `item` is the single remaining unowned item, so
+    /// buying it completes the set.  nil if the item isn't one-away in any set.
+    /// (Only meaningful when `item` itself is unowned, which is the only path
+    /// that calls it.)
+    private func lastItemBundle<Item: CosmeticItem>(for item: Item) -> CosmeticBundle? {
+        CosmeticBundle.catalogue.first {
+            $0.contains(item) && ownedCount(in: $0) == $0.itemCount - 1
+        }
+    }
+
+    /// Human-readable list of the bundle(s) an item was released with, e.g.
+    /// "Hellfire" or "Hellfire +1".  Empty when the item is in no bundle
+    /// (obtainable only via the Shop's daily individual picks).
+    private func bundleCaption<Item: CosmeticItem>(for item: Item) -> String {
+        let names = CosmeticBundle.bundles(containing: item).map(\.displayName)
+        guard let first = names.first else { return "" }
+        return names.count > 1 ? "\(first) +\(names.count - 1)" : first
     }
 
     /// The price the player pays for `bundle` on the current surface: the
