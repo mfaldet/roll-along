@@ -213,7 +213,8 @@ struct HomeView: View {
                                                        y: geo.size.height / 2),
                                        diameter: ballRadius * 2,
                                        since: launchStart,
-                                       duration: launchDuration)
+                                       duration: launchDuration,
+                                       accent: gameState.equippedGoal.accentColor)
                         } else {
                             liveBall
                                 .position(ballPos)
@@ -325,7 +326,8 @@ struct HomeView: View {
 
                 // Play → game launch transition (the ball dives at the viewer).
                 if launching {
-                    LaunchTransition(since: launchStart, duration: launchDuration)
+                    LaunchTransition(since: launchStart, duration: launchDuration,
+                                     accent: gameState.equippedGoal.accentColor)
                         .transition(.opacity)
                         .zIndex(70)
 
