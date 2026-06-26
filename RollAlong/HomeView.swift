@@ -694,8 +694,7 @@ struct HomeView: View {
 
     /// A Level Select button for the climb / challenge packs, or a stat readout
     /// for the mini-games (high score, zen time, coins earned, competitive
-    /// wins).  Coin Pit also floats a name tag on the marble; Sumo is pure
-    /// survival, so it shows that rather than a win count.
+    /// wins).  Coin Pit also floats a name tag on the marble.
     @ViewBuilder
     private var modeHeader: some View {
         let id = gameState.currentModeID
@@ -711,8 +710,6 @@ struct HomeView: View {
         } else if id == "coinpit" {   // displayed "Gold Rush"
             statChip(icon: "dollarsign.circle.fill",
                      text: "\(gameState.goldrushCoinsTotal.formatted()) coins earned")
-        } else if id == "sumo" {
-            statChip(icon: "circle.dashed", text: "Endless survival")
         } else if gameState.currentMode.section == .competitive {
             let w = gameState.minigameWins[id] ?? 0
             statChip(icon: "trophy.fill", text: "\(w) win\(w == 1 ? "" : "s")")
