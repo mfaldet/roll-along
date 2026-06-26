@@ -232,12 +232,9 @@ struct HomeView: View {
 
                     titleText
                         .homeBallCollider()
-                        // Smoke-test anchor.  Deliberately on this LEAF, not
-                        // the root ZStack: a container's accessibilityIdentifier
-                        // propagates to every descendant and CLOBBERS their own
-                        // identifiers (verified via AX-tree dump — every home
-                        // element read 'HomeView' and per-button ids vanished).
-                        .accessibilityIdentifier("HomeView")
+                        // Smoke-test anchor "HomeView" now lives on the title
+                        // leaf inside `titleText` (a container identifier would
+                        // clobber its children's own ids), so it isn't set here.
                         .padding(.bottom, 20)
 
                     // Open roaming space — the ball lives on the layer behind.
@@ -362,9 +359,17 @@ struct HomeView: View {
                             AnalyticsClient.shared.track("daily_challenge_started")
                         }
                 case .mode(let id):
-                    BallGameView(activeMode: GameModeCatalogue.mode(id: id)
-                                 ?? GameModeCatalogue.climb)
-                        .firstPlayTutorial(id)
+                    // A Challenge Track armed from the hub launches via Play —
+                    // initialise its progress (resume at the next level) the way
+                    // ChallengeTrackView does, since Play bypasses that screen.
+                    if let track = GameModeCatalogue.mode(id: id) as? ChallengeTrackMode {
+                        BallGameView(activeMode: track)
+                            .onAppear { gameState.startTrack(track.trackID) }
+                    } else {
+                        BallGameView(activeMode: GameModeCatalogue.mode(id: id)
+                                     ?? GameModeCatalogue.climb)
+                            .firstPlayTutorial(id)
+                    }
                 }
             }
             // Sheet driven by tapping the top-left lives pill.  Re-uses
@@ -640,13 +645,29 @@ struct HomeView: View {
     }
 
     private var titleText: some View {
-        Text("Roll Along")
-            .font(.system(size: 52, weight: .black, design: .rounded))
-            .foregroundStyle(
-                LinearGradient(colors: [.white, Color(white: 0.82)],
-                               startPoint: .top, endPoint: .bottom)
-            )
-            .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
+        VStack(spacing: 6) {
+            Text("Roll Along")
+                .font(.system(size: 52, weight: .black, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(colors: [.white, Color(white: 0.82)],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
+                // Smoke-test anchor — kept on THIS leaf (a container identifier
+                // propagates to every descendant and clobbers their own ids).
+                .accessibilityIdentifier("HomeView")
+
+            // The title is always "Roll Along".  When a non-core mode is armed
+            // (chosen in the Games hub), name it here so the player knows what
+            // Play will launch.
+            if gameState.currentModeID != "climb" {
+                Text(gameState.currentMode.displayName)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.62))
+                    .accessibilityIdentifier("ArmedModeSubtitle")
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: gameState.currentModeID)
     }
 
     /// Floating coin-balance pill in the top-right corner.  Tappable —
@@ -945,11 +966,27 @@ struct HomeView: View {
         gameState.currentModeID == "climb" ? .game : .mode(gameState.currentModeID)
     }
 
-    /// Play-button subtitle: the climb shows its level, other modes their name.
-    private var playSubtitle: String {
-        gameState.currentModeID == "climb"
-            ? "Level \(gameState.currentLevel)"
-            : gameState.currentMode.displayName
+    /// Play-button second line — what's at stake in the armed mode.  The mode's
+    /// NAME now lives under the title, so this line carries the level / match /
+    /// cost / reward instead.
+    private var playStakes: String {
+        if let track = gameState.currentMode as? ChallengeTrackMode {
+            let next = min(100, (gameState.trackProgress[track.trackID] ?? 0) + 1)
+            return "Level \(next) / 100"
+        }
+        switch gameState.currentModeID {
+        case "climb":     return "Level \(gameState.currentLevel)"
+        case "pinball":   return "3 balls"
+        case "zen":       return "Endless · no pressure"
+        case "coinpit":   return "30s · stake a ticket"
+        case "goldrush":  return "60s · most coins wins"
+        case "snake":     return "Last comet glowing wins"
+        case "sumo":      return "Survive the waves"
+        case "paintball": return "60s · most paint wins"
+        case "marblecup": return "90s · marble soccer"
+        case "koth":      return "60s · hold the hill"
+        default:          return gameState.currentMode.tagline
+        }
     }
 
     private var playButton: some View {
@@ -968,7 +1005,8 @@ struct HomeView: View {
             playButtonBody
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Play \(playSubtitle)")
+        .accessibilityIdentifier("PlayButton")
+        .accessibilityLabel("Play \(gameState.currentMode.displayName), \(playStakes)")
         .accessibilityHint("Launches your selected game mode.")
     }
 
@@ -987,7 +1025,7 @@ struct HomeView: View {
             VStack(spacing: 2) {
                 Text("Play")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                Text(playSubtitle)
+                Text(playStakes)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .opacity(0.65)
             }
