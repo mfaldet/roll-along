@@ -178,6 +178,24 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     purchasable and hidden from the regular shop grid.
     case diamond = "Diamond"
 
+    // ── Premium bundle skins (coin/bundle purchasable — NOT bundle-exclusive) ─
+    //   • highRoller — casino roulette wheel: alternating deep-red and black
+    //     wedges inside a gold-rimmed rim with a crisp white centre pip and a
+    //     glossy specular.  Static.  High Roller bundle (Legendary).
+    case highRoller  = "High Roller"
+    //   • quicksilver — perfectly reflective liquid-chrome blob (T-1000): a
+    //     steely silver MeshGradient with a bright roving specular highlight.
+    //     Animated.  Quicksilver bundle (Legendary).
+    case quicksilver = "Quicksilver"
+    //   • oracle — smoky violet fortune crystal: swirling inner fog with a tiny
+    //     galaxy/star core glowing through; deep purples + magenta.  Animated.
+    //     Oracle bundle (Legendary).
+    case oracle      = "Oracle"
+    //   • geode — cracked-open agate: banded amethyst rings around the rim with
+    //     a sparkly druzy (crystalline) centre catching light; purples + quartz
+    //     white.  Static-but-twinkling.  Geode bundle (Epic).
+    case geode       = "Geode"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -711,6 +729,51 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.80, green: 0.95, blue: 1.00),
                 Color(red: 0.50, green: 0.78, blue: 0.98),
                 Color(red: 0.22, green: 0.45, blue: 0.74),
+            ]
+
+        // ── Premium bundle skins ─────────────────────────────────────────────
+        case .highRoller:
+            // Casino felt-red → deep crimson → black, gold-warm highlight.
+            // The roulette wedges + gold rim + white pip paint on top via the
+            // bespoke highRollerCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 0.55),
+                Color(red: 0.78, green: 0.10, blue: 0.12),
+                Color(red: 0.34, green: 0.03, blue: 0.05),
+                Color(red: 0.08, green: 0.02, blue: 0.03),
+            ]
+
+        case .quicksilver:
+            // Bright chrome highlight → cool steely silver → slate → near-black.
+            // The liquid-chrome MeshGradient + roving specular paint on top via
+            // the bespoke quicksilverCanvas in BallSkinView.
+            return [
+                Color(red: 0.97, green: 0.98, blue: 1.00),
+                Color(red: 0.74, green: 0.80, blue: 0.88),
+                Color(red: 0.40, green: 0.46, blue: 0.56),
+                Color(red: 0.10, green: 0.13, blue: 0.18),
+            ]
+
+        case .oracle:
+            // Pale magenta highlight → violet → deep purple → near-black.  The
+            // swirling fog + glowing galaxy core paint on top via the bespoke
+            // oracleCanvas in BallSkinView.
+            return [
+                Color(red: 0.86, green: 0.62, blue: 0.98),
+                Color(red: 0.52, green: 0.22, blue: 0.78),
+                Color(red: 0.24, green: 0.06, blue: 0.42),
+                Color(red: 0.06, green: 0.02, blue: 0.14),
+            ]
+
+        case .geode:
+            // Quartz-white highlight → lilac → amethyst → deep violet.  The
+            // banded agate rings + druzy crystal core paint on top via the
+            // bespoke geodeCanvas in BallSkinView.
+            return [
+                Color(red: 0.97, green: 0.93, blue: 1.00),
+                Color(red: 0.74, green: 0.52, blue: 0.86),
+                Color(red: 0.46, green: 0.24, blue: 0.62),
+                Color(red: 0.20, green: 0.08, blue: 0.34),
             ]
         }
     }

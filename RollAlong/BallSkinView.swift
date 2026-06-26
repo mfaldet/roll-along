@@ -202,6 +202,27 @@ struct BallSkinView: View {
         case .diamond:
             diamondCanvas.clipShape(Circle()).overlay(planetRim)
 
+        // ── Premium bundle skins ────────────────────────────────────────
+        case .highRoller:
+            highRollerCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.78, green: 0.58, blue: 0.18).opacity(0.65), lineWidth: 0.5))
+
+        case .quicksilver:
+            quicksilverCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.white.opacity(0.22), lineWidth: 0.5))
+
+        case .oracle:
+            oracleCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.45, green: 0.18, blue: 0.66).opacity(0.55), lineWidth: 0.5))
+
+        case .geode:
+            geodeCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.36, green: 0.18, blue: 0.50).opacity(0.55), lineWidth: 0.5))
+
         // No `default`: every BallSkin has an explicit renderer above, so the
         // switch is exhaustive.  Adding a new skin will (intentionally) fail to
         // compile here until it's given a case — same as the colors/tier switches.
@@ -1711,6 +1732,291 @@ struct BallSkinView: View {
         }
         star.closeSubpath()
         ctx.fill(star, with: .color(.white.opacity(min(1.0, 0.95 * opacity))))
+    }
+
+    // =========================================================================
+    // MARK: - High Roller  (High Roller bundle · Legendary)
+    // A casino roulette wheel / chip: alternating deep-red and black wedges
+    // radiating from the centre, ringed by a polished gold rim, with a crisp
+    // white centre pip and a glossy top-left specular.  Static.  Clipped to a
+    // circle by the body switch caller.
+    // =========================================================================
+    private var highRollerCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+            let red   = Color(red: 0.74, green: 0.07, blue: 0.10)
+            let black = Color(red: 0.07, green: 0.05, blue: 0.06)
+            let gold  = Color(red: 0.92, green: 0.74, blue: 0.30)
+            let goldD = Color(red: 0.58, green: 0.42, blue: 0.10)
+
+            // 1. Gold rim base (fills the whole disc; wedges sit inside it).
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: [gold, goldD]),
+                center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.26), startRadius: 0, endRadius: r * 1.25))
+
+            // 2. Alternating red/black wedges inside the rim.
+            let wedges = 16
+            let inner  = r * 0.10
+            let outer  = r * 0.86          // leaves a gold rim band
+            for k in 0..<wedges {
+                let a0 = Double(k)     / Double(wedges) * 2 * .pi - .pi / 2
+                let a1 = Double(k + 1) / Double(wedges) * 2 * .pi - .pi / 2
+                var wedge = Path()
+                wedge.move(to: CGPoint(x: cx + CGFloat(cos(a0)) * inner, y: cy + CGFloat(sin(a0)) * inner))
+                wedge.addLine(to: CGPoint(x: cx + CGFloat(cos(a0)) * outer, y: cy + CGFloat(sin(a0)) * outer))
+                wedge.addArc(center: CGPoint(x: cx, y: cy), radius: outer,
+                             startAngle: .radians(a0), endAngle: .radians(a1), clockwise: false)
+                wedge.addLine(to: CGPoint(x: cx + CGFloat(cos(a1)) * inner, y: cy + CGFloat(sin(a1)) * inner))
+                wedge.addArc(center: CGPoint(x: cx, y: cy), radius: inner,
+                             startAngle: .radians(a1), endAngle: .radians(a0), clockwise: true)
+                wedge.closeSubpath()
+                ctx.fill(wedge, with: .color(k % 2 == 0 ? red : black))
+                ctx.stroke(wedge, with: .color(gold.opacity(0.55)), lineWidth: max(0.4, r * 0.012))
+            }
+
+            // 3. Gold separator ring between wedges and rim.
+            ctx.stroke(Path(ellipseIn: CGRect(x: cx - outer, y: cy - outer, width: outer * 2, height: outer * 2)),
+                       with: .color(gold), lineWidth: max(0.8, r * 0.05))
+
+            // 4. White centre pip with a gold ring.
+            let pipR = r * 0.16
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
+                     with: .radialGradient(Gradient(colors: [.white, Color(red: 0.86, green: 0.86, blue: 0.88)]),
+                        center: CGPoint(x: cx - pipR * 0.3, y: cy - pipR * 0.3), startRadius: 0, endRadius: pipR * 1.2))
+            ctx.stroke(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
+                       with: .color(gold), lineWidth: max(0.6, r * 0.03))
+
+            // 5. Roundness (limb darkening) + glossy top-left specular.
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(stops: [
+                .init(color: .clear, location: 0.55),
+                .init(color: .black.opacity(0.45), location: 1.0)]),
+                center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.80, width: r * 0.50, height: r * 0.30)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.38))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Quicksilver  (Quicksilver bundle · Legendary)
+    // A perfectly reflective liquid-chrome blob (T-1000): a cool steely-silver
+    // MeshGradient body with a bright roving specular highlight that drifts
+    // across the surface, plus a dark sky/ground reflection split and a bright
+    // rim that sell the polished mercury read.  Reduce Motion freezes the
+    // specular.  Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private static let quicksilverGrid: [SIMD2<Float>] = [
+        [0, 0],   [0.5, 0],   [1, 0],
+        [0, 0.5], [0.5, 0.5], [1, 0.5],
+        [0, 1],   [0.5, 1],   [1, 1],
+    ]
+    private var quicksilverCanvas: some View {
+        TimelineView(.animation) { tl in
+            let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+
+            // Cool chrome palette; the interior nodes brighten/darken slightly
+            // over time so the metal looks like it's quietly rippling.
+            let hi   = Color(red: 0.97, green: 0.98, blue: 1.00)
+            let mid  = Color(red: 0.70, green: 0.77, blue: 0.86)
+            let steel = Color(red: 0.42, green: 0.49, blue: 0.60)
+            let dark = Color(red: 0.10, green: 0.13, blue: 0.19)
+            let ripple = Float(0.5 + 0.5 * sin(t * 0.8))
+            let centerCol = Color(red: 0.78 + 0.10 * Double(ripple),
+                                  green: 0.84 + 0.08 * Double(ripple),
+                                  blue:  0.92 + 0.06 * Double(ripple))
+            let mesh: [Color] = [
+                dark, steel, hi,
+                steel, centerCol, mid,
+                hi,   mid,   steel,
+            ]
+            // The mesh nodes drift, so the reflection "flows" like liquid metal.
+            let dx = Float(sin(t * 0.6)) * 0.07
+            let dy = Float(cos(t * 0.5)) * 0.06
+            let pts: [SIMD2<Float>] = [
+                [0, 0],            [0.5 + dx, 0],         [1, 0],
+                [0, 0.5 - dy],     [0.5 + dx, 0.5 + dy],  [1, 0.5 + dy],
+                [0, 1],            [0.5 - dx, 1],         [1, 1],
+            ]
+
+            ZStack {
+                MeshGradient(width: 3, height: 3, points: pts, colors: mesh)
+
+                Canvas { ctx, size in
+                    let w = size.width, h = size.height
+                    let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                    let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+                    // Sky/ground reflection split — bright up top, dark below.
+                    ctx.fill(Path(ellipseIn: sphere), with: .linearGradient(
+                        Gradient(stops: [.init(color: .white.opacity(0.55), location: 0.0),
+                                         .init(color: .clear, location: 0.42),
+                                         .init(color: .clear, location: 0.58),
+                                         .init(color: dark.opacity(0.75), location: 1.0)]),
+                        startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r)))
+
+                    // Roving bright specular — drifts on a slow Lissajous path.
+                    let sx = cx + CGFloat(cos(t * 0.9)) * r * 0.34 - r * 0.10
+                    let sy = cy + CGFloat(sin(t * 0.7)) * r * 0.30 - r * 0.18
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - r * 0.30, y: sy - r * 0.20,
+                                                    width: r * 0.60, height: r * 0.40)),
+                        with: .radialGradient(Gradient(colors: [.white.opacity(0.95), .clear]),
+                            center: CGPoint(x: sx, y: sy), startRadius: 0, endRadius: r * 0.34))
+
+                    // Bright cool rim — sells the chrome edge.
+                    ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.03, dy: r * 0.03)),
+                        with: .color(Color(red: 0.90, green: 0.94, blue: 1.0).opacity(0.7)),
+                        lineWidth: max(0.7, r * 0.05))
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Oracle  (Oracle bundle · Legendary)
+    // A smoky violet fortune crystal: deep-purple glass with swirling inner fog
+    // and a tiny glowing galaxy/star core spinning at its heart.  The fog drifts
+    // and the core's stars twinkle; Reduce Motion freezes both.  Clipped to a
+    // circle by the body switch caller.
+    // =========================================================================
+    private var oracleCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+                // Deep violet glass base.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.40, green: 0.18, blue: 0.62),
+                                      Color(red: 0.20, green: 0.06, blue: 0.36),
+                                      Color(red: 0.05, green: 0.02, blue: 0.12)]),
+                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.24), startRadius: 0, endRadius: r * 1.25))
+
+                // Swirling inner fog — drifting purple/magenta clouds.
+                ctx.blendMode = .plusLighter
+                let fog: [(CGFloat, CGFloat, Color)] = [
+                    (-0.26, -0.14, Color(red: 0.62, green: 0.26, blue: 0.92)),
+                    ( 0.24,  0.08, Color(red: 0.92, green: 0.30, blue: 0.78)),
+                    ( 0.02,  0.30, Color(red: 0.46, green: 0.18, blue: 0.86)),
+                    (-0.14,  0.26, Color(red: 0.78, green: 0.34, blue: 0.96)),
+                ]
+                for (i, f) in fog.enumerated() {
+                    let bx = cx + f.0 * r + CGFloat(sin(t * 0.45 + Double(i) * 1.6)) * r * 0.10
+                    let by = cy + f.1 * r + CGFloat(cos(t * 0.38 + Double(i))) * r * 0.08
+                    let br = r * (0.40 + 0.08 * CGFloat(sin(t * 0.5 + Double(i))))
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                        with: .radialGradient(Gradient(colors: [f.2.opacity(0.42), .clear]),
+                            center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
+                }
+
+                // Glowing galaxy core — a small bright bloom of spiralling stars.
+                let coreR = r * 0.34
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - coreR, y: cy - coreR, width: coreR * 2, height: coreR * 2)),
+                    with: .radialGradient(Gradient(colors: [Color(red: 1.0, green: 0.92, blue: 1.0).opacity(0.95),
+                                                            Color(red: 0.85, green: 0.45, blue: 1.0).opacity(0.35), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: coreR))
+                for i in 0..<22 {
+                    let f   = Double(i) / 22.0
+                    let ang = f * 5.0 + t * 0.5 + Double(i % 2) * .pi
+                    let rad = coreR * CGFloat(pow(f, 0.85))
+                    let sx  = cx + CGFloat(cos(ang)) * rad
+                    let sy  = cy + CGFloat(sin(ang)) * rad
+                    let ss  = r * CGFloat(0.010 + (1 - f) * 0.012)
+                    let tw  = reduceMotion ? 0.85 : 0.5 + 0.5 * sin(t * 3 + Double(i))
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - ss, y: sy - ss, width: ss * 2, height: ss * 2)),
+                             with: .color(Color(red: 1.0, green: 0.92, blue: 1.0).opacity(tw)))
+                }
+                ctx.blendMode = .normal
+
+                // Glassy top-left specular.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.50, y: cy - r * 0.80, width: r * 0.46, height: r * 0.30)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.34))
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Geode  (Geode bundle · Epic)
+    // A cracked-open agate: concentric banded amethyst rings around the rim,
+    // opening to a sparkly druzy (crystalline) centre of quartz-white facets
+    // that catch the light.  Mostly static, with a few twinkling crystal
+    // glints.  Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var geodeCanvas: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+                // Deep amethyst base.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.58, green: 0.36, blue: 0.74),
+                                      Color(red: 0.36, green: 0.16, blue: 0.52),
+                                      Color(red: 0.16, green: 0.06, blue: 0.28)]),
+                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.26), startRadius: 0, endRadius: r * 1.25))
+
+                // Banded agate rings — concentric rim bands, alternating tints.
+                let bands: [(CGFloat, Color)] = [
+                    (1.00, Color(red: 0.30, green: 0.14, blue: 0.44)),
+                    (0.90, Color(red: 0.56, green: 0.34, blue: 0.72)),
+                    (0.80, Color(red: 0.40, green: 0.20, blue: 0.58)),
+                    (0.70, Color(red: 0.68, green: 0.46, blue: 0.82)),
+                    (0.60, Color(red: 0.48, green: 0.26, blue: 0.66)),
+                    (0.50, Color(red: 0.78, green: 0.58, blue: 0.90)),
+                ]
+                for (scale, col) in bands {
+                    let rr = r * scale
+                    ctx.stroke(Path(ellipseIn: CGRect(x: cx - rr, y: cy - rr, width: rr * 2, height: rr * 2)),
+                               with: .color(col.opacity(0.85)), lineWidth: max(1.0, r * 0.06))
+                }
+
+                // Druzy crystal core — a cluster of white quartz facets.
+                let coreR = r * 0.44
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - coreR, y: cy - coreR, width: coreR * 2, height: coreR * 2)),
+                    with: .radialGradient(Gradient(colors: [Color(red: 0.98, green: 0.95, blue: 1.0),
+                                                            Color(red: 0.82, green: 0.74, blue: 0.94)]),
+                        center: CGPoint(x: cx - coreR * 0.2, y: cy - coreR * 0.2), startRadius: 0, endRadius: coreR * 1.1))
+                // Crystalline facets — small white diamonds packed in the core.
+                let facets: [(CGFloat, CGFloat, CGFloat)] = [
+                    (-0.16, -0.10, 0.12), (0.14, -0.06, 0.10), (0.02, 0.16, 0.11),
+                    (-0.12, 0.14, 0.08), (0.18, 0.16, 0.07), (0.00, -0.18, 0.08),
+                    (-0.22, 0.02, 0.07), (0.22, 0.00, 0.06),
+                ]
+                for (fx, fy, fr) in facets {
+                    let gx = cx + fx * r, gy = cy + fy * r, gr = fr * r
+                    var d = Path()
+                    d.move(to: CGPoint(x: gx, y: gy - gr));        d.addLine(to: CGPoint(x: gx + gr * 0.62, y: gy))
+                    d.addLine(to: CGPoint(x: gx, y: gy + gr));     d.addLine(to: CGPoint(x: gx - gr * 0.62, y: gy))
+                    d.closeSubpath()
+                    ctx.fill(d, with: .color(Color(red: 0.92, green: 0.88, blue: 1.0).opacity(0.8)))
+                    ctx.stroke(d, with: .color(Color(red: 0.55, green: 0.40, blue: 0.70).opacity(0.5)),
+                               lineWidth: max(0.4, r * 0.008))
+                }
+
+                // Twinkling crystal glints.
+                ctx.blendMode = .plusLighter
+                for (i, s) in [(-0.10, -0.08), (0.12, 0.06), (0.02, 0.18), (-0.16, 0.10)].enumerated() {
+                    let tw = reduceMotion ? 0.7 : 0.5 + 0.5 * sin(t * 2.6 + Double(i) * 1.4)
+                    if tw < 0.25 { continue }
+                    let gx = cx + CGFloat(s.0) * r, gy = cy + CGFloat(s.1) * r, gs = r * 0.05 * CGFloat(tw)
+                    ctx.fill(Path(ellipseIn: CGRect(x: gx - gs, y: gy - gs, width: gs * 2, height: gs * 2)),
+                             with: .color(.white.opacity(tw)))
+                }
+                ctx.blendMode = .normal
+
+                // Glassy top-left specular.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.48, y: cy - r * 0.76, width: r * 0.44, height: r * 0.28)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.6), .clear]),
+                        center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.60), startRadius: 0, endRadius: r * 0.32))
+            }
+        }
     }
 
     // =========================================================================

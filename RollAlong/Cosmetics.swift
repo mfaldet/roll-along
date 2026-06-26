@@ -115,10 +115,14 @@ extension BallSkin: CosmeticItem {
             return .standard   //  50 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
              .pastel, .neon, .dune,
-             .basketball, .soccer, .baseball, .eightBall, .golfBall:
+             .basketball, .soccer, .baseball, .eightBall, .golfBall,
+             .geode:           // Geode bundle — Epic (banded agate + druzy core)
             return .premium    // 200 coins (Epic) — colour blends + sports balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
              .storm, .candy, .ghost, .lava, .trench,
+             .highRoller,      // High Roller bundle — coin/bundle purchasable
+             .quicksilver,     // Quicksilver bundle — coin/bundle purchasable
+             .oracle,          // Oracle bundle — coin/bundle purchasable
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -1887,6 +1891,56 @@ struct CosmeticBundle: Identifiable {
             floors: [.sunset],
             pits:   [.evil],
             music:  [.downtempo]
+        ),
+
+        // ── Premium bundles (permanent — no availability window) ─────────
+        CosmeticBundle(
+            id:             "high-roller",
+            displayName:    "High Roller",
+            tagline:        "The house always remembers your name.",
+            contentSummary: "High Roller ball · Quasar goal · Gilded trail · Felt floor · Pocket pit · Jazz music",
+            balls:  [.highRoller],
+            goals:  [.quasar],
+            trails: [.gilded],
+            floors: [.felt],
+            pits:   [.pocket],
+            music:  [.jazz]
+        ),
+        CosmeticBundle(
+            id:             "quicksilver",
+            displayName:    "Quicksilver",
+            tagline:        "Liquid metal with a mind of its own.",
+            contentSummary: "Quicksilver ball · Prism goal · Smoke trail · Inverted floor · Inverted pit · Cinematic music",
+            balls:  [.quicksilver],
+            goals:  [.prism],
+            trails: [.smoke],
+            floors: [.inverted],
+            pits:   [.inverted],
+            music:  [.cinematic]
+        ),
+        CosmeticBundle(
+            id:             "oracle",
+            displayName:    "Oracle",
+            tagline:        "Gaze in. Roll forward.",
+            contentSummary: "Oracle ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Mysterium music",
+            balls:  [.oracle],
+            goals:  [.galaxy],
+            trails: [.stardust],
+            floors: [.midnight],
+            pits:   [.midnight],
+            music:  [.mysterium]
+        ),
+        CosmeticBundle(
+            id:             "geode",
+            displayName:    "Geode",
+            tagline:        "Cracked open, brilliant inside.",
+            contentSummary: "Geode ball · Crystal goal · Ice trail · Velvet floor · Velvet pit · Classical music",
+            balls:  [.geode],
+            goals:  [.crystal],
+            trails: [.ice],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.classical]
         ),
     ]
 }
