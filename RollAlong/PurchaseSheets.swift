@@ -24,30 +24,39 @@ struct BuyLivesSheet: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var purchaseError: String? = nil
     @State private var fitHeight: CGFloat = 560   // content height; set on first layout
+    @State private var celebrate = false          // drives the Diamond Balls victory loop
 
     var body: some View {
         ZStack {
             Color(white: 0.08).ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Title lives in the content now (no nav bar) so the sheet
-                    // can size itself to exactly fit the content.
-                    Text("Get Lives")
-                        .font(.system(size: 19, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.bottom, 2)
-                    header
-                    statusBlock
-                    lifePackCards
-                    Text("OR NEVER RUN OUT")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .kerning(1.5)
-                        .foregroundStyle(Color(white: 0.45))
-                        .padding(.top, 6)
-                    diamondBallsCard
+                    if gameState.unlimitedLives {
+                        // Diamond Balls owners never buy lives — hide every
+                        // purchasable so a tap can't cost them money they don't
+                        // need.  Just celebrate what they already own.
+                        celebrationView
+                    } else {
+                        // Title lives in the content now (no nav bar) so the sheet
+                        // can size itself to exactly fit the content.
+                        Text("Get Lives")
+                            .font(.system(size: 19, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.bottom, 2)
+                        header
+                        statusBlock
+                        lifePackCards
+                        Text("OR NEVER RUN OUT")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .kerning(1.5)
+                            .foregroundStyle(Color(white: 0.45))
+                            .padding(.top, 6)
+                        diamondBallsCard
+                    }
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
@@ -62,6 +71,7 @@ struct BuyLivesSheet: View {
         // Size the sheet to its content — Diamond Balls fully visible, no gap below.
         .presentationDetents([.height(fitHeight)])
         .onPreferenceChange(SheetFitHeightKey.self) { fitHeight = max($0, 200) }
+        .onAppear { if !reduceMotion { celebrate = true } }
         .onChange(of: store.lastError) { _, err in purchaseError = err }
         .alert("Purchase Failed", isPresented: Binding(
             get: { purchaseError != nil },
@@ -160,6 +170,138 @@ struct BuyLivesSheet: View {
         let s = max(0, Int(ceil(seconds)))
         return String(format: "%d:%02d", s / 60, s % 60)
     }
+
+    // MARK: - Diamond Balls celebration (owners only)
+
+    /// Replaces every purchasable once Diamond Balls is owned, so a stray tap
+    /// can never spend money on lives the player already has infinite of.
+    /// A looping gradient + sparkle victory lap around the diamond marble they
+    /// unlocked — and nothing else.
+    private var celebrationView: some View {
+        VStack(spacing: 18) {
+            Text("✦  YOU OWN  ✦")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .kerning(3.0)
+                .foregroundStyle(Self.diamondGradient)
+
+            // Centerpiece: the real Diamond ball skin, haloed by a slow conic
+            // glow and ringed with twinkling sparkles.
+            ZStack {
+                Circle()
+                    .fill(Self.celebrationHalo)
+                    .frame(width: 188, height: 188)
+                    .blur(radius: 34)
+                    .opacity(0.55)
+                    .rotationEffect(.degrees(celebrate ? 360 : 0))
+                    .animation(.linear(duration: 9).repeatForever(autoreverses: false),
+                               value: celebrate)
+
+                ForEach(Array(Self.sparkleOffsets.enumerated()), id: \.offset) { idx, off in
+                    Image(systemName: "sparkle")
+                        .font(.system(size: idx % 2 == 0 ? 17 : 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .opacity(celebrate ? 1.0 : 0.7)
+                        .scaleEffect(celebrate ? 1.0 : 0.55)
+                        .offset(off)
+                        .shadow(color: Color(red: 0.55, green: 0.85, blue: 1.0), radius: 6)
+                        .animation(.easeInOut(duration: 1.1 + Double(idx) * 0.35)
+                                    .repeatForever(autoreverses: true),
+                                   value: celebrate)
+                }
+
+                BallSkinView(skin: .diamond, diameter: 116)
+                    .frame(width: 116, height: 116)
+                    .scaleEffect(celebrate ? 1.05 : 0.98)
+                    .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.7),
+                            radius: 22)
+                    .animation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true),
+                               value: celebrate)
+            }
+            .frame(height: 196)
+
+            Text("Diamond Balls")
+                .font(.system(size: 30, weight: .black, design: .rounded))
+                .foregroundStyle(Self.diamondGradient)
+
+            HStack(spacing: 7) {
+                Image(systemName: "infinity")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Self.diamondLifeGradient)
+                Text("Unlimited lives, forever")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.88))
+            }
+
+            Text("Active — indestructible. You'll never run out.")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.62))
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 5) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Self.diamondGradient)
+                Text("Exclusive Diamond ball skin unlocked")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            .padding(.top, 2)
+        }
+        .padding(.vertical, 34)
+        .padding(.horizontal, 22)
+        .frame(maxWidth: .infinity)
+        .background(celebrationBackground)
+    }
+
+    /// The card's deep-blue base with a slowly rotating aurora sheen — the
+    /// "animated gradient" the celebration sits on.
+    private var celebrationBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.05, green: 0.11, blue: 0.22),
+                                 Color(red: 0.10, green: 0.19, blue: 0.34),
+                                 Color(red: 0.05, green: 0.09, blue: 0.19)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+            Circle()
+                .fill(Self.celebrationHalo)
+                .frame(width: 460, height: 460)
+                .blur(radius: 70)
+                .opacity(0.28)
+                .rotationEffect(.degrees(celebrate ? -360 : 0))
+                .animation(.linear(duration: 14).repeatForever(autoreverses: false),
+                           value: celebrate)
+                .blendMode(.plusLighter)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Self.diamondGradient, lineWidth: 1.5)
+        )
+        .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.30), radius: 16, y: 4)
+    }
+
+    /// Cool white→cyan conic sweep reused by the halo and the card sheen.
+    private static let celebrationHalo = AngularGradient(
+        gradient: Gradient(colors: [
+            Color(red: 0.40, green: 0.72, blue: 1.00),
+            Color(red: 0.82, green: 0.96, blue: 1.00),
+            Color(red: 0.55, green: 0.82, blue: 1.00),
+            Color.white,
+            Color(red: 0.45, green: 0.70, blue: 0.98),
+            Color(red: 0.40, green: 0.72, blue: 1.00),
+        ]),
+        center: .center)
+
+    /// Where the four twinkling sparkles sit around the diamond marble.
+    private static let sparkleOffsets: [CGSize] = [
+        CGSize(width: -82, height: -46),
+        CGSize(width:  84, height: -30),
+        CGSize(width:  70, height:  58),
+        CGSize(width: -68, height:  54),
+    ]
 
     /// The headline one-time unlock — indestructible "Diamond Balls" = unlimited
     /// lives, forever.  Deliberately the shiniest thing in the sheet, shown last.
