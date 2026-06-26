@@ -13,6 +13,7 @@ W = 560
 H = int(W * 1.9)
 
 GRAV    = float(sys.argv[1]) if len(sys.argv) > 1 else 640.0   # = device gravFrac 0.60 * harness H 1064
+LAUNCH  = float(sys.argv[2]) if len(sys.argv) > 2 else 1900.0  # shooter-lane launch speed
 WALL_E  = 0.32
 BUMP_E  = 1.15
 SLING_E = 0.85
@@ -31,17 +32,22 @@ def quad(p0, p1, p2, n=40):
     return o
 
 def table_geometry():
+    # Outer edge: bottom-left funnel + left wall + TOP ARCH that sweeps over and
+    # down to the lane outer wall, then down the lane + lane floor. That arch is
+    # the orbit the launched ball physically rides around into the playfield.
     shell = [Pp(0.40,0.95)]
     shell += quad(Pp(0.40,0.95), Pp(0.10,0.93), Pp(0.05,0.74))
     shell += [Pp(0.05,0.16)]
-    shell += quad(Pp(0.05,0.16), Pp(0.05,0.035), Pp(0.26,0.028))
-    shell += quad(Pp(0.26,0.028), Pp(0.45,0.005), Pp(0.64,0.030))
-    shell += quad(Pp(0.64,0.030), Pp(0.82,0.06), Pp(0.82,0.18))
-    shell += [Pp(0.82,0.74)]
-    shell += quad(Pp(0.82,0.74), Pp(0.78,0.93), Pp(0.52,0.95))
-    lane_out = [Pp(0.93,0.95), Pp(0.93,0.13)] + quad(Pp(0.93,0.13), Pp(0.93,0.045), Pp(0.84,0.045))
-    lane_in  = [Pp(0.84,0.95), Pp(0.84,0.20)]
-    walls = [shell, lane_out, lane_in]
+    shell += quad(Pp(0.05,0.16), Pp(0.05,0.035), Pp(0.26,0.022))
+    shell += quad(Pp(0.26,0.022), Pp(0.50,0.004), Pp(0.74,0.022))
+    shell += quad(Pp(0.74,0.022), Pp(0.93,0.06), Pp(0.93,0.22))
+    shell += [Pp(0.93,0.95), Pp(0.84,0.95)]
+    # Divider: lane left wall / playfield right wall; stops at 0.25 (below the
+    # arch) so the ball flows up out of the lane and over it into the playfield.
+    divider = [Pp(0.84,0.95), Pp(0.84,0.25)]
+    # Playfield bottom-right funnel down to the centre drain.
+    funnel = [Pp(0.50,0.95)] + quad(Pp(0.50,0.95), Pp(0.80,0.94), Pp(0.84,0.72))
+    walls = [shell, divider, funnel]
     slings = [[Pp(0.20,0.78),Pp(0.30,0.83),Pp(0.20,0.85),Pp(0.20,0.78)],
               [Pp(0.64,0.78),Pp(0.54,0.83),Pp(0.64,0.85),Pp(0.64,0.78)]]
     flippers = [(Pp(0.27,0.865),Pp(0.42,0.915),"L"), (Pp(0.61,0.865),Pp(0.45,0.915),"R")]
@@ -93,10 +99,10 @@ def set_flip(fl, up): fl["motor"].rate = fl["frate"] if up else fl["hrate"]
 
 # ── ball ──────────────────────────────────────────────────────────────────
 ball = pymunk.Body(1.0, pymunk.moment_for_circle(1.0, 0, BALL_R))
-ball.position = Pp(0.46, 0.11)
+ball.position = Pp(0.885, 0.92)          # rest in the shooter lane
 bs = pymunk.Circle(ball, BALL_R); bs.elasticity = 0.35; bs.friction = 0.2
 space.add(ball, bs)
-ball.velocity = (150, 240)
+ball.velocity = (0, -LAUNCH)   # launch up the shooter lane (y-down coords)
 
 def near(fl):
     px, py = fl["pivot"]; bx, by = ball.position
