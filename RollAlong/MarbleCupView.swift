@@ -535,7 +535,7 @@ struct MarbleCupView: View {
                              "map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
             )
             if playerWon {
-                gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+                gameState.recordCompetitiveWin("marblecup")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("marblecup")])
             }
