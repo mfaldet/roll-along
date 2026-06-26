@@ -445,6 +445,15 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Eclipse floor (Eclipse bundle) — a dark starlit sky with a
+                // glowing golden corona ring that slowly pulses.  Skipped under
+                // Reduce Motion (the static dark base remains).
+                if floor == .eclipse && !reduceMotion {
+                    eclipseFloorOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 // Paper-world floor overlays (ruled lines, grids, fold shadows…)
                 paperFloorOverlay(geo: geo)
                     .ignoresSafeArea()
@@ -492,6 +501,10 @@ struct BallGameView: View {
                         case .archery:     archeryTargetGoal
                         case .holeInOne:   holeInOneGoal
                         case .tractorBeam: tractorBeamGoal
+                        case .inferno:     infernoGoal
+                        case .halo:        heavensHaloGoal
+                        case .doodle:      doodleGoal
+                        case .soccerNet:   soccerNetGoal
                         default:           rainbowHole
                         }
                     }
@@ -694,11 +707,13 @@ struct BallGameView: View {
                 // suppresses the animation; the static base remains.
                 if !reduceMotion {
                     switch pit {
-                    case .evil:  evilPitOverlay
-                    case .sky:   skyPitOverlay
-                    case .pond:  pondPitOverlay
-                    case .space: spacePitOverlay
-                    default:     EmptyView()
+                    case .evil:      evilPitOverlay
+                    case .sky:       skyPitOverlay
+                    case .pond:      pondPitOverlay
+                    case .space:     spacePitOverlay
+                    case .eclipse:   eclipsePitOverlay
+                    case .nightclub: nightclubPitOverlay
+                    default:         EmptyView()
                     }
                 }
             }
@@ -1107,6 +1122,113 @@ struct BallGameView: View {
                             )
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /// Eclipse floor (Eclipse bundle) — a faint starfield with a large dark
+    /// moon disc occluding a glowing golden corona ring, hung in the upper sky.
+    /// The corona slowly pulses.  Full-screen overlay.
+    private var eclipseFloorOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t  = tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width * 0.5
+                let cy = size.height * 0.30
+                let r  = min(size.width, size.height) * 0.16
+                let pulse = 1.0 + 0.06 * sin(t * 1.4)
+
+                // Faint static star specks.
+                var rng = SeededRNG(seed: 0xEC11_9523)
+                let stars = max(24, Int(size.width * size.height / 5200))
+                for _ in 0..<stars {
+                    let sx = CGFloat(rng.nextUnit()) * size.width
+                    let sy = CGFloat(rng.nextUnit()) * size.height
+                    let sr = 0.5 + CGFloat(rng.nextUnit()) * 1.1
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr, width: sr * 2, height: sr * 2)),
+                             with: .color(Color.white.opacity(0.10 + 0.18 * rng.nextUnit())))
+                }
+
+                // Broad soft corona glow.
+                let glowR = r * 3.2 * CGFloat(pulse)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: cy - glowR, width: glowR * 2, height: glowR * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 0.80, blue: 0.36).opacity(0.0),  location: 0.40),
+                        .init(color: Color(red: 1.0, green: 0.80, blue: 0.36).opacity(0.30), location: 0.52),
+                        .init(color: Color(red: 1.0, green: 0.66, blue: 0.22).opacity(0.0),  location: 0.80),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glowR))
+
+                // Bright corona ring + dark occluding moon.
+                let ringR = r * 1.14
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - ringR, y: cy - ringR, width: ringR * 2, height: ringR * 2)),
+                           with: .color(Color(red: 1.0, green: 0.86, blue: 0.42).opacity(0.85)),
+                           lineWidth: max(2, r * 0.10))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                         with: .color(Color(red: 0.02, green: 0.02, blue: 0.05)))
+            }
+        }
+    }
+
+    /// Eclipse pit (Eclipse bundle) — a mini eclipse in the death zone: a dark
+    /// core ringed by a pulsing golden corona over a near-black void.
+    private var eclipsePitOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t  = tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width * 0.5, cy = size.height * 0.5
+                let r  = min(size.width, size.height) * 0.32
+                let pulse = 1.0 + 0.08 * sin(t * 1.6)
+
+                ctx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
+                         with: .color(Color(red: 0.02, green: 0.02, blue: 0.05)))
+                let glowR = r * 2.4 * CGFloat(pulse)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: cy - glowR, width: glowR * 2, height: glowR * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 0.82, blue: 0.38).opacity(0.0),  location: 0.45),
+                        .init(color: Color(red: 1.0, green: 0.82, blue: 0.38).opacity(0.45), location: 0.60),
+                        .init(color: Color(red: 1.0, green: 0.66, blue: 0.20).opacity(0.0),  location: 0.85),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glowR))
+                let ringR = r * 1.1
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - ringR, y: cy - ringR, width: ringR * 2, height: ringR * 2)),
+                           with: .color(Color(red: 1.0, green: 0.86, blue: 0.42).opacity(0.9)),
+                           lineWidth: max(1.5, r * 0.12))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                         with: .color(Color(red: 0.01, green: 0.01, blue: 0.03)))
+            }
+        }
+    }
+
+    /// Nightclub pit (Nightclub bundle) — a dark dancefloor void with drifting,
+    /// twinkling coloured spotlights (additive) spilling across it.
+    private var nightclubPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                ctx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
+                         with: .color(Color(red: 0.05, green: 0.03, blue: 0.09)))
+
+                var ctxL = ctx
+                ctxL.blendMode = .plusLighter
+                let cols = [Color(red: 1.0, green: 0.20, blue: 0.70),
+                            Color(red: 0.30, green: 0.80, blue: 1.0),
+                            Color(red: 1.0, green: 0.85, blue: 0.20),
+                            Color(red: 0.60, green: 0.30, blue: 1.0)]
+                var rng = SeededRNG(seed: 0x4B17_C0DE)
+                let count = 7
+                for i in 0..<count {
+                    let bx0 = CGFloat(rng.nextUnit())
+                    let by0 = CGFloat(rng.nextUnit())
+                    let sp  = 0.5 + rng.nextUnit()
+                    let px = (bx0 + CGFloat(0.18 * sin(t * sp + Double(i)))) * size.width
+                    let py = (by0 + CGFloat(0.18 * cos(t * (sp * 0.8) + Double(i) * 1.3))) * size.height
+                    let rr = min(size.width, size.height) * (0.18 + 0.10 * CGFloat(rng.nextUnit()))
+                    let tw = 0.4 + 0.6 * (0.5 + 0.5 * sin(t * 3 + Double(i) * 2.0))
+                    ctxL.fill(Path(ellipseIn: CGRect(x: px - rr, y: py - rr, width: rr * 2, height: rr * 2)),
+                        with: .radialGradient(Gradient(colors: [cols[i % cols.count].opacity(0.45 * tw), .clear]),
+                            center: CGPoint(x: px, y: py), startRadius: 0, endRadius: rr))
                 }
             }
         }
@@ -1570,6 +1692,192 @@ struct BallGameView: View {
                     with: .color(Color(red: 0.30, green: 0.92, blue: 0.55).opacity(0.95))
                 )
             }
+        }
+    }
+
+    /// Inferno goal (Hellfire bundle) — a molten lava ring around a dark core
+    /// with flame tongues licking outward.  Animated flicker; Reduce Motion
+    /// freezes the flames.
+    private var infernoGoal: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let w  = size.width, h = size.height
+                let cx = w / 2, cy = h / 2
+                let r  = min(w, h) / 2 * 0.95
+
+                // Molten ring — dark centre bleeding out to a bright rim.
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red: 0.03, green: 0.00, blue: 0.00), location: 0.00),
+                        .init(color: Color(red: 0.08, green: 0.01, blue: 0.00), location: 0.42),
+                        .init(color: Color(red: 0.95, green: 0.28, blue: 0.04), location: 0.74),
+                        .init(color: Color(red: 1.00, green: 0.74, blue: 0.20), location: 0.93),
+                        .init(color: Color(red: 1.00, green: 0.45, blue: 0.08).opacity(0.0), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+
+                // Flame tongues around the rim — additive so they glow.
+                var fctx = ctx
+                fctx.blendMode = .plusLighter
+                let flames = 12
+                for i in 0..<flames {
+                    let a     = Double(i) / Double(flames) * 2 * .pi
+                    let flick = 0.6 + 0.4 * sin(t * 6 + Double(i) * 1.7)
+                    let baseR = r * 0.78
+                    let tipR  = r * (0.92 + 0.26 * flick)
+                    let perp  = a + .pi / 2
+                    let wdt   = r * 0.10
+                    let bx = cx + CGFloat(cos(a)) * baseR
+                    let by = cy + CGFloat(sin(a)) * baseR
+                    let tx = cx + CGFloat(cos(a)) * tipR
+                    let ty = cy + CGFloat(sin(a)) * tipR
+                    var fl = Path()
+                    fl.move(to: CGPoint(x: bx + CGFloat(cos(perp)) * wdt, y: by + CGFloat(sin(perp)) * wdt))
+                    fl.addQuadCurve(to: CGPoint(x: tx, y: ty),
+                                    control: CGPoint(x: bx + CGFloat(cos(perp)) * wdt * 0.5, y: by + CGFloat(sin(perp)) * wdt * 0.5))
+                    fl.addQuadCurve(to: CGPoint(x: bx - CGFloat(cos(perp)) * wdt, y: by - CGFloat(sin(perp)) * wdt),
+                                    control: CGPoint(x: bx - CGFloat(cos(perp)) * wdt * 0.5, y: by - CGFloat(sin(perp)) * wdt * 0.5))
+                    fl.closeSubpath()
+                    fctx.fill(fl, with: .color(Color(red: 1.0, green: 0.5, blue: 0.12).opacity(0.5 * flick)))
+                }
+            }
+        }
+    }
+
+    /// Halo goal (Heavens bundle) — a radiant golden halo with slowly rotating
+    /// light rays over a soft heavenly glow.  Reduce Motion freezes the rays.
+    private var heavensHaloGoal: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let w  = size.width, h = size.height
+                let cx = w / 2, cy = h / 2
+                let r  = min(w, h) / 2 * 0.95
+
+                // Heavenly background glow.
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(Gradient(colors: [
+                        Color(red: 1.00, green: 0.99, blue: 0.92).opacity(0.95),
+                        Color(red: 0.80, green: 0.90, blue: 1.00).opacity(0.55),
+                        Color(red: 0.65, green: 0.80, blue: 1.00).opacity(0.0),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+
+                // Rotating sunburst rays.
+                var rctx = ctx
+                rctx.blendMode = .plusLighter
+                let rays  = 12
+                let pulse = 1.0 + 0.05 * sin(t * 2)
+                for i in 0..<rays {
+                    let a      = Double(i) / Double(rays) * 2 * .pi + t * 0.25
+                    let innerR = r * 0.30
+                    let outerR = r * pulse
+                    let perp   = a + .pi / 2
+                    let half   = r * 0.05
+                    let ix = cx + CGFloat(cos(a)) * innerR, iy = cy + CGFloat(sin(a)) * innerR
+                    let ox = cx + CGFloat(cos(a)) * outerR, oy = cy + CGFloat(sin(a)) * outerR
+                    var ray = Path()
+                    ray.move(to: CGPoint(x: ix + CGFloat(cos(perp)) * half, y: iy + CGFloat(sin(perp)) * half))
+                    ray.addLine(to: CGPoint(x: ox, y: oy))
+                    ray.addLine(to: CGPoint(x: ix - CGFloat(cos(perp)) * half, y: iy - CGFloat(sin(perp)) * half))
+                    ray.closeSubpath()
+                    rctx.fill(ray, with: .color(Color(red: 1.0, green: 0.95, blue: 0.70).opacity(0.18)))
+                }
+
+                // Golden halo ring with a bright inner highlight.
+                let haloR = r * 0.55
+                let haloRect = CGRect(x: cx - haloR, y: cy - haloR, width: haloR * 2, height: haloR * 2)
+                ctx.stroke(Path(ellipseIn: haloRect),
+                           with: .color(Color(red: 1.0, green: 0.84, blue: 0.35)),
+                           lineWidth: max(2, r * 0.10))
+                ctx.stroke(Path(ellipseIn: haloRect),
+                           with: .color(Color(red: 1.0, green: 0.97, blue: 0.80).opacity(0.9)),
+                           lineWidth: max(1, r * 0.04))
+            }
+        }
+    }
+
+    /// Doodle goal (Paper World bundle) — a hand-drawn pencil bullseye on cream
+    /// paper.  The rings wobble (seeded, stable) so they read as sketched, not
+    /// printed.  Static — no animation.
+    private var doodleGoal: some View {
+        Canvas { ctx, size in
+            let w  = size.width, h = size.height
+            let cx = w / 2, cy = h / 2
+            let r  = min(w, h) / 2 * 0.95
+            let lead = Color(red: 0.22, green: 0.22, blue: 0.26)
+
+            // Cream paper disc.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                     with: .color(Color(red: 0.97, green: 0.96, blue: 0.90)))
+
+            // Concentric wobbly pencil rings.
+            let fracs: [CGFloat] = [0.92, 0.66, 0.40]
+            for (ri, frac) in fracs.enumerated() {
+                let rr  = r * frac
+                let seg = 60
+                var ring = Path()
+                for s in 0...seg {
+                    let a   = Double(s) / Double(seg) * 2 * .pi
+                    let wob = sin(a * 5 + Double(ri) * 2.1) * 0.5 + sin(a * 9 + Double(ri)) * 0.5
+                    let rad = rr + CGFloat(wob) * r * 0.02
+                    let p   = CGPoint(x: cx + CGFloat(cos(a)) * rad, y: cy + CGFloat(sin(a)) * rad)
+                    if s == 0 { ring.move(to: p) } else { ring.addLine(to: p) }
+                }
+                ctx.stroke(ring, with: .color(lead.opacity(0.85)),
+                           style: StrokeStyle(lineWidth: max(1.2, r * 0.045), lineCap: .round, lineJoin: .round))
+            }
+
+            // Filled centre dot.
+            let dotR = r * 0.16
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - dotR, y: cy - dotR, width: dotR * 2, height: dotR * 2)),
+                     with: .color(lead.opacity(0.9)))
+        }
+    }
+
+    /// Soccer Net goal (Soccer bundle) — a goal mouth: a square white net over a
+    /// dark interior with a green grass strip, framed by two posts + crossbar.
+    /// Static — no animation.
+    private var soccerNetGoal: some View {
+        Canvas { ctx, size in
+            var ctx = ctx
+            let w  = size.width, h = size.height
+            let cx = w / 2, cy = h / 2
+            let r  = min(w, h) / 2 * 0.95
+            let circle = Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+            ctx.clip(to: circle)
+
+            // Dark goal-mouth interior + grass strip across the bottom.
+            ctx.fill(circle, with: .color(Color(red: 0.12, green: 0.14, blue: 0.18)))
+            ctx.fill(Path(CGRect(x: cx - r, y: cy + r * 0.52, width: r * 2, height: r * 0.9)),
+                     with: .color(Color(red: 0.30, green: 0.60, blue: 0.26)))
+
+            // Square net mesh — thin white lines.
+            let net   = Color.white.opacity(0.62)
+            let cells = 7
+            let step  = (r * 2) / CGFloat(cells)
+            for k in 0...cells {
+                let x = cx - r + CGFloat(k) * step
+                var v = Path(); v.move(to: CGPoint(x: x, y: cy - r)); v.addLine(to: CGPoint(x: x, y: cy + r))
+                ctx.stroke(v, with: .color(net), lineWidth: 1)
+                let y = cy - r + CGFloat(k) * step
+                var hz = Path(); hz.move(to: CGPoint(x: cx - r, y: y)); hz.addLine(to: CGPoint(x: cx + r, y: y))
+                ctx.stroke(hz, with: .color(net), lineWidth: 1)
+            }
+
+            // White goal frame — two posts + crossbar.
+            let postW  = max(2.5, r * 0.13)
+            let frame  = Color.white
+            let topY   = cy - r * 0.72
+            let botY   = cy + r * 0.72
+            let leftX  = cx - r * 0.80
+            let rightX = cx + r * 0.80
+            ctx.fill(Path(CGRect(x: leftX, y: topY, width: postW, height: botY - topY)), with: .color(frame))
+            ctx.fill(Path(CGRect(x: rightX - postW, y: topY, width: postW, height: botY - topY)), with: .color(frame))
+            ctx.fill(Path(CGRect(x: leftX, y: topY, width: rightX - leftX, height: postW)), with: .color(frame))
         }
     }
 

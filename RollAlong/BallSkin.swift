@@ -91,6 +91,14 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     via the bespoke `ghostMarble` Canvas in BallGameView.
     case ghost = "Ghost"
 
+    // ── Round-6 bundle completion skins ─────────────────────────────────
+    //   • disco — mirror-ball sphere of twinkling silver-violet facets
+    //     (Nightclub bundle), via the bespoke animated `discoCanvas`.
+    case disco = "Disco Ball"
+    //   • paper — crumpled cream-paper sphere with shaded fold creases
+    //     (Paper World bundle), via the bespoke static `paperCanvas`.
+    case paper = "Paper"
+
     // ── Sports bundle skins (new) ──────────────────────────────────────
     //   • basketball — orange sphere with classic NBA seam curves, via the
     //     bespoke `basketballCanvas` in BallSkinView.
@@ -229,6 +237,20 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.95, green: 0.20, blue: 0.20),
                 Color(red: 0.55, green: 0.05, blue: 0.05),
                 Color(red: 0.25, green: 0.02, blue: 0.02),
+            ]
+        case .disco:
+            return [
+                Color(red: 0.95, green: 0.95, blue: 1.00),
+                Color(red: 0.70, green: 0.72, blue: 0.86),
+                Color(red: 0.38, green: 0.40, blue: 0.55),
+                Color(red: 0.14, green: 0.14, blue: 0.22),
+            ]
+        case .paper:
+            return [
+                Color(red: 1.00, green: 0.99, blue: 0.95),
+                Color(red: 0.90, green: 0.89, blue: 0.82),
+                Color(red: 0.66, green: 0.64, blue: 0.58),
+                Color(red: 0.40, green: 0.39, blue: 0.35),
             ]
         case .blue:
             return [

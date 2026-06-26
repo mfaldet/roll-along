@@ -114,11 +114,11 @@ extension BallSkin: CosmeticItem {
              .gold, .silver, .copper, .jade, .ruby:
             return .standard   //  50 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
-             .pastel, .neon, .dune,
+             .pastel, .neon, .dune, .paper,
              .basketball, .soccer, .baseball, .eightBall, .golfBall:
-            return .premium    // 200 coins (Epic) — colour blends + sports balls
+            return .premium    // 200 coins (Epic) — colour blends + sports/paper balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
-             .storm, .candy, .ghost, .lava, .trench,
+             .storm, .candy, .ghost, .lava, .trench, .disco,
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -178,6 +178,10 @@ enum GoalSkin: String, CosmeticItem {
     case quasar         // hot magenta + cyan, brightest in the catalogue
     case holeInOne      // golf hole with red flag (Golf bundle)
     case tractorBeam    // ★ NEW (Space Travel bundle) — UFO beam column
+    case inferno        // Hellfire bundle — molten lava ring with flame licks
+    case halo           // Heavens bundle — radiant golden halo + light rays
+    case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
+    case soccerNet      // Soccer bundle — goal mouth with white netting
 
     var id: String { rawValue }
     var displayName: String {
@@ -201,6 +205,10 @@ enum GoalSkin: String, CosmeticItem {
         case .quasar:      return "Quasar"
         case .holeInOne:   return "Hole-in-One"
         case .tractorBeam: return "Tractor Beam"
+        case .inferno:     return "Inferno"
+        case .halo:        return "Halo"
+        case .doodle:      return "Doodle"
+        case .soccerNet:   return "Soccer Net"
         }
     }
 
@@ -223,7 +231,8 @@ enum GoalSkin: String, CosmeticItem {
 
     var holeStyle: HoleStyle {
         switch self {
-        case .target, .archery, .holeInOne, .tractorBeam:
+        case .target, .archery, .holeInOne, .tractorBeam,
+             .inferno, .halo, .doodle, .soccerNet:
             // Not actually consumed (their renderers are bespoke), but
             // we keep a placeholder so callers can read it uniformly.
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
@@ -460,6 +469,48 @@ enum GoalSkin: String, CosmeticItem {
                     Color(red: 0.02, green: 0.10, blue: 0.06),
                 ],
                 startPoint: .top, endPoint: .bottom))
+        case .inferno:
+            // Fiery portal — dark molten core bleeding to orange/red.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.04, green: 0.00, blue: 0.00), location: 0.00),
+                    .init(color: Color(red: 0.10, green: 0.01, blue: 0.00), location: 0.40),
+                    .init(color: Color(red: 0.95, green: 0.30, blue: 0.05), location: 0.78),
+                    .init(color: Color(red: 1.00, green: 0.74, blue: 0.22), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
+        case .halo:
+            // Heavenly glow — warm white-gold core into soft sky blue.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 1.00, green: 0.98, blue: 0.86), location: 0.00),
+                    .init(color: Color(red: 1.00, green: 0.86, blue: 0.40), location: 0.45),
+                    .init(color: Color(red: 0.74, green: 0.86, blue: 1.00), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
+        case .doodle:
+            // Pencil bullseye on cream paper — grey rings, dark centre.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.22, green: 0.22, blue: 0.26), location: 0.00),
+                    .init(color: Color(red: 0.22, green: 0.22, blue: 0.26), location: 0.22),
+                    .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.22),
+                    .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.55),
+                    .init(color: Color(red: 0.35, green: 0.35, blue: 0.40), location: 0.55),
+                    .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.72),
+                    .init(color: Color(red: 0.35, green: 0.35, blue: 0.40), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
+        case .soccerNet:
+            // White net over a dark goal mouth with a green grass base.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color.white,                               location: 0.00),
+                    .init(color: Color(red: 0.85, green: 0.88, blue: 0.92), location: 0.45),
+                    .init(color: Color(red: 0.18, green: 0.22, blue: 0.28), location: 0.80),
+                    .init(color: Color(red: 0.30, green: 0.60, blue: 0.26), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -482,7 +533,8 @@ enum GoalSkin: String, CosmeticItem {
              .ripple, .comet, .eclipse, .plasma,
              .mirage, .obsidian:
             return .premium    // 200 coins — animated, tight palette
-        case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam:
+        case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
+             .inferno, .halo, .doodle, .soccerNet:
             return .exclusive  // 500 coins — animated, full-spectrum, or bespoke
         }
     }
@@ -621,6 +673,7 @@ enum Floor: String, CosmeticItem {
     case disco            // colour-cycling dance-floor squares
     case grass            // golf-course turf with grass tufts (Golf bundle)
     case moon             // ★ NEW (Space Travel bundle) — lunar regolith + craters
+    case eclipse          // Eclipse bundle — dark void behind a glowing corona ring
 
     // Sports bundles (new)
     case court            // Full Court bundle — warm hardwood basketball floor
@@ -653,6 +706,7 @@ enum Floor: String, CosmeticItem {
         case .disco:      return "Disco"
         case .grass:      return "Grass"
         case .moon:       return "Moon"
+        case .eclipse:    return "Eclipse"
         case .court:      return "Court"
         case .felt:       return "Felt"
         }
@@ -670,7 +724,7 @@ enum Floor: String, CosmeticItem {
              .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
             return .standard   //  50 coins
-        case .aurora, .disco, .grass, .moon:
+        case .aurora, .disco, .grass, .moon, .eclipse:
             return .exclusive  // 500 coins — animated / textured overlay
         }
     }
@@ -704,6 +758,7 @@ enum Floor: String, CosmeticItem {
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
+        case .eclipse:    return Color(red: 0.04,  green: 0.04,  blue: 0.10 )  // dark void; corona paints over
         case .court:      return Color(red: 0.84,  green: 0.65,  blue: 0.38 )  // warm hardwood
         case .felt:       return Color(red: 0.18,  green: 0.48,  blue: 0.24 )  // pool-table green
         }
@@ -722,7 +777,7 @@ enum Floor: String, CosmeticItem {
     /// tufts, etc.).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .aurora, .disco, .grass, .moon: return true
+        case .aurora, .disco, .grass, .moon, .eclipse: return true
         default: return false
         }
     }
@@ -764,6 +819,8 @@ enum Pit: String, CosmeticItem {
     case sky              // sky-blue gradient with drifting clouds
     case pond             // water with ripples + lily pad (Golf bundle)
     case space            // ★ NEW (Space Travel bundle) — starfield void
+    case eclipse          // Eclipse bundle — dark void with a corona ring glow
+    case nightclub        // Nightclub bundle — dark void with drifting disco lights
 
     // Sports bundles (new)
     case sideline         // Full Court bundle — dark-grey out-of-bounds edge
@@ -797,6 +854,8 @@ enum Pit: String, CosmeticItem {
         case .sky:        return "Sky"
         case .pond:       return "Pond"
         case .space:      return "Space"
+        case .eclipse:    return "Eclipse"
+        case .nightclub:  return "Nightclub"
         case .sideline:   return "Sideline"
         case .pocket:     return "Pocket"
         }
@@ -814,7 +873,7 @@ enum Pit: String, CosmeticItem {
              .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard,
              .sideline, .pocket:
             return .standard   //  50 coins
-        case .evil, .sky, .pond, .space:
+        case .evil, .sky, .pond, .space, .eclipse, .nightclub:
             return .exclusive  // 500 coins — animated overlay
         }
     }
@@ -849,6 +908,8 @@ enum Pit: String, CosmeticItem {
         case .sky:        return Color(red: 0.55,  green: 0.78,  blue: 0.95 )  // pale blue base; clouds drift on top
         case .pond:       return Color(red: 0.08,  green: 0.30,  blue: 0.42 )  // deep water; ripples + lily pad on top
         case .space:      return Color(red: 0.02,  green: 0.02,  blue: 0.06 )  // near-black void; stars twinkle on top
+        case .eclipse:    return Color(red: 0.03,  green: 0.02,  blue: 0.07 )  // near-black; corona ring on top
+        case .nightclub:  return Color(red: 0.06,  green: 0.04,  blue: 0.10 )  // dark; disco lights drift on top
         case .sideline:   return Color(red: 0.14,  green: 0.14,  blue: 0.16 )  // dark court edge / out-of-bounds
         case .pocket:     return Color(red: 0.06,  green: 0.08,  blue: 0.06 )  // near-black pool pocket
         }
@@ -859,7 +920,7 @@ enum Pit: String, CosmeticItem {
     /// Space starfield).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .evil, .sky, .pond, .space: return true
+        case .evil, .sky, .pond, .space, .eclipse, .nightclub: return true
         default: return false
         }
     }
@@ -1261,61 +1322,61 @@ struct CosmeticBundle: Identifiable {
             id:             "hellfire",
             displayName:    "Hellfire",
             tagline:        "Roll a ruby through the inferno.",
-            contentSummary: "Ruby ball · Ember floor · Evil pit · Fire trail",
+            contentSummary: "Ruby ball · Inferno goal · Ember floor · Evil pit · Fire trail · Synthwave music",
             balls:  [.ruby],
-            goals:  [],
+            goals:  [.inferno],
             trails: [.fire],
             floors: [.ember],
             pits:   [.evil],
-            music:  []
+            music:  [.synthwave]
         ),
         CosmeticBundle(
             id:             "heavens",
             displayName:    "Heavens",
             tagline:        "Drift the sky on opal lustre.",
-            contentSummary: "Opal ball · Classic floor · Sky pit · Stardust trail",
+            contentSummary: "Opal ball · Halo goal · Classic floor · Sky pit · Stardust trail · Celestial music",
             balls:  [.opal],
-            goals:  [],
+            goals:  [.halo],
             trails: [.stardust],
             floors: [.classic],
             pits:   [.sky],
-            music:  []
+            music:  [.celestial]
         ),
         CosmeticBundle(
             id:             "nightclub",
             displayName:    "Nightclub",
             tagline:        "Disco lights, neon goal, bubblegum streak.",
-            contentSummary: "Disco floor · Neon goal · Bubblegum trail",
-            balls:  [],
+            contentSummary: "Disco Ball · Disco floor · Nightclub pit · Neon goal · Bubblegum trail · Retrowave music",
+            balls:  [.disco],
             goals:  [.neon],
             trails: [.bubblegum],
             floors: [.disco],
-            pits:   [],
-            music:  []
+            pits:   [.nightclub],
+            music:  [.retrowave]
         ),
         CosmeticBundle(
             id:             "paper-world",
             displayName:    "Paper World",
             tagline:        "The full Notebook + Graphite-trail pack.",
-            contentSummary: "Notebook floor · Notebook pit · Graphite trail (starter)",
-            balls:  [],
-            goals:  [],
+            contentSummary: "Paper ball · Doodle goal · Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
+            balls:  [.paper],
+            goals:  [.doodle],
             trails: [],   // graphite is starter; included by default
             floors: [.notebook],
             pits:   [.notebook],
-            music:  []
+            music:  [.lofi]
         ),
         CosmeticBundle(
             id:             "golf",
             displayName:    "Golf",
             tagline:        "Dimpled ball, fairway green, lily-pad pond, hole-in-one flag.",
-            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal",
+            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal · Jazz music",
             balls:  [.golfBall],
             goals:  [.holeInOne],
             trails: [.air],
             floors: [.grass],
             pits:   [.pond],
-            music:  []
+            music:  [.jazz]
         ),
 
         CosmeticBundle(
@@ -1336,78 +1397,78 @@ struct CosmeticBundle: Identifiable {
             id:             "space-travel",
             displayName:    "Space Travel",
             tagline:        "Pilot a saucer across the moon and into the void.",
-            contentSummary: "UFO ball · Moon floor · Space pit · Tractor Beam goal · Raybeam trail",
+            contentSummary: "UFO ball · Moon floor · Space pit · Tractor Beam goal · Raybeam trail · Retrowave music",
             balls:  [.ufo],
             goals:  [.tractorBeam],
             trails: [.raybeam],
             floors: [.moon],
             pits:   [.space],
-            music:  []
+            music:  [.retrowave]
         ),
 
         CosmeticBundle(
             id:             "winter",
             displayName:    "Winter",
             tagline:        "A snowglobe marble through crystal frost.",
-            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit",
+            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Classical music",
             balls:  [.snowglobe],
             goals:  [.crystal],
             trails: [.ice],
             floors: [.twilight],
             pits:   [.twilight],
-            music:  []
+            music:  [.classical]
         ),
 
         CosmeticBundle(
             id:             "cosmos",
             displayName:    "Cosmos",
             tagline:        "Drift the deep with a nebula in hand.",
-            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit",
+            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Celestial music",
             balls:  [.nebula],
             goals:  [.galaxy],
             trails: [.stardust],
             floors: [.midnight],
             pits:   [.midnight],
-            music:  []
+            music:  [.celestial]
         ),
 
         CosmeticBundle(
             id:             "nature",
             displayName:    "Nature",
             tagline:        "Jade and blossoms over a meadow green.",
-            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit",
+            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Acoustic music",
             balls:  [.jade],
             goals:  [.blossom],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],
-            music:  []
+            music:  [.acoustic]
         ),
 
         CosmeticBundle(
             id:             "ocean",
             displayName:    "Ocean",
             tagline:        "Ride the tide on a wave of mint.",
-            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit",
+            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music",
             balls:  [.mint],
             goals:  [.ripple],
             trails: [.sky],
             floors: [.blueprint],
             pits:   [.blueprint],
-            music:  []
+            music:  [.lofi]
         ),
 
         CosmeticBundle(
             id:             "velvet-night",
             displayName:    "Velvet Night",
             tagline:        "Plasma and rainbow over deep velvet.",
-            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit",
+            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit · Downtempo music",
             balls:  [.purple],
             goals:  [.plasma],
             trails: [.rainbow],
             floors: [.velvet],
             pits:   [.velvet],
-            music:  []
+            music:  [.downtempo]
         ),
 
         CosmeticBundle(
@@ -1531,12 +1592,12 @@ struct CosmeticBundle: Identifiable {
             id:             "eclipse",
             displayName:    "Eclipse",
             tagline:        "A golden corona around the dark.",
-            contentSummary: "Blue ball · Eclipse goal · Gilded trail · Mysterium music",
+            contentSummary: "Blue ball · Eclipse goal · Eclipse floor · Eclipse pit · Gilded trail · Mysterium music",
             balls:  [.blue],
             goals:  [.eclipse],
             trails: [.gilded],
-            floors: [],
-            pits:   [],
+            floors: [.eclipse],
+            pits:   [.eclipse],
             music:  [.mysterium]
         ),
         CosmeticBundle(
@@ -1567,9 +1628,9 @@ struct CosmeticBundle: Identifiable {
             id:             "soccer",
             displayName:    "Soccer",
             tagline:        "Hit the pitch — hex-stitched ball on fresh turf.",
-            contentSummary: "Soccer Ball · Smoke trail · Grass floor · Meadow pit · Synthwave music",
+            contentSummary: "Soccer Ball · Soccer Net goal · Smoke trail · Grass floor · Meadow pit · Synthwave music",
             balls:  [.soccer],
-            goals:  [],
+            goals:  [.soccerNet],
             trails: [.smoke],
             floors: [.grass],
             pits:   [.meadow],
