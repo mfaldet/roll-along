@@ -245,17 +245,17 @@ struct HomeView: View {
                         // Smoke-test anchor "HomeView" now lives on the title
                         // leaf inside `titleText` (a container identifier would
                         // clobber its children's own ids), so it isn't set here.
-                        .padding(.bottom, 12)
-
-                    // Per-mode status near the title: a Level Select button for
-                    // the climb / challenge packs, or a stat readout for the
-                    // mini-games.  (Coin Pit shows its name tag on the marble.)
-                    modeHeader
-                        .homeBallCollider()
-                        .padding(.bottom, 8)
 
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
+
+                    // Per-mode status — sits JUST ABOVE Play so it reads as
+                    // "what you're about to launch": a Level Select button for
+                    // the climb / challenge packs, a stat readout for the
+                    // mini-games, or competitive wins.
+                    modeHeader
+                        .homeBallCollider()
+                        .padding(.bottom, 10)
 
                     // Bottom control grid — 3 rows, up to 4 columns wide:
                     //   • Play (full width)
@@ -657,7 +657,7 @@ struct HomeView: View {
             Text("Welcome back, \(gameState.playerName)!")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.55))
-                .padding(.bottom, 12)
+                .padding(.bottom, 2)   // sit the title snug under the greeting
         }
     }
 
@@ -678,20 +678,24 @@ struct HomeView: View {
             // (chosen in the Games hub), name it here so the player knows what
             // Play will launch.
             if gameState.currentModeID != "climb" {
+                // At least half the 52pt title so the armed mode reads loud.
                 Text(gameState.currentMode.displayName)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.62))
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color(white: 0.72))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
                     .accessibilityIdentifier("ArmedModeSubtitle")
             }
         }
         .animation(.easeInOut(duration: 0.25), value: gameState.currentModeID)
     }
 
-    // MARK: - Per-mode status header (sits just under the title)
+    // MARK: - Per-mode status header (sits just above the Play button)
 
     /// A Level Select button for the climb / challenge packs, or a stat readout
-    /// for the mini-games.  Coin Pit shows its name tag on the marble instead,
-    /// so it renders nothing here.
+    /// for the mini-games (high score, zen time, coins earned, competitive
+    /// wins).  Coin Pit also floats a name tag on the marble; Sumo is pure
+    /// survival, so it shows that rather than a win count.
     @ViewBuilder
     private var modeHeader: some View {
         let id = gameState.currentModeID
@@ -707,6 +711,11 @@ struct HomeView: View {
         } else if id == "coinpit" {   // displayed "Gold Rush"
             statChip(icon: "dollarsign.circle.fill",
                      text: "\(gameState.goldrushCoinsTotal.formatted()) coins earned")
+        } else if id == "sumo" {
+            statChip(icon: "circle.dashed", text: "Endless survival")
+        } else if gameState.currentMode.section == .competitive {
+            let w = gameState.minigameWins[id] ?? 0
+            statChip(icon: "trophy.fill", text: "\(w) win\(w == 1 ? "" : "s")")
         }
     }
 
