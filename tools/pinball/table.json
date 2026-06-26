@@ -43,5 +43,6 @@
   "flippers":  [{"px": 0.30, "py": 0.90, "dir": 1, "len": 0.16},
                 {"px": 0.60, "py": 0.90, "dir": -1, "len": 0.16}],
   "drain":     {"x": 0.45, "y": 0.965, "w": 0.13, "h": 0.015},
-  "ballStart": {"x": 0.93, "y": 0.93, "r": 0.016}
+  "ballStart": {"x": 0.93, "y": 0.93, "r": 0.016, "_note": "lower-right white-centre circle = the ball, resting in the shooter lane"},
+  "dropHole":  {"x": 0.10, "y": 0.62, "r": 0.02, "_note": "lower-left white circle = hole that drops the ball from the raised bridge floor to the main surface beneath"}
 }
