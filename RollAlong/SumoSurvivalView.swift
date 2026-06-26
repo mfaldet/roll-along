@@ -775,32 +775,38 @@ struct SumoSurvivalView: View {
         guard !fell.isEmpty else { return }
 
         if survivors.count >= 1 {
-            for b in fell { recordFall(b, winner: false) }
+            for b in fell { recordFinish(b, points: fallPoints(orderIndex: fallenThisRound.count), poof: true) }
             bumpers = survivors
             if survivors.count == 1, let w = survivors.first {
-                recordFall(w, winner: true)
+                // The last marble standing won — it didn't fall, so no poof.
+                recordFinish(w, points: winnerPoints, poof: false)
                 bumpers = []
                 endRound()
             }
         } else {
             // Rare: every remaining marble fell this tick — last one is the winner.
             for (idx, b) in fell.enumerated() {
-                recordFall(b, winner: idx == fell.count - 1)
+                let isWinner = idx == fell.count - 1
+                recordFinish(b, points: isWinner ? winnerPoints
+                                                  : fallPoints(orderIndex: fallenThisRound.count),
+                             poof: true)
             }
             bumpers = []
             endRound()
         }
     }
 
-    /// Award a marble its finish for this round (fall points by order, or the
-    /// winner's 5), record the finishing order, and poof it.
-    private func recordFall(_ b: Bumper, winner: Bool) {
-        poofs.append(Poof(pos: b.pos, color: b.isPlayer ? .white : b.color, born: localTick))
-        let pts = winner ? winnerPoints : fallPoints(orderIndex: fallenThisRound.count)
-        if let idx = roster.firstIndex(where: { $0.id == b.id }) { roster[idx].points += pts }
+    /// Award a marble its finish for this round: add points, record the
+    /// finishing order, and (for marbles that actually fell) poof + buzz and
+    /// flag the player as spectating.
+    private func recordFinish(_ b: Bumper, points: Int, poof: Bool) {
+        if poof {
+            poofs.append(Poof(pos: b.pos, color: b.isPlayer ? .white : b.color, born: localTick))
+            if b.isPlayer { playerSpectating = true }
+            if gameState.hapticsEnabled { Haptics.heavy() }
+        }
+        if let idx = roster.firstIndex(where: { $0.id == b.id }) { roster[idx].points += points }
         fallenThisRound.append(b.id)
-        if b.isPlayer && !winner { playerSpectating = true }
-        if gameState.hapticsEnabled { Haptics.heavy() }
     }
 
     private func prunePoofs() {
