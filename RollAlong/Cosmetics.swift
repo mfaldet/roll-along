@@ -2422,8 +2422,9 @@ private func trailRose(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: 
         let cy = p.y + fall
         let sz = baseWidth * CGFloat(0.32 + 0.26 * r3) * (1.0 - 0.22 * CGFloat(life))
         let rot = seed * 6.283 + t * 0.5 + Double(life) * 1.0   // slow turn in place
+        let colorIdx = min(2, max(0, Int(r3 * 3)))              // clamp (seed may be <0 off-edge)
         drawPetal(ctx, CGPoint(x: cx, y: cy), sz, rot,
-                  petals[Int(r3 * 3) % 3].opacity(0.82 * env))
+                  petals[colorIdx].opacity(0.82 * env))
     }
 }
 
