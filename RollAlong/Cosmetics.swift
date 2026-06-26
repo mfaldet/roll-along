@@ -516,6 +516,38 @@ enum GoalSkin: String, CosmeticItem {
     var coinCost: Int { tier.basePrice }
     var unlockLevel: Int { 0 }
     static var starter: GoalSkin { .target }
+
+    /// Representative accent colour for this goal.  Used to theme effects that
+    /// reference the equipped goal but aren't the full portal art — the launch
+    /// vortex glow + spiral trail and the goal-reached burst — so the equipped
+    /// goal reads consistently everywhere, not just on the in-game portal.
+    var accentColor: Color {
+        switch self {
+        case .target:      return Color(red: 0.90, green: 0.18, blue: 0.20)
+        case .archery:     return Color(red: 1.00, green: 0.80, blue: 0.20)
+        case .galaxy:      return Color(red: 0.55, green: 0.55, blue: 1.00)
+        case .crystal:     return Color(red: 0.55, green: 0.88, blue: 1.00)
+        case .flame:       return Color(red: 1.00, green: 0.50, blue: 0.12)
+        case .blossom:     return Color(red: 1.00, green: 0.62, blue: 0.78)
+        case .mosaic:      return Color(red: 0.95, green: 0.45, blue: 0.85)
+        case .ripple:      return Color(red: 0.45, green: 0.85, blue: 1.00)
+        case .comet:       return Color(red: 0.75, green: 0.90, blue: 1.00)
+        case .rainbow:     return Color(red: 1.00, green: 0.30, blue: 0.85)
+        case .neon:        return Color(red: 1.00, green: 0.15, blue: 0.70)
+        case .eclipse:     return Color(red: 1.00, green: 0.78, blue: 0.32)
+        case .plasma:      return Color(red: 0.70, green: 0.40, blue: 1.00)
+        case .mirage:      return Color(red: 1.00, green: 0.82, blue: 0.45)
+        case .prism:       return Color(red: 0.80, green: 0.90, blue: 1.00)
+        case .obsidian:    return Color(red: 0.35, green: 0.45, blue: 0.80)
+        case .quasar:      return Color(red: 1.00, green: 0.25, blue: 0.90)
+        case .holeInOne:   return Color(red: 0.40, green: 0.80, blue: 0.30)
+        case .tractorBeam: return Color(red: 0.30, green: 0.95, blue: 0.55)
+        case .inferno:     return Color(red: 1.00, green: 0.45, blue: 0.10)
+        case .halo:        return Color(red: 1.00, green: 0.86, blue: 0.42)
+        case .doodle:      return Color(red: 0.55, green: 0.60, blue: 0.75)
+        case .soccerNet:   return Color(red: 0.85, green: 0.92, blue: 1.00)
+        }
+    }
     /// Tier rule (player-facing: Standard / Epic / Legendary):
     ///   • Standard  — truly static, solid-banded targets (no
     ///                 particles, no animation).

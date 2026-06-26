@@ -787,6 +787,9 @@ struct LaunchTransition: View {
     /// Live spiral length in seconds.  Shrinks when the player taps to rush the
     /// launch (see HomeView.rushLaunch); the unrushed default is `defaultDuration`.
     let duration: Double
+    /// The equipped goal's accent colour — the portal the ball drains into is
+    /// tinted to match the goal you're rolling toward.
+    var accent: Color = Color(red: 0.45, green: 0.78, blue: 1.0)
     static let defaultDuration: Double = 3.4
 
     var body: some View {
@@ -802,8 +805,8 @@ struct LaunchTransition: View {
                 ZStack {
                     Circle()
                         .fill(RadialGradient(
-                            colors: [Color(red: 0.45, green: 0.78, blue: 1.0).opacity(0.55 * glow),
-                                     Color(red: 0.30, green: 0.55, blue: 0.95).opacity(0.25 * glow),
+                            colors: [accent.opacity(0.60 * glow),
+                                     accent.opacity(0.28 * glow),
                                      .clear],
                             center: .center, startRadius: 0, endRadius: 70))
                         .frame(width: 150, height: 150)
@@ -831,6 +834,8 @@ struct LaunchBall: View {
     let diameter: CGFloat     // starting size (matches the home ball)
     let since: Date
     let duration: Double      // live spiral length; shrinks on a rush tap
+    /// Equipped goal's accent colour — tints the draining vortex trail.
+    var accent: Color = Color(red: 0.62, green: 0.86, blue: 1.0)
     private static let turns: Double = 6.0
 
     /// Whirlpool path position at progress `pp` (0…1).  Tuned to read like the
@@ -878,7 +883,7 @@ struct LaunchBall: View {
                             let op = (1 - frac) * 0.55 * (1 - Double(blackP))
                             let lw = ballSize * CGFloat(0.40 + (1 - frac) * 0.55)
                             var seg = Path(); seg.move(to: pv); seg.addLine(to: pt)
-                            ctx.stroke(seg, with: .color(Color(red: 0.62, green: 0.86, blue: 1.0).opacity(op)),
+                            ctx.stroke(seg, with: .color(accent.opacity(op)),
                                        style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
                         }
                         prev = pt

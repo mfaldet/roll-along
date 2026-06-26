@@ -556,7 +556,7 @@ struct BallGameView: View {
 
                 // Goal burst — one-shot particle blast on goal reach
                 if let burst = goalBurst {
-                    GoalBurstView(event: burst)
+                    GoalBurstView(event: burst, accent: gameState.equippedGoal.accentColor)
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                 }
@@ -4831,6 +4831,8 @@ struct BallSquash: Animatable {
 // ---------------------------------------------------------------------------
 struct GoalBurstView: View {
     let event: GoalBurstEvent
+    /// Equipped goal's accent colour — the burst matches the goal you reached.
+    var accent: Color = .white
     private let lifetime: TimeInterval = 0.75
     private let particleCount = 26
 
@@ -4857,8 +4859,7 @@ struct GoalBurstView: View {
 
                     let alpha = Double(1.0 - progress)
                     let pR    = CGFloat(7.0 * (1.0 - progress) + 2.0)
-                    let hue   = (phase + Double(t) * 0.4).truncatingRemainder(dividingBy: 1.0)
-                    let color = Color(hue: hue, saturation: 1.0, brightness: 1.0)
+                    let color = accent
 
                     // Glow
                     let gR = pR * 3.0
