@@ -709,21 +709,35 @@ struct CosmeticShopView: View {
     }
 
     private func collectionCard(_ bundle: CosmeticBundle, isFeatured: Bool) -> some View {
-        let bundleOwned = gameState.ownedBundles.contains(bundle.id)
+        // A set the player already owns in full (bought as a unit OR every
+        // item owned individually) reads as complete — no buy button.
+        let bundleOwned = gameState.completedBundleIDs.contains(bundle.id)
         let owned       = ownedCount(in: bundle)
         let total       = bundle.itemCount
-        let cost        = bundle.price(in: gameState)
+        // Catalog sells bundles at the full prorated price; the Shop sells the
+        // featured bundle at the window's randomized discount off that price.
+        let isShop      = mode == .shop
+        let discount    = ShopRotation.featuredDiscount()
+        let prorated    = bundle.proratedPrice(in: gameState)
+        let cost        = bundleCost(bundle)
+        let discounted  = isShop && cost < prorated
         let canAfford   = gameState.coinBalance >= cost
 
         return VStack(alignment: .leading, spacing: 10) {
             // ── Title row ────────────────────────────────────────────────
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    // Chips row — ⭐ FEATURED and/or 🔥 LIMITED
+                    // Chips row — ⚡ DEAL, ⭐ FEATURED and/or 🔥 LIMITED
                     let showFeatured = isFeatured
                     let showLimited  = bundle.isLimitedTime && bundle.isAvailable
-                    if showFeatured || showLimited {
+                    if discounted || showFeatured || showLimited {
                         HStack(spacing: 6) {
+                            if discounted {
+                                Text("⚡ \(discount.label.uppercased()) DEAL · \(discount.percent)% OFF")
+                                    .font(.system(size: 9, weight: .black, design: .rounded))
+                                    .kerning(1.2)
+                                    .foregroundStyle(discount.color)
+                            }
                             if showFeatured {
                                 Text("⭐ FEATURED")
                                     .font(.system(size: 9, weight: .black, design: .rounded))
@@ -783,11 +797,19 @@ struct CosmeticShopView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(canAfford ? .black : Color(white: 0.50))
                         Spacer()
-                        HStack(spacing: 3) {
-                            CoinIcon(size: 13)
-                            Text("\(cost)")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+                        HStack(spacing: 5) {
+                            if discounted {
+                                Text("\(prorated)")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .strikethrough(true, color: (canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                                    .foregroundStyle((canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                            }
+                            HStack(spacing: 3) {
+                                CoinIcon(size: 13)
+                                Text("\(cost)")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+                            }
                         }
                     }
                     .padding(.horizontal, 14)
@@ -1060,24 +1082,31 @@ struct CosmeticShopView: View {
         return n
     }
 
-    private func canAffordBundle(_ bundle: CosmeticBundle) -> Bool {
-        gameState.coinBalance >= bundle.price(in: gameState)
+    /// The price the player pays for `bundle` on the current surface: the
+    /// Catalog charges the full prorated price; the Shop charges the window's
+    /// discounted price off that same prorated base.
+    private func bundleCost(_ bundle: CosmeticBundle) -> Int {
+        mode == .shop
+            ? bundle.shopPrice(in: gameState, discount: ShopRotation.featuredDiscount())
+            : bundle.proratedPrice(in: gameState)
     }
 
+    private func canAffordBundle(_ bundle: CosmeticBundle) -> Bool {
+        gameState.coinBalance >= bundleCost(bundle)
+    }
+
+    /// Buy a bundle — grants every yet-unowned item and marks the set owned.
+    /// Live in BOTH surfaces now: the Catalog charges the full prorated price,
+    /// the Shop the discounted price for the featured bundle.
     private func handleBundleTap(_ bundle: CosmeticBundle, owned: Bool) {
         if owned { return }
-        // Catalog is browse-only — bundles are bought in the Shop when featured.
-        if mode == .catalog {
-            alertMessage = "This bundle is buyable in the Shop while it's featured."
-            showAlert = true
-            return
-        }
-        let cost = bundle.price(in: gameState)
+        let cost = bundleCost(bundle)
         guard gameState.coinBalance >= cost else {
             alertMessage = "You need \(cost - gameState.coinBalance) more coins for the \(bundle.displayName) bundle.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
             showAlert = true
             return
         }
+        let discountPct = mode == .shop ? ShopRotation.featuredDiscount().percent : 0
         let beforeCompleted = gameState.completedBundleIDs
         _ = gameState.spendCoins(cost)
         bundle.grantContents(to: gameState)
@@ -1085,9 +1114,11 @@ struct CosmeticShopView: View {
         AnalyticsClient.shared.track(
             "bundle_purchased",
             properties: [
-                "bundle":  .string(bundle.id),
-                "price":   .int(cost),
-                "items":   .int(bundle.itemCount),
+                "bundle":       .string(bundle.id),
+                "price":        .int(cost),
+                "items":        .int(bundle.itemCount),
+                "surface":      .string(mode == .shop ? "shop" : "catalog"),
+                "discount_pct": .int(discountPct),
             ]
         )
         checkCompletionToast(before: beforeCompleted)
