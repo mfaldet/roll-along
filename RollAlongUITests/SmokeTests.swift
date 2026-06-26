@@ -106,18 +106,31 @@ final class SmokeTests: XCTestCase {
         // 3. Tap the competitive coin scramble in the mode list (id
         // "goldrush"; DISPLAYED as "Coin Pit" since the name swap).  It
         // sits a few cards down the hub — scroll once if it's below the
-        // fold on small screens.
+        // fold on small screens.  Selecting a mode now ARMS it and returns
+        // Home (it no longer launches the game directly).
         let goldRushButton = entry("goldrush", labeled: "Coin Pit")
         XCTAssertTrue(goldRushButton.waitForExistence(timeout: 5),
                       "Neither the goldrush identifier nor the 'Coin Pit' label was found in the Games hub — see the AX-tree attachment")
         if !goldRushButton.isHittable { app.swipeUp() }
         goldRushButton.tap()
 
-        // 4. The scramble's view is on screen (leaf anchor on its HUD label)
-        let goldRushView = element("GoldRushView")
-        XCTAssertTrue(goldRushView.waitForExistence(timeout: 5))
+        // 4. Back on Home, with Coin Pit armed for Play.
+        XCTAssertTrue(homeView.waitForExistence(timeout: 5),
+                      "Selecting a mode should return to Home with it armed")
 
-        // 5. Exit via the game's own close (✕) button — the nav bar is
+        // 5. Press Play — it launches the armed mode after the ~3.3s launch
+        // flourish, so allow a longer timeout for the game to appear.
+        let playButton = element("PlayButton")
+        XCTAssertTrue(playButton.waitForExistence(timeout: 5),
+                      "The Play button should be on Home — see the AX-tree attachment")
+        playButton.tap()
+
+        // 6. The scramble's view is on screen (leaf anchor on its HUD label)
+        let goldRushView = element("GoldRushView")
+        XCTAssertTrue(goldRushView.waitForExistence(timeout: 10),
+                      "Coin Pit should launch from Play within the launch-animation window")
+
+        // 7. Exit via the game's own close (✕) button — the nav bar is
         // hidden in-game, so there is no Back button and the swipe-back
         // gesture is disabled.  nav.goHome() pops straight to the root.
         let closeButton = entry("GoldRushCloseButton", labeled: "Close")
@@ -125,10 +138,10 @@ final class SmokeTests: XCTestCase {
                       "The scramble's close button should be on screen — see the AX-tree attachment if missing")
         closeButton.tap()
 
-        // 6. Home screen is visible again
+        // 8. Home screen is visible again
         XCTAssertTrue(
             homeView.waitForExistence(timeout: 5),
-            "HomeView should be visible again after returning from Gold Rush"
+            "HomeView should be visible again after returning from Coin Pit"
         )
     }
 
