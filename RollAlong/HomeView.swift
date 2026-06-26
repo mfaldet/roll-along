@@ -193,6 +193,16 @@ struct HomeView: View {
                         } else {
                             liveBall
                                 .position(ballPos)
+                            // Coin Pit arms the home marble with the player's
+                            // name tag, just as it appears in the game itself.
+                            if gameState.currentModeID == "goldrush" {
+                                RivalNameTag(
+                                    label: gameState.playerName.isEmpty ? "YOU" : gameState.playerName,
+                                    color: Color(red: 0.28, green: 0.85, blue: 0.45),
+                                    isPlayer: true)
+                                    .position(x: ballPos.x, y: ballPos.y - ballRadius - 16)
+                                    .allowsHitTesting(false)
+                            }
                         }
                     }
                     .contentShape(Rectangle())
@@ -235,7 +245,14 @@ struct HomeView: View {
                         // Smoke-test anchor "HomeView" now lives on the title
                         // leaf inside `titleText` (a container identifier would
                         // clobber its children's own ids), so it isn't set here.
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 12)
+
+                    // Per-mode status near the title: a Level Select button for
+                    // the climb / challenge packs, or a stat readout for the
+                    // mini-games.  (Coin Pit shows its name tag on the marble.)
+                    modeHeader
+                        .homeBallCollider()
+                        .padding(.bottom, 8)
 
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
@@ -668,6 +685,77 @@ struct HomeView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: gameState.currentModeID)
+    }
+
+    // MARK: - Per-mode status header (sits just under the title)
+
+    /// A Level Select button for the climb / challenge packs, or a stat readout
+    /// for the mini-games.  Coin Pit shows its name tag on the marble instead,
+    /// so it renders nothing here.
+    @ViewBuilder
+    private var modeHeader: some View {
+        let id = gameState.currentModeID
+        if id == "climb" {
+            levelSelectButton(route: .levels)
+        } else if gameState.currentMode is ChallengeTrackMode {
+            levelSelectButton(route: .challengeTracks)
+        } else if id == "pinball" {
+            statChip(icon: "gamecontroller.fill",
+                     text: "Best  \(gameState.pinballBest.formatted())")
+        } else if id == "zen" {
+            statChip(icon: "leaf.fill", text: zenTimePhrase(gameState.zenSeconds))
+        } else if id == "coinpit" {   // displayed "Gold Rush"
+            statChip(icon: "dollarsign.circle.fill",
+                     text: "\(gameState.goldrushCoinsTotal.formatted()) coins earned")
+        }
+    }
+
+    private func levelSelectButton(route: HomeRoute) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.3x3.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text("Level Select")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 9)
+            .background(
+                Capsule().fill(Color(white: 0.16))
+                    .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 1))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("LevelSelectButton")
+    }
+
+    private func statChip(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color(white: 0.75))
+            Text(text)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(
+            Capsule().fill(Color(white: 0.14))
+                .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 1))
+        )
+    }
+
+    /// Humorous Zen Garden time readout — scales the unit with the total time
+    /// ("48 minutes at peace" → "3 hours successfully relaxed" → "2 days
+    /// without worries").
+    private func zenTimePhrase(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(max(0, seconds))s of calm" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes) minute\(minutes == 1 ? "" : "s") at peace" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours) hour\(hours == 1 ? "" : "s") successfully relaxed" }
+        let days = hours / 24
+        return "\(days) day\(days == 1 ? "" : "s") without worries"
     }
 
     /// Floating coin-balance pill in the top-right corner.  Tappable —
