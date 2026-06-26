@@ -1,393 +1,147 @@
 {
-  "identifier" : "AA1B2C3D-4E5F-6789-ABCD-1234567890AB",
-  "nonRenewingSubscriptions" : [
-
-  ],
-  "products" : [
+  "identifier": "AA1B2C3D-4E5F-6789-ABCD-1234567890AB",
+  "nonRenewingSubscriptions": [],
+  "products": [
     {
-      "displayPrice" : "0.99",
-      "familyShareable" : false,
-      "internalID" : "11000001",
-      "localizations" : [
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "11000001",
+      "localizations": [
         {
-          "description" : "6 lives instantly delivered.",
-          "displayName" : "1 full reload",
-          "locale" : "en_US"
+          "description": "6 lives instantly delivered.",
+          "displayName": "1 full reload",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.lives.pack1",
-      "referenceName" : "1 Full Reload (6 lives) $0.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.lives.pack1",
+      "referenceName": "1 Full Reload (6 lives) $0.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "4.99",
-      "familyShareable" : false,
-      "internalID" : "11000002",
-      "localizations" : [
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "11000002",
+      "localizations": [
         {
-          "description" : "36 lives — best value for casual play.",
-          "displayName" : "6 full reloads",
-          "locale" : "en_US"
+          "description": "36 lives — best value for casual play.",
+          "displayName": "6 full reloads",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.lives.pack5",
-      "referenceName" : "6 Full Reloads (36 lives) $4.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.lives.pack5",
+      "referenceName": "6 Full Reloads (36 lives) $4.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "9.99",
-      "familyShareable" : false,
-      "internalID" : "11000003",
-      "localizations" : [
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "11000003",
+      "localizations": [
         {
-          "description" : "78 lives — for serious chasers.",
-          "displayName" : "13 full reloads",
-          "locale" : "en_US"
+          "description": "78 lives — for serious chasers.",
+          "displayName": "13 full reloads",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.lives.pack10",
-      "referenceName" : "13 Full Reloads (78 lives) $9.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.lives.pack10",
+      "referenceName": "13 Full Reloads (78 lives) $9.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "19.99",
-      "familyShareable" : false,
-      "internalID" : "11000004",
-      "localizations" : [
+      "displayPrice": "19.99",
+      "familyShareable": false,
+      "internalID": "11000004",
+      "localizations": [
         {
-          "description" : "Never run out of lives again. Unlocks the gold marble HUD + exclusive cosmetic packs as we release them.",
-          "displayName" : "Unlimited Lives",
-          "locale" : "en_US"
+          "description": "Never run out of lives again. Unlocks the gold marble HUD + exclusive cosmetic packs as we release them.",
+          "displayName": "Unlimited Lives",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.unlimited",
-      "referenceName" : "Unlimited Lives",
-      "type" : "NonConsumable"
+      "productID": "com.macfaldet.RollAlong.unlimited",
+      "referenceName": "Unlimited Lives",
+      "type": "NonConsumable"
     },
     {
-      "displayPrice" : "0.99",
-      "familyShareable" : false,
-      "internalID" : "11000005",
-      "localizations" : [
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "11000005",
+      "localizations": [
         {
-          "description" : "100 coins added to your balance.",
-          "displayName" : "100 coins",
-          "locale" : "en_US"
+          "description": "100 coins added to your balance.",
+          "displayName": "100 coins",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.coins.100",
-      "referenceName" : "100 Coins $0.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.coins.100",
+      "referenceName": "100 Coins $0.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "4.99",
-      "familyShareable" : false,
-      "internalID" : "11000006",
-      "localizations" : [
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "11000006",
+      "localizations": [
         {
-          "description" : "600 coins (+100 bonus over the pack-1 rate).",
-          "displayName" : "600 coins",
-          "locale" : "en_US"
+          "description": "600 coins (+100 bonus over the pack-1 rate).",
+          "displayName": "600 coins",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.coins.600",
-      "referenceName" : "600 Coins $4.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.coins.600",
+      "referenceName": "600 Coins $4.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "9.99",
-      "familyShareable" : false,
-      "internalID" : "11000007",
-      "localizations" : [
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "11000007",
+      "localizations": [
         {
-          "description" : "1,300 coins (+300 bonus).",
-          "displayName" : "1,300 coins",
-          "locale" : "en_US"
+          "description": "1,300 coins (+300 bonus).",
+          "displayName": "1,300 coins",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.coins.1300",
-      "referenceName" : "1,300 Coins $9.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.coins.1300",
+      "referenceName": "1,300 Coins $9.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "19.99",
-      "familyShareable" : false,
-      "internalID" : "11000008",
-      "localizations" : [
+      "displayPrice": "19.99",
+      "familyShareable": false,
+      "internalID": "11000008",
+      "localizations": [
         {
-          "description" : "3,000 coins — biggest pack.",
-          "displayName" : "3,000 coins",
-          "locale" : "en_US"
+          "description": "3,000 coins — biggest pack.",
+          "displayName": "3,000 coins",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.coins.3000",
-      "referenceName" : "3,000 Coins $19.99",
-      "type" : "Consumable"
+      "productID": "com.macfaldet.RollAlong.coins.3000",
+      "referenceName": "3,000 Coins $19.99",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "1.99",
-      "familyShareable" : false,
-      "internalID" : "11000009",
-      "localizations" : [
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "11000009",
+      "localizations": [
         {
-          "description" : "One-time welcome gift: 500 coins + the exclusive Aurora ball (never sold separately).",
-          "displayName" : "Starter Pack",
-          "locale" : "en_US"
+          "description": "One-time welcome gift: 500 coins + the exclusive Aurora ball (never sold separately).",
+          "displayName": "Starter Pack",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.macfaldet.RollAlong.starterpack",
-      "referenceName" : "Starter Pack $1.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000010",
-      "localizations" : [
-        {
-          "description" : "The full Summer Vibes seasonal collection — Beach Ball, Ripple goal, Sky trail, Blueprint floor, Pond pit, and Acoustic music. Available Jun–Sep 2026 only.",
-          "displayName" : "Summer Vibes Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.summer2026",
-      "referenceName" : "Summer Vibes Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000011",
-      "localizations" : [
-        {
-          "description" : "The full Trick or Roll seasonal collection — Ghost, Obsidian goal, Smoke trail, Fog floor, Graveyard pit, and Downtempo music. Available Oct 2026 only.",
-          "displayName" : "Trick or Roll Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.halloween2026",
-      "referenceName" : "Trick or Roll Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000012",
-      "localizations" : [
-        {
-          "description" : "The full Winter Wonderland seasonal collection — Snowglobe, Crystal goal, Ice trail, Twilight floor, Twilight pit, and Dreamscape music. Available Dec 2026–Jan 2027 only.",
-          "displayName" : "Winter Wonderland Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.winter2026",
-      "referenceName" : "Winter Wonderland Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000013",
-      "localizations" : [
-        {
-          "description" : "The full Sweetheart seasonal collection — Heartstone ball, Blossom goal, Rose trail, Velvet floor, Dusk pit, and Piano music. Available Feb 1–14, 2027 only.",
-          "displayName" : "Sweetheart Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.valentines2027",
-      "referenceName" : "Sweetheart Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000014",
-      "localizations" : [
-        {
-          "description" : "The full Luck of the Roll seasonal collection — Shamrock ball, Mirage goal, Gilded trail, Meadow floor, Pond pit, and Lofi music. Available Mar 1–17, 2027 only.",
-          "displayName" : "Luck of the Roll Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.stpatricks2027",
-      "referenceName" : "Luck of the Roll Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000015",
-      "localizations" : [
-        {
-          "description" : "The full Countdown seasonal collection — Confetti ball, Rainbow goal, Gold trail, Disco floor, Midnight pit, and Electronic music. Available Dec 28–Jan 4 only.",
-          "displayName" : "Countdown Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.newyear2027",
-      "referenceName" : "Countdown Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000016",
-      "localizations" : [
-        {
-          "description" : "The full Spring Fling seasonal collection — Speckled Egg ball, Mosaic goal, Forest trail, Meadow floor, Sky pit, and Acoustic music. Available Mar 20–May 1, 2027 only.",
-          "displayName" : "Spring Fling Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.spring2027",
-      "referenceName" : "Spring Fling Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000017",
-      "localizations" : [
-        {
-          "description" : "The full Star-Spangled seasonal collection — Fireworks ball, Rainbow goal, Stardust trail, Midnight floor, Midnight pit, and Orchestral music. Available Jun 28–Jul 6, 2026 only.",
-          "displayName" : "Star-Spangled Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.july4_2026",
-      "referenceName" : "Star-Spangled Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000018",
-      "localizations" : [
-        {
-          "description" : "The full Día de los Muertos seasonal collection — Sugar Skull ball, Blossom goal, Rose trail, Velvet floor, Graveyard pit, and Downtempo music. Available Oct 28–Nov 3, 2026 only.",
-          "displayName" : "Día de los Muertos Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.muertos2026",
-      "referenceName" : "Día de los Muertos Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000019",
-      "localizations" : [
-        {
-          "description" : "The full Harvest Moon seasonal collection — Harvest Moon ball, Flame goal, Ember trail, Desert floor, Canyon pit, and Lo-fi music. Available Nov 1–30, 2026 only.",
-          "displayName" : "Harvest Moon Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.harvest2026",
-      "referenceName" : "Harvest Moon Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000020",
-      "localizations" : [
-        {
-          "description" : "The full Year of the Dragon seasonal collection — Golden Dragon ball, Flame goal, Gilded trail, Velvet floor, Velvet pit, and Cinematic music. Available Jan 29–Feb 19, 2027 only.",
-          "displayName" : "Year of the Dragon Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.lunar2027",
-      "referenceName" : "Year of the Dragon Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000021",
-      "localizations" : [
-        {
-          "description" : "The full Mardi Gras seasonal collection — Mardi Gras ball, Plasma goal, Bubblegum trail, Disco floor, Midnight pit, and Jazz music. Available Feb 5–17, 2027 only.",
-          "displayName" : "Mardi Gras Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.mardigras2027",
-      "referenceName" : "Mardi Gras Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000022",
-      "localizations" : [
-        {
-          "description" : "The full Spectrum seasonal collection — Spectrum ball, Rainbow goal, Rainbow trail, Aurora floor, Aurora pit, and Electronic music. Available Jun 1–30, 2027 only.",
-          "displayName" : "Spectrum Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.pride2027",
-      "referenceName" : "Spectrum Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000023",
-      "localizations" : [
-        {
-          "description" : "The full Oktoberfest seasonal collection — Oktoberfest ball, Mirage goal, Ember trail, Meadow floor, Canyon pit, and Acoustic music. Available Sep 19–Oct 5, 2026 only.",
-          "displayName" : "Oktoberfest Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.oktoberfest2026",
-      "referenceName" : "Oktoberfest Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000024",
-      "localizations" : [
-        {
-          "description" : "The full Earth Day seasonal collection — Earth ball, Blossom goal, Forest trail, Meadow floor, Meadow pit, and Ambient music. Available Apr 18–26, 2027 only.",
-          "displayName" : "Earth Day Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.earthday2027",
-      "referenceName" : "Earth Day Bundle $2.99",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "2.99",
-      "familyShareable" : false,
-      "internalID" : "11000025",
-      "localizations" : [
-        {
-          "description" : "The full Back to School seasonal collection — Teacher's Apple ball, Target goal, Ink trail, Notebook floor, Notebook pit, and Piano music. Available Aug 15–Sep 8, 2026 only.",
-          "displayName" : "Back to School Bundle",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.macfaldet.RollAlong.bundle.backtoschool2026",
-      "referenceName" : "Back to School Bundle $2.99",
-      "type" : "NonConsumable"
+      "productID": "com.macfaldet.RollAlong.starterpack",
+      "referenceName": "Starter Pack $1.99",
+      "type": "NonConsumable"
     }
   ],
-  "settings" : {
-
-  },
-  "subscriptionGroups" : [
-
-  ],
-  "version" : {
-    "major" : 4,
-    "minor" : 0
+  "settings": {},
+  "subscriptionGroups": [],
+  "version": {
+    "major": 4,
+    "minor": 0
   }
 }

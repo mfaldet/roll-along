@@ -88,24 +88,6 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
-    // MARK: - StoreKitManager ProductID bundle mapping
-
-    func testProductIDs_bundleIDsAreUnique() {
-        let bundleIDs = StoreKitManager.ProductID.allCases.compactMap { $0.bundleID }
-        let uniqueIDs = Set(bundleIDs)
-        XCTAssertEqual(bundleIDs.count, uniqueIDs.count,
-                       "No two ProductIDs should map to the same bundleID")
-    }
-
-    func testProductIDs_bundleIDsResolveToKnownCatalogueEntry() {
-        let catalogueIDs = Set(CosmeticBundle.catalogue.map { $0.id })
-        for pid in StoreKitManager.ProductID.allCases {
-            guard let bundleID = pid.bundleID else { continue }
-            XCTAssertTrue(catalogueIDs.contains(bundleID),
-                          "ProductID.\(pid.rawValue) bundleID '\(bundleID)' has no matching CosmeticBundle in catalogue")
-        }
-    }
-
     // MARK: - CosmeticTier
 
     func testCosmeticTier_starterPriceIsZero() {

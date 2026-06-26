@@ -686,13 +686,6 @@ struct BuyCoinsSheet: View {
         case .coins1300, .livesPack10: return "$9.99"
         case .coins3000, .unlimited:   return "$19.99"
         case .starterPack:             return "$1.99"
-        case .summerBundle2026, .halloweenBundle2026, .winterBundle2026,
-             .valentinesBundle2027, .stPatricksBundle2027,
-             .newYearBundle2027, .springBundle2027,
-             .july4Bundle2026, .muertosBundle2026, .harvestBundle2026,
-             .lunarBundle2027, .mardiGrasBundle2027, .prideBundle2027,
-             .oktoberfestBundle2026, .earthDayBundle2027, .backToSchoolBundle2026:
-                                       return "$2.99"
         }
     }
 
