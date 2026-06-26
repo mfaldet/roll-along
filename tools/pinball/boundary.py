@@ -43,6 +43,20 @@ for i in range(1, hn + 1):
         fillmask |= hl == i
 track = track | fillmask
 
+# Fix the ink smudge on the lower-left outer edge: re-smooth that edge column so
+# the wall runs clean and vertical (doesn't touch interior features past the edge).
+r0, r1 = int(0.56 * H), int(0.73 * H)
+xlo, xhi = int(0.02 * W), int(0.22 * W)
+edges = []
+for r in range(r0, r1):
+    row = track[r, xlo:xhi]
+    edges.append(xlo + int(np.argmax(row)) if row.any() else xhi)
+edges_s = ndimage.gaussian_filter1d(np.array(edges, float), sigma=12)
+for i, r in enumerate(range(r0, r1)):
+    e = int(round(edges_s[i]))
+    track[r, :e] = False           # wall outside the smoothed edge
+    track[r, e:e + 3] = True        # track just inside it
+
 # boundary band = the white/black edge, outer + interior (crisp, ~2px)
 band = ndimage.binary_dilation(track, iterations=1) & ~ndimage.binary_erosion(track, iterations=1)
 
