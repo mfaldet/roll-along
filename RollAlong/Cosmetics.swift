@@ -2128,7 +2128,7 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .air:             trailAir(ctx, pts, n, t, baseWidth, times)
     case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth)
     case .graphite:        trailGraphite(ctx, pts, n, baseWidth)
-    case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth)
+    case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth, times)
     default:
         trailTapered(ctx, pts, n, baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded || trail == .ember)
@@ -2370,28 +2370,60 @@ private func trailGraphite(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _
     }
 }
 
-/// Rose — a dark rose streak that sheds drifting, spinning rose petals.
-private func trailRose(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
-    let dark = Color(red: 0.42, green: 0.06, blue: 0.18)
-    for i in 1..<n {
-        let age = Double(i) / Double(n - 1)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(dark.opacity(0.20 + 0.60 * age)),
-                   style: StrokeStyle(lineWidth: baseWidth * CGFloat(0.40 + 0.50 * age), lineCap: .round, lineJoin: .round))
-    }
+/// Rose — sheds rose petals that settle where they're laid and dissipate in
+/// place over a short life (like the fire/ice trails), rather than being towed
+/// along behind the ball.  A faint rose stem fades beneath them so the path
+/// still reads.  `times` drives each petal's own lifecycle so it lives and dies
+/// on its own clock wherever it was dropped, independent of the ball's motion.
+private func trailRose(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
+                       _ times: [Double]?) {
+    let lifetime = 1.3
+    let stem = Color(red: 0.42, green: 0.06, blue: 0.18)
     let petals = [Color(red: 0.85, green: 0.20, blue: 0.40),
                   Color(red: 0.95, green: 0.45, blue: 0.60),
                   Color(red: 0.62, green: 0.10, blue: 0.28)]
+
+    // Faint stem connecting recent points, fading out as it ages so it doesn't
+    // read as a permanent ribbon towed behind the ball.
+    for i in 1..<n {
+        let age = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let env = max(0, 1 - age / lifetime)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(stem.opacity(0.22 * env)),
+                   style: StrokeStyle(lineWidth: baseWidth * 0.5, lineCap: .round, lineJoin: .round))
+    }
+
+    // Petals — dropped along the path and left behind.  Each is pinned to the
+    // spot it was laid (a fixed point in `pts`): it pops in, then gently settles
+    // (falls + sways + slowly turns) IN PLACE while it fades, and vanishes.
+    // Whether a spot sheds a petal is a stable function of its position, so the
+    // scatter doesn't flicker as the FIFO buffer shifts indices underneath it.
     for i in 0..<n {
-        let age = Double(i) / Double(n - 1)
-        let seed = Double(i) * 0.6180339
-        let driftAng = t * 0.8 + seed * 6.283
-        let off = baseWidth * CGFloat(0.8 + 2.0 * (1 - age))
-        let cx = pts[i].x + CGFloat(cos(driftAng)) * off
-        let cy = pts[i].y + CGFloat(sin(driftAng)) * off + CGFloat(1 - age) * baseWidth * 0.8
-        let sz = baseWidth * CGFloat(0.32 + 0.26 * seed.truncatingRemainder(dividingBy: 1.0))
-        drawPetal(ctx, CGPoint(x: cx, y: cy), sz, t * 1.5 + seed * 6,
-                  petals[i % 3].opacity(0.40 * age + 0.25))
+        let p = pts[i]
+        let seed = trailSeed(p)
+        let r1 = seed.truncatingRemainder(dividingBy: 1.0)
+        guard r1 < 0.34 else { continue }                    // stable thinning of shed spots
+        let age = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let life = age / lifetime
+        let rise = min(1.0, age / 0.06)                      // pop in when shed
+        let fade = life < 0.55 ? 1.0 : 1.0 - (life - 0.55) / 0.45
+        let env  = rise * max(0, fade)
+        guard env > 0.02 else { continue }
+
+        let r2   = (seed * 2.13).truncatingRemainder(dividingBy: 1.0)
+        let r3   = (seed * 5.70).truncatingRemainder(dividingBy: 1.0)
+        let side = r2 < 0.5 ? CGFloat(-1) : CGFloat(1)
+        let scatter = baseWidth * (0.2 + 0.6 * CGFloat(r2))  // sits just off the path
+        let sway = CGFloat(sin(t * 1.6 + seed * 6.283)) * baseWidth * 0.22 * CGFloat(life)
+        let fall = CGFloat(life) * baseWidth * 0.55          // gentle drop as it settles
+        let cx = p.x + side * scatter + sway
+        let cy = p.y + fall
+        let sz = baseWidth * CGFloat(0.32 + 0.26 * r3) * (1.0 - 0.22 * CGFloat(life))
+        let rot = seed * 6.283 + t * 0.5 + Double(life) * 1.0   // slow turn in place
+        drawPetal(ctx, CGPoint(x: cx, y: cy), sz, rot,
+                  petals[Int(r3 * 3) % 3].opacity(0.82 * env))
     }
 }
 
