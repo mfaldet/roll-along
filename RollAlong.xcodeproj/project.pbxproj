@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		AA000001000000000000AA01 /* RollAlongApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000AA00 /* RollAlongApp.swift */; };
 		AA000002000000000000AA01 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000AA00 /* ContentView.swift */; };
-		AA000099000000000000AA01 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000099000000000000AA00 /* IntroView.swift */; };
 		AA000003000000000000AA01 /* BallGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000AA00 /* BallGameView.swift */; };
 		AA000006000000000000AA01 /* BallSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000006000000000000AA00 /* BallSkin.swift */; };
 		AA000007000000000000AA01 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000007000000000000AA00 /* GameState.swift */; };
@@ -27,6 +26,7 @@
 		AA000016000000000000AA02 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA000016000000000000AA00 /* Products.storekit */; };
 		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
 		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
+		AA000099000000000000AA01 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000099000000000000AA00 /* IntroView.swift */; };
 		D502FED42FD5024E00CA86BD /* SocialClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FED32FD5024E00CA86BD /* SocialClient.swift */; };
 		D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FED12FD5024E00CA86BD /* GameMode.swift */; };
 		D502FED62FD5024E00CA86BD /* LevelOverrides.json in Resources */ = {isa = PBXBuildFile; fileRef = D502FED22FD5024E00CA86BD /* LevelOverrides.json */; };
@@ -42,6 +42,7 @@
 		D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */; };
 		D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */; };
 		D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF42FD5024E00CA86BD /* PinballView.swift */; };
+		D569BB9A2FEE4DF6008E91A6 /* Chipmunk in Frameworks */ = {isa = PBXBuildFile; productRef = D569BB992FEE4DF6008E91A6 /* Chipmunk */; };
 		DA11FEED0000000000000001 /* DailyRewardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000002 /* DailyRewardView.swift */; };
 		DA11FEED0000000000000003 /* BallSkinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000004 /* BallSkinView.swift */; };
 		FA000001000000000000FA01 /* MinigameMaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000001000000000000FA00 /* MinigameMaps.swift */; };
@@ -80,7 +81,6 @@
 /* Begin PBXFileReference section */
 		AA000001000000000000AA00 /* RollAlongApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollAlongApp.swift; sourceTree = "<group>"; };
 		AA000002000000000000AA00 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		AA000099000000000000AA00 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		AA000003000000000000AA00 /* BallGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallGameView.swift; sourceTree = "<group>"; };
 		AA000004000000000000AA00 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AA000005000000000000AA00 /* RollAlong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollAlong.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -99,6 +99,7 @@
 		AA000015000000000000AA00 /* PurchaseSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseSheets.swift; sourceTree = "<group>"; };
 		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		AA000017000000000000AA00 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
+		AA000099000000000000AA00 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		D502FED12FD5024E00CA86BD /* GameMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMode.swift; sourceTree = "<group>"; };
 		D502FED22FD5024E00CA86BD /* LevelOverrides.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = LevelOverrides.json; sourceTree = "<group>"; };
 		D502FED32FD5024E00CA86BD /* SocialClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialClient.swift; sourceTree = "<group>"; };
@@ -140,6 +141,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */,
+				D569BB9A2FEE4DF6008E91A6 /* Chipmunk in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -229,8 +231,16 @@
 				AA000011000000000000AA00 /* RollAlong */,
 				QE3B0016000000000000AA00 /* RollAlongTests */,
 				QE3C0016000000000000AA00 /* RollAlongUITests */,
+				D569BB982FEE4DF6008E91A6 /* Frameworks */,
 				AA000010000000000000AA00 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		D569BB982FEE4DF6008E91A6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		QE3B0016000000000000AA00 /* RollAlongTests */ = {
@@ -271,6 +281,7 @@
 			name = RollAlong;
 			packageProductDependencies = (
 				D502FED02FCB156C00CA86BD /* GoogleMobileAds */,
+				D569BB992FEE4DF6008E91A6 /* Chipmunk */,
 			);
 			productName = RollAlong;
 			productReference = AA000005000000000000AA00 /* RollAlong.app */;
@@ -334,6 +345,7 @@
 			packageReferences = (
 				D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
+				D569BB972FEE4B9B008E91A6 /* XCRemoteSwiftPackageReference "Chipmunk2D-SPM" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AA000010000000000000AA00 /* Products */;
@@ -742,6 +754,14 @@
 				minimumVersion = 13.4.0;
 			};
 		};
+		D569BB972FEE4B9B008E91A6 /* XCRemoteSwiftPackageReference "Chipmunk2D-SPM" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/spencerkohan/Chipmunk2D-SPM";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.3;
+			};
+		};
 		FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing.git";
@@ -757,6 +777,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		D569BB992FEE4DF6008E91A6 /* Chipmunk */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D569BB972FEE4B9B008E91A6 /* XCRemoteSwiftPackageReference "Chipmunk2D-SPM" */;
+			productName = Chipmunk;
 		};
 		FB000002000000000000FB00 /* SnapshotTesting */ = {
 			isa = XCSwiftPackageProductDependency;
