@@ -1,4 +1,5 @@
-out.png
-reference*.png
-reference*.jpg
-*.tmp.png
+# images are local working/reference files — never commit
+*.png
+*.jpg
+*.jpeg
+*.heic

@@ -98,6 +98,12 @@ def render(ref_path=None, out_path=None):
         cx, cy = P(ro["x"], ro["y"]); r = ro["r"] * W
         circle(cx, cy, r, outline=ROLL, width=2)
 
+    cw = t.get("centerWell")
+    if cw:
+        cx, cy = P(cw["x"], cw["y"]); r = cw["r"] * W
+        circle(cx, cy, r, outline=(180, 120, 255, 255), width=3)
+        circle(cx, cy, r * 0.45, fill=(120, 80, 200, 255))
+
     import math
     for f in t["flippers"]:
         px, py = P(f["px"], f["py"]); ln = f["len"] * W; dr = f["dir"]
