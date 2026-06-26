@@ -71,14 +71,23 @@ struct BuyLivesSheet: View {
     }
 
     private var header: some View {
-        HStack(spacing: 6) {
+        let unlimited = gameState.unlimitedLives
+        return HStack(spacing: 6) {
             ForEach(0..<GameState.livesMax, id: \.self) { i in
-                lifeMarble(filled: i < gameState.displayedLives)
+                // Diamond Balls owners: every slot is a filled diamond marble.
+                lifeMarble(filled: unlimited || i < gameState.displayedLives,
+                           diamond: unlimited)
             }
             Spacer()
-            Text("\(gameState.displayedLives) / \(GameState.livesMax)")
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Color(white: 0.75))
+            if unlimited {
+                Image(systemName: "infinity")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Self.diamondLifeGradient)
+            } else {
+                Text("\(gameState.displayedLives) / \(GameState.livesMax)")
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color(white: 0.75))
+            }
         }
         .padding(.bottom, 6)
     }
@@ -87,7 +96,7 @@ struct BuyLivesSheet: View {
     /// the home screen's lives pill (HomeView.marbleIcon), so lives read as
     /// the familiar red ball here too instead of a flat disc.  An empty slot
     /// is a hollow outline, also matching the pill.
-    private func lifeMarble(filled: Bool) -> some View {
+    private func lifeMarble(filled: Bool, diamond: Bool = false) -> some View {
         let size: CGFloat = 18
         return ZStack {
             Circle()
@@ -95,7 +104,7 @@ struct BuyLivesSheet: View {
                 .frame(width: size, height: size)
             if filled {
                 Circle()
-                    .fill(Self.redLifeGradient)
+                    .fill(diamond ? Self.diamondLifeGradient : Self.redLifeGradient)
                     .frame(width: size, height: size)
                     .overlay(
                         Circle()
@@ -123,15 +132,7 @@ struct BuyLivesSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: "infinity")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.00, green: 0.86, blue: 0.36),
-                                        Color(red: 0.93, green: 0.65, blue: 0.10),
-                                    ],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
+                            .foregroundStyle(Self.diamondLifeGradient)
                         Text("You have unlimited lives.")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color(white: 0.85))
@@ -383,6 +384,13 @@ struct BuyLivesSheet: View {
     private static let redLifeGradient = LinearGradient(
         colors: [Color(red: 1.00, green: 0.32, blue: 0.32),
                  Color(red: 0.78, green: 0.14, blue: 0.14)],
+        startPoint: .top, endPoint: .bottom
+    )
+    /// Diamond Balls (unlimited lives) marble + ∞ fill — cool white→cyan,
+    /// matching the home lives pill and the in-game HUD.
+    private static let diamondLifeGradient = LinearGradient(
+        colors: [Color(red: 0.86, green: 0.96, blue: 1.00),
+                 Color(red: 0.48, green: 0.74, blue: 0.97)],
         startPoint: .top, endPoint: .bottom
     )
 }
