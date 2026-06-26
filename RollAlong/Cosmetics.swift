@@ -178,6 +178,10 @@ enum GoalSkin: String, CosmeticItem {
     case quasar         // hot magenta + cyan, brightest in the catalogue
     case holeInOne      // golf hole with red flag (Golf bundle)
     case tractorBeam    // ★ NEW (Space Travel bundle) — UFO beam column
+    case inferno        // Hellfire bundle — molten lava ring with flame licks
+    case halo           // Heavens bundle — radiant golden halo + light rays
+    case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
+    case soccerNet      // Soccer bundle — goal mouth with white netting
 
     var id: String { rawValue }
     var displayName: String {
@@ -201,6 +205,10 @@ enum GoalSkin: String, CosmeticItem {
         case .quasar:      return "Quasar"
         case .holeInOne:   return "Hole-in-One"
         case .tractorBeam: return "Tractor Beam"
+        case .inferno:     return "Inferno"
+        case .halo:        return "Halo"
+        case .doodle:      return "Doodle"
+        case .soccerNet:   return "Soccer Net"
         }
     }
 
@@ -223,7 +231,8 @@ enum GoalSkin: String, CosmeticItem {
 
     var holeStyle: HoleStyle {
         switch self {
-        case .target, .archery, .holeInOne, .tractorBeam:
+        case .target, .archery, .holeInOne, .tractorBeam,
+             .inferno, .halo, .doodle, .soccerNet:
             // Not actually consumed (their renderers are bespoke), but
             // we keep a placeholder so callers can read it uniformly.
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
@@ -460,6 +469,48 @@ enum GoalSkin: String, CosmeticItem {
                     Color(red: 0.02, green: 0.10, blue: 0.06),
                 ],
                 startPoint: .top, endPoint: .bottom))
+        case .inferno:
+            // Fiery portal — dark molten core bleeding to orange/red.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.04, green: 0.00, blue: 0.00), location: 0.00),
+                    .init(color: Color(red: 0.10, green: 0.01, blue: 0.00), location: 0.40),
+                    .init(color: Color(red: 0.95, green: 0.30, blue: 0.05), location: 0.78),
+                    .init(color: Color(red: 1.00, green: 0.74, blue: 0.22), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
+        case .halo:
+            // Heavenly glow — warm white-gold core into soft sky blue.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 1.00, green: 0.98, blue: 0.86), location: 0.00),
+                    .init(color: Color(red: 1.00, green: 0.86, blue: 0.40), location: 0.45),
+                    .init(color: Color(red: 0.74, green: 0.86, blue: 1.00), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
+        case .doodle:
+            // Pencil bullseye on cream paper — grey rings, dark centre.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.22, green: 0.22, blue: 0.26), location: 0.00),
+                    .init(color: Color(red: 0.22, green: 0.22, blue: 0.26), location: 0.22),
+                    .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.22),
+                    .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.55),
+                    .init(color: Color(red: 0.35, green: 0.35, blue: 0.40), location: 0.55),
+                    .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.72),
+                    .init(color: Color(red: 0.35, green: 0.35, blue: 0.40), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
+        case .soccerNet:
+            // White net over a dark goal mouth with a green grass base.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color.white,                               location: 0.00),
+                    .init(color: Color(red: 0.85, green: 0.88, blue: 0.92), location: 0.45),
+                    .init(color: Color(red: 0.18, green: 0.22, blue: 0.28), location: 0.80),
+                    .init(color: Color(red: 0.30, green: 0.60, blue: 0.26), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -482,7 +533,8 @@ enum GoalSkin: String, CosmeticItem {
              .ripple, .comet, .eclipse, .plasma,
              .mirage, .obsidian:
             return .premium    // 200 coins — animated, tight palette
-        case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam:
+        case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
+             .inferno, .halo, .doodle, .soccerNet:
             return .exclusive  // 500 coins — animated, full-spectrum, or bespoke
         }
     }
@@ -1261,9 +1313,9 @@ struct CosmeticBundle: Identifiable {
             id:             "hellfire",
             displayName:    "Hellfire",
             tagline:        "Roll a ruby through the inferno.",
-            contentSummary: "Ruby ball · Ember floor · Evil pit · Fire trail · Synthwave music",
+            contentSummary: "Ruby ball · Inferno goal · Ember floor · Evil pit · Fire trail · Synthwave music",
             balls:  [.ruby],
-            goals:  [],
+            goals:  [.inferno],
             trails: [.fire],
             floors: [.ember],
             pits:   [.evil],
@@ -1273,9 +1325,9 @@ struct CosmeticBundle: Identifiable {
             id:             "heavens",
             displayName:    "Heavens",
             tagline:        "Drift the sky on opal lustre.",
-            contentSummary: "Opal ball · Classic floor · Sky pit · Stardust trail · Celestial music",
+            contentSummary: "Opal ball · Halo goal · Classic floor · Sky pit · Stardust trail · Celestial music",
             balls:  [.opal],
-            goals:  [],
+            goals:  [.halo],
             trails: [.stardust],
             floors: [.classic],
             pits:   [.sky],
@@ -1297,9 +1349,9 @@ struct CosmeticBundle: Identifiable {
             id:             "paper-world",
             displayName:    "Paper World",
             tagline:        "The full Notebook + Graphite-trail pack.",
-            contentSummary: "Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
+            contentSummary: "Doodle goal · Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
             balls:  [],
-            goals:  [],
+            goals:  [.doodle],
             trails: [],   // graphite is starter; included by default
             floors: [.notebook],
             pits:   [.notebook],
@@ -1567,9 +1619,9 @@ struct CosmeticBundle: Identifiable {
             id:             "soccer",
             displayName:    "Soccer",
             tagline:        "Hit the pitch — hex-stitched ball on fresh turf.",
-            contentSummary: "Soccer Ball · Smoke trail · Grass floor · Meadow pit · Synthwave music",
+            contentSummary: "Soccer Ball · Soccer Net goal · Smoke trail · Grass floor · Meadow pit · Synthwave music",
             balls:  [.soccer],
-            goals:  [],
+            goals:  [.soccerNet],
             trails: [.smoke],
             floors: [.grass],
             pits:   [.meadow],
