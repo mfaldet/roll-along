@@ -1882,8 +1882,8 @@ struct BallGameView: View {
     private func livesHUDOverlay(safeTop: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
             // One marble + the live count.  When running low (< 6 lives) a
-            // countdown to the next free life appears beside it.  Unlimited-
-            // lives subscribers see a gold marble + ∞.
+            // countdown to the next free life appears beside it.  Diamond Balls
+            // owners see a diamond marble + ∞.
             let unlimited = gameState.unlimitedLives
             let display   = gameState.displayedLives
 
@@ -1893,10 +1893,7 @@ struct BallGameView: View {
                 if unlimited {
                     Image(systemName: "infinity")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(LinearGradient(
-                            colors: [Color(red: 1.00, green: 0.86, blue: 0.36),
-                                     Color(red: 0.93, green: 0.65, blue: 0.10)],
-                            startPoint: .top, endPoint: .bottom))
+                        .foregroundStyle(Self.diamondLifeGradient)
                 } else {
                     Text("\(display)")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -2037,7 +2034,7 @@ struct BallGameView: View {
 
             if filled {
                 Circle()
-                    .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                    .fill(gold ? Self.diamondLifeGradient : Self.redLifeGradient)
                     .frame(width: size, height: size)
                     .overlay(
                         Circle()
@@ -2051,7 +2048,7 @@ struct BallGameView: View {
                     .shadow(color: Color.black.opacity(0.22), radius: 1.5, y: 1)
             } else if partialFill > 0 {
                 Circle()
-                    .fill(gold ? Self.goldLifeGradient : Self.redLifeGradient)
+                    .fill(gold ? Self.diamondLifeGradient : Self.redLifeGradient)
                     .frame(width: size, height: size)
                     .clipShape(BottomFillRect(fraction: partialFill))
             }
@@ -2066,10 +2063,13 @@ struct BallGameView: View {
         ],
         startPoint: .top, endPoint: .bottom
     )
-    private static let goldLifeGradient = LinearGradient(
+    /// The "diamond" marble gradient — Diamond Balls (unlimited lives).  Cool
+    /// white→cyan, matching the home lives pill so the indestructible-ball
+    /// iconography reads the same everywhere (HUD, Out of Lives, Get Lives).
+    private static let diamondLifeGradient = LinearGradient(
         colors: [
-            Color(red: 1.00, green: 0.86, blue: 0.36),
-            Color(red: 0.93, green: 0.65, blue: 0.10),
+            Color(red: 0.86, green: 0.96, blue: 1.00),
+            Color(red: 0.48, green: 0.74, blue: 0.97),
         ],
         startPoint: .top, endPoint: .bottom
     )
@@ -2241,7 +2241,7 @@ struct BallGameView: View {
             if unlimited {
                 Image(systemName: "infinity")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Self.goldLifeGradient)
+                    .foregroundStyle(Self.diamondLifeGradient)
                     .padding(.leading, 2)
             } else if stockpile > 0 {
                 Text("+\(stockpile)")
