@@ -49,7 +49,8 @@ final class CosmeticsTests: XCTestCase {
     func testBundleExclusiveSkins_flagIsConsistent() {
         let expected: Set<String> = [
             "Pluto", "Aurora", "Beach Ball", "Pumpkin", "Ornament",
-            "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy"
+            "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy",
+            "Diamond"   // Diamond Balls IAP exclusive
         ]
         let actual = Set(BallSkin.allCases.filter { $0.isBundleExclusive }.map { $0.rawValue })
         XCTAssertEqual(actual, expected,
