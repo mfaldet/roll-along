@@ -143,6 +143,11 @@ struct BallGameView: View {
     // Graphite trail (Paper world).  Holds recent ball positions so we can
     // render a fading lead streak behind the ball.  Cleared each spawn.
     @State private var trailPoints:           [CGPoint] = []
+    /// Wall-clock stamp (timeIntervalSinceReferenceDate) for each `trailPoints`
+    /// entry, kept strictly in lockstep.  Lets the elemental trails (ink/fire/
+    /// ice/air) animate and dissipate on a real clock, in place, instead of
+    /// riding the ball.  Cleared with the points each spawn.
+    @State private var trailTimes:            [Double] = []
     /// Opacity of the Zen sand groove.  The "smooth the sand" (rake) button
     /// fades this to 0, wipes the trail, then restores it to 1 so the next
     /// strokes draw crisp.  Stays 1 in every other mode.
@@ -1184,7 +1189,8 @@ struct BallGameView: View {
             // so a trail looks identical everywhere.
             drawRichTrail(ctx, points: trailPoints,
                           trail: gameState.equippedTrail,
-                          t: Date().timeIntervalSinceReferenceDate)
+                          t: Date().timeIntervalSinceReferenceDate,
+                          times: trailTimes)
         }
     }
 
@@ -1863,6 +1869,7 @@ struct BallGameView: View {
         withAnimation(.easeOut(duration: 0.45)) { sandClearFade = 0 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             trailPoints.removeAll(keepingCapacity: true)
+            trailTimes.removeAll(keepingCapacity: true)
             sandClearFade = 1
         }
     }
@@ -3331,6 +3338,7 @@ struct BallGameView: View {
         goalBurst = nil  // clear any leftover burst from previous level
         coinsPickedThisAttempt = []
         trailPoints.removeAll(keepingCapacity: true)
+        trailTimes.removeAll(keepingCapacity: true)
         trailHueOffset = 0.0
         // Coin Pit: a fresh ball means a fresh round — clear the rain, the
         // clock, and the stake (the stake overlay re-appears for the next
@@ -3451,17 +3459,21 @@ struct BallGameView: View {
         // can render the streak behind the ball.  Skip if too close to the
         // previous point (the ball is nearly stationary).
         if gameState.equippedTrail != .none || usesSandTrail {
+            let now = Date().timeIntervalSinceReferenceDate
             if let last = trailPoints.last {
                 if hypot(b.position.x - last.x, b.position.y - last.y) > trailMinStep {
                     trailPoints.append(b.position)
+                    trailTimes.append(now)
                 }
             } else {
                 trailPoints.append(b.position)
+                trailTimes.append(now)
             }
             let cap = effectiveTrailMaxLength
             if trailPoints.count > cap {
                 let removed = trailPoints.count - cap
                 trailPoints.removeFirst(removed)
+                trailTimes.removeFirst(min(removed, trailTimes.count))   // stay in lockstep
                 // Bake-in hue per position: advancing the tail offset
                 // by `removed × step` means each surviving segment
                 // keeps the colour it had before the trim.
