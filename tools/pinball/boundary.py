@@ -18,10 +18,8 @@ im = Image.open(src).convert("RGB")
 a = np.asarray(im).astype(int)
 H, W, _ = a.shape
 bright = a.max(axis=2)
-track = bright > thr                      # not-black = track
-
-track = ndimage.binary_opening(track, iterations=2)
-track = ndimage.binary_closing(track, iterations=2)
+black = bright < thr                       # every black pixel is a wall
+track = ~black
 
 # keep the largest track region (drops stray coloured dots sitting in the black)
 lab, n = ndimage.label(track)
@@ -29,18 +27,24 @@ if n:
     sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
     track = lab == (int(np.argmax(sizes)) + 1)
 
-# fill only TINY holes (noise / coloured dots); keep large interior black shapes
+# smooth the OUTER edge to kill jaggies, but re-carve every real black line back
+# in afterwards so thin interior dividers are never bridged away.
+sigma = max(1.0, W / 650.0)
+smooth = ndimage.gaussian_filter(track.astype(float), sigma=sigma) > 0.5
+track = smooth & ~black
+
+# fill only pin-prick specks (JPEG noise); keep thin lines + real interior shapes
 filled = ndimage.binary_fill_holes(track)
 holes = filled & ~track
 hl, hn = ndimage.label(holes)
 fillmask = np.zeros_like(track)
 for i in range(1, hn + 1):
-    if (hl == i).sum() < 0.0006 * H * W:
+    if (hl == i).sum() < 0.00004 * H * W:
         fillmask |= hl == i
 track = track | fillmask
 
-# boundary band (a few px) = the white/black edge, outer + interior
-band = ndimage.binary_dilation(track, iterations=2) & ~ndimage.binary_erosion(track, iterations=2)
+# boundary band = the white/black edge, outer + interior (crisp, ~2px)
+band = ndimage.binary_dilation(track, iterations=1) & ~ndimage.binary_erosion(track, iterations=1)
 
 base = Image.blend(im, Image.new("RGB", (W, H), (16, 16, 24)), 0.45)
 out = np.asarray(base).copy()
