@@ -59,7 +59,7 @@ struct PinballView: View {
                             .frame(width: 34, height: 34).background(Circle().fill(.black.opacity(0.45)))
                     }
                     Spacer()
-                    Text("Chipmunk physics — tap to nudge")
+                    Text("Tap left / right half to flip")
                         .font(.system(.caption, design: .rounded).weight(.semibold))
                         .foregroundStyle(Color(white: 0.55))
                     Spacer()
@@ -80,7 +80,7 @@ struct PinballView: View {
 final class PinballScene: SKScene {
 
     // Tuning as fractions of the field (resolution-independent; matches harness).
-    private let gravFrac:    CGFloat = 1500.0 / 1064.0   // harness grav at H=1064
+    private let gravFrac:    CGFloat = 0.60   // gentle table-slope gravity (pinball isn't free-fall); harness GRAV = gravFrac*1064 ≈ 640
     private let ballRadFrac: CGFloat = 0.018
     private let wallElast:   Double = 0.30
     private let wallFric:    Double = 0.20
@@ -88,6 +88,8 @@ final class PinballScene: SKScene {
     private var space: OpaquePointer?
     private var ballBody: OpaquePointer?
     private var ballNode: SKShapeNode?
+    private struct Flipper { let body: OpaquePointer; let motor: OpaquePointer; let node: SKShapeNode; let flipRate: Double; let holdRate: Double; let side: String }
+    private var flippers: [Flipper] = []
     private var field = CGRect.zero
     private var built = false
 
@@ -115,8 +117,9 @@ final class PinballScene: SKScene {
         for _ in 0..<2 { cpSpaceStep(space, 1.0 / 120.0) }
         let p = cpBodyGetPosition(ballBody)
         ballNode?.position = CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))
+        for f in flippers { f.node.zRotation = CGFloat(cpBodyGetAngle(f.body)) }
         // respawn when it falls past the bottom of the field
-        if CGFloat(p.y) < field.minY - ballRadius * 2 { resetBall(launch: false) }
+        if CGFloat(p.y) < field.minY - ballRadius * 2 { resetBall() }
     }
 
     private func computeField() {
@@ -151,6 +154,7 @@ final class PinballScene: SKScene {
         }
 
         spawnBall()
+        buildFlippers()
     }
 
     private func spawnBall() {
@@ -169,18 +173,59 @@ final class PinballScene: SKScene {
         ballNode = node
         addChild(node)
 
-        resetBall(launch: false)
+        resetBall()
     }
 
-    private func resetBall(launch: Bool) {
+    private func resetBall() {
         guard let ballBody = ballBody else { return }
         let s = CleanTable.shared.ballStart
         cpBodySetPosition(ballBody, v(pt(s.x, s.y)))
-        cpBodySetVelocity(ballBody, cpVect(x: launch ? 220 : 0, y: launch ? -260 : 0))
+        cpBodySetVelocity(ballBody, cpVect(x: 150, y: 0))   // gentle drift into play
+    }
+
+    private func buildFlippers() {
+        guard let space = space else { return }
+        let sb = cpSpaceGetStaticBody(space)
+        let swing = 0.95, mass = 0.5, thick = Double(ballRadius * 1.3)
+        for f in CleanTable.shared.flippers {
+            let pivot = pt(f.pivot[0], f.pivot[1]), tip = pt(f.tip[0], f.tip[1])
+            let len = Double(max(hypot(tip.x - pivot.x, tip.y - pivot.y), 1))
+            let rest = atan2(Double(tip.y - pivot.y), Double(tip.x - pivot.x))
+            let body = cpBodyNew(mass, cpMomentForSegment(mass, cpVect(x: 0, y: 0), cpVect(x: len, y: 0), thick))
+            cpBodySetPosition(body, v(pivot)); cpBodySetAngle(body, rest)
+            cpSpaceAddBody(space, body)
+            let shape = cpSegmentShapeNew(body, cpVect(x: 0, y: 0), cpVect(x: len, y: 0), thick)
+            cpShapeSetElasticity(shape, 0.0); cpShapeSetFriction(shape, 0.5)
+            cpSpaceAddShape(space, shape)
+            cpSpaceAddConstraint(space, cpPivotJointNew(sb, body, v(pivot)))
+            let lo: Double, hi: Double, flipRate: Double, holdRate: Double
+            if f.side == "L" { lo = rest - swing; hi = rest;        flipRate = -28; holdRate =  18 }
+            else             { lo = rest;         hi = rest + swing; flipRate =  28; holdRate = -18 }
+            cpSpaceAddConstraint(space, cpRotaryLimitJointNew(sb, body, lo, hi))
+            let motor = cpSimpleMotorNew(sb, body, holdRate)
+            cpConstraintSetMaxForce(motor, 8_000_000.0)
+            cpSpaceAddConstraint(space, motor)
+            let node = SKShapeNode(rect: CGRect(x: 0, y: -CGFloat(thick) / 2, width: CGFloat(len), height: CGFloat(thick)), cornerRadius: CGFloat(thick) / 2)
+            node.fillColor = SKColor(red: 0.25, green: 0.55, blue: 1.0, alpha: 1); node.strokeColor = .white; node.lineWidth = 1
+            node.position = pivot; node.zRotation = CGFloat(rest); node.zPosition = 4
+            addChild(node)
+            flippers.append(Flipper(body: body, motor: motor, node: node, flipRate: flipRate, holdRate: holdRate, side: f.side))
+        }
+    }
+
+    private func flip(left: Bool, up: Bool) {
+        for f in flippers where (f.side == "L") == left {
+            cpSimpleMotorSetRate(f.motor, up ? f.flipRate : f.holdRate)
+        }
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // nudge the ball back into play so the physics is easy to watch
-        resetBall(launch: true)
+        for t in touches { flip(left: t.location(in: self).x < size.width / 2, up: true) }
+    }
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        for t in touches { flip(left: t.location(in: self).x < size.width / 2, up: false) }
+    }
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        flip(left: true, up: false); flip(left: false, up: false)
     }
 }

@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 W = 560
 H = int(W * 1.9)
 
-GRAV    = float(sys.argv[1]) if len(sys.argv) > 1 else 1500.0
+GRAV    = float(sys.argv[1]) if len(sys.argv) > 1 else 640.0   # = device gravFrac 0.60 * harness H 1064
 WALL_E  = 0.32
 BUMP_E  = 1.15
 SLING_E = 0.85
