@@ -966,27 +966,47 @@ struct HomeView: View {
         gameState.currentModeID == "climb" ? .game : .mode(gameState.currentModeID)
     }
 
-    /// Play-button second line — what's at stake in the armed mode.  The mode's
-    /// NAME now lives under the title, so this line carries the level / match /
-    /// cost / reward instead.
-    private var playStakes: String {
+    /// Play-button MAIN label.  Most modes read "Play"; a few carry a bespoke
+    /// call-to-action instead (Zen cycles through puns — see `zenPun`).
+    private var playPrimary: String {
+        switch gameState.currentModeID {
+        case "pinball":  return "Play Ball!"
+        case "coinpit":  return "Pay tickets, earn coins"    // displayed "Gold Rush"
+        case "goldrush": return "Win the Pit, earn tickets"  // displayed "Coin Pit"
+        case "zen":      return zenPun(at: Date())           // body cycles this live
+        default:         return "Play"
+        }
+    }
+
+    /// Play-button SECOND line — the structural stake (level / match) for modes
+    /// that have one.  nil for modes whose primary CTA already says it all.
+    private var playSecondary: String? {
         if let track = gameState.currentMode as? ChallengeTrackMode {
             let next = min(100, (gameState.trackProgress[track.trackID] ?? 0) + 1)
             return "Level \(next) / 100"
         }
         switch gameState.currentModeID {
         case "climb":     return "Level \(gameState.currentLevel)"
-        case "pinball":   return "3 balls"
-        case "zen":       return "Endless · no pressure"
-        case "coinpit":   return "30s · stake a ticket"
-        case "goldrush":  return "60s · most coins wins"
         case "snake":     return "Last comet glowing wins"
         case "sumo":      return "Survive the waves"
         case "paintball": return "60s · most paint wins"
         case "marblecup": return "90s · marble soccer"
         case "koth":      return "60s · hold the hill"
-        default:          return gameState.currentMode.tagline
+        default:          return nil
         }
+    }
+
+    /// Zen Garden button copy — revolves through gentle puns, swapping every
+    /// few seconds (driven by a periodic TimelineView in `playButtonBody`).
+    private static let zenPuns = [
+        "Roll On, amigo", "Zen Mode: Activate", "Zen it to win it",
+        "Zenjoy the moment", "Find your center", "Ommmm… let's roll",
+        "Breathe. Then roll.", "Stay zen, my friend",
+    ]
+    private func zenPun(at date: Date) -> String {
+        let i = Int(date.timeIntervalSinceReferenceDate / 3.0)
+        let n = Self.zenPuns.count
+        return Self.zenPuns[((i % n) + n) % n]
     }
 
     private var playButton: some View {
@@ -1006,7 +1026,7 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("PlayButton")
-        .accessibilityLabel("Play \(gameState.currentMode.displayName), \(playStakes)")
+        .accessibilityLabel("Play \(gameState.currentMode.displayName)\(playSecondary.map { ", \($0)" } ?? "")")
         .accessibilityHint("Launches your selected game mode.")
     }
 
@@ -1023,13 +1043,29 @@ struct HomeView: View {
 
             // Bold black label
             VStack(spacing: 2) {
-                Text("Play")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                Text(playStakes)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .opacity(0.65)
+                if gameState.currentModeID == "zen" {
+                    // Zen revolves through puns, swapping every 3 seconds.
+                    TimelineView(.periodic(from: .now, by: 3)) { ctx in
+                        Text(zenPun(at: ctx.date))
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                    }
+                } else {
+                    Text(playPrimary)
+                        .font(.system(size: playPrimary.count > 12 ? 20 : 24,
+                                      weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    if let secondary = playSecondary {
+                        Text(secondary)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .opacity(0.65)
+                    }
+                }
             }
             .foregroundStyle(.black)
+            .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 56)
