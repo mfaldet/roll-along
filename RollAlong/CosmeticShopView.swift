@@ -892,48 +892,6 @@ struct CosmeticShopView: View {
                     )
                 }
                 .buttonStyle(.plain)
-
-                // ── Real-money IAP button (seasonal bundles only) ─────────
-                // Gives the player an alternative to grinding coins: a one-tap
-                // $2.99 purchase that instantly grants the full collection.
-                if bundle.isLimitedTime,
-                   let pid = StoreKitManager.ProductID.productID(forBundleID: bundle.id) {
-                    let inProgress = store.purchaseInProgress == pid
-                    Button {
-                        guard !inProgress else { return }
-                        Task { _ = await store.purchase(pid) }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if inProgress {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .scaleEffect(0.75)
-                                    .tint(Color(white: 0.60))
-                            } else {
-                                Image(systemName: "creditcard.fill")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            Text(inProgress ? "Processing…" : "Buy Now")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                            Spacer()
-                            Text(store.displayPrice(for: pid, fallback: "$2.99"))
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                        }
-                        .foregroundStyle(inProgress ? Color(white: 0.45) : Color(white: 0.88))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(white: 0.15))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color(white: 0.28), lineWidth: 0.8)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(inProgress)
-                }
             }
         }
         .padding(14)
