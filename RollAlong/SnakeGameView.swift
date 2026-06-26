@@ -498,7 +498,7 @@ struct SnakeGameView: View {
                              "map_name": .string(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)]
             )
             if didWin {
-                gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+                gameState.recordCompetitiveWin("snake")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("snake")])
             }

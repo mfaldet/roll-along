@@ -260,6 +260,12 @@ final class GameState: ObservableObject {
         didSet { save(trackProgress, trackProgressKey: "ra_trackProgress") }
     }
 
+    /// Lifetime competitive-minigame wins per mode id: [modeID: wins].
+    /// Powers the home "N wins" readout when a competitive mode is armed.
+    @Published var minigameWins: [String: Int] {
+        didSet { save(minigameWins, trackProgressKey: "ra_minigameWins") }
+    }
+
     /// Set of Challenge Track IDs fully completed (level 100 cleared).
     /// The reward bundle is granted exactly once when a track enters this set.
     @Published var completedTracks: Set<String> {
@@ -448,6 +454,7 @@ final class GameState: ObservableObject {
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
+        minigameWins   = Self.loadTrackProgress(key: "ra_minigameWins", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
@@ -836,6 +843,14 @@ final class GameState: ObservableObject {
         assert(amount >= 0, "addTickets: negative amount — use spendTickets(_:)")
         guard amount > 0 else { return }
         tickets = min(tickets + amount, Self.maxTicketBalance)
+    }
+
+    /// Record a competitive-minigame win: bump that mode's lifetime win tally
+    /// and award the customary Gold Rush ticket.  Called from each competitive
+    /// view's win path (replaces the bare `addTickets(1)`).
+    func recordCompetitiveWin(_ modeID: String) {
+        minigameWins[modeID, default: 0] += 1
+        addTickets(1)
     }
 
     /// Spend tickets.  Returns false (no-op) if the balance is short.

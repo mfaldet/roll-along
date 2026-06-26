@@ -531,7 +531,7 @@ struct GoldRushView: View {
                          "map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
         )
         if engine.playerWon {
-            gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+            gameState.recordCompetitiveWin("goldrush")   // win tally + Gold Rush ticket
             AnalyticsClient.shared.track("ticket_earned",
                                          properties: ["source": .string("goldrush")])
         }

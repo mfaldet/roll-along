@@ -476,7 +476,7 @@ struct KingOfTheHillView: View {
                              "map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
             )
             if playerWon {
-                gameState.addTickets(1)   // Gold Rush ticket — one per competitive win
+                gameState.recordCompetitiveWin("koth")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("koth")])
             }
