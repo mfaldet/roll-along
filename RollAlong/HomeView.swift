@@ -193,6 +193,16 @@ struct HomeView: View {
                         } else {
                             liveBall
                                 .position(ballPos)
+                            // Coin Pit arms the home marble with the player's
+                            // name tag, just as it appears in the game itself.
+                            if gameState.currentModeID == "goldrush" {
+                                RivalNameTag(
+                                    label: gameState.playerName.isEmpty ? "YOU" : gameState.playerName,
+                                    color: Color(red: 0.28, green: 0.85, blue: 0.45),
+                                    isPlayer: true)
+                                    .position(x: ballPos.x, y: ballPos.y - ballRadius - 16)
+                                    .allowsHitTesting(false)
+                            }
                         }
                     }
                     .contentShape(Rectangle())
@@ -232,13 +242,17 @@ struct HomeView: View {
 
                     titleText
                         .homeBallCollider()
-                        // Smoke-test anchor.  Deliberately on this LEAF, not
-                        // the root ZStack: a container's accessibilityIdentifier
-                        // propagates to every descendant and CLOBBERS their own
-                        // identifiers (verified via AX-tree dump — every home
-                        // element read 'HomeView' and per-button ids vanished).
-                        .accessibilityIdentifier("HomeView")
-                        .padding(.bottom, 20)
+                        // Smoke-test anchor "HomeView" now lives on the title
+                        // leaf inside `titleText` (a container identifier would
+                        // clobber its children's own ids), so it isn't set here.
+                        .padding(.bottom, 12)
+
+                    // Per-mode status near the title: a Level Select button for
+                    // the climb / challenge packs, or a stat readout for the
+                    // mini-games.  (Coin Pit shows its name tag on the marble.)
+                    modeHeader
+                        .homeBallCollider()
+                        .padding(.bottom, 8)
 
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
@@ -362,9 +376,17 @@ struct HomeView: View {
                             AnalyticsClient.shared.track("daily_challenge_started")
                         }
                 case .mode(let id):
-                    BallGameView(activeMode: GameModeCatalogue.mode(id: id)
-                                 ?? GameModeCatalogue.climb)
-                        .firstPlayTutorial(id)
+                    // A Challenge Track armed from the hub launches via Play —
+                    // initialise its progress (resume at the next level) the way
+                    // ChallengeTrackView does, since Play bypasses that screen.
+                    if let track = GameModeCatalogue.mode(id: id) as? ChallengeTrackMode {
+                        BallGameView(activeMode: track)
+                            .onAppear { gameState.startTrack(track.trackID) }
+                    } else {
+                        BallGameView(activeMode: GameModeCatalogue.mode(id: id)
+                                     ?? GameModeCatalogue.climb)
+                            .firstPlayTutorial(id)
+                    }
                 }
             }
             // Sheet driven by tapping the top-left lives pill.  Re-uses
@@ -640,13 +662,100 @@ struct HomeView: View {
     }
 
     private var titleText: some View {
-        Text("Roll Along")
-            .font(.system(size: 52, weight: .black, design: .rounded))
-            .foregroundStyle(
-                LinearGradient(colors: [.white, Color(white: 0.82)],
-                               startPoint: .top, endPoint: .bottom)
+        VStack(spacing: 6) {
+            Text("Roll Along")
+                .font(.system(size: 52, weight: .black, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(colors: [.white, Color(white: 0.82)],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
+                // Smoke-test anchor — kept on THIS leaf (a container identifier
+                // propagates to every descendant and clobbers their own ids).
+                .accessibilityIdentifier("HomeView")
+
+            // The title is always "Roll Along".  When a non-core mode is armed
+            // (chosen in the Games hub), name it here so the player knows what
+            // Play will launch.
+            if gameState.currentModeID != "climb" {
+                Text(gameState.currentMode.displayName)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.62))
+                    .accessibilityIdentifier("ArmedModeSubtitle")
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: gameState.currentModeID)
+    }
+
+    // MARK: - Per-mode status header (sits just under the title)
+
+    /// A Level Select button for the climb / challenge packs, or a stat readout
+    /// for the mini-games.  Coin Pit shows its name tag on the marble instead,
+    /// so it renders nothing here.
+    @ViewBuilder
+    private var modeHeader: some View {
+        let id = gameState.currentModeID
+        if id == "climb" {
+            levelSelectButton(route: .levels)
+        } else if gameState.currentMode is ChallengeTrackMode {
+            levelSelectButton(route: .challengeTracks)
+        } else if id == "pinball" {
+            statChip(icon: "gamecontroller.fill",
+                     text: "Best  \(gameState.pinballBest.formatted())")
+        } else if id == "zen" {
+            statChip(icon: "leaf.fill", text: zenTimePhrase(gameState.zenSeconds))
+        } else if id == "coinpit" {   // displayed "Gold Rush"
+            statChip(icon: "dollarsign.circle.fill",
+                     text: "\(gameState.goldrushCoinsTotal.formatted()) coins earned")
+        }
+    }
+
+    private func levelSelectButton(route: HomeRoute) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.3x3.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text("Level Select")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 9)
+            .background(
+                Capsule().fill(Color(white: 0.16))
+                    .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 1))
             )
-            .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("LevelSelectButton")
+    }
+
+    private func statChip(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color(white: 0.75))
+            Text(text)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(
+            Capsule().fill(Color(white: 0.14))
+                .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 1))
+        )
+    }
+
+    /// Humorous Zen Garden time readout — scales the unit with the total time
+    /// ("48 minutes at peace" → "3 hours successfully relaxed" → "2 days
+    /// without worries").
+    private func zenTimePhrase(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(max(0, seconds))s of calm" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes) minute\(minutes == 1 ? "" : "s") at peace" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours) hour\(hours == 1 ? "" : "s") successfully relaxed" }
+        let days = hours / 24
+        return "\(days) day\(days == 1 ? "" : "s") without worries"
     }
 
     /// Floating coin-balance pill in the top-right corner.  Tappable —
@@ -945,11 +1054,47 @@ struct HomeView: View {
         gameState.currentModeID == "climb" ? .game : .mode(gameState.currentModeID)
     }
 
-    /// Play-button subtitle: the climb shows its level, other modes their name.
-    private var playSubtitle: String {
-        gameState.currentModeID == "climb"
-            ? "Level \(gameState.currentLevel)"
-            : gameState.currentMode.displayName
+    /// Play-button MAIN label.  Most modes read "Play"; a few carry a bespoke
+    /// call-to-action instead (Zen cycles through puns — see `zenPun`).
+    private var playPrimary: String {
+        switch gameState.currentModeID {
+        case "pinball":  return "Play Ball!"
+        case "coinpit":  return "Pay tickets, earn coins"    // displayed "Gold Rush"
+        case "goldrush": return "Win the Pit, earn tickets"  // displayed "Coin Pit"
+        case "zen":      return zenPun(at: Date())           // body cycles this live
+        default:         return "Play"
+        }
+    }
+
+    /// Play-button SECOND line — the structural stake (level / match) for modes
+    /// that have one.  nil for modes whose primary CTA already says it all.
+    private var playSecondary: String? {
+        if let track = gameState.currentMode as? ChallengeTrackMode {
+            let next = min(100, (gameState.trackProgress[track.trackID] ?? 0) + 1)
+            return "Level \(next) / 100"
+        }
+        switch gameState.currentModeID {
+        case "climb":     return "Level \(gameState.currentLevel)"
+        case "snake":     return "Last comet glowing wins"
+        case "sumo":      return "Survive the waves"
+        case "paintball": return "60s · most paint wins"
+        case "marblecup": return "90s · marble soccer"
+        case "koth":      return "60s · hold the hill"
+        default:          return nil
+        }
+    }
+
+    /// Zen Garden button copy — revolves through gentle puns, swapping every
+    /// few seconds (driven by a periodic TimelineView in `playButtonBody`).
+    private static let zenPuns = [
+        "Roll On, amigo", "Zen Mode: Activate", "Zen it to win it",
+        "Zenjoy the moment", "Find your center", "Ommmm… let's roll",
+        "Breathe. Then roll.", "Stay zen, my friend",
+    ]
+    private func zenPun(at date: Date) -> String {
+        let i = Int(date.timeIntervalSinceReferenceDate / 3.0)
+        let n = Self.zenPuns.count
+        return Self.zenPuns[((i % n) + n) % n]
     }
 
     private var playButton: some View {
@@ -968,7 +1113,8 @@ struct HomeView: View {
             playButtonBody
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Play \(playSubtitle)")
+        .accessibilityIdentifier("PlayButton")
+        .accessibilityLabel("Play \(gameState.currentMode.displayName)\(playSecondary.map { ", \($0)" } ?? "")")
         .accessibilityHint("Launches your selected game mode.")
     }
 
@@ -985,13 +1131,29 @@ struct HomeView: View {
 
             // Bold black label
             VStack(spacing: 2) {
-                Text("Play")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                Text(playSubtitle)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .opacity(0.65)
+                if gameState.currentModeID == "zen" {
+                    // Zen revolves through puns, swapping every 3 seconds.
+                    TimelineView(.periodic(from: .now, by: 3)) { ctx in
+                        Text(zenPun(at: ctx.date))
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                    }
+                } else {
+                    Text(playPrimary)
+                        .font(.system(size: playPrimary.count > 12 ? 20 : 24,
+                                      weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    if let secondary = playSecondary {
+                        Text(secondary)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .opacity(0.65)
+                    }
+                }
             }
             .foregroundStyle(.black)
+            .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 56)

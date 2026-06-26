@@ -33,6 +33,15 @@ struct GameMenuView: View {
     }
     private var packs: [ChallengeTrackMode] { GameModeCatalogue.challengeTracks }
 
+    /// Arm a mode and return Home — the home Play button then launches it.
+    /// (Replaces the old launch-on-tap so the player chooses, then confirms
+    /// with Play.)  `modeID` is a catalogue id, e.g. "climb", "pinball",
+    /// "challenge.frozen-peaks".
+    private func select(_ modeID: String) {
+        gameState.currentModeID = modeID
+        nav.goHome()
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)],
@@ -100,7 +109,7 @@ struct GameMenuView: View {
     // MARK: - ROLL ALONG hero (the core game — biggest, on top)
 
     private var rollAlongHero: some View {
-        NavigationLink(value: HomeRoute.game) {
+        Button { select("climb") } label: {
             ZStack(alignment: .bottomLeading) {
                 LinearGradient(
                     colors: [Color(red: 0.42, green: 0.30, blue: 0.96),
@@ -262,7 +271,7 @@ struct GameMenuView: View {
                 .accessibilityIdentifier(mode.id)
                 .accessibilityLabel("\(mode.displayName). Locked. Win a competitive game to earn a ticket.")
         } else {
-            NavigationLink(value: HomeRoute.mode(mode.id)) {
+            Button { select(mode.id) } label: {
                 widgetCard(icon: s.icon, colors: s.colors, title: mode.displayName,
                            ticket: mode.id == "coinpit" ? gameState.tickets : nil)
             }
@@ -273,7 +282,7 @@ struct GameMenuView: View {
 
     private func packWidget(_ track: ChallengeTrackMode) -> some View {
         let s = Self.packStyle(for: track.trackID)
-        return NavigationLink(value: HomeRoute.challengeTracks) {
+        return Button { select(track.id) } label: {
             widgetCard(icon: s.icon, colors: s.colors, title: track.displayName)
         }
         .buttonStyle(.plain)
