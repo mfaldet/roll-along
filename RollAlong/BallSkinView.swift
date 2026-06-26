@@ -103,6 +103,17 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
 
+        // ── Round-6 bundle completion bespoke skins ─────────────────────
+        case .disco:
+            discoCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.30), lineWidth: 0.5))
+
+        case .paper:
+            paperCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
+
         // ── New sports bespoke skins ────────────────────────────────────
         case .basketball:
             basketballCanvas
@@ -205,6 +216,130 @@ struct BallSkinView: View {
         // No `default`: every BallSkin has an explicit renderer above, so the
         // switch is exhaustive.  Adding a new skin will (intentionally) fail to
         // compile here until it's given a case — same as the colors/tier switches.
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Disco Ball (Nightclub bundle)
+    // Mirror-ball sphere: a foreshortened grid of small reflective facets that
+    // brighten toward the light and twinkle on their own clocks, with a crisp
+    // specular.  Animated; Reduce Motion freezes the twinkle.  Clipped to a
+    // circle by the body switch caller.
+    // =========================================================================
+    private var discoCanvas: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let w  = size.width, h = size.height
+                let cx = w / 2, cy = h / 2
+                let r  = min(w, h) / 2
+
+                // Base sphere — dark silvery violet.
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(Gradient(colors: [
+                        Color(red: 0.55, green: 0.57, blue: 0.72),
+                        Color(red: 0.30, green: 0.32, blue: 0.46),
+                        Color(red: 0.12, green: 0.12, blue: 0.20),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.3, y: cy - r * 0.3), startRadius: 0, endRadius: r * 1.1))
+
+                // Mirror facets — a grid of small tiles, foreshortened toward
+                // the rim, brighter near the centre, each twinkling.
+                let cols = 9, rows = 7
+                for iy in 0..<rows {
+                    for ix in 0..<cols {
+                        let u  = (CGFloat(ix) + 0.5) / CGFloat(cols)
+                        let v  = (CGFloat(iy) + 0.5) / CGFloat(rows)
+                        let px = cx - r + u * r * 2
+                        let py = cy - r + v * r * 2
+                        let dx = px - cx, dy = py - cy
+                        let dist = (dx * dx + dy * dy).squareRoot()
+                        if dist > r * 0.95 { continue }
+                        let fore  = 1 - (dist / r) * 0.55
+                        let tileW = (r * 2 / CGFloat(cols)) * 0.82 * fore
+                        let tileH = (r * 2 / CGFloat(rows)) * 0.82 * fore
+                        let seed  = Double(ix) * 1.7 + Double(iy) * 2.3
+                        let tw    = 0.5 + 0.5 * sin(t * 3 + seed)
+                        let lightFace = max(0, 1 - dist / r)
+                        let bright = 0.32 + 0.46 * lightFace + 0.20 * tw
+                        let col = Color(red: 0.85 * bright + 0.10,
+                                        green: 0.85 * bright + 0.10,
+                                        blue: 0.95 * bright + 0.12)
+                        ctx.fill(
+                            Path(roundedRect: CGRect(x: px - tileW / 2, y: py - tileH / 2,
+                                                     width: tileW, height: tileH),
+                                 cornerRadius: tileW * 0.18),
+                            with: .color(col.opacity(0.92)))
+                    }
+                }
+
+                // Specular highlight.
+                let hl = r * 0.5
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.62, width: hl, height: hl)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: cx - r * 0.40, y: cy - r * 0.46), startRadius: 0, endRadius: hl))
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Paper Ball (Paper World bundle)
+    // Crumpled cream-paper sphere — a soft paper gradient with a few angular
+    // fold creases (shaded line + adjacent highlight) and faint folded facets.
+    // Static.  Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var paperCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width, h = size.height
+            let cx = w / 2, cy = h / 2
+            let r  = min(w, h) / 2
+
+            // Base cream paper sphere.
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                with: .radialGradient(Gradient(colors: [
+                    Color(red: 1.00, green: 0.99, blue: 0.95),
+                    Color(red: 0.92, green: 0.90, blue: 0.83),
+                    Color(red: 0.74, green: 0.72, blue: 0.65),
+                ]),
+                center: CGPoint(x: cx - r * 0.3, y: cy - r * 0.3), startRadius: 0, endRadius: r * 1.1))
+
+            let creaseShade = Color(red: 0.55, green: 0.53, blue: 0.47)
+            // Fold creases — shaded polylines with a highlight offset alongside.
+            let creases: [[CGPoint]] = [
+                [CGPoint(x: cx - r * 0.55, y: cy - r * 0.7), CGPoint(x: cx - r * 0.1, y: cy - r * 0.1), CGPoint(x: cx + r * 0.45, y: cy - r * 0.4)],
+                [CGPoint(x: cx - r * 0.7,  y: cy + r * 0.1), CGPoint(x: cx - r * 0.05, y: cy + r * 0.05), CGPoint(x: cx + r * 0.3, y: cy + r * 0.6)],
+                [CGPoint(x: cx + r * 0.1,  y: cy - r * 0.55), CGPoint(x: cx + r * 0.18, y: cy + r * 0.0), CGPoint(x: cx + r * 0.6, y: cy + r * 0.25)],
+            ]
+            for line in creases {
+                var p = Path()
+                p.move(to: line[0]); for pt in line.dropFirst() { p.addLine(to: pt) }
+                ctx.stroke(p, with: .color(creaseShade.opacity(0.5)),
+                           style: StrokeStyle(lineWidth: max(1, r * 0.03), lineCap: .round, lineJoin: .round))
+                var hi = Path()
+                hi.move(to: CGPoint(x: line[0].x + 1.5, y: line[0].y + 1.5))
+                for pt in line.dropFirst() { hi.addLine(to: CGPoint(x: pt.x + 1.5, y: pt.y + 1.5)) }
+                ctx.stroke(hi, with: .color(Color.white.opacity(0.35)),
+                           style: StrokeStyle(lineWidth: max(0.8, r * 0.02), lineCap: .round, lineJoin: .round))
+            }
+            // Faint folded facets (subtle shaded patches).
+            let facets: [[CGPoint]] = [
+                [CGPoint(x: cx - r * 0.1, y: cy - r * 0.1), CGPoint(x: cx + r * 0.45, y: cy - r * 0.4), CGPoint(x: cx + r * 0.5, y: cy + r * 0.05), CGPoint(x: cx + r * 0.1, y: cy + r * 0.0)],
+                [CGPoint(x: cx - r * 0.7, y: cy + r * 0.1), CGPoint(x: cx - r * 0.05, y: cy + r * 0.05), CGPoint(x: cx - r * 0.2, y: cy + r * 0.55)],
+            ]
+            for f in facets {
+                var p = Path()
+                p.move(to: f[0]); for pt in f.dropFirst() { p.addLine(to: pt) }; p.closeSubpath()
+                ctx.fill(p, with: .color(creaseShade.opacity(0.12)))
+            }
+            // Specular highlight.
+            let hl = r * 0.5
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.62, width: hl, height: hl)),
+                with: .radialGradient(Gradient(colors: [Color.white.opacity(0.40), .clear]),
+                    center: CGPoint(x: cx - r * 0.40, y: cy - r * 0.46), startRadius: 0, endRadius: hl))
         }
     }
 

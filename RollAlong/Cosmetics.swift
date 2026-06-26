@@ -114,11 +114,11 @@ extension BallSkin: CosmeticItem {
              .gold, .silver, .copper, .jade, .ruby:
             return .standard   //  50 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
-             .pastel, .neon, .dune,
+             .pastel, .neon, .dune, .paper,
              .basketball, .soccer, .baseball, .eightBall, .golfBall:
-            return .premium    // 200 coins (Epic) — colour blends + sports balls
+            return .premium    // 200 coins (Epic) — colour blends + sports/paper balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
-             .storm, .candy, .ghost, .lava, .trench,
+             .storm, .candy, .ghost, .lava, .trench, .disco,
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -1337,8 +1337,8 @@ struct CosmeticBundle: Identifiable {
             id:             "nightclub",
             displayName:    "Nightclub",
             tagline:        "Disco lights, neon goal, bubblegum streak.",
-            contentSummary: "Disco floor · Neon goal · Bubblegum trail · Retrowave music",
-            balls:  [],
+            contentSummary: "Disco Ball · Disco floor · Neon goal · Bubblegum trail · Retrowave music",
+            balls:  [.disco],
             goals:  [.neon],
             trails: [.bubblegum],
             floors: [.disco],
@@ -1349,8 +1349,8 @@ struct CosmeticBundle: Identifiable {
             id:             "paper-world",
             displayName:    "Paper World",
             tagline:        "The full Notebook + Graphite-trail pack.",
-            contentSummary: "Doodle goal · Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
-            balls:  [],
+            contentSummary: "Paper ball · Doodle goal · Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
+            balls:  [.paper],
             goals:  [.doodle],
             trails: [],   // graphite is starter; included by default
             floors: [.notebook],
