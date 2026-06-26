@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import AppTrackingTransparency
 import GoogleMobileAds
 
 // ---------------------------------------------------------------------------
@@ -14,11 +13,10 @@ import GoogleMobileAds
 // the next ad is pre-loaded immediately after the current one dismisses
 // to keep the cycle going.
 //
-// ATT (App Tracking Transparency, iOS 14.5+) — required for personalised
-// ads.  We request it once on first cold-start AFTER the user has been
-// shown onboarding, so they understand the app before deciding.  Denying
-// ATT doesn't block ads — Google just serves non-personalised ones (lower
-// eCPM but functional).
+// Privacy — Roll Along never tracks users.  We do NOT request App Tracking
+// Transparency and never touch the advertising identifier (IDFA); every ad
+// request is tagged non-personalised (npa=1), so AdMob serves only generic
+// ads.  No ATT prompt is ever shown.
 //
 // DEBUG vs RELEASE — in DEBUG builds we use Google's documented test ad
 // unit ID so dev runs don't generate fraud impressions against the real
@@ -70,49 +68,23 @@ final class AdManager: NSObject, ObservableObject {
     /// at app launch.  Safe to call multiple times — subsequent calls are
     /// no-ops apart from ensuring an ad is loaded.
     ///
-    /// **ATT timing:** on first launch (`seenOnboarding == false`) the ATT
-    /// dialog is NOT shown here — `HomeView` calls `requestTracking()` after
-    /// the onboarding overlay is dismissed, so the user understands the app
-    /// before deciding.  On subsequent launches (`seenOnboarding == true`)
-    /// the ATT status is already determined and `requestTracking()` is called
-    /// here directly; the system returns the cached value with no dialog.
+    /// No ATT / no tracking: we never call `requestTrackingAuthorization`, so
+    /// the system prompt never appears.  Every ad request is non-personalised.
     func bootstrap(with gameState: GameState) async {
         self.gameState = gameState
-        if gameState.seenOnboarding {
-            // Non-first-launch: status is cached — no dialog will appear.
-            await requestTracking()
-        }
-        // Start the Mobile Ads SDK.  Google falls back to non-personalised
-        // ads automatically until/unless ATT is authorised.
+        // Start the Mobile Ads SDK.  All ad requests are non-personalised.
         _ = await MobileAds.shared.start()
         await loadRewarded()
     }
 
-    /// Request ATT authorisation and fire an `att_response` analytics event.
-    ///
-    /// - On **first launch** this is called by `HomeView` after the user
-    ///   dismisses the onboarding overlay — the system dialog appears here.
-    /// - On **subsequent launches** this is called by `bootstrap` when
-    ///   `seenOnboarding == true` — `requestTrackingAuthorization()` returns
-    ///   the already-determined status immediately with no dialog.
-    func requestTracking() async {
-        let status = await ATTrackingManager.requestTrackingAuthorization()
-        AnalyticsClient.shared.track(
-            "att_response",
-            properties: [
-                "status": .string(Self.attStatusString(status)),
-            ]
-        )
-    }
-
-    private static func attStatusString(_ status: ATTrackingManager.AuthorizationStatus) -> String {
-        switch status {
-        case .authorized:    return "authorized"
-        case .denied:        return "denied"
-        case .notDetermined: return "not_determined"
-        case .restricted:    return "restricted"
-        @unknown default:    return "unknown"
-        }
+    /// A non-personalised ad request (`npa=1`).  AdMob serves only generic ads
+    /// and never uses the advertising identifier — no user tracking.
+    private static func nonPersonalizedRequest() -> Request {
+        let request = Request()
+        let extras = Extras()
+        extras.additionalParameters = ["npa": "1"]
+        request.register(extras)
+        return request
     }
 
     // MARK: - Pre-load
@@ -125,7 +97,7 @@ final class AdManager: NSObject, ObservableObject {
         do {
             let ad = try await RewardedAd.load(
                 with: Self.rewardedAdUnitID,
-                request: Request()
+                request: Self.nonPersonalizedRequest()
             )
             ad.fullScreenContentDelegate = self
             self.rewardedAd = ad

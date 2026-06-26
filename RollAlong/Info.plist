@@ -22,8 +22,6 @@
 	<string>1</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Tilt your device to roll the ball.</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>Your choice here only changes the ads you see. Allow tracking for more relevant ads; decline to see generic ones — either way, Roll Along works the same.</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-7121593460502747~1774498708</string>
 	<key>SKAdNetworkItems</key>

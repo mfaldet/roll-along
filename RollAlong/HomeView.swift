@@ -522,11 +522,8 @@ struct HomeView: View {
             "onboarding_dismissed",
             properties: ["source": .string(source)]
         )
-        // Request ATT now that the user has seen the app — fires the system
-        // dialog on first launch only.  requestTracking() is a no-op on
-        // subsequent launches (status already determined), but it's not called
-        // from this path after the first launch anyway.
-        Task { await ads.requestTracking() }
+        // No ATT request — Roll Along never asks to track and serves only
+        // non-personalised ads (see AdManager).
         withAnimation(.easeInOut(duration: 0.32)) {
             gameState.seenOnboarding = true
         }
