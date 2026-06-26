@@ -41,7 +41,7 @@ def render(ref_path=None, out_path=None):
         base = Image.open(ref_path).convert("RGBA")
         W, H = base.size
         # dim the reference so the overlay reads clearly
-        base = Image.blend(base, Image.new("RGBA", (W, H), (20, 20, 28, 255)), 0.45)
+        base = Image.blend(base, Image.new("RGBA", (W, H), (20, 20, 28, 255)), 0.30)
     else:
         W = 640
         H = int(W * t.get("aspect", 1.95))
