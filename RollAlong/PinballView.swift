@@ -191,7 +191,7 @@ final class PinballScene: SKScene {
             let pivot = pt(f.pivot[0], f.pivot[1]), tip = pt(f.tip[0], f.tip[1])
             let len = Double(max(hypot(tip.x - pivot.x, tip.y - pivot.y), 1))
             let rest = atan2(Double(tip.y - pivot.y), Double(tip.x - pivot.x))
-            let body = cpBodyNew(mass, cpMomentForSegment(mass, cpVect(x: 0, y: 0), cpVect(x: len, y: 0), thick))
+            guard let body = cpBodyNew(mass, cpMomentForSegment(mass, cpVect(x: 0, y: 0), cpVect(x: len, y: 0), thick)) else { continue }
             cpBodySetPosition(body, v(pivot)); cpBodySetAngle(body, rest)
             cpSpaceAddBody(space, body)
             let shape = cpSegmentShapeNew(body, cpVect(x: 0, y: 0), cpVect(x: len, y: 0), thick)
@@ -202,7 +202,7 @@ final class PinballScene: SKScene {
             if f.side == "L" { lo = rest - swing; hi = rest;        flipRate = -28; holdRate =  18 }
             else             { lo = rest;         hi = rest + swing; flipRate =  28; holdRate = -18 }
             cpSpaceAddConstraint(space, cpRotaryLimitJointNew(sb, body, lo, hi))
-            let motor = cpSimpleMotorNew(sb, body, holdRate)
+            guard let motor = cpSimpleMotorNew(sb, body, holdRate) else { continue }
             cpConstraintSetMaxForce(motor, 8_000_000.0)
             cpSpaceAddConstraint(space, motor)
             let node = SKShapeNode(rect: CGRect(x: 0, y: -CGFloat(thick) / 2, width: CGFloat(len), height: CGFloat(thick)), cornerRadius: CGFloat(thick) / 2)
