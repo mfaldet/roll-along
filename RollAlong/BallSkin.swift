@@ -186,6 +186,82 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     purchasable and hidden from the regular shop grid.
     case diamond = "Diamond"
 
+    // ── Premium bundle skins (coin/bundle purchasable — NOT bundle-exclusive) ─
+    //   • highRoller — casino roulette wheel: alternating deep-red and black
+    //     wedges inside a gold-rimmed rim with a crisp white centre pip and a
+    //     glossy specular.  Static.  High Roller bundle (Legendary).
+    case highRoller  = "High Roller"
+    //   • quicksilver — perfectly reflective liquid-chrome blob (T-1000): a
+    //     steely silver MeshGradient with a bright roving specular highlight.
+    //     Animated.  Quicksilver bundle (Legendary).
+    case quicksilver = "Quicksilver"
+    //   • oracle — smoky violet fortune crystal: swirling inner fog with a tiny
+    //     galaxy/star core glowing through; deep purples + magenta.  Animated.
+    //     Oracle bundle (Legendary).
+    case oracle      = "Oracle"
+    //   • geode — cracked-open agate: banded amethyst rings around the rim with
+    //     a sparkly druzy (crystalline) centre catching light; purples + quartz
+    //     white.  Static-but-twinkling.  Geode bundle (Epic).
+    case geode       = "Geode"
+    //   • lavaLamp — retro lava lamp: fat warm-orange/coral wax blobs slowly
+    //     rising, merging and splitting inside a magenta-violet fluid with a
+    //     soft glow.  Animated.  Lava Lamp bundle (Epic).
+    case lavaLamp    = "Lava Lamp"
+    //   • plasmaGlobe — Tesla plasma globe: electric magenta/cyan tendrils
+    //     arcing from a bright central electrode to the glass, flickering and
+    //     rerouting over a dark interior.  Animated.  Plasma Globe bundle (Legendary).
+    case plasmaGlobe = "Plasma Globe"
+    //   • cathedral — stained-glass rosette window: jewel-tone panes (ruby,
+    //     cobalt, emerald, amber) divided by dark leaded cames radiating from
+    //     the centre, with light glinting through.  Subtle shimmer.  Cathedral
+    //     bundle (Epic).
+    case cathedral   = "Cathedral"
+    //   • magmaCore — dark obsidian/basalt shell with glowing molten-orange
+    //     fracture seams pulsing as if lava flows beneath; drifting embers.
+    //     Animated.  Magma Core bundle (Legendary).
+    case magmaCore   = "Magma Core"
+    //   • hologram — glitchy holographic sphere: translucent cyan/magenta with
+    //     horizontal scanlines, chromatic-aberration edges, and occasional
+    //     flicker/jitter; sci-fi HUD feel.  Animated.  Neon City bundle (Legendary).
+    case hologram    = "Hologram"
+    //   • clockwork — interlocking brass/copper gears meshing and slowly
+    //     rotating over a warm metal body; rivets, patina, a polished sheen.
+    //     Animated rotation.  Clockwork bundle (Legendary).
+    case clockwork   = "Clockwork"
+
+    // ── Seasonal bundle skins (catalogue + real-money IAP — NOT bundle-exclusive) ─
+    //   • fireworks — dark night-sky sphere with bursting red / white / blue
+    //     firework shells and falling sparks; celebratory.  Animated, Reduce-
+    //     Motion-safe.  Star-Spangled bundle (Legendary).
+    case fireworks   = "Fireworks"
+    //   • sugarSkull — ornate white calavera (sugar skull) decorated with
+    //     marigold-orange and rose floral patterns; bright and festive.  Static.
+    //     Día de los Muertos bundle (Legendary).
+    case sugarSkull  = "Sugar Skull"
+    //   • harvest — warm amber-to-maple gradient sphere with a subtle autumn-
+    //     leaf motif; cozy fall tones.  Static.  Harvest Moon bundle (Legendary).
+    case harvest     = "Harvest Moon"
+    //   • lunarDragon — deep-red lacquer sphere with gold dragon-scale texture
+    //     and filigree; a regal sheen with a subtle Reduce-Motion-safe shimmer.
+    //     Year of the Dragon bundle (Legendary).
+    case lunarDragon = "Golden Dragon"
+    //   • mardiGras — festive harlequin-diamond pattern in royal purple,
+    //     emerald green, and gold with a jeweled bead-like sheen.  Static.
+    //     Mardi Gras bundle (Legendary).
+    case mardiGras   = "Mardi Gras"
+    //   • spectrum — bold glossy six-colour rainbow sphere (red/orange/yellow/
+    //     green/blue/violet bands) with a bright specular highlight.  Static.
+    //     Spectrum bundle (Legendary).
+    case spectrum    = "Spectrum"
+    //   • oktoberfest — Bavarian blue-and-white diamond (lozenge) pattern with
+    //     warm pretzel-gold accents and a creamy foam highlight at the top.
+    //     Festive beer-hall feel.  Static.  Oktoberfest seasonal (Legendary).
+    case oktoberfest = "Oktoberfest"
+    //   • apple — glossy classic-red teacher's apple with a small green leaf,
+    //     brown stem, and a bright specular highlight.  Clean and cheerful.
+    //     Static.  Back to School seasonal (Legendary).
+    case apple       = "Teacher's Apple"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -733,6 +809,212 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.80, green: 0.95, blue: 1.00),
                 Color(red: 0.50, green: 0.78, blue: 0.98),
                 Color(red: 0.22, green: 0.45, blue: 0.74),
+            ]
+
+        // ── Premium bundle skins ─────────────────────────────────────────────
+        case .highRoller:
+            // Casino felt-red → deep crimson → black, gold-warm highlight.
+            // The roulette wedges + gold rim + white pip paint on top via the
+            // bespoke highRollerCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 0.55),
+                Color(red: 0.78, green: 0.10, blue: 0.12),
+                Color(red: 0.34, green: 0.03, blue: 0.05),
+                Color(red: 0.08, green: 0.02, blue: 0.03),
+            ]
+
+        case .quicksilver:
+            // Bright chrome highlight → cool steely silver → slate → near-black.
+            // The liquid-chrome MeshGradient + roving specular paint on top via
+            // the bespoke quicksilverCanvas in BallSkinView.
+            return [
+                Color(red: 0.97, green: 0.98, blue: 1.00),
+                Color(red: 0.74, green: 0.80, blue: 0.88),
+                Color(red: 0.40, green: 0.46, blue: 0.56),
+                Color(red: 0.10, green: 0.13, blue: 0.18),
+            ]
+
+        case .oracle:
+            // Pale magenta highlight → violet → deep purple → near-black.  The
+            // swirling fog + glowing galaxy core paint on top via the bespoke
+            // oracleCanvas in BallSkinView.
+            return [
+                Color(red: 0.86, green: 0.62, blue: 0.98),
+                Color(red: 0.52, green: 0.22, blue: 0.78),
+                Color(red: 0.24, green: 0.06, blue: 0.42),
+                Color(red: 0.06, green: 0.02, blue: 0.14),
+            ]
+
+        case .geode:
+            // Quartz-white highlight → lilac → amethyst → deep violet.  The
+            // banded agate rings + druzy crystal core paint on top via the
+            // bespoke geodeCanvas in BallSkinView.
+            return [
+                Color(red: 0.97, green: 0.93, blue: 1.00),
+                Color(red: 0.74, green: 0.52, blue: 0.86),
+                Color(red: 0.46, green: 0.24, blue: 0.62),
+                Color(red: 0.20, green: 0.08, blue: 0.34),
+            ]
+
+        case .lavaLamp:
+            // Warm coral-orange wax highlight → orange → magenta-violet fluid →
+            // deep purple.  The rising/merging wax blobs paint on top via the
+            // bespoke lavaLampCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.76, blue: 0.46),
+                Color(red: 0.98, green: 0.46, blue: 0.30),
+                Color(red: 0.58, green: 0.14, blue: 0.52),
+                Color(red: 0.18, green: 0.04, blue: 0.26),
+            ]
+
+        case .plasmaGlobe:
+            // Bright electrode magenta-white highlight → magenta → cyan-violet →
+            // near-black interior.  The arcing electric tendrils paint on top via
+            // the bespoke plasmaGlobeCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.80, blue: 1.00),
+                Color(red: 0.82, green: 0.24, blue: 0.92),
+                Color(red: 0.24, green: 0.28, blue: 0.70),
+                Color(red: 0.03, green: 0.02, blue: 0.10),
+            ]
+
+        case .cathedral:
+            // Amber-gold glint → ruby → cobalt → deep leaded-black.  The radiating
+            // stained-glass rosette of jewel-tone panes paints on top via the
+            // bespoke cathedralCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 0.42),
+                Color(red: 0.82, green: 0.14, blue: 0.22),
+                Color(red: 0.14, green: 0.24, blue: 0.66),
+                Color(red: 0.06, green: 0.05, blue: 0.10),
+            ]
+
+        case .magmaCore:
+            // Molten-orange seam glow → ember orange → basalt grey → obsidian
+            // black.  The cracked crust + pulsing molten fracture seams paint on
+            // top via the bespoke magmaCoreCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.78, blue: 0.30),
+                Color(red: 0.96, green: 0.42, blue: 0.10),
+                Color(red: 0.26, green: 0.22, blue: 0.22),
+                Color(red: 0.05, green: 0.04, blue: 0.05),
+            ]
+
+        case .hologram:
+            // Bright cyan highlight → magenta mid → deep indigo → near-black
+            // interior.  The translucent scanlines, chromatic-aberration edges
+            // and flicker/jitter paint on top via the bespoke hologramCanvas
+            // in BallSkinView.
+            return [
+                Color(red: 0.62, green: 1.00, blue: 0.98),
+                Color(red: 0.90, green: 0.26, blue: 0.92),
+                Color(red: 0.16, green: 0.18, blue: 0.46),
+                Color(red: 0.02, green: 0.03, blue: 0.10),
+            ]
+
+        case .clockwork:
+            // Polished brass glint → warm copper → aged bronze → dark patina.
+            // The meshing/rotating gears, rivets and engraved sheen paint on top
+            // via the bespoke clockworkCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.88, blue: 0.56),
+                Color(red: 0.84, green: 0.58, blue: 0.24),
+                Color(red: 0.52, green: 0.34, blue: 0.14),
+                Color(red: 0.18, green: 0.12, blue: 0.07),
+            ]
+
+        // ── Seasonal bundle skins ─────────────────────────────────────────────
+        case .fireworks:
+            // Dark indigo night sky — faint top glow → deep navy → near-black
+            // horizon.  The bursting red/white/blue shells and falling sparks
+            // paint on top via the bespoke fireworksCanvas in BallSkinView.
+            return [
+                Color(red: 0.18, green: 0.20, blue: 0.42),
+                Color(red: 0.06, green: 0.08, blue: 0.24),
+                Color(red: 0.02, green: 0.03, blue: 0.12),
+                Color(red: 0.00, green: 0.01, blue: 0.05),
+            ]
+
+        case .sugarSkull:
+            // Bright bone-white calavera — pure white highlight → ivory → warm
+            // shadow.  The marigold-orange and rose floral decorations paint on
+            // top via the bespoke sugarSkullCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 1.00, blue: 0.99),
+                Color(red: 0.96, green: 0.95, blue: 0.90),
+                Color(red: 0.80, green: 0.76, blue: 0.68),
+                Color(red: 0.48, green: 0.42, blue: 0.36),
+            ]
+
+        case .harvest:
+            // Warm autumn moon — pale gold highlight → amber → maple-orange →
+            // deep russet shadow.  The subtle autumn-leaf motif paints on top
+            // via the bespoke harvestCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.90, blue: 0.62),
+                Color(red: 0.94, green: 0.66, blue: 0.28),
+                Color(red: 0.74, green: 0.40, blue: 0.14),
+                Color(red: 0.38, green: 0.18, blue: 0.06),
+            ]
+
+        case .lunarDragon:
+            // Deep-red lacquer sphere — bright gilt highlight → vivid lacquer
+            // red → deep oxblood → near-black shadow.  The gold dragon-scale
+            // texture, filigree, and shimmer paint on top via the bespoke
+            // lunarDragonCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.82, blue: 0.42),
+                Color(red: 0.78, green: 0.12, blue: 0.10),
+                Color(red: 0.46, green: 0.05, blue: 0.06),
+                Color(red: 0.16, green: 0.02, blue: 0.03),
+            ]
+
+        case .mardiGras:
+            // Festive base — bright gold highlight → royal purple → emerald
+            // green → deep aubergine shadow.  The harlequin-diamond pattern in
+            // purple / green / gold and jeweled sheen paint on top via the
+            // bespoke mardiGrasCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 0.30),
+                Color(red: 0.42, green: 0.12, blue: 0.62),
+                Color(red: 0.06, green: 0.52, blue: 0.24),
+                Color(red: 0.14, green: 0.04, blue: 0.22),
+            ]
+
+        case .spectrum:
+            // Bold rainbow base — bright specular white → warm red → cool blue
+            // → deep violet shadow.  The six vivid red/orange/yellow/green/blue/
+            // violet bands and bright highlight paint on top via the bespoke
+            // spectrumCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.98, blue: 0.98),
+                Color(red: 0.94, green: 0.22, blue: 0.20),
+                Color(red: 0.16, green: 0.40, blue: 0.92),
+                Color(red: 0.30, green: 0.08, blue: 0.46),
+            ]
+
+        case .oktoberfest:
+            // Bavarian base — creamy foam-white highlight → bright Bavarian
+            // blue → deeper sky blue → warm pretzel-gold shadow.  The blue/white
+            // lozenge diamonds, gold accents, and foam cap paint on top via the
+            // bespoke oktoberfestCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.97, blue: 0.92),
+                Color(red: 0.16, green: 0.46, blue: 0.86),
+                Color(red: 0.09, green: 0.32, blue: 0.66),
+                Color(red: 0.74, green: 0.52, blue: 0.16),
+            ]
+
+        case .apple:
+            // Glossy red apple — bright specular white → vivid apple red →
+            // deep crimson → dark maroon shadow.  The leaf, stem, and wet
+            // gloss highlight paint on top via the bespoke appleCanvas in
+            // BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.96, blue: 0.94),
+                Color(red: 0.90, green: 0.16, blue: 0.16),
+                Color(red: 0.62, green: 0.06, blue: 0.10),
+                Color(red: 0.34, green: 0.03, blue: 0.06),
             ]
         }
     }

@@ -243,6 +243,141 @@
       "productID" : "com.macfaldet.RollAlong.bundle.spring2027",
       "referenceName" : "Spring Fling Bundle $2.99",
       "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000017",
+      "localizations" : [
+        {
+          "description" : "The full Star-Spangled seasonal collection — Fireworks ball, Rainbow goal, Stardust trail, Midnight floor, Midnight pit, and Orchestral music. Available Jun 28–Jul 6, 2026 only.",
+          "displayName" : "Star-Spangled Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.july4_2026",
+      "referenceName" : "Star-Spangled Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000018",
+      "localizations" : [
+        {
+          "description" : "The full Día de los Muertos seasonal collection — Sugar Skull ball, Blossom goal, Rose trail, Velvet floor, Graveyard pit, and Downtempo music. Available Oct 28–Nov 3, 2026 only.",
+          "displayName" : "Día de los Muertos Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.muertos2026",
+      "referenceName" : "Día de los Muertos Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000019",
+      "localizations" : [
+        {
+          "description" : "The full Harvest Moon seasonal collection — Harvest Moon ball, Flame goal, Ember trail, Desert floor, Canyon pit, and Lo-fi music. Available Nov 1–30, 2026 only.",
+          "displayName" : "Harvest Moon Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.harvest2026",
+      "referenceName" : "Harvest Moon Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000020",
+      "localizations" : [
+        {
+          "description" : "The full Year of the Dragon seasonal collection — Golden Dragon ball, Flame goal, Gilded trail, Velvet floor, Velvet pit, and Cinematic music. Available Jan 29–Feb 19, 2027 only.",
+          "displayName" : "Year of the Dragon Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.lunar2027",
+      "referenceName" : "Year of the Dragon Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000021",
+      "localizations" : [
+        {
+          "description" : "The full Mardi Gras seasonal collection — Mardi Gras ball, Plasma goal, Bubblegum trail, Disco floor, Midnight pit, and Jazz music. Available Feb 5–17, 2027 only.",
+          "displayName" : "Mardi Gras Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.mardigras2027",
+      "referenceName" : "Mardi Gras Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000022",
+      "localizations" : [
+        {
+          "description" : "The full Spectrum seasonal collection — Spectrum ball, Rainbow goal, Rainbow trail, Aurora floor, Aurora pit, and Electronic music. Available Jun 1–30, 2027 only.",
+          "displayName" : "Spectrum Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.pride2027",
+      "referenceName" : "Spectrum Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000023",
+      "localizations" : [
+        {
+          "description" : "The full Oktoberfest seasonal collection — Oktoberfest ball, Mirage goal, Ember trail, Meadow floor, Canyon pit, and Acoustic music. Available Sep 19–Oct 5, 2026 only.",
+          "displayName" : "Oktoberfest Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.oktoberfest2026",
+      "referenceName" : "Oktoberfest Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000024",
+      "localizations" : [
+        {
+          "description" : "The full Earth Day seasonal collection — Earth ball, Blossom goal, Forest trail, Meadow floor, Meadow pit, and Ambient music. Available Apr 18–26, 2027 only.",
+          "displayName" : "Earth Day Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.earthday2027",
+      "referenceName" : "Earth Day Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000025",
+      "localizations" : [
+        {
+          "description" : "The full Back to School seasonal collection — Teacher's Apple ball, Target goal, Ink trail, Notebook floor, Notebook pit, and Piano music. Available Aug 15–Sep 8, 2026 only.",
+          "displayName" : "Back to School Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.backtoschool2026",
+      "referenceName" : "Back to School Bundle $2.99",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {

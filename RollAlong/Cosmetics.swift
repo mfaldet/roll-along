@@ -115,10 +115,28 @@ extension BallSkin: CosmeticItem {
             return .standard   //  50 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
              .pastel, .neon, .dune, .paper,
-             .basketball, .soccer, .baseball, .eightBall, .golfBall:
+             .basketball, .soccer, .baseball, .eightBall, .golfBall,
+             .geode,           // Geode bundle — Epic (banded agate + druzy core)
+             .lavaLamp,        // Lava Lamp bundle — Epic (animated wax blobs)
+             .cathedral:       // Cathedral bundle — Epic (stained-glass rosette)
             return .premium    // 200 coins (Epic) — colour blends + sports/paper balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
              .storm, .candy, .ghost, .lava, .trench, .disco,
+             .highRoller,      // High Roller bundle — coin/bundle purchasable
+             .quicksilver,     // Quicksilver bundle — coin/bundle purchasable
+             .oracle,          // Oracle bundle — coin/bundle purchasable
+             .plasmaGlobe,     // Plasma Globe bundle — coin/bundle purchasable
+             .magmaCore,       // Magma Core bundle — coin/bundle purchasable
+             .hologram,        // Neon City bundle — coin/bundle purchasable (animated)
+             .clockwork,       // Clockwork bundle — coin/bundle purchasable (animated)
+             .fireworks,       // Star-Spangled seasonal — coin/bundle purchasable (animated)
+             .sugarSkull,      // Día de los Muertos seasonal — coin/bundle purchasable
+             .harvest,         // Harvest Moon seasonal — coin/bundle purchasable
+             .lunarDragon,     // Year of the Dragon seasonal — coin/bundle purchasable
+             .mardiGras,       // Mardi Gras seasonal — coin/bundle purchasable
+             .spectrum,        // Spectrum seasonal — coin/bundle purchasable
+             .oktoberfest,     // Oktoberfest seasonal — coin/bundle purchasable
+             .apple,           // Back to School seasonal — coin/bundle purchasable
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -679,6 +697,10 @@ enum Floor: String, CosmeticItem {
     case court            // Full Court bundle — warm hardwood basketball floor
     case felt             // Billiards Hall bundle — deep-green pool-table felt
 
+    // Premium bundles (textured overlays)
+    case gridCity         // Neon City bundle — synthwave neon perspective grid
+    case brass            // Clockwork bundle — riveted brass/bronze plating
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -709,6 +731,8 @@ enum Floor: String, CosmeticItem {
         case .eclipse:    return "Eclipse"
         case .court:      return "Court"
         case .felt:       return "Felt"
+        case .gridCity:   return "Grid City"
+        case .brass:      return "Brass Works"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -724,7 +748,7 @@ enum Floor: String, CosmeticItem {
              .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
             return .standard   //  50 coins
-        case .aurora, .disco, .grass, .moon, .eclipse:
+        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass:
             return .exclusive  // 500 coins — animated / textured overlay
         }
     }
@@ -761,6 +785,8 @@ enum Floor: String, CosmeticItem {
         case .eclipse:    return Color(red: 0.04,  green: 0.04,  blue: 0.10 )  // dark void; corona paints over
         case .court:      return Color(red: 0.84,  green: 0.65,  blue: 0.38 )  // warm hardwood
         case .felt:       return Color(red: 0.18,  green: 0.48,  blue: 0.24 )  // pool-table green
+        case .gridCity:   return Color(red: 0.03,  green: 0.02,  blue: 0.08 )  // near-black; neon grid paints over
+        case .brass:      return Color(red: 0.52,  green: 0.37,  blue: 0.16 )  // warm bronze; plating paints over
         }
     }
 
@@ -777,7 +803,7 @@ enum Floor: String, CosmeticItem {
     /// tufts, etc.).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .aurora, .disco, .grass, .moon, .eclipse: return true
+        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass: return true
         default: return false
         }
     }
@@ -1815,6 +1841,132 @@ struct CosmeticBundle: Identifiable {
             availableFrom:  CosmeticBundle.date(2027, 3, 20),
             availableUntil: CosmeticBundle.date(2027, 5,  1)
         ),
+        CosmeticBundle(
+            id:             "july4-2026",
+            displayName:    "Star-Spangled",
+            tagline:        "Light up the night sky.",
+            contentSummary: "Fireworks ball · Rainbow goal · Stardust trail · Midnight floor · Midnight pit · Orchestral music",
+            balls:  [.fireworks],
+            goals:  [.rainbow],
+            trails: [.stardust],
+            floors: [.midnight],
+            pits:   [.midnight],
+            music:  [.orchestral],
+            availableFrom:  CosmeticBundle.date(2026, 6, 28),
+            availableUntil: CosmeticBundle.date(2026, 7,  6)
+        ),
+        CosmeticBundle(
+            id:             "muertos-2026",
+            displayName:    "Día de los Muertos",
+            tagline:        "Roll bright, remember well.",
+            contentSummary: "Sugar Skull ball · Blossom goal · Rose trail · Velvet floor · Graveyard pit · Downtempo music",
+            balls:  [.sugarSkull],
+            goals:  [.blossom],
+            trails: [.roseTrail],
+            floors: [.velvet],
+            pits:   [.graveyard],
+            music:  [.downtempo],
+            availableFrom:  CosmeticBundle.date(2026, 10, 28),
+            availableUntil: CosmeticBundle.date(2026, 11,  3)
+        ),
+        CosmeticBundle(
+            id:             "harvest-2026",
+            displayName:    "Harvest Moon",
+            tagline:        "Gather the golden hour in.",
+            contentSummary: "Harvest Moon ball · Flame goal · Ember trail · Desert floor · Canyon pit · Lo-fi music",
+            balls:  [.harvest],
+            goals:  [.flame],
+            trails: [.ember],
+            floors: [.desert],
+            pits:   [.canyon],
+            music:  [.lofi],
+            availableFrom:  CosmeticBundle.date(2026, 11, 1),
+            availableUntil: CosmeticBundle.date(2026, 11, 30)
+        ),
+        CosmeticBundle(
+            id:             "lunar-2027",
+            displayName:    "Year of the Dragon",
+            tagline:        "Fortune favors the fast.",
+            contentSummary: "Golden Dragon ball · Flame goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music",
+            balls:  [.lunarDragon],
+            goals:  [.flame],
+            trails: [.gilded],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.cinematic],
+            availableFrom:  CosmeticBundle.date(2027, 1, 29),
+            availableUntil: CosmeticBundle.date(2027, 2, 19)
+        ),
+        CosmeticBundle(
+            id:             "mardigras-2027",
+            displayName:    "Mardi Gras",
+            tagline:        "Purple, green, and gold — let the good times roll.",
+            contentSummary: "Mardi Gras ball · Plasma goal · Bubblegum trail · Disco floor · Midnight pit · Jazz music",
+            balls:  [.mardiGras],
+            goals:  [.plasma],
+            trails: [.bubblegum],
+            floors: [.disco],
+            pits:   [.midnight],
+            music:  [.jazz],
+            availableFrom:  CosmeticBundle.date(2027, 2, 5),
+            availableUntil: CosmeticBundle.date(2027, 2, 17)
+        ),
+        CosmeticBundle(
+            id:             "pride-2027",
+            displayName:    "Spectrum",
+            tagline:        "Roll proud, roll loud.",
+            contentSummary: "Spectrum ball · Rainbow goal · Rainbow trail · Aurora floor · Aurora pit · Electronic music",
+            balls:  [.spectrum],
+            goals:  [.rainbow],
+            trails: [.rainbow],
+            floors: [.aurora],
+            pits:   [.aurora],
+            music:  [.electronic],
+            availableFrom:  CosmeticBundle.date(2027, 6, 1),
+            availableUntil: CosmeticBundle.date(2027, 6, 30)
+        ),
+        CosmeticBundle(
+            id:             "oktoberfest-2026",
+            displayName:    "Oktoberfest",
+            tagline:        "Prost! Raise a stein and roll.",
+            contentSummary: "Oktoberfest ball · Mirage goal · Ember trail · Meadow floor · Canyon pit · Acoustic music",
+            balls:  [.oktoberfest],
+            goals:  [.mirage],
+            trails: [.ember],
+            floors: [.meadow],
+            pits:   [.canyon],
+            music:  [.acoustic],
+            availableFrom:  CosmeticBundle.date(2026, 9, 19),
+            availableUntil: CosmeticBundle.date(2026, 10, 5)
+        ),
+        CosmeticBundle(
+            id:             "earthday-2027",
+            displayName:    "Earth Day",
+            tagline:        "One small planet, one perfect roll.",
+            contentSummary: "Earth ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Ambient music",
+            balls:  [.earth],
+            goals:  [.blossom],
+            trails: [.forest],
+            floors: [.meadow],
+            pits:   [.meadow],
+            music:  [.ambient],
+            availableFrom:  CosmeticBundle.date(2027, 4, 18),
+            availableUntil: CosmeticBundle.date(2027, 4, 26)
+        ),
+        CosmeticBundle(
+            id:             "backtoschool-2026",
+            displayName:    "Back to School",
+            tagline:        "Sharpen up. Class is rolling.",
+            contentSummary: "Teacher's Apple ball · Target goal · Ink trail · Notebook floor · Notebook pit · Piano music",
+            balls:  [.apple],
+            goals:  [.target],
+            trails: [.ink],
+            floors: [.notebook],
+            pits:   [.notebook],
+            music:  [.piano],
+            availableFrom:  CosmeticBundle.date(2026, 8, 15),
+            availableUntil: CosmeticBundle.date(2026, 9, 8)
+        ),
 
         // ── Sports bundles ──────────────────────────────────────────────
         CosmeticBundle(
@@ -1948,6 +2100,128 @@ struct CosmeticBundle: Identifiable {
             floors: [.sunset],
             pits:   [.evil],
             music:  [.downtempo]
+        ),
+
+        // ── Premium bundles (permanent — no availability window) ─────────
+        CosmeticBundle(
+            id:             "high-roller",
+            displayName:    "High Roller",
+            tagline:        "The house always remembers your name.",
+            contentSummary: "High Roller ball · Quasar goal · Gilded trail · Felt floor · Pocket pit · Jazz music",
+            balls:  [.highRoller],
+            goals:  [.quasar],
+            trails: [.gilded],
+            floors: [.felt],
+            pits:   [.pocket],
+            music:  [.jazz]
+        ),
+        CosmeticBundle(
+            id:             "quicksilver",
+            displayName:    "Quicksilver",
+            tagline:        "Liquid metal with a mind of its own.",
+            contentSummary: "Quicksilver ball · Prism goal · Smoke trail · Inverted floor · Inverted pit · Cinematic music",
+            balls:  [.quicksilver],
+            goals:  [.prism],
+            trails: [.smoke],
+            floors: [.inverted],
+            pits:   [.inverted],
+            music:  [.cinematic]
+        ),
+        CosmeticBundle(
+            id:             "oracle",
+            displayName:    "Oracle",
+            tagline:        "Gaze in. Roll forward.",
+            contentSummary: "Oracle ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Mysterium music",
+            balls:  [.oracle],
+            goals:  [.galaxy],
+            trails: [.stardust],
+            floors: [.midnight],
+            pits:   [.midnight],
+            music:  [.mysterium]
+        ),
+        CosmeticBundle(
+            id:             "geode",
+            displayName:    "Geode",
+            tagline:        "Cracked open, brilliant inside.",
+            contentSummary: "Geode ball · Crystal goal · Ice trail · Velvet floor · Velvet pit · Classical music",
+            balls:  [.geode],
+            goals:  [.crystal],
+            trails: [.ice],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.classical]
+        ),
+        CosmeticBundle(
+            id:             "lava-lamp",
+            displayName:    "Lava Lamp",
+            tagline:        "Slow, warm, and a little groovy.",
+            contentSummary: "Lava Lamp ball · Plasma goal · Ember trail · Disco floor · Midnight pit · Retrowave music",
+            balls:  [.lavaLamp],
+            goals:  [.plasma],
+            trails: [.ember],
+            floors: [.disco],
+            pits:   [.midnight],
+            music:  [.retrowave]
+        ),
+        CosmeticBundle(
+            id:             "plasma-globe",
+            displayName:    "Plasma Globe",
+            tagline:        "Touch the glass. Feel the charge.",
+            contentSummary: "Plasma Globe ball · Neon goal · Raybeam trail · Midnight floor · Space pit · Synthwave music",
+            balls:  [.plasmaGlobe],
+            goals:  [.neon],
+            trails: [.raybeam],
+            floors: [.midnight],
+            pits:   [.space],
+            music:  [.synthwave]
+        ),
+        CosmeticBundle(
+            id:             "cathedral",
+            displayName:    "Cathedral",
+            tagline:        "Light through a thousand panes.",
+            contentSummary: "Cathedral ball · Prism goal · Smoke trail · Velvet floor · Velvet pit · Orchestral music",
+            balls:  [.cathedral],
+            goals:  [.prism],
+            trails: [.smoke],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.orchestral]
+        ),
+        CosmeticBundle(
+            id:             "magma-core",
+            displayName:    "Magma Core",
+            tagline:        "A cracked shell over a molten heart.",
+            contentSummary: "Magma Core ball · Eclipse goal · Fire trail · Stormcloud floor · Downpour pit · Cinematic music",
+            balls:  [.magmaCore],
+            goals:  [.eclipse],
+            trails: [.fire],
+            floors: [.stormcloud],
+            pits:   [.downpour],
+            music:  [.cinematic]
+        ),
+        CosmeticBundle(
+            id:             "neon-city",
+            displayName:    "Neon City",
+            tagline:        "Jack in. Roll out.",
+            contentSummary: "Hologram ball · Neon goal · Raybeam trail · Grid City floor · Space pit · Synthwave music",
+            balls:  [.hologram],
+            goals:  [.neon],
+            trails: [.raybeam],
+            floors: [.gridCity],
+            pits:   [.space],
+            music:  [.synthwave]
+        ),
+        CosmeticBundle(
+            id:             "clockwork",
+            displayName:    "Clockwork",
+            tagline:        "Every tooth in its place.",
+            contentSummary: "Clockwork ball · Eclipse goal · Smoke trail · Brass Works floor · Canyon pit · Classical music",
+            balls:  [.clockwork],
+            goals:  [.eclipse],
+            trails: [.smoke],
+            floors: [.brass],
+            pits:   [.canyon],
+            music:  [.classical]
         ),
     ]
 }

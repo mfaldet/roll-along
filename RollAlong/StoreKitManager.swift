@@ -53,6 +53,15 @@ final class StoreKitManager: ObservableObject {
         case stPatricksBundle2027  = "com.macfaldet.RollAlong.bundle.stpatricks2027"
         case newYearBundle2027     = "com.macfaldet.RollAlong.bundle.newyear2027"
         case springBundle2027      = "com.macfaldet.RollAlong.bundle.spring2027"
+        case july4Bundle2026       = "com.macfaldet.RollAlong.bundle.july4_2026"
+        case muertosBundle2026     = "com.macfaldet.RollAlong.bundle.muertos2026"
+        case harvestBundle2026     = "com.macfaldet.RollAlong.bundle.harvest2026"
+        case lunarBundle2027       = "com.macfaldet.RollAlong.bundle.lunar2027"
+        case mardiGrasBundle2027   = "com.macfaldet.RollAlong.bundle.mardigras2027"
+        case prideBundle2027       = "com.macfaldet.RollAlong.bundle.pride2027"
+        case oktoberfestBundle2026 = "com.macfaldet.RollAlong.bundle.oktoberfest2026"
+        case earthDayBundle2027    = "com.macfaldet.RollAlong.bundle.earthday2027"
+        case backToSchoolBundle2026 = "com.macfaldet.RollAlong.bundle.backtoschool2026"
 
         var id: String { rawValue }
 
@@ -72,7 +81,10 @@ final class StoreKitManager: ObservableObject {
             case .starterPack:                            return .starterPackUnlock
             case .summerBundle2026, .halloweenBundle2026, .winterBundle2026,
                  .valentinesBundle2027, .stPatricksBundle2027,
-                 .newYearBundle2027, .springBundle2027:
+                 .newYearBundle2027, .springBundle2027,
+                 .july4Bundle2026, .muertosBundle2026, .harvestBundle2026,
+                 .lunarBundle2027, .mardiGrasBundle2027, .prideBundle2027,
+                 .oktoberfestBundle2026, .earthDayBundle2027, .backToSchoolBundle2026:
                                                           return .bundlePurchase
             }
         }
@@ -92,6 +104,15 @@ final class StoreKitManager: ObservableObject {
             case .stPatricksBundle2027: return "stpatricks-2027"
             case .newYearBundle2027:    return "newyear-2027"
             case .springBundle2027:     return "spring-2027"
+            case .july4Bundle2026:      return "july4-2026"
+            case .muertosBundle2026:    return "muertos-2026"
+            case .harvestBundle2026:    return "harvest-2026"
+            case .lunarBundle2027:      return "lunar-2027"
+            case .mardiGrasBundle2027:  return "mardigras-2027"
+            case .prideBundle2027:      return "pride-2027"
+            case .oktoberfestBundle2026: return "oktoberfest-2026"
+            case .earthDayBundle2027:   return "earthday-2027"
+            case .backToSchoolBundle2026: return "backtoschool-2026"
             case .livesPack1, .livesPack5, .livesPack10,
                  .unlimited,
                  .coins100, .coins600, .coins1300, .coins3000,
@@ -209,6 +230,15 @@ final class StoreKitManager: ObservableObject {
         var stPatricksSeen     = false
         var newYearSeen        = false
         var springSeen         = false
+        var july4Seen          = false
+        var muertosSeen        = false
+        var harvestSeen        = false
+        var lunarSeen          = false
+        var mardiGrasSeen      = false
+        var prideSeen          = false
+        var oktoberfestSeen    = false
+        var earthDaySeen       = false
+        var backToSchoolSeen   = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let txn) = result else {
                 // .unverified: Apple's JWS signature check failed.  Skip —
@@ -234,6 +264,15 @@ final class StoreKitManager: ObservableObject {
             case ProductID.stPatricksBundle2027.rawValue:    stPatricksSeen  = true
             case ProductID.newYearBundle2027.rawValue:       newYearSeen     = true
             case ProductID.springBundle2027.rawValue:        springSeen      = true
+            case ProductID.july4Bundle2026.rawValue:         july4Seen       = true
+            case ProductID.muertosBundle2026.rawValue:       muertosSeen     = true
+            case ProductID.harvestBundle2026.rawValue:       harvestSeen     = true
+            case ProductID.lunarBundle2027.rawValue:         lunarSeen       = true
+            case ProductID.mardiGrasBundle2027.rawValue:     mardiGrasSeen   = true
+            case ProductID.prideBundle2027.rawValue:         prideSeen       = true
+            case ProductID.oktoberfestBundle2026.rawValue:   oktoberfestSeen = true
+            case ProductID.earthDayBundle2027.rawValue:      earthDaySeen    = true
+            case ProductID.backToSchoolBundle2026.rawValue:  backToSchoolSeen = true
             default: break
             }
         }
@@ -251,6 +290,15 @@ final class StoreKitManager: ObservableObject {
         if stPatricksSeen   { await deliverReward(for: .stPatricksBundle2027)   }
         if newYearSeen      { await deliverReward(for: .newYearBundle2027)      }
         if springSeen       { await deliverReward(for: .springBundle2027)       }
+        if july4Seen        { await deliverReward(for: .july4Bundle2026)        }
+        if muertosSeen      { await deliverReward(for: .muertosBundle2026)      }
+        if harvestSeen      { await deliverReward(for: .harvestBundle2026)      }
+        if lunarSeen        { await deliverReward(for: .lunarBundle2027)        }
+        if mardiGrasSeen    { await deliverReward(for: .mardiGrasBundle2027)    }
+        if prideSeen        { await deliverReward(for: .prideBundle2027)        }
+        if oktoberfestSeen  { await deliverReward(for: .oktoberfestBundle2026)  }
+        if earthDaySeen     { await deliverReward(for: .earthDayBundle2027)     }
+        if backToSchoolSeen { await deliverReward(for: .backToSchoolBundle2026) }
     }
 
     // MARK: - Purchase
