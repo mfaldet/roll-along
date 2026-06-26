@@ -690,7 +690,8 @@ struct BuyCoinsSheet: View {
              .valentinesBundle2027, .stPatricksBundle2027,
              .newYearBundle2027, .springBundle2027,
              .july4Bundle2026, .muertosBundle2026, .harvestBundle2026,
-             .lunarBundle2027, .mardiGrasBundle2027, .prideBundle2027:
+             .lunarBundle2027, .mardiGrasBundle2027, .prideBundle2027,
+             .oktoberfestBundle2026, .earthDayBundle2027, .backToSchoolBundle2026:
                                        return "$2.99"
         }
     }

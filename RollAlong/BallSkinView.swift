@@ -284,6 +284,16 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(.white.opacity(0.20), lineWidth: 0.5))
 
+        case .oktoberfest:
+            oktoberfestCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.74, green: 0.52, blue: 0.16).opacity(0.55), lineWidth: 0.6))
+
+        case .apple:
+            appleCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.40, green: 0.04, blue: 0.06).opacity(0.45), lineWidth: 0.5))
+
         // No `default`: every BallSkin has an explicit renderer above, so the
         // switch is exhaustive.  Adding a new skin will (intentionally) fail to
         // compile here until it's given a case — same as the colors/tier switches.
@@ -4130,6 +4140,186 @@ struct BallSkinView: View {
                     Gradient(colors: [.white.opacity(0.9), .white.opacity(0.25), .clear]),
                     center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.66),
                     startRadius: 0, endRadius: r * 0.32))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Oktoberfest
+    // Bavarian blue-and-white diamond (lozenge) pattern with warm pretzel-gold
+    // accent lines and a creamy foam-like highlight along the top.  Festive
+    // beer-hall feel.  Static.
+    // =========================================================================
+    private var oktoberfestCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Creamy white base ─────────────────────────────────────
+            ctx.fill(Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                     with: .color(Color(red: 0.98, green: 0.97, blue: 0.92)))
+
+            // ── 2. Bavarian blue lozenge (diamond) lattice ───────────────
+            let blue  = Color(red: 0.13, green: 0.42, blue: 0.82)
+            let gold  = Color(red: 0.80, green: 0.58, blue: 0.18)
+            let cell  = w / 4.0                  // diamond half-pitch
+            // Tile diamonds so that alternating cells are filled blue.
+            var row = -1
+            var y = -cell
+            while y < h + cell {
+                var col = 0
+                var x = -cell
+                while x < w + cell {
+                    if (row + col) % 2 == 0 {
+                        var dia = Path()
+                        dia.move(to:    CGPoint(x: x,             y: y - cell))
+                        dia.addLine(to: CGPoint(x: x + cell,      y: y))
+                        dia.addLine(to: CGPoint(x: x,             y: y + cell))
+                        dia.addLine(to: CGPoint(x: x - cell,      y: y))
+                        dia.closeSubpath()
+                        ctx.fill(dia, with: .color(blue))
+                    }
+                    x += cell
+                    col += 1
+                }
+                y += cell
+                row += 1
+            }
+
+            // ── 3. Warm pretzel-gold accent lines along the diamond grid ─
+            var grid = Path()
+            var gx = -cell
+            while gx < w + cell {
+                grid.move(to:    CGPoint(x: gx,            y: 0))
+                grid.addLine(to: CGPoint(x: gx + h,       y: h))   // ╲ diagonal
+                grid.move(to:    CGPoint(x: gx,            y: h))
+                grid.addLine(to: CGPoint(x: gx + h,       y: 0))   // ╱ diagonal
+                gx += cell
+            }
+            ctx.stroke(grid, with: .color(gold.opacity(0.55)), lineWidth: 1.0)
+
+            // ── 4. Creamy foam highlight along the top ───────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.80, y: cy - r * 1.02,
+                                       width: r * 1.60, height: r * 0.70)),
+                with: .radialGradient(
+                    Gradient(colors: [Color(red: 1.0, green: 0.99, blue: 0.95).opacity(0.85),
+                                      .white.opacity(0.25), .clear]),
+                    center: CGPoint(x: cx, y: cy - r * 0.66),
+                    startRadius: 0, endRadius: r * 0.92))
+
+            // ── 5. Sphere-shade overlay (lit upper-left, dark rim) ───────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.30),  location: 0.00),
+                        .init(color: .clear,                location: 0.44),
+                        .init(color: .black.opacity(0.18),  location: 0.82),
+                        .init(color: .black.opacity(0.50),  location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.30),
+                    startRadius: 0, endRadius: r * 1.22))
+
+            // ── 6. Bright wet-gloss specular highlight (upper-left) ──────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
+                                       width: r * 0.44, height: r * 0.28)),
+                with: .radialGradient(
+                    Gradient(colors: [.white.opacity(0.85), .white.opacity(0.2), .clear]),
+                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.64),
+                    startRadius: 0, endRadius: r * 0.30))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Teacher's Apple
+    // Glossy classic-red apple with a small green leaf and brown stem at the
+    // top and a bright specular highlight.  Clean and cheerful.  Static.
+    // =========================================================================
+    private var appleCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Rounded apple-red body (radial shading) ───────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 0.97, green: 0.32, blue: 0.28), location: 0.00),
+                        .init(color: Color(red: 0.88, green: 0.13, blue: 0.14), location: 0.46),
+                        .init(color: Color(red: 0.60, green: 0.05, blue: 0.09), location: 0.84),
+                        .init(color: Color(red: 0.34, green: 0.03, blue: 0.06), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.24),
+                    startRadius: 0, endRadius: r * 1.18))
+
+            // ── 2. Subtle dimple shading at the top (apple navel) ────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.30, y: cy - r * 0.92,
+                                       width: r * 0.60, height: r * 0.40)),
+                with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.40, green: 0.03, blue: 0.06).opacity(0.55), .clear]),
+                    center: CGPoint(x: cx, y: cy - r * 0.74),
+                    startRadius: 0, endRadius: r * 0.36))
+
+            // ── 3. Brown stem ───────────────────────────────────────────
+            var stem = Path()
+            stem.move(to:    CGPoint(x: cx - r * 0.05, y: cy - r * 0.72))
+            stem.addQuadCurve(to: CGPoint(x: cx + r * 0.08, y: cy - r * 1.02),
+                              control: CGPoint(x: cx - r * 0.02, y: cy - r * 0.92))
+            ctx.stroke(stem,
+                       with: .color(Color(red: 0.42, green: 0.26, blue: 0.10)),
+                       style: StrokeStyle(lineWidth: max(2, r * 0.10), lineCap: .round))
+
+            // ── 4. Small green leaf beside the stem ──────────────────────
+            var leaf = Path()
+            let lx = cx + r * 0.10
+            let ly = cy - r * 0.88
+            leaf.move(to: CGPoint(x: lx, y: ly))
+            leaf.addQuadCurve(to: CGPoint(x: lx + r * 0.42, y: ly - r * 0.18),
+                              control: CGPoint(x: lx + r * 0.22, y: ly - r * 0.34))
+            leaf.addQuadCurve(to: CGPoint(x: lx, y: ly),
+                              control: CGPoint(x: lx + r * 0.22, y: ly + r * 0.04))
+            ctx.fill(leaf, with: .linearGradient(
+                Gradient(colors: [Color(red: 0.36, green: 0.72, blue: 0.30),
+                                  Color(red: 0.18, green: 0.52, blue: 0.20)]),
+                startPoint: CGPoint(x: lx, y: ly - r * 0.2),
+                endPoint:   CGPoint(x: lx + r * 0.42, y: ly + r * 0.05)))
+            // leaf mid-vein
+            var vein = Path()
+            vein.move(to: CGPoint(x: lx + r * 0.02, y: ly - r * 0.02))
+            vein.addQuadCurve(to: CGPoint(x: lx + r * 0.38, y: ly - r * 0.16),
+                              control: CGPoint(x: lx + r * 0.22, y: ly - r * 0.16))
+            ctx.stroke(vein, with: .color(Color(red: 0.14, green: 0.40, blue: 0.16).opacity(0.7)),
+                       lineWidth: 0.8)
+
+            // ── 5. Sphere-shade rim ─────────────────────────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .clear,               location: 0.55),
+                        .init(color: .black.opacity(0.14), location: 0.84),
+                        .init(color: .black.opacity(0.46), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.24),
+                    startRadius: 0, endRadius: r * 1.18))
+
+            // ── 6. Bright wet-gloss specular highlight (upper-left) ──────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.62,
+                                       width: r * 0.50, height: r * 0.34)),
+                with: .radialGradient(
+                    Gradient(colors: [.white.opacity(0.92), .white.opacity(0.3), .clear]),
+                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.50),
+                    startRadius: 0, endRadius: r * 0.34))
         }
     }
 }

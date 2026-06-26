@@ -135,6 +135,8 @@ extension BallSkin: CosmeticItem {
              .lunarDragon,     // Year of the Dragon seasonal — coin/bundle purchasable
              .mardiGras,       // Mardi Gras seasonal — coin/bundle purchasable
              .spectrum,        // Spectrum seasonal — coin/bundle purchasable
+             .oktoberfest,     // Oktoberfest seasonal — coin/bundle purchasable
+             .apple,           // Back to School seasonal — coin/bundle purchasable
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -1861,6 +1863,48 @@ struct CosmeticBundle: Identifiable {
             music:  [.electronic],
             availableFrom:  CosmeticBundle.date(2027, 6, 1),
             availableUntil: CosmeticBundle.date(2027, 6, 30)
+        ),
+        CosmeticBundle(
+            id:             "oktoberfest-2026",
+            displayName:    "Oktoberfest",
+            tagline:        "Prost! Raise a stein and roll.",
+            contentSummary: "Oktoberfest ball · Mirage goal · Ember trail · Meadow floor · Canyon pit · Acoustic music",
+            balls:  [.oktoberfest],
+            goals:  [.mirage],
+            trails: [.ember],
+            floors: [.meadow],
+            pits:   [.canyon],
+            music:  [.acoustic],
+            availableFrom:  CosmeticBundle.date(2026, 9, 19),
+            availableUntil: CosmeticBundle.date(2026, 10, 5)
+        ),
+        CosmeticBundle(
+            id:             "earthday-2027",
+            displayName:    "Earth Day",
+            tagline:        "One small planet, one perfect roll.",
+            contentSummary: "Earth ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Ambient music",
+            balls:  [.earth],
+            goals:  [.blossom],
+            trails: [.forest],
+            floors: [.meadow],
+            pits:   [.meadow],
+            music:  [.ambient],
+            availableFrom:  CosmeticBundle.date(2027, 4, 18),
+            availableUntil: CosmeticBundle.date(2027, 4, 26)
+        ),
+        CosmeticBundle(
+            id:             "backtoschool-2026",
+            displayName:    "Back to School",
+            tagline:        "Sharpen up. Class is rolling.",
+            contentSummary: "Teacher's Apple ball · Target goal · Ink trail · Notebook floor · Notebook pit · Piano music",
+            balls:  [.apple],
+            goals:  [.target],
+            trails: [.ink],
+            floors: [.notebook],
+            pits:   [.notebook],
+            music:  [.piano],
+            availableFrom:  CosmeticBundle.date(2026, 8, 15),
+            availableUntil: CosmeticBundle.date(2026, 9, 8)
         ),
 
         // ── Sports bundles ──────────────────────────────────────────────

@@ -333,6 +333,51 @@
       "productID" : "com.macfaldet.RollAlong.bundle.pride2027",
       "referenceName" : "Spectrum Bundle $2.99",
       "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000023",
+      "localizations" : [
+        {
+          "description" : "The full Oktoberfest seasonal collection — Oktoberfest ball, Mirage goal, Ember trail, Meadow floor, Canyon pit, and Acoustic music. Available Sep 19–Oct 5, 2026 only.",
+          "displayName" : "Oktoberfest Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.oktoberfest2026",
+      "referenceName" : "Oktoberfest Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000024",
+      "localizations" : [
+        {
+          "description" : "The full Earth Day seasonal collection — Earth ball, Blossom goal, Forest trail, Meadow floor, Meadow pit, and Ambient music. Available Apr 18–26, 2027 only.",
+          "displayName" : "Earth Day Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.earthday2027",
+      "referenceName" : "Earth Day Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000025",
+      "localizations" : [
+        {
+          "description" : "The full Back to School seasonal collection — Teacher's Apple ball, Target goal, Ink trail, Notebook floor, Notebook pit, and Piano music. Available Aug 15–Sep 8, 2026 only.",
+          "displayName" : "Back to School Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.backtoschool2026",
+      "referenceName" : "Back to School Bundle $2.99",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {

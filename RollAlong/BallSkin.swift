@@ -245,6 +245,14 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     green/blue/violet bands) with a bright specular highlight.  Static.
     //     Spectrum bundle (Legendary).
     case spectrum    = "Spectrum"
+    //   • oktoberfest — Bavarian blue-and-white diamond (lozenge) pattern with
+    //     warm pretzel-gold accents and a creamy foam highlight at the top.
+    //     Festive beer-hall feel.  Static.  Oktoberfest seasonal (Legendary).
+    case oktoberfest = "Oktoberfest"
+    //   • apple — glossy classic-red teacher's apple with a small green leaf,
+    //     brown stem, and a bright specular highlight.  Clean and cheerful.
+    //     Static.  Back to School seasonal (Legendary).
+    case apple       = "Teacher's Apple"
 
     var id: String { rawValue }
 
@@ -961,6 +969,30 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.94, green: 0.22, blue: 0.20),
                 Color(red: 0.16, green: 0.40, blue: 0.92),
                 Color(red: 0.30, green: 0.08, blue: 0.46),
+            ]
+
+        case .oktoberfest:
+            // Bavarian base — creamy foam-white highlight → bright Bavarian
+            // blue → deeper sky blue → warm pretzel-gold shadow.  The blue/white
+            // lozenge diamonds, gold accents, and foam cap paint on top via the
+            // bespoke oktoberfestCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.97, blue: 0.92),
+                Color(red: 0.16, green: 0.46, blue: 0.86),
+                Color(red: 0.09, green: 0.32, blue: 0.66),
+                Color(red: 0.74, green: 0.52, blue: 0.16),
+            ]
+
+        case .apple:
+            // Glossy red apple — bright specular white → vivid apple red →
+            // deep crimson → dark maroon shadow.  The leaf, stem, and wet
+            // gloss highlight paint on top via the bespoke appleCanvas in
+            // BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.96, blue: 0.94),
+                Color(red: 0.90, green: 0.16, blue: 0.16),
+                Color(red: 0.62, green: 0.06, blue: 0.10),
+                Color(red: 0.34, green: 0.03, blue: 0.06),
             ]
         }
     }
