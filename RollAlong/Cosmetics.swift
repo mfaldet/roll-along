@@ -2555,43 +2555,57 @@ private func trailAir(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: D
 /// spot's gap is fixed, so the bled blot stays exactly where it was set.
 private func trailInk(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
                       _ times: [Double]?) {
-    let ink      = Color(red: 0.07, green: 0.07, blue: 0.12)
-    let neatR    = baseWidth * 0.65          // half-width of the crisp stroke (wider than before)
-    let maxBleed = baseWidth * 3.5           // cap so a long rest can't flood the whole page
-    let tau      = 0.22                       // dwell time-constant for the bleed ramp (s)
+    let ink      = Color(red: 0.05, green: 0.05, blue: 0.10)
+    let neatR    = baseWidth * 0.55          // half-width of the crisp stroke at full speed
+    let maxBleed = baseWidth * 3.2           // cap so a long rest can't flood the whole page
+    let tau      = 0.10                       // dwell time-constant: smaller ⇒ slow strokes bleed wide sooner
 
-    // 1) Crisp connecting line through every point — the pen stroke itself.
-    //    A gentle fade over the oldest few points hides the FIFO pop as marks
-    //    scroll off the tail (ink that's "run out" of the visible window).
-    for i in 1..<n {
-        let tailFade = min(1.0, Double(i + 1) / Double(n))      // ~0 tail → 1 head
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(ink.opacity(0.25 + 0.60 * tailFade)),
-                   style: StrokeStyle(lineWidth: neatR * 2, lineCap: .round, lineJoin: .round))
-    }
-
-    // 2) Bleed blots — radius grows with how long the pen dwelled at each spot.
-    for i in 0..<n {
+    // Per-point ink half-width.  Points are laid at a fixed spatial step, so the
+    // dwell (seconds the pen lingered leaving this spot) is ≈ step ÷ speed — the
+    // slower the ball moves, the bigger the gap to the next point and the wider
+    // this spot bleeds.  A resting head's gap keeps growing (next = now), so its
+    // blot keeps widening until it saturates.  Once the pen moves on each gap is
+    // fixed, so the bled mark stays exactly where it was set.
+    func radius(_ i: Int) -> CGFloat {
         let dwell: Double
         if let times, i < times.count {
-            let next = (i < times.count - 1) ? times[i + 1] : t  // head keeps growing while at rest
+            let next = (i < times.count - 1) ? times[i + 1] : t
             dwell = max(0, next - times[i])
         } else {
-            // No timing (shop preview): synthesize a little pooling toward the
-            // head so the cell still sells the bleed.
+            // No timing (shop preview): synthesize pooling toward the head so the
+            // cell still sells the bleed.
             let f = n > 1 ? Double(i) / Double(n - 1) : 0
-            dwell = f * f * 0.4
+            dwell = f * f * 0.5
         }
-        let bleed = CGFloat(Double(maxBleed) * (1 - exp(-dwell / tau)))
-        let r = neatR + bleed
-        guard r > neatR + 0.5 else { continue }                  // skip spots that didn't pool
+        return neatR + CGFloat(Double(maxBleed) * (1 - exp(-dwell / tau)))
+    }
+
+    // 1) Solid ink ribbon — each segment stroked at the width its endpoints
+    //    earned, so the line itself swells where the ball crawled and stays
+    //    thin where it raced.  Dense, flat ink (no soft feather) reads as a pen
+    //    line rather than a watercolour wash.  A gentle fade over the oldest few
+    //    points hides the FIFO pop as marks scroll off the tail.
+    for i in 1..<n {
+        let tailFade = min(1.0, Double(i + 1) / Double(n))       // ~0 tail → 1 head
+        let w = radius(i - 1) + radius(i)                        // local diameter
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(ink.opacity(0.55 + 0.43 * tailFade)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+
+    // 2) Pooled blots where the pen dwelled — a dense, near-solid disc held flat
+    //    almost to the rim with only a thin damp edge, not a translucent radial
+    //    wash.
+    for i in 0..<n {
+        let r = radius(i)
+        guard r > neatR + 0.6 else { continue }                  // skip spots that didn't pool
         let tailFade = min(1.0, Double(i + 1) / Double(n))
         let p = pts[i]
-        // Soft-edged ink puddle: near-solid core feathering to a wet rim.
         ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
             with: .radialGradient(Gradient(stops: [
-                .init(color: ink.opacity(0.85 * tailFade), location: 0.00),
-                .init(color: ink.opacity(0.78 * tailFade), location: 0.60),
+                .init(color: ink.opacity(0.98 * tailFade), location: 0.00),
+                .init(color: ink.opacity(0.97 * tailFade), location: 0.80),
+                .init(color: ink.opacity(0.60 * tailFade), location: 0.93),
                 .init(color: ink.opacity(0.0),             location: 1.00)]),
                 center: p, startRadius: 0, endRadius: r))
     }
