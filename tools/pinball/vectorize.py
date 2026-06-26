@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Vectorise the detected track/boundary (track_mask.png) into SMOOTH wall
-polylines. Marching-squares contours -> periodic smoothing B-spline (so long
-outer walls become clean barrel arcs the ball won't rattle on) -> dense resample
-in playfield fractions. Writes walls_vector.json + a colour-coded overlay.
+"""Vectorise the detected track/boundary (track_mask.png) into clean wall
+polylines with smooth straightaways AND crisp turns.
 
-Usage: python3 vectorize.py [smooth=2.0] [minlen_px=60]
-  smooth : spline smoothing strength (× point count). Higher = smoother arcs.
+Per contour: marching-squares -> Douglas-Peucker simplify (removes pixel jaggies
+but keeps the turn shape) -> LOW-smoothing periodic B-spline through those points
+(hugs the turns instead of cutting them) -> dense resample, in playfield
+fractions. Writes walls_vector.json + a colour-coded overlay.
+
+Usage: python3 vectorize.py [dp_tol=2.5] [spline_s=0.25] [minlen_px=60]
+  dp_tol   : simplify tolerance px (bigger = fewer points, looser)
+  spline_s : spline smoothing factor (× simplified-point count; smaller = tighter)
 """
 import json, sys, colorsys
 import numpy as np
@@ -13,39 +17,39 @@ from PIL import Image, ImageDraw
 from skimage import measure
 from scipy import interpolate
 
-smooth = float(sys.argv[1]) if len(sys.argv) > 1 else 2.0
-minlen = float(sys.argv[2]) if len(sys.argv) > 2 else 60.0
+dp_tol   = float(sys.argv[1]) if len(sys.argv) > 1 else 2.5
+spline_s = float(sys.argv[2]) if len(sys.argv) > 2 else 0.25
+minlen   = float(sys.argv[3]) if len(sys.argv) > 3 else 60.0
 
 mask = np.asarray(Image.open("track_mask.png").convert("L"))
 H, W = mask.shape
 field = (mask > 127).astype(float)
 contours = measure.find_contours(field, 0.5)
 
+FLIPPER_BOXES = [(0.20, 0.42, 0.88, 0.99), (0.55, 0.72, 0.88, 0.99)]
+
 
 def smooth_poly(c):
-    """c: Nx2 (row, col). Returns smoothed [(x,y)...] in pixels or None."""
-    y, x = c[:, 0], c[:, 1]
+    """c: Nx2 (row, col). -> ([(x,y)...] px, perim) or None."""
     perim = float(np.sqrt((np.diff(c, axis=0) ** 2).sum(axis=1)).sum())
     if perim < minlen:
         return None
-    closed = abs(x[0] - x[-1]) < 2 and abs(y[0] - y[-1]) < 2
-    if closed:
-        x, y = x[:-1], y[:-1]
-    if len(x) < 6:
-        return None
+    closed = abs(c[0, 0] - c[-1, 0]) < 2 and abs(c[0, 1] - c[-1, 1]) < 2
+    cc = c[:-1] if closed else c
+    simp = measure.approximate_polygon(cc, tolerance=dp_tol)   # crisp, jaggy-free
+    if len(simp) < 5:
+        return [(p[1], p[0]) for p in simp], perim
+    x, y = simp[:, 1], simp[:, 0]
     try:
-        tck, _ = interpolate.splprep([x, y], s=smooth * len(x),
+        tck, _ = interpolate.splprep([x, y], s=spline_s * len(simp),
                                      per=1 if closed else 0, k=3)
     except Exception:
-        return None
-    n = int(min(420, max(48, perim * 0.12)))
+        return [(p[1], p[0]) for p in simp], perim
+    n = int(min(500, max(48, perim * 0.14)))
     u = np.linspace(0, 1, n)
     xs, ys = interpolate.splev(u, tck)
     return list(zip(xs, ys)), perim
 
-
-# the two white ovals near the bottom are flippers (dynamic) — not walls
-FLIPPER_BOXES = [(0.20, 0.42, 0.88, 0.99), (0.55, 0.72, 0.88, 0.99)]
 
 polys = []
 for c in contours:
@@ -62,8 +66,8 @@ for c in contours:
 polys.sort(key=lambda p: p["perim"], reverse=True)
 json.dump({"aspect": round(H / W, 3), "walls": [p["pts"] for p in polys]},
           open("walls_vector.json", "w"))
-print(f"{len(polys)} smooth wall polylines, "
-      f"{sum(len(p['pts']) for p in polys)} vertices (smooth={smooth})")
+print(f"{len(polys)} walls, {sum(len(p['pts']) for p in polys)} vertices "
+      f"(dp_tol={dp_tol}, spline_s={spline_s})")
 
 base = Image.blend(Image.open("map.png").convert("RGB"),
                    Image.new("RGB", (W, H), (16, 16, 24)), 0.45)
