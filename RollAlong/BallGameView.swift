@@ -445,6 +445,15 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Eclipse floor (Eclipse bundle) — a dark starlit sky with a
+                // glowing golden corona ring that slowly pulses.  Skipped under
+                // Reduce Motion (the static dark base remains).
+                if floor == .eclipse && !reduceMotion {
+                    eclipseFloorOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 // Paper-world floor overlays (ruled lines, grids, fold shadows…)
                 paperFloorOverlay(geo: geo)
                     .ignoresSafeArea()
@@ -698,11 +707,13 @@ struct BallGameView: View {
                 // suppresses the animation; the static base remains.
                 if !reduceMotion {
                     switch pit {
-                    case .evil:  evilPitOverlay
-                    case .sky:   skyPitOverlay
-                    case .pond:  pondPitOverlay
-                    case .space: spacePitOverlay
-                    default:     EmptyView()
+                    case .evil:      evilPitOverlay
+                    case .sky:       skyPitOverlay
+                    case .pond:      pondPitOverlay
+                    case .space:     spacePitOverlay
+                    case .eclipse:   eclipsePitOverlay
+                    case .nightclub: nightclubPitOverlay
+                    default:         EmptyView()
                     }
                 }
             }
@@ -1111,6 +1122,113 @@ struct BallGameView: View {
                             )
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /// Eclipse floor (Eclipse bundle) — a faint starfield with a large dark
+    /// moon disc occluding a glowing golden corona ring, hung in the upper sky.
+    /// The corona slowly pulses.  Full-screen overlay.
+    private var eclipseFloorOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t  = tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width * 0.5
+                let cy = size.height * 0.30
+                let r  = min(size.width, size.height) * 0.16
+                let pulse = 1.0 + 0.06 * sin(t * 1.4)
+
+                // Faint static star specks.
+                var rng = SeededRNG(seed: 0xEC11_9523)
+                let stars = max(24, Int(size.width * size.height / 5200))
+                for _ in 0..<stars {
+                    let sx = CGFloat(rng.nextUnit()) * size.width
+                    let sy = CGFloat(rng.nextUnit()) * size.height
+                    let sr = 0.5 + CGFloat(rng.nextUnit()) * 1.1
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr, width: sr * 2, height: sr * 2)),
+                             with: .color(Color.white.opacity(0.10 + 0.18 * rng.nextUnit())))
+                }
+
+                // Broad soft corona glow.
+                let glowR = r * 3.2 * CGFloat(pulse)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: cy - glowR, width: glowR * 2, height: glowR * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 0.80, blue: 0.36).opacity(0.0),  location: 0.40),
+                        .init(color: Color(red: 1.0, green: 0.80, blue: 0.36).opacity(0.30), location: 0.52),
+                        .init(color: Color(red: 1.0, green: 0.66, blue: 0.22).opacity(0.0),  location: 0.80),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glowR))
+
+                // Bright corona ring + dark occluding moon.
+                let ringR = r * 1.14
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - ringR, y: cy - ringR, width: ringR * 2, height: ringR * 2)),
+                           with: .color(Color(red: 1.0, green: 0.86, blue: 0.42).opacity(0.85)),
+                           lineWidth: max(2, r * 0.10))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                         with: .color(Color(red: 0.02, green: 0.02, blue: 0.05)))
+            }
+        }
+    }
+
+    /// Eclipse pit (Eclipse bundle) — a mini eclipse in the death zone: a dark
+    /// core ringed by a pulsing golden corona over a near-black void.
+    private var eclipsePitOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t  = tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width * 0.5, cy = size.height * 0.5
+                let r  = min(size.width, size.height) * 0.32
+                let pulse = 1.0 + 0.08 * sin(t * 1.6)
+
+                ctx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
+                         with: .color(Color(red: 0.02, green: 0.02, blue: 0.05)))
+                let glowR = r * 2.4 * CGFloat(pulse)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: cy - glowR, width: glowR * 2, height: glowR * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 0.82, blue: 0.38).opacity(0.0),  location: 0.45),
+                        .init(color: Color(red: 1.0, green: 0.82, blue: 0.38).opacity(0.45), location: 0.60),
+                        .init(color: Color(red: 1.0, green: 0.66, blue: 0.20).opacity(0.0),  location: 0.85),
+                    ]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glowR))
+                let ringR = r * 1.1
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - ringR, y: cy - ringR, width: ringR * 2, height: ringR * 2)),
+                           with: .color(Color(red: 1.0, green: 0.86, blue: 0.42).opacity(0.9)),
+                           lineWidth: max(1.5, r * 0.12))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                         with: .color(Color(red: 0.01, green: 0.01, blue: 0.03)))
+            }
+        }
+    }
+
+    /// Nightclub pit (Nightclub bundle) — a dark dancefloor void with drifting,
+    /// twinkling coloured spotlights (additive) spilling across it.
+    private var nightclubPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                ctx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
+                         with: .color(Color(red: 0.05, green: 0.03, blue: 0.09)))
+
+                var ctxL = ctx
+                ctxL.blendMode = .plusLighter
+                let cols = [Color(red: 1.0, green: 0.20, blue: 0.70),
+                            Color(red: 0.30, green: 0.80, blue: 1.0),
+                            Color(red: 1.0, green: 0.85, blue: 0.20),
+                            Color(red: 0.60, green: 0.30, blue: 1.0)]
+                var rng = SeededRNG(seed: 0x4B17_C0DE)
+                let count = 7
+                for i in 0..<count {
+                    let bx0 = CGFloat(rng.nextUnit())
+                    let by0 = CGFloat(rng.nextUnit())
+                    let sp  = 0.5 + rng.nextUnit()
+                    let px = (bx0 + CGFloat(0.18 * sin(t * sp + Double(i)))) * size.width
+                    let py = (by0 + CGFloat(0.18 * cos(t * (sp * 0.8) + Double(i) * 1.3))) * size.height
+                    let rr = min(size.width, size.height) * (0.18 + 0.10 * CGFloat(rng.nextUnit()))
+                    let tw = 0.4 + 0.6 * (0.5 + 0.5 * sin(t * 3 + Double(i) * 2.0))
+                    ctxL.fill(Path(ellipseIn: CGRect(x: px - rr, y: py - rr, width: rr * 2, height: rr * 2)),
+                        with: .radialGradient(Gradient(colors: [cols[i % cols.count].opacity(0.45 * tw), .clear]),
+                            center: CGPoint(x: px, y: py), startRadius: 0, endRadius: rr))
                 }
             }
         }

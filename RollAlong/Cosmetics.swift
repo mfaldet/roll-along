@@ -673,6 +673,7 @@ enum Floor: String, CosmeticItem {
     case disco            // colour-cycling dance-floor squares
     case grass            // golf-course turf with grass tufts (Golf bundle)
     case moon             // ★ NEW (Space Travel bundle) — lunar regolith + craters
+    case eclipse          // Eclipse bundle — dark void behind a glowing corona ring
 
     // Sports bundles (new)
     case court            // Full Court bundle — warm hardwood basketball floor
@@ -705,6 +706,7 @@ enum Floor: String, CosmeticItem {
         case .disco:      return "Disco"
         case .grass:      return "Grass"
         case .moon:       return "Moon"
+        case .eclipse:    return "Eclipse"
         case .court:      return "Court"
         case .felt:       return "Felt"
         }
@@ -722,7 +724,7 @@ enum Floor: String, CosmeticItem {
              .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
             return .standard   //  50 coins
-        case .aurora, .disco, .grass, .moon:
+        case .aurora, .disco, .grass, .moon, .eclipse:
             return .exclusive  // 500 coins — animated / textured overlay
         }
     }
@@ -756,6 +758,7 @@ enum Floor: String, CosmeticItem {
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
+        case .eclipse:    return Color(red: 0.04,  green: 0.04,  blue: 0.10 )  // dark void; corona paints over
         case .court:      return Color(red: 0.84,  green: 0.65,  blue: 0.38 )  // warm hardwood
         case .felt:       return Color(red: 0.18,  green: 0.48,  blue: 0.24 )  // pool-table green
         }
@@ -774,7 +777,7 @@ enum Floor: String, CosmeticItem {
     /// tufts, etc.).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .aurora, .disco, .grass, .moon: return true
+        case .aurora, .disco, .grass, .moon, .eclipse: return true
         default: return false
         }
     }
@@ -816,6 +819,8 @@ enum Pit: String, CosmeticItem {
     case sky              // sky-blue gradient with drifting clouds
     case pond             // water with ripples + lily pad (Golf bundle)
     case space            // ★ NEW (Space Travel bundle) — starfield void
+    case eclipse          // Eclipse bundle — dark void with a corona ring glow
+    case nightclub        // Nightclub bundle — dark void with drifting disco lights
 
     // Sports bundles (new)
     case sideline         // Full Court bundle — dark-grey out-of-bounds edge
@@ -849,6 +854,8 @@ enum Pit: String, CosmeticItem {
         case .sky:        return "Sky"
         case .pond:       return "Pond"
         case .space:      return "Space"
+        case .eclipse:    return "Eclipse"
+        case .nightclub:  return "Nightclub"
         case .sideline:   return "Sideline"
         case .pocket:     return "Pocket"
         }
@@ -866,7 +873,7 @@ enum Pit: String, CosmeticItem {
              .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard,
              .sideline, .pocket:
             return .standard   //  50 coins
-        case .evil, .sky, .pond, .space:
+        case .evil, .sky, .pond, .space, .eclipse, .nightclub:
             return .exclusive  // 500 coins — animated overlay
         }
     }
@@ -901,6 +908,8 @@ enum Pit: String, CosmeticItem {
         case .sky:        return Color(red: 0.55,  green: 0.78,  blue: 0.95 )  // pale blue base; clouds drift on top
         case .pond:       return Color(red: 0.08,  green: 0.30,  blue: 0.42 )  // deep water; ripples + lily pad on top
         case .space:      return Color(red: 0.02,  green: 0.02,  blue: 0.06 )  // near-black void; stars twinkle on top
+        case .eclipse:    return Color(red: 0.03,  green: 0.02,  blue: 0.07 )  // near-black; corona ring on top
+        case .nightclub:  return Color(red: 0.06,  green: 0.04,  blue: 0.10 )  // dark; disco lights drift on top
         case .sideline:   return Color(red: 0.14,  green: 0.14,  blue: 0.16 )  // dark court edge / out-of-bounds
         case .pocket:     return Color(red: 0.06,  green: 0.08,  blue: 0.06 )  // near-black pool pocket
         }
@@ -911,7 +920,7 @@ enum Pit: String, CosmeticItem {
     /// Space starfield).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .evil, .sky, .pond, .space: return true
+        case .evil, .sky, .pond, .space, .eclipse, .nightclub: return true
         default: return false
         }
     }
@@ -1337,12 +1346,12 @@ struct CosmeticBundle: Identifiable {
             id:             "nightclub",
             displayName:    "Nightclub",
             tagline:        "Disco lights, neon goal, bubblegum streak.",
-            contentSummary: "Disco Ball · Disco floor · Neon goal · Bubblegum trail · Retrowave music",
+            contentSummary: "Disco Ball · Disco floor · Nightclub pit · Neon goal · Bubblegum trail · Retrowave music",
             balls:  [.disco],
             goals:  [.neon],
             trails: [.bubblegum],
             floors: [.disco],
-            pits:   [],
+            pits:   [.nightclub],
             music:  [.retrowave]
         ),
         CosmeticBundle(
@@ -1583,12 +1592,12 @@ struct CosmeticBundle: Identifiable {
             id:             "eclipse",
             displayName:    "Eclipse",
             tagline:        "A golden corona around the dark.",
-            contentSummary: "Blue ball · Eclipse goal · Gilded trail · Mysterium music",
+            contentSummary: "Blue ball · Eclipse goal · Eclipse floor · Eclipse pit · Gilded trail · Mysterium music",
             balls:  [.blue],
             goals:  [.eclipse],
             trails: [.gilded],
-            floors: [],
-            pits:   [],
+            floors: [.eclipse],
+            pits:   [.eclipse],
             music:  [.mysterium]
         ),
         CosmeticBundle(
