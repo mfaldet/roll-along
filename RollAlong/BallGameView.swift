@@ -505,6 +505,21 @@ struct BallGameView: View {
                         case .halo:        heavensHaloGoal
                         case .doodle:      doodleGoal
                         case .soccerNet:   soccerNetGoal
+                        case .galaxy:      galaxyGoal
+                        case .crystal:     crystalGoal
+                        case .flame:       flameGoal
+                        case .blossom:     blossomGoal
+                        case .mosaic:      mosaicGoal
+                        case .ripple:      rippleGoal
+                        case .comet:       cometGoal
+                        case .neon:        neonGoal
+                        case .eclipse:     eclipseGoal
+                        case .plasma:      plasmaGoal
+                        case .mirage:      mirageGoal
+                        case .prism:       prismGoal
+                        case .obsidian:    obsidianGoal
+                        case .quasar:      quasarGoal
+                        case .rainbow:     rainbowHole
                         default:           rainbowHole
                         }
                     }
@@ -1953,6 +1968,441 @@ struct BallGameView: View {
                 )
             }
         }
+    }
+
+    // ── Distinct bespoke portals for the former "particle" goals ─────────
+    // Each goal now has its own unique art instead of sharing rainbowHole.
+
+    /// Galaxy — two spiral arms of stars winding around a bright core.
+    private var galaxyGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.10,green:0.06,blue:0.22), Color(red:0.02,green:0.01,blue:0.06)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                var g = ctx; g.blendMode = .plusLighter
+                for arm in 0..<2 {
+                    let base = Double(arm) * .pi + t * 0.3
+                    for i in 0..<40 {
+                        let f = Double(i) / 40.0
+                        let ang = base + f * 3.2
+                        let rad = r * CGFloat(f)
+                        let px = cx + CGFloat(cos(ang)) * rad
+                        let py = cy + CGFloat(sin(ang)) * rad
+                        let sz = CGFloat(1.2 + 2.0 * (1 - f))
+                        let hue = 0.60 + 0.15 * sin(f * 6 + t)
+                        g.fill(Path(ellipseIn: CGRect(x: px-sz, y: py-sz, width: sz*2, height: sz*2)),
+                            with: .color(Color(hue: hue, saturation: 0.6, brightness: 1).opacity(0.8 * (1 - f) + 0.2)))
+                    }
+                }
+                let cr = r * 0.28
+                g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.95), Color(red:0.8,green:0.7,blue:1).opacity(0.4), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Crystal — radiating angular facets that shimmer in icy blue.
+    private var crystalGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .color(Color(red:0.03,green:0.08,blue:0.12)))
+                var g = ctx; g.blendMode = .plusLighter
+                let facets = 8
+                for i in 0..<facets {
+                    let a0 = Double(i) / Double(facets) * 2 * .pi
+                    let a1 = Double(i+1) / Double(facets) * 2 * .pi
+                    var p = Path()
+                    p.move(to: CGPoint(x: cx, y: cy))
+                    p.addLine(to: CGPoint(x: cx + CGFloat(cos(a0)) * r, y: cy + CGFloat(sin(a0)) * r))
+                    p.addLine(to: CGPoint(x: cx + CGFloat(cos(a1)) * r, y: cy + CGFloat(sin(a1)) * r))
+                    p.closeSubpath()
+                    let shimmer = 0.3 + 0.5 * (0.5 + 0.5 * sin(t * 2 + Double(i) * 1.3))
+                    g.fill(p, with: .color(Color(red:0.5,green:0.85,blue:1.0).opacity(0.16 + 0.24 * shimmer)))
+                    g.stroke(p, with: .color(Color.white.opacity(0.25)), lineWidth: 0.6)
+                }
+                let cr = r * 0.20
+                g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.9), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Flame — a ring of dancing flames around a dark mouth.
+    private var flameGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.18,green:0.04,blue:0.0), Color(red:0.03,green:0.0,blue:0.0)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                var g = ctx; g.blendMode = .plusLighter
+                let n = 14
+                for i in 0..<n {
+                    let a = Double(i) / Double(n) * 2 * .pi
+                    let flick = 0.6 + 0.4 * sin(t * 7 + Double(i) * 1.9)
+                    let baseR = r * 0.55
+                    let tipR  = r * (0.78 + 0.30 * flick)
+                    let perp = a + .pi/2
+                    let w = r * 0.11
+                    let bx = cx + CGFloat(cos(a)) * baseR, by = cy + CGFloat(sin(a)) * baseR
+                    let tx = cx + CGFloat(cos(a)) * tipR,  ty = cy + CGFloat(sin(a)) * tipR
+                    var fl = Path()
+                    fl.move(to: CGPoint(x: bx + CGFloat(cos(perp))*w, y: by + CGFloat(sin(perp))*w))
+                    fl.addQuadCurve(to: CGPoint(x: tx, y: ty), control: CGPoint(x: bx + CGFloat(cos(perp))*w*0.4, y: by + CGFloat(sin(perp))*w*0.4))
+                    fl.addQuadCurve(to: CGPoint(x: bx - CGFloat(cos(perp))*w, y: by - CGFloat(sin(perp))*w), control: CGPoint(x: bx - CGFloat(cos(perp))*w*0.4, y: by - CGFloat(sin(perp))*w*0.4))
+                    fl.closeSubpath()
+                    g.fill(fl, with: .color(Color(red:1.0,green:0.55,blue:0.12).opacity(0.5 * flick)))
+                }
+                let cr = r * 0.42
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .color(Color(red:0.05,green:0.0,blue:0.0)))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Blossom — a soft cherry-blossom flower with drifting petals.
+    private var blossomGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.20,green:0.06,blue:0.12), Color(red:0.06,green:0.02,blue:0.05)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                let petalColor = Color(red:1.0,green:0.62,blue:0.78)
+                let petals = 5
+                for i in 0..<petals {
+                    let a = Double(i) / Double(petals) * 2 * .pi - t * 0.3
+                    let pr = r * 0.5
+                    let pc = CGPoint(x: cx + CGFloat(cos(a)) * pr * 0.6, y: cy + CGFloat(sin(a)) * pr * 0.6)
+                    let ca = CGFloat(cos(a)), sa = CGFloat(sin(a))
+                    let s = pr * 0.55
+                    func rp(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: pc.x + x*ca - y*sa, y: pc.y + x*sa + y*ca) }
+                    var petal = Path()
+                    petal.move(to: rp(-s, 0))
+                    petal.addQuadCurve(to: rp(s, 0), control: rp(0, -s*0.9))
+                    petal.addQuadCurve(to: rp(-s, 0), control: rp(0, s*0.9))
+                    petal.closeSubpath()
+                    ctx.fill(petal, with: .color(petalColor.opacity(0.85)))
+                }
+                let cr = r * 0.20
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:1.0,green:0.92,blue:0.5), Color(red:1.0,green:0.7,blue:0.4).opacity(0.4), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Mosaic — a ring of small multi-coloured tiles around a dark centre.
+    private var mosaicGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .color(Color(red:0.06,green:0.06,blue:0.08)))
+                let rings = 3
+                for ring in 1...rings {
+                    let rad = r * (0.35 + 0.55 * CGFloat(ring) / CGFloat(rings))
+                    let count = 8 + ring * 4
+                    for i in 0..<count {
+                        let a = Double(i) / Double(count) * 2 * .pi + Double(ring) * 0.4
+                        let px = cx + CGFloat(cos(a)) * rad, py = cy + CGFloat(sin(a)) * rad
+                        let hue = (Double(i) / Double(count) + Double(ring) * 0.2).truncatingRemainder(dividingBy: 1.0)
+                        let tw = 0.6 + 0.4 * sin(t * 2 + Double(i) + Double(ring))
+                        let s = r * 0.09
+                        ctx.fill(Path(roundedRect: CGRect(x: px-s, y: py-s, width: s*2, height: s*2), cornerRadius: s*0.3),
+                            with: .color(Color(hue: hue, saturation: 0.7, brightness: 0.95).opacity(0.55 + 0.4 * tw)))
+                    }
+                }
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Ripple — concentric water rings expanding outward over a calm pool.
+    private var rippleGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.08,green:0.30,blue:0.46), Color(red:0.02,green:0.10,blue:0.20)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                let waves = 4
+                for i in 0..<waves {
+                    let phase = (t * 0.5 + Double(i) / Double(waves)).truncatingRemainder(dividingBy: 1.0)
+                    let rr = r * CGFloat(phase)
+                    let op = (1 - phase) * 0.7
+                    ctx.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
+                        with: .color(Color(red:0.7,green:0.92,blue:1.0).opacity(op)),
+                        lineWidth: max(1, r * 0.05))
+                }
+                let cr = r * 0.10
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .color(Color(red:0.8,green:0.95,blue:1.0).opacity(0.8)))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Comet — white-blue streaks whirling around a glowing core.
+    private var cometGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .color(Color(red:0.01,green:0.02,blue:0.05)))
+                var g = ctx; g.blendMode = .plusLighter
+                let streaks = 5
+                for i in 0..<streaks {
+                    let a = Double(i) / Double(streaks) * 2 * .pi + t * 1.1
+                    let rad = r * 0.78
+                    let hx = cx + CGFloat(cos(a)) * rad, hy = cy + CGFloat(sin(a)) * rad
+                    var trail = Path()
+                    trail.move(to: CGPoint(x: hx, y: hy))
+                    for k in 1...10 {
+                        let kk = Double(k)
+                        let aa = a - kk * 0.10
+                        let rr = rad * CGFloat(1 - kk * 0.06)
+                        trail.addLine(to: CGPoint(x: cx + CGFloat(cos(aa)) * rr, y: cy + CGFloat(sin(aa)) * rr))
+                    }
+                    g.stroke(trail, with: .color(Color(red:0.75,green:0.9,blue:1.0).opacity(0.6)),
+                             style: StrokeStyle(lineWidth: r * 0.06, lineCap: .round))
+                    g.fill(Path(ellipseIn: CGRect(x: hx-r*0.06, y: hy-r*0.06, width: r*0.12, height: r*0.12)),
+                           with: .color(Color.white.opacity(0.95)))
+                }
+                let cr = r * 0.22
+                g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.85,green:0.95,blue:1.0).opacity(0.9), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Neon — concentric glowing neon tubes flickering in magenta + cyan.
+    private var neonGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(.black))
+                var g = ctx; g.blendMode = .plusLighter
+                for i in 0..<4 {
+                    let rr = r * CGFloat(0.30 + 0.20 * Double(i))
+                    let flick = 0.7 + 0.3 * sin(t * 8 + Double(i) * 2)
+                    let col = i % 2 == 0 ? Color(red:1.0,green:0.15,blue:0.7) : Color(red:0.2,green:0.9,blue:1.0)
+                    g.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
+                             with: .color(col.opacity(0.25 * flick)), lineWidth: r * 0.16)
+                    g.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
+                             with: .color(col.opacity(0.9 * flick)), lineWidth: r * 0.04)
+                }
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Eclipse — a black disc ringed by a slowly-pulsing golden corona.
+    private var eclipseGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                let pulse = 1.0 + 0.06 * sin(t * 1.6)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(Color(red:0.02,green:0.02,blue:0.05)))
+                var g = ctx; g.blendMode = .plusLighter
+                let glowR = r * CGFloat(pulse)
+                g.fill(Path(ellipseIn: CGRect(x: cx-glowR, y: cy-glowR, width: glowR*2, height: glowR*2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red:1.0,green:0.82,blue:0.38).opacity(0.0), location: 0.50),
+                        .init(color: Color(red:1.0,green:0.82,blue:0.38).opacity(0.5), location: 0.66),
+                        .init(color: Color(red:1.0,green:0.6,blue:0.15).opacity(0.0), location: 0.95)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glowR))
+                let ringR = r * 0.60
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx-ringR, y: cy-ringR, width: ringR*2, height: ringR*2)),
+                           with: .color(Color(red:1.0,green:0.86,blue:0.42).opacity(0.95)), lineWidth: r * 0.06)
+                let cr = r * 0.55
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)), with: .color(Color(red:0.01,green:0.01,blue:0.03)))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Plasma — jagged electric arcs writhing out of a white-hot core.
+    private var plasmaGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.18,green:0.04,blue:0.28), Color(red:0.04,green:0.0,blue:0.08)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                var g = ctx; g.blendMode = .plusLighter
+                let arcs = 6
+                for i in 0..<arcs {
+                    let a = Double(i) / Double(arcs) * 2 * .pi + t * 0.8
+                    var p = Path()
+                    p.move(to: CGPoint(x: cx, y: cy))
+                    for k in 1...6 {
+                        let f = Double(k) / 6.0
+                        let aa = a + sin(t * 9 + Double(i) * 3 + Double(k) * 2.0) * 0.25
+                        let rr = r * 0.9 * CGFloat(f)
+                        p.addLine(to: CGPoint(x: cx + CGFloat(cos(aa)) * rr, y: cy + CGFloat(sin(aa)) * rr))
+                    }
+                    g.stroke(p, with: .color(Color(red:0.8,green:0.5,blue:1.0).opacity(0.7)),
+                             style: StrokeStyle(lineWidth: r * 0.03, lineCap: .round, lineJoin: .round))
+                }
+                let cr = r * 0.20
+                g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.9), Color(red:0.7,green:0.4,blue:1).opacity(0.3), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Mirage — shimmering wavy heat-haze bands over warm desert gold.
+    private var mirageGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:1.0,green:0.85,blue:0.45), Color(red:0.6,green:0.35,blue:0.08)]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                var g = ctx; g.blendMode = .plusLighter
+                let bands = 7
+                for i in 0..<bands {
+                    let yy = cy - r + r * 2 * CGFloat(i) / CGFloat(bands - 1)
+                    var p = Path()
+                    p.move(to: CGPoint(x: cx - r, y: yy))
+                    for k in 0...12 {
+                        let fx = Double(k) / 12.0
+                        let x = cx - r + r * 2 * CGFloat(fx)
+                        let wob = sin(fx * 6 + t * 2 + Double(i)) * Double(r) * 0.04
+                        p.addLine(to: CGPoint(x: x, y: yy + CGFloat(wob)))
+                    }
+                    g.stroke(p, with: .color(Color(red:1.0,green:0.95,blue:0.7).opacity(0.22)), lineWidth: r * 0.03)
+                }
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Prism — a glass triangle fanning a white beam into a spectrum.
+    private var prismGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(Color(red:0.06,green:0.06,blue:0.09)))
+                var g = ctx; g.blendMode = .plusLighter
+                let beams = 7
+                for i in 0..<beams {
+                    let hue = Double(i) / Double(beams)
+                    let spread = (Double(i) - Double(beams - 1) / 2) * 0.12
+                    let a = Double.pi / 2 + spread + sin(t * 0.6) * 0.05
+                    let bx = cx + CGFloat(cos(a)) * r, by = cy + CGFloat(sin(a)) * r
+                    var p = Path(); p.move(to: CGPoint(x: cx, y: cy)); p.addLine(to: CGPoint(x: bx, y: by))
+                    g.stroke(p, with: .color(Color(hue: hue, saturation: 0.9, brightness: 1).opacity(0.5)), lineWidth: r * 0.08)
+                }
+                var tri = Path()
+                tri.move(to: CGPoint(x: cx, y: cy - r * 0.45))
+                tri.addLine(to: CGPoint(x: cx - r * 0.4, y: cy + r * 0.25))
+                tri.addLine(to: CGPoint(x: cx + r * 0.4, y: cy + r * 0.25))
+                tri.closeSubpath()
+                ctx.fill(tri, with: .color(Color.white.opacity(0.18)))
+                ctx.stroke(tri, with: .color(Color.white.opacity(0.8)), lineWidth: 1.2)
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Obsidian — dark volcanic glass with faint facets and a gliding sheen.
+    private var obsidianGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
+                    with: .radialGradient(Gradient(colors: [Color(red:0.06,green:0.08,blue:0.18), Color(red:0.0,green:0.0,blue:0.02)]),
+                        center: CGPoint(x: cx - r*0.3, y: cy - r*0.3), startRadius: 0, endRadius: r))
+                for i in 0..<6 {
+                    let a = Double(i) / 6.0 * .pi
+                    var p = Path()
+                    p.move(to: CGPoint(x: cx - CGFloat(cos(a)) * r, y: cy - CGFloat(sin(a)) * r))
+                    p.addLine(to: CGPoint(x: cx + CGFloat(cos(a)) * r, y: cy + CGFloat(sin(a)) * r))
+                    ctx.stroke(p, with: .color(Color(red:0.3,green:0.4,blue:0.7).opacity(0.18)), lineWidth: 0.8)
+                }
+                var g = ctx; g.blendMode = .plusLighter
+                let off = CGFloat(sin(t * 0.8)) * r * 0.5
+                var sheen = Path()
+                sheen.move(to: CGPoint(x: cx - r*0.5 + off, y: cy - r))
+                sheen.addLine(to: CGPoint(x: cx - r*0.2 + off, y: cy - r))
+                sheen.addLine(to: CGPoint(x: cx + r*0.3 + off, y: cy + r))
+                sheen.addLine(to: CGPoint(x: cx + off, y: cy + r))
+                sheen.closeSubpath()
+                g.fill(sheen, with: .color(Color(red:0.5,green:0.65,blue:1.0).opacity(0.18)))
+            }
+        }
+        .clipShape(Circle())
+    }
+
+    /// Quasar — a white-hot core firing two counter-rotating energy jets.
+    private var quasarGoal: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2, cy = size.height / 2
+                let r  = min(size.width, size.height) / 2 * 0.95
+                ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(Color(red:0.02,green:0.0,blue:0.05)))
+                var g = ctx; g.blendMode = .plusLighter
+                let ang = t * 0.5
+                for dir in [CGFloat(1), -1] {
+                    let ax = cx + CGFloat(cos(ang)) * r * dir
+                    let ay = cy + CGFloat(sin(ang)) * r * dir
+                    var jet = Path(); jet.move(to: CGPoint(x: cx, y: cy)); jet.addLine(to: CGPoint(x: ax, y: ay))
+                    g.stroke(jet, with: .linearGradient(Gradient(colors: [Color(red:1.0,green:0.2,blue:0.9), Color(red:0.2,green:0.95,blue:1.0).opacity(0.0)]),
+                        startPoint: CGPoint(x: cx, y: cy), endPoint: CGPoint(x: ax, y: ay)), style: StrokeStyle(lineWidth: r * 0.12, lineCap: .round))
+                }
+                let rr = r * 0.45
+                g.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
+                         with: .color(Color(red:0.2,green:0.9,blue:1.0).opacity(0.5)), lineWidth: r * 0.05)
+                let cr = r * 0.22
+                g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
+                    with: .radialGradient(Gradient(colors: [Color.white, Color(red:1.0,green:0.4,blue:0.9).opacity(0.4), .clear]),
+                        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+            }
+        }
+        .clipShape(Circle())
     }
 
     private var rainbowHole: some View {
