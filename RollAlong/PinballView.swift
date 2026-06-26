@@ -39,18 +39,29 @@ struct CleanTable: Codable {
 """#
 }
 
+// MARK: - HUD model
+
+final class PinballModel: ObservableObject {
+    @Published var score = 0
+    @Published var ballsLeft = 3
+    @Published var isOver = false
+}
+
 // MARK: - SwiftUI host
 
 struct PinballView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav: Navigator
+    @StateObject private var model = PinballModel()
     @State private var scene = PinballScene(size: CGSize(width: 393, height: 760))
+    @State private var didSubmit = false
 
     var body: some View {
         ZStack {
             Color(white: 0.04).ignoresSafeArea()
             SpriteView(scene: scene, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
+
             VStack {
                 HStack {
                     Button { nav.goHome() } label: {
@@ -59,20 +70,64 @@ struct PinballView: View {
                             .frame(width: 34, height: 34).background(Circle().fill(.black.opacity(0.45)))
                     }
                     Spacer()
-                    Text("Tap left / right half to flip")
-                        .font(.system(.caption, design: .rounded).weight(.semibold))
-                        .foregroundStyle(Color(white: 0.55))
+                    VStack(spacing: 0) {
+                        Text("\(model.score)")
+                            .font(.system(.title2, design: .rounded).weight(.heavy)).monospacedDigit().foregroundStyle(.white)
+                        Text("SCORE").font(.system(size: 10, weight: .bold)).tracking(2).foregroundStyle(Color(white: 0.6))
+                    }
                     Spacer()
-                    Color.clear.frame(width: 34, height: 34)
+                    HStack(spacing: 5) {
+                        ForEach(0..<3, id: \.self) { i in
+                            Circle().fill(i < model.ballsLeft ? Color.white : Color(white: 0.3)).frame(width: 9, height: 9)
+                        }
+                    }.frame(width: 34)
                 }
                 .padding(.horizontal, 16).padding(.top, 8)
                 Spacer()
             }
+
+            if model.isOver { gameOverOverlay }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { scene.scaleMode = .resizeFill }
+        .onAppear { scene.scaleMode = .resizeFill; scene.model = model }
+        .onChange(of: model.isOver) { _, over in if over { submitScore() } }
     }
+
+    private var gameOverOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.7).ignoresSafeArea()
+            VStack(spacing: 18) {
+                Text("Game Over").font(.system(.largeTitle, design: .rounded).weight(.heavy)).foregroundStyle(.white)
+                VStack(spacing: 2) {
+                    Text("\(model.score)").font(.system(size: 52, design: .rounded).weight(.black)).monospacedDigit()
+                        .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
+                    Text("FINAL SCORE").font(.system(size: 11, weight: .bold)).tracking(2).foregroundStyle(Color(white: 0.6))
+                }
+                HStack(spacing: 14) {
+                    Button { playAgain() } label: {
+                        Text("Play again").font(.system(.body, design: .rounded).weight(.bold)).foregroundStyle(.black)
+                            .padding(.horizontal, 22).padding(.vertical, 12).background(Capsule().fill(.white))
+                    }
+                    Button { nav.goHome() } label: {
+                        Text("Home").font(.system(.body, design: .rounded).weight(.bold)).foregroundStyle(.white)
+                            .padding(.horizontal, 22).padding(.vertical, 12).background(Capsule().fill(Color(white: 0.22)))
+                    }
+                }
+            }
+        }
+    }
+
+    private func submitScore() {
+        guard !didSubmit else { return }
+        didSubmit = true
+        let s = model.score
+        if s / 250 > 0 { gameState.addCoins(s / 250) }
+        gameState.recordPinballScore(s)
+        if gameState.hapticsEnabled { Haptics.success() }
+    }
+
+    private func playAgain() { didSubmit = false; scene.resetGame() }
 }
 
 // MARK: - Chipmunk-driven scene
@@ -90,6 +145,17 @@ final class PinballScene: SKScene {
     private var ballNode: SKShapeNode?
     private struct Flipper { let body: OpaquePointer; let motor: OpaquePointer; let node: SKShapeNode; let flipRate: Double; let holdRate: Double; let side: String }
     private var flippers: [Flipper] = []
+    private final class Scorer {
+        let center: CGPoint; let hitR: CGFloat; let node: SKShapeNode; let points: Int; var cd = 0
+        init(_ center: CGPoint, _ hitR: CGFloat, _ node: SKShapeNode, _ points: Int) {
+            self.center = center; self.hitR = hitR; self.node = node; self.points = points
+        }
+    }
+    private var scorers: [Scorer] = []
+    weak var model: PinballModel?
+    private var score = 0
+    private var ballsLeft = 3
+    private var isOver = false
     private var field = CGRect.zero
     private var built = false
 
@@ -113,13 +179,35 @@ final class PinballScene: SKScene {
             computeField()
             buildSpace()
         }
-        guard built, let space = space, let ballBody = ballBody else { return }
+        guard built, !isOver, let space = space, let ballBody = ballBody else { return }
         for _ in 0..<2 { cpSpaceStep(space, 1.0 / 120.0) }
         let p = cpBodyGetPosition(ballBody)
-        ballNode?.position = CGPoint(x: CGFloat(p.x), y: CGFloat(p.y))
+        let bx = CGFloat(p.x), by = CGFloat(p.y)
+        ballNode?.position = CGPoint(x: bx, y: by)
         for f in flippers { f.node.zRotation = CGFloat(cpBodyGetAngle(f.body)) }
-        // respawn when it falls past the bottom of the field
-        if CGFloat(p.y) < field.minY - ballRadius * 2 { resetBall() }
+
+        // proximity scoring (physics already handles the bounce)
+        for s in scorers {
+            if s.cd > 0 { s.cd -= 1; continue }
+            let dx = bx - s.center.x, dy = by - s.center.y
+            if dx * dx + dy * dy < s.hitR * s.hitR {
+                score += s.points; model?.score = score
+                s.cd = 20
+                s.node.run(.sequence([.scale(to: 1.15, duration: 0.05), .scale(to: 1.0, duration: 0.08)]))
+            }
+        }
+
+        // drain → lose a ball
+        if by < field.minY - ballRadius * 2 {
+            ballsLeft -= 1
+            model?.ballsLeft = max(0, ballsLeft)
+            if ballsLeft <= 0 {
+                isOver = true; model?.isOver = true
+                ballNode?.isHidden = true
+            } else {
+                resetBall()
+            }
+        }
     }
 
     private func computeField() {
@@ -153,6 +241,8 @@ final class PinballScene: SKScene {
             addChild(node)
         }
 
+        buildBumpers()
+        buildSlings()
         spawnBall()
         buildFlippers()
     }
@@ -180,7 +270,7 @@ final class PinballScene: SKScene {
         guard let ballBody = ballBody else { return }
         let s = CleanTable.shared.ballStart
         cpBodySetPosition(ballBody, v(pt(s.x, s.y)))
-        cpBodySetVelocity(ballBody, cpVect(x: 150, y: 0))   // gentle drift into play
+        cpBodySetVelocity(ballBody, cpVect(x: 0, y: 0))   // drop straight down — gravity only
     }
 
     private func buildFlippers() {
@@ -211,6 +301,52 @@ final class PinballScene: SKScene {
             addChild(node)
             flippers.append(Flipper(body: body, motor: motor, node: node, flipRate: flipRate, holdRate: holdRate, side: f.side))
         }
+    }
+
+    private func buildBumpers() {
+        guard let space = space else { return }
+        let sb = cpSpaceGetStaticBody(space)
+        for b in CleanTable.shared.bumpers {
+            let c = pt(b.x, b.y), r = CGFloat(b.r) * fw
+            let shape = cpCircleShapeNew(sb, Double(r), v(c))
+            cpShapeSetElasticity(shape, 1.05); cpShapeSetFriction(shape, 0.2)
+            cpSpaceAddShape(space, shape)
+            let node = SKShapeNode(circleOfRadius: r)
+            node.fillColor = SKColor(red: 0.95, green: 0.55, blue: 0.15, alpha: 1); node.strokeColor = .white; node.lineWidth = 2
+            node.position = c; node.zPosition = 3
+            let cap = SKShapeNode(circleOfRadius: r * 0.42); cap.fillColor = SKColor(white: 0.1, alpha: 1); cap.strokeColor = .clear
+            node.addChild(cap)
+            addChild(node)
+            scorers.append(Scorer(c, r + ballRadius + 4, node, 100))
+        }
+    }
+
+    private func buildSlings() {
+        guard let space = space else { return }
+        let sb = cpSpaceGetStaticBody(space)
+        for tri in CleanTable.shared.slings where tri.count == 3 {
+            let pts = tri.map { pt($0[0], $0[1]) }
+            for i in 0..<3 {
+                let a = pts[i], b = pts[(i + 1) % 3]
+                let seg = cpSegmentShapeNew(sb, v(a), v(b), 2.0)
+                cpShapeSetElasticity(seg, 0.85); cpShapeSetFriction(seg, 0.2)
+                cpSpaceAddShape(space, seg)
+            }
+            let path = CGMutablePath(); path.addLines(between: pts); path.closeSubpath()
+            let node = SKShapeNode(path: path)
+            node.fillColor = SKColor(red: 0.90, green: 0.28, blue: 0.34, alpha: 1); node.strokeColor = .white; node.lineWidth = 1; node.zPosition = 3
+            addChild(node)
+            let cx = (pts[0].x + pts[1].x + pts[2].x) / 3, cy = (pts[0].y + pts[1].y + pts[2].y) / 3
+            scorers.append(Scorer(CGPoint(x: cx, y: cy), ballRadius + fw * 0.05, node, 10))
+        }
+    }
+
+    func resetGame() {
+        score = 0; ballsLeft = 3; isOver = false
+        model?.score = 0; model?.ballsLeft = 3; model?.isOver = false
+        for s in scorers { s.cd = 0 }
+        ballNode?.isHidden = false
+        resetBall()
     }
 
     private func flip(left: Bool, up: Bool) {
