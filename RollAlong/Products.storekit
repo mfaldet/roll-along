@@ -288,6 +288,51 @@
       "productID" : "com.macfaldet.RollAlong.bundle.harvest2026",
       "referenceName" : "Harvest Moon Bundle $2.99",
       "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000020",
+      "localizations" : [
+        {
+          "description" : "The full Year of the Dragon seasonal collection — Golden Dragon ball, Flame goal, Gilded trail, Velvet floor, Velvet pit, and Cinematic music. Available Jan 29–Feb 19, 2027 only.",
+          "displayName" : "Year of the Dragon Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.lunar2027",
+      "referenceName" : "Year of the Dragon Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000021",
+      "localizations" : [
+        {
+          "description" : "The full Mardi Gras seasonal collection — Mardi Gras ball, Plasma goal, Bubblegum trail, Disco floor, Midnight pit, and Jazz music. Available Feb 5–17, 2027 only.",
+          "displayName" : "Mardi Gras Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.mardigras2027",
+      "referenceName" : "Mardi Gras Bundle $2.99",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "11000022",
+      "localizations" : [
+        {
+          "description" : "The full Spectrum seasonal collection — Spectrum ball, Rainbow goal, Rainbow trail, Aurora floor, Aurora pit, and Electronic music. Available Jun 1–30, 2027 only.",
+          "displayName" : "Spectrum Bundle",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.macfaldet.RollAlong.bundle.pride2027",
+      "referenceName" : "Spectrum Bundle $2.99",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {

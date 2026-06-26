@@ -132,6 +132,9 @@ extension BallSkin: CosmeticItem {
              .fireworks,       // Star-Spangled seasonal — coin/bundle purchasable (animated)
              .sugarSkull,      // Día de los Muertos seasonal — coin/bundle purchasable
              .harvest,         // Harvest Moon seasonal — coin/bundle purchasable
+             .lunarDragon,     // Year of the Dragon seasonal — coin/bundle purchasable
+             .mardiGras,       // Mardi Gras seasonal — coin/bundle purchasable
+             .spectrum,        // Spectrum seasonal — coin/bundle purchasable
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -1816,6 +1819,48 @@ struct CosmeticBundle: Identifiable {
             music:  [.lofi],
             availableFrom:  CosmeticBundle.date(2026, 11, 1),
             availableUntil: CosmeticBundle.date(2026, 11, 30)
+        ),
+        CosmeticBundle(
+            id:             "lunar-2027",
+            displayName:    "Year of the Dragon",
+            tagline:        "Fortune favors the fast.",
+            contentSummary: "Golden Dragon ball · Flame goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music",
+            balls:  [.lunarDragon],
+            goals:  [.flame],
+            trails: [.gilded],
+            floors: [.velvet],
+            pits:   [.velvet],
+            music:  [.cinematic],
+            availableFrom:  CosmeticBundle.date(2027, 1, 29),
+            availableUntil: CosmeticBundle.date(2027, 2, 19)
+        ),
+        CosmeticBundle(
+            id:             "mardigras-2027",
+            displayName:    "Mardi Gras",
+            tagline:        "Purple, green, and gold — let the good times roll.",
+            contentSummary: "Mardi Gras ball · Plasma goal · Bubblegum trail · Disco floor · Midnight pit · Jazz music",
+            balls:  [.mardiGras],
+            goals:  [.plasma],
+            trails: [.bubblegum],
+            floors: [.disco],
+            pits:   [.midnight],
+            music:  [.jazz],
+            availableFrom:  CosmeticBundle.date(2027, 2, 5),
+            availableUntil: CosmeticBundle.date(2027, 2, 17)
+        ),
+        CosmeticBundle(
+            id:             "pride-2027",
+            displayName:    "Spectrum",
+            tagline:        "Roll proud, roll loud.",
+            contentSummary: "Spectrum ball · Rainbow goal · Rainbow trail · Aurora floor · Aurora pit · Electronic music",
+            balls:  [.spectrum],
+            goals:  [.rainbow],
+            trails: [.rainbow],
+            floors: [.aurora],
+            pits:   [.aurora],
+            music:  [.electronic],
+            availableFrom:  CosmeticBundle.date(2027, 6, 1),
+            availableUntil: CosmeticBundle.date(2027, 6, 30)
         ),
 
         // ── Sports bundles ──────────────────────────────────────────────

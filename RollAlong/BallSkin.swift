@@ -233,6 +233,18 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //   • harvest — warm amber-to-maple gradient sphere with a subtle autumn-
     //     leaf motif; cozy fall tones.  Static.  Harvest Moon bundle (Legendary).
     case harvest     = "Harvest Moon"
+    //   • lunarDragon — deep-red lacquer sphere with gold dragon-scale texture
+    //     and filigree; a regal sheen with a subtle Reduce-Motion-safe shimmer.
+    //     Year of the Dragon bundle (Legendary).
+    case lunarDragon = "Golden Dragon"
+    //   • mardiGras — festive harlequin-diamond pattern in royal purple,
+    //     emerald green, and gold with a jeweled bead-like sheen.  Static.
+    //     Mardi Gras bundle (Legendary).
+    case mardiGras   = "Mardi Gras"
+    //   • spectrum — bold glossy six-colour rainbow sphere (red/orange/yellow/
+    //     green/blue/violet bands) with a bright specular highlight.  Static.
+    //     Spectrum bundle (Legendary).
+    case spectrum    = "Spectrum"
 
     var id: String { rawValue }
 
@@ -913,6 +925,42 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.94, green: 0.66, blue: 0.28),
                 Color(red: 0.74, green: 0.40, blue: 0.14),
                 Color(red: 0.38, green: 0.18, blue: 0.06),
+            ]
+
+        case .lunarDragon:
+            // Deep-red lacquer sphere — bright gilt highlight → vivid lacquer
+            // red → deep oxblood → near-black shadow.  The gold dragon-scale
+            // texture, filigree, and shimmer paint on top via the bespoke
+            // lunarDragonCanvas in BallSkinView.
+            return [
+                Color(red: 0.98, green: 0.82, blue: 0.42),
+                Color(red: 0.78, green: 0.12, blue: 0.10),
+                Color(red: 0.46, green: 0.05, blue: 0.06),
+                Color(red: 0.16, green: 0.02, blue: 0.03),
+            ]
+
+        case .mardiGras:
+            // Festive base — bright gold highlight → royal purple → emerald
+            // green → deep aubergine shadow.  The harlequin-diamond pattern in
+            // purple / green / gold and jeweled sheen paint on top via the
+            // bespoke mardiGrasCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.86, blue: 0.30),
+                Color(red: 0.42, green: 0.12, blue: 0.62),
+                Color(red: 0.06, green: 0.52, blue: 0.24),
+                Color(red: 0.14, green: 0.04, blue: 0.22),
+            ]
+
+        case .spectrum:
+            // Bold rainbow base — bright specular white → warm red → cool blue
+            // → deep violet shadow.  The six vivid red/orange/yellow/green/blue/
+            // violet bands and bright highlight paint on top via the bespoke
+            // spectrumCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.98, blue: 0.98),
+                Color(red: 0.94, green: 0.22, blue: 0.20),
+                Color(red: 0.16, green: 0.40, blue: 0.92),
+                Color(red: 0.30, green: 0.08, blue: 0.46),
             ]
         }
     }

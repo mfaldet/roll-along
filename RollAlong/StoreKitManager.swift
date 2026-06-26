@@ -56,6 +56,9 @@ final class StoreKitManager: ObservableObject {
         case july4Bundle2026       = "com.macfaldet.RollAlong.bundle.july4_2026"
         case muertosBundle2026     = "com.macfaldet.RollAlong.bundle.muertos2026"
         case harvestBundle2026     = "com.macfaldet.RollAlong.bundle.harvest2026"
+        case lunarBundle2027       = "com.macfaldet.RollAlong.bundle.lunar2027"
+        case mardiGrasBundle2027   = "com.macfaldet.RollAlong.bundle.mardigras2027"
+        case prideBundle2027       = "com.macfaldet.RollAlong.bundle.pride2027"
 
         var id: String { rawValue }
 
@@ -76,7 +79,8 @@ final class StoreKitManager: ObservableObject {
             case .summerBundle2026, .halloweenBundle2026, .winterBundle2026,
                  .valentinesBundle2027, .stPatricksBundle2027,
                  .newYearBundle2027, .springBundle2027,
-                 .july4Bundle2026, .muertosBundle2026, .harvestBundle2026:
+                 .july4Bundle2026, .muertosBundle2026, .harvestBundle2026,
+                 .lunarBundle2027, .mardiGrasBundle2027, .prideBundle2027:
                                                           return .bundlePurchase
             }
         }
@@ -99,6 +103,9 @@ final class StoreKitManager: ObservableObject {
             case .july4Bundle2026:      return "july4-2026"
             case .muertosBundle2026:    return "muertos-2026"
             case .harvestBundle2026:    return "harvest-2026"
+            case .lunarBundle2027:      return "lunar-2027"
+            case .mardiGrasBundle2027:  return "mardigras-2027"
+            case .prideBundle2027:      return "pride-2027"
             case .livesPack1, .livesPack5, .livesPack10,
                  .unlimited,
                  .coins100, .coins600, .coins1300, .coins3000,
@@ -219,6 +226,9 @@ final class StoreKitManager: ObservableObject {
         var july4Seen          = false
         var muertosSeen        = false
         var harvestSeen        = false
+        var lunarSeen          = false
+        var mardiGrasSeen      = false
+        var prideSeen          = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let txn) = result else {
                 // .unverified: Apple's JWS signature check failed.  Skip —
@@ -247,6 +257,9 @@ final class StoreKitManager: ObservableObject {
             case ProductID.july4Bundle2026.rawValue:         july4Seen       = true
             case ProductID.muertosBundle2026.rawValue:       muertosSeen     = true
             case ProductID.harvestBundle2026.rawValue:       harvestSeen     = true
+            case ProductID.lunarBundle2027.rawValue:         lunarSeen       = true
+            case ProductID.mardiGrasBundle2027.rawValue:     mardiGrasSeen   = true
+            case ProductID.prideBundle2027.rawValue:         prideSeen       = true
             default: break
             }
         }
@@ -267,6 +280,9 @@ final class StoreKitManager: ObservableObject {
         if july4Seen        { await deliverReward(for: .july4Bundle2026)        }
         if muertosSeen      { await deliverReward(for: .muertosBundle2026)      }
         if harvestSeen      { await deliverReward(for: .harvestBundle2026)      }
+        if lunarSeen        { await deliverReward(for: .lunarBundle2027)        }
+        if mardiGrasSeen    { await deliverReward(for: .mardiGrasBundle2027)    }
+        if prideSeen        { await deliverReward(for: .prideBundle2027)        }
     }
 
     // MARK: - Purchase

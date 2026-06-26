@@ -269,6 +269,21 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color(red: 0.50, green: 0.26, blue: 0.08).opacity(0.55), lineWidth: 0.5))
 
+        case .lunarDragon:
+            lunarDragonCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.86, green: 0.66, blue: 0.26).opacity(0.55), lineWidth: 0.6))
+
+        case .mardiGras:
+            mardiGrasCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.86, green: 0.70, blue: 0.22).opacity(0.50), lineWidth: 0.5))
+
+        case .spectrum:
+            spectrumCanvas
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.white.opacity(0.20), lineWidth: 0.5))
+
         // No `default`: every BallSkin has an explicit renderer above, so the
         // switch is exhaustive.  Adding a new skin will (intentionally) fail to
         // compile here until it's given a case — same as the colors/tier switches.
@@ -3857,6 +3872,264 @@ struct BallSkinView: View {
                     ]),
                     center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.64),
                     startRadius: 0, endRadius: r * 0.34))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Golden Dragon  (Year of the Dragon seasonal · Legendary)
+    // A deep-red lacquer sphere with a gold dragon-scale field, gilt filigree
+    // arcs, and a regal sheen.  A MeshGradient supplies the lustrous lacquer
+    // base; a Canvas paints the overlapping gold scales, filigree, and a roving
+    // gilt specular.  A single slow shimmer band drifts across the lit face —
+    // under Reduce Motion it holds steady (no animation).  Clipped to a circle
+    // by the body switch caller.
+    // =========================================================================
+    private var lunarDragonCanvas: some View {
+        TimelineView(.animation) { tl in
+            let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+            // Slow shimmer phase — 0…1, used to drift one bright band.
+            let shimmer = reduceMotion ? 0.30 : (sin(t * 0.7) * 0.5 + 0.5)
+
+            ZStack {
+                // ── 1. Lacquer-red lustre base (MeshGradient) ────────────────
+                MeshGradient(
+                    width: 3, height: 3,
+                    points: [
+                        [0.0, 0.0], [0.5, 0.0], [1.0, 0.0],
+                        [0.0, 0.5], [0.5, 0.5], [1.0, 0.5],
+                        [0.0, 1.0], [0.5, 1.0], [1.0, 1.0],
+                    ],
+                    colors: [
+                        Color(red: 0.94, green: 0.30, blue: 0.20), Color(red: 0.80, green: 0.14, blue: 0.12), Color(red: 0.52, green: 0.06, blue: 0.08),
+                        Color(red: 0.86, green: 0.18, blue: 0.14), Color(red: 0.66, green: 0.09, blue: 0.09), Color(red: 0.34, green: 0.03, blue: 0.05),
+                        Color(red: 0.50, green: 0.05, blue: 0.07), Color(red: 0.30, green: 0.02, blue: 0.04), Color(red: 0.14, green: 0.01, blue: 0.02),
+                    ]
+                )
+
+                // ── 2. Gold dragon-scale field + filigree + sheen ────────────
+                Canvas { ctx, size in
+                    let w  = size.width
+                    let h  = size.height
+                    let cx = w / 2
+                    let cy = h / 2
+                    let r  = min(w, h) / 2
+
+                    let gold     = Color(red: 0.92, green: 0.74, blue: 0.30)
+                    let goldDark = Color(red: 0.62, green: 0.44, blue: 0.12)
+                    let goldHi   = Color(red: 1.00, green: 0.92, blue: 0.58)
+
+                    // ── Overlapping dragon scales — rows of gilt-edged arcs ──
+                    let scale = r * 0.22
+                    var row = 0
+                    var y = cy - r * 0.92
+                    while y < cy + r * 0.95 {
+                        // Offset alternate rows for a tessellated scale look.
+                        let xOff = (row % 2 == 0) ? 0.0 : scale
+                        var x = cx - r - scale
+                        while x < cx + r + scale {
+                            let scx = x + CGFloat(xOff)
+                            // Distance-cull so scales sit inside the sphere edge.
+                            let dx = scx - cx
+                            let dy = y  - cy
+                            if dx * dx + dy * dy < (r * 0.98) * (r * 0.98) {
+                                // Scale = a downward fan (half-disc) with a gilt rim.
+                                let rect = CGRect(x: scx - scale, y: y - scale,
+                                                  width: scale * 2, height: scale * 2)
+                                var fan = Path()
+                                fan.addArc(center: CGPoint(x: scx, y: y),
+                                           radius: scale,
+                                           startAngle: .degrees(0), endAngle: .degrees(180),
+                                           clockwise: false)
+                                fan.closeSubpath()
+                                ctx.fill(fan, with: .radialGradient(
+                                    Gradient(colors: [goldHi.opacity(0.55), gold.opacity(0.32), .clear]),
+                                    center: CGPoint(x: scx, y: y + scale * 0.2),
+                                    startRadius: 0, endRadius: scale * 1.1))
+                                ctx.stroke(fan, with: .color(goldDark.opacity(0.5)),
+                                           lineWidth: max(0.5, scale * 0.06))
+                                _ = rect
+                            }
+                            x += scale * 2
+                        }
+                        y += scale * 0.9
+                        row += 1
+                    }
+
+                    // ── Gilt filigree arcs (two sweeping S-curves) ───────────
+                    for sgn in [CGFloat(-1), 1] {
+                        var fil = Path()
+                        fil.move(to: CGPoint(x: cx + sgn * r * 0.10, y: cy - r * 0.72))
+                        fil.addCurve(to: CGPoint(x: cx + sgn * r * 0.62, y: cy + r * 0.20),
+                                     control1: CGPoint(x: cx + sgn * r * 0.70, y: cy - r * 0.50),
+                                     control2: CGPoint(x: cx + sgn * r * 0.30, y: cy - r * 0.10))
+                        fil.addCurve(to: CGPoint(x: cx + sgn * r * 0.04, y: cy + r * 0.74),
+                                     control1: CGPoint(x: cx + sgn * r * 0.90, y: cy + r * 0.48),
+                                     control2: CGPoint(x: cx + sgn * r * 0.34, y: cy + r * 0.56))
+                        ctx.stroke(fil, with: .color(gold.opacity(0.7)),
+                                   style: StrokeStyle(lineWidth: max(1.0, r * 0.035), lineCap: .round))
+                    }
+
+                    // ── Drifting shimmer band (Reduce-Motion-safe) ───────────
+                    let bandX = cx - r + CGFloat(shimmer) * r * 2
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: bandX - r * 0.30, y: cy - r * 1.1,
+                                               width: r * 0.60, height: r * 2.2)),
+                        with: .linearGradient(
+                            Gradient(colors: [.clear, goldHi.opacity(0.30), .clear]),
+                            startPoint: CGPoint(x: bandX - r * 0.30, y: cy),
+                            endPoint:   CGPoint(x: bandX + r * 0.30, y: cy)))
+
+                    // ── Regal specular highlight (upper-left) ────────────────
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.78,
+                                               width: r * 0.44, height: r * 0.30)),
+                        with: .radialGradient(
+                            Gradient(colors: [.white.opacity(0.55), goldHi.opacity(0.25), .clear]),
+                            center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.66),
+                            startRadius: 0, endRadius: r * 0.34))
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Mardi Gras  (Mardi Gras seasonal · Legendary)
+    // A festive harlequin-diamond pattern in royal purple, emerald green, and
+    // gold, with a jeweled bead-like sheen.  A Canvas tiles a diagonal diamond
+    // lattice (clipped to the sphere by the body switch caller), tints it with a
+    // radial sphere-shade so it reads 3-D, scatters a few bright bead glints,
+    // and adds a specular highlight.  Static.
+    // =========================================================================
+    private var mardiGrasCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            let purple = Color(red: 0.42, green: 0.12, blue: 0.62)
+            let green  = Color(red: 0.06, green: 0.52, blue: 0.24)
+            let gold   = Color(red: 0.92, green: 0.74, blue: 0.20)
+
+            // ── 1. Harlequin diamond lattice ─────────────────────────────
+            // Rotated 45° grid of diamonds; colour cycles purple→green→gold
+            // by (row+col) so adjacent diamonds always differ.
+            let d = r * 0.42                       // diamond half-diagonal
+            let cols = Int(w / d) + 3
+            let rows = Int(h / d) + 3
+            for rr in -1..<rows {
+                for cc in -1..<cols {
+                    let dcx = CGFloat(cc) * d - (rr % 2 == 0 ? 0 : d / 2)
+                    let dcy = CGFloat(rr) * (d * 0.7)
+                    // Cull to sphere.
+                    let dx = dcx - cx
+                    let dy = dcy - cy
+                    if dx * dx + dy * dy > (r * 1.05) * (r * 1.05) { continue }
+                    var dia = Path()
+                    dia.move(to: CGPoint(x: dcx,         y: dcy - d * 0.7))
+                    dia.addLine(to: CGPoint(x: dcx + d * 0.5, y: dcy))
+                    dia.addLine(to: CGPoint(x: dcx,         y: dcy + d * 0.7))
+                    dia.addLine(to: CGPoint(x: dcx - d * 0.5, y: dcy))
+                    dia.closeSubpath()
+                    let hue = (rr + cc) % 3
+                    let col = (hue == 0 ? purple : (hue == 1 ? green : gold))
+                    ctx.fill(dia, with: .color(col))
+                    ctx.stroke(dia, with: .color(gold.opacity(0.45)),
+                               lineWidth: max(0.5, r * 0.012))
+                }
+            }
+
+            // ── 2. Radial sphere-shade so the lattice reads 3-D ──────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.30),       location: 0.00),
+                        .init(color: .clear,                     location: 0.46),
+                        .init(color: .black.opacity(0.22),       location: 0.82),
+                        .init(color: .black.opacity(0.55),       location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.28),
+                    startRadius: 0, endRadius: r * 1.24))
+
+            // ── 3. Jeweled bead glints scattered over the surface ────────
+            for (fx, fy, fr) in [(0.30, 0.32, 0.06), (0.66, 0.40, 0.05),
+                                 (0.46, 0.62, 0.055), (0.72, 0.66, 0.04),
+                                 (0.24, 0.58, 0.04)] {
+                let bx = cx - r + CGFloat(fx) * r * 2
+                let by = cy - r + CGFloat(fy) * r * 2
+                let br = CGFloat(fr) * r
+                ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                         with: .radialGradient(
+                            Gradient(colors: [.white.opacity(0.85), gold.opacity(0.4), .clear]),
+                            center: CGPoint(x: bx - br * 0.3, y: by - br * 0.3),
+                            startRadius: 0, endRadius: br))
+            }
+
+            // ── 4. Specular highlight (upper-left) ───────────────────────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
+                                       width: r * 0.42, height: r * 0.28)),
+                with: .radialGradient(
+                    Gradient(colors: [.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.64),
+                    startRadius: 0, endRadius: r * 0.30))
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Spectrum  (Spectrum seasonal · Legendary)
+    // A bold, glossy six-colour rainbow sphere — vivid red/orange/yellow/green/
+    // blue/violet bands running top→bottom, shaded into a sphere by a radial
+    // overlay, with a bright specular highlight for a wet-gloss finish.  Static.
+    // Clipped to a circle by the body switch caller.
+    // =========================================================================
+    private var spectrumCanvas: some View {
+        Canvas { ctx, size in
+            let w  = size.width
+            let h  = size.height
+            let cx = w / 2
+            let cy = h / 2
+            let r  = min(w, h) / 2
+
+            // ── 1. Six vivid rainbow bands (top → bottom) ────────────────
+            let bands: [Color] = [
+                Color(red: 0.93, green: 0.16, blue: 0.16),   // red
+                Color(red: 0.97, green: 0.55, blue: 0.10),   // orange
+                Color(red: 0.99, green: 0.84, blue: 0.10),   // yellow
+                Color(red: 0.18, green: 0.72, blue: 0.28),   // green
+                Color(red: 0.13, green: 0.42, blue: 0.92),   // blue
+                Color(red: 0.52, green: 0.16, blue: 0.78),   // violet
+            ]
+            let bandH = h / CGFloat(bands.count)
+            for (i, col) in bands.enumerated() {
+                let y = CGFloat(i) * bandH
+                ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: bandH + 1)),
+                         with: .color(col))
+            }
+
+            // ── 2. Sphere-shade overlay (lit upper-left, dark rim) ───────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0.34),  location: 0.00),
+                        .init(color: .clear,                location: 0.42),
+                        .init(color: .black.opacity(0.18),  location: 0.80),
+                        .init(color: .black.opacity(0.52),  location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.28),
+                    startRadius: 0, endRadius: r * 1.24))
+
+            // ── 3. Bright wet-gloss specular highlight (upper-left) ───────
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.78,
+                                       width: r * 0.46, height: r * 0.30)),
+                with: .radialGradient(
+                    Gradient(colors: [.white.opacity(0.9), .white.opacity(0.25), .clear]),
+                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.66),
+                    startRadius: 0, endRadius: r * 0.32))
         }
     }
 }
