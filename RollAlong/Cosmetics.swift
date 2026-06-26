@@ -2557,7 +2557,7 @@ private func trailAir(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: D
 private func trailInk(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
                       _ times: [Double]?) {
     let ink      = Color(red: 0.05, green: 0.05, blue: 0.10)
-    let neatR    = baseWidth * 0.55          // half-width of the crisp stroke at full speed
+    let neatR    = baseWidth * 0.30          // half-width at full speed — a thin pen line when racing
     let maxBleed = baseWidth * 3.2           // cap so a long rest can't flood the whole page
     let tau      = 0.10                       // dwell time-constant: smaller ⇒ slow strokes bleed wide sooner
 
@@ -2590,13 +2590,15 @@ private func trailInk(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: D
         let tailFade = min(1.0, Double(i + 1) / Double(n))       // ~0 tail → 1 head
         let w = radius(i - 1) + radius(i)                        // local diameter
         var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(ink.opacity(0.55 + 0.43 * tailFade)),
+        ctx.stroke(p, with: .color(ink.opacity(0.55 + 0.45 * tailFade)),   // solid ink at the head
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
     }
 
-    // 2) Pooled blots where the pen dwelled — a dense, near-solid disc held flat
-    //    almost to the rim with only a thin damp edge, not a translucent radial
-    //    wash.
+    // 2) Pooled blots where the pen dwelled — a FULLY OPAQUE, solid ink disc.
+    //    A wide slow/stopped bleed reads as saturated ink soaked into the page,
+    //    not a translucent watercolour wash: the fill holds full opacity flat to
+    //    the very rim, with only a 1-px antialiased edge so it isn't jagged.
+    //    (`tailFade` still eases the very oldest marks out to hide the FIFO pop.)
     for i in 0..<n {
         let r = radius(i)
         guard r > neatR + 0.6 else { continue }                  // skip spots that didn't pool
@@ -2604,10 +2606,9 @@ private func trailInk(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: D
         let p = pts[i]
         ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
             with: .radialGradient(Gradient(stops: [
-                .init(color: ink.opacity(0.98 * tailFade), location: 0.00),
-                .init(color: ink.opacity(0.97 * tailFade), location: 0.80),
-                .init(color: ink.opacity(0.60 * tailFade), location: 0.93),
-                .init(color: ink.opacity(0.0),             location: 1.00)]),
+                .init(color: ink.opacity(1.0 * tailFade), location: 0.00),
+                .init(color: ink.opacity(1.0 * tailFade), location: 0.97),
+                .init(color: ink.opacity(0.0),            location: 1.00)]),
                 center: p, startRadius: 0, endRadius: r))
     }
 }
