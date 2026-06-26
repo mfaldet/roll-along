@@ -191,7 +191,8 @@ struct CosmeticShopView: View {
                     }
                 }
 
-                // A few odds-and-ends — one ball, one trail, one goal.
+                // Odds-and-ends — one featured pick from each of the six
+                // cosmetic categories (ball · trail · goal · floor · pit · music).
                 VStack(alignment: .leading, spacing: 10) {
                     sectionLabel("TODAY'S PICKS")
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 14),
@@ -200,23 +201,59 @@ struct CosmeticShopView: View {
                         if let b  = ShopRotation.featuredBall()  { itemCell(item: b) }
                         if let tr = ShopRotation.featuredTrail() { itemCell(item: tr) }
                         if let g  = ShopRotation.featuredGoal()  { itemCell(item: g) }
+                        if let f  = ShopRotation.featuredFloor() { itemCell(item: f) }
+                        if let p  = ShopRotation.featuredPit()   { itemCell(item: p) }
+                        if let m  = ShopRotation.featuredMusic() { itemCell(item: m) }
                     }
                 }
 
-                // Everything else lives in the browsable Catalog.
+                // Everything else lives in the browsable Catalog — a big,
+                // gradient call-to-action so it reads as the next thing to do.
                 NavigationLink(value: HomeRoute.catalog) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.grid.2x2.fill")
-                        Text("Browse Full Catalog")
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.white.opacity(0.18))
+                                .frame(width: 58, height: 58)
+                            Image(systemName: "square.grid.2x2.fill")
+                                .font(.system(size: 27, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Browse Full Catalog")
+                                .font(.system(size: 20, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                            Text("Every ball, trail, goal, floor & more — buy complete sets")
+                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.82))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(.white.opacity(0.9))
                     }
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(LinearGradient(
+                                colors: [Color(red: 0.30, green: 0.42, blue: 0.95),
+                                         Color(red: 0.56, green: 0.30, blue: 0.95)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(.white.opacity(0.20), lineWidth: 1)
+                    )
+                    .shadow(color: Color(red: 0.42, green: 0.34, blue: 0.95).opacity(0.45),
+                            radius: 16, y: 7)
                 }
                 .buttonStyle(.plain)
+                .padding(.top, 4)
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
@@ -395,6 +432,15 @@ struct CosmeticShopView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
 
+                // Catalog: surface the set(s) this cosmetic was released with.
+                if mode == .catalog {
+                    let caption = bundleCaption(for: item)
+                    Text(caption.isEmpty ? "Daily picks only" : caption)
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.50))
+                        .lineLimit(1)
+                }
+
                 stateBadge(item: item, owned: owned, equipped: equipped)
             }
             .opacity(greyed ? 0.5 : 1.0)
@@ -432,18 +478,24 @@ struct CosmeticShopView: View {
                     .padding(.vertical, 4)
                     .background(Capsule().fill(Color(white: 0.22)))
             } else {
+                // Catalog shows the individual price as information only — you
+                // buy the bundle, not the item — so it's a neutral pill there.
+                // The Shop keeps the green "affordable / buy" pill.
+                let inCatalog = (mode == .catalog)
                 HStack(spacing: 4) {
                     CoinIcon(size: 13)
                     Text("\(item.coinCost)")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(canAfford(item) ? .white : Color(white: 0.45))
+                        .foregroundStyle(inCatalog ? Color(white: 0.82)
+                                                   : (canAfford(item) ? .white : Color(white: 0.45)))
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(
                     Capsule()
-                        .fill(canAfford(item) ? Color(red: 0.20, green: 0.78, blue: 0.38).opacity(0.85)
-                                              : Color(white: 0.22))
+                        .fill(inCatalog ? Color(white: 0.20)
+                                        : (canAfford(item) ? Color(red: 0.20, green: 0.78, blue: 0.38).opacity(0.85)
+                                                           : Color(white: 0.22)))
                 )
             }
         }
@@ -453,6 +505,9 @@ struct CosmeticShopView: View {
         let category = String(describing: type(of: item))
         if equipped { return "\(item.displayName) \(category), equipped." }
         if owned    { return "\(item.displayName) \(category), owned. Double-tap to equip." }
+        if mode == .catalog {
+            return "\(item.displayName) \(category), \(item.coinCost) coins. Sold as part of a bundle — double-tap for details."
+        }
         return "\(item.displayName) \(category), \(item.coinCost) coins. Double-tap to buy."
     }
 
@@ -472,10 +527,23 @@ struct CosmeticShopView: View {
             )
             return
         }
-        // Catalog is browse-only — buying happens in the Shop.
+        // Catalog: individuals aren't bought directly — you buy the bundle.
+        // EXCEPTION: when this is the last unowned item of a set, buying it
+        // completes that set, so route straight to that bundle purchase.
         if mode == .catalog {
-            alertMessage = "Pick this up in the Shop when it's featured."
-            showAlert = true
+            if let bundle = lastItemBundle(for: item) {
+                handleBundleTap(bundle, owned: false)
+            } else {
+                let names = CosmeticBundle.bundles(containing: item).map(\.displayName)
+                if names.isEmpty {
+                    alertMessage = "\(item.displayName) shows up in the Shop's daily picks — grab it there."
+                } else {
+                    let list = names.joined(separator: ", ")
+                    let noun = names.count > 1 ? "bundles" : "bundle"
+                    alertMessage = "\(item.displayName) is part of the \(list) \(noun). Buy the \(noun) from the Collections tab to unlock it."
+                }
+                showAlert = true
+            }
             return
         }
         // Buy + equip
@@ -709,21 +777,35 @@ struct CosmeticShopView: View {
     }
 
     private func collectionCard(_ bundle: CosmeticBundle, isFeatured: Bool) -> some View {
-        let bundleOwned = gameState.ownedBundles.contains(bundle.id)
+        // A set the player already owns in full (bought as a unit OR every
+        // item owned individually) reads as complete — no buy button.
+        let bundleOwned = gameState.completedBundleIDs.contains(bundle.id)
         let owned       = ownedCount(in: bundle)
         let total       = bundle.itemCount
-        let cost        = bundle.price(in: gameState)
+        // Catalog sells bundles at the full prorated price; the Shop sells the
+        // featured bundle at the window's randomized discount off that price.
+        let isShop      = mode == .shop
+        let discount    = ShopRotation.featuredDiscount()
+        let prorated    = bundle.proratedPrice(in: gameState)
+        let cost        = bundleCost(bundle)
+        let discounted  = isShop && cost < prorated
         let canAfford   = gameState.coinBalance >= cost
 
         return VStack(alignment: .leading, spacing: 10) {
             // ── Title row ────────────────────────────────────────────────
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    // Chips row — ⭐ FEATURED and/or 🔥 LIMITED
+                    // Chips row — ⚡ DEAL, ⭐ FEATURED and/or 🔥 LIMITED
                     let showFeatured = isFeatured
                     let showLimited  = bundle.isLimitedTime && bundle.isAvailable
-                    if showFeatured || showLimited {
+                    if discounted || showFeatured || showLimited {
                         HStack(spacing: 6) {
+                            if discounted {
+                                Text("⚡ \(discount.label.uppercased()) DEAL · \(discount.percent)% OFF")
+                                    .font(.system(size: 9, weight: .black, design: .rounded))
+                                    .kerning(1.2)
+                                    .foregroundStyle(discount.color)
+                            }
                             if showFeatured {
                                 Text("⭐ FEATURED")
                                     .font(.system(size: 9, weight: .black, design: .rounded))
@@ -783,11 +865,19 @@ struct CosmeticShopView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(canAfford ? .black : Color(white: 0.50))
                         Spacer()
-                        HStack(spacing: 3) {
-                            CoinIcon(size: 13)
-                            Text("\(cost)")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+                        HStack(spacing: 5) {
+                            if discounted {
+                                Text("\(prorated)")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .strikethrough(true, color: (canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                                    .foregroundStyle((canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                            }
+                            HStack(spacing: 3) {
+                                CoinIcon(size: 13)
+                                Text("\(cost)")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+                            }
                         }
                     }
                     .padding(.horizontal, 14)
@@ -1060,24 +1150,50 @@ struct CosmeticShopView: View {
         return n
     }
 
-    private func canAffordBundle(_ bundle: CosmeticBundle) -> Bool {
-        gameState.coinBalance >= bundle.price(in: gameState)
+    /// The bundle for which `item` is the single remaining unowned item, so
+    /// buying it completes the set.  nil if the item isn't one-away in any set.
+    /// (Only meaningful when `item` itself is unowned, which is the only path
+    /// that calls it.)
+    private func lastItemBundle<Item: CosmeticItem>(for item: Item) -> CosmeticBundle? {
+        CosmeticBundle.catalogue.first {
+            $0.contains(item) && ownedCount(in: $0) == $0.itemCount - 1
+        }
     }
 
+    /// Human-readable list of the bundle(s) an item was released with, e.g.
+    /// "Hellfire" or "Hellfire +1".  Empty when the item is in no bundle
+    /// (obtainable only via the Shop's daily individual picks).
+    private func bundleCaption<Item: CosmeticItem>(for item: Item) -> String {
+        let names = CosmeticBundle.bundles(containing: item).map(\.displayName)
+        guard let first = names.first else { return "" }
+        return names.count > 1 ? "\(first) +\(names.count - 1)" : first
+    }
+
+    /// The price the player pays for `bundle` on the current surface: the
+    /// Catalog charges the full prorated price; the Shop charges the window's
+    /// discounted price off that same prorated base.
+    private func bundleCost(_ bundle: CosmeticBundle) -> Int {
+        mode == .shop
+            ? bundle.shopPrice(in: gameState, discount: ShopRotation.featuredDiscount())
+            : bundle.proratedPrice(in: gameState)
+    }
+
+    private func canAffordBundle(_ bundle: CosmeticBundle) -> Bool {
+        gameState.coinBalance >= bundleCost(bundle)
+    }
+
+    /// Buy a bundle — grants every yet-unowned item and marks the set owned.
+    /// Live in BOTH surfaces now: the Catalog charges the full prorated price,
+    /// the Shop the discounted price for the featured bundle.
     private func handleBundleTap(_ bundle: CosmeticBundle, owned: Bool) {
         if owned { return }
-        // Catalog is browse-only — bundles are bought in the Shop when featured.
-        if mode == .catalog {
-            alertMessage = "This bundle is buyable in the Shop while it's featured."
-            showAlert = true
-            return
-        }
-        let cost = bundle.price(in: gameState)
+        let cost = bundleCost(bundle)
         guard gameState.coinBalance >= cost else {
             alertMessage = "You need \(cost - gameState.coinBalance) more coins for the \(bundle.displayName) bundle.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
             showAlert = true
             return
         }
+        let discountPct = mode == .shop ? ShopRotation.featuredDiscount().percent : 0
         let beforeCompleted = gameState.completedBundleIDs
         _ = gameState.spendCoins(cost)
         bundle.grantContents(to: gameState)
@@ -1085,9 +1201,11 @@ struct CosmeticShopView: View {
         AnalyticsClient.shared.track(
             "bundle_purchased",
             properties: [
-                "bundle":  .string(bundle.id),
-                "price":   .int(cost),
-                "items":   .int(bundle.itemCount),
+                "bundle":       .string(bundle.id),
+                "price":        .int(cost),
+                "items":        .int(bundle.itemCount),
+                "surface":      .string(mode == .shop ? "shop" : "catalog"),
+                "discount_pct": .int(discountPct),
             ]
         )
         checkCompletionToast(before: beforeCompleted)

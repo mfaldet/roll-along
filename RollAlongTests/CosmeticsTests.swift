@@ -121,4 +121,102 @@ final class CosmeticsTests: XCTestCase {
             previous = tier.basePrice
         }
     }
+
+    // MARK: - BundleDiscount (Shop's randomized featured-bundle discount)
+
+    /// A fresh GameState backed by an isolated UserDefaults suite so each
+    /// test starts from a clean owned-set with no cross-test pollution.
+    private func makeCleanState() -> GameState {
+        let defaults = UserDefaults(suiteName: "test.\(UUID().uuidString)")!
+        return GameState(defaults: defaults)
+    }
+
+    func testBundleDiscount_percentMapping() {
+        XCTAssertEqual(BundleDiscount.common.percent,    10)
+        XCTAssertEqual(BundleDiscount.rare.percent,      15)
+        XCTAssertEqual(BundleDiscount.epic.percent,      25)
+        XCTAssertEqual(BundleDiscount.legendary.percent, 50)
+    }
+
+    func testBundleDiscount_weightsSumTo100() {
+        let total = BundleDiscount.allCases.reduce(0) { $0 + $1.weight }
+        XCTAssertEqual(total, 100, "Loot weights should sum to 100")
+    }
+
+    func testFeaturedDiscount_isStableWithinAWindow() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let a = ShopRotation.featuredDiscount(at: date)
+        let b = ShopRotation.featuredDiscount(at: date.addingTimeInterval(60))   // same 2-hour window
+        XCTAssertEqual(a, b, "Discount must be stable within a shop window")
+    }
+
+    func testFeaturedDiscount_variesAcrossWindows() {
+        var seen = Set<BundleDiscount>()
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        for i in 0..<300 {
+            let d = ShopRotation.featuredDiscount(
+                at: base.addingTimeInterval(Double(i) * ShopRotation.windowSeconds))
+            seen.insert(d)
+        }
+        XCTAssertGreaterThan(seen.count, 1, "Discount should not be constant across windows")
+    }
+
+    // MARK: - Bundle pricing (full / prorated / shop)
+
+    func testBundle_fullPrice_equalsSumOfItemCosts() {
+        for bundle in CosmeticBundle.catalogue {
+            let ballSum  = bundle.balls.reduce(0)  { $0 + $1.coinCost }
+            let goalSum  = bundle.goals.reduce(0)  { $0 + $1.coinCost }
+            let trailSum = bundle.trails.reduce(0) { $0 + $1.coinCost }
+            let floorSum = bundle.floors.reduce(0) { $0 + $1.coinCost }
+            let pitSum   = bundle.pits.reduce(0)   { $0 + $1.coinCost }
+            let musicSum = bundle.music.reduce(0)  { $0 + $1.coinCost }
+            let manual = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
+            XCTAssertEqual(bundle.fullPrice(), manual, "fullPrice mismatch for '\(bundle.id)'")
+        }
+    }
+
+    func testBundle_proratedPrice_onCleanStateEqualsFullPrice() {
+        let state = makeCleanState()
+        for bundle in CosmeticBundle.catalogue {
+            XCTAssertEqual(bundle.proratedPrice(in: state), bundle.fullPrice(),
+                           "Owning nothing (but starters), prorated should equal full for '\(bundle.id)'")
+        }
+    }
+
+    func testBundle_proratedPrice_dropsByOwnedItemCost() {
+        let state = makeCleanState()
+        guard let bundle = CosmeticBundle.catalogue.first(where: {
+            !$0.balls.isEmpty && $0.balls[0].coinCost > 0 && $0.itemCount > 1
+        }) else { return XCTFail("expected a multi-item bundle with a priced ball") }
+        let ball = bundle.balls[0]
+        let before = bundle.proratedPrice(in: state)
+        state.grant(ball)
+        XCTAssertEqual(bundle.proratedPrice(in: state), before - ball.coinCost,
+                       "Owning one item should drop the prorated price by exactly its cost")
+    }
+
+    func testBundle_proratedPrice_zeroAfterGrantingContents() {
+        let state = makeCleanState()
+        let bundle = CosmeticBundle.catalogue[0]
+        bundle.grantContents(to: state)
+        XCTAssertEqual(bundle.proratedPrice(in: state), 0,
+                       "Owning every item should make the prorated price 0")
+        XCTAssertTrue(state.completedBundleIDs.contains(bundle.id),
+                      "Owning every item should mark the bundle complete")
+    }
+
+    func testBundle_shopPrice_appliesDiscountFlooredToFive() {
+        let state = makeCleanState()
+        for bundle in CosmeticBundle.catalogue {
+            let prorated = bundle.proratedPrice(in: state)
+            for discount in BundleDiscount.allCases {
+                let expected = (Int(Double(prorated) * (1.0 - discount.fraction)) / 5) * 5
+                let actual = bundle.shopPrice(in: state, discount: discount)
+                XCTAssertEqual(actual, expected, "shopPrice mismatch for '\(bundle.id)' @ \(discount)")
+                XCTAssertLessThanOrEqual(actual, prorated, "shopPrice must not exceed prorated")
+                XCTAssertEqual(actual % 5, 0, "shopPrice must be a clean multiple of 5")
+            }
+        }
+    }
 }

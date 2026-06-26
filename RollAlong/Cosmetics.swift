@@ -942,15 +942,71 @@ enum MusicTrack: String, CosmeticItem {
 // MARK: - Bundles
 //
 // A bundle wraps several cosmetic items from any number of categories
-// into one purchase.  Buying a bundle grants every contained item into
-// the player's owned-set forever — `ownedBundles` is purely for UI
-// (the "OWNED" badge in the shop).  Items remain available individually
-// after the bundle is owned; the bundle just costs less than the sum
-// of its parts.
+// into one purchase.  Buying a bundle grants every yet-unowned contained
+// item into the player's owned-set forever — `ownedBundles` is purely for
+// UI (the "OWNED" badge in the shop).  Items remain available individually
+// after the bundle is owned.
 //
-// Pricing: 66% of (sum of individual item prices), rounded DOWN to
-// the nearest multiple of 20.  Per Mac's spec.
+// Pricing (per Mac's spec):
+//   • fullPrice            — the sum of every item's individual price.
+//   • proratedPrice(in:)   — the sum of the UNOWNED items' prices.  This is
+//                            the Catalog price (you only pay for what you
+//                            don't already own).
+//   • shopPrice(in:_:)     — proratedPrice with the Shop's randomized
+//                            featured-bundle discount applied.
 // ---------------------------------------------------------------------------
+
+/// A randomized discount applied to the Shop's featured bundle.  The four
+/// tiers mirror the cosmetic rarity ramp so a deep discount reads as a
+/// "lucky drop".  Rolled once per Shop window (stable for 2 hours) by
+/// `ShopRotation.featuredDiscount`.
+enum BundleDiscount: String, CaseIterable {
+    case common, rare, epic, legendary
+
+    /// Percent off the (prorated) bundle price.
+    var percent: Int {
+        switch self {
+        case .common:    return 10
+        case .rare:      return 15
+        case .epic:      return 25
+        case .legendary: return 50
+        }
+    }
+
+    /// Fractional discount (0…1) for arithmetic.
+    var fraction: Double { Double(percent) / 100.0 }
+
+    /// Player-facing rarity name shown in the Shop's "% OFF" chip.
+    var label: String {
+        switch self {
+        case .common:    return "Common"
+        case .rare:      return "Rare"
+        case .epic:      return "Epic"
+        case .legendary: return "Legendary"
+        }
+    }
+
+    /// Loot-weighted odds — big discounts are rare (sums to 100).
+    var weight: Int {
+        switch self {
+        case .common:    return 50
+        case .rare:      return 30
+        case .epic:      return 15
+        case .legendary: return 5
+        }
+    }
+
+    /// Rarity accent — the same gray→blue→purple→gold ramp the rest of the
+    /// catalogue uses (see `CosmeticTier.color`).  starter has no analogue.
+    var color: Color {
+        switch self {
+        case .common:    return Color(red: 0.45, green: 0.62, blue: 0.85)
+        case .rare:      return Color(red: 0.28, green: 0.78, blue: 0.95)
+        case .epic:      return Color(red: 0.72, green: 0.45, blue: 0.95)
+        case .legendary: return Color(red: 1.00, green: 0.78, blue: 0.28)
+        }
+    }
+}
 
 // ===========================================================================
 // Shop rotation — the curated storefront refreshes every 2 hours.  A
@@ -987,6 +1043,15 @@ enum ShopRotation {
     static var goalPool: [GoalSkin] {
         GoalSkin.allCases.filter { $0.tier != .starter }
     }
+    static var floorPool: [Floor] {
+        Floor.allCases.filter { $0.tier != .starter }
+    }
+    static var pitPool: [Pit] {
+        Pit.allCases.filter { $0.tier != .starter }
+    }
+    static var musicPool: [MusicTrack] {
+        MusicTrack.allCases.filter { $0.tier != .starter }
+    }
 
     private static func pick<T>(_ pool: [T], _ window: Int, salt: Int) -> T? {
         guard !pool.isEmpty else { return nil }
@@ -998,6 +1063,23 @@ enum ShopRotation {
     static func featuredBall(at date: Date = Date())   -> BallSkin?       { pick(ballPool,   window(at: date), salt: 7) }
     static func featuredTrail(at date: Date = Date())  -> TrailColor?     { pick(trailPool,  window(at: date), salt: 13) }
     static func featuredGoal(at date: Date = Date())   -> GoalSkin?       { pick(goalPool,   window(at: date), salt: 19) }
+    static func featuredFloor(at date: Date = Date())  -> Floor?          { pick(floorPool,  window(at: date), salt: 29) }
+    static func featuredPit(at date: Date = Date())    -> Pit?            { pick(pitPool,    window(at: date), salt: 37) }
+    static func featuredMusic(at date: Date = Date())  -> MusicTrack?     { pick(musicPool,  window(at: date), salt: 41) }
+
+    /// The randomized discount applied to the featured bundle this window.
+    /// Loot-weighted (see `BundleDiscount.weight`) so deep discounts are
+    /// rare, and deterministic per window so the Shop shows a stable "% OFF".
+    static func featuredDiscount(at date: Date = Date()) -> BundleDiscount {
+        let total = BundleDiscount.allCases.reduce(0) { $0 + $1.weight }   // 100
+        let h = window(at: date) &* 31 &+ 23
+        var roll = ((h % total) + total) % total
+        for d in BundleDiscount.allCases {
+            if roll < d.weight { return d }
+            roll -= d.weight
+        }
+        return .common
+    }
 
     /// True if `item` is one of the individually-featured odds-and-ends OR a
     /// member of the featured bundle — i.e. buyable in the Shop right now.
@@ -1006,6 +1088,9 @@ enum ShopRotation {
         if let b = item as? BallSkin    { if b == featuredBall(at: date) { return true } }
         if let t = item as? TrailColor  { if t == featuredTrail(at: date) { return true } }
         if let g = item as? GoalSkin    { if g == featuredGoal(at: date) { return true } }
+        if let f = item as? Floor       { if f == featuredFloor(at: date) { return true } }
+        if let p = item as? Pit         { if p == featuredPit(at: date) { return true } }
+        if let m = item as? MusicTrack  { if m == featuredMusic(at: date) { return true } }
         guard let bundle = featuredBundle(at: date) else { return false }
         return bundle.contains(item)
     }
@@ -1093,23 +1178,44 @@ struct CosmeticBundle: Identifiable {
         balls.count + goals.count + trails.count + floors.count + pits.count + music.count
     }
 
-    /// 66% of the sum-of-individuals.  Re-computed on each read so
-    /// future tier shuffles automatically update bundle prices.
-    func price(in _: GameState) -> Int {
-        // Broken into per-category locals so the Swift type-checker
-        // doesn't choke on one giant chained-generic expression.
+    /// The full price of the bundle — the sum of every contained item's
+    /// individual `coinCost`.  Starter items are free, so they add nothing.
+    func fullPrice() -> Int {
+        // Per-category locals so the Swift type-checker doesn't choke on one
+        // giant chained-generic expression.
         let ballSum:  Int = balls.reduce(0)  { $0 + $1.coinCost }
         let goalSum:  Int = goals.reduce(0)  { $0 + $1.coinCost }
         let trailSum: Int = trails.reduce(0) { $0 + $1.coinCost }
         let floorSum: Int = floors.reduce(0) { $0 + $1.coinCost }
         let pitSum:   Int = pits.reduce(0)   { $0 + $1.coinCost }
         let musicSum: Int = music.reduce(0)  { $0 + $1.coinCost }
-        let sum = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
-        // 66% discount, then rounded DOWN to the nearest multiple of 20
-        // so every bundle lands on a clean price point (per Mac's spec).
-        let discounted = Double(sum) * 0.66
-        return Int(discounted / 20.0) * 20
+        return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
     }
+
+    /// The prorated price — the sum of only the items the player does NOT
+    /// already own.  This is the Catalog price (and the base the Shop
+    /// discount comes off).  A bundle purchase grants exactly these items.
+    func proratedPrice(in state: GameState) -> Int {
+        let ballSum:  Int = balls.reduce(0)  { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        let goalSum:  Int = goals.reduce(0)  { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        let trailSum: Int = trails.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        let floorSum: Int = floors.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        let pitSum:   Int = pits.reduce(0)   { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        let musicSum: Int = music.reduce(0)  { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
+    }
+
+    /// The Shop's featured-bundle price: the prorated price with the given
+    /// discount applied, floored to a clean multiple of 5.
+    func shopPrice(in state: GameState, discount: BundleDiscount) -> Int {
+        let base = proratedPrice(in: state)
+        let discounted = Double(base) * (1.0 - discount.fraction)
+        return (Int(discounted) / 5) * 5
+    }
+
+    /// Back-compat shim — defaults to the Catalog (prorated) price so any
+    /// caller not yet migrated to the explicit methods still reads sensibly.
+    func price(in state: GameState) -> Int { proratedPrice(in: state) }
 
     /// True if this bundle includes `item` (any category).
     func contains<Item: CosmeticItem>(_ item: Item) -> Bool {
@@ -1122,6 +1228,13 @@ struct CosmeticBundle: Identifiable {
         case let m as MusicTrack: return music.contains(m)
         default:                  return false
         }
+    }
+
+    /// Every catalogue bundle whose contents include `item` — i.e. the
+    /// set(s) the item was released with.  Used by the Catalog to show
+    /// each cosmetic's related bundle(s).
+    static func bundles<Item: CosmeticItem>(containing item: Item) -> [CosmeticBundle] {
+        catalogue.filter { $0.contains(item) }
     }
 
     /// Add every contained item to the appropriate owned-set on
