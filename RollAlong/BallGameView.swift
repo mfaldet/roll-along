@@ -445,6 +445,25 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Grid City floor (Neon City bundle) — synthwave neon
+                // perspective grid receding to a horizon.  The scroll is
+                // frozen internally under Reduce Motion, so it renders in
+                // both cases and still shows the grid texture.
+                if floor == .gridCity {
+                    gridCityFloorOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
+                // Brass Works floor (Clockwork bundle) — riveted brass/
+                // bronze plating with engraved cog outlines.  Static, so
+                // it renders under Reduce Motion too.
+                if floor == .brass {
+                    brassFloorOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 // Paper-world floor overlays (ruled lines, grids, fold shadows…)
                 paperFloorOverlay(geo: geo)
                     .ignoresSafeArea()
@@ -862,6 +881,158 @@ struct BallGameView: View {
                 }
             }
         }
+    }
+
+    /// Grid City floor overlay (Neon City bundle) — a synthwave neon
+    /// perspective grid.  Horizontal lines bunch toward a horizon set at
+    /// ~38% screen height (above it, a magenta→indigo sky glow); below,
+    /// vertical lines fan out from the vanishing point toward the bottom
+    /// edge, and horizontal lines spaced by a perspective curve recede to
+    /// the horizon and scroll slowly toward the viewer.  Magenta + cyan
+    /// glowing gridlines on near-black.  Under Reduce Motion the scroll
+    /// freezes (the grid stays put) so it's safe and still textured.
+    private var gridCityFloorOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let horizonY = h * 0.38
+                let vpX = w / 2                       // vanishing point x
+
+                // Sky glow above the horizon — magenta high → indigo low.
+                ctx.fill(
+                    Path(CGRect(x: 0, y: 0, width: w, height: horizonY)),
+                    with: .linearGradient(
+                        Gradient(colors: [
+                            Color(red: 0.10, green: 0.02, blue: 0.18),
+                            Color(red: 0.42, green: 0.06, blue: 0.42),
+                            Color(red: 0.85, green: 0.18, blue: 0.62).opacity(0.55),
+                        ]),
+                        startPoint: .zero, endPoint: CGPoint(x: 0, y: horizonY)))
+                // A bright neon sun-line right on the horizon.
+                var hline = Path()
+                hline.move(to: CGPoint(x: 0, y: horizonY))
+                hline.addLine(to: CGPoint(x: w, y: horizonY))
+                ctx.stroke(hline, with: .color(Color(red: 1.0, green: 0.45, blue: 0.95).opacity(0.85)),
+                           lineWidth: 2.0)
+
+                let cyan    = Color(red: 0.20, green: 0.95, blue: 1.0)
+                let magenta = Color(red: 1.0,  green: 0.30, blue: 0.85)
+
+                // Vertical lines fanning from the vanishing point to the
+                // bottom edge.  Evenly spaced along the bottom; all meet at
+                // (vpX, horizonY).
+                let verticals = 14
+                for i in 0...verticals {
+                    let f = CGFloat(i) / CGFloat(verticals)
+                    let bottomX = (f - 0.5) * w * 2.2 + vpX   // spread wider than screen
+                    var p = Path()
+                    p.move(to: CGPoint(x: vpX, y: horizonY))
+                    p.addLine(to: CGPoint(x: bottomX, y: h))
+                    ctx.stroke(p, with: .color(cyan.opacity(0.35)), lineWidth: 1.4)
+                    ctx.stroke(p, with: .color(cyan.opacity(0.85)), lineWidth: 0.6)
+                }
+
+                // Horizontal lines receding to the horizon, spaced by a
+                // perspective curve and scrolling toward the viewer.  We
+                // parametrize by k in [0,1): depth = fract(k + scroll); the
+                // screen y uses a 1/(1-depth) falloff so lines bunch near
+                // the horizon and spread near the bottom.
+                let rows = 16
+                let scroll = (t * 0.18).truncatingRemainder(dividingBy: 1.0 / Double(rows))
+                for i in 0..<rows {
+                    let depth = (Double(i) / Double(rows) + scroll).truncatingRemainder(dividingBy: 1.0)
+                    // Perspective: depth 0 = horizon, depth 1 = bottom edge.
+                    let persp = pow(depth, 2.2)                // ease so near rows are far apart
+                    let y = horizonY + CGFloat(persp) * (h - horizonY)
+                    guard y > horizonY && y <= h else { continue }
+                    var p = Path()
+                    p.move(to: CGPoint(x: 0, y: y))
+                    p.addLine(to: CGPoint(x: w, y: y))
+                    // Nearer rows are brighter / thicker.
+                    let near = CGFloat(persp)
+                    ctx.stroke(p, with: .color(magenta.opacity(0.25 + 0.55 * Double(near))),
+                               lineWidth: 0.6 + 1.6 * near)
+                }
+            }
+        }
+    }
+
+    /// Brass Works floor overlay (Clockwork bundle) — riveted brass/bronze
+    /// plating laid out as a seamed grid of plates, each with a rivet at its
+    /// corners and a faint engraved cog outline, over a warm metallic sheen.
+    /// Deterministic seeded placement so it doesn't shift between frames.
+    /// Static (renders under Reduce Motion too).
+    private var brassFloorOverlay: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+
+            // Warm metallic sheen — a soft diagonal highlight band.
+            ctx.fill(
+                Path(CGRect(x: 0, y: 0, width: w, height: h)),
+                with: .linearGradient(
+                    Gradient(colors: [
+                        Color(red: 0.62, green: 0.45, blue: 0.20).opacity(0.0),
+                        Color(red: 0.92, green: 0.74, blue: 0.40).opacity(0.30),
+                        Color(red: 0.40, green: 0.27, blue: 0.10).opacity(0.30),
+                    ]),
+                    startPoint: CGPoint(x: 0, y: 0),
+                    endPoint:   CGPoint(x: w, y: h)))
+
+            // Seamed plates.
+            let plate: CGFloat = 96
+            let seam   = Color(red: 0.22, green: 0.14, blue: 0.05).opacity(0.55)
+            let groove = Color(red: 0.98, green: 0.84, blue: 0.50).opacity(0.30)
+            let rivet  = Color(red: 0.98, green: 0.86, blue: 0.52)
+            let rivetD = Color(red: 0.40, green: 0.26, blue: 0.10)
+            let cog    = Color(red: 0.30, green: 0.20, blue: 0.08).opacity(0.28)
+
+            let cols = Int(ceil(w / plate))
+            let rows = Int(ceil(h / plate))
+            var rng = SeededRNG(seed: 0xB8A5_5C06)
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    let x = CGFloat(col) * plate
+                    let y = CGFloat(row) * plate
+                    let rect = CGRect(x: x, y: y, width: plate, height: plate)
+                    // Plate seam (dark groove + bright highlight just inside).
+                    ctx.stroke(Path(rect), with: .color(seam), lineWidth: 2.0)
+                    ctx.stroke(Path(rect.insetBy(dx: 1.5, dy: 1.5)), with: .color(groove), lineWidth: 0.8)
+
+                    // Faint engraved cog outline in the plate centre on some plates.
+                    if rng.nextUnit() < 0.55 {
+                        let ccx = x + plate / 2
+                        let ccy = y + plate / 2
+                        let cr  = plate * 0.26
+                        let teeth = 10
+                        var p = Path()
+                        let n = teeth * 2
+                        for k in 0..<n {
+                            let a = Double(k) / Double(n) * 2 * .pi
+                            let rad = (k % 2 == 0) ? cr : cr * 0.78
+                            let pt = CGPoint(x: ccx + CGFloat(cos(a)) * rad, y: ccy + CGFloat(sin(a)) * rad)
+                            if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                        }
+                        p.closeSubpath()
+                        ctx.stroke(p, with: .color(cog), lineWidth: 1.2)
+                        let hr = cr * 0.30
+                        ctx.stroke(Path(ellipseIn: CGRect(x: ccx - hr, y: ccy - hr, width: hr * 2, height: hr * 2)),
+                                   with: .color(cog), lineWidth: 1.0)
+                    }
+
+                    // Rivets at the four plate corners.
+                    let rr: CGFloat = 3.0
+                    for (rx, ry) in [(x + 7, y + 7), (x + plate - 7, y + 7),
+                                     (x + 7, y + plate - 7), (x + plate - 7, y + plate - 7)] {
+                        ctx.fill(Path(ellipseIn: CGRect(x: rx - rr, y: ry - rr, width: rr * 2, height: rr * 2)),
+                            with: .radialGradient(Gradient(colors: [rivet, rivetD]),
+                                center: CGPoint(x: rx - rr * 0.3, y: ry - rr * 0.3),
+                                startRadius: 0, endRadius: rr))
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     /// Evil pit — fire pit animation inside a single hole rect.  A

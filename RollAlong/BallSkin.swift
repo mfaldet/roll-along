@@ -212,6 +212,14 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     fracture seams pulsing as if lava flows beneath; drifting embers.
     //     Animated.  Magma Core bundle (Legendary).
     case magmaCore   = "Magma Core"
+    //   • hologram — glitchy holographic sphere: translucent cyan/magenta with
+    //     horizontal scanlines, chromatic-aberration edges, and occasional
+    //     flicker/jitter; sci-fi HUD feel.  Animated.  Neon City bundle (Legendary).
+    case hologram    = "Hologram"
+    //   • clockwork — interlocking brass/copper gears meshing and slowly
+    //     rotating over a warm metal body; rivets, patina, a polished sheen.
+    //     Animated rotation.  Clockwork bundle (Legendary).
+    case clockwork   = "Clockwork"
 
     var id: String { rawValue }
 
@@ -835,6 +843,29 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.96, green: 0.42, blue: 0.10),
                 Color(red: 0.26, green: 0.22, blue: 0.22),
                 Color(red: 0.05, green: 0.04, blue: 0.05),
+            ]
+
+        case .hologram:
+            // Bright cyan highlight → magenta mid → deep indigo → near-black
+            // interior.  The translucent scanlines, chromatic-aberration edges
+            // and flicker/jitter paint on top via the bespoke hologramCanvas
+            // in BallSkinView.
+            return [
+                Color(red: 0.62, green: 1.00, blue: 0.98),
+                Color(red: 0.90, green: 0.26, blue: 0.92),
+                Color(red: 0.16, green: 0.18, blue: 0.46),
+                Color(red: 0.02, green: 0.03, blue: 0.10),
+            ]
+
+        case .clockwork:
+            // Polished brass glint → warm copper → aged bronze → dark patina.
+            // The meshing/rotating gears, rivets and engraved sheen paint on top
+            // via the bespoke clockworkCanvas in BallSkinView.
+            return [
+                Color(red: 1.00, green: 0.88, blue: 0.56),
+                Color(red: 0.84, green: 0.58, blue: 0.24),
+                Color(red: 0.52, green: 0.34, blue: 0.14),
+                Color(red: 0.18, green: 0.12, blue: 0.07),
             ]
         }
     }

@@ -127,6 +127,8 @@ extension BallSkin: CosmeticItem {
              .oracle,          // Oracle bundle — coin/bundle purchasable
              .plasmaGlobe,     // Plasma Globe bundle — coin/bundle purchasable
              .magmaCore,       // Magma Core bundle — coin/bundle purchasable
+             .hologram,        // Neon City bundle — coin/bundle purchasable (animated)
+             .clockwork,       // Clockwork bundle — coin/bundle purchasable (animated)
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
@@ -634,6 +636,10 @@ enum Floor: String, CosmeticItem {
     case court            // Full Court bundle — warm hardwood basketball floor
     case felt             // Billiards Hall bundle — deep-green pool-table felt
 
+    // Premium bundles (textured overlays)
+    case gridCity         // Neon City bundle — synthwave neon perspective grid
+    case brass            // Clockwork bundle — riveted brass/bronze plating
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -663,6 +669,8 @@ enum Floor: String, CosmeticItem {
         case .moon:       return "Moon"
         case .court:      return "Court"
         case .felt:       return "Felt"
+        case .gridCity:   return "Grid City"
+        case .brass:      return "Brass Works"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -678,7 +686,7 @@ enum Floor: String, CosmeticItem {
              .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
             return .standard   //  50 coins
-        case .aurora, .disco, .grass, .moon:
+        case .aurora, .disco, .grass, .moon, .gridCity, .brass:
             return .exclusive  // 500 coins — animated / textured overlay
         }
     }
@@ -714,6 +722,8 @@ enum Floor: String, CosmeticItem {
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
         case .court:      return Color(red: 0.84,  green: 0.65,  blue: 0.38 )  // warm hardwood
         case .felt:       return Color(red: 0.18,  green: 0.48,  blue: 0.24 )  // pool-table green
+        case .gridCity:   return Color(red: 0.03,  green: 0.02,  blue: 0.08 )  // near-black; neon grid paints over
+        case .brass:      return Color(red: 0.52,  green: 0.37,  blue: 0.16 )  // warm bronze; plating paints over
         }
     }
 
@@ -730,7 +740,7 @@ enum Floor: String, CosmeticItem {
     /// tufts, etc.).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .aurora, .disco, .grass, .moon: return true
+        case .aurora, .disco, .grass, .moon, .gridCity, .brass: return true
         default: return false
         }
     }
@@ -1993,6 +2003,30 @@ struct CosmeticBundle: Identifiable {
             floors: [.stormcloud],
             pits:   [.downpour],
             music:  [.cinematic]
+        ),
+        CosmeticBundle(
+            id:             "neon-city",
+            displayName:    "Neon City",
+            tagline:        "Jack in. Roll out.",
+            contentSummary: "Hologram ball · Neon goal · Raybeam trail · Grid City floor · Space pit · Synthwave music",
+            balls:  [.hologram],
+            goals:  [.neon],
+            trails: [.raybeam],
+            floors: [.gridCity],
+            pits:   [.space],
+            music:  [.synthwave]
+        ),
+        CosmeticBundle(
+            id:             "clockwork",
+            displayName:    "Clockwork",
+            tagline:        "Every tooth in its place.",
+            contentSummary: "Clockwork ball · Eclipse goal · Smoke trail · Brass Works floor · Canyon pit · Classical music",
+            balls:  [.clockwork],
+            goals:  [.eclipse],
+            trails: [.smoke],
+            floors: [.brass],
+            pits:   [.canyon],
+            music:  [.classical]
         ),
     ]
 }
