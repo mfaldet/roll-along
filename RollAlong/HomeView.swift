@@ -105,6 +105,10 @@ struct HomeView: View {
     /// in-game trail mechanic — only populated when the player has a
     /// non-`.none` TrailColor equipped.
     @State private var trailPoints: [CGPoint] = []
+    /// Wall-clock stamp per `trailPoints` entry, kept in lockstep — drives the
+    /// real-time, in-place lifecycle of the ink/fire/ice/air trails so the home
+    /// preview matches the in-game look.
+    @State private var trailTimes: [Double] = []
     private let homeTrailMaxLength = 120        // ~2.0s at 60fps — doubled so the streak reads across the full-screen arena
     private let homeTrailMinStep:  CGFloat = 1.5
 
@@ -145,6 +149,25 @@ struct HomeView: View {
     /// Drives the Play→game launch animation (the ball dives at the viewer).
     @State private var launching: Bool = false
     @State private var launchStart: Date = .now
+    /// Live length of the launch spiral.  A rushed tap (rushLaunch) shrinks this
+    /// so the marble whips to the centre sooner; reset to the default each launch.
+    @State private var launchDuration: Double = LaunchTransition.defaultDuration
+    /// Re-schedulable hop into the game + overlay teardown, so a rush can pull
+    /// them in to match the shortened spiral.
+    @State private var launchPushWork: DispatchWorkItem?
+    @State private var launchResetWork: DispatchWorkItem?
+    /// Guards against a double nav-push if a rush tap races the scheduled push.
+    @State private var launchPushed: Bool = false
+
+    /// Progress (0…1) at which the screen is fully black and the game pushes —
+    /// the original 3.3s mark expressed as a fraction so it survives rushing.
+    private static let launchPushProgress = 3.3 / LaunchTransition.defaultDuration
+    /// Each rush tap multiplies the remaining spiral length by this…
+    private static let launchRushFactor = 0.45
+    /// …down to this floor, so the spin stays legible instead of a 1-frame snap.
+    private static let launchMinDuration = 0.9
+    /// Real seconds to keep the overlay up after the push (covers the nav transition).
+    private static let launchResetDelay = 0.5
 
     private let ballRadius: CGFloat = 42   // a touch smaller than before — leaves room for the trail to read behind the ball
 
@@ -189,7 +212,8 @@ struct HomeView: View {
                                        center: CGPoint(x: geo.size.width / 2,
                                                        y: geo.size.height / 2),
                                        diameter: ballRadius * 2,
-                                       since: launchStart)
+                                       since: launchStart,
+                                       duration: launchDuration)
                         } else {
                             liveBall
                                 .position(ballPos)
@@ -301,9 +325,19 @@ struct HomeView: View {
 
                 // Play → game launch transition (the ball dives at the viewer).
                 if launching {
-                    LaunchTransition(since: launchStart)
+                    LaunchTransition(since: launchStart, duration: launchDuration)
                         .transition(.opacity)
                         .zIndex(70)
+
+                    // A tap anywhere (e.g. the middle) rushes the marble to the
+                    // centre.  Full-screen catcher sits above the flourish so it
+                    // also shadows the arena's respawn-on-tap and the buttons —
+                    // no accidental respawn or double-launch mid-flight.
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { rushLaunch() }
+                        .ignoresSafeArea()
+                        .zIndex(80)
                 }
             }
             // NOTE: no accessibilityIdentifier here — the "HomeView" anchor
@@ -506,6 +540,7 @@ struct HomeView: View {
         ballPos = CGPoint(x: size.width / 2, y: size.height / 2)
         ballVel = .zero
         trailPoints.removeAll(keepingCapacity: true)
+        trailTimes.removeAll(keepingCapacity: true)
         trailHueOffset = 0.0
     }
 
@@ -548,16 +583,20 @@ struct HomeView: View {
         // since the last segment.  Skipped entirely when the player
         // has `.none` equipped (no trail to draw).
         if gameState.equippedTrail != .none {
+            let now = Date().timeIntervalSinceReferenceDate
             if let last = trailPoints.last {
                 if hypot(ballPos.x - last.x, ballPos.y - last.y) > homeTrailMinStep {
                     trailPoints.append(ballPos)
+                    trailTimes.append(now)
                 }
             } else {
                 trailPoints.append(ballPos)
+                trailTimes.append(now)
             }
             if trailPoints.count > homeTrailMaxLength {
                 let removed = trailPoints.count - homeTrailMaxLength
                 trailPoints.removeFirst(removed)
+                trailTimes.removeFirst(min(removed, trailTimes.count))   // stay in lockstep
                 // Advance the tail hue by exactly the number of
                 // segments we dropped — every remaining segment
                 // keeps its original colour.
@@ -568,6 +607,7 @@ struct HomeView: View {
         } else if !trailPoints.isEmpty {
             // Player just switched to .none — clear any residual trail.
             trailPoints.removeAll(keepingCapacity: true)
+            trailTimes.removeAll(keepingCapacity: true)
             trailHueOffset = 0.0
         }
     }
@@ -584,7 +624,8 @@ struct HomeView: View {
         Canvas { ctx, _ in
             drawRichTrail(ctx, points: trailPoints,
                           trail: gameState.equippedTrail,
-                          t: Date().timeIntervalSinceReferenceDate)
+                          t: Date().timeIntervalSinceReferenceDate,
+                          times: trailTimes)
         }
     }
 
@@ -1103,18 +1144,55 @@ struct HomeView: View {
         return Self.zenPuns[((i % n) + n) % n]
     }
 
+    /// (Re)schedule the hop into the game so it fires exactly when the spiral
+    /// reaches `launchPushProgress` at the *current* speed.  Called on launch and
+    /// again after every rush tap, so a shortened spiral lands the game sooner.
+    private func scheduleLaunchPush() {
+        launchPushWork?.cancel()
+        let elapsed = Date().timeIntervalSince(launchStart)
+        let remaining = max(0, Self.launchPushProgress * launchDuration - elapsed)
+        let push = DispatchWorkItem {
+            guard !launchPushed else { return }
+            launchPushed = true
+            nav.path.append(currentModeRoute)
+            // Reset after the push so the overlay isn't lingering on pop-back.
+            let reset = DispatchWorkItem { launching = false }
+            launchResetWork = reset
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.launchResetDelay, execute: reset)
+        }
+        launchPushWork = push
+        DispatchQueue.main.asyncAfter(deadline: .now() + remaining, execute: push)
+    }
+
+    /// Tapping the screen mid-launch rushes the marble in: shrink the remaining
+    /// spiral length (re-anchoring `launchStart` so progress stays continuous —
+    /// the marble never teleports, it just winds in faster) and pull the
+    /// game-push in to match.  Repeated taps stack down to `launchMinDuration`.
+    private func rushLaunch() {
+        guard launching, !launchPushed else { return }
+        let now = Date()
+        let p = min(1.0, max(0, now.timeIntervalSince(launchStart) / launchDuration))
+        guard p < Self.launchPushProgress else { return }     // already arriving
+        let shorter = max(Self.launchMinDuration, launchDuration * Self.launchRushFactor)
+        guard shorter < launchDuration else { return }         // already at the floor
+        launchDuration = shorter
+        // Hold the current progress `p` fixed at `now`; only the slope steepens.
+        launchStart = now.addingTimeInterval(-p * shorter)
+        if gameState.hapticsEnabled { Haptics.light() }
+        scheduleLaunchPush()
+    }
+
     private var playButton: some View {
         Button {
             guard !launching else { return }
+            launchPushWork?.cancel(); launchResetWork?.cancel()
+            launchPushed = false
             launchStart = .now
+            launchDuration = LaunchTransition.defaultDuration
             launching = true
-            // Whirlpool-into-portal flourish; push once the screen has gone black
-            // (~3.3s into the 3.4s spiral), so the game reveals from under it.
-            // Reset after the push so the overlay isn't lingering on pop-back.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
-                nav.path.append(currentModeRoute)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { launching = false }
-            }
+            // Whirlpool-into-portal flourish; the game pushes once the screen has
+            // gone black (~3.3s in) — or sooner, if the player taps to rush it.
+            scheduleLaunchPush()
         } label: {
             playButtonBody
         }

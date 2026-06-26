@@ -784,14 +784,17 @@ extension View {
 /// ball's own coordinate space, so the two are layered but independent.
 struct LaunchTransition: View {
     let since: Date
-    static let duration: Double = 3.4
+    /// Live spiral length in seconds.  Shrinks when the player taps to rush the
+    /// launch (see HomeView.rushLaunch); the unrushed default is `defaultDuration`.
+    let duration: Double
+    static let defaultDuration: Double = 3.4
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             let c = CGPoint(x: w / 2, y: h / 2)
             TimelineView(.animation) { tl in
-                let p = min(1.0, tl.date.timeIntervalSince(since) / Self.duration)  // 0→1
+                let p = min(1.0, tl.date.timeIntervalSince(since) / duration)  // 0→1
                 let glow   = Double(pow(p, 2.0))                   // portal brightens as ball nears
                 let blackP = max(0.0, (p - 0.78) / 0.18)           // black covers only at the very end (p≈0.96), after the long spiral
                 let blackSize = CGFloat(blackP) * hypot(w, h) * 1.2
@@ -827,26 +830,40 @@ struct LaunchBall: View {
     let center: CGPoint       // arena centre — the drain
     let diameter: CGFloat     // starting size (matches the home ball)
     let since: Date
-    private static let turns: Double = 5.5
+    let duration: Double      // live spiral length; shrinks on a rush tap
+    private static let turns: Double = 6.0
 
-    /// Whirlpool path position at progress `pp` (0…1): slow loops out wide,
-    /// whipping faster as the inward pull (spin = pp²) drags it to the centre.
+    /// Whirlpool path position at progress `pp` (0…1).  Tuned to read like the
+    /// cold-open vortex in `IntroView`: the radius draws inward *steadily* from
+    /// the first frame — no dwelling out at the rim — while the angular speed
+    /// ramps up toward the centre, so the marble winds ever tighter as it
+    /// drains (a real whirlpool whip rather than slow, wide outer orbits).
+    ///
+    /// Decoupling the two easings is the whole trick.  A single `pp²` used to
+    /// drive *both* radius and angle, which left the ball loitering at full
+    /// radius for ~2s and only whipping in at the very end.  Now `radEase`
+    /// (linear → steady draw) and `angEase` (ease-in → accelerating spin) are
+    /// independent.  `pos(0) == start` and `pos(1) == center` still hold, so the
+    /// spiral begins exactly where the roaming home ball sits.
     /// A method (not a closure-local func) so it lives outside the ViewBuilder.
     private func pos(_ pp: Double) -> CGPoint {
         let r0 = hypot(start.x - center.x, start.y - center.y)
         let a0 = Double(atan2(start.y - center.y, start.x - center.x))
-        let spin = pow(pp, 2.0)
-        let rad  = r0 * CGFloat(1 - spin)
-        let ang  = a0 + spin * 2 * .pi * Self.turns
+        let radEase = pp                 // steady inward draw — kills the rim-dwell
+        let angEase = pow(pp, 1.7)       // angular speed ramps up toward the centre
+        let rad = r0 * CGFloat(1 - radEase)
+        let ang = a0 + angEase * 2 * .pi * Self.turns
         return CGPoint(x: center.x + CGFloat(cos(ang)) * rad,
                        y: center.y + CGFloat(sin(ang)) * rad)
     }
 
     var body: some View {
         TimelineView(.animation) { tl in
-            let p  = min(1.0, tl.date.timeIntervalSince(since) / LaunchTransition.duration)
+            let p  = min(1.0, tl.date.timeIntervalSince(since) / duration)
             let here     = pos(p)
-            let ballSize = max(7, diameter * (1 - CGFloat(pow(p, 2.0))))
+            // Shrinks steadily alongside the inward draw (was a late pp² drop,
+            // which kept the ball large while the old rim-dwell played out).
+            let ballSize = max(7, diameter * (1 - CGFloat(pow(p, 1.6))))
             let blackP   = max(0.0, (p - 0.78) / 0.18)
 
             ZStack {
