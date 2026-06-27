@@ -79,6 +79,26 @@ create table if not exists public.players (
     pinball_best         int         not null default 0,
     zen_seconds          int         not null default 0,
     goldrush_best        int         not null default 0,
+    -- Competitive-mode leaderboards (client-synced).  Each mode persists a
+    -- personal best (mode-specific units) plus a lifetime win tally; the boards
+    -- rank by wins, then best as the tiebreaker.
+    --   snake_*     — Comet Clash  (best = power; wins = rounds won)
+    --   sumo_*      — Sumo Survival(best = points; wins = 1st-place finishes)
+    --   paintball_* — Paint Ball   (best = coverage %; wins = rounds won)
+    --   marblecup_* — Marble Cup   (best = goals; wins = matches won)
+    --   koth_*      — King of the Hill (best = hold seconds; wins = rounds won)
+    --   goldrush_*  — Coin Pit     (best already above; goldrush_wins added here)
+    snake_best           int         not null default 0,
+    sumo_best            int         not null default 0,
+    paintball_best       int         not null default 0,
+    marblecup_best       int         not null default 0,
+    koth_best            int         not null default 0,
+    snake_wins           int         not null default 0,
+    sumo_wins            int         not null default 0,
+    paintball_wins       int         not null default 0,
+    marblecup_wins       int         not null default 0,
+    koth_wins            int         not null default 0,
+    goldrush_wins        int         not null default 0,
 
     -- Lives economy mirror (the canonical timer still lives on-device; this is
     -- the shareable count clans/friends can top up via life_gifts).
@@ -92,6 +112,17 @@ create table if not exists public.players (
     constraint players_pinball_nonneg     check (pinball_best     >= 0),
     constraint players_zen_nonneg         check (zen_seconds      >= 0),
     constraint players_goldrush_nonneg    check (goldrush_best    >= 0),
+    constraint players_snake_best_nonneg     check (snake_best     >= 0),
+    constraint players_sumo_best_nonneg      check (sumo_best      >= 0),
+    constraint players_paintball_best_nonneg check (paintball_best >= 0),
+    constraint players_marblecup_best_nonneg check (marblecup_best >= 0),
+    constraint players_koth_best_nonneg      check (koth_best      >= 0),
+    constraint players_snake_wins_nonneg     check (snake_wins     >= 0),
+    constraint players_sumo_wins_nonneg      check (sumo_wins      >= 0),
+    constraint players_paintball_wins_nonneg check (paintball_wins >= 0),
+    constraint players_marblecup_wins_nonneg check (marblecup_wins >= 0),
+    constraint players_koth_wins_nonneg      check (koth_wins      >= 0),
+    constraint players_goldrush_wins_nonneg  check (goldrush_wins  >= 0),
     constraint players_lives_nonneg       check (lives            >= 0)
 );
 
@@ -118,6 +149,14 @@ create index if not exists players_pinball_idx  on public.players (pinball_best 
 create index if not exists players_zen_idx      on public.players (zen_seconds   desc);
 create index if not exists players_goldrush_idx on public.players (goldrush_best desc);
 
+-- Competitive-mode boards rank by wins, then best as the tiebreaker.
+create index if not exists players_snake_idx        on public.players (snake_wins     desc, snake_best     desc);
+create index if not exists players_sumo_idx         on public.players (sumo_wins      desc, sumo_best      desc);
+create index if not exists players_paintball_idx    on public.players (paintball_wins desc, paintball_best desc);
+create index if not exists players_marblecup_idx    on public.players (marblecup_wins desc, marblecup_best desc);
+create index if not exists players_koth_idx         on public.players (koth_wins      desc, koth_best      desc);
+create index if not exists players_goldrush_wins_idx on public.players (goldrush_wins  desc, goldrush_best  desc);
+
 -- ── Migration for existing deployments ───────────────────────────────────
 -- Run once on databases created before these columns existed. Safe + additive
 -- (each defaults to 0). MUST be applied before shipping the client build that
@@ -126,7 +165,19 @@ alter table public.players
     add column if not exists coins_collected int not null default 0,
     add column if not exists pinball_best     int not null default 0,
     add column if not exists zen_seconds      int not null default 0,
-    add column if not exists goldrush_best    int not null default 0;
+    add column if not exists goldrush_best    int not null default 0,
+    -- Competitive-mode best + win columns (migration: add_competitive_leaderboard_stats).
+    add column if not exists snake_best       int not null default 0,
+    add column if not exists sumo_best        int not null default 0,
+    add column if not exists paintball_best   int not null default 0,
+    add column if not exists marblecup_best   int not null default 0,
+    add column if not exists koth_best        int not null default 0,
+    add column if not exists snake_wins       int not null default 0,
+    add column if not exists sumo_wins        int not null default 0,
+    add column if not exists paintball_wins   int not null default 0,
+    add column if not exists marblecup_wins   int not null default 0,
+    add column if not exists koth_wins        int not null default 0,
+    add column if not exists goldrush_wins    int not null default 0;
 
 -- =============================================================================
 -- Table: public.clans  — collaborative groups.

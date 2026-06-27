@@ -526,6 +526,7 @@ struct MarbleCupView: View {
             awarded = true
             let banked = playerGoals * coinsPerGoal + (playerWon ? winBonus : 0)
             if banked > 0 { gameState.addCoins(banked) }
+            gameState.recordCompetitiveScore("marblecup", playerGoals)   // leaderboard best (goals)
             AnalyticsClient.shared.track(
                 "marblecup_match_over",
                 properties: ["won": .bool(playerWon),

@@ -488,6 +488,7 @@ struct SnakeGameView: View {
             let collects = playerCycle?.collects ?? 0
             let banked = power * coinsPerPower + (didWin ? winBonus : 0)
             if banked > 0 { gameState.addCoins(banked) }
+            gameState.recordCompetitiveScore("snake", power)   // leaderboard best
             AnalyticsClient.shared.track(
                 "comet_round_over",
                 properties: ["won": .bool(didWin),
