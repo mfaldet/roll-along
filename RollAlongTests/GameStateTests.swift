@@ -35,6 +35,74 @@ final class GameStateTests: XCTestCase {
         GameState(defaults: defaults)
     }
 
+    // MARK: - Challenge of the Day
+
+    func testDailyChallenge_fullPass_awards30CoinsAndLocksDay() {
+        let gs = makeGameState()
+        gs.coinBalance = 0
+        gs.startDailyChallenge()
+        XCTAssertEqual(gs.dailyChallengeAttemptsLeft, 3)
+        XCTAssertFalse(gs.dailyChallengeDoneToday)
+
+        // Clear every sub-level of today's gauntlet.
+        var done = false
+        while !done { done = gs.advanceDailyChallenge() }
+        gs.completeTodaysDailyChallenge()
+
+        XCTAssertEqual(gs.todaysDailyChallenge.rewardCoins, 30, "CotD reward is a flat 30 coins")
+        XCTAssertEqual(gs.coinBalance, 30, "clearing the day banks exactly 30 coins")
+        XCTAssertTrue(gs.dailyChallengeDoneToday)
+        XCTAssertFalse(gs.dailyChallengeFailedToday)
+        XCTAssertTrue(gs.dailyChallengeSettledToday)
+    }
+
+    func testDailyChallenge_completeIsIdempotent_doesNotDoubleReward() {
+        let gs = makeGameState()
+        gs.coinBalance = 0
+        gs.startDailyChallenge()
+        var done = false
+        while !done { done = gs.advanceDailyChallenge() }
+        gs.completeTodaysDailyChallenge()
+        gs.completeTodaysDailyChallenge()   // second call must be a no-op
+        XCTAssertEqual(gs.coinBalance, 30)
+    }
+
+    func testDailyChallenge_threeFailures_exhaustsAttemptsAndFailsDay() {
+        let gs = makeGameState()
+        gs.startDailyChallenge()
+        XCTAssertFalse(gs.recordDailyAttemptFailure())   // 3 -> 2
+        XCTAssertEqual(gs.dailyChallengeAttemptsLeft, 2)
+        XCTAssertFalse(gs.recordDailyAttemptFailure())   // 2 -> 1
+        XCTAssertTrue(gs.recordDailyAttemptFailure())    // 1 -> 0, exhausted
+        XCTAssertEqual(gs.dailyChallengeAttemptsLeft, 0)
+
+        gs.failTodaysDailyChallenge()
+        XCTAssertTrue(gs.dailyChallengeFailedToday)
+        XCTAssertTrue(gs.dailyChallengeSettledToday)
+        XCTAssertFalse(gs.dailyChallengeDoneToday, "a failed day is not a cleared day")
+    }
+
+    func testDailyChallenge_advancingASubLevel_refreshesAttempts() {
+        let gs = makeGameState()
+        gs.startDailyChallenge()
+        guard gs.todaysDailyChallenge.levelCount >= 2 else {
+            return   // single-level day — nothing to advance into
+        }
+        _ = gs.recordDailyAttemptFailure()                // 3 -> 2
+        XCTAssertEqual(gs.dailyChallengeAttemptsLeft, 2)
+        let done = gs.advanceDailyChallenge()             // into sub-level 1
+        XCTAssertFalse(done)
+        XCTAssertEqual(gs.dailyChallengeAttemptsLeft, 3, "each new sub-level grants a fresh 3")
+    }
+
+    func testDailyChallenge_failurePersistsAcrossReload() {
+        let gs = makeGameState()
+        gs.failTodaysDailyChallenge()
+        XCTAssertTrue(gs.dailyChallengeFailedToday)
+        let reloaded = GameState(defaults: defaults)
+        XCTAssertTrue(reloaded.dailyChallengeFailedToday, "failure is saved + reloaded")
+    }
+
     // MARK: - addCoins — normal cases
 
     func testAddCoins_positiveAmount_increasesBalance() {

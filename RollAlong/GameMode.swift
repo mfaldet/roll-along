@@ -467,7 +467,7 @@ struct DailyChallenge {
         ]
         let title      = titlePool[next(titlePool.count)]
         let levelCount = 1 + next(3)              // 1…3 brutal levels
-        let reward     = 120 + levelCount * 60    // 180 / 240 / 300
+        let reward     = 30                        // flat 30 coins for clearing the day
         return DailyChallenge(dateKey: key(date), title: title,
                               levelCount: levelCount, seed: dayNum, rewardCoins: reward)
     }

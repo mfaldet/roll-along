@@ -180,13 +180,19 @@ struct GameMenuView: View {
     // MARK: - Challenge of the Day (skinny banner)
 
     private var challengeOfTheDay: some View {
-        let ch = gameState.todaysDailyChallenge
-        let done = gameState.dailyChallengeDoneToday
+        let ch      = gameState.todaysDailyChallenge
+        let done    = gameState.dailyChallengeDoneToday
+        let failed  = gameState.dailyChallengeFailedToday
+        let settled = done || failed   // no replays once the day is decided
+        let green   = Color(red: 0.30, green: 0.92, blue: 0.50)
+
         return NavigationLink(value: HomeRoute.mode("daily")) {
             HStack(spacing: 14) {
-                Image(systemName: done ? "checkmark.seal.fill" : "bolt.fill")
+                // Leading mark: a GREEN check when cleared, otherwise the bolt
+                // (greyed along with the whole banner when the day is failed).
+                Image(systemName: done ? "checkmark.circle.fill" : "bolt.fill")
                     .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(done ? green : .white)
                     .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("CHALLENGE OF THE DAY")
@@ -196,18 +202,25 @@ struct GameMenuView: View {
                     Text(ch.title)
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Text(done
-                         ? "Cleared! Come back tomorrow."
-                         : "\(ch.levelCount) brutal level\(ch.levelCount == 1 ? "" : "s") · +\(ch.rewardCoins) coins")
+                    // No coins language on the banner copy (the reward shows as
+                    // a badge only once it's earned).
+                    Text(done   ? "Cleared! Come back tomorrow."
+                         : failed ? "Out of attempts — try again tomorrow."
+                         : "\(ch.levelCount) brutal level\(ch.levelCount == 1 ? "" : "s")")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.9))
                 }
                 Spacer()
+                // Trailing affordance: cleared → "+30 🪙" reward badge;
+                // failed → nothing; fresh → the play button.
                 if done {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .black))
-                        .foregroundStyle(.white)
-                } else {
+                    HStack(spacing: 4) {
+                        Text("+\(ch.rewardCoins)")
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        CoinIcon(size: 18)
+                    }
+                } else if !failed {
                     Image(systemName: "play.fill")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.black)
@@ -220,19 +233,28 @@ struct GameMenuView: View {
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(LinearGradient(
-                        colors: done
+                        colors: settled
                             ? [Color(white: 0.22), Color(white: 0.14)]
                             : [Color(red: 0.96, green: 0.34, blue: 0.24),
                                Color(red: 0.99, green: 0.63, blue: 0.20)],
                         startPoint: .leading, endPoint: .trailing))
             )
-            .shadow(color: Color(red: 0.96, green: 0.4, blue: 0.2).opacity(done ? 0 : 0.35), radius: 8, y: 4)
+            // Green border ONLY when cleared.  Failed/fresh have no border.
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(green, lineWidth: done ? 2.5 : 0)
+            )
+            .shadow(color: Color(red: 0.96, green: 0.4, blue: 0.2).opacity(settled ? 0 : 0.35), radius: 8, y: 4)
+            // Fully greyed when the day was failed.
+            .opacity(failed ? 0.55 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(settled)   // can't replay a cleared or failed day
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Challenge of the Day: \(ch.title). "
-                            + (done ? "Cleared today."
-                                    : "\(ch.levelCount) levels for \(ch.rewardCoins) coins."))
+                            + (done   ? "Cleared today. Plus \(ch.rewardCoins) coins earned."
+                               : failed ? "Out of attempts today. Try again tomorrow."
+                               : "\(ch.levelCount) brutal levels."))
         .accessibilityIdentifier("dailyChallenge")
     }
 
