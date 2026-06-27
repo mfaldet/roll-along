@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showResetAlert = false
     @State private var showCosmeticResetAlert = false
+    @State private var cosmeticResetMessage: String?
     @State private var showDeleteAccountAlert = false
     @State private var isDeletingAccount = false
     @State private var deleteAccountError: String?
@@ -68,10 +69,15 @@ struct SettingsView: View {
             Text("This wipes all level progress — stars, coins, and best times. Your cosmetics, nickname, and settings will be kept.")
         }
         .alert("Reset Cosmetics?", isPresented: $showCosmeticResetAlert) {
-            Button("Reset", role: .destructive) { gameState.liquidateCoinCosmetics() }
+            Button("Reset", role: .destructive) {
+                let r = gameState.liquidateCoinCosmetics()
+                cosmeticResetMessage = r.coins > 0
+                    ? "Reset your look to default and refunded \(r.coins) coins from \(r.count) cosmetic\(r.count == 1 ? "" : "s")."
+                    : "Reset your look to the default red ball."
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This relocks every cosmetic you bought with coins and refunds those coins. Cosmetics you earned (challenge-pack rewards) or that came with a purchase (the Diamond & Aurora skins) are kept, as is your level progress. This can't be undone.")
+            Text("This resets your equipped look to the default (red ball, no trail), relocks every cosmetic you bought with coins, and refunds those coins. Cosmetics you earned (challenge-pack rewards) or that came with a purchase (the Diamond & Aurora skins) are kept — just unequipped. Your level progress is untouched. This can't be undone.")
         }
     }
 
@@ -636,9 +642,9 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Reset Cosmetics")
                             .font(.system(.body, design: .rounded))
-                        Text(cosmetic.count == 0
-                             ? "No coin-bought cosmetics to refund"
-                             : "Refund \(cosmetic.count) coin-bought item\(cosmetic.count == 1 ? "" : "s")")
+                        Text(cosmetic.count > 0
+                             ? "Reset look · refund \(cosmetic.count) coin item\(cosmetic.count == 1 ? "" : "s")"
+                             : "Reset your look to default")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.4))
                     }
@@ -653,8 +659,14 @@ struct SettingsView: View {
                 .padding()
                 .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
-            .disabled(cosmetic.count == 0)
-            .opacity(cosmetic.count == 0 ? 0.5 : 1)
+            .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
+            .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
+            if let m = cosmeticResetMessage {
+                Text(m)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(red: 0.3, green: 0.8, blue: 0.45))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

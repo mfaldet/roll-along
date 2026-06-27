@@ -114,6 +114,45 @@ final class CosmeticsTests: XCTestCase {
         return GameState(defaults: defaults)
     }
 
+    // MARK: - Reset Cosmetics (coin liquidation)
+
+    func testLiquidate_refundsCoinItems_keepsExclusives_resetsLook() {
+        let gs = makeCleanState()
+        gs.coinBalance = 0
+        gs.ownedBallSkins.insert(BallSkin.blue.rawValue)     // coin (standard)
+        gs.ownedBallSkins.insert(BallSkin.diamond.rawValue)  // IAP-exclusive — keep
+        gs.ownedGoals.insert(GoalSkin.galaxy.rawValue)        // coin (standard)
+        gs.activeSkin   = .blue
+        gs.equippedGoal = .galaxy
+
+        let preview = gs.coinLiquidationPreview()
+        XCTAssertEqual(preview.count, 2)   // .blue + .galaxy; .diamond excluded
+        XCTAssertEqual(preview.coins, BallSkin.blue.coinCost + GoalSkin.galaxy.coinCost)
+
+        let r = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(r.count, 2)
+        XCTAssertEqual(gs.coinBalance, r.coins)                                // refunded
+        XCTAssertFalse(gs.ownedBallSkins.contains(BallSkin.blue.rawValue))     // coin relocked
+        XCTAssertFalse(gs.ownedGoals.contains(GoalSkin.galaxy.rawValue))
+        XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.diamond.rawValue))   // exclusive kept
+        XCTAssertEqual(gs.activeSkin, .red)        // look reset to default
+        XCTAssertEqual(gs.equippedGoal, .target)
+        XCTAssertTrue(gs.isLoadoutDefault)
+    }
+
+    func testLiquidate_resetsLookEvenWithNoCoinItems() {
+        let gs = makeCleanState()
+        gs.ownedBallSkins.insert(BallSkin.diamond.rawValue)  // kept exclusive, equipped
+        gs.activeSkin = .diamond
+        XCTAssertFalse(gs.isLoadoutDefault)
+
+        let r = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(r.count, 0)                 // nothing to refund…
+        XCTAssertEqual(gs.activeSkin, .red)        // …but the look still resets
+        XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.diamond.rawValue))   // diamond re-equippable
+        XCTAssertTrue(gs.isLoadoutDefault)
+    }
+
     func testBundleDiscount_percentMapping() {
         XCTAssertEqual(BundleDiscount.common.percent,    10)
         XCTAssertEqual(BundleDiscount.rare.percent,      15)

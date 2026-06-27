@@ -578,15 +578,26 @@ final class GameState: ObservableObject {
         // Bundle/pack ownership is a UI badge only (items were owned individually
         // and handled above) — clear it and drop any equipped pack.
         ownedBundles = []; ownedPacks = []; equippedPackID = nil
-        // Re-equip starters for any slot whose equipped item is no longer owned.
-        if !ownedBallSkins.contains(activeSkin.rawValue)  { activeSkin    = .starter }
-        if !ownedGoals.contains(equippedGoal.rawValue)    { equippedGoal  = .starter }
-        if !ownedTrails.contains(equippedTrail.rawValue)  { equippedTrail = .starter }
-        if !ownedFloors.contains(equippedFloor.rawValue)  { equippedFloor = .starter }
-        if !ownedPits.contains(equippedPit.rawValue)      { equippedPit   = .starter }
-        if !ownedMusic.contains(equippedMusic.rawValue)   { equippedMusic = .starter }
+        // Reset the WHOLE equipped loadout to the default starters — red ball, no
+        // trail, etc. — regardless of whether each item was liquidated. Kept
+        // exclusives (Diamond/Aurora/earned) stay owned and can be re-equipped.
+        activeSkin    = .starter
+        equippedGoal  = .starter
+        equippedTrail = .starter
+        equippedFloor = .starter
+        equippedPit   = .starter
+        equippedMusic = .starter
         addCoins(coins)
         return (count, coins)
+    }
+
+    /// True when the equipped loadout is already the all-default starters (used
+    /// to enable "Reset Cosmetics" whenever there's a look to reset, even if
+    /// there are no coin cosmetics to refund).
+    var isLoadoutDefault: Bool {
+        activeSkin == .starter && equippedGoal == .starter && equippedTrail == .starter
+            && equippedFloor == .starter && equippedPit == .starter
+            && equippedMusic == .starter && equippedPackID == nil
     }
 
     // MARK: - Result recording
