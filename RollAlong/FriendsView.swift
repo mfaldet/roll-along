@@ -104,6 +104,8 @@ struct FriendsView: View {
                 VStack(spacing: 22) {
                     searchField
 
+                    if searchTerm.isEmpty { inviteRow }
+
                     if !searchTerm.isEmpty {
                         searchSection
                     }
@@ -158,6 +160,48 @@ struct FriendsView: View {
         .background(
             RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14))
         )
+    }
+
+    // MARK: - Invite (share a deep link so a friend can add you)
+
+    /// A `rollalong://player/<my id>` link a friend taps to open your profile
+    /// and add you back.  Only shown when signed in (so there's an id to share).
+    @ViewBuilder
+    private var inviteRow: some View {
+        if let me = myId {
+            let link = URL(string: "rollalong://player/\(me.uuidString)")!
+            let who  = gameState.playerName.isEmpty ? "me" : gameState.playerName
+            ShareLink(item: link,
+                      subject: Text("Add me on Roll Along"),
+                      message: Text("Add \(who) on Roll Along so we can send each other lives! Tap: \(link.absoluteString)")) {
+                HStack(spacing: 10) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Invite a friend")
+                            .font(.system(.body, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text("Share a link so they can add you")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color(white: 0.6))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color(white: 0.45))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.18))
+                        .overlay(RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.45), lineWidth: 1))
+                )
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     @ViewBuilder
@@ -307,23 +351,31 @@ struct FriendsView: View {
         let level = profile?.climbLevel ?? 1
         let world = World.world(for: max(1, level))
         return HStack(spacing: 14) {
-            avatar(name, tint: world.accent)
-            HStack(spacing: 8) {
-                Text(name)
-                    .font(.system(.body, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text("\(level)")
-                    .font(.system(.caption, design: .rounded).weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(world.accent.opacity(0.28))
-                            .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
-                    )
+            Button {
+                if let profile { nav.goToPlayer(profile) }
+            } label: {
+                HStack(spacing: 14) {
+                    avatar(name, tint: world.accent)
+                    HStack(spacing: 8) {
+                        Text(name)
+                            .font(.system(.body, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text("\(level)")
+                            .font(.system(.caption, design: .rounded).weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule().fill(world.accent.opacity(0.28))
+                                    .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
+                            )
+                    }
+                }
             }
+            .buttonStyle(.plain)
+            .disabled(profile == nil)
             Spacer(minLength: 8)
             trailing()
         }

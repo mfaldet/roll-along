@@ -219,7 +219,7 @@ final class SocialClient: @unchecked Sendable {
     func fetchProfiles(ids: [UUID]) async throws -> [PlayerProfile] {
         guard !ids.isEmpty else { return [] }
         let list = ids.map { $0.uuidString }.joined(separator: ",")
-        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives"
+        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives,needs_lives_at"
             + "&id=in.(\(list))"
         let data = try await send(method: "GET", path: "players", query: query)
         return try decode([PlayerProfile].self, from: data)
@@ -372,6 +372,45 @@ final class SocialClient: @unchecked Sendable {
                            query: "id=eq.\(id.uuidString)", prefer: "return=minimal")
     }
 
+    // MARK: - Ask for a life + clan activity feed  (schema v2)
+
+    /// Flag yourself as needing lives ("Ask for a life") — clan-mates see it on
+    /// the roster and can send.  Sets players.needs_lives_at = now().
+    func askForLives() async throws {
+        let me = try requireSession()
+        let body = NeedsLivesPatch(needs_lives_at: Self.iso.string(from: Date()))
+        _ = try await send(method: "PATCH", path: "players",
+                           query: "id=eq.\(me.userId.uuidString)",
+                           bodyData: try encoder.encode(body), prefer: "return=minimal")
+    }
+
+    /// Clear the needs-lives flag (topped up, or cancelled).
+    func clearNeedsLives() async throws {
+        let me = try requireSession()
+        let body = NeedsLivesPatch(needs_lives_at: nil)
+        _ = try await send(method: "PATCH", path: "players",
+                           query: "id=eq.\(me.userId.uuidString)",
+                           bodyData: try encoder.encode(body), prefer: "return=minimal")
+    }
+
+    /// Recent clan activity (newest first) — powers the activity feed.
+    func fetchClanEvents(clanId: UUID, limit: Int = 40) async throws -> [ClanEvent] {
+        _ = try requireSession()
+        let query = "select=id,clan_id,actor_id,target_id,kind,created_at"
+            + "&clan_id=eq.\(clanId.uuidString)&order=created_at.desc&limit=\(limit)"
+        let data = try await send(method: "GET", path: "clan_events", query: query)
+        return try decode([ClanEvent].self, from: data)
+    }
+
+    /// Post a clan activity event (joined / left / sent_life / requested_life / thanked).
+    func postClanEvent(clanId: UUID, kind: String, target: UUID? = nil) async throws {
+        let me = try requireSession()
+        let body = ClanEventInsert(clan_id: clanId, actor_id: me.userId,
+                                   target_id: target, kind: kind)
+        _ = try await send(method: "POST", path: "clan_events",
+                           bodyData: try encoder.encode([body]), prefer: "return=minimal")
+    }
+
     // MARK: - Networking core
 
     private func requireSession() throws -> Session {
@@ -430,7 +469,7 @@ enum SocialError: Error {
 // ===========================================================================
 
 /// A player's public profile + game stats (no PII).
-struct PlayerProfile: Codable, Identifiable {
+struct PlayerProfile: Codable, Identifiable, Hashable {
     let id: UUID
     var displayName: String
     var climbLevel: Int
@@ -451,6 +490,12 @@ struct PlayerProfile: Codable, Identifiable {
     var createdAt: String?
     var updatedAt: String?
     var lastSeenAt: String?
+    // When the player last tapped "Ask for a life" (null = not asking). Optional
+    // + decode-resilient like the stats above.
+    var needsLivesAt: String?
+
+    /// True when the player is currently asking clan-mates for lives.
+    var isAskingForLives: Bool { (needsLivesAt?.isEmpty == false) }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -466,6 +511,7 @@ struct PlayerProfile: Codable, Identifiable {
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
+        case needsLivesAt     = "needs_lives_at"
     }
 }
 
@@ -519,7 +565,7 @@ struct Friendship: Codable, Identifiable {
 }
 
 /// A collaborative group.  `tag` is the short [TAG] shown beside member names.
-struct Clan: Codable, Identifiable {
+struct Clan: Codable, Identifiable, Hashable {
     let id: UUID
     var name: String
     var tag: String
@@ -552,6 +598,26 @@ struct ClanMember: Codable, Identifiable {
         case playerId = "player_id"
         case role
         case joinedAt = "joined_at"
+    }
+}
+
+/// A clan activity-feed entry (schema v2).  `targetId` is the other player for
+/// pair events (sent_life / thanked).
+struct ClanEvent: Codable, Identifiable {
+    let id: UUID
+    let clanId: UUID
+    let actorId: UUID
+    let targetId: UUID?
+    let kind: String
+    var createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case clanId    = "clan_id"
+        case actorId   = "actor_id"
+        case targetId  = "target_id"
+        case kind
+        case createdAt = "created_at"
     }
 }
 
@@ -612,4 +678,23 @@ private struct ClanMemberInsert: Encodable {
     let clan_id: UUID
     let player_id: UUID
     let role: String
+}
+
+private struct ClanEventInsert: Encodable {
+    let clan_id: UUID
+    let actor_id: UUID
+    let target_id: UUID?   // nil → omitted → column null (fine for solo events)
+    let kind: String
+}
+
+/// PATCH payload that forces `needs_lives_at` to a value OR explicit null (so
+/// clearing actually nulls the column instead of omitting the key).
+private struct NeedsLivesPatch: Encodable {
+    let needs_lives_at: String?
+    enum CodingKeys: String, CodingKey { case needs_lives_at }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        if let v = needs_lives_at { try c.encode(v, forKey: .needs_lives_at) }
+        else { try c.encodeNil(forKey: .needs_lives_at) }
+    }
 }
