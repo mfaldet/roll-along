@@ -30,12 +30,16 @@ struct RollAlongApp: App {
                     await store.bootstrap(with: gameState)
                 }
                 .task {
-                    // Bootstrap Google Mobile Ads — requests ATT once on
-                    // first cold start (after the user has seen the rest of
-                    // the app at least briefly), initialises the SDK, and
-                    // pre-loads the first rewarded ad so the "Watch ad" tap
-                    // is instant.
+                    // Bootstrap Google Mobile Ads — initialises the SDK and
+                    // pre-loads the first rewarded ad so the "Watch ad" tap is
+                    // instant.  No ATT prompt — ads are always non-personalised.
                     await ads.bootstrap(with: gameState)
+                }
+                .task {
+                    // Restore a persisted Sign in with Apple session (refresh
+                    // token in the Keychain) so the player stays signed in
+                    // across launches without re-authenticating.
+                    await AppleAuthManager.shared.restoreSession()
                 }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared

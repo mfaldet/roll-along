@@ -91,6 +91,7 @@ final class AppleAuthManager: NSObject, ObservableObject {
     /// just drops our Supabase token so the social layer goes quiet again.)
     func signOut() {
         SocialClient.shared.clearSession()
+        Keychain.delete(Self.refreshTokenKey)
         isSignedIn = false
     }
 
@@ -117,17 +118,64 @@ final class AppleAuthManager: NSObject, ObservableObject {
             }
 
             let session = try JSONDecoder().decode(SupabaseSession.self, from: data)
-            guard let userId = UUID(uuidString: session.user.id) else {
-                throw AuthError.message("Auth server returned an unreadable user id.")
-            }
-
-            SocialClient.shared.setSession(accessToken: session.access_token, userId: userId)
-            isSignedIn = true
-            isWorking  = false
+            try install(session)
             onSignedIn?()
         } catch {
             fail(error.localizedDescription)
         }
+    }
+
+    // MARK: - Session persistence (stay signed in across launches)
+
+    /// Keychain key for the Supabase refresh token.
+    private static let refreshTokenKey = "ra_supabase_refresh_token"
+
+    /// Restore a signed-in session on launch by trading the persisted refresh
+    /// token for a fresh access token.  No-op (stays signed out) when there's
+    /// no stored token or it has expired / been revoked.  Call once at launch.
+    func restoreSession() async {
+        guard !isSignedIn, let token = Keychain.read(Self.refreshTokenKey) else { return }
+        do {
+            let session = try await refreshSession(refreshToken: token)
+            try install(session)
+            onSignedIn?()
+        } catch {
+            // Expired / revoked / invalid — drop it; the user can sign in again.
+            Keychain.delete(Self.refreshTokenKey)
+        }
+    }
+
+    /// Exchange a refresh token for a fresh Supabase session.  Supabase rotates
+    /// the refresh token on each use, so `install` persists the new one.
+    private func refreshSession(refreshToken: String) async throws -> SupabaseSession {
+        let url = URL(string: "\(Self.projectURL)/auth/v1/token?grant_type=refresh_token")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Self.apiKey,        forHTTPHeaderField: "apikey")
+        req.httpBody = try JSONEncoder().encode(RefreshGrant(refresh_token: refreshToken))
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200...299).contains(status) else {
+            throw AuthError.message("Token refresh failed (\(status)).")
+        }
+        return try JSONDecoder().decode(SupabaseSession.self, from: data)
+    }
+
+    /// Install a freshly-minted session: hand the access token to
+    /// `SocialClient`, persist the (rotated) refresh token for next launch, and
+    /// flip the published flags.
+    private func install(_ session: SupabaseSession) throws {
+        guard let userId = UUID(uuidString: session.user.id) else {
+            throw AuthError.message("Auth server returned an unreadable user id.")
+        }
+        SocialClient.shared.setSession(accessToken: session.access_token, userId: userId)
+        if let refresh = session.refresh_token {
+            Keychain.save(refresh, for: Self.refreshTokenKey)
+        }
+        isSignedIn = true
+        isWorking  = false
     }
 
     private func fail(_ message: String) {
@@ -236,8 +284,13 @@ private struct IdTokenGrant: Encodable {
     let nonce: String
 }
 
+private struct RefreshGrant: Encodable {
+    let refresh_token: String
+}
+
 private struct SupabaseSession: Decodable {
     let access_token: String
+    let refresh_token: String?
     let user: SupabaseUser
 }
 
@@ -249,5 +302,44 @@ private enum AuthError: LocalizedError {
     case message(String)
     var errorDescription: String? {
         switch self { case .message(let m): return m }
+    }
+}
+
+// ===========================================================================
+// Keychain — minimal secure string store for the Supabase refresh token.
+// Kept here (not a new file) to avoid touching the Xcode project structure.
+// ===========================================================================
+private enum Keychain {
+    static func save(_ value: String, for key: String) {
+        let base: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+        ]
+        SecItemDelete(base as CFDictionary)
+        var add = base
+        add[kSecValueData as String]      = Data(value.utf8)
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    static func read(_ key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String:  true,
+            kSecMatchLimit as String:  kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func delete(_ key: String) {
+        let query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }
