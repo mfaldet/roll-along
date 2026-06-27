@@ -538,8 +538,7 @@ struct BallGameView: View {
                         case .prism:       prismGoal
                         case .obsidian:    obsidianGoal
                         case .quasar:      quasarGoal
-                        case .rainbow:     rainbowHole
-                        default:           rainbowHole
+                        default:           rainbowHole   // .rainbow + any future goal
                         }
                     }
                     .frame(width: ballRadius * 2.8, height: ballRadius * 2.8)

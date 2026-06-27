@@ -66,12 +66,6 @@ struct SettingsView: View {
         } message: {
             Text("This wipes all level progress — stars, coins, and best times. Your cosmetics, nickname, and settings will be kept.")
         }
-        .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
-            Button("Delete", role: .destructive) { Task { await performAccountDeletion() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This permanently deletes your account and all its data — profile, friends, clan membership, and leaderboard standing. This can't be undone.")
-        }
     }
 
     /// Delete the player's account server-side, then drop the local session.
@@ -201,6 +195,15 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+        // Attached here (not on `body`, which already owns the Reset alert) —
+        // SwiftUI presents only one alert per view, so two on the same view
+        // would silently swallow the second.
+        .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
+            Button("Delete", role: .destructive) { Task { await performAccountDeletion() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes your account and all its data — profile, friends, clan membership, and leaderboard standing. This can't be undone.")
         }
     }
 
