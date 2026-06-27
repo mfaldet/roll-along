@@ -3413,7 +3413,6 @@ struct BallSkinView: View {
     //
     // Animation is frozen (t = 0) when reduceMotion is on.
     private var lavaCanvas: some View {
-        @Environment(\.accessibilityReduceMotion) var reduceMotion: Bool
         return TimelineView(.animation) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
@@ -3514,7 +3513,6 @@ struct BallSkinView: View {
     //
     // Animation freezes at t = 0 when reduceMotion is on.
     private var trenchCanvas: some View {
-        @Environment(\.accessibilityReduceMotion) var reduceMotion: Bool
         return TimelineView(.animation) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
@@ -3623,7 +3621,6 @@ struct BallSkinView: View {
     //
     // Freezes at t = 0 when reduceMotion is on.
     private var trophyCanvas: some View {
-        @Environment(\.accessibilityReduceMotion) var reduceMotion: Bool
         return TimelineView(.animation) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
