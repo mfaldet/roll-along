@@ -468,6 +468,7 @@ struct KingOfTheHillView: View {
             let holdSec = playerHoldTicks / 60
             let banked = holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0)
             if banked > 0 { gameState.addCoins(banked) }
+            gameState.recordCompetitiveScore("koth", holdSec)   // leaderboard best (hold seconds)
             AnalyticsClient.shared.track(
                 "koth_round_over",
                 properties: ["won": .bool(playerWon),

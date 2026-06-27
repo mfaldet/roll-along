@@ -10,6 +10,9 @@ enum HomeRoute: Hashable {
     case settings
     case shop
     case catalog
+    /// The player's own cosmetics wardrobe — equip owned items (moved out of
+    /// Settings).  Reached from the Shop, just above the Catalog.
+    case locker
     case leaderboard
     case friends
     case clans
@@ -59,6 +62,11 @@ final class Navigator: ObservableObject {
     /// Push the Cosmetic Shop on top of the current stack.
     func goToShop() {
         if path.last != .shop { path.append(.shop) }
+    }
+
+    /// Push the Locker (cosmetics wardrobe) on top of the current stack.
+    func goToLocker() {
+        if path.last != .locker { path.append(.locker) }
     }
 
     /// Push the global Leaderboard on top of the current stack.
@@ -384,6 +392,7 @@ struct HomeView: View {
                 case .settings:    SettingsView()
                 case .shop:        CosmeticShopView(mode: .shop)
                 case .catalog:     CosmeticShopView(mode: .catalog)
+                case .locker:      LockerView()
                 case .leaderboard: LeaderboardView()
                 case .friends:     FriendsView()
                 case .clans:       ClansView()

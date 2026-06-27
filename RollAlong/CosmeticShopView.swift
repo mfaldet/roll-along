@@ -207,6 +207,54 @@ struct CosmeticShopView: View {
                     }
                 }
 
+                // The player's wardrobe — equip what they already own.  Sits
+                // just above the Catalog so "equip" reads before "browse/buy".
+                NavigationLink(value: HomeRoute.locker) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.white.opacity(0.18))
+                                .frame(width: 58, height: 58)
+                            Image(systemName: "tshirt.fill")
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Open Your Locker")
+                                .font(.system(size: 20, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                            Text("Equip the balls, trails, goals, floors & more you own")
+                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.82))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(LinearGradient(
+                                colors: [Color(red: 0.10, green: 0.62, blue: 0.55),
+                                         Color(red: 0.16, green: 0.44, blue: 0.72)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(.white.opacity(0.20), lineWidth: 1)
+                    )
+                    .shadow(color: Color(red: 0.12, green: 0.52, blue: 0.55).opacity(0.45),
+                            radius: 16, y: 7)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+
                 // Everything else lives in the browsable Catalog — a big,
                 // gradient call-to-action so it reads as the next thing to do.
                 NavigationLink(value: HomeRoute.catalog) {

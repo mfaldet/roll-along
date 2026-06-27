@@ -553,6 +553,7 @@ struct PaintBallView: View {
             let pct = percent(0)
             let banked = pct + (playerWon ? winBonus : 0)
             if banked > 0 { gameState.addCoins(banked) }
+            gameState.recordCompetitiveScore("paintball", pct)   // leaderboard best (coverage %)
             AnalyticsClient.shared.track(
                 "paintball_round_over",
                 properties: ["won": .bool(playerWon),

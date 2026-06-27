@@ -41,7 +41,7 @@ struct PublicProfileView: View {
                     heroCard
                     if !isMe && SocialClient.shared.isSignedIn { actionRow }
                     statsGrid
-                    if hasMinigameStats { minigameCard }
+                    PlayerRanksCard(profile: profile, playerId: profile.id)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 10)
@@ -155,28 +155,6 @@ struct PublicProfileView: View {
         }
         .padding(18)
         .ppCard()
-    }
-
-    private var hasMinigameStats: Bool {
-        (profile.pinballBest ?? 0) > 0 || (profile.zenSeconds ?? 0) > 0 || (profile.goldrushBest ?? 0) > 0
-    }
-
-    private var minigameCard: some View {
-        VStack(spacing: 16) {
-            sectionLabel("Minigame Bests")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                statCell("\(profile.pinballBest ?? 0)", "Pinball", "circle.hexagongrid.fill", Color(red: 0.36, green: 0.62, blue: 1.0))
-                statCell(zenLabel,                      "Zen",     "leaf.fill", Color(red: 0.34, green: 0.78, blue: 0.55))
-                statCell("\(profile.goldrushBest ?? 0)", "Gold Rush", "bolt.fill", Color(red: 1.0, green: 0.78, blue: 0.20))
-            }
-        }
-        .padding(18)
-        .ppCard()
-    }
-
-    private var zenLabel: String {
-        let s = profile.zenSeconds ?? 0
-        return s >= 60 ? "\(s / 60)m" : "\(s)s"
     }
 
     // MARK: - Relationship
