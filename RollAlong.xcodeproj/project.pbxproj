@@ -48,6 +48,7 @@
 		FA000001000000000000FA01 /* MinigameMaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000001000000000000FA00 /* MinigameMaps.swift */; };
 		FA000002000000000000FA01 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000002000000000000FA00 /* Constants.swift */; };
 		FA000003000000000000FA01 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000003000000000000FA00 /* ProfileView.swift */; };
+		FA000006000000000000FA01 /* PublicProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000006000000000000FA00 /* PublicProfileView.swift */; };
 		FA000004000000000000FA01 /* ChallengeTrackSelectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000004000000000000FA00 /* ChallengeTrackSelectView.swift */; };
 		FA000005000000000000FA01 /* ChallengeTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000005000000000000FA00 /* ChallengeTrackView.swift */; };
 		FB000003000000000000FB01 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = FB000002000000000000FB00 /* SnapshotTesting */; };
@@ -121,6 +122,7 @@
 		FA000001000000000000FA00 /* MinigameMaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinigameMaps.swift; sourceTree = "<group>"; };
 		FA000002000000000000FA00 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		FA000003000000000000FA00 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		FA000006000000000000FA00 /* PublicProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicProfileView.swift; sourceTree = "<group>"; };
 		FA000004000000000000FA00 /* ChallengeTrackSelectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeTrackSelectView.swift; sourceTree = "<group>"; };
 		FA000005000000000000FA00 /* ChallengeTrackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeTrackView.swift; sourceTree = "<group>"; };
 		FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkinSnapshotTests.swift; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 				FA000001000000000000FA00 /* MinigameMaps.swift */,
 				FA000002000000000000FA00 /* Constants.swift */,
 				FA000003000000000000FA00 /* ProfileView.swift */,
+				FA000006000000000000FA00 /* PublicProfileView.swift */,
 				FA000004000000000000FA00 /* ChallengeTrackSelectView.swift */,
 				FA000005000000000000FA00 /* ChallengeTrackView.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
@@ -415,6 +418,7 @@
 				FA000001000000000000FA01 /* MinigameMaps.swift in Sources */,
 				FA000002000000000000FA01 /* Constants.swift in Sources */,
 				FA000003000000000000FA01 /* ProfileView.swift in Sources */,
+				FA000006000000000000FA01 /* PublicProfileView.swift in Sources */,
 				FA000004000000000000FA01 /* ChallengeTrackSelectView.swift in Sources */,
 				FA000005000000000000FA01 /* ChallengeTrackView.swift in Sources */,
 			);

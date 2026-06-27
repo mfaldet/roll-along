@@ -20,6 +20,10 @@ enum HomeRoute: Hashable {
     case mode(String)
     case profile
     case challengeTracks
+    /// Another player's public profile (from Friends, a clan roster, or a deep link).
+    case player(PlayerProfile)
+    /// A clan's public detail (from Browse or a deep link).
+    case clan(Clan)
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +89,16 @@ final class Navigator: ObservableObject {
     /// Push the Challenge Tracks selection screen.
     func goToTracks() {
         if path.last != .challengeTracks { path.append(.challengeTracks) }
+    }
+
+    /// Push another player's public profile (from a name tap or a deep link).
+    func goToPlayer(_ profile: PlayerProfile) {
+        path.append(.player(profile))
+    }
+
+    /// Push a clan's public detail (from Browse or a deep link).
+    func goToClan(_ clan: Clan) {
+        path.append(.clan(clan))
     }
 }
 
@@ -404,6 +418,8 @@ struct HomeView: View {
                         .firstPlayTutorial("pinball")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
+                case .player(let p):    PublicProfileView(player: p)
+                case .clan(let c):      ClanDetailView(clan: c)
                 case .mode("daily"):
                     BallGameView(activeMode: GameModeCatalogue.mode(id: "daily")
                                  ?? GameModeCatalogue.climb)
@@ -422,6 +438,20 @@ struct HomeView: View {
                         BallGameView(activeMode: GameModeCatalogue.mode(id: id)
                                      ?? GameModeCatalogue.climb)
                             .firstPlayTutorial(id)
+                    }
+                }
+            }
+            .onOpenURL { url in
+                // rollalong://player/<uuid> or rollalong://clan/<uuid>.
+                guard url.scheme == "rollalong",
+                      let id = UUID(uuidString: url.lastPathComponent) else { return }
+                Task {
+                    switch url.host {
+                    case "player":
+                        if let p = try? await SocialClient.shared.fetchProfile(id: id) { nav.goToPlayer(p) }
+                    case "clan":
+                        if let c = try? await SocialClient.shared.fetchClan(id: id) { nav.goToClan(c) }
+                    default: break
                     }
                 }
             }
