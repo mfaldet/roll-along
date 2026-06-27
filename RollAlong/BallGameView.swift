@@ -107,6 +107,9 @@ struct BallGameView: View {
     /// Challenge-of-the-Day "Better Luck Tomorrow" overlay — shown when the
     /// player exhausts their free attempts on a CotD sub-level.
     @State private var showDailyFailed:               Bool   = false
+    /// Confirmation before quitting an in-progress CotD run from the home
+    /// button — leaving forfeits the day, so we guard against a stray tap.
+    @State private var showDailyQuitConfirm:          Bool   = false
     @State private var showLivesPlaceholderAlert:     Bool   = false
     @State private var livesPlaceholderMessage:       String = ""
 
@@ -2916,7 +2919,15 @@ struct BallGameView: View {
         VStack {
             Spacer()
             HStack {
-                Button { nav.goHome() } label: {
+                Button {
+                    // Quitting an in-progress Challenge of the Day forfeits the
+                    // day — confirm first so a stray tap can't cost the run.
+                    if isDaily && !gameState.dailyChallengeSettledToday {
+                        showDailyQuitConfirm = true
+                    } else {
+                        nav.goHome()
+                    }
+                } label: {
                     Image(systemName: "house.fill")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color(white: 0.38))
@@ -2928,7 +2939,20 @@ struct BallGameView: View {
                         )
                 }
                 .accessibilityLabel("Quit to home screen")
-                .accessibilityHint("Returns to the main menu. No level progress is lost.")
+                .accessibilityHint(isDaily
+                    ? "Leaving forfeits today's Challenge of the Day."
+                    : "Returns to the main menu. No level progress is lost.")
+                .confirmationDialog("Forfeit today's Challenge?",
+                                    isPresented: $showDailyQuitConfirm,
+                                    titleVisibility: .visible) {
+                    Button("Quit & Forfeit", role: .destructive) {
+                        gameState.failTodaysDailyChallenge()
+                        nav.goHome()
+                    }
+                    Button("Keep Playing", role: .cancel) {}
+                } message: {
+                    Text("Leaving now ends your run — the Challenge of the Day will be marked failed until tomorrow.")
+                }
                 Spacer()
             }
             .padding(.leading, 22)
@@ -4639,7 +4663,7 @@ struct BallGameView: View {
         // `isSinkingIntoPit` freezes physics while the ball plays its
         // fall-into-the-pit animation — without this the ball would keep
         // rolling (and re-triggering the fall) behind the end screen.
-        guard phase == .playing, !isSinkingIntoPit, var b = ball else { return }
+        guard phase == .playing, !isSinkingIntoPit, !showDailyQuitConfirm, var b = ball else { return }
 
         // Spawn-lock: physics is paused while the player gets oriented.
         // When the lock expires naturally we arm levelStartTime here (so
