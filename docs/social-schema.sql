@@ -340,6 +340,14 @@ grant select, insert, delete           on public.clan_members to authenticated;
 grant select, insert, update, delete   on public.friendships  to authenticated;
 grant select, insert, update           on public.life_gifts   to authenticated;
 
+-- The delete-account Edge Function runs as `service_role` and must read +
+-- reassign clan ownership during the account-deletion hand-off. The grants
+-- above target `authenticated` only, so without these the function 500s with
+-- "permission denied for table clans". (User deletion itself cascades at the
+-- constraint level, so no INSERT/DELETE grant is needed here.)
+grant select, update on public.clans        to service_role;
+grant select, update on public.clan_members to service_role;
+
 -- =============================================================================
 -- Useful queries (run with service_role, or adapt for the client).
 -- =============================================================================

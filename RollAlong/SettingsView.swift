@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject private var auth = AppleAuthManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var showResetAlert = false
+    @State private var showCosmeticResetAlert = false
     @State private var showDeleteAccountAlert = false
     @State private var isDeletingAccount = false
     @State private var deleteAccountError: String?
@@ -65,6 +66,12 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This wipes all level progress — stars, coins, and best times. Your cosmetics, nickname, and settings will be kept.")
+        }
+        .alert("Reset Cosmetics?", isPresented: $showCosmeticResetAlert) {
+            Button("Reset", role: .destructive) { gameState.liquidateCoinCosmetics() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This relocks every cosmetic you bought with coins and refunds those coins. Cosmetics you earned (challenge-pack rewards) or that came with a purchase (the Diamond & Aurora skins) are kept, as is your level progress. This can't be undone.")
         }
     }
 
@@ -602,7 +609,8 @@ struct SettingsView: View {
     }
 
     private var resetSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let cosmetic = gameState.coinLiquidationPreview()
+        return VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Danger Zone")
             Button {
                 showResetAlert = true
@@ -620,6 +628,33 @@ struct SettingsView: View {
                 .padding()
                 .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
+            Button {
+                showCosmeticResetAlert = true
+            } label: {
+                HStack {
+                    Image(systemName: "paintbrush.pointed")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Reset Cosmetics")
+                            .font(.system(.body, design: .rounded))
+                        Text(cosmetic.count == 0
+                             ? "No coin-bought cosmetics to refund"
+                             : "Refund \(cosmetic.count) coin-bought item\(cosmetic.count == 1 ? "" : "s")")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color(white: 0.4))
+                    }
+                    Spacer()
+                    if cosmetic.coins > 0 {
+                        Text("+\(cosmetic.coins) 🪙")
+                            .font(.system(.footnote, design: .rounded))
+                            .foregroundStyle(Color(white: 0.4))
+                    }
+                }
+                .foregroundStyle(Color(red: 0.95, green: 0.3, blue: 0.3))
+                .padding()
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            }
+            .disabled(cosmetic.count == 0)
+            .opacity(cosmetic.count == 0 ? 0.5 : 1)
         }
     }
 

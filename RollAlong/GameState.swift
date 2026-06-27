@@ -538,6 +538,57 @@ final class GameState: ObservableObject {
         highestUnlocked = 1
     }
 
+    // MARK: - Cosmetic liquidation ("Reset Cosmetics")
+
+    /// Dry run: how many owned cosmetics were bought with coins, and the coins
+    /// they'd refund.  Powers the Danger-Zone button label + confirm dialog.
+    func coinLiquidationPreview() -> (count: Int, coins: Int) {
+        var count = 0, coins = 0
+        func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
+            for item in Item.allCases where item.isCoinPurchasable && owned.contains(item.rawValue) {
+                count += 1; coins += item.coinCost
+            }
+        }
+        tally(ownedBallSkins, BallSkin.self); tally(ownedGoals, GoalSkin.self)
+        tally(ownedTrails, TrailColor.self);  tally(ownedFloors, Floor.self)
+        tally(ownedPits, Pit.self);           tally(ownedMusic, MusicTrack.self)
+        return (count, coins)
+    }
+
+    /// Relock every coin-bought cosmetic and refund its coins, KEEPING starters
+    /// and exclusives (challenge-pack earned, IAP/indirect like the Diamond &
+    /// Aurora skins).  Re-equips the starter for any slot whose item was
+    /// liquidated.  Returns what was liquidated.  Level progress is untouched.
+    @discardableResult
+    func liquidateCoinCosmetics() -> (count: Int, coins: Int) {
+        var count = 0, coins = 0
+        func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
+            for item in Item.allCases where item.isCoinPurchasable && owned.contains(item.rawValue) {
+                count += 1; coins += item.coinCost
+                owned.remove(item.rawValue)
+            }
+            owned.insert(Item.starter.rawValue)   // the starter is always owned
+        }
+        var balls = ownedBallSkins, goals = ownedGoals, trails = ownedTrails
+        var floors = ownedFloors, pits = ownedPits, music = ownedMusic
+        strip(&balls, BallSkin.self); strip(&goals, GoalSkin.self); strip(&trails, TrailColor.self)
+        strip(&floors, Floor.self);   strip(&pits, Pit.self);       strip(&music, MusicTrack.self)
+        ownedBallSkins = balls; ownedGoals = goals; ownedTrails = trails
+        ownedFloors = floors; ownedPits = pits; ownedMusic = music
+        // Bundle/pack ownership is a UI badge only (items were owned individually
+        // and handled above) — clear it and drop any equipped pack.
+        ownedBundles = []; ownedPacks = []; equippedPackID = nil
+        // Re-equip starters for any slot whose equipped item is no longer owned.
+        if !ownedBallSkins.contains(activeSkin.rawValue)  { activeSkin    = .starter }
+        if !ownedGoals.contains(equippedGoal.rawValue)    { equippedGoal  = .starter }
+        if !ownedTrails.contains(equippedTrail.rawValue)  { equippedTrail = .starter }
+        if !ownedFloors.contains(equippedFloor.rawValue)  { equippedFloor = .starter }
+        if !ownedPits.contains(equippedPit.rawValue)      { equippedPit   = .starter }
+        if !ownedMusic.contains(equippedMusic.rawValue)   { equippedMusic = .starter }
+        addCoins(coins)
+        return (count, coins)
+    }
+
     // MARK: - Result recording
 
     /// Call when the player completes a level.  Stars only ever increase,
