@@ -54,6 +54,38 @@ final class SocialClient: @unchecked Sendable {
     /// The signed-in player's id, if any.
     var currentUserId: UUID? { session?.userId }
 
+    // MARK: - Account deletion (App Store Guideline 5.1.1(v))
+
+    /// Permanently delete the signed-in player's account and all associated
+    /// server data — profile, clan memberships, friendships, and life gifts —
+    /// plus the underlying auth user.  A clan the player owns is transferred to
+    /// another member (an officer if any, else the longest-standing member); a
+    /// clan with no other members is deleted.  The cascade + clan hand-off runs
+    /// in the `delete-account` Edge Function under elevated privileges; this
+    /// just invokes it with the player's bearer token.  Clears the local
+    /// session on success — sign the user out afterwards.
+    func deleteMyAccount() async throws {
+        let session = try requireSession()
+        guard let url = URL(string: "\(Self.projectURL)/functions/v1/delete-account") else {
+            throw SocialError.badURL
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json",        forHTTPHeaderField: "Content-Type")
+        req.setValue(Self.apiKey,               forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(session.token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw SocialError.http(status: -1, body: "no HTTP response")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw SocialError.http(status: http.statusCode,
+                                   body: String(data: data, encoding: .utf8) ?? "")
+        }
+        clearSession()
+    }
+
     // MARK: - JSON
 
     private let encoder = JSONEncoder()

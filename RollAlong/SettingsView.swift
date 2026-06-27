@@ -6,6 +6,9 @@ struct SettingsView: View {
     @ObservedObject private var auth = AppleAuthManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var showResetAlert = false
+    @State private var showDeleteAccountAlert = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
     @FocusState private var nameFocused: Bool
 
     let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
@@ -63,6 +66,26 @@ struct SettingsView: View {
         } message: {
             Text("This wipes all level progress — stars, coins, and best times. Your cosmetics, nickname, and settings will be kept.")
         }
+        .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
+            Button("Delete", role: .destructive) { Task { await performAccountDeletion() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes your account and all its data — profile, friends, clan membership, and leaderboard standing. This can't be undone.")
+        }
+    }
+
+    /// Delete the player's account server-side, then drop the local session.
+    @MainActor
+    private func performAccountDeletion() async {
+        isDeletingAccount = true
+        deleteAccountError = nil
+        do {
+            try await SocialClient.shared.deleteMyAccount()
+            auth.signOut()
+        } catch {
+            deleteAccountError = "Couldn't delete your account. Check your connection and try again."
+        }
+        isDeletingAccount = false
     }
 
     // MARK: - Sections
@@ -115,6 +138,35 @@ struct SettingsView: View {
                 }
                 .padding()
                 .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+
+                // Account deletion — required by App Store Guideline 5.1.1(v)
+                // for any app that supports account creation.
+                Button(role: .destructive) {
+                    showDeleteAccountAlert = true
+                } label: {
+                    HStack(spacing: 8) {
+                        if isDeletingAccount {
+                            ProgressView().tint(Color(red: 0.95, green: 0.32, blue: 0.32))
+                        }
+                        Text(isDeletingAccount ? "Deleting…" : "Delete Account")
+                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    }
+                    .foregroundStyle(Color(red: 0.95, green: 0.32, blue: 0.32))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(white: 0.12).clipShape(RoundedRectangle(cornerRadius: 14)))
+                }
+                .disabled(isDeletingAccount)
+
+                if let err = deleteAccountError {
+                    Text(err)
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
+                }
+
+                Text("Deleting your account permanently removes your profile, friends, clan membership, and leaderboard standing. Your level progress stays on this device.")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     Button {
