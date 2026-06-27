@@ -286,9 +286,22 @@ final class GameState: ObservableObject {
     @Published var dailyChallengeCompletions: Set<String> {
         didSet { saveStringSet(dailyChallengeCompletions, forKey: "ra_dailyChallengeDone") }
     }
+    /// Dates ("YYYY-MM-DD") whose Challenge of the Day the player has *failed*
+    /// (ran out of attempts).  Like completions, this locks the day — there's
+    /// one shot at the CotD per calendar day, win or lose.
+    @Published var dailyChallengeFailures: Set<String> {
+        didSet { saveStringSet(dailyChallengeFailures, forKey: "ra_dailyChallengeFailed") }
+    }
     /// Which sub-level (0-based) of today's Challenge the player is on.  Session
     /// state — reset by `startDailyChallenge()` when the challenge is launched.
     @Published var dailyChallengeIndex: Int = 0
+    /// Attempts remaining on the current sub-level of today's Challenge.  The
+    /// CotD never spends real lives — each sub-level grants a fixed number of
+    /// free attempts (`dailyChallengeAttemptsPerLevel`); exhausting them fails
+    /// the day.  Session state — reset on launch and on advancing a sub-level.
+    @Published var dailyChallengeAttemptsLeft: Int = GameState.dailyChallengeAttemptsPerLevel
+    /// Free attempts granted per Challenge-of-the-Day sub-level.
+    static let dailyChallengeAttemptsPerLevel = 3
 
     // ── Challenge Track active session (transient — not persisted) ──────────
     //
@@ -459,6 +472,7 @@ final class GameState: ObservableObject {
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
         dailyChallengeCompletions = Self.loadStringSet(forKey: "ra_dailyChallengeDone", defaults)
+        dailyChallengeFailures    = Self.loadStringSet(forKey: "ra_dailyChallengeFailed", defaults)
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -681,18 +695,46 @@ final class GameState: ObservableObject {
         dailyChallengeCompletions.contains(DailyChallenge.key())
     }
 
+    /// Has the player already failed (used up all attempts on) today's challenge?
+    var dailyChallengeFailedToday: Bool {
+        dailyChallengeFailures.contains(DailyChallenge.key())
+    }
+
+    /// Today's challenge is settled (cleared or failed) — no more plays today.
+    var dailyChallengeSettledToday: Bool {
+        dailyChallengeDoneToday || dailyChallengeFailedToday
+    }
+
     /// The brutal-layout seed for the current sub-level of the run.
     var dailyChallengeLayoutSeed: Int {
         todaysDailyChallenge.layoutSeed(for: dailyChallengeIndex)
     }
 
     /// Begin a fresh run of today's challenge (called when it's launched).
-    func startDailyChallenge() { dailyChallengeIndex = 0 }
+    func startDailyChallenge() {
+        dailyChallengeIndex = 0
+        dailyChallengeAttemptsLeft = Self.dailyChallengeAttemptsPerLevel
+    }
 
     /// Advance to the next sub-level; returns true when the gauntlet is cleared.
+    /// Each new sub-level refreshes the free-attempt allowance.
     func advanceDailyChallenge() -> Bool {
         dailyChallengeIndex += 1
-        return dailyChallengeIndex >= todaysDailyChallenge.levelCount
+        if dailyChallengeIndex >= todaysDailyChallenge.levelCount { return true }
+        dailyChallengeAttemptsLeft = Self.dailyChallengeAttemptsPerLevel
+        return false
+    }
+
+    /// Spend one attempt on the current sub-level after a fall.  Returns true
+    /// when the player has now exhausted their attempts and the day is lost.
+    func recordDailyAttemptFailure() -> Bool {
+        dailyChallengeAttemptsLeft = max(0, dailyChallengeAttemptsLeft - 1)
+        return dailyChallengeAttemptsLeft <= 0
+    }
+
+    /// Mark today's challenge failed (once) — locks it until tomorrow, no reward.
+    func failTodaysDailyChallenge() {
+        dailyChallengeFailures.insert(DailyChallenge.key())
     }
 
     /// Mark today's challenge done (once) and grant its coin reward.

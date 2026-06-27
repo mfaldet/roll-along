@@ -104,6 +104,9 @@ struct BallGameView: View {
 
     // Lives system (Sprint 4c)
     @State private var showOutOfLives:                Bool   = false
+    /// Challenge-of-the-Day "Better Luck Tomorrow" overlay — shown when the
+    /// player exhausts their free attempts on a CotD sub-level.
+    @State private var showDailyFailed:               Bool   = false
     @State private var showLivesPlaceholderAlert:     Bool   = false
     @State private var livesPlaceholderMessage:       String = ""
 
@@ -237,6 +240,12 @@ struct BallGameView: View {
     }
     /// True only while presenting a Coin Pit round.
     private var isCoinPit: Bool { coinPitTarget != nil }
+
+    /// True while playing the Challenge of the Day (the one-shot daily gauntlet).
+    private var isDaily: Bool {
+        if case .oneShot = activeMode.progression { return true }
+        return false
+    }
 
     /// Round length bought at Start: time-tickets × 30 s.
     private var coinPitStakedDuration: TimeInterval {
@@ -594,6 +603,12 @@ struct BallGameView: View {
                     livesHUDOverlay(safeTop: geo.safeAreaInsets.top)
                 }
 
+                // Challenge of the Day attempts HUD — no real lives here, just
+                // the per-sub-level free attempts remaining.
+                if isDaily {
+                    dailyAttemptsHUDOverlay(safeTop: geo.safeAreaInsets.top)
+                }
+
                 // Coin Pit: live round HUD — seconds remaining + coins caught.
                 // Gated to the reward round, and only once the round has been
                 // bought (the stake overlay owns the screen before that).
@@ -617,7 +632,7 @@ struct BallGameView: View {
                 // the buy / watch-ad / quit choices instead.  Without
                 // this guard, both overlays render in the same frame and
                 // the "Oops!" text bleeds through behind Out of Lives.
-                if phase == .fell && !showOutOfLives { oopsOverlay }
+                if phase == .fell && !showOutOfLives && !showDailyFailed { oopsOverlay }
                 if phase == .levelComplete { winOverlay }
 
                 // Coin Pit: round-over payout — the haul, Play Again, Home.
@@ -633,6 +648,9 @@ struct BallGameView: View {
                 // Out-of-lives overlay — shown when the player tries to play
                 // with zero lives.  Sits above the Oops/Win overlays.
                 if showOutOfLives { outOfLivesOverlay }
+
+                // Challenge-of-the-Day failure — out of attempts for the day.
+                if showDailyFailed { dailyFailedOverlay }
 
                 // Home button — rendered AFTER oops/win overlays so it stays
                 // tappable while they're showing.  Hidden during the one-time
@@ -2856,6 +2874,39 @@ struct BallGameView: View {
         }
     }
 
+    /// Challenge-of-the-Day attempts HUD — a top-left capsule of pips showing
+    /// the free attempts remaining on the current sub-level.  No real lives are
+    /// ever at stake in the CotD, so this stands in for the lives HUD.
+    private func dailyAttemptsHUDOverlay(safeTop: CGFloat) -> some View {
+        let total = GameState.dailyChallengeAttemptsPerLevel
+        let left  = gameState.dailyChallengeAttemptsLeft
+        return HStack(spacing: 6) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color(red: 0.99, green: 0.63, blue: 0.20))
+            HStack(spacing: 5) {
+                ForEach(0..<total, id: \.self) { i in
+                    Circle()
+                        .fill(i < left
+                              ? Color(red: 0.99, green: 0.63, blue: 0.20)
+                              : Color(white: 0.28))
+                        .frame(width: 9, height: 9)
+                }
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(
+            Capsule().fill(Color.black.opacity(0.35))
+                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+        )
+        .padding(.leading, 16)
+        .padding(.top, max(safeTop + 4, 50))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(left) of \(total) attempts left on this Challenge level.")
+    }
+
     /// "M:SS" for a seconds interval (the lives regen countdown).
     private static func mmss(_ secs: TimeInterval) -> String {
         let s = max(0, Int(secs.rounded()))
@@ -3334,16 +3385,71 @@ struct BallGameView: View {
         .transition(.opacity)
     }
 
-    private var oopsOverlay: some View {
+    /// "Better Luck Tomorrow" — the Challenge of the Day is failed once the
+    /// player burns all their attempts on a sub-level.  No reward, no retry;
+    /// the hub banner greys out until tomorrow's challenge rotates in.
+    private var dailyFailedOverlay: some View {
         ZStack {
+            Color.black.opacity(0.82).ignoresSafeArea()
+            VStack(spacing: 22) {
+                Spacer()
+                VStack(spacing: 12) {
+                    Image(systemName: "moon.zzz.fill")
+                        .font(.system(size: 46, weight: .bold))
+                        .foregroundStyle(Color(white: 0.55))
+                    Text("Better Luck Tomorrow")
+                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Text("You're out of attempts for today's Challenge of the Day. A fresh one rolls in tomorrow.")
+                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                        .foregroundStyle(Color(white: 0.70))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 30)
+                }
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.28)) { showDailyFailed = false }
+                    nav.goHome()
+                } label: {
+                    Text("Back to Home")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 40)
+            }
+            .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+    }
+
+    private var oopsOverlay: some View {
+        // The Challenge of the Day shows the free attempts that remain so the
+        // player feels the stakes (3 per sub-level); every other mode just
+        // nudges them to retry.
+        let attemptsLeft = gameState.dailyChallengeAttemptsLeft
+        return ZStack {
             Color.black.opacity(0.52).ignoresSafeArea()
             VStack(spacing: 18) {
                 Text("Oops!")
                     .font(.system(size: 58, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Text("Tap to try again")
-                    .font(.system(size: 18, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color(white: 0.78))
+                if isDaily {
+                    Text("\(attemptsLeft) attempt\(attemptsLeft == 1 ? "" : "s") left — tap to try again")
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundStyle(attemptsLeft == 1
+                                         ? Color(red: 0.98, green: 0.55, blue: 0.35)
+                                         : Color(white: 0.85))
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("Tap to try again")
+                        .font(.system(size: 18, weight: .regular, design: .rounded))
+                        .foregroundStyle(Color(white: 0.78))
+                }
             }
         }
         .onTapGesture {
@@ -3421,43 +3527,60 @@ struct BallGameView: View {
                     )
                 }
 
-                // Coins row — shows all 3 pickup slots.  Collected this
-                // attempt → full detailed CoinIcon (same graphic as the
-                // home pill / shop / in-game coin face); not collected →
-                // hollow grey outline so the slot still reads as "a coin
-                // is here".
-                HStack(spacing: 10) {
-                    ForEach(0..<3) { i in
-                        if lastClearedCoinIndices.contains(i) {
-                            CoinIcon(size: 26)
-                                .shadow(color: Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.45),
-                                        radius: 6)
-                        } else {
-                            Circle()
-                                .stroke(Color(white: 0.30), lineWidth: 1.4)
-                                .frame(width: 26, height: 26)
+                // The Challenge of the Day has no coins on its maps and never
+                // talks coins on its clear screens — show gauntlet progress
+                // instead.  The 30-coin reward is granted silently on full
+                // completion and surfaced on the hub banner, not here.
+                if isDaily {
+                    Text("Level \(gameState.dailyChallengeIndex + 1) of \(gameState.todaysDailyChallenge.levelCount)")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.78))
+                        .accessibilityLabel("Level \(gameState.dailyChallengeIndex + 1) of \(gameState.todaysDailyChallenge.levelCount).")
+                } else {
+                    // Coins row — shows all 3 pickup slots.  Collected this
+                    // attempt → full detailed CoinIcon (same graphic as the
+                    // home pill / shop / in-game coin face); not collected →
+                    // hollow grey outline so the slot still reads as "a coin
+                    // is here".
+                    HStack(spacing: 10) {
+                        ForEach(0..<3) { i in
+                            if lastClearedCoinIndices.contains(i) {
+                                CoinIcon(size: 26)
+                                    .shadow(color: Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.45),
+                                            radius: 6)
+                            } else {
+                                Circle()
+                                    .stroke(Color(white: 0.30), lineWidth: 1.4)
+                                    .frame(width: 26, height: 26)
+                            }
                         }
                     }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(lastClearedCoinIndices.count) of 3 coins collected")
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(lastClearedCoinIndices.count) of 3 coins collected")
 
-                // Coin reward earned this run
-                if lastClearedCoinReward > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 13, weight: .bold))
-                        Text("\(lastClearedCoinReward) coins")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                    // Coin reward earned this run
+                    if lastClearedCoinReward > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("\(lastClearedCoinReward) coins")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
+                        .accessibilityLabel("Plus \(lastClearedCoinReward) coins earned.")
                     }
-                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                    .accessibilityLabel("Plus \(lastClearedCoinReward) coins earned.")
                 }
 
                 // Actions
                 VStack(spacing: 12) {
+                    // Primary advance button.  The Challenge of the Day is a
+                    // one-shot gauntlet, so on its final sub-level the button
+                    // reads "Finish" (which banks the day + pops home) and the
+                    // Levels/Replay row is hidden — you don't replay a CotD.
+                    let dailyIsLastLevel = isDaily
+                        && gameState.dailyChallengeIndex >= gameState.todaysDailyChallenge.levelCount - 1
                     Button { advanceFromLevelClear() } label: {
-                        Text("Next Level")
+                        Text(dailyIsLastLevel ? "Finish" : "Next Level")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -3467,33 +3590,35 @@ struct BallGameView: View {
                                     .fill(Color(red: 0.20, green: 0.78, blue: 0.38))
                             )
                     }
-                    HStack(spacing: 12) {
-                        // Levels button — LEFT.  Takes the player to the Level
-                        // Select grid (not home).  Goes via the Navigator so
-                        // the path is correctly reset.
-                        Button { nav.goToLevels() } label: {
-                            Text("Levels")
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(white: 0.85))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 13)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(white: 0.20))
-                                )
-                        }
-                        // Replay button — RIGHT.  Re-runs the current level
-                        // without leaving BallGameView.
-                        Button { spawnBall(in: arenaSize) } label: {
-                            Text("Replay")
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(white: 0.85))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 13)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(white: 0.20))
-                                )
+                    if !isDaily {
+                        HStack(spacing: 12) {
+                            // Levels button — LEFT.  Takes the player to the Level
+                            // Select grid (not home).  Goes via the Navigator so
+                            // the path is correctly reset.
+                            Button { nav.goToLevels() } label: {
+                                Text("Levels")
+                                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color(white: 0.85))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(white: 0.20))
+                                    )
+                            }
+                            // Replay button — RIGHT.  Re-runs the current level
+                            // without leaving BallGameView.
+                            Button { spawnBall(in: arenaSize) } label: {
+                                Text("Replay")
+                                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color(white: 0.85))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(white: 0.20))
+                                    )
+                            }
                         }
                     }
                 }
@@ -4575,6 +4700,29 @@ struct BallGameView: View {
                 // any normal replay of a level you've previously
                 // banked coins on.
                 coinsPickedThisAttempt = []
+                return
+            }
+            // Challenge of the Day: no real lives are ever spent (fireFell
+            // above is a no-op for its .unlimited policy).  Instead the player
+            // gets a fixed number of free attempts per sub-level — spend one
+            // here, and if that was the last, the day is failed (no reward,
+            // greyed in the hub) with a "Better Luck Tomorrow" send-off.
+            // Otherwise it's a normal retry via the Oops screen, which shows
+            // how many attempts remain.
+            if isDaily {
+                // Either branch leaves `.playing` so the physics tick (guarded
+                // on phase == .playing) halts and can't re-fire this fall.
+                if gameState.recordDailyAttemptFailure() {
+                    gameState.failTodaysDailyChallenge()
+                    AnalyticsClient.shared.track(
+                        "daily_challenge_failed",
+                        properties: ["sub_level": .int(gameState.dailyChallengeIndex)]
+                    )
+                    phase = .fell
+                    withAnimation(.easeInOut(duration: 0.28)) { showDailyFailed = true }
+                } else {
+                    withAnimation(.easeIn(duration: 0.22)) { phase = .fell }
+                }
                 return
             }
             // If that was the player's last life, skip the Oops screen
