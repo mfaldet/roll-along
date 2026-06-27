@@ -382,7 +382,12 @@ struct HomeView: View {
                 if case .game = last { gameState.currentModeID = "climb" }
                 else if case .mode(let id) = last, id != "daily" { gameState.currentModeID = id }
             }
-            .onAppear    { motion.start(); clock.start(); maybeAutoPresentDailyReward() }
+            .onAppear    {
+                motion.start(); clock.start(); maybeAutoPresentDailyReward()
+                // A CotD run left unfinished at last launch (app killed mid-run)
+                // is forfeited — leaving a run forfeits the day.
+                gameState.forfeitDailyChallengeIfRunning()
+            }
             .onDisappear { motion.stop();  clock.stop()  }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: HomeRoute.self) { route in

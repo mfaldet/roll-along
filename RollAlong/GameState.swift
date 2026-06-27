@@ -311,6 +311,20 @@ final class GameState: ObservableObject {
     @Published var dailyChallengeAttemptsLeft: Int = GameState.dailyChallengeAttemptsPerLevel
     /// Free attempts granted per Challenge-of-the-Day sub-level.
     static let dailyChallengeAttemptsPerLevel = 3
+    /// The day-key of a Challenge-of-the-Day run that is currently in progress,
+    /// or nil when no run is active.  Persisted so that quitting mid-run — via
+    /// the home button or by killing the app — forfeits the day rather than
+    /// handing out a fresh set of attempts.  Cleared on completion/failure and
+    /// reconciled on the next home appearance (see `forfeitDailyChallengeIfRunning`).
+    @Published var dailyChallengeRunStartedKey: String? {
+        didSet {
+            if let k = dailyChallengeRunStartedKey {
+                defaults.set(k, forKey: "ra_dailyChallengeRunStarted")
+            } else {
+                defaults.removeObject(forKey: "ra_dailyChallengeRunStarted")
+            }
+        }
+    }
 
     // ── Challenge Track active session (transient — not persisted) ──────────
     //
@@ -483,6 +497,7 @@ final class GameState: ObservableObject {
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
         dailyChallengeCompletions = Self.loadStringSet(forKey: "ra_dailyChallengeDone", defaults)
         dailyChallengeFailures    = Self.loadStringSet(forKey: "ra_dailyChallengeFailed", defaults)
+        dailyChallengeRunStartedKey = defaults.string(forKey: "ra_dailyChallengeRunStarted")
         // Equipped cosmetics — load saved raw values, fall back to the
         // category's starter if the loaded item is non-starter and not
         // in the owned set.  Floor + Pit replaced the legacy
@@ -721,9 +736,25 @@ final class GameState: ObservableObject {
     }
 
     /// Begin a fresh run of today's challenge (called when it's launched).
+    /// Stamps the day as "in progress" so that abandoning the run (home button
+    /// or app kill) forfeits it.
     func startDailyChallenge() {
         dailyChallengeIndex = 0
         dailyChallengeAttemptsLeft = Self.dailyChallengeAttemptsPerLevel
+        dailyChallengeRunStartedKey = DailyChallenge.key()
+    }
+
+    /// Forfeit an in-progress Challenge-of-the-Day run.  Quitting mid-run — via
+    /// the home button or by killing the app — counts as failing the day.  A
+    /// no-op when no run is active; a stale key (a run started on an earlier
+    /// day) is simply cleared without penalising today.
+    func forfeitDailyChallengeIfRunning() {
+        guard let key = dailyChallengeRunStartedKey else { return }
+        if key == DailyChallenge.key() && !dailyChallengeCompletions.contains(key) {
+            failTodaysDailyChallenge()        // also clears the in-progress key
+        } else {
+            dailyChallengeRunStartedKey = nil // stale or already cleared
+        }
     }
 
     /// Advance to the next sub-level; returns true when the gauntlet is cleared.
@@ -745,10 +776,12 @@ final class GameState: ObservableObject {
     /// Mark today's challenge failed (once) — locks it until tomorrow, no reward.
     func failTodaysDailyChallenge() {
         dailyChallengeFailures.insert(DailyChallenge.key())
+        dailyChallengeRunStartedKey = nil   // the run is settled
     }
 
     /// Mark today's challenge done (once) and grant its coin reward.
     func completeTodaysDailyChallenge() {
+        dailyChallengeRunStartedKey = nil   // the run is settled
         let key = DailyChallenge.key()
         guard !dailyChallengeCompletions.contains(key) else { return }
         dailyChallengeCompletions.insert(key)

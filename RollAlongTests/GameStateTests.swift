@@ -103,6 +103,51 @@ final class GameStateTests: XCTestCase {
         XCTAssertTrue(reloaded.dailyChallengeFailedToday, "failure is saved + reloaded")
     }
 
+    func testDailyChallenge_quitWhileRunning_forfeitsTheDay() {
+        let gs = makeGameState()
+        gs.startDailyChallenge()
+        XCTAssertEqual(gs.dailyChallengeRunStartedKey, DailyChallenge.key())
+        XCTAssertFalse(gs.dailyChallengeFailedToday)
+
+        gs.forfeitDailyChallengeIfRunning()   // home button / app kill mid-run
+        XCTAssertTrue(gs.dailyChallengeFailedToday)
+        XCTAssertNil(gs.dailyChallengeRunStartedKey)
+    }
+
+    func testDailyChallenge_abandonedRunForfeitsOnReload() {
+        // Start a run, then simulate an app kill: a fresh GameState reloads the
+        // persisted in-progress key, and the home reconcile fails the day.
+        let a = makeGameState()
+        a.startDailyChallenge()
+        XCTAssertFalse(a.dailyChallengeDoneToday)
+
+        let reloaded = GameState(defaults: defaults)
+        XCTAssertEqual(reloaded.dailyChallengeRunStartedKey, DailyChallenge.key())
+        reloaded.forfeitDailyChallengeIfRunning()
+        XCTAssertTrue(reloaded.dailyChallengeFailedToday)
+    }
+
+    func testDailyChallenge_completeClearsInProgressKey_andSurvivesReconcile() {
+        let gs = makeGameState()
+        gs.startDailyChallenge()
+        var done = false
+        while !done { done = gs.advanceDailyChallenge() }
+        gs.completeTodaysDailyChallenge()
+        XCTAssertNil(gs.dailyChallengeRunStartedKey, "completing settles the run")
+
+        gs.forfeitDailyChallengeIfRunning()   // must NOT flip a cleared day to failed
+        XCTAssertFalse(gs.dailyChallengeFailedToday)
+        XCTAssertTrue(gs.dailyChallengeDoneToday)
+    }
+
+    func testDailyChallenge_staleRunKey_clearsWithoutFailingToday() {
+        let gs = makeGameState()
+        gs.dailyChallengeRunStartedKey = "2020-01-01"   // a run from a long-gone day
+        gs.forfeitDailyChallengeIfRunning()
+        XCTAssertFalse(gs.dailyChallengeFailedToday, "a stale key never penalises today")
+        XCTAssertNil(gs.dailyChallengeRunStartedKey)
+    }
+
     // MARK: - addCoins — normal cases
 
     func testAddCoins_positiveAmount_increasesBalance() {
