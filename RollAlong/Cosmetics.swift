@@ -27,6 +27,24 @@ protocol CosmeticItem: Hashable, Identifiable, CaseIterable, Codable
     /// Tier classification.  Shapes the shop layout + which items are
     /// pick-able as the post-tutorial reward.
     var tier: CosmeticTier { get }
+    /// True if the item can be bought with coins (individually or via a coin
+    /// bundle) — i.e. not the free starter and not an exclusive (earned / IAP /
+    /// event-only) item. A protocol REQUIREMENT (not just an extension method)
+    /// so generic code dispatches to a type's override. Defaulted below.
+    var isCoinPurchasable: Bool { get }
+}
+
+extension CosmeticItem {
+    var isCoinPurchasable: Bool { tier != .starter }
+}
+
+extension BallSkin {
+    /// Exclusive balls are never coin-purchasable — earned (trophy), IAP (aurora,
+    /// diamond), or seasonal-event drops — so the coin-liquidation reset keeps them.
+    static let coinExclusiveBalls: Set<BallSkin> =
+        [.trophy, .aurora, .beachBall, .pumpkin, .ornament, .heartstone,
+         .shamrock, .confetti, .speckledEgg, .diamond]
+    var isCoinPurchasable: Bool { tier != .starter && !Self.coinExclusiveBalls.contains(self) }
 }
 
 /// Tier roughly corresponds to price + rarity.
