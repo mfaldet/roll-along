@@ -26,44 +26,19 @@ struct LeaderboardView: View {
     @State private var isLoading  = false
     @State private var errorText: String?
 
-    @State private var sortKey:      SortKey    = .level
-    @State private var selectedGame: GameFilter = .rollAlong
+    @State private var sortKey:       SortKey         = .level
+    @State private var selectedBoard: LeaderboardBoard = .rollAlong
 
     /// Which Roll Along stat the board ranks by.  (Speed was dropped — we lean
-    /// on stars for skill.)
+    /// on stars for skill.)  Only changes ranking — never which columns show.
     private enum SortKey: String, CaseIterable, Identifiable {
         case level = "Level", stars = "Stars", coins = "Coins"
         var id: String { rawValue }
     }
 
-    /// Game whose board is shown — the climb plus three minigame boards, each
-    /// ranked by its own stat.
-    private enum GameFilter: String, CaseIterable, Identifiable {
-        case rollAlong = "Roll Along"
-        case pinball   = "Pinball"
-        case zenGarden = "Zen Garden"
-        case goldRush  = "Gold Rush"
-        var id: String { rawValue }
-
-        /// PostgREST order clause for this board.
-        var order: String {
-            switch self {
-            case .rollAlong: return "climb_level.desc,total_stars.desc"
-            case .pinball:   return "pinball_best.desc"
-            case .zenGarden: return "zen_seconds.desc"
-            case .goldRush:  return "goldrush_best.desc"
-            }
-        }
-        /// The ranking stat for a row (0 = hasn't played this game yet).
-        func stat(_ p: PlayerProfile) -> Int {
-            switch self {
-            case .rollAlong: return p.climbLevel
-            case .pinball:   return p.pinballBest ?? 0
-            case .zenGarden: return p.zenSeconds ?? 0
-            case .goldRush:  return p.goldrushBest ?? 0
-            }
-        }
-    }
+    // The set of boards (identity / ranking order / "has played") lives in the
+    // shared `LeaderboardBoard` so the profile "Player Ranks" section stays in
+    // lockstep with this picker.
 
     /// Rows re-sorted client-side by the active key (Roll Along only).
     private var sortedRows: [PlayerProfile] {
@@ -74,10 +49,11 @@ struct LeaderboardView: View {
         }
     }
 
-    /// What the list shows: Roll Along uses the client sort; the minigame boards
-    /// keep the server order and drop players who haven't played (stat 0).
+    /// What the list shows: Roll Along uses the client sort; every other board
+    /// keeps the server order (already ranked) and drops players who haven't
+    /// played that game yet.
     private var displayRows: [PlayerProfile] {
-        selectedGame == .rollAlong ? sortedRows : rows.filter { selectedGame.stat($0) > 0 }
+        selectedBoard == .rollAlong ? sortedRows : rows.filter { selectedBoard.hasPlayed($0) }
     }
 
     private var myId: UUID? { SocialClient.shared.currentUserId }
@@ -112,7 +88,7 @@ struct LeaderboardView: View {
             }
         }
         .task { await load() }
-        .onChange(of: selectedGame) { _, _ in
+        .onChange(of: selectedBoard) { _, _ in
             rows = []
             Task { await load() }
         }
@@ -131,22 +107,96 @@ struct LeaderboardView: View {
         } else if displayRows.isEmpty {
             emptyState
         } else {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(Array(displayRows.enumerated()), id: \.element.id) { index, profile in
-                        leaderboardRow(rank: index + 1, profile: profile)
+            VStack(spacing: 0) {
+                columnHeader
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(Array(displayRows.enumerated()), id: \.element.id) { index, profile in
+                            leaderboardRow(rank: index + 1, profile: profile)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 18)
+                .refreshable { await load() }
             }
-            .refreshable { await load() }
         }
     }
 
+    // MARK: - Column model
+    //
+    // Every board renders the SAME column set for its game on every row — the
+    // sort/order only changes ranking, never which columns show.  The header row
+    // and the data rows both iterate `columns`, so they stay aligned by width.
+
+    private struct StatColumn: Identifiable {
+        let id: String                       // header label, also the row id
+        let width: CGFloat
+        let highlighted: Bool                // the active ranking column
+        let cell: (PlayerProfile) -> AnyView
+    }
+
+    // Stat tints, shared by header accents and row cells.
+    private static let starTint = Color(red: 1.00, green: 0.84, blue: 0.30)
+    private static let pinTint  = Color(red: 0.30, green: 0.62, blue: 1.00)
+    private static let zenTint  = Color(red: 0.40, green: 0.82, blue: 0.55)
+    private static let winTint  = Color(red: 1.00, green: 0.81, blue: 0.30)
+
+    /// The columns shown on every row of the current board.
+    private var columns: [StatColumn] {
+        switch selectedBoard {
+        case .rollAlong:
+            return [
+                StatColumn(id: "LVL", width: 46, highlighted: sortKey == .level) { p in
+                    AnyView(self.plainCell("\(p.climbLevel)")) },
+                StatColumn(id: "STARS", width: 56, highlighted: sortKey == .stars) { p in
+                    AnyView(self.iconCell(system: "star.fill", tint: Self.starTint, value: "\(p.totalStars)")) },
+                StatColumn(id: "COINS", width: 60, highlighted: sortKey == .coins) { p in
+                    AnyView(self.coinCell(p.coinsCollected ?? 0)) },
+            ]
+        case .pinball:
+            return [ StatColumn(id: "BEST", width: 92, highlighted: true) { p in
+                AnyView(self.iconCell(system: "gamecontroller.fill", tint: Self.pinTint,
+                                      value: (p.pinballBest ?? 0).formatted())) } ]
+        case .zenGarden:
+            return [ StatColumn(id: "TIME", width: 92, highlighted: true) { p in
+                AnyView(self.iconCell(system: "leaf.fill", tint: Self.zenTint,
+                                      value: LeaderboardBoard.zenText(p.zenSeconds ?? 0))) } ]
+        default:
+            // Competitive boards: Wins (ranking) + Best.
+            let mode = selectedBoard.competitiveModeID ?? ""
+            return [
+                StatColumn(id: "WINS", width: 54, highlighted: true) { p in
+                    AnyView(self.iconCell(system: "trophy.fill", tint: Self.winTint,
+                                          value: "\(p.competitiveWins(mode))")) },
+                StatColumn(id: "BEST", width: 74, highlighted: false) { p in
+                    AnyView(self.bestCell(LeaderboardBoard.bestText(mode, p.competitiveBest(mode)))) },
+            ]
+        }
+    }
+
+    /// Column titles above the list — aligned to the row columns by width.
+    private var columnHeader: some View {
+        HStack(spacing: 12) {
+            Color.clear.frame(width: 34, height: 1)          // rank-badge gutter
+            Text("PLAYER").font(Self.headerFont).foregroundStyle(Color(white: 0.45))
+            Spacer(minLength: 0)
+            ForEach(columns) { col in
+                Text(col.id)
+                    .font(Self.headerFont)
+                    .foregroundStyle(col.highlighted ? Self.starTint : Color(white: 0.45))
+                    .frame(width: col.width)
+            }
+        }
+        .padding(.horizontal, 30)
+        .padding(.bottom, 8)
+    }
+
+    private static let headerFont = Font.system(size: 10, weight: .heavy, design: .rounded)
+
     private func leaderboardRow(rank: Int, profile: PlayerProfile) -> some View {
-        let isMe  = (profile.id == myId)
-        let world = World.world(for: max(1, profile.climbLevel))
+        let isMe = (profile.id == myId)
+        let cols = columns
 
         return HStack(spacing: 12) {
             rankBadge(rank)
@@ -155,23 +205,12 @@ struct LeaderboardView: View {
                 .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
-            // Roll Along shows the player's top level as a status chip ("Mac 20").
-            if selectedGame == .rollAlong {
-                Text("\(profile.climbLevel)")
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule().fill(world.accent.opacity(0.28))
-                            .overlay(Capsule().stroke(world.accent.opacity(0.65), lineWidth: 1))
-                    )
+
+            Spacer(minLength: 0)
+
+            ForEach(cols) { col in
+                col.cell(profile).frame(width: col.width)
             }
-
-            Spacer()
-
-            statTrailing(profile)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -187,58 +226,65 @@ struct LeaderboardView: View {
                 )
         )
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "Rank \(rank). \(profile.displayName.isEmpty ? "Climber" : profile.displayName), "
-            + "level \(profile.climbLevel), \(profile.totalStars) stars."
-            + (isMe ? " This is you." : "")
-        )
+        .accessibilityLabel(rowAccessibilityLabel(rank: rank, profile: profile, isMe: isMe))
     }
 
-    /// The per-game stat shown at the trailing edge of a row.
-    @ViewBuilder
-    private func statTrailing(_ p: PlayerProfile) -> some View {
-        switch selectedGame {
+    /// A spoken summary covering every column on the current board.
+    private func rowAccessibilityLabel(rank: Int, profile: PlayerProfile, isMe: Bool) -> String {
+        let name = profile.displayName.isEmpty ? "Climber" : profile.displayName
+        var parts = ["Rank \(rank). \(name)"]
+        switch selectedBoard {
         case .rollAlong:
-            if sortKey == .coins { coinStat(p.coinsCollected ?? 0) } else { starStat(p.totalStars) }
+            parts.append("level \(profile.climbLevel)")
+            parts.append("\(profile.totalStars) stars")
+            parts.append("\(profile.coinsCollected ?? 0) coins")
         case .pinball:
-            valueStat((p.pinballBest ?? 0).formatted(), system: "gamecontroller.fill",
-                      tint: Color(red: 0.30, green: 0.62, blue: 1.0))
+            parts.append("best \(profile.pinballBest ?? 0)")
         case .zenGarden:
-            valueStat(Self.zenTime(p.zenSeconds ?? 0), system: "leaf.fill",
-                      tint: Color(red: 0.40, green: 0.82, blue: 0.55))
-        case .goldRush:
-            coinStat(p.goldrushBest ?? 0)
+            parts.append("\(LeaderboardBoard.zenText(profile.zenSeconds ?? 0)) in the garden")
+        default:
+            let mode = selectedBoard.competitiveModeID ?? ""
+            parts.append("\(profile.competitiveWins(mode)) wins")
+            parts.append("best \(LeaderboardBoard.bestText(mode, profile.competitiveBest(mode)))")
+        }
+        return parts.joined(separator: ", ") + "." + (isMe ? " This is you." : "")
+    }
+
+    // MARK: - Cell builders
+
+    private func plainCell(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.subheadline, design: .rounded).weight(.bold))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+    }
+    private func bestCell(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(Color(white: 0.82))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+    private func iconCell(system: String, tint: Color, value: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: system).font(.system(size: 10)).foregroundStyle(tint)
+            Text(value).font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color(white: 0.82)).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.7)
+        }
+    }
+    private func coinCell(_ v: Int) -> some View {
+        HStack(spacing: 3) {
+            CoinIcon(size: 12)
+            Text("\(v)").font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color(white: 0.82)).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.7)
         }
     }
 
-    private func starStat(_ v: Int) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "star.fill").font(.system(size: 11))
-                .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
-            Text("\(v)").font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color(white: 0.7)).monospacedDigit()
-        }
-    }
-    private func coinStat(_ v: Int) -> some View {
-        HStack(spacing: 4) {
-            CoinIcon(size: 13)
-            Text("\(v)").font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color(white: 0.7)).monospacedDigit()
-        }
-    }
-    private func valueStat(_ text: String, system: String, tint: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: system).font(.system(size: 11)).foregroundStyle(tint)
-            Text(text).font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color(white: 0.75)).monospacedDigit()
-        }
-    }
-    /// Seconds → "1h 23m" / "45m" / "30s".
-    private static func zenTime(_ s: Int) -> String {
-        if s >= 3600 { return "\(s / 3600)h \((s % 3600) / 60)m" }
-        if s >= 60   { return "\(s / 60)m" }
-        return "\(s)s"
-    }
+    // Stat formatting (zen time, competitive best) is shared with the profile
+    // via `LeaderboardBoard`'s static helpers — see Self → LeaderboardBoard.
 
     // MARK: - Header (game filter + sort)
 
@@ -246,9 +292,9 @@ struct LeaderboardView: View {
         VStack(spacing: 12) {
             // Game filter — a dropdown sitting just under the nav title.
             Menu {
-                ForEach(GameFilter.allCases) { g in
-                    Button { selectedGame = g } label: {
-                        if selectedGame == g {
+                ForEach(LeaderboardBoard.allCases) { g in
+                    Button { selectedBoard = g } label: {
+                        if selectedBoard == g {
                             Label(g.rawValue, systemImage: "checkmark")
                         } else {
                             Text(g.rawValue)
@@ -257,7 +303,7 @@ struct LeaderboardView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Text(selectedGame.rawValue)
+                    Text(selectedBoard.title)
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .foregroundStyle(.white)
                     Image(systemName: "chevron.down")
@@ -267,7 +313,7 @@ struct LeaderboardView: View {
             }
 
             // Sort toggles — only meaningful for the Roll Along board.
-            if selectedGame == .rollAlong {
+            if selectedBoard == .rollAlong {
                 HStack(spacing: 8) {
                     ForEach(SortKey.allCases) { key in
                         sortChip(key)
@@ -323,10 +369,13 @@ struct LeaderboardView: View {
     // MARK: - Empty / error / signed-out states
 
     private var emptyState: some View {
-        messageBlock(
+        let isClimb = (selectedBoard == .rollAlong)
+        return messageBlock(
             icon: "trophy",
-            title: "No climbers yet",
-            message: "Be the first on the board — clear a level to post your rank.",
+            title: isClimb ? "No climbers yet" : "No scores yet",
+            message: isClimb
+                ? "Be the first on the board — clear a level to post your rank."
+                : "Be the first on the board — play a round of \(selectedBoard.title) to post your rank.",
             actionTitle: nil,
             action: nil
         )
@@ -392,7 +441,7 @@ struct LeaderboardView: View {
         isLoading = true
         errorText = nil
         do {
-            rows = try await SocialClient.shared.fetchLeaderboard(order: selectedGame.order)
+            rows = try await SocialClient.shared.fetchLeaderboard(order: selectedBoard.order)
         } catch {
             errorText = "The ranking server is unreachable right now. Pull to refresh or try again."
         }

@@ -35,10 +35,11 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
-                    progressCard
-                    statsGrid
+                    careerCard
                     badgesCard
                     loadoutCard
+                    PlayerRanksCard(profile: gameState.localLeaderboardProfile,
+                                    playerId: SocialClient.shared.currentUserId)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 10)
@@ -205,23 +206,35 @@ struct ProfileView: View {
                 loadoutRow(category: "Goal",
                            name: gameState.equippedGoal.displayName,
                            tier: gameState.equippedGoal.tier) {
-                    Image(systemName: "flag.checkered")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(gameState.equippedGoal.tier.color)
+                    // Actual goal colour, not a tinted flag — so the swatch
+                    // matches what's equipped (including the default).
+                    Circle()
+                        .fill(GoalSkin.previewGradient(for: gameState.equippedGoal))
+                        .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
+                        .frame(width: 22, height: 22)
                 }
                 loadoutRow(category: "Floor",
                            name: gameState.equippedFloor.displayName,
                            tier: gameState.equippedFloor.tier) {
-                    Image(systemName: "square.grid.3x3.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(gameState.equippedFloor.tier.color)
+                    // The floor's real colour — "Classic" included.
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(gameState.equippedFloor.color)
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(white: 0.32), lineWidth: 0.6))
+                        .frame(width: 24, height: 24)
                 }
                 loadoutRow(category: "Pit",
                            name: gameState.equippedPit.displayName,
                            tier: gameState.equippedPit.tier) {
-                    Image(systemName: "circle.bottomhalf.filled")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(gameState.equippedPit.tier.color)
+                    // A mini pit — dark well with the pit's real colour bar,
+                    // matching the Locker preview ("Classic" included).
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.16))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(gameState.equippedPit.color)
+                            .frame(width: 16, height: 8)
+                    }
+                    .frame(width: 24, height: 24)
                 }
                 loadoutRow(category: "Music",
                            name: gameState.equippedMusic.displayName,
@@ -262,9 +275,16 @@ struct ProfileView: View {
         }
     }
 
-    private var progressCard: some View {
-        VStack(spacing: 16) {
-            sectionLabel("Progress")
+    // =========================================================================
+    // MARK: - Career card  (merged Progress + Career Stats)
+    // Ratio bars on top (stars, perfect levels), then counter cells below. Each
+    // stat appears exactly once — Max Level replaces the old "Levels cleared"
+    // bar + "Max Level" cell, and the wallet Balance is intentionally omitted
+    // (spend shouldn't be visible from a profile).
+    // =========================================================================
+    private var careerCard: some View {
+        VStack(spacing: 18) {
+            sectionLabel("Career Stats")
 
             VStack(spacing: 14) {
                 progressRow(
@@ -275,19 +295,34 @@ struct ProfileView: View {
                     color: Color(red: 1.0, green: 0.80, blue: 0.20)
                 )
                 progressRow(
-                    icon: "flag.checkered",
-                    label: "Levels cleared",
-                    value: levelsCompleted,
-                    total: max(1, levelsCompleted),
-                    color: Color(red: 0.30, green: 0.75, blue: 0.42)
-                )
-                progressRow(
                     icon: "star.circle.fill",
                     label: "Perfect levels (3★)",
                     value: threeStarCount,
                     total: max(1, levelsCompleted),
                     color: Color(red: 1.0, green: 0.62, blue: 0.10)
                 )
+            }
+
+            LazyVGrid(
+                columns: [GridItem(.flexible()), GridItem(.flexible())],
+                spacing: 12
+            ) {
+                statCell(value: "\(gameState.highestUnlocked)",
+                         label: "Max Level",
+                         icon:  "flag.fill",
+                         color: Color(red: 0.30, green: 0.75, blue: 0.42))
+                statCell(value: "\(gameState.liveStreak)",
+                         label: "Streak",
+                         icon:  "flame.fill",
+                         color: Color(red: 1.0, green: 0.45, blue: 0.15))
+                statCell(value: "\(gameState.totalCoins)",
+                         label: "Coins Found",
+                         icon:  "circle.fill",
+                         color: Color(red: 0.95, green: 0.75, blue: 0.20))
+                statCell(value: "\(gameState.completedBundleIDs.count)",
+                         label: "Bundles",
+                         icon:  "gift.fill",
+                         color: Color(red: 0.58, green: 0.32, blue: 0.96))
             }
         }
         .padding(18)
@@ -329,49 +364,6 @@ struct ProfileView: View {
             }
             .frame(height: 6)
         }
-    }
-
-    // =========================================================================
-    // MARK: - Stats grid
-    // 3×2 grid of large-number cells: stars, streak, coins, bundles, level,
-    // balance.
-    // =========================================================================
-    private var statsGrid: some View {
-        VStack(spacing: 16) {
-            sectionLabel("Career Stats")
-
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 12
-            ) {
-                statCell(value: "\(gameState.totalStars)",
-                         label: "Stars",
-                         icon:  "star.fill",
-                         color: Color(red: 1.0, green: 0.80, blue: 0.20))
-                statCell(value: "\(gameState.liveStreak)",
-                         label: "Streak",
-                         icon:  "flame.fill",
-                         color: Color(red: 1.0, green: 0.45, blue: 0.15))
-                statCell(value: "\(gameState.totalCoins)",
-                         label: "Coins Found",
-                         icon:  "circle.fill",
-                         color: Color(red: 0.95, green: 0.75, blue: 0.20))
-                statCell(value: "\(gameState.completedBundleIDs.count)",
-                         label: "Bundles",
-                         icon:  "gift.fill",
-                         color: Color(red: 0.58, green: 0.32, blue: 0.96))
-                statCell(value: "\(gameState.highestUnlocked)",
-                         label: "Max Level",
-                         icon:  "flag.fill",
-                         color: Color(red: 0.30, green: 0.75, blue: 0.42))
-                statCell(value: "\(gameState.coinBalance)",
-                         label: "Balance",
-                         icon:  "banknote.fill",
-                         color: Color(red: 0.38, green: 0.80, blue: 0.46))
-            }
-        }
-        .padding(18)
-        .profileCard()
     }
 
     private func statCell(value: String, label: String, icon: String, color: Color) -> some View {
@@ -631,6 +623,148 @@ private struct ProfileCardModifier: ViewModifier {
 
 private extension View {
     func profileCard() -> some View { modifier(ProfileCardModifier()) }
+}
+
+// ===========================================================================
+// PlayerRanksCard — the bottom-of-profile section listing the player's stats
+// AND global rank on every game-mode board.  Shared by ProfileView (your own,
+// stats sourced from local GameState) and PublicProfileView (another player,
+// stats from their remote PlayerProfile).  Ranks are fetched from the server
+// (signed-in only); every board is listed, with unplayed boards shown dim.
+// ===========================================================================
+struct PlayerRanksCard: View {
+    /// The stat source — local snapshot for your own profile, remote row for others.
+    let profile: PlayerProfile
+    /// The player's id for the rank lookup; nil (or signed out) → stats only.
+    let playerId: UUID?
+
+    @State private var ranks:   [String: Int] = [:]   // board.rawValue → rank
+    @State private var loading = false
+    @State private var loaded  = false
+
+    private var canRank: Bool { playerId != nil && SocialClient.shared.isSignedIn }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("Player Ranks")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Spacer()
+                if loading { ProgressView().scaleEffect(0.7).tint(.white) }
+            }
+
+            VStack(spacing: 8) {
+                ForEach(LeaderboardBoard.allCases) { board in
+                    rankRow(board)
+                }
+            }
+
+            if !canRank {
+                Text("Sign in to see your global ranks.")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(Color(white: 0.42))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(white: 0.105))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(white: 0.18), lineWidth: 0.8))
+        )
+        .task { await loadRanks() }
+    }
+
+    private func rankRow(_ board: LeaderboardBoard) -> some View {
+        let played = board.hasPlayed(profile)
+        let rank   = ranks[board.rawValue]
+        return HStack(spacing: 12) {
+            Image(systemName: Self.icon(board))
+                .font(.system(size: 15))
+                .foregroundStyle(played ? Self.tint(board) : Color(white: 0.30))
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(board.title)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(played ? .white : Color(white: 0.45))
+                Text(played ? board.statText(profile) : "Not played yet")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            Spacer(minLength: 8)
+
+            rankChip(rank: rank, played: played)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10).fill(Color(white: 0.125))
+        )
+    }
+
+    @ViewBuilder
+    private func rankChip(rank: Int?, played: Bool) -> some View {
+        if let rank {
+            Text("#\(rank)")
+                .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(rank <= 3 ? .black : .white)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(
+                    Capsule().fill(rank <= 3
+                                   ? Color(red: 1.0, green: 0.81, blue: 0.30)   // top-3 gold
+                                   : Color(white: 0.22))
+                )
+        } else if played && canRank && loading {
+            Text("…").font(.system(size: 13, design: .rounded)).foregroundStyle(Color(white: 0.5))
+        } else if played && canRank {
+            // Played, ranks loaded, but outside the fetched window.
+            Text("Unranked").font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.4))
+        } else {
+            Text("—").font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(white: 0.3))
+        }
+    }
+
+    private func loadRanks() async {
+        guard !loaded, canRank, let id = playerId else { return }
+        loaded = true
+        loading = true; defer { loading = false }
+        ranks = await SocialClient.shared.fetchAllRanks(for: id)
+    }
+
+    // Per-board icon + tint (the data model stays UI-free).
+    private static func icon(_ b: LeaderboardBoard) -> String {
+        switch b {
+        case .rollAlong:  return "flag.fill"
+        case .pinball:    return "gamecontroller.fill"
+        case .zenGarden:  return "leaf.fill"
+        case .cometClash: return "sparkles"
+        case .sumo:       return "shield.fill"
+        case .paintBall:  return "paintbrush.fill"
+        case .coinPit:    return "dollarsign.circle.fill"
+        case .marbleCup:  return "soccerball"
+        case .kingOfHill: return "crown.fill"
+        }
+    }
+    private static func tint(_ b: LeaderboardBoard) -> Color {
+        switch b {
+        case .rollAlong:  return Color(red: 0.30, green: 0.75, blue: 0.42)
+        case .pinball:    return Color(red: 0.36, green: 0.62, blue: 1.00)
+        case .zenGarden:  return Color(red: 0.34, green: 0.78, blue: 0.55)
+        case .cometClash: return Color(red: 0.42, green: 0.80, blue: 1.00)
+        case .sumo:       return Color(red: 0.95, green: 0.45, blue: 0.30)
+        case .paintBall:  return Color(red: 0.70, green: 0.42, blue: 0.96)
+        case .coinPit:    return Color(red: 1.00, green: 0.78, blue: 0.20)
+        case .marbleCup:  return Color(red: 0.30, green: 0.80, blue: 0.70)
+        case .kingOfHill: return Color(red: 0.95, green: 0.72, blue: 0.15)
+        }
+    }
 }
 
 #Preview {

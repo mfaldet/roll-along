@@ -613,6 +613,8 @@ struct SumoSurvivalView: View {
         let playerRank = order.firstIndex(where: { $0.isPlayer }) ?? (order.count - 1)
         let coins = placementCoins[min(playerRank, placementCoins.count - 1)]
         gameState.addCoins(coins)
+        let points = order.first(where: { $0.isPlayer })?.points ?? 0
+        gameState.recordCompetitiveScore("sumo", points)   // leaderboard best
         if playerRank == 0 { gameState.recordCompetitiveWin("sumo") }
         AnalyticsClient.shared.track(
             "sumo_match_over",

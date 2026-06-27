@@ -271,6 +271,32 @@ struct BallGameView: View {
     @State private var shakeTrigger:       Int       = 0   // on .fell
     @State private var goalBurst:          GoalBurstEvent? = nil
 
+    // MARK: - Pit-fall animation
+    //
+    // When the ball enters a pit we don't snap straight to the end screen.
+    // Instead we freeze physics, fire the loss feedback once, and play a
+    // short "the ball sinks into the depth" animation — the ball drops,
+    // shrinks, and fades out as if it fell down a deep hole.  Only once it
+    // has vanished do we surface Oops / Out-of-Lives.  This both reads far
+    // better than a ball snapping out of existence AND fixes the old bug
+    // where an out-of-lives fall left `phase == .playing`, so `tick` kept
+    // running and re-fired the fall feedback every frame (constant buzz +
+    // the screen jerking left while the ball jittered in the pit).
+    //
+    // `isSinkingIntoPit` freezes the physics tick; `pitSunk` is the
+    // animation driver (false = at the rim, true = fallen away).  A
+    // one-shot landing reaction (splash / ember burst / smoke poof, keyed
+    // to the equipped Pit) is triggered via `pitLandingEvent`.
+    @State private var isSinkingIntoPit:   Bool      = false
+    @State private var pitSunk:            Bool      = false
+    @State private var pitLandingEvent:    PitLandingEvent? = nil
+
+    /// How long the ball takes to fall out of view into the pit.
+    private let pitFallDuration: TimeInterval = 0.5
+    /// How far (in points) the ball drifts downward as it sinks — well past
+    /// the hole rim so it clearly disappears into depth.
+    private var pitFallDepth: CGFloat { effectiveBallRadius * 7 }
+
     private let ballRadius:  CGFloat = 18
     private let coinRadius:  CGFloat = 9
     private let tickRate              = 1.0 / 60.0
@@ -575,10 +601,29 @@ struct BallGameView: View {
                                 SpringKeyframe(1.0,  duration: 0.32, spring: .bouncy)
                             }
                         }
+                        // Pit-fall sink — driven by the explicit
+                        // withAnimation in `beginPitFall`.  The ball
+                        // shrinks (receding into depth), drops below the
+                        // rim, and fades out, so by the time the end card
+                        // appears it has fully disappeared into the pit.
+                        .scaleEffect(pitSunk ? 0.12 : 1.0)
                         .position(ball.position)
+                        .offset(y: pitSunk ? pitFallDepth : 0)
+                        .opacity(pitSunk ? 0.0 : 1.0)
                         .scaleEffect(phase == .playing ? 1.0 : 0.05)
                         .opacity(phase == .playing ? 1.0 : 0.0)
                         .animation(.easeIn(duration: 0.28), value: phase)
+                }
+
+                // Pit landing reaction — splash / embers / smoke that
+                // erupts the instant the ball drops into the pit.  Keyed to
+                // the equipped Pit so each cosmetic feels distinct.
+                if let landing = pitLandingEvent {
+                    // No .ignoresSafeArea() — the Canvas shares the ball's
+                    // coordinate space so the splash lands exactly where the
+                    // ball dropped (event.center == the fall position).
+                    PitLandingView(event: landing)
+                        .allowsHitTesting(false)
                 }
 
                 // Goal burst — one-shot particle blast on goal reach
@@ -767,10 +812,48 @@ struct BallGameView: View {
                     default:         EmptyView()
                     }
                 }
+
+                // Depth shade — a soft inset shadow around the rim plus a
+                // darker pooling toward the centre, so EVERY pit (even the
+                // flat-colour Standard ones) reads as a recess the ball
+                // falls into rather than a painted-on patch.  Drawn last so
+                // it deepens the animated overlays too.
+                pitDepthShade(width: w, height: h)
             }
             .frame(width: w, height: h)
+            .clipped()   // keep the inset-shadow blur inside the hole
             .position(x: x, y: y)
         }
+    }
+
+    /// Inset-shadow + centre-pooling overlay that gives a hole visual depth.
+    /// Sized to the hole rect so the rim shadow scales with the opening.
+    private func pitDepthShade(width w: CGFloat, height h: CGFloat) -> some View {
+        let minDim = min(w, h)
+        return ZStack {
+            // Centre pooling — darkest in the middle, fading out toward the
+            // rim, so the floor of the pit feels far below.
+            Rectangle()
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            Color.black.opacity(0.45),
+                            Color.black.opacity(0.0),
+                        ]),
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: max(w, h) * 0.62
+                    )
+                )
+                .blendMode(.multiply)
+            // Inset rim shadow — a blurred dark border hugging the opening.
+            Rectangle()
+                .strokeBorder(Color.black.opacity(0.55),
+                              lineWidth: max(3, minDim * 0.12))
+                .blur(radius: max(2, minDim * 0.07))
+                .blendMode(.multiply)
+        }
+        .allowsHitTesting(false)
     }
 
     /// Renders coins for this level.  Coins picked up THIS attempt disappear
@@ -1134,6 +1217,29 @@ struct BallGameView: View {
                         )
                     )
                 }
+
+                // Rising embers — sparks that drift up from the fire, wobble
+                // side to side, and burn out near the top.  Additive so they
+                // glow over the flames.  Seeded so each spark keeps its lane.
+                var emberCtx = ctx
+                emberCtx.blendMode = .plusLighter
+                var rng = SeededRNG(seed: 0xE3B1_0F1A)
+                let emberCount = max(6, Int(size.width / 16))
+                for _ in 0..<emberCount {
+                    let lane  = CGFloat(rng.nextUnit())
+                    let speed = 0.10 + rng.nextUnit() * 0.12
+                    let phase = rng.nextUnit()
+                    // 0 = bottom, 1 = top, looping.
+                    let rise  = (t * speed + phase).truncatingRemainder(dividingBy: 1.0)
+                    let ex    = lane * size.width + CGFloat(sin(t * 2 + phase * 10)) * size.width * 0.04
+                    let ey    = size.height * (1.0 - CGFloat(rise))
+                    let fade  = sin(rise * .pi)          // dim at both ends
+                    let er    = CGFloat(0.8 + rng.nextUnit() * 1.6)
+                    emberCtx.fill(
+                        Path(ellipseIn: CGRect(x: ex - er, y: ey - er, width: er * 2, height: er * 2)),
+                        with: .color(Color(red: 1.0, green: 0.6, blue: 0.2).opacity(0.7 * fade))
+                    )
+                }
             }
         }
     }
@@ -1214,6 +1320,25 @@ struct BallGameView: View {
                         endPoint:   CGPoint(x: 0, y: size.height)
                     )
                 )
+
+                // Caustics — soft bands of light dancing on the surface.
+                // Additive cyan blobs drift on offset sine waves so the
+                // water shimmers like sun through shallow water.
+                var caustic = ctx
+                caustic.blendMode = .plusLighter
+                let bands = max(4, Int(size.height / 26))
+                for b in 0..<bands {
+                    let by = (CGFloat(b) + 0.5) / CGFloat(bands) * size.height
+                    let drift = sin(t * 1.1 + Double(b) * 0.9)
+                    let bx = size.width * (0.5 + 0.32 * CGFloat(drift))
+                    let bw = size.width * CGFloat(0.30 + 0.12 * sin(t * 0.7 + Double(b)))
+                    let bh = max(3, size.height * 0.05)
+                    caustic.fill(
+                        Path(ellipseIn: CGRect(x: bx - bw / 2, y: by - bh / 2, width: bw, height: bh)),
+                        with: .color(Color(red: 0.6, green: 0.95, blue: 1.0)
+                            .opacity(0.10 + 0.06 * (0.5 + 0.5 * sin(t * 2 + Double(b)))))
+                    )
+                }
 
                 // Concentric ripples — slowly expanding circles whose
                 // alpha fades as they grow.  Two ripples staggered.
@@ -1325,6 +1450,37 @@ struct BallGameView: View {
                             )
                         )
                     }
+                }
+
+                // Shooting star — every ~3.5s a streak crosses the void on a
+                // diagonal, leaving a fading tail.  `cycle` is the time since
+                // the last launch; we only draw during its brief flight.
+                let period = 3.5
+                let cycle  = t.truncatingRemainder(dividingBy: period)
+                if cycle < 0.9 {
+                    let prog = CGFloat(cycle / 0.9)
+                    // Seed start position off the launch index so successive
+                    // shooting stars take different paths.
+                    var sRng = SeededRNG(seed: UInt64(t / period) &* 0x2545_F491 | 1)
+                    let startX = CGFloat(sRng.nextUnit()) * size.width
+                    let startY = CGFloat(sRng.nextUnit()) * size.height * 0.4
+                    let dx = size.width * 0.7, dy = size.height * 0.5
+                    let hx = startX + dx * prog
+                    let hy = startY + dy * prog
+                    var streak = ctx
+                    streak.blendMode = .plusLighter
+                    // Tail — a short line behind the head.
+                    var tail = Path()
+                    tail.move(to: CGPoint(x: hx - dx * 0.10, y: hy - dy * 0.10))
+                    tail.addLine(to: CGPoint(x: hx, y: hy))
+                    streak.stroke(tail,
+                        with: .color(Color.white.opacity(Double(0.8 * (1 - prog)))),
+                        lineWidth: 1.6)
+                    // Head glow.
+                    let hr: CGFloat = 2.2
+                    streak.fill(
+                        Path(ellipseIn: CGRect(x: hx - hr, y: hy - hr, width: hr * 2, height: hr * 2)),
+                        with: .color(Color.white.opacity(Double(1 - prog))))
                 }
             }
         }
@@ -4383,6 +4539,11 @@ struct BallGameView: View {
         }
         showOutOfLives = false
 
+        // Clear any in-flight pit-fall state from a prior attempt so the
+        // fresh ball spawns at full size/opacity and physics runs immediately.
+        endPitFallStateWithoutAnimation()
+        pitLandingEvent = nil
+
         // If a ball Pack is equipped, advance to its next shuffled skin so
         // every attempt rolls a different member of the pack.
         gameState.advancePackSkin()
@@ -4475,7 +4636,10 @@ struct BallGameView: View {
     }
 
     private func tick(geoSize: CGSize) {
-        guard phase == .playing, var b = ball else { return }
+        // `isSinkingIntoPit` freezes physics while the ball plays its
+        // fall-into-the-pit animation — without this the ball would keep
+        // rolling (and re-triggering the fall) behind the end screen.
+        guard phase == .playing, !isSinkingIntoPit, var b = ball else { return }
 
         // Spawn-lock: physics is paused while the player gets oriented.
         // When the lock expires naturally we arm levelStartTime here (so
@@ -4670,7 +4834,6 @@ struct BallGameView: View {
             }
 
             ball = b
-            fireFell()
             AnalyticsClient.shared.track(
                 "level_fail",
                 properties: [
@@ -4681,67 +4844,131 @@ struct BallGameView: View {
                 ],
                 level: gameState.currentLevel
             )
-            // L1 first-time-play tutorial: a fall during `.playing`
-            // means the player has met the hole concept and bumped
-            // into it.  Per design, drop them out of the phased
-            // tutorial entirely (no more hint pills), reset the ball
-            // to start, and engage the standard spawn-lock + "Tap to
-            // start" pill — no Oops screen.  Coins stay banked, hole
-            // stays present, no life is consumed (L1 is a tutorial
-            // level so consumeLife is already a no-op).
-            if gameState.currentLevel == 1 && tutorialPhase != .notTutorial {
-                tutorialPhase = .notTutorial
-                ball = Ball(position: startPoint(in: geoSize), velocity: .zero)
-                levelStartTime = nil
-                spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
-                // Reset coinsPickedThisAttempt so the banked coins
-                // become visible again as dimmed "already collected"
-                // indicators on the new attempt — matches the look of
-                // any normal replay of a level you've previously
-                // banked coins on.
-                coinsPickedThisAttempt = []
-                return
-            }
-            // Challenge of the Day: no real lives are ever spent (fireFell
-            // above is a no-op for its .unlimited policy).  Instead the player
-            // gets a fixed number of free attempts per sub-level — spend one
-            // here, and if that was the last, the day is failed (no reward,
-            // greyed in the hub) with a "Better Luck Tomorrow" send-off.
-            // Otherwise it's a normal retry via the Oops screen, which shows
-            // how many attempts remain.
-            if isDaily {
-                // Either branch leaves `.playing` so the physics tick (guarded
-                // on phase == .playing) halts and can't re-fire this fall.
-                if gameState.recordDailyAttemptFailure() {
-                    gameState.failTodaysDailyChallenge()
-                    AnalyticsClient.shared.track(
-                        "daily_challenge_failed",
-                        properties: ["sub_level": .int(gameState.dailyChallengeIndex)]
-                    )
-                    phase = .fell
-                    withAnimation(.easeInOut(duration: 0.28)) { showDailyFailed = true }
-                } else {
-                    withAnimation(.easeIn(duration: 0.22)) { phase = .fell }
-                }
-                return
-            }
-            // If that was the player's last life, skip the Oops screen
-            // entirely and jump straight to Out of Lives.  Otherwise the
-            // overlay-stack hierarchy (Oops drawn under Out of Lives)
-            // leaves an "Oops!" ghost bleeding through behind the modal.
-            // Tutorial levels (where lives aren't consumed) never trigger
-            // this branch because displayedLives stays > 0 for them.
-            if !gameState.isTutorialLevel(gameState.currentLevel),
-               !gameState.unlimitedLives,
-               gameState.displayedLives <= 0 {
-                withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }
+            // Hand off to the pit-fall animation: freeze physics, fire the
+            // loss feedback once, sink the ball into the depth, then resolve
+            // to the right end state.  The branching that used to live here
+            // (tutorial reset / Out-of-Lives / Oops / CotD attempts) now runs
+            // in `resolvePitFall`, after the ball has visibly fallen away.
+            beginPitFall(at: b.position, geoSize: geoSize)
+            return
+        }
+
+        ball = b
+    }
+
+    // MARK: - Pit-fall sequence
+
+    /// Begins the "ball sinks into the pit" animation.  Fires the single
+    /// loss feedback (one haptic double-tap + one screen shake + life
+    /// consumption, all via `fireFell`), kicks off a pit-specific landing
+    /// reaction, animates the ball dropping out of view, and schedules
+    /// `resolvePitFall` to surface the end screen once it has vanished.
+    private func beginPitFall(at point: CGPoint, geoSize: CGSize) {
+        // Re-entrancy guard — a single fall must not stack feedback or
+        // schedule multiple resolutions.
+        guard !isSinkingIntoPit else { return }
+        isSinkingIntoPit = true
+
+        // The one-and-only loss feedback for this fall.
+        fireFell()
+
+        // Pit-specific splash / ember / smoke reaction at the entry point.
+        // Suppressed under Reduce Motion (the ball still sinks, just plainly).
+        if !reduceMotion {
+            pitLandingEvent = PitLandingEvent(center: point, start: .now, pit: pit)
+        }
+
+        // Animate the descent.  Reduce Motion skips the long drop and just
+        // resolves promptly so motion-sensitive players aren't held on a
+        // moving ball.
+        let duration = reduceMotion ? 0.0 : pitFallDuration
+        if duration > 0 {
+            withAnimation(.easeIn(duration: duration)) { pitSunk = true }
+        } else {
+            pitSunk = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) {
+            resolvePitFall(geoSize: geoSize)
+        }
+    }
+
+    /// Runs once the ball has sunk out of view: clears the sink state and
+    /// surfaces the correct end screen (tutorial reset / Out-of-Lives /
+    /// Oops).  Guarded so a mid-fall navigation away (e.g. tapping Home)
+    /// can't fire a stale resolution.
+    private func resolvePitFall(geoSize: CGSize) {
+        guard isSinkingIntoPit else { return }
+
+        // L1 first-time-play tutorial: a fall during the tour just drops the
+        // player out of the phased tutorial and respawns at the start — no
+        // Oops, no life lost (L1 is a tutorial level so `consumeLife` was a
+        // no-op above).  Banked coins reappear as dimmed indicators.
+        if gameState.currentLevel == 1 && tutorialPhase != .notTutorial {
+            tutorialPhase = .notTutorial
+            coinsPickedThisAttempt = []
+            levelStartTime = nil
+            spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
+            respawnAfterPitFall(in: geoSize)
+            return
+        }
+
+        // Clear the sink flags WITHOUT animation so the (now-hidden) ball
+        // doesn't visibly "rise" back out before the overlay covers it.
+        endPitFallStateWithoutAnimation()
+        // The ball has fallen away — drop it so nothing renders or jitters
+        // behind the end card.  Replay/Next re-creates it via `spawnBall`.
+        ball = nil
+
+        // Challenge of the Day: no real lives are ever spent.  Each sub-level
+        // grants a fixed number of free attempts — spend one here; if it was
+        // the last, the day is failed (no reward, greyed in the hub) with a
+        // "Better Luck Tomorrow" send-off, otherwise it's a normal Oops retry
+        // (which shows the attempts that remain).
+        if isDaily {
+            if gameState.recordDailyAttemptFailure() {
+                gameState.failTodaysDailyChallenge()
+                AnalyticsClient.shared.track(
+                    "daily_challenge_failed",
+                    properties: ["sub_level": .int(gameState.dailyChallengeIndex)]
+                )
+                phase = .fell
+                withAnimation(.easeInOut(duration: 0.28)) { showDailyFailed = true }
             } else {
                 withAnimation(.easeIn(duration: 0.22)) { phase = .fell }
             }
             return
         }
 
-        ball = b
+        // If that was the player's last life, go straight to Out of Lives;
+        // otherwise show the Oops screen.  Tutorial levels (lives not
+        // consumed) keep displayedLives > 0 and always take the Oops path.
+        if !gameState.isTutorialLevel(gameState.currentLevel),
+           !gameState.unlimitedLives,
+           gameState.displayedLives <= 0 {
+            withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }
+        } else {
+            withAnimation(.easeIn(duration: 0.22)) { phase = .fell }
+        }
+    }
+
+    /// Respawns the ball at the start after a tutorial-L1 pit fall, resetting
+    /// the sink state without an unwanted reverse animation.
+    private func respawnAfterPitFall(in geoSize: CGSize) {
+        endPitFallStateWithoutAnimation()
+        ball = Ball(position: startPoint(in: geoSize), velocity: .zero)
+    }
+
+    /// Resets the pit-fall flags outside any animation transaction, so the
+    /// next ball appears at full size/opacity instantly rather than easing
+    /// up out of the depth.
+    private func endPitFallStateWithoutAnimation() {
+        var txn = Transaction()
+        txn.disablesAnimations = true
+        withTransaction(txn) {
+            isSinkingIntoPit = false
+            pitSunk = false
+        }
     }
 
     // MARK: - Feedback fan-out
@@ -5050,6 +5277,23 @@ struct GoalBurstEvent: Equatable {
 }
 
 // ---------------------------------------------------------------------------
+// PitLandingEvent — one-shot reaction the moment the ball drops into a pit.
+// The look is keyed to the equipped Pit (a water splash for Pond, an ember
+// burst for Evil, a smoke poof for the rest …) so a higher-rarity pit feels
+// alive when it swallows the ball.  A TimelineView+Canvas reads `start` to
+// drive a brief, self-terminating animation.
+// ---------------------------------------------------------------------------
+struct PitLandingEvent: Equatable {
+    let center: CGPoint
+    let start:  Date
+    let pit:    Pit
+
+    static func == (lhs: PitLandingEvent, rhs: PitLandingEvent) -> Bool {
+        lhs.start == rhs.start && lhs.center == rhs.center && lhs.pit == rhs.pit
+    }
+}
+
+// ---------------------------------------------------------------------------
 // BallMotion — CMMotionManager wrapper
 // ---------------------------------------------------------------------------
 @MainActor
@@ -5218,6 +5462,202 @@ struct GoalBurstView: View {
                     )
                 }
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PitLandingView — one-shot reaction the moment the ball drops into a pit.
+//
+// The look is keyed to the equipped Pit so each cosmetic swallows the ball
+// in character: water pits splash, fire pits throw embers, void pits implode
+// inward, the nightclub pit bursts confetti, and everything else coughs up a
+// soft dust poof.  Renders for ~0.6s after the event, then draws nothing.
+// ---------------------------------------------------------------------------
+struct PitLandingView: View {
+    let event: PitLandingEvent
+    private let lifetime: TimeInterval = 0.6
+
+    /// Coarse reaction families — keeps the Canvas branching readable while
+    /// every Pit maps to a deliberate feel.
+    private enum Style { case splash, embers, smoke, voidImplosion, confetti }
+
+    private var style: Style {
+        switch event.pit {
+        case .pond, .downpour, .syrup:                 return .splash
+        case .evil, .ember, .sunset, .dusk:            return .embers
+        case .space, .eclipse, .aurora, .midnight,
+             .twilight, .velvet:                       return .voidImplosion
+        case .nightclub:                               return .confetti
+        default:                                       return .smoke
+        }
+    }
+
+    /// Primary / secondary tints per pit, used by the splash & smoke styles
+    /// (embers/void/confetti carry their own fixed palettes).
+    private var tint: (Color, Color) {
+        switch event.pit {
+        case .pond:      return (Color(red: 0.55, green: 0.85, blue: 1.0),  Color(red: 0.18, green: 0.50, blue: 0.62))
+        case .downpour:  return (Color(red: 0.62, green: 0.78, blue: 1.0),  Color(red: 0.10, green: 0.16, blue: 0.26))
+        case .syrup:     return (Color(red: 0.55, green: 0.25, blue: 0.18), Color(red: 0.20, green: 0.06, blue: 0.10))
+        case .meadow:    return (Color(red: 0.55, green: 0.78, blue: 0.42), Color(red: 0.10, green: 0.22, blue: 0.10))
+        case .canyon:    return (Color(red: 0.78, green: 0.52, blue: 0.34), Color(red: 0.32, green: 0.14, blue: 0.08))
+        case .graveyard: return (Color(red: 0.45, green: 0.55, blue: 0.45), Color(red: 0.10, green: 0.14, blue: 0.10))
+        default:         return (Color(white: 0.78),                        Color(white: 0.42))
+        }
+    }
+
+    var body: some View {
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let elapsed = tl.date.timeIntervalSince(event.start)
+                guard elapsed >= 0, elapsed <= lifetime else { return }
+                let p = CGFloat(elapsed / lifetime)   // 0…1 progress
+                let c = event.center
+                // Seed from the event start so particle placement is stable
+                // across this landing's frames but differs between falls.
+                let seed = event.start.timeIntervalSinceReferenceDate.bitPattern ^ 0x9E37_79B9_7F4A_7C15
+                var rng = SeededRNG(seed: seed)
+                switch style {
+                case .splash:        drawSplash(ctx, c, p, &rng)
+                case .embers:        drawEmbers(ctx, c, p, &rng)
+                case .smoke:         drawSmoke(ctx, c, p, &rng)
+                case .voidImplosion: drawVoid(ctx, c, p, &rng)
+                case .confetti:      drawConfetti(ctx, c, p, &rng)
+                }
+            }
+        }
+    }
+
+    // MARK: Style renderers
+
+    /// Water: an expanding ripple ring plus droplets that arc up then fall.
+    private func drawSplash(_ ctx: GraphicsContext, _ c: CGPoint, _ p: CGFloat, _ rng: inout SeededRNG) {
+        let (bright, deep) = tint
+        // Ripple ring — expands and fades.
+        let ringR = 10 + 70 * p
+        ctx.stroke(
+            Path(ellipseIn: CGRect(x: c.x - ringR, y: c.y - ringR, width: ringR * 2, height: ringR * 2)),
+            with: .color(bright.opacity(Double(0.5 * (1 - p)))),
+            lineWidth: 2.5 * (1 - p) + 0.5
+        )
+        // Droplets — launched outward+up, pulled back down by gravity.
+        let drops = 11
+        for i in 0..<drops {
+            let ang = (Double(i) / Double(drops)) * .pi - .pi   // upper hemisphere
+            let spread = 70 + rng.nextUnit() * 60
+            let vx = CGFloat(cos(ang)) * CGFloat(spread)
+            let vy = CGFloat(sin(ang)) * CGFloat(spread) * 1.2
+            let gx = c.x + vx * p
+            let gy = c.y + vy * p + 220 * p * p           // gravity arc
+            let r  = CGFloat(2 + rng.nextUnit() * 3) * (1 - p * 0.6)
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: gx - r, y: gy - r, width: r * 2, height: r * 2)),
+                with: .color((i % 2 == 0 ? bright : deep).opacity(Double(1 - p)))
+            )
+        }
+    }
+
+    /// Fire: a quick warm flash then sparks shooting up and flickering out.
+    private func drawEmbers(_ ctx: GraphicsContext, _ c: CGPoint, _ p: CGFloat, _ rng: inout SeededRNG) {
+        // Warm flash, brightest at the start.
+        if p < 0.4 {
+            let fR = 22 + 60 * p
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: c.x - fR, y: c.y - fR, width: fR * 2, height: fR * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [Color(red: 1.0, green: 0.7, blue: 0.2).opacity(Double(0.6 * (1 - p / 0.4))), .clear]),
+                    center: c, startRadius: 0, endRadius: fR
+                )
+            )
+        }
+        var lighter = ctx
+        lighter.blendMode = .plusLighter
+        let sparks = 16
+        for i in 0..<sparks {
+            let ang = -(.pi / 2) + (rng.nextUnit() - 0.5) * 2.4   // mostly upward
+            let speed = 80 + rng.nextUnit() * 110
+            let sx = c.x + CGFloat(cos(ang)) * CGFloat(speed) * p
+            let sy = c.y + CGFloat(sin(ang)) * CGFloat(speed) * p + 60 * p * p
+            let flick = 0.5 + 0.5 * sin(Double(i) * 1.7 + Double(p) * 18)
+            let r = CGFloat(1.5 + rng.nextUnit() * 2.5) * (1 - p)
+            let col = i % 3 == 0
+                ? Color(red: 1.0, green: 0.9, blue: 0.4)
+                : Color(red: 1.0, green: 0.45, blue: 0.1)
+            lighter.fill(
+                Path(ellipseIn: CGRect(x: sx - r, y: sy - r, width: r * 2, height: r * 2)),
+                with: .color(col.opacity(Double((1 - p) * flick)))
+            )
+        }
+    }
+
+    /// Default: a few soft dust puffs that rise and expand as they fade.
+    private func drawSmoke(_ ctx: GraphicsContext, _ c: CGPoint, _ p: CGFloat, _ rng: inout SeededRNG) {
+        let (bright, deep) = tint
+        let puffs = 6
+        for i in 0..<puffs {
+            let ang = (Double(i) / Double(puffs)) * 2 * .pi + rng.nextUnit()
+            let dist = (18 + rng.nextUnit() * 22) * Double(p)
+            let px = c.x + CGFloat(cos(ang)) * CGFloat(dist)
+            let py = c.y + CGFloat(sin(ang)) * CGFloat(dist) - 40 * p   // drift up
+            let r  = CGFloat(10 + rng.nextUnit() * 14) * (0.5 + p)      // grow
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: px - r, y: py - r, width: r * 2, height: r * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        (i % 2 == 0 ? bright : deep).opacity(Double(0.40 * (1 - p))),
+                        .clear,
+                    ]),
+                    center: CGPoint(x: px, y: py), startRadius: 0, endRadius: r
+                )
+            )
+        }
+    }
+
+    /// Void: particles are pulled inward and snuffed out, with a faint dark
+    /// shockwave ring — the pit "swallows" the ball.
+    private func drawVoid(_ ctx: GraphicsContext, _ c: CGPoint, _ p: CGFloat, _ rng: inout SeededRNG) {
+        var lighter = ctx
+        lighter.blendMode = .plusLighter
+        let motes = 18
+        for _ in 0..<motes {
+            let ang  = rng.nextUnit() * 2 * .pi
+            let r0   = 30 + rng.nextUnit() * 55
+            let r    = CGFloat(r0) * (1 - p)               // collapse inward
+            let mx   = c.x + CGFloat(cos(ang)) * r
+            let my   = c.y + CGFloat(sin(ang)) * r
+            let dot  = CGFloat(1.0 + rng.nextUnit() * 1.8) * (1 - p * 0.4)
+            lighter.fill(
+                Path(ellipseIn: CGRect(x: mx - dot, y: my - dot, width: dot * 2, height: dot * 2)),
+                with: .color(Color(red: 0.75, green: 0.82, blue: 1.0).opacity(Double(0.85 * (1 - p))))
+            )
+        }
+        // Dark imploding shockwave ring.
+        let ringR = 60 * (1 - p) + 6
+        ctx.stroke(
+            Path(ellipseIn: CGRect(x: c.x - ringR, y: c.y - ringR, width: ringR * 2, height: ringR * 2)),
+            with: .color(Color(red: 0.55, green: 0.45, blue: 0.95).opacity(Double(0.5 * (1 - p)))),
+            lineWidth: 2.0
+        )
+    }
+
+    /// Nightclub: a quick burst of multicoloured confetti dots that fall.
+    private func drawConfetti(_ ctx: GraphicsContext, _ c: CGPoint, _ p: CGFloat, _ rng: inout SeededRNG) {
+        let cols = [Color(red: 1.0, green: 0.20, blue: 0.70),
+                    Color(red: 0.30, green: 0.80, blue: 1.0),
+                    Color(red: 1.0, green: 0.85, blue: 0.20),
+                    Color(red: 0.60, green: 0.30, blue: 1.0)]
+        let bits = 18
+        for i in 0..<bits {
+            let ang = rng.nextUnit() * 2 * .pi
+            let speed = 70 + rng.nextUnit() * 90
+            let bx = c.x + CGFloat(cos(ang)) * CGFloat(speed) * p
+            let by = c.y + CGFloat(sin(ang)) * CGFloat(speed) * p + 200 * p * p
+            let s  = CGFloat(3 + rng.nextUnit() * 3) * (1 - p * 0.5)
+            ctx.fill(
+                Path(CGRect(x: bx - s / 2, y: by - s / 2, width: s, height: s * 1.6)),
+                with: .color(cols[i % cols.count].opacity(Double(1 - p)))
+            )
         }
     }
 }

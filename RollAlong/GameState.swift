@@ -266,6 +266,15 @@ final class GameState: ObservableObject {
         didSet { save(minigameWins, trackProgressKey: "ra_minigameWins") }
     }
 
+    /// Personal-best score per competitive mode id: [modeID: best].  Units are
+    /// mode-specific (Comet Clash power, Sumo points, Paint Ball coverage %,
+    /// Marble Cup goals, KotH hold-seconds).  Gold Rush keeps its own flat
+    /// `goldrushBest` above; this dict covers the other competitive modes and
+    /// feeds the per-mode leaderboards' "Best" column alongside the win tally.
+    @Published var minigameBests: [String: Int] {
+        didSet { save(minigameBests, trackProgressKey: "ra_minigameBests") }
+    }
+
     /// Set of Challenge Track IDs fully completed (level 100 cleared).
     /// The reward bundle is granted exactly once when a track enters this set.
     @Published var completedTracks: Set<String> {
@@ -468,6 +477,7 @@ final class GameState: ObservableObject {
         ownedPacks     = loadedOwnedPacks
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         minigameWins   = Self.loadTrackProgress(key: "ra_minigameWins", defaults)
+        minigameBests  = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
@@ -884,11 +894,68 @@ final class GameState: ObservableObject {
     /// Coin bonus paid for a new personal best on a minigame.
     static let minigameBestBonus = 100
 
-    /// Publish the minigame personal bests to the leaderboard (no-op signed out).
+    /// A snapshot of local stats as a `PlayerProfile`, used by the profile
+    /// "Player Ranks" section to render the player's own stats (the global rank
+    /// for each board is fetched from the server separately).
+    var localLeaderboardProfile: PlayerProfile {
+        PlayerProfile(
+            id: SocialClient.shared.currentUserId ?? UUID(),
+            displayName: playerName,
+            climbLevel: currentLevel,
+            highestUnlocked: highestUnlocked,
+            totalStars: totalStars,
+            coinsCollected: totalCoins,
+            pinballBest: pinballBest,
+            zenSeconds: zenSeconds,
+            goldrushBest: goldrushBest,
+            snakeBest: minigameBests["snake"],
+            sumoBest: minigameBests["sumo"],
+            paintballBest: minigameBests["paintball"],
+            marblecupBest: minigameBests["marblecup"],
+            kothBest: minigameBests["koth"],
+            snakeWins: minigameWins["snake"],
+            sumoWins: minigameWins["sumo"],
+            paintballWins: minigameWins["paintball"],
+            marblecupWins: minigameWins["marblecup"],
+            kothWins: minigameWins["koth"],
+            goldrushWins: minigameWins["goldrush"]
+        )
+    }
+
+    /// Publish the minigame + competitive personal bests/wins to the leaderboard
+    /// (no-op signed out).
     func syncMinigameStats() {
         guard SocialClient.shared.isSignedIn else { return }
         let p = pinballBest, z = zenSeconds, g = goldrushBest
-        Task { try? await SocialClient.shared.syncMinigameStats(pinballBest: p, zenSeconds: z, goldrushBest: g) }
+        let gw = minigameWins["goldrush", default: 0]
+        let snB = minigameBests["snake", default: 0],     snW = minigameWins["snake", default: 0]
+        let suB = minigameBests["sumo", default: 0],      suW = minigameWins["sumo", default: 0]
+        let pbB = minigameBests["paintball", default: 0], pbW = minigameWins["paintball", default: 0]
+        let mcB = minigameBests["marblecup", default: 0], mcW = minigameWins["marblecup", default: 0]
+        let koB = minigameBests["koth", default: 0],      koW = minigameWins["koth", default: 0]
+        Task {
+            try? await SocialClient.shared.syncMinigameStats(
+                pinballBest: p, zenSeconds: z,
+                goldrushBest: g, goldrushWins: gw,
+                snakeBest: snB, snakeWins: snW,
+                sumoBest: suB, sumoWins: suW,
+                paintballBest: pbB, paintballWins: pbW,
+                marblecupBest: mcB, marblecupWins: mcW,
+                kothBest: koB, kothWins: koW)
+        }
+    }
+
+    /// Record a competitive-mode result's score (units are mode-specific). Keeps
+    /// only the personal best and publishes it.  Called from every competitive
+    /// view's finish path, win or lose, so the "Best" column reflects skill even
+    /// without a win.  Gold Rush uses `recordGoldRushCoins` instead (flat best).
+    @discardableResult
+    func recordCompetitiveScore(_ modeID: String, _ score: Int) -> Bool {
+        guard score > 0 else { return false }
+        let isBest = score > minigameBests[modeID, default: 0]
+        if isBest { minigameBests[modeID] = score }
+        syncMinigameStats()
+        return isBest
     }
 
     /// Record a finished Pinball game — updates the best + pays a new-best bonus.
@@ -955,6 +1022,7 @@ final class GameState: ObservableObject {
     func recordCompetitiveWin(_ modeID: String) {
         minigameWins[modeID, default: 0] += 1
         addTickets(1)
+        syncMinigameStats()   // publish the bumped win tally to the leaderboard
     }
 
     /// Spend tickets.  Returns false (no-op) if the balance is short.

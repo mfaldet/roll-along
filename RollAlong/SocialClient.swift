@@ -134,13 +134,31 @@ final class SocialClient: @unchecked Sendable {
                            prefer: "return=minimal")
     }
 
-    /// Sync the minigame leaderboard stats (best Pinball score, total Zen
-    /// seconds, best Gold Rush haul).  Client-trusted, like the climb stats.
-    func syncMinigameStats(pinballBest: Int, zenSeconds: Int, goldrushBest: Int) async throws {
+    /// Sync the minigame + competitive leaderboard stats (best Pinball score,
+    /// total Zen seconds, and every competitive mode's personal best + lifetime
+    /// win tally).  Client-trusted, like the climb stats.
+    func syncMinigameStats(pinballBest: Int, zenSeconds: Int,
+                           goldrushBest: Int, goldrushWins: Int,
+                           snakeBest: Int, snakeWins: Int,
+                           sumoBest: Int, sumoWins: Int,
+                           paintballBest: Int, paintballWins: Int,
+                           marblecupBest: Int, marblecupWins: Int,
+                           kothBest: Int, kothWins: Int) async throws {
         let me = try requireSession()
         let body = MinigamePatch(pinball_best: pinballBest,
                                  zen_seconds: zenSeconds,
-                                 goldrush_best: goldrushBest)
+                                 goldrush_best: goldrushBest,
+                                 snake_best: snakeBest,
+                                 sumo_best: sumoBest,
+                                 paintball_best: paintballBest,
+                                 marblecup_best: marblecupBest,
+                                 koth_best: kothBest,
+                                 snake_wins: snakeWins,
+                                 sumo_wins: sumoWins,
+                                 paintball_wins: paintballWins,
+                                 marblecup_wins: marblecupWins,
+                                 koth_wins: kothWins,
+                                 goldrush_wins: goldrushWins)
         _ = try await send(method: "PATCH", path: "players",
                            query: "id=eq.\(me.userId.uuidString)",
                            bodyData: try encoder.encode(body),
@@ -161,10 +179,34 @@ final class SocialClient: @unchecked Sendable {
     func fetchLeaderboard(order: String = "climb_level.desc,total_stars.desc",
                           limit: Int = 100) async throws -> [PlayerProfile] {
         let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
-                 + "coins_collected,pinball_best,zen_seconds,goldrush_best,lives"
+                 + "coins_collected,pinball_best,zen_seconds,goldrush_best,lives,"
+                 + "snake_best,sumo_best,paintball_best,marblecup_best,koth_best,"
+                 + "snake_wins,sumo_wins,paintball_wins,marblecup_wins,koth_wins,goldrush_wins"
         let query = "select=\(cols)&order=\(order)&limit=\(limit)"
         let data = try await send(method: "GET", path: "players", query: query)
         return try decode([PlayerProfile].self, from: data)
+    }
+
+    /// The player's rank (1-based) on every `LeaderboardBoard`, computed exactly
+    /// like the on-screen leaderboard: position among players who have actually
+    /// played that board.  Boards the player hasn't played are omitted from the
+    /// result.  Fetches all boards concurrently; signed-in only (reads are
+    /// authed).  Powers the profile "Player Ranks" section.
+    func fetchAllRanks(for playerId: UUID, limit: Int = 500) async -> [String: Int] {
+        await withTaskGroup(of: (String, Int?).self) { group in
+            for board in LeaderboardBoard.allCases {
+                group.addTask {
+                    let rows = (try? await self.fetchLeaderboard(order: board.order, limit: limit)) ?? []
+                    let rank = rows.filter { board.hasPlayed($0) }
+                                   .firstIndex { $0.id == playerId }
+                                   .map { $0 + 1 }
+                    return (board.rawValue, rank)
+                }
+            }
+            var out: [String: Int] = [:]
+            for await (key, rank) in group { if let rank { out[key] = rank } }
+            return out
+        }
     }
 
     // MARK: - Life gifts
@@ -486,6 +528,20 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     var pinballBest: Int?
     var zenSeconds: Int?
     var goldrushBest: Int?
+    // Competitive-mode bests + lifetime win tallies (all optional /
+    // decode-resilient like the stats above; absent → 0).  See competitiveBest /
+    // competitiveWins for keyed lookups by GameMode id.
+    var snakeBest: Int?
+    var sumoBest: Int?
+    var paintballBest: Int?
+    var marblecupBest: Int?
+    var kothBest: Int?
+    var snakeWins: Int?
+    var sumoWins: Int?
+    var paintballWins: Int?
+    var marblecupWins: Int?
+    var kothWins: Int?
+    var goldrushWins: Int?
     // Server-managed timestamps; present on reads, omitted on writes.
     var createdAt: String?
     var updatedAt: String?
@@ -494,8 +550,61 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     // + decode-resilient like the stats above.
     var needsLivesAt: String?
 
+    /// Memberwise init with defaults — lets local code build a profile from
+    /// GameState values for the profile "Player Ranks" readout.  (Codable's
+    /// `init(from:)` is synthesized separately, so decoding is unaffected.)
+    init(id: UUID, displayName: String = "", climbLevel: Int = 1,
+         highestUnlocked: Int = 1, totalStars: Int = 0, lives: Int = 0,
+         coinsCollected: Int? = nil, pinballBest: Int? = nil,
+         zenSeconds: Int? = nil, goldrushBest: Int? = nil,
+         snakeBest: Int? = nil, sumoBest: Int? = nil, paintballBest: Int? = nil,
+         marblecupBest: Int? = nil, kothBest: Int? = nil,
+         snakeWins: Int? = nil, sumoWins: Int? = nil, paintballWins: Int? = nil,
+         marblecupWins: Int? = nil, kothWins: Int? = nil, goldrushWins: Int? = nil,
+         createdAt: String? = nil, updatedAt: String? = nil,
+         lastSeenAt: String? = nil, needsLivesAt: String? = nil) {
+        self.id = id; self.displayName = displayName; self.climbLevel = climbLevel
+        self.highestUnlocked = highestUnlocked; self.totalStars = totalStars
+        self.lives = lives; self.coinsCollected = coinsCollected
+        self.pinballBest = pinballBest; self.zenSeconds = zenSeconds
+        self.goldrushBest = goldrushBest; self.snakeBest = snakeBest
+        self.sumoBest = sumoBest; self.paintballBest = paintballBest
+        self.marblecupBest = marblecupBest; self.kothBest = kothBest
+        self.snakeWins = snakeWins; self.sumoWins = sumoWins
+        self.paintballWins = paintballWins; self.marblecupWins = marblecupWins
+        self.kothWins = kothWins; self.goldrushWins = goldrushWins
+        self.createdAt = createdAt; self.updatedAt = updatedAt
+        self.lastSeenAt = lastSeenAt; self.needsLivesAt = needsLivesAt
+    }
+
     /// True when the player is currently asking clan-mates for lives.
     var isAskingForLives: Bool { (needsLivesAt?.isEmpty == false) }
+
+    /// This player's best score in a competitive mode, keyed by GameMode id.
+    func competitiveBest(_ modeID: String) -> Int {
+        switch modeID {
+        case "snake":     return snakeBest     ?? 0
+        case "sumo":      return sumoBest      ?? 0
+        case "paintball": return paintballBest ?? 0
+        case "marblecup": return marblecupBest ?? 0
+        case "koth":      return kothBest      ?? 0
+        case "goldrush":  return goldrushBest  ?? 0
+        default:          return 0
+        }
+    }
+
+    /// This player's lifetime wins in a competitive mode, keyed by GameMode id.
+    func competitiveWins(_ modeID: String) -> Int {
+        switch modeID {
+        case "snake":     return snakeWins     ?? 0
+        case "sumo":      return sumoWins      ?? 0
+        case "paintball": return paintballWins ?? 0
+        case "marblecup": return marblecupWins ?? 0
+        case "koth":      return kothWins      ?? 0
+        case "goldrush":  return goldrushWins  ?? 0
+        default:          return 0
+        }
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -508,10 +617,130 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case pinballBest      = "pinball_best"
         case zenSeconds       = "zen_seconds"
         case goldrushBest     = "goldrush_best"
+        case snakeBest        = "snake_best"
+        case sumoBest         = "sumo_best"
+        case paintballBest    = "paintball_best"
+        case marblecupBest    = "marblecup_best"
+        case kothBest         = "koth_best"
+        case snakeWins        = "snake_wins"
+        case sumoWins         = "sumo_wins"
+        case paintballWins    = "paintball_wins"
+        case marblecupWins    = "marblecup_wins"
+        case kothWins         = "koth_wins"
+        case goldrushWins     = "goldrush_wins"
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
         case needsLivesAt     = "needs_lives_at"
+    }
+}
+
+// ===========================================================================
+// LeaderboardBoard — one ranked list per Roll Along game/mode.
+//
+// The single source of truth for board identity, ranking order, and the
+// "has this player played it?" test.  Shared by LeaderboardView (the board
+// picker + per-row columns) and the profile "Player Ranks" section, so the two
+// can never drift apart.  Pure data (Foundation only); the icon/colour mapping
+// lives in the view layer.
+// ===========================================================================
+enum LeaderboardBoard: String, CaseIterable, Identifiable {
+    case rollAlong, pinball, zenGarden
+    case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
+    var id: String { rawValue }
+
+    /// Player-facing board name.
+    var title: String {
+        switch self {
+        case .rollAlong:  return "Roll Along"
+        case .pinball:    return "Pinball"
+        case .zenGarden:  return "Zen Garden"
+        case .cometClash: return "Comet Clash"
+        case .sumo:       return "Sumo Survival"
+        case .paintBall:  return "Paint Ball"
+        case .coinPit:    return "Coin Pit"
+        case .marbleCup:  return "Marble Cup"
+        case .kingOfHill: return "King of the Hill"
+        }
+    }
+
+    /// The competitive GameMode id backing this board, or nil for the climb and
+    /// the solo (Pinball / Zen) boards.
+    var competitiveModeID: String? {
+        switch self {
+        case .cometClash: return "snake"
+        case .sumo:       return "sumo"
+        case .paintBall:  return "paintball"
+        case .coinPit:    return "goldrush"
+        case .marbleCup:  return "marblecup"
+        case .kingOfHill: return "koth"
+        default:          return nil
+        }
+    }
+
+    /// PostgREST order clause.  Competitive boards rank by wins, then best.
+    var order: String {
+        switch self {
+        case .rollAlong:  return "climb_level.desc,total_stars.desc"
+        case .pinball:    return "pinball_best.desc"
+        case .zenGarden:  return "zen_seconds.desc"
+        case .cometClash: return "snake_wins.desc,snake_best.desc"
+        case .sumo:       return "sumo_wins.desc,sumo_best.desc"
+        case .paintBall:  return "paintball_wins.desc,paintball_best.desc"
+        case .coinPit:    return "goldrush_wins.desc,goldrush_best.desc"
+        case .marbleCup:  return "marblecup_wins.desc,marblecup_best.desc"
+        case .kingOfHill: return "koth_wins.desc,koth_best.desc"
+        }
+    }
+
+    /// True once the player has any record on this board (hides players who
+    /// haven't played the game yet, and drives "Unranked" in the profile).
+    func hasPlayed(_ p: PlayerProfile) -> Bool {
+        if let mode = competitiveModeID {
+            return p.competitiveWins(mode) > 0 || p.competitiveBest(mode) > 0
+        }
+        switch self {
+        case .rollAlong: return true                       // everyone has a climb level
+        case .pinball:   return (p.pinballBest ?? 0) > 0
+        case .zenGarden: return (p.zenSeconds ?? 0) > 0
+        default:         return true
+        }
+    }
+
+    /// A compact one-line summary of the player's stats on this board — every
+    /// stat the board tracks (the profile shows them all, regardless of rank).
+    func statText(_ p: PlayerProfile) -> String {
+        if let mode = competitiveModeID {
+            let w = p.competitiveWins(mode)
+            return "\(w) win\(w == 1 ? "" : "s") · best \(Self.bestText(mode, p.competitiveBest(mode)))"
+        }
+        switch self {
+        case .rollAlong: return "Lv \(p.climbLevel) · \(p.totalStars)★ · \(p.coinsCollected ?? 0) coins"
+        case .pinball:   return "\((p.pinballBest ?? 0).formatted()) pts"
+        case .zenGarden: return Self.zenText(p.zenSeconds ?? 0)
+        default:         return ""
+        }
+    }
+
+    // MARK: - Shared stat formatters (reused by LeaderboardView's row cells)
+
+    /// Mode-specific formatting for a competitive "Best" value.
+    static func bestText(_ modeID: String, _ v: Int) -> String {
+        switch modeID {
+        case "koth":      return holdText(v)   // hold seconds → "1m 20s"
+        case "paintball": return "\(v)%"       // floor coverage
+        default:          return v.formatted()
+        }
+    }
+    /// Seconds → "1h 23m" / "45m" / "30s" (Zen — long durations).
+    static func zenText(_ s: Int) -> String {
+        if s >= 3600 { return "\(s / 3600)h \((s % 3600) / 60)m" }
+        if s >= 60   { return "\(s / 60)m" }
+        return "\(s)s"
+    }
+    /// Seconds → "1m 20s" / "45s" (KotH hold time — keeps the seconds).
+    static func holdText(_ s: Int) -> String {
+        s >= 60 ? "\(s / 60)m \(s % 60)s" : "\(s)s"
     }
 }
 
@@ -645,6 +874,18 @@ private struct MinigamePatch: Encodable {
     let pinball_best: Int
     let zen_seconds: Int
     let goldrush_best: Int
+    // Competitive-mode bests + lifetime win tallies.
+    let snake_best: Int
+    let sumo_best: Int
+    let paintball_best: Int
+    let marblecup_best: Int
+    let koth_best: Int
+    let snake_wins: Int
+    let sumo_wins: Int
+    let paintball_wins: Int
+    let marblecup_wins: Int
+    let koth_wins: Int
+    let goldrush_wins: Int
 }
 
 private struct GiftInsert: Encodable {
