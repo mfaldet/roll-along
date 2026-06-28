@@ -2487,6 +2487,31 @@ enum RivalCosmetics {
 
 /// A small floating tag above a competitive marble — a bold "YOU" for the
 /// player, the rival's nickname otherwise.  `color` is the racer's identity rim.
+
+// MARK: - Color ⇄ hex (persists the player's primary color)
+
+extension Color {
+    /// "#RRGGBB" → opaque Color.  nil on malformed input.
+    init?(hexRGB: String) {
+        var s = hexRGB.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let v = UInt64(s, radix: 16) else { return nil }
+        self.init(.sRGB,
+                  red:   Double((v >> 16) & 0xFF) / 255,
+                  green: Double((v >>  8) & 0xFF) / 255,
+                  blue:  Double( v        & 0xFF) / 255,
+                  opacity: 1)
+    }
+
+    /// Resolve to an opaque "#RRGGBB" string.
+    var hexRGB: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let clamp = { (x: CGFloat) in Int((max(0, min(1, x)) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", clamp(r), clamp(g), clamp(b))
+    }
+}
+
 /// The floating bottom-left "home" button used by the solo minigames — the same
 /// affordance the climb / Zen Garden show in BallGameView, so leaving a game is
 /// consistent everywhere.  Always tappable; pops back to the home screen.

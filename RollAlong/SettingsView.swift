@@ -115,6 +115,21 @@ struct SettingsView: View {
             }
             .padding()
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+
+            ColorPicker(selection: Binding(get:  { gameState.primaryColor },
+                                           set:  { gameState.primaryColor = $0 }),
+                        supportsOpacity: false) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Primary Color")
+                        .font(.system(.body, design: .rounded))
+                        .foregroundStyle(Color(white: 0.75))
+                    Text("Outlines your nickname in competitive games")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(white: 0.42))
+                }
+            }
+            .padding()
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
         }
     }
 
@@ -397,9 +412,12 @@ struct SettingsView: View {
                     }
                     Spacer()
                     if cosmetic.coins > 0 {
-                        Text("+\(cosmetic.coins) 🪙")
-                            .font(.system(.footnote, design: .rounded))
-                            .foregroundStyle(Color(white: 0.4))
+                        HStack(spacing: 3) {
+                            Text("+\(cosmetic.coins)")
+                                .font(.system(.footnote, design: .rounded))
+                                .foregroundStyle(Color(white: 0.4))
+                            CoinIcon(size: 13)
+                        }
                     }
                 }
                 .foregroundStyle(Color(red: 0.95, green: 0.3, blue: 0.3))

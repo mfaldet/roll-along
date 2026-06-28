@@ -146,7 +146,7 @@ struct PaintBallView: View {
                         marble(p)
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: p.isPlayer ? "YOU" : (rivalLooks[p.colorIndex]?.name ?? "Rival"),
-                                             color: Self.paintColors[p.colorIndex],
+                                             color: p.isPlayer ? gameState.primaryColor : Self.paintColors[p.colorIndex],
                                              isPlayer: p.isPlayer,
                                              isLeader: isLeader(p))
                                     .offset(y: -15).allowsHitTesting(false)

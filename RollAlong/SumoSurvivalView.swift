@@ -174,7 +174,7 @@ struct SumoSurvivalView: View {
                         marble(b)
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: b.isPlayer ? "YOU" : (rivalLooks[b.id]?.name ?? "Rival"),
-                                             color: b.isPlayer ? .white : b.color,
+                                             color: b.isPlayer ? gameState.primaryColor : b.color,
                                              isPlayer: b.isPlayer)
                                     .offset(y: -13).allowsHitTesting(false)
                             }

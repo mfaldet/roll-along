@@ -247,7 +247,7 @@ struct HomeView: View {
                             if gameState.currentMode.section == .competitive {
                                 RivalNameTag(
                                     label: gameState.playerName.isEmpty ? "YOU" : gameState.playerName,
-                                    color: Color(red: 0.28, green: 0.85, blue: 0.45),
+                                    color: gameState.primaryColor,
                                     isPlayer: true)
                                     .position(x: ballPos.x, y: ballPos.y - ballRadius - 16)
                                     .allowsHitTesting(false)

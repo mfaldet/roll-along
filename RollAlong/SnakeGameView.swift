@@ -161,7 +161,7 @@ struct SnakeGameView: View {
                         headView(c)
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: c.isPlayer ? "YOU" : (rivalLooks[c.colorIndex]?.name ?? "Rival"),
-                                             color: Self.palette[c.colorIndex % Self.palette.count],
+                                             color: c.isPlayer ? gameState.primaryColor : Self.palette[c.colorIndex % Self.palette.count],
                                              isPlayer: c.isPlayer)
                                     .offset(y: -12).allowsHitTesting(false)
                             }
