@@ -753,7 +753,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .cometClash: return "Comet Clash"
         case .sumo:       return "Sumo Survival"
         case .paintBall:  return "Paint Ball"
-        case .coinPit:    return "Coin Pit"
+        case .coinPit:    return "Smash and Grab"   // board id stays `coinPit`; backs the `goldrush` mode
         case .marbleCup:  return "Marble Cup"
         case .kingOfHill: return "King of the Hill"
         }

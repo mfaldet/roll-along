@@ -1,14 +1,17 @@
 import SwiftUI
 
 // ===========================================================================
-// GoldRushView — the competitive coin-scramble mode, DISPLAYED as "Coin Pit"
-// (display names swapped with the coinpit mode 2026-06-11; code/id/analytics
-// names keep "goldrush").
+// GoldRushView — the competitive coin-scramble mode, DISPLAYED as "Smash and
+// Grab" (renamed from "Coin Pit" 2026-06-28; the display name had itself been
+// swapped with the coinpit mode 2026-06-11 — code/id/analytics names keep
+// "goldrush" throughout).
 //
 // A 60-second coin scramble.  Coins keep scattering across the floor; roll over
-// them to bank them.  Slam into a rival hard enough and they SPILL some of their
-// hoard onto the ground for anyone to snatch.  Most coins when the clock hits
-// zero wins — and your final count is paid straight into your real balance.
+// them to bank them.  Tap to CHARGE — a short forward dash in the tilt direction
+// (once every 3 s); ram a rival mid-charge and they SPILL some of their hoard
+// onto the ground for anyone to snatch.  An ordinary bump no longer spills.
+// Most coins when the clock hits zero wins — and your final count is paid
+// straight into your real balance.
 //
 // Single-player vs AI (solo-testable): you are the blue marble; three AI rivals
 // chase the nearest coin, and one of them ("the bully") likes to ram whoever's
@@ -139,12 +142,20 @@ struct GoldRushView: View {
                             "goldrush_round_started",
                             properties: ["map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
                         )
+                    } else if started && !isOver {
+                        // Tap = charge: a short forward dash in the tilt direction,
+                        // gated to once every 3 s.  Only a charging ram spills coins.
+                        if engine.chargePlayer() {
+                            if gameState.hapticsEnabled { Haptics.medium() }
+                            AnalyticsClient.shared.track("goldrush_charge")
+                        }
                     }
                 }
             }
 
             topBar
             if !started && !isOver { startPrompt }
+            if started && !isOver { chargeIndicator }
             if isOver { gameOverOverlay }
             if showMapName && started { mapNameLabel }
         }
@@ -246,6 +257,15 @@ struct GoldRushView: View {
         // screen, shop, and climb.  The name tag identifies who's who.
         BallSkinView(skin: skinFor(r), diameter: marbleRadius * 2)
             .frame(width: marbleRadius * 2, height: marbleRadius * 2)
+            // A glowing rim while charging — reads who's mid-dash (and dangerous).
+            .overlay {
+                if r.charging > 0 {
+                    let glow = Color(red: 1.0, green: 0.84, blue: 0.30)
+                    Circle()
+                        .stroke(glow, lineWidth: 3)
+                        .shadow(color: glow.opacity(0.9), radius: 8)
+                }
+            }
             .shadow(color: .black.opacity(0.5), radius: 5, x: 1, y: 3)
     }
 
@@ -275,7 +295,7 @@ struct GoldRushView: View {
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundStyle(secondsLeft <= 10 ? Color(red: 1.0, green: 0.45, blue: 0.4) : .white)
                         .monospacedDigit()
-                    Text("COIN PIT")
+                    Text("SMASH AND GRAB")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .tracking(2)
@@ -328,13 +348,13 @@ struct GoldRushView: View {
                 Text("Tilt to play")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                Text("Grab the most coins in 60 seconds.\nRam rivals to knock coins loose.")
+                Text("Grab the most coins in 60 seconds.\nTap to charge — ram rivals to make them spill.")
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(white: 0.6))
                     .multilineTextAlignment(.center)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Coin Pit. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
+            .accessibilityLabel("Smash and Grab. Tilt to steer. Grab the most coins in 60 seconds. Tap to charge forward and ram rivals to make them spill coins. Tap anywhere to begin.")
 
             // Difficulty selector — shared component; custom Buttons (not a
             // segmented Picker) so the arena's tap-to-start gesture doesn't
@@ -394,7 +414,7 @@ struct GoldRushView: View {
                                 .fill(Color(red: 1.0, green: 0.82, blue: 0.30)))
                     }
                     ResultShareButton(result: ShareableResult(
-                        mode: "Coin Pit",   // this view is DISPLAYED as Coin Pit
+                        mode: "Smash and Grab",   // this view is DISPLAYED as Smash and Grab
                         headline: "\(playerScore) coins",
                         subtitle: "\(ordinal(placement)) of \(racers.count)",
                         skin: gameState.activeSkin,
@@ -430,6 +450,47 @@ struct GoldRushView: View {
                 }
             Spacer()
         }
+    }
+
+    /// Bottom-center charge affordance: a bright "TAP TO CHARGE" pill when ready,
+    /// or a dimmed pill with a left-to-right refill while the 3 s cooldown ticks.
+    /// Non-interactive — the whole arena is the tap target (see `onTapGesture`).
+    private var chargeIndicator: some View {
+        let ready = engine.playerChargeReady
+        let progress = engine.playerChargeProgress
+        let accent = Color(red: 1.0, green: 0.84, blue: 0.30)
+        return VStack {
+            Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 13, weight: .black))
+                Text(ready ? "TAP TO CHARGE" : "CHARGING")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .tracking(1.5)
+            }
+            .foregroundStyle(ready ? accent : Color(white: 0.55))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+            .background(
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.black.opacity(0.5))
+                    if !ready {
+                        GeometryReader { g in
+                            Capsule().fill(accent.opacity(0.20))
+                                .frame(width: g.size.width * CGFloat(progress))
+                        }
+                    }
+                }
+            )
+            .overlay(
+                Capsule().stroke(ready ? accent.opacity(0.65) : Color.white.opacity(0.12),
+                                 lineWidth: 1)
+            )
+            .scaleEffect(ready ? 1.0 : 0.96)
+            .animation(.easeInOut(duration: 0.2), value: ready)
+            .padding(.bottom, 30)
+        }
+        .allowsHitTesting(false)
     }
 
     private func ordinal(_ n: Int) -> String {

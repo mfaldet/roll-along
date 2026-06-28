@@ -36,7 +36,8 @@ struct GameMenuView: View {
 
     /// The reward round shown as a full-width banner.  NB: the tile *displayed*
     /// as "Gold Rush" is catalogue id "coinpit" — the names were swapped with the
-    /// competitive "Coin Pit" (id "goldrush") on 2026-06-11; ids stayed put.
+    /// competitive mode (id "goldrush", now displayed "Smash and Grab") on
+    /// 2026-06-11; ids stayed put through that swap and the later rename.
     private static let goldRushID = "coinpit"
     private var packs: [ChallengeTrackMode] { GameModeCatalogue.challengeTracks }
 

@@ -335,15 +335,17 @@ struct PaintBallMode: GameMode {
     let showsScore                   = true
 }
 
-/// Gold Rush — 60-second coin scramble: grab the most coins off the floor;
-/// ramming a rival knocks coins loose for anyone to snatch.  Your final count
-/// is paid into your real balance, plus a win bonus.
+/// Smash and Grab — 60-second coin scramble: grab the most coins off the floor;
+/// tap to charge a short forward dash (once every 3 s) and ram a rival mid-charge
+/// to knock their coins loose for anyone to snatch.  An ordinary bump spills
+/// nothing.  Your final count is paid into your real balance, plus a win bonus.
 struct GoldRushMode: GameMode {
-    // Display name swapped with the coinpit mode (2026-06-11, Mac's call) —
-    // ids stay put: they're analytics keys, routes, and test anchors.
+    // Renamed "Coin Pit" → "Smash and Grab" 2026-06-28 (Mac's call); the display
+    // name had itself been swapped with the coinpit mode 2026-06-11.  The id
+    // stays put through both: it's an analytics key, a route, and a test anchor.
     let id          = "goldrush"
-    let displayName = "Coin Pit"
-    let tagline     = "Grab the most coins in a minute. Bump rivals to make them spill."
+    let displayName = "Smash and Grab"
+    let tagline     = "Grab the most coins in a minute. Charge into rivals to make them spill."
     let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
@@ -669,10 +671,10 @@ struct ModeTutorial {
                          goal: "Scoop up as many coins as you can in 30 seconds.",
                          hazard: "Only the clock — nothing can hurt you.",
                          reward: "Every coin you grab banks straight to your balance.")
-        case "goldrush":  // displayed "Coin Pit" — the 60s competitive scramble
-            return .init(controls: "Tilt to roll and chase the coins.",
+        case "goldrush":  // displayed "Smash and Grab" — the 60s competitive scramble
+            return .init(controls: "Tilt to roll and chase the coins. Tap to charge forward.",
                          goal: "Grab the most coins of anyone in 60 seconds.",
-                         hazard: "Rivals ram you to knock your coins loose.",
+                         hazard: "Charge into rivals to make them spill — and dodge theirs.",
                          reward: "Your haul banks as coins — win to earn a ticket.")
         case "snake":     // Comet Clash
             return .init(controls: "Tilt to steer your comet.",

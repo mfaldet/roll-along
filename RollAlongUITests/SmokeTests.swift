@@ -77,6 +77,15 @@ final class SmokeTests: XCTestCase {
         return app.staticTexts[label].firstMatch
     }
 
+    /// Dismiss the first-run "Sign in with Apple" sheet if it's up.  On a fresh
+    /// simulator it can cover Home and swallow the next tap (e.g. Game Modes);
+    /// "Not now" sends the player straight in.  A no-op once already dismissed.
+    private func dismissSignInIfPresent(timeout: TimeInterval = 0) {
+        let notNow = app.buttons["Not now"]
+        if timeout > 0 { _ = notNow.waitForExistence(timeout: timeout) }
+        if notNow.exists { notNow.tap() }
+    }
+
     // MARK: - Launch
 
     func testApp_launchesAndShowsHomeView() throws {
@@ -95,26 +104,33 @@ final class SmokeTests: XCTestCase {
         let homeView = element("HomeView")
         XCTAssertTrue(homeView.waitForExistence(timeout: 10))
 
+        // 1b. On a fresh install a "Sign in with Apple" sheet can slide up over
+        // Home and intercept the Game Modes tap — give it a moment to appear,
+        // then dismiss it via "Not now".
+        dismissSignInIfPresent(timeout: 5)
+
         // 2. Navigate to Game Modes hub — by identifier, else by its
         // visible "Game Modes" label (with an AX-tree attachment for
         // diagnosis whenever the identifier is missing).
         let gameModeButton = entry("GameModesButton", labeled: "Game Modes")
         XCTAssertTrue(gameModeButton.waitForExistence(timeout: 5),
                       "Neither the GameModesButton identifier nor the 'Game Modes' label was found — see the AX-tree attachment")
+        dismissSignInIfPresent()   // in case the async sign-in result popped it late
         gameModeButton.tap()
+        dismissSignInIfPresent()
 
         // 3. Tap the competitive coin scramble in the mode list (id
-        // "goldrush"; DISPLAYED as "Coin Pit" since the name swap).  It
-        // sits a few cards down the hub — scroll once if it's below the
-        // fold on small screens.  Selecting a mode now ARMS it and returns
-        // Home (it no longer launches the game directly).
-        let goldRushButton = entry("goldrush", labeled: "Coin Pit")
+        // "goldrush"; DISPLAYED as "Smash and Grab" since the name swap +
+        // rename).  It sits a few cards down the hub — scroll once if it's
+        // below the fold on small screens.  Selecting a mode now ARMS it and
+        // returns Home (it no longer launches the game directly).
+        let goldRushButton = entry("goldrush", labeled: "Smash and Grab")
         XCTAssertTrue(goldRushButton.waitForExistence(timeout: 5),
-                      "Neither the goldrush identifier nor the 'Coin Pit' label was found in the Games hub — see the AX-tree attachment")
+                      "Neither the goldrush identifier nor the 'Smash and Grab' label was found in the Games hub — see the AX-tree attachment")
         if !goldRushButton.isHittable { app.swipeUp() }
         goldRushButton.tap()
 
-        // 4. Back on Home, with Coin Pit armed for Play.
+        // 4. Back on Home, with Smash and Grab armed for Play.
         XCTAssertTrue(homeView.waitForExistence(timeout: 5),
                       "Selecting a mode should return to Home with it armed")
 
@@ -128,7 +144,13 @@ final class SmokeTests: XCTestCase {
         // 6. The scramble's view is on screen (leaf anchor on its HUD label)
         let goldRushView = element("GoldRushView")
         XCTAssertTrue(goldRushView.waitForExistence(timeout: 10),
-                      "Coin Pit should launch from Play within the launch-animation window")
+                      "Smash and Grab should launch from Play within the launch-animation window")
+
+        // 6b. On first play a "How to play" card slides up over the game and
+        // intercepts the close tap — dismiss it via "Got it — Play".  A no-op
+        // once the tutorial has been seen.
+        let gotItButton = app.buttons["Got it — Play"]
+        if gotItButton.waitForExistence(timeout: 3) { gotItButton.tap() }
 
         // 7. Exit via the game's own close (✕) button — the nav bar is
         // hidden in-game, so there is no Back button and the swipe-back
@@ -138,11 +160,38 @@ final class SmokeTests: XCTestCase {
                       "The scramble's close button should be on screen — see the AX-tree attachment if missing")
         closeButton.tap()
 
-        // 8. Home screen is visible again
+        // 8. Home screen is visible again (dismiss a re-presented Sign-in sheet
+        // first — the async sign-in can slide back up over Home on return).
+        dismissSignInIfPresent(timeout: 3)
+        if !homeView.waitForExistence(timeout: 8) { attachAccessibilityTree("step8-no-home") }
         XCTAssertTrue(
-            homeView.waitForExistence(timeout: 5),
-            "HomeView should be visible again after returning from Coin Pit"
+            homeView.exists,
+            "HomeView should be visible again after returning from Smash and Grab"
         )
+    }
+
+    /// Signed out, the social home buttons (Leaderboard / Clans / Friends) are
+    /// locked: tapping one raises the "Sign in with Apple" prompt instead of
+    /// navigating.  The sim starts signed out, so this exercises the locked path.
+    func testSignedOut_socialButtonRaisesSignInPrompt() throws {
+        let homeView = element("HomeView")
+        XCTAssertTrue(homeView.waitForExistence(timeout: 10))
+
+        // Clear the once-per-launch Sign-in nudge so the only prompt that can
+        // appear next is the one our button tap raises.
+        dismissSignInIfPresent(timeout: 5)
+
+        // Tap the locked Leaderboard button.
+        let leaderboard = app.buttons["Leaderboard"]
+        XCTAssertTrue(leaderboard.waitForExistence(timeout: 5),
+                      "Leaderboard button should be on Home")
+        leaderboard.tap()
+
+        // The prompt's title confirms it came up (and that we did NOT navigate
+        // into the Leaderboard screen, whose signed-out copy reads differently).
+        let promptTitle = app.staticTexts["Sign in to play with friends"]
+        XCTAssertTrue(promptTitle.waitForExistence(timeout: 5),
+                      "Tapping a locked social button should raise the Sign-in-with-Apple prompt")
     }
 
     // MARK: - Home screen elements
