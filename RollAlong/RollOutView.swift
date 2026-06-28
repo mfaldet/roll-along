@@ -140,6 +140,7 @@ struct RollOutView: View {
     private let trailMinStep: CGFloat = 3
 
     private var maze: RollOutMaze { RollOutMazes.all[mazeIndex % RollOutMazes.all.count] }
+    private var boundary: Boundary { gameState.equippedBoundary }
     private var outOfLives: Bool { !gameState.unlimitedLives && gameState.displayedLives <= 0 }
 
     // MARK: - Body
@@ -204,7 +205,7 @@ struct RollOutView: View {
     private var tableBorder: some View {
         RoundedRectangle(cornerRadius: 4)
             .strokeBorder(
-                LinearGradient(colors: [Color(white: 0.42), Color(white: 0.22)],
+                LinearGradient(colors: [boundary.edgeColor, boundary.deepColor],
                                startPoint: .top, endPoint: .bottom),
                 lineWidth: 5)
             .ignoresSafeArea()
@@ -217,9 +218,9 @@ struct RollOutView: View {
                 let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
                 let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
                 var path = Path(); path.move(to: p1); path.addLine(to: p2)
-                ctx.stroke(path, with: .color(Color(white: 0.34)),
+                ctx.stroke(path, with: .color(boundary.color),
                            style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                ctx.stroke(path, with: .color(Color(white: 0.58).opacity(0.6)),
+                ctx.stroke(path, with: .color(boundary.edgeColor.opacity(0.7)),
                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
             }
         }

@@ -12,10 +12,11 @@ import SwiftUI
 //   ra_lives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
 //   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
-//   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBundles, ra_ownedPacks,
+//   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBoundaries,
+//   ra_ownedBundles, ra_ownedPacks,
 //   ra_ownedMusic, ra_trackProgress, ra_completedTracks, ra_equippedGoal,
-//   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedMusic,
-//   ra_equippedPack.
+//   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedBoundary,
+//   ra_equippedMusic, ra_equippedPack.
 //
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
@@ -232,6 +233,10 @@ final class GameState: ObservableObject {
     @Published var ownedPits: Set<String> {
         didSet { saveStringSet(ownedPits, forKey: "ra_ownedPits") }
     }
+    /// Owned Boundary cosmetics (walls / platforms / perimeter).
+    @Published var ownedBoundaries: Set<String> {
+        didSet { saveStringSet(ownedBoundaries, forKey: "ra_ownedBoundaries") }
+    }
     /// Owned bundle IDs (for the shop's "OWNED" badge — items inside
     /// each bundle are also added to their individual owned sets at
     /// purchase time, so this is purely for UI state).
@@ -392,6 +397,9 @@ final class GameState: ObservableObject {
     @Published var equippedPit: Pit {
         didSet { defaults.set(equippedPit.rawValue, forKey: "ra_equippedPit") }
     }
+    @Published var equippedBoundary: Boundary {
+        didSet { defaults.set(equippedBoundary.rawValue, forKey: "ra_equippedBoundary") }
+    }
     @Published var equippedMusic: MusicTrack {
         didSet { defaults.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
     }
@@ -490,6 +498,7 @@ final class GameState: ObservableObject {
         let loadedOwnedTrails  = Self.loadStringSet(forKey: "ra_ownedTrails", defaults)
         let loadedOwnedFloors  = Self.loadStringSet(forKey: "ra_ownedFloors", defaults)
         let loadedOwnedPits    = Self.loadStringSet(forKey: "ra_ownedPits", defaults)
+        let loadedOwnedBoundaries = Self.loadStringSet(forKey: "ra_ownedBoundaries", defaults)
         let loadedOwnedMusic   = Self.loadStringSet(forKey: "ra_ownedMusic", defaults)
         let loadedOwnedBundles = Self.loadStringSet(forKey: "ra_ownedBundles", defaults)
         let loadedOwnedPacks   = Self.loadStringSet(forKey: "ra_ownedPacks", defaults)
@@ -498,6 +507,7 @@ final class GameState: ObservableObject {
         ownedTrails    = loadedOwnedTrails
         ownedFloors    = loadedOwnedFloors
         ownedPits      = loadedOwnedPits
+        ownedBoundaries = loadedOwnedBoundaries
         ownedMusic     = loadedOwnedMusic
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
@@ -522,11 +532,13 @@ final class GameState: ObservableObject {
         let savedTrail = TrailColor(rawValue: defaults.string(forKey: "ra_equippedTrail") ?? "")
         let savedFloor = Floor(rawValue:      defaults.string(forKey: "ra_equippedFloor") ?? "")
         let savedPit   = Pit(rawValue:        defaults.string(forKey: "ra_equippedPit")   ?? "")
+        let savedBoundary = Boundary(rawValue: defaults.string(forKey: "ra_equippedBoundary") ?? "")
         let savedMusic = MusicTrack(rawValue: defaults.string(forKey: "ra_equippedMusic") ?? "")
         equippedGoal  = Self.legitimise(savedGoal,  owned: loadedOwnedGoals,  starter: GoalSkin.starter)
         equippedTrail = Self.legitimise(savedTrail, owned: loadedOwnedTrails, starter: TrailColor.starter)
         equippedFloor = Self.legitimise(savedFloor, owned: loadedOwnedFloors, starter: Floor.starter)
         equippedPit   = Self.legitimise(savedPit,   owned: loadedOwnedPits,   starter: Pit.starter)
+        equippedBoundary = Self.legitimise(savedBoundary, owned: loadedOwnedBoundaries, starter: Boundary.starter)
         equippedMusic = Self.legitimise(savedMusic, owned: loadedOwnedMusic,  starter: MusicTrack.starter)
 
         // Restore the equipped Ball Pack only if it's still owned;
@@ -605,6 +617,7 @@ final class GameState: ObservableObject {
         tally(ownedBallSkins, BallSkin.self); tally(ownedGoals, GoalSkin.self)
         tally(ownedTrails, TrailColor.self);  tally(ownedFloors, Floor.self)
         tally(ownedPits, Pit.self);           tally(ownedMusic, MusicTrack.self)
+        tally(ownedBoundaries, Boundary.self)
         return (count, coins)
     }
 
@@ -624,10 +637,13 @@ final class GameState: ObservableObject {
         }
         var balls = ownedBallSkins, goals = ownedGoals, trails = ownedTrails
         var floors = ownedFloors, pits = ownedPits, music = ownedMusic
+        var boundaries = ownedBoundaries
         strip(&balls, BallSkin.self); strip(&goals, GoalSkin.self); strip(&trails, TrailColor.self)
         strip(&floors, Floor.self);   strip(&pits, Pit.self);       strip(&music, MusicTrack.self)
+        strip(&boundaries, Boundary.self)
         ownedBallSkins = balls; ownedGoals = goals; ownedTrails = trails
         ownedFloors = floors; ownedPits = pits; ownedMusic = music
+        ownedBoundaries = boundaries
         // Bundle/pack ownership is a UI badge only (items were owned individually
         // and handled above) — clear it and drop any equipped pack.
         ownedBundles = []; ownedPacks = []; equippedPackID = nil
@@ -639,6 +655,7 @@ final class GameState: ObservableObject {
         equippedTrail = .starter
         equippedFloor = .starter
         equippedPit   = .starter
+        equippedBoundary = .starter
         equippedMusic = .starter
         addCoins(coins)
         return (count, coins)
@@ -650,6 +667,7 @@ final class GameState: ObservableObject {
     var isLoadoutDefault: Bool {
         activeSkin == .starter && equippedGoal == .starter && equippedTrail == .starter
             && equippedFloor == .starter && equippedPit == .starter
+            && equippedBoundary == .starter
             && equippedMusic == .starter && equippedPackID == nil
     }
 
@@ -1303,6 +1321,7 @@ final class GameState: ObservableObject {
         case let t as TrailColor:  return t == TrailColor.starter  || ownedTrails.contains(t.rawValue)
         case let f as Floor:       return f == Floor.starter       || ownedFloors.contains(f.rawValue)
         case let p as Pit:         return p == Pit.starter         || ownedPits.contains(p.rawValue)
+        case let b as Boundary:    return b == Boundary.starter    || ownedBoundaries.contains(b.rawValue)
         case let m as MusicTrack:  return m == MusicTrack.starter  || ownedMusic.contains(m.rawValue)
         default: return false
         }
@@ -1317,6 +1336,7 @@ final class GameState: ObservableObject {
         case let t as TrailColor:  ownedTrails.insert(t.rawValue)
         case let f as Floor:       ownedFloors.insert(f.rawValue)
         case let p as Pit:         ownedPits.insert(p.rawValue)
+        case let b as Boundary:    ownedBoundaries.insert(b.rawValue)
         case let m as MusicTrack:  ownedMusic.insert(m.rawValue)
         default: break
         }

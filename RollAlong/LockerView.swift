@@ -57,6 +57,12 @@ struct LockerView: View {
                         onTap:      { gameState.equippedPit = $0 }
                     )
                     cosmeticRow(
+                        label: "Boundary",
+                        items: Boundary.allCases.filter { gameState.isOwned($0) },
+                        isEquipped: { $0 == gameState.equippedBoundary },
+                        onTap:      { gameState.equippedBoundary = $0 }
+                    )
+                    cosmeticRow(
                         label: "Music",
                         items: MusicTrack.allCases.filter { gameState.isOwned($0) },
                         isEquipped: { $0 == gameState.equippedMusic },
@@ -289,6 +295,13 @@ struct LockerView: View {
                 RoundedRectangle(cornerRadius: 2).fill(p.color).frame(width: 26, height: 14)
             }
             .padding(6)
+        case let b as Boundary:
+            RoundedRectangle(cornerRadius: 4)
+                .fill(LinearGradient(colors: [b.color, b.deepColor],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(height: 16)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(b.edgeColor.opacity(0.9), lineWidth: 1.2))
+                .padding(8)
         case let m as MusicTrack:
             Image(systemName: m == .none ? "speaker.slash.fill" : "music.note")
                 .font(.system(size: 24, weight: .semibold))

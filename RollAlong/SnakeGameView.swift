@@ -150,7 +150,9 @@ struct SnakeGameView: View {
             GeometryReader { geo in
                 ZStack {
                     Color.clear
-                    StaticObstacleLayer(arena: arena, walls: walls, asteroids: asteroids)
+                    StaticObstacleLayer(arena: arena, walls: walls, asteroids: asteroids,
+                                        wallColor: gameState.equippedBoundary.color,
+                                        wallEdge: gameState.equippedBoundary.edgeColor)
                         .equatable()
                         .allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
@@ -863,6 +865,9 @@ private struct StaticObstacleLayer: View, Equatable {
     let arena:    CGSize
     let walls:    [WallSegFrac]
     let asteroids: [PillarFrac]
+    /// Equipped Boundary cosmetic colours (themes the interior walls).
+    var wallColor: Color = Color(white: 0.30)
+    var wallEdge:  Color = Color(white: 0.55)
 
     var body: some View {
         Canvas { ctx, _ in
@@ -871,9 +876,9 @@ private struct StaticObstacleLayer: View, Equatable {
                 let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
                 let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
                 var path = Path(); path.move(to: p1); path.addLine(to: p2)
-                ctx.stroke(path, with: .color(Color(white: 0.30).opacity(0.85)),
+                ctx.stroke(path, with: .color(wallColor.opacity(0.9)),
                            style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                ctx.stroke(path, with: .color(Color(white: 0.55).opacity(0.55)),
+                ctx.stroke(path, with: .color(wallEdge.opacity(0.6)),
                            style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
             for ast in asteroids {

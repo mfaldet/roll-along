@@ -1002,6 +1002,107 @@ enum Pit: String, CosmeticItem {
     }
 }
 
+// MARK: - Boundary (walls / platforms / perimeter)
+//
+// The shared cosmetic for every solid play-surface boundary: Roll Out's maze
+// walls + table rim, Roll Up's platforms, Roll Along's perimeter border, and
+// interior wall "obstacles" in competitive modes.  NOT used by Zen Garden
+// (no walls) or Pinball (its table art is bespoke).
+//
+// rawValue strings are persistence keys — don't rename existing cases.
+enum Boundary: String, CosmeticItem {
+    // Starter — the neutral grey the games shipped with.
+    case classic
+
+    // Standard (50 coins) — solid-colour walls
+    case slate
+    case ember
+    case mint
+    case sky
+    case orchid
+    case sand
+
+    // Rare (100 coins) — richer hues
+    case neon
+    case gold
+    case ice
+
+    // Exclusive / Legendary (500 coins)
+    case obsidian
+    case candy
+    case circuit
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .classic:  return "Classic"
+        case .slate:    return "Slate"
+        case .ember:    return "Ember"
+        case .mint:     return "Mint"
+        case .sky:      return "Sky"
+        case .orchid:   return "Orchid"
+        case .sand:     return "Sand"
+        case .neon:     return "Neon"
+        case .gold:     return "Gold"
+        case .ice:      return "Ice"
+        case .obsidian: return "Obsidian"
+        case .candy:    return "Candy"
+        case .circuit:  return "Circuit"
+        }
+    }
+    var coinCost: Int { tier.basePrice }
+    var unlockLevel: Int { 0 }
+    static var starter: Boundary { .classic }
+    var tier: CosmeticTier {
+        switch self {
+        case .classic:
+            return .starter
+        case .slate, .ember, .mint, .sky, .orchid, .sand:
+            return .standard   //  50 coins
+        case .neon, .gold, .ice:
+            return .rare       // 100 coins
+        case .obsidian, .candy, .circuit:
+            return .exclusive  // 500 coins
+        }
+    }
+
+    /// Base fill for the wall / platform / border.
+    var color: Color {
+        switch self {
+        case .classic:  return Color(white: 0.34)
+        case .slate:    return Color(red: 0.36, green: 0.42, blue: 0.52)
+        case .ember:    return Color(red: 0.78, green: 0.34, blue: 0.22)
+        case .mint:     return Color(red: 0.34, green: 0.74, blue: 0.58)
+        case .sky:      return Color(red: 0.34, green: 0.60, blue: 0.92)
+        case .orchid:   return Color(red: 0.66, green: 0.40, blue: 0.86)
+        case .sand:     return Color(red: 0.80, green: 0.68, blue: 0.44)
+        case .neon:     return Color(red: 0.10, green: 0.92, blue: 0.74)
+        case .gold:     return Color(red: 0.92, green: 0.74, blue: 0.28)
+        case .ice:      return Color(red: 0.62, green: 0.84, blue: 0.96)
+        case .obsidian: return Color(red: 0.16, green: 0.16, blue: 0.22)
+        case .candy:    return Color(red: 0.98, green: 0.46, blue: 0.70)
+        case .circuit:  return Color(red: 0.20, green: 0.70, blue: 0.55)
+        }
+    }
+
+    /// Darker shade — gradient depth (platform undersides, wall base).
+    var deepColor: Color { color.boundaryShaded(0.62) }
+    /// Brighter shade — the lit rim/highlight along an edge.
+    var edgeColor: Color { color.boundaryShaded(1.45) }
+}
+
+fileprivate extension Color {
+    /// Multiply brightness by `factor` (clamped 0…1) — used to derive a
+    /// Boundary's depth + edge shades from its base colour.
+    func boundaryShaded(_ factor: CGFloat) -> Color {
+        let ui = UIColor(self)
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard ui.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }
+        return Color(hue: Double(h), saturation: Double(s),
+                     brightness: Double(min(1, max(0, b * factor))), opacity: Double(a))
+    }
+}
+
 // MARK: - Music tracks
 //
 // Pure identifiers — actual `.m4a` audio + AVAudioPlayer wiring arrive
@@ -1186,6 +1287,9 @@ enum ShopRotation {
     static var pitPool: [Pit] {
         Pit.allCases.filter { $0.tier != .starter }
     }
+    static var boundaryPool: [Boundary] {
+        Boundary.allCases.filter { $0.tier != .starter }
+    }
     static var musicPool: [MusicTrack] {
         MusicTrack.allCases.filter { $0.tier != .starter }
     }
@@ -1202,6 +1306,7 @@ enum ShopRotation {
     static func featuredGoal(at date: Date = Date())   -> GoalSkin?       { pick(goalPool,   window(at: date), salt: 19) }
     static func featuredFloor(at date: Date = Date())  -> Floor?          { pick(floorPool,  window(at: date), salt: 29) }
     static func featuredPit(at date: Date = Date())    -> Pit?            { pick(pitPool,    window(at: date), salt: 37) }
+    static func featuredBoundary(at date: Date = Date()) -> Boundary?     { pick(boundaryPool, window(at: date), salt: 43) }
     static func featuredMusic(at date: Date = Date())  -> MusicTrack?     { pick(musicPool,  window(at: date), salt: 41) }
 
     /// The randomized discount applied to the featured bundle this window.
@@ -1227,6 +1332,7 @@ enum ShopRotation {
         if let g = item as? GoalSkin    { if g == featuredGoal(at: date) { return true } }
         if let f = item as? Floor       { if f == featuredFloor(at: date) { return true } }
         if let p = item as? Pit         { if p == featuredPit(at: date) { return true } }
+        if let bd = item as? Boundary   { if bd == featuredBoundary(at: date) { return true } }
         if let m = item as? MusicTrack  { if m == featuredMusic(at: date) { return true } }
         guard let bundle = featuredBundle(at: date) else { return false }
         return bundle.contains(item)

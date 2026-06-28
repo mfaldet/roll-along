@@ -433,8 +433,13 @@ struct BallGameView: View {
 
     private var borderColor: Color {
         switch borderPhase {
-        case .arming: return Color(white: 0.95)   // bright white = "ready"
-        case .normal: return Color(white: 0.68)
+        // Neutral + armed states wear the equipped Boundary cosmetic; fell (red)
+        // and won (green) stay semantic so game-state feedback always reads.
+        // "Classic" preserves the climb's original border greys exactly.
+        case .arming: return gameState.equippedBoundary == .classic
+            ? Color(white: 0.95) : gameState.equippedBoundary.edgeColor   // brightened = "ready"
+        case .normal: return gameState.equippedBoundary == .classic
+            ? Color(white: 0.68) : gameState.equippedBoundary.color
         case .fell:   return Color(red: 0.95, green: 0.15, blue: 0.15)
         case .won:    return Color(red: 0.25, green: 0.90, blue: 0.45)
         }

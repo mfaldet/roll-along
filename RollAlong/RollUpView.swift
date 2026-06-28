@@ -32,10 +32,10 @@ struct RollUpView: View {
     @StateObject private var clock  = PhysicsClock()
 
     // MARK: - Tunables
-    private let ballRadius:   CGFloat = 15
+    private let ballRadius:   CGFloat = 18      // matches Roll Along's ball (BallGameView.ballRadius)
     private let gravity:      CGFloat = 2_200     // px/s² downward
     private let jumpSpeed:    CGFloat = 980       // px/s upward on a jump
-    private let moveAccel:    CGFloat = 1_150     // tilt → horizontal accel
+    private let moveAccel:    CGFloat = 3_450     // tilt → horizontal accel (3× more sensitive)
     private let airFriction:  CGFloat = 0.90
     private let maxVx:        CGFloat = 540
     private let maxFall:      CGFloat = 1_500
@@ -81,6 +81,7 @@ struct RollUpView: View {
     // MARK: - Derived
     private var heightMeters: Int { max(0, Int((maxBallY - groundY) / pixelsPerMeter)) }
     private var bestMeters: Int { gameState.minigameBests["rollup", default: 0] }
+    private var boundary: Boundary { gameState.equippedBoundary }
     private var outOfLives: Bool { !gameState.unlimitedLives && gameState.displayedLives <= 0 }
 
     // MARK: - Body
@@ -140,13 +141,15 @@ struct RollUpView: View {
                 let rect = CGRect(x: p.worldX - p.width / 2, y: sy - 7,
                                   width: p.width, height: 14)
                 let path = Path(roundedRect: rect, cornerRadius: 7)
-                let top = isGround ? Color(white: 0.40) : Color(red: 0.45, green: 0.78, blue: 1.0)
-                let bot = isGround ? Color(white: 0.22) : Color(red: 0.22, green: 0.45, blue: 0.85)
+                // The Boundary cosmetic themes the platforms; the ground is a
+                // darker shade of the same so it reads as the same material.
+                let top = isGround ? boundary.deepColor : boundary.color
+                let bot = isGround ? boundary.deepColor : boundary.deepColor
                 ctx.fill(path, with: .linearGradient(
                     Gradient(colors: [top, bot]),
                     startPoint: CGPoint(x: rect.minX, y: rect.minY),
                     endPoint: CGPoint(x: rect.minX, y: rect.maxY)))
-                ctx.stroke(path, with: .color(.white.opacity(0.25)), lineWidth: 1)
+                ctx.stroke(path, with: .color(boundary.edgeColor.opacity(0.45)), lineWidth: 1)
             }
         }
     }

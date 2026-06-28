@@ -101,6 +101,7 @@ struct PaintBallView: View {
     @State private var splashes: [Splash]  = []
 
     @State private var grid:    [Int8] = []     // colour index per cell, -1 = bare
+    @State private var paintTick: [Int] = []    // localTick a cell was (re)painted — drives the bloom
     @State private var blocked: [Bool] = []     // cells under a pit — never paintable
     @State private var coverage: [Int] = []     // painted-cell count per colour
     @State private var totalPaintable = 0
@@ -189,21 +190,47 @@ struct PaintBallView: View {
 
     // MARK: - Render layers
 
+    /// The painted floor.  Each cell is a blob, but the blobs are accumulated
+    /// into ONE path per colour and filled once — so overlapping cells merge
+    /// into continuous paint with curvy (arc) edges instead of a seamed dot
+    /// grid.  Per-cell jitter (stable hash) breaks up the lattice so the
+    /// frontier reads as organic splotches, and each freshly painted cell
+    /// "blooms" in (and re-blooms when a rival paints over it).
     private var paintLayer: some View {
         Canvas { ctx, _ in
-            guard cols > 0, rows > 0, grid.count == cols * rows else { return }
-            let rad = max(cellW, cellH) * 0.64
+            guard cols > 0, rows > 0,
+                  grid.count == cols * rows, paintTick.count == grid.count else { return }
+            let baseRad = max(cellW, cellH) * 0.72
+            let bloom   = 12.0   // ticks (~0.2s) for a tile to pop to full size
+
+            var paths = [Path](repeating: Path(), count: colorCount)
             for row in 0..<rows {
-                let base = row * cols
-                let cy = (CGFloat(row) + 0.5) * cellH
+                let base   = row * cols
+                let cyBase = (CGFloat(row) + 0.5) * cellH
                 for col in 0..<cols {
-                    let v = grid[base + col]
-                    if v < 0 { continue }
-                    let cx = (CGFloat(col) + 0.5) * cellW
-                    let rect = CGRect(x: cx - rad, y: cy - rad, width: rad * 2, height: rad * 2)
-                    ctx.fill(Path(ellipseIn: rect),
-                             with: .color(Self.paintColors[Int(v)].opacity(0.92)))
+                    let idx = base + col
+                    let v = grid[idx]
+                    if v < 0 || Int(v) >= colorCount { continue }
+
+                    // Stable per-cell jitter → organic, non-gridded edges.
+                    let h = Self.hash2(col, row)
+                    let jx = (CGFloat(h & 0xFF)        / 255.0 - 0.5) * cellW * 0.5
+                    let jy = (CGFloat(h >> 8  & 0xFF)  / 255.0 - 0.5) * cellH * 0.5
+                    let rmul = 0.82 + CGFloat(h >> 16 & 0xFF) / 255.0 * 0.42   // 0.82…1.24
+
+                    // Bloom: scale the blob up from nothing over `bloom` ticks.
+                    let t    = max(0, min(1, Double(localTick - paintTick[idx]) / bloom))
+                    let rad  = baseRad * rmul * CGFloat(Self.easeOutBack(t))
+                    if rad <= 0.3 { continue }
+
+                    let cx = (CGFloat(col) + 0.5) * cellW + jx
+                    let cy = cyBase + jy
+                    paths[Int(v)].addEllipse(in: CGRect(x: cx - rad, y: cy - rad,
+                                                        width: rad * 2, height: rad * 2))
                 }
+            }
+            for i in 0..<colorCount {
+                ctx.fill(paths[i], with: .color(Self.paintColors[i].opacity(0.96)))
             }
         }
     }
@@ -503,6 +530,7 @@ struct PaintBallView: View {
 
         // Fresh, bare canvas.
         grid = Array(repeating: -1, count: cols * rows)
+        paintTick = Array(repeating: 0, count: cols * rows)
         coverage = Array(repeating: 0, count: colorCount)
 
         loadMapPits(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count])
@@ -721,19 +749,21 @@ struct PaintBallView: View {
     /// Stamp every moving (non-frozen) marble's brush blob onto the grid.
     /// Copies grid + coverage into locals and writes back once for one redraw.
     private func paintPass() {
-        guard grid.count == cols * rows else { return }
+        guard grid.count == cols * rows, paintTick.count == grid.count else { return }
         var g = grid
         var cov = coverage
+        var pt = paintTick
         var changed = false
         for p in painters {
             if localTick < p.stuckUntil { continue }    // frozen marbles don't paint
-            if stamp(&g, &cov, at: p.pos, color: p.colorIndex) { changed = true }
+            if stamp(&g, &cov, &pt, at: p.pos, color: p.colorIndex) { changed = true }
         }
-        if changed { grid = g; coverage = cov }
+        if changed { grid = g; coverage = cov; paintTick = pt }
     }
 
     @discardableResult
-    private func stamp(_ g: inout [Int8], _ cov: inout [Int], at pos: CGPoint, color: Int) -> Bool {
+    private func stamp(_ g: inout [Int8], _ cov: inout [Int], _ pt: inout [Int],
+                       at pos: CGPoint, color: Int) -> Bool {
         let c0 = Int(pos.x / cellW)
         let r0 = Int(pos.y / cellH)
         let span = 2
@@ -754,6 +784,7 @@ struct PaintBallView: View {
                 if old >= 0 { cov[Int(old)] -= 1 }
                 cov[color] += 1
                 g[idx] = Int8(color)
+                pt[idx] = localTick        // restart this tile's bloom in the new colour
                 changed = true
             }
         }
@@ -770,6 +801,22 @@ struct PaintBallView: View {
         let m = hypot(dx, dy)
         guard m > 0 else { return CGVector(dx: 0, dy: 0) }
         return CGVector(dx: dx / m * scale, dy: dy / m * scale)
+    }
+
+    /// Stable per-cell pseudo-random hash → jitter that's fixed for a given
+    /// tile (so paint doesn't shimmer frame to frame) but varied across tiles.
+    private static func hash2(_ x: Int, _ y: Int) -> UInt {
+        var h = UInt(bitPattern: x &* 73_856_093) ^ UInt(bitPattern: y &* 19_349_663)
+        h ^= h >> 13; h = h &* 0x9E37_79B1; h ^= h >> 16
+        return h
+    }
+
+    /// Ease-out with a slight overshoot — gives each tile a "splat" pop as it
+    /// blooms in.  0 at t=0, settles to 1 at t=1.
+    private static func easeOutBack(_ t: Double) -> Double {
+        let c1 = 1.70158, c3 = 1.70158 + 1.0
+        let p = t - 1.0
+        return 1.0 + c3 * p * p * p + c1 * p * p
     }
 }
 
