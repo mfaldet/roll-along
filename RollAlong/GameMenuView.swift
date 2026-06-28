@@ -216,9 +216,7 @@ struct GameMenuView: View {
                     CoinIcon(size: 12)
                 }
             } else {
-                Text("back tomorrow")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.4))
+                dailyResetCountdown
             }
         }
         .padding(.horizontal, 14)
@@ -233,8 +231,27 @@ struct GameMenuView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(done
             ? "Challenge of the Day cleared today. Plus \(ch.rewardCoins) coins earned."
-            : "Challenge of the Day: out of attempts today. Back tomorrow.")
+            : "Challenge of the Day: out of attempts today. Resets at midnight.")
         .accessibilityIdentifier("dailyChallenge")
+    }
+
+    /// Live H:MM:SS countdown to the next Challenge-of-the-Day reset (local
+    /// midnight — the CotD is keyed by the calendar day).
+    private var dailyResetCountdown: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let now = context.date
+            let cal = Calendar.current
+            let reset = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now)) ?? now
+            let secs = max(0, Int(reset.timeIntervalSince(now)))
+            HStack(spacing: 3) {
+                Image(systemName: "clock")
+                    .font(.system(size: 10, weight: .bold))
+                Text(String(format: "%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(Color(white: 0.5))
+        }
     }
 
     /// Full orange call-to-action banner — shown only while today's challenge is
