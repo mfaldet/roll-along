@@ -129,20 +129,46 @@ struct LockerView: View {
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .kerning(1.5)
                 .foregroundStyle(Color(white: 0.55))
+            // Wrap a crowded category into two stacked rows: more than 5 owned
+            // items split into a first-half row on top and the rest below,
+            // instead of one long horizontal strip.  5 or fewer stay a single
+            // row, and every category decides independently (others unaffected).
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(items, id: \.id) { item in
-                        cosmeticCell(item: item, selected: isEquipped(item)) {
-                            onTap(item)
+                Group {
+                    if items.count > 5 {
+                        VStack(alignment: .leading, spacing: 12) {
+                            cosmeticCellsRow(items.prefix((items.count + 1) / 2),
+                                             isEquipped: isEquipped, onTap: onTap)
+                            cosmeticCellsRow(items.suffix(items.count / 2),
+                                             isEquipped: isEquipped, onTap: onTap)
                         }
+                    } else {
+                        cosmeticCellsRow(items[...], isEquipped: isEquipped, onTap: onTap)
                     }
                 }
                 .padding(.horizontal, 2)
                 // Vertical breathing room — the selected cell uses
                 // .scaleEffect(1.06) + a 2pt border, which together push it
                 // ~4pt taller; without this padding the ScrollView clips the
-                // selected cell's top border.
+                // selected cell's top/bottom border.
                 .padding(.vertical, 6)
+            }
+        }
+    }
+
+    /// One horizontal strip of cosmetic cells.  Shared by `cosmeticRow` so a
+    /// single category can render as one strip (≤5 owned) or two stacked strips
+    /// (>5 owned) without duplicating the cell layout.
+    private func cosmeticCellsRow<Item: CosmeticItem>(
+        _ items: ArraySlice<Item>,
+        isEquipped: @escaping (Item) -> Bool,
+        onTap: @escaping (Item) -> Void
+    ) -> some View {
+        HStack(spacing: 14) {
+            ForEach(items, id: \.id) { item in
+                cosmeticCell(item: item, selected: isEquipped(item)) {
+                    onTap(item)
+                }
             }
         }
     }
