@@ -573,7 +573,7 @@ struct MarbleCupView: View {
                 movers[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
                 movers[i].vel.dy += CGFloat(motion.gravity.y) * playerAccel * dt
             case .ai:
-                let s = botSteer(movers[i], ballPos: ballPos)
+                let s = botSteer(movers[i], ballPos: ballPos, seed: i)
                 movers[i].vel.dx += s.dx * dt
                 movers[i].vel.dy += s.dy * dt
             case .ball:
@@ -601,7 +601,7 @@ struct MarbleCupView: View {
 
     /// AI: defend the top goal when the ball is in its third, otherwise line up
     /// behind the ball and shove it toward the bottom goal.
-    private func botSteer(_ ai: Mover, ballPos: CGPoint) -> CGVector {
+    private func botSteer(_ ai: Mover, ballPos: CGPoint, seed: Int) -> CGVector {
         let topGoal = CGPoint(x: field.midX, y: field.minY)       // AI defends this
         let bottomGoal = CGPoint(x: field.midX, y: field.maxY)    // AI attacks this
         let defThird = field.minY + field.height * 0.36
@@ -614,7 +614,9 @@ struct MarbleCupView: View {
             target = CGPoint(x: ballPos.x + dir.dx * (ballRadius + marbleRadius * 0.9),
                              y: ballPos.y + dir.dy * (ballRadius + marbleRadius * 0.9))
         }
-        return unit(dx: target.x - ai.pos.x, dy: target.y - ai.pos.y, scale: aiAccel)
+        return MinigameAI.humanizedSteer(dx: target.x - ai.pos.x, dy: target.y - ai.pos.y,
+                                         scale: aiAccel, seed: seed, tick: localTick,
+                                         difficulty: gameState.minigameDifficulty)
     }
 
     private func inMouth(_ x: CGFloat) -> Bool { abs(x - field.midX) <= goalHalf }

@@ -1529,6 +1529,28 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Peak aim wander (radians) layered onto rival steering so lower
+    /// difficulties don't track like homing missiles — they weave and drift
+    /// off-target for a beat, the way a person misjudges.  Zero on Hard, which
+    /// keeps the surgical pursuit players expect at the top.
+    var aiAimError: CGFloat {
+        switch self {
+        case .easy:   return 1.15   // markedly wider wander than Normal
+        case .normal: return 0.42
+        case .hard:   return 0.0
+        }
+    }
+
+    /// Per-tick chance a rival momentarily eases off the gas — a human "let off"
+    /// beat that breaks relentless pursuit.  Zero on Hard.
+    var aiHesitationChance: Double {
+        switch self {
+        case .easy:   return 0.28   // eases off far more often than Normal
+        case .normal: return 0.08
+        case .hard:   return 0.0
+        }
+    }
+
     /// Payout multiplier applied to a competitive minigame's coin winnings.
     /// Higher difficulty = harder to win = bigger reward for the risk taken.
     /// Spread: Easy 0.5× · Normal 1× · Hard 2× (today's payout == Normal).
@@ -1561,5 +1583,43 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
         case .normal: return 0.45
         case .hard:   return 0.22
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MinigameAI — shared "humanizer" for rival steering across the competitive
+// minigames.  Turns flawless homing into something that reads as a person:
+// a slow, organic aim weave plus occasional eased-off ticks, both scaled by
+// `MinigameDifficulty`.  Stateless — every wobble is derived from (seed, tick),
+// so callers need no per-bot storage; pass a stable per-rival `seed` (its colour
+// index or slot) and the view's tick counter.
+// ---------------------------------------------------------------------------
+enum MinigameAI {
+    /// The aim-wander (radians) to add to a rival's heading this tick — a slow
+    /// two-frequency weave so the bot drifts off-target and back, rather than
+    /// snapping.  Zero when the difficulty asks for surgical aim (Hard).
+    static func weaveAngle(seed: Int, tick: Int, difficulty: MinigameDifficulty) -> CGFloat {
+        let error = difficulty.aiAimError
+        guard error > 0 else { return 0 }
+        let t = Double(tick), s = Double(seed)
+        // ~2.3s and ~8s periods: a gentle sway layered on a longer drift.
+        let weave = sin(t * 0.045 + s * 2.1) * 0.5
+                  + sin(t * 0.013 + s * 1.3) * 0.5
+        return CGFloat(weave) * error
+    }
+
+    /// A steering acceleration toward (dx, dy) at magnitude `scale`, but aimed
+    /// imperfectly (weave) and occasionally eased off (hesitation) per the
+    /// difficulty.  Drop-in replacement for a `unit(dx:dy:scale:)` chase vector.
+    static func humanizedSteer(dx: CGFloat, dy: CGFloat, scale: CGFloat,
+                               seed: Int, tick: Int,
+                               difficulty: MinigameDifficulty) -> CGVector {
+        let m = hypot(dx, dy)
+        guard m > 0 else { return .zero }
+        let ang = atan2(dy, dx) + weaveAngle(seed: seed, tick: tick, difficulty: difficulty)
+        var thrust = scale
+        let hesitation = difficulty.aiHesitationChance
+        if hesitation > 0, Double.random(in: 0..<1) < hesitation { thrust *= 0.35 }
+        return CGVector(dx: cos(ang) * thrust, dy: sin(ang) * thrust)
     }
 }

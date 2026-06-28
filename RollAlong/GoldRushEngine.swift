@@ -117,6 +117,9 @@ final class GoldRushEngine {
     /// never to the player's marble.
     var aiAccelScale: CGFloat = 1.0
     var aiSpeedScale: CGFloat = 1.0
+    /// Difficulty for AI "humanizing" (aim weave + ease-off).  Defaults to
+    /// `.hard` so headless/test runs keep the surgical, full-strength AI.
+    var difficulty: MinigameDifficulty = .hard
 
     // MARK: - Computed
 
@@ -245,11 +248,17 @@ final class GoldRushEngine {
         let base: CGVector
         if r.aggro, let leader = leaderToHarass(than: r),
            hypot(leader.pos.x - r.pos.x, leader.pos.y - r.pos.y) < ramSeekRange {
-            base = unit(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y, scale: accel)
+            base = MinigameAI.humanizedSteer(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y,
+                                             scale: accel, seed: r.colorIndex, tick: localTick,
+                                             difficulty: difficulty)
         } else if let coin = nearestCoin(to: r) {
-            base = unit(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y, scale: accel)
+            base = MinigameAI.humanizedSteer(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y,
+                                             scale: accel, seed: r.colorIndex, tick: localTick,
+                                             difficulty: difficulty)
         } else {
-            base = unit(dx: center.x - r.pos.x, dy: center.y - r.pos.y, scale: accel * 0.5)
+            base = MinigameAI.humanizedSteer(dx: center.x - r.pos.x, dy: center.y - r.pos.y,
+                                             scale: accel * 0.5, seed: r.colorIndex, tick: localTick,
+                                             difficulty: difficulty)
         }
 
         // Always layer on a push away from nearby edges.  Without it a strong

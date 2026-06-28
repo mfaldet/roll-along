@@ -158,6 +158,36 @@ struct BallGameView: View {
     /// fades this to 0, wipes the trail, then restores it to 1 so the next
     /// strokes draw crisp.  Stays 1 in every other mode.
     @State private var sandClearFade:         Double = 1.0
+
+    // ── Zen Garden tools (all Zen-only; see ZenGardenTools.swift) ──────────
+    /// The bottom-right tool dropdown is expanded.
+    @State private var zenMenuOpen   = false
+    /// Which tool sub-panel is showing (pattern options / item options).
+    @State private var zenSubmenu:    ZenSubmenu = .none
+    /// Active auto-track pattern, or nil for manual touch-roll.
+    @State private var zenPattern:    ZenPattern? = nil
+    /// How fast the auto-track advances.
+    @State private var zenSpeed:      ZenSpeed = .medium
+    /// Phase along the active pattern (radians), advanced each tick.
+    @State private var zenPatternPhase = 0.0
+    /// Currently-selected prop to drop on the next garden tap (nil = none).
+    @State private var zenPlacingItem: ZenItem? = nil
+    /// Props placed in the garden this session.
+    @State private var zenDecorations: [ZenDecoration] = []
+    /// True while the player is holding the garden (manual roll + buttons hidden).
+    @State private var zenTouching   = false
+
+    // ── Zen sand accumulation ─────────────────────────────────────────────
+    // Unlike the cosmetic trail (a fixed-length fading ribbon), the Zen sand
+    // groove is baked into a persistent image that grows until "smooth sand"
+    // wipes it — so an auto-pattern left running fills the whole garden and the
+    // raked lines stay put.  Updated incrementally (one new segment per move),
+    // so cost stays O(1) per frame regardless of how full the garden gets.
+    @State private var sandAccumImage: UIImage? = nil
+    @State private var lastSandPoint:  CGPoint? = nil
+    @State private var sandCanvasSize: CGSize = .zero
+    private let sandMinStep: CGFloat = 3.0
+
     /// Default cap on trail segments — about 1.5s at 60fps.
     private let trailMaxLength = 90
     /// Extra segments granted per coin picked up while the Snake
@@ -516,6 +546,15 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Money Full floor (10,000-coin IAP secret) — an overlapping
+                // tiled stack of $100 bills.  Static, so it renders under Reduce
+                // Motion too.
+                if floor == .moneyFull {
+                    moneyFloorOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 // Paper-world floor overlays (ruled lines, grids, fold shadows…)
                 paperFloorOverlay(geo: geo)
                     .ignoresSafeArea()
@@ -523,10 +562,21 @@ struct BallGameView: View {
 
                 // Graphite trail (Paper world): drawn over the floor, UNDER the
                 // holes — the streak should appear cut by the page tear.
-                if (gameState.equippedTrail != .none || usesSandTrail) && trailPoints.count >= 2 {
+                if usesSandTrail {
+                    if sandAccumImage != nil {
+                        trailOverlay(geo: geo)
+                            .opacity(sandClearFade)
+                            .allowsHitTesting(false)
+                    }
+                } else if gameState.equippedTrail != .none && trailPoints.count >= 2 {
                     trailOverlay(geo: geo)
-                        .opacity(usesSandTrail ? sandClearFade : 1)
                         .allowsHitTesting(false)
+                }
+
+                // Zen Garden props (stones, bonsai…) — under the ball so the
+                // marble rolls over them.
+                if usesSandTrail {
+                    ZenDecorationLayer(decorations: zenDecorations, size: geo.size)
                 }
 
                 // Hole zones (themed) — only modes that use holes draw them.
@@ -641,6 +691,16 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Zen Garden input — a transparent layer over the garden that
+                // turns finger-holds into a free roll (and taps into prop
+                // placement).  Sits above the ball so the whole garden reacts
+                // uniformly; the HUD + tool buttons render after it, so they
+                // capture their own taps first.  Auto-pattern disables it (the
+                // ball drives itself).
+                if usesSandTrail && (zenPattern == nil || zenPlacingItem != nil) {
+                    zenInputLayer(size: geo.size)
+                }
+
                 // HUD — just the level label
                 hud(safeBottom: geo.safeAreaInsets.bottom)
 
@@ -709,16 +769,29 @@ struct BallGameView: View {
                 // tappable while they're showing.  Hidden during the one-time
                 // welcome moment and tutorial reward modal so it doesn't
                 // compete for attention with those flows.
+                // Home button — also hidden while the player is holding the Zen
+                // garden (everything clears so they just roll).
                 if !showWelcomeMoment && !showTutorialReward
-                    && !(isCoinPit && coinPitOver) {
+                    && !(isCoinPit && coinPitOver)
+                    && !(usesSandTrail && zenTouching) {
                     homeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
                 }
 
-                // Rake — Zen Garden only.  Mirrors the home button on the
-                // right; smooths the sand so the player can start a fresh
-                // pattern.  Other modes have no persistent trail to clear.
-                if usesSandTrail {
-                    rakeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
+                // Zen Garden tools — bottom-right dropdown (wind ▸ pattern ▸
+                // tree).  Replaces the old standalone rake button.  Hidden while
+                // the player is holding the garden to roll.
+                if usesSandTrail && !zenTouching {
+                    ZenToolsOverlay(
+                        menuOpen:    $zenMenuOpen,
+                        submenu:     $zenSubmenu,
+                        pattern:     $zenPattern,
+                        speed:       $zenSpeed,
+                        placingItem: $zenPlacingItem,
+                        haptics:     gameState.hapticsEnabled,
+                        onSmoothSand: { smoothSand() },
+                        onClearItems: { zenDecorations.removeAll() }
+                    )
+                    .padding(.bottom, geo.safeAreaInsets.bottom)
                 }
 
                 if showWelcomeMoment       { welcomeMomentOverlay }
@@ -1094,6 +1167,64 @@ struct BallGameView: View {
                 }
             }
         }
+    }
+
+    /// Money Full floor (10,000-coin IAP secret) — a dense, overlapping tiling
+    /// of $100 bills laid out brick-fashion so they read as a heaped stack.
+    /// Static + deterministic, so it renders identically every frame.
+    private var moneyFloorOverlay: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let billW: CGFloat = 150, billH: CGFloat = 66
+            let stepX = billW * 0.72            // horizontal overlap
+            let stepY = billH * 0.62            // vertical overlap
+            let cols = Int(ceil(w / stepX)) + 2
+            let rows = Int(ceil(h / stepY)) + 2
+            // Top-to-bottom, left-to-right: later bills overlap earlier ones, so
+            // the stack reads with each bill layered over the one above it.
+            for row in 0..<rows {
+                let oy = CGFloat(row) * stepY - billH * 0.3
+                let rowOffset: CGFloat = (row % 2 == 0) ? 0 : stepX * 0.5
+                for col in 0..<cols {
+                    let ox = CGFloat(col) * stepX - billW * 0.4 - rowOffset
+                    drawHundred(ctx, CGRect(x: ox, y: oy, width: billW, height: billH))
+                }
+            }
+        }
+    }
+
+    /// One $100 bill for the Money Full floor — green paper with a drop shadow
+    /// (to lift it off the stack below), an inner frame, a centre portrait oval,
+    /// and "100" in two opposite corners.
+    private func drawHundred(_ ctx: GraphicsContext, _ rect: CGRect) {
+        let paper  = Color(red: 0.62, green: 0.78, blue: 0.62)
+        let paperD = Color(red: 0.40, green: 0.60, blue: 0.45)
+        let ink    = Color(red: 0.11, green: 0.33, blue: 0.21)
+        let r = min(rect.width, rect.height) * 0.10
+        // Drop shadow under this bill so it sits above the row beneath it.
+        ctx.fill(Path(roundedRect: rect.offsetBy(dx: 1.5, dy: 2.5), cornerRadius: r),
+                 with: .color(.black.opacity(0.18)))
+        let bill = Path(roundedRect: rect, cornerRadius: r)
+        ctx.fill(bill, with: .linearGradient(Gradient(colors: [paper, paperD]),
+            startPoint: CGPoint(x: rect.minX, y: rect.minY),
+            endPoint:   CGPoint(x: rect.minX, y: rect.maxY)))
+        ctx.stroke(bill, with: .color(ink.opacity(0.6)), lineWidth: 1.2)
+        // Inner frame.
+        ctx.stroke(Path(roundedRect: rect.insetBy(dx: rect.width * 0.05, dy: rect.height * 0.10),
+                        cornerRadius: r * 0.6),
+                   with: .color(ink.opacity(0.32)), lineWidth: 0.8)
+        // Centre portrait oval.
+        let ow = rect.width * 0.26, oh = rect.height * 0.62
+        let oc = CGRect(x: rect.midX - ow / 2, y: rect.midY - oh / 2, width: ow, height: oh)
+        ctx.fill(Path(ellipseIn: oc), with: .color(paperD.opacity(0.7)))
+        ctx.stroke(Path(ellipseIn: oc), with: .color(ink.opacity(0.5)), lineWidth: 0.8)
+        // "100" in two opposite corners.
+        let label = ctx.resolve(
+            Text("100").font(.system(size: rect.height * 0.24, weight: .heavy, design: .rounded))
+                .foregroundStyle(ink.opacity(0.72)))
+        let ix = rect.width * 0.17, iy = rect.height * 0.27
+        ctx.draw(label, at: CGPoint(x: rect.minX + ix, y: rect.minY + iy), anchor: .center)
+        ctx.draw(label, at: CGPoint(x: rect.maxX - ix, y: rect.maxY - iy), anchor: .center)
     }
 
     /// Brass Works floor overlay (Clockwork bundle) — riveted brass/bronze
@@ -1649,33 +1780,21 @@ struct BallGameView: View {
     /// surviving positions keep their original colours and the
     /// spectrum follows the ball.
     private func trailOverlay(geo: GeometryProxy) -> some View {
-        Canvas { ctx, _ in
-            let n = trailPoints.count
-            guard n >= 2 else { return }
-            // Zen Garden — one continuous raked-sand groove.  Unlike the
-            // cosmetic trail it doesn't fade head-to-tail (it's a permanent
-            // furrow, not a comet) and is drawn two-tone: a soft wide shadow
-            // for the depression, under a thin pale highlight for the carved
-            // line catching the light.
+        Canvas { ctx, size in
+            // Zen Garden — the raked-sand groove is a PERSISTENT furrow baked
+            // into an image (see addSandPoint), so a running auto-pattern fills
+            // the whole garden and hand-raked lines stay until "smooth sand".
             if usesSandTrail {
-                var groove = Path()
-                groove.move(to: trailPoints[0])
-                for i in 1..<n { groove.addLine(to: trailPoints[i]) }
-                ctx.stroke(
-                    groove,
-                    with: .color(Color(red: 0.40, green: 0.32, blue: 0.22).opacity(0.22)),
-                    style: StrokeStyle(lineWidth: 7.0, lineCap: .round, lineJoin: .round)
-                )
-                ctx.stroke(
-                    groove,
-                    with: .color(Color(red: 0.96, green: 0.91, blue: 0.80).opacity(0.55)),
-                    style: StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round)
-                )
+                if let img = sandAccumImage {
+                    ctx.draw(Image(uiImage: img), in: CGRect(origin: .zero, size: size))
+                }
                 return
             }
             // Bespoke, animated per-trail rendering (scales, fire→smoke, snow
             // trench, jet-stream, …) — the same renderer the home trail uses,
             // so a trail looks identical everywhere.
+            let n = trailPoints.count
+            guard n >= 2 else { return }
             drawRichTrail(ctx, points: trailPoints,
                           trail: gameState.equippedTrail,
                           t: Date().timeIntervalSinceReferenceDate,
@@ -2968,28 +3087,87 @@ struct BallGameView: View {
     /// Floating rake button (Zen Garden) — bottom-right mirror of the home
     /// button.  Gently smooths the sand: fades the groove out, wipes the
     /// trail, then restores full opacity so the next strokes draw crisp.
-    private func rakeButtonOverlay(safeBottom: CGFloat) -> some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Button { smoothSand() } label: {
-                    Image(systemName: "wind")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.52, green: 0.43, blue: 0.28))
-                        .frame(width: 34, height: 34)
-                        .background(
-                            Circle()
-                                .fill(Color(white: 1.0, opacity: 0.85))
-                                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
-                        )
-                }
-                .accessibilityLabel("Smooth the sand")
-                .accessibilityHint("Clears the raked line so you can start a fresh pattern.")
-            }
-            .padding(.trailing, 22)
-            .padding(.bottom, max(safeBottom, 12) + 8)
+    /// Transparent full-garden gesture layer (Zen Garden, manual mode only).
+    /// Holding the garden frees the ball to roll with tilt and clears the UI;
+    /// releasing re-locks it.  When a prop is selected, a tap drops (or removes)
+    /// that prop instead of rolling.
+    private func zenInputLayer(size: CGSize) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        // Placing a prop: don't roll the ball.
+                        guard zenPlacingItem == nil else { return }
+                        if !zenTouching {
+                            zenTouching = true
+                            zenMenuOpen = false      // tuck the menu away while rolling
+                            zenSubmenu  = .none
+                        }
+                    }
+                    .onEnded { value in
+                        if let item = zenPlacingItem {
+                            placeOrRemoveZenProp(item, at: value.location, in: size)
+                        } else {
+                            zenTouching = false       // re-lock the ball
+                        }
+                    }
+            )
+    }
+
+    /// Drop a prop at `location`, or remove an existing prop if the tap landed
+    /// on one (so a tap toggles).
+    private func placeOrRemoveZenProp(_ item: ZenItem, at location: CGPoint, in size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        let hitR: CGFloat = 28
+        if let idx = zenDecorations.firstIndex(where: {
+            hypot($0.pos.x * size.width - location.x, $0.pos.y * size.height - location.y) < hitR
+        }) {
+            zenDecorations.remove(at: idx)
+        } else {
+            let frac = CGPoint(x: location.x / size.width, y: location.y / size.height)
+            zenDecorations.append(ZenDecoration(item: item, pos: frac))
         }
+        if gameState.hapticsEnabled { Haptics.soft() }
+    }
+
+    /// Bake one more sand segment into the persistent groove image.  The groove
+    /// accumulates (never fades) so a running pattern fills the whole garden;
+    /// "smooth sand" clears it.  Drawing only the NEW segment onto the prior
+    /// image keeps this O(1) per frame.
+    private func addSandPoint(_ p: CGPoint, size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        // (Re)start the canvas on first use or a size change (rotation).
+        if sandAccumImage == nil || sandCanvasSize != size {
+            sandCanvasSize = size
+            sandAccumImage = nil
+            lastSandPoint  = nil
+        }
+        guard let last = lastSandPoint else { lastSandPoint = p; return }
+        let d = hypot(p.x - last.x, p.y - last.y)
+        guard d > sandMinStep else { return }
+        // Pen-up on big jumps (switching pattern, motif crossing centre) so we
+        // don't draw a stray line across the garden.
+        if d > 90 { lastSandPoint = p; return }
+
+        let fmt = UIGraphicsImageRendererFormat.default()
+        fmt.scale = 1            // point-resolution — plenty for a soft groove, cheap to redraw
+        fmt.opaque = false
+        let img = UIGraphicsImageRenderer(size: size, format: fmt).image { rc in
+            sandAccumImage?.draw(at: .zero)
+            let cg = rc.cgContext
+            cg.setLineCap(.round); cg.setLineJoin(.round)
+            // Soft wide depression…
+            cg.setStrokeColor(UIColor(red: 0.40, green: 0.32, blue: 0.22, alpha: 0.22).cgColor)
+            cg.setLineWidth(7.0)
+            cg.move(to: last); cg.addLine(to: p); cg.strokePath()
+            // …under a thin pale carved highlight.
+            cg.setStrokeColor(UIColor(red: 0.96, green: 0.91, blue: 0.80, alpha: 0.55).cgColor)
+            cg.setLineWidth(2.6)
+            cg.move(to: last); cg.addLine(to: p); cg.strokePath()
+        }
+        sandAccumImage = img
+        lastSandPoint = p
     }
 
     /// Rake action — fade the sand groove away, then wipe it and restore
@@ -3001,6 +3179,9 @@ struct BallGameView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             trailPoints.removeAll(keepingCapacity: true)
             trailTimes.removeAll(keepingCapacity: true)
+            // Wipe the persistent groove image so the next strokes draw fresh.
+            sandAccumImage = nil
+            lastSandPoint  = nil
             sandClearFade = 1
         }
     }
@@ -4631,7 +4812,9 @@ struct BallGameView: View {
             tutorialCoinBonus = 0
         } else {
             tutorialPhase  = .notTutorial
-            spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
+            // Zen Garden has no "tap to start" — the ball rests, locked, until
+            // the player holds the garden to roll it (see tick()).
+            spawnLockUntil = usesSandTrail ? nil : .now.addingTimeInterval(spawnLockDuration)
             tutorialCoinBonus = 0
         }
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
@@ -4685,6 +4868,27 @@ struct BallGameView: View {
 
         let dt = CGFloat(tickRate)
 
+        // Zen Garden control:
+        //   • an auto-pattern drives the ball along its parametric path, or
+        //   • the ball is locked in place unless the player is holding the
+        //     garden (manual roll falls through to the normal tilt physics).
+        if usesSandTrail {
+            if let pattern = zenPattern {
+                zenPatternPhase += zenSpeed.rate * Double(dt)
+                let p = pattern.point(phase: zenPatternPhase, in: geoSize)
+                b.position = p
+                b.velocity = .zero
+                ball = b
+                addSandPoint(p, size: geoSize)
+                return
+            }
+            if !zenTouching {
+                b.velocity = .zero
+                ball = b
+                return
+            }
+        }
+
         // Reduce Motion: dampen tilt acceleration so the ball is easier to
         // control for players sensitive to fast motion.
         let accelScale: CGFloat = reduceMotion ? 1080 : 1800
@@ -4701,10 +4905,15 @@ struct BallGameView: View {
         b.position.x += b.velocity.dx * dt
         b.position.y += b.velocity.dy * dt
 
-        // Graphite trail (Paper world) — accumulate position points so we
-        // can render the streak behind the ball.  Skip if too close to the
-        // previous point (the ball is nearly stationary).
-        if gameState.equippedTrail != .none || usesSandTrail {
+        // Zen Garden manual roll bakes into the persistent sand image (same as
+        // the auto-pattern), so a hand-raked garden also fills and stays.
+        if usesSandTrail {
+            addSandPoint(b.position, size: geoSize)
+        }
+        // Graphite trail (Paper world / cosmetic trails) — accumulate position
+        // points so we can render the fading streak behind the ball.  Skip if
+        // too close to the previous point (the ball is nearly stationary).
+        else if gameState.equippedTrail != .none {
             let now = Date().timeIntervalSinceReferenceDate
             if let last = trailPoints.last {
                 if hypot(b.position.x - last.x, b.position.y - last.y) > trailMinStep {

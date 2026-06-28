@@ -186,6 +186,12 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     purchasable and hidden from the regular shop grid.
     case diamond = "Diamond"
 
+    // ── 10,000-coin IAP secret exclusive ─────────────────────────────────
+    //   • moneyBall — a rolled-up wad of dollar bills.  One of three "Money"
+    //     cosmetics granted at random ONLY by the $49.99 / 10,000-coin pack;
+    //     never coin-purchasable and hidden from the shop grid.
+    case moneyBall = "Money Ball"
+
     // ── Premium bundle skins (coin/bundle purchasable — NOT bundle-exclusive) ─
     //   • highRoller — casino roulette wheel: alternating deep-red and black
     //     wedges inside a gold-rimmed rim with a crisp white centre pip and a
@@ -281,7 +287,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
         case .pluto, .aurora, .beachBall, .pumpkin, .ornament,
              .heartstone, .shamrock, .confetti, .speckledEgg,
              .trophy,    // Golden Gauntlet completion exclusive
-             .diamond:   // Diamond Balls IAP exclusive
+             .diamond,   // Diamond Balls IAP exclusive
+             .moneyBall: // 10,000-coin IAP secret exclusive
             return true
         default:                          return false
         }
@@ -809,6 +816,16 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.80, green: 0.95, blue: 1.00),
                 Color(red: 0.50, green: 0.78, blue: 0.98),
                 Color(red: 0.22, green: 0.45, blue: 0.74),
+            ]
+
+        // ── 10,000-coin IAP secret exclusive ──
+        case .moneyBall:
+            // Currency green → the rolled-bill renderer paints paper + $ on top.
+            return [
+                Color(red: 0.74, green: 0.86, blue: 0.70),
+                Color(red: 0.45, green: 0.66, blue: 0.46),
+                Color(red: 0.20, green: 0.42, blue: 0.26),
+                Color(red: 0.09, green: 0.22, blue: 0.14),
             ]
 
         // ── Premium bundle skins ─────────────────────────────────────────────

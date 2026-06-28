@@ -29,8 +29,15 @@ struct GameMenuView: View {
         GameModeCatalogue.enabled.filter { $0.section == .competitive }
     }
     private var newWays: [GameMode] {
-        GameModeCatalogue.enabled.filter { $0.section == .solo }
+        // Gold Rush (id "coinpit") is pulled out into its own full-width banner
+        // below the Competitive shelf, so keep it out of this shelf.
+        GameModeCatalogue.enabled.filter { $0.section == .solo && $0.id != Self.goldRushID }
     }
+
+    /// The reward round shown as a full-width banner.  NB: the tile *displayed*
+    /// as "Gold Rush" is catalogue id "coinpit" — the names were swapped with the
+    /// competitive "Coin Pit" (id "goldrush") on 2026-06-11; ids stayed put.
+    private static let goldRushID = "coinpit"
     private var packs: [ChallengeTrackMode] { GameModeCatalogue.challengeTracks }
 
     /// Arm a mode and return Home — the home Play button then launches it.
@@ -66,6 +73,8 @@ struct GameMenuView: View {
                           "Mini-games vs. rivals — climb the boards, earn tickets.") {
                         ForEach(competitive, id: \.id) { modeWidget($0) }
                     }
+
+                    goldRushBanner
 
                     shelf("NEW WAYS TO PLAY",
                           "A change of pace — different rules, different vibe.") {
@@ -270,6 +279,54 @@ struct GameMenuView: View {
         .accessibilityIdentifier("dailyChallenge")
     }
 
+    // MARK: - Gold Rush (full-width banner)
+
+    /// Gold Rush gets its own full-width banner — same chrome as Challenge of the
+    /// Day — sitting between the Competitive shelf and New Ways to Play.
+    private var goldRushBanner: some View {
+        let mode = GameModeCatalogue.enabled.first { $0.id == Self.goldRushID }
+        let s = Self.style(for: Self.goldRushID)
+        return Button { select(Self.goldRushID) } label: {
+            HStack(spacing: 14) {
+                Image(systemName: s.icon)
+                    .font(.system(size: 27, weight: .bold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("REWARD ROUND")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .tracking(1.5)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(mode?.displayName ?? "Gold Rush")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(mode?.tagline ?? "Thirty seconds. Up to a hundred coins. Go.")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer()
+                Image(systemName: "play.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(11)
+                    .background(Circle().fill(.white))
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(colors: s.colors,
+                                         startPoint: .leading, endPoint: .trailing))
+            )
+            .shadow(color: (s.colors.first ?? .black).opacity(0.40), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(Self.goldRushID)
+        .accessibilityLabel("\(mode?.displayName ?? "Gold Rush"). \(mode?.tagline ?? "")")
+    }
+
     // MARK: - Shelves
 
     /// A captioned, horizontally-scrolling shelf of equal widgets.
@@ -335,11 +392,11 @@ struct GameMenuView: View {
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
             }
-            .frame(width: 150, height: 142)
+            .frame(width: 132, height: 152)
             .background(
-                RoundedRectangle(cornerRadius: 22)
+                RoundedRectangle(cornerRadius: 24)
                     .fill(Color(white: 0.14))
-                    .overlay(RoundedRectangle(cornerRadius: 22)
+                    .overlay(RoundedRectangle(cornerRadius: 24)
                         .stroke(Color(white: 0.26), lineWidth: 1))
             )
         }
@@ -347,60 +404,77 @@ struct GameMenuView: View {
         .accessibilityIdentifier("tracks")
     }
 
-    /// The shared rounded-square widget chrome.
+    /// The shared game tile — a wide, centered, individually-branded card: a big
+    /// logo in a frosted badge floating over an oversized watermark of the same
+    /// glyph, the name centered beneath, all on the game's own gradient with a
+    /// matching colored glow.  Used by every shelf (modes + challenge packs).
     private func widgetCard(icon: String, colors: [Color], title: String,
                             locked: Bool = false, ticket: Int? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                Image(systemName: icon)
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
-                Spacer()
-                if locked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.9))
-                } else if let ticket {
-                    HStack(spacing: 2) {
-                        Image(systemName: "ticket.fill")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("\(ticket)")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(Capsule().fill(.black.opacity(0.28)))
-                }
-            }
-            Spacer()
-            Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(15)
-        .frame(width: 150, height: 142, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 22)
-                .fill(LinearGradient(colors: colors,
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-        )
-        // Glossy sheen — a soft radial highlight in the top-right, the same
-        // ball-gloss motif as the hero, so every tile reads as a marble.
-        .overlay(
-            RadialGradient(colors: [.white.opacity(0.40), .clear],
-                           center: .init(x: 0.82, y: 0.12), startRadius: 2, endRadius: 95)
+        let accent = colors.first ?? .white
+        return ZStack {
+            // Base gradient.
+            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+
+            // Oversized watermark of the game's glyph — a themed, unique backdrop
+            // that keeps each tile from blending into its neighbours.
+            Image(systemName: icon)
+                .font(.system(size: 132, weight: .bold))
+                .foregroundStyle(.white.opacity(0.14))
+                .rotationEffect(.degrees(-15))
+                .offset(x: 74, y: 30)
+
+            // Soft top-left sheen so the card reads glossy.
+            RadialGradient(colors: [.white.opacity(0.38), .clear],
+                           center: .init(x: 0.22, y: 0.12), startRadius: 2, endRadius: 150)
                 .blendMode(.plusLighter)
-                .allowsHitTesting(false)
-                .clipShape(RoundedRectangle(cornerRadius: 22))
-        )
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.16), lineWidth: 1))
+
+            // Centered logo + name — the brand.
+            VStack(spacing: 11) {
+                ZStack {
+                    Circle()
+                        .fill(.white.opacity(0.20))
+                        .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: icon)
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+                }
+                Text(title)
+                    .font(.system(size: 19, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
+            }
+            .padding(.horizontal, 12)
+        }
+        .frame(width: 228, height: 152)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        // Lock / ticket badge (top-right) — only modes that use it pass it in.
+        .overlay(alignment: .topTrailing) {
+            if locked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .padding(12)
+            } else if let ticket {
+                HStack(spacing: 2) {
+                    Image(systemName: "ticket.fill").font(.system(size: 10, weight: .bold))
+                    Text("\(ticket)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(Capsule().fill(.black.opacity(0.30)))
+                .padding(10)
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.white.opacity(0.18), lineWidth: 1))
         .opacity(locked ? 0.5 : 1.0)
-        .shadow(color: (colors.first ?? .black).opacity(0.5), radius: 12, y: 6)
+        .shadow(color: accent.opacity(0.55), radius: 14, y: 7)
     }
 
     // MARK: - Per-mode art (icon + saturated gradient), keyed by catalogue id
