@@ -185,6 +185,9 @@ struct ProfileView: View {
     // so the profile shows off what you've earned/collected at a glance.
     // =========================================================================
     private var loadoutCard: some View {
+        // Tapping the loadout opens the Locker to equip cosmetics. The Locker
+        // reads the route beneath it (.profile) to show a "< Profile" back button.
+        NavigationLink(value: HomeRoute.locker) {
         VStack(spacing: 14) {
             sectionLabel("My Loadout")
 
@@ -247,6 +250,8 @@ struct ProfileView: View {
         }
         .padding(18)
         .profileCard()
+        }
+        .buttonStyle(.plain)
     }
 
     /// One equipped-cosmetic row: a small preview, the category + item name,

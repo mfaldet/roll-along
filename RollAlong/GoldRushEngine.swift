@@ -41,12 +41,24 @@ final class GoldRushEngine {
     private let initialCoins       = 12
     private let maxCoins           = 18
     private let spawnEveryTicks    = 20
-    private let spillImpact:  CGFloat = 360
     private let coinsPerSpill      = 3
     private let spillImmunityTicks = 45
     private let ramSeekRange: CGFloat = 220
     private let winBonus           = 15
     private let topReserve: CGFloat = Layout.topReserve
+
+    // Charge / ram-spill mechanic.  A tap launches the player's marble a short
+    // distance in the tilt direction: its velocity is overridden to `chargeSpeed`
+    // and its speed cap is lifted for `chargeBoostTicks`, after which friction
+    // blends it back to normal play.  A marble only knocks coins loose from a
+    // rival WHILE it is charging — an ordinary bump no longer spills anything.
+    // Charge is gated to once per `chargeCooldownTicks` (3 s).  The aggro "bully"
+    // rival charges too, so it can still threaten the player's hoard.
+    private let chargeSpeed:          CGFloat = 760
+    private let chargeBoostTicks              = 15
+    private let chargeCooldownTicks           = 180   // 3 s @ 60 fps
+    private let chargeAITriggerRange: CGFloat = 150   // bully commits a charge inside this gap
+    private let chargeSpillImpact:    CGFloat = 120   // min closing speed for a charge to spill
 
     /// Width of the edge band rivals are pushed out of (see `edgeRepulsion`).
     /// Coins never spawn inside it, so every coin is reachable by every ball.
@@ -68,6 +80,11 @@ final class GoldRushEngine {
         let isPlayer: Bool
         let aggro: Bool
         var score: Int = 0
+        /// Ticks remaining of an active charge dash.  While > 0 the marble's
+        /// speed cap is lifted and ramming a rival knocks coins loose.
+        var charging: Int = 0
+        /// Ticks until this marble may charge again (0 = ready).
+        var chargeCD: Int = 0
     }
 
     struct Coin: Identifiable {
@@ -125,6 +142,16 @@ final class GoldRushEngine {
 
     var playerScore: Int { racers.first { $0.isPlayer }?.score ?? 0 }
     var maxScore: Int { racers.map(\.score).max() ?? 0 }
+
+    /// True while the player may fire a charge (round live + cooldown elapsed).
+    var playerChargeReady: Bool {
+        started && !isOver && (racers.first { $0.isPlayer }?.chargeCD ?? 1) == 0
+    }
+    /// Charge cooldown fill for the HUD, 0…1 (1 = ready to charge).
+    var playerChargeProgress: Double {
+        let cd = racers.first { $0.isPlayer }?.chargeCD ?? 0
+        return chargeCooldownTicks > 0 ? 1 - Double(cd) / Double(chargeCooldownTicks) : 1
+    }
 
     // MARK: - Setup
 
@@ -191,6 +218,18 @@ final class GoldRushEngine {
         started = true
     }
 
+    /// Launch the player's marble a short distance in the current tilt direction
+    /// (a "charge").  Returns `true` only if it actually fired: a round must be
+    /// live, the per-marble cooldown elapsed, and there must be a usable tilt.
+    /// The host view calls this on a tap inside a live round.
+    @discardableResult
+    func chargePlayer() -> Bool {
+        guard started, !isOver else { return false }
+        guard let idx = racers.firstIndex(where: { $0.isPlayer }) else { return false }
+        guard racers[idx].chargeCD == 0 else { return false }
+        return fireCharge(&racers[idx], aim: playerInput)
+    }
+
     // MARK: - Simulation
 
     func tick() {
@@ -208,6 +247,10 @@ final class GoldRushEngine {
 
         let dt: CGFloat = 1.0 / 60.0
         for i in racers.indices {
+            // Tick down the charge dash window and the charge cooldown.
+            if racers[i].charging > 0 { racers[i].charging -= 1 }
+            if racers[i].chargeCD  > 0 { racers[i].chargeCD  -= 1 }
+
             if racers[i].isPlayer {
                 racers[i].vel.dx += playerInput.dx * playerAccel * dt
                 racers[i].vel.dy += playerInput.dy * playerAccel * dt
@@ -215,11 +258,14 @@ final class GoldRushEngine {
                 let steer = botSteer(racers[i])
                 racers[i].vel.dx += steer.dx * dt
                 racers[i].vel.dy += steer.dy * dt
+                maybeAICharge(at: i)        // the bully commits a ram when it's bearing down
             }
             racers[i].vel.dx *= friction
             racers[i].vel.dy *= friction
             // Rivals get a difficulty-scaled speed cap; the player never does.
-            let cap = racers[i].isPlayer ? maxSpeed : maxSpeed * aiSpeedScale
+            // A live charge lifts the cap to `chargeSpeed` so the dash reads.
+            let baseCap = racers[i].isPlayer ? maxSpeed : maxSpeed * aiSpeedScale
+            let cap = racers[i].charging > 0 ? max(baseCap, chargeSpeed) : baseCap
             let s = hypot(racers[i].vel.dx, racers[i].vel.dy)
             if s > cap {
                 let k = cap / s
@@ -365,8 +411,16 @@ final class GoldRushEngine {
                            + (racers[j].vel.dy - racers[i].vel.dy) * ny
                 guard relVel < 0 else { continue }
 
-                let si = hypot(racers[i].vel.dx, racers[i].vel.dy)
-                let sj = hypot(racers[j].vel.dx, racers[j].vel.dy)
+                // Decide the spill from the closing velocity, BEFORE the bounce
+                // alters it.  Coins only spill when exactly one marble is mid-
+                // charge: that marble is the rammer, the other is the victim.
+                // An ordinary bump (neither charging) or a charge-vs-charge
+                // clash knocks nothing loose.
+                let iCharging = racers[i].charging > 0
+                let jCharging = racers[j].charging > 0
+                let rammedVictim: Int? = (iCharging != jCharging && -relVel > chargeSpillImpact)
+                    ? (iCharging ? j : i)
+                    : nil
 
                 let jImp = -(1 + restitution) * relVel / 2
                 racers[i].vel.dx -= jImp * nx
@@ -374,8 +428,7 @@ final class GoldRushEngine {
                 racers[j].vel.dx += jImp * nx
                 racers[j].vel.dy += jImp * ny
 
-                if -relVel > spillImpact {
-                    let hit = si <= sj ? i : j
+                if let hit = rammedVictim {
                     let k = min(coinsPerSpill, racers[hit].score)
                     if k > 0 {
                         racers[hit].score -= k
@@ -435,6 +488,41 @@ final class GoldRushEngine {
         p.x = min(max(edgeBand, p.x), arena.width - edgeBand)
         p.y = min(max(topReserve + edgeBand, p.y), arena.height - bottomReserve - edgeBand)
         return Coin(pos: p, value: 1, ignoreRacer: who, ignoreUntil: localTick + spillImmunityTicks, born: localTick)
+    }
+
+    /// The aggro "bully" rival commits a charge when it's bearing down on the
+    /// current leader and close enough to connect within the dash window.
+    /// Index-based on purpose: the leader is read (which touches `racers`) by
+    /// value *before* we take the `inout` into `racers[i]`, so the two accesses
+    /// never overlap (Swift exclusivity would trap otherwise).
+    private func maybeAICharge(at i: Int) {
+        guard racers[i].aggro, racers[i].chargeCD == 0 else { return }
+        guard let leader = leaderToHarass(than: racers[i]) else { return }
+        let dx = leader.pos.x - racers[i].pos.x, dy = leader.pos.y - racers[i].pos.y
+        guard hypot(dx, dy) < chargeAITriggerRange else { return }
+        _ = fireCharge(&racers[i], aim: CGVector(dx: dx, dy: dy))
+    }
+
+    /// Override the marble's velocity with a short forward dash in `aim`'s
+    /// direction and arm its charge window + cooldown.  No-op (cooldown unspent)
+    /// when there's no usable direction.
+    @discardableResult
+    private func fireCharge(_ r: inout Racer, aim: CGVector) -> Bool {
+        guard let d = chargeDirection(aim: aim, fallback: r.vel) else { return false }
+        r.vel = CGVector(dx: d.dx * chargeSpeed, dy: d.dy * chargeSpeed)
+        r.charging = chargeBoostTicks
+        r.chargeCD = chargeCooldownTicks
+        return true
+    }
+
+    /// Unit charge direction: the tilt/aim vector when it's meaningful, else the
+    /// marble's current heading, else `nil` (truly stationary, no tilt).
+    private func chargeDirection(aim: CGVector, fallback vel: CGVector) -> CGVector? {
+        let am = hypot(aim.dx, aim.dy)
+        if am > 0.05 { return CGVector(dx: aim.dx / am, dy: aim.dy / am) }
+        let vm = hypot(vel.dx, vel.dy)
+        if vm > 1 { return CGVector(dx: vel.dx / vm, dy: vel.dy / vm) }
+        return nil
     }
 
     private func prunePoofs() {

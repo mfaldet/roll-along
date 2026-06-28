@@ -15,7 +15,16 @@ import SwiftUI
 // ===========================================================================
 struct LockerView: View {
     @EnvironmentObject var gameState: GameState
+    @EnvironmentObject var nav:       Navigator
     @Environment(\.dismiss) var dismiss
+
+    /// The screen beneath the Locker in the nav stack decides the back-button
+    /// label: "Profile" when opened from the profile's loadout, "Shop" from the
+    /// Cosmetic Shop (and the default for any other entry point).
+    private var backLabel: String {
+        if case .profile? = nav.path.dropLast().last { return "Profile" }
+        return "Shop"
+    }
 
     var body: some View {
         ZStack {
@@ -83,7 +92,7 @@ struct LockerView: View {
                 Button { dismiss() } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "chevron.left")
-                        Text("Shop")
+                        Text(backLabel)
                     }
                     .foregroundStyle(.white)
                 }
@@ -324,5 +333,6 @@ struct LockerView: View {
     NavigationStack {
         LockerView()
             .environmentObject(GameState())
+            .environmentObject(Navigator())
     }
 }

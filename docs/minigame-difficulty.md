@@ -21,7 +21,7 @@ For the multi-round game (Sumo Survival) the picker only appears on round 1 so
 difficulty can't be changed mid-match.
 
 Covers all six `section == .competitive` modes: Comet Clash (`snake`), Sumo
-Survival (`sumo`), Paint Ball (`paintball`), Coin Pit (`goldrush`), Marble Cup
+Survival (`sumo`), Paint Ball (`paintball`), Smash and Grab (`goldrush`), Marble Cup
 (`marblecup`), King of the Hill (`koth`).
 
 ## The two knobs (single source of truth)
@@ -29,7 +29,7 @@ Survival (`sumo`), Paint Ball (`paintball`), Coin Pit (`goldrush`), Marble Cup
 Both live on `MinigameDifficulty` in `RollAlong/GameState.swift` — **these tables
 are the only things you edit to retune.**
 
-- `aiAccelScale` (and `aiSpeedScale`, Coin Pit only): scales rival AI strength.
+- `aiAccelScale` (and `aiSpeedScale`, Smash and Grab only): scales rival AI strength.
   `Easy 0.55 · Normal 0.78 · Hard 1.0`. **Hard == the original pre-difficulty
   AI**; Easy/Normal handicap it. Each game multiplies its base rival
   acceleration (`aiAccelBase`) by `aiAccelScale`.
@@ -41,7 +41,7 @@ are the only things you edit to retune.**
 ## How payout is applied
 
 Each game computes a raw `basePayout` from its own formula (e.g. Sumo placement
-coins `[10,5,3,2]`; Comet Clash `power×3 + winBonus`; Coin Pit = coins
+coins `[10,5,3,2]`; Comet Clash `power×3 + winBonus`; Smash and Grab = coins
 collected). The award and the on-screen "+N coins" both run through:
 
 - `GameState.minigamePayout(base:difficulty:)` — pure, for the result-screen and
@@ -92,7 +92,7 @@ is **not** auto-balanced — watch its total in the data.
    different.
 3. **If win-rates are where we want them but the coin EV is skewed** across
    tiers (compute mean `payout` per play per tier from the events), adjust
-   `payoutMultiplier` so the EVs line up. Coin Pit is accumulation-heavy and may
+   `payoutMultiplier` so the EVs line up. Smash and Grab is accumulation-heavy and may
    need its own multiplier if its EV curve diverges — split it out then.
 4. Edit only the tables in `MinigameDifficulty`; ship; repeat.
 

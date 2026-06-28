@@ -113,6 +113,7 @@ final class Navigator: ObservableObject {
 struct HomeView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var ads:       AdManager
+    @ObservedObject private var auth = AppleAuthManager.shared   // greys out the social buttons when signed out
     @StateObject private var nav    = Navigator()
     @StateObject private var motion = BallMotion()   // same class used in BallGameView
     @StateObject private var clock  = PhysicsClock()
@@ -122,6 +123,11 @@ struct HomeView: View {
     @State private var ballVel:   CGVector = .zero
     @State private var arenaSize: CGSize   = .zero
     @State private var spawned:   Bool     = false
+
+    /// Shown when a signed-out player taps a locked social button
+    /// (Leaderboard / Clans / Friends) — the same "Sign in with Apple" prompt
+    /// the once-per-launch nudge and Settings use.
+    @State private var showSignInPrompt = false
 
     /// Recent ball positions for the home-screen trail.  Mirrors the
     /// in-game trail mechanic — only populated when the player has a
@@ -242,7 +248,7 @@ struct HomeView: View {
                                 .position(ballPos)
                             // Competitive modes arm the home marble with the
                             // player's name tag, just as it appears in the game
-                            // itself (Coin Pit, Comet Clash, Sumo Survival,
+                            // itself (Smash and Grab, Comet Clash, Sumo Survival,
                             // Paint Ball, Marble Cup, King of the Hill).
                             if gameState.currentMode.section == .competitive {
                                 RivalNameTag(
@@ -316,14 +322,14 @@ struct HomeView: View {
 
                         Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                             GridRow {
-                                squareNavButton("trophy.fill", "Leaderboard", HomeRoute.leaderboard)
+                                squareNavButton("trophy.fill", "Leaderboard", HomeRoute.leaderboard, requiresSignIn: true)
                                 gameModesGridButton.gridCellColumns(2)
                                 squareNavButton("bag.fill", "Shop", HomeRoute.shop)
                             }
                             GridRow {
                                 squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
-                                squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
-                                squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
+                                squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans,   requiresSignIn: true)
+                                squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends, requiresSignIn: true)
                                 squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
                             }
                         }
@@ -362,6 +368,17 @@ struct HomeView: View {
                         .onTapGesture { rushLaunch() }
                         .ignoresSafeArea()
                         .zIndex(80)
+                }
+
+                // Sign-in prompt — raised when a signed-out player taps a locked
+                // social button (Leaderboard / Clans / Friends).  Auto-dismisses
+                // the instant sign-in succeeds (see SignInPromptView).
+                if showSignInPrompt {
+                    SignInPromptView(onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.30)) { showSignInPrompt = false }
+                    })
+                    .transition(.opacity)
+                    .zIndex(90)
                 }
             }
             // NOTE: no accessibilityIdentifier here — the "HomeView" anchor
@@ -690,24 +707,54 @@ struct HomeView: View {
     /// edge (Ranks / Clans / Friends / Profile / Settings).  Equal-width
     /// slots (maxWidth: .infinity) keep the row evenly spaced on any
     /// device; the name is exposed to accessibility instead of drawn.
-    private func squareNavButton(_ icon: String, _ label: String, _ route: HomeRoute) -> some View {
-        NavigationLink(value: route) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color(white: 0.75))
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(white: 0.14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color(white: 0.26), lineWidth: 0.8)
-                        )
-                )
+    /// A square home nav button.  Pass `requiresSignIn: true` for a social
+    /// destination (Leaderboard / Clans / Friends): when the player isn't signed
+    /// in with Apple the button greys out and, instead of navigating, opens the
+    /// "Sign in with Apple" prompt — just like the Sign In button in Settings.
+    private func squareNavButton(_ icon: String, _ label: String, _ route: HomeRoute,
+                                 requiresSignIn: Bool = false) -> some View {
+        let locked = requiresSignIn && !auth.isSignedIn
+        return Group {
+            if locked {
+                Button { showSignInPrompt = true } label: {
+                    squareNavButtonFace(icon, locked: true)
+                }
+                .accessibilityHint("Sign in with Apple to use \(label)")
+            } else {
+                NavigationLink(value: route) {
+                    squareNavButtonFace(icon, locked: false)
+                }
+            }
         }
         .homeBallCollider()
         .accessibilityLabel(label)
+    }
+
+    /// The square nav button's face.  `locked` dims the icon + surface and adds
+    /// a small lock badge, so a signed-out player can see at a glance that the
+    /// social buttons are unavailable until they sign in.
+    private func squareNavButtonFace(_ icon: String, locked: Bool) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(Color(white: locked ? 0.42 : 0.75))
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(white: locked ? 0.10 : 0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color(white: locked ? 0.18 : 0.26), lineWidth: 0.8)
+                    )
+            )
+            .overlay(alignment: .topTrailing) {
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color(white: 0.55))
+                        .padding(5)
+                }
+            }
     }
 
     /// Wide "Game Modes" cell for the control grid (spans 2 columns).  Same
@@ -1216,7 +1263,7 @@ struct HomeView: View {
         switch gameState.currentModeID {
         case "pinball":  return "Play Ball!"
         case "coinpit":  return "Pay tickets, earn coins"    // displayed "Gold Rush"
-        case "goldrush": return "Win the Pit, earn tickets"  // displayed "Coin Pit"
+        case "goldrush": return "Smash, grab, earn tickets"  // displayed "Smash and Grab"
         case "zen":      return zenPun(at: Date())           // body cycles this live
         default:         return "Play"
         }

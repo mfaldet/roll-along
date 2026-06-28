@@ -23,7 +23,7 @@ test build (they make the test representative and are low-regret either way — 
 
 ## 2. What's in the test build
 
-- The climb (5,000+ levels) + all competitive modes (Coin Pit, Gold Rush, KOTH, Sumo,
+- The climb (5,000+ levels) + all competitive modes (Smash and Grab, Gold Rush, KOTH, Sumo,
   Marble Cup, Paint Ball, Comet Clash).
 - **Keystone live everywhere:** opponents wear real ball skins + trails, name tags, the
   leader crown.
