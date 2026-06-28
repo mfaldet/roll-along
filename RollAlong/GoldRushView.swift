@@ -336,34 +336,12 @@ struct GoldRushView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Coin Pit. Tilt to steer. Grab the most coins in 60 seconds. Ram rivals to knock coins loose. Tap anywhere to begin.")
 
-            // Difficulty selector — custom Buttons, NOT a segmented Picker:
-            // the arena's full-screen tap-to-start gesture interferes with a
-            // UIKit-backed segmented control (that's why selection was stuck on
-            // the default).  SwiftUI Buttons consume their own taps cleanly, so
-            // they select without starting the round; tapping elsewhere starts.
-            Text("Rival difficulty")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(white: 0.5))
+            // Difficulty selector — shared component; custom Buttons (not a
+            // segmented Picker) so the arena's tap-to-start gesture doesn't
+            // steal the selection.  Higher difficulty = harder rivals + bigger
+            // payout (shown per option).
+            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
                 .padding(.top, 8)
-            HStack(spacing: 8) {
-                ForEach(MinigameDifficulty.allCases) { d in
-                    let selected = gameState.minigameDifficulty == d
-                    Button { gameState.minigameDifficulty = d } label: {
-                        Text(d.displayName)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(selected ? .black : Color(white: 0.82))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(selected
-                                          ? Color(red: 1.0, green: 0.82, blue: 0.30)
-                                          : Color(white: 0.18))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -371,7 +349,8 @@ struct GoldRushView: View {
 
     private var gameOverOverlay: some View {
         let placement = 1 + racers.filter { !$0.isPlayer && $0.score > playerScore }.count
-        let banked = engine.banked
+        let banked = gameState.minigamePayout(base: engine.banked,
+                                              difficulty: gameState.minigameDifficulty)
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
             VStack(spacing: 22) {
@@ -521,17 +500,25 @@ struct GoldRushView: View {
     /// Round-end side effects the headless engine intentionally omits: pay the
     /// banked coins into the real balance, log analytics, and buzz.
     private func finishRound() {
-        let banked = engine.banked
-        if banked > 0 { gameState.addCoins(banked) }
+        let base = engine.banked
+        // Difficulty scales the payout and records the attempt/win for the
+        // success-rate tracking that calibrates fairness (also banks the coins
+        // and, on a win, bumps the tally + ticket).
+        let banked = gameState.recordMinigameResult(
+            modeID: "goldrush",
+            difficulty: gameState.minigameDifficulty,
+            won: engine.playerWon,
+            basePayout: base)
         AnalyticsClient.shared.track(
             "goldrush_round_over",
             properties: ["won": .bool(engine.playerWon),
+                         "difficulty": .string(gameState.minigameDifficulty.rawValue),
                          "collected": .int(engine.playerScore),
+                         "base_coins": .int(base),
                          "coins": .int(banked),
                          "map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
         )
         if engine.playerWon {
-            gameState.recordCompetitiveWin("goldrush")   // win tally + Gold Rush ticket
             AnalyticsClient.shared.track("ticket_earned",
                                          properties: ["source": .string("goldrush")])
         }

@@ -34,7 +34,9 @@ struct MarbleCupView: View {
     private let marbleRadius: CGFloat = 18
     private let ballRadius:   CGFloat = 14
     private let playerAccel:  CGFloat = 1_550
-    private let aiAccel:      CGFloat = 1_250     // a touch slower than you
+    private let aiAccelBase:  CGFloat = 1_250     // a touch slower than you
+    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
+    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let marbleFriction: CGFloat = 0.990
     private let ballFriction:   CGFloat = 0.993   // the ball glides further
     private let marbleMaxSpeed: CGFloat = 660
@@ -400,6 +402,8 @@ struct MarbleCupView: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
+            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
+                .padding(.top, 6)
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -408,7 +412,8 @@ struct MarbleCupView: View {
     }
 
     private var matchOverOverlay: some View {
-        let banked = playerGoals * coinsPerGoal + (playerWon ? winBonus : 0)
+        let banked = gameState.minigamePayout(base: playerGoals * coinsPerGoal + (playerWon ? winBonus : 0),
+                                              difficulty: gameState.minigameDifficulty)
         let title = playerWon ? "You Win!" : (playerGoals == aiGoals ? "Draw" : "You Lose")
         let titleColor: Color = playerWon ? Self.playerAccent
             : (playerGoals == aiGoals ? Color(white: 0.85) : Self.aiAccent)
@@ -524,19 +529,23 @@ struct MarbleCupView: View {
         playerWon = playerGoals > aiGoals
         if !awarded {
             awarded = true
-            let banked = playerGoals * coinsPerGoal + (playerWon ? winBonus : 0)
-            if banked > 0 { gameState.addCoins(banked) }
+            let base = playerGoals * coinsPerGoal + (playerWon ? winBonus : 0)
             gameState.recordCompetitiveScore("marblecup", playerGoals)   // leaderboard best (goals)
+            // Difficulty scales the payout + records the attempt/win for tracking.
+            let banked = gameState.recordMinigameResult(
+                modeID: "marblecup", difficulty: gameState.minigameDifficulty,
+                won: playerWon, basePayout: base)
             AnalyticsClient.shared.track(
                 "marblecup_match_over",
                 properties: ["won": .bool(playerWon),
+                             "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "goals_for": .int(playerGoals),
                              "goals_against": .int(aiGoals),
+                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
             )
             if playerWon {
-                gameState.recordCompetitiveWin("marblecup")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("marblecup")])
             }

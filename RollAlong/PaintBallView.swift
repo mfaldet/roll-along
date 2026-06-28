@@ -31,7 +31,9 @@ struct PaintBallView: View {
 
     private let marbleRadius: CGFloat = 16
     private let playerAccel:  CGFloat = 1_500     // your tilt → acceleration
-    private let aiAccel:      CGFloat = 1_150     // a touch slower than you
+    private let aiAccelBase:  CGFloat = 1_150     // a touch slower than you
+    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
+    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let friction:     CGFloat = 0.990
     private let maxSpeed:     CGFloat = 620
     private let wallBounce:   CGFloat = 0.70
@@ -392,6 +394,8 @@ struct PaintBallView: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
+            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
+                .padding(.top, 6)
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -402,7 +406,8 @@ struct PaintBallView: View {
     private var gameOverOverlay: some View {
         let pct = percent(0)
         let placement = 1 + coverage.enumerated().filter { $0.offset != 0 && $0.element > coverage[0] }.count
-        let banked = pct + (playerWon ? winBonus : 0)
+        let banked = gameState.minigamePayout(base: pct + (playerWon ? winBonus : 0),
+                                              difficulty: gameState.minigameDifficulty)
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
             VStack(spacing: 22) {
@@ -551,18 +556,22 @@ struct PaintBallView: View {
         if !awarded {
             awarded = true
             let pct = percent(0)
-            let banked = pct + (playerWon ? winBonus : 0)
-            if banked > 0 { gameState.addCoins(banked) }
+            let base = pct + (playerWon ? winBonus : 0)
             gameState.recordCompetitiveScore("paintball", pct)   // leaderboard best (coverage %)
+            // Difficulty scales the payout + records the attempt/win for tracking.
+            let banked = gameState.recordMinigameResult(
+                modeID: "paintball", difficulty: gameState.minigameDifficulty,
+                won: playerWon, basePayout: base)
             AnalyticsClient.shared.track(
                 "paintball_round_over",
                 properties: ["won": .bool(playerWon),
+                             "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "coverage_pct": .int(pct),
+                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count].name)]
             )
             if playerWon {
-                gameState.recordCompetitiveWin("paintball")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("paintball")])
             }

@@ -31,7 +31,9 @@ struct KingOfTheHillView: View {
 
     private let marbleRadius: CGFloat = 17
     private let playerAccel:  CGFloat = 1_500
-    private let aiAccel:      CGFloat = 1_250
+    private let aiAccelBase:  CGFloat = 1_250
+    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
+    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let friction:     CGFloat = 0.990
     private let maxSpeed:     CGFloat = 660
     private let wallBounce:   CGFloat = 0.70
@@ -345,6 +347,8 @@ struct KingOfTheHillView: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
+            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
+                .padding(.top, 6)
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -354,7 +358,8 @@ struct KingOfTheHillView: View {
 
     private var gameOverOverlay: some View {
         let holdSec = playerHoldTicks / 60
-        let banked = holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0)
+        let banked = gameState.minigamePayout(base: holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0),
+                                              difficulty: gameState.minigameDifficulty)
         let title = playerWon ? "You Win!" : "You Lose"
         let titleColor: Color = playerWon ? Color(red: 0.50, green: 0.88, blue: 0.55)
                                           : Color(red: 0.98, green: 0.45, blue: 0.40)
@@ -466,18 +471,22 @@ struct KingOfTheHillView: View {
         if !awarded {
             awarded = true
             let holdSec = playerHoldTicks / 60
-            let banked = holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0)
-            if banked > 0 { gameState.addCoins(banked) }
+            let base = holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0)
             gameState.recordCompetitiveScore("koth", holdSec)   // leaderboard best (hold seconds)
+            // Difficulty scales the payout + records the attempt/win for tracking.
+            let banked = gameState.recordMinigameResult(
+                modeID: "koth", difficulty: gameState.minigameDifficulty,
+                won: playerWon, basePayout: base)
             AnalyticsClient.shared.track(
                 "koth_round_over",
                 properties: ["won": .bool(playerWon),
+                             "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "hold_sec": .int(holdSec),
+                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
             )
             if playerWon {
-                gameState.recordCompetitiveWin("koth")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("koth")])
             }

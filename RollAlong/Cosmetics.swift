@@ -2381,6 +2381,47 @@ enum RivalCosmetics {
 
 /// A small floating tag above a competitive marble — a bold "YOU" for the
 /// player, the rival's nickname otherwise.  `color` is the racer's identity rim.
+/// Shared pre-game difficulty selector for the competitive minigames.  Each
+/// option shows its coin-payout multiplier so the player sees the reward for
+/// the risk before committing.  Binds straight to the remembered
+/// `minigameDifficulty`; harder rivals → lower win odds → bigger payout.
+struct MinigameDifficultyPicker: View {
+    @Binding var selection: MinigameDifficulty
+    var accent: Color = Color(red: 1.0, green: 0.82, blue: 0.30)
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("Difficulty · payout")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.5))
+            HStack(spacing: 8) {
+                ForEach(MinigameDifficulty.allCases) { d in
+                    let selected = selection == d
+                    Button { selection = d } label: {
+                        VStack(spacing: 3) {
+                            Text(d.displayName)
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                            Text(d.payoutLabel)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .opacity(0.85)
+                        }
+                        .foregroundStyle(selected ? .black : Color(white: 0.82))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(selected ? accent : Color(white: 0.18))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(d.displayName), \(d.payoutLabel)")
+                    .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+                }
+            }
+        }
+    }
+}
+
 struct RivalNameTag: View {
     let label: String
     let color: Color
