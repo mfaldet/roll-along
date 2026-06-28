@@ -5,7 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject var store:     StoreKitManager
     @ObservedObject private var auth = AppleAuthManager.shared
     @Environment(\.dismiss) var dismiss
-    @State private var showResetAlert = false
+    @State private var showResetConfirm = false
     @State private var showCosmeticResetAlert = false
     @State private var cosmeticResetMessage: String?
     @State private var showDeleteAccountAlert = false
@@ -62,22 +62,21 @@ struct SettingsView: View {
                     .foregroundStyle(.white)
             }
         }
-        .alert("Reset Progress?", isPresented: $showResetAlert) {
-            Button("Reset", role: .destructive) { gameState.resetProgress() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This wipes all level progress — stars, coins, and best times. Your cosmetics, nickname, and settings will be kept.")
+        .sheet(isPresented: $showResetConfirm) {
+            ResetProgressConfirmSheet(currentLevel: gameState.currentLevel) {
+                gameState.resetProgress()
+            }
         }
-        .alert("Reset Cosmetics?", isPresented: $showCosmeticResetAlert) {
-            Button("Reset", role: .destructive) {
+        .alert("Sell Back Cosmetics?", isPresented: $showCosmeticResetAlert) {
+            Button("Sell Back") {
                 let r = gameState.liquidateCoinCosmetics()
                 cosmeticResetMessage = r.coins > 0
-                    ? "Reset your look to default and refunded \(r.coins) coins from \(r.count) cosmetic\(r.count == 1 ? "" : "s")."
+                    ? "Sold back \(r.count) cosmetic\(r.count == 1 ? "" : "s") for \(r.coins) coins and reset your look to default."
                     : "Reset your look to the default red ball."
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This resets your equipped look to the default (red ball, no trail), relocks every cosmetic you bought with coins, and refunds those coins. Cosmetics you earned (challenge-pack rewards) or that came with a purchase (the Diamond & Aurora skins) are kept — just unequipped. Your level progress is untouched. This can't be undone.")
+            Text("This returns the cosmetics you bought with coins for a full refund and resets your equipped look to default — handy for tidying your locker and freeing up coins to spend on something new. Earned cosmetics (challenge-pack rewards) and ones that came with a purchase (Diamond & Aurora) are kept, just unequipped. You can re-buy anything anytime. Your level progress is untouched.")
         }
     }
 
@@ -379,9 +378,54 @@ struct SettingsView: View {
     private var resetSection: some View {
         let cosmetic = gameState.coinLiquidationPreview()
         return VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Danger Zone")
+            // ── Cosmetics — beneficial: sell coin-bought cosmetics back for a
+            //    full refund and tidy the locker.  Sits ABOVE the Danger Zone
+            //    because it's recoverable (re-buy anything anytime), so it gets
+            //    an inviting, non-alarming treatment.
+            sectionHeader("Cosmetics")
             Button {
-                showResetAlert = true
+                showCosmeticResetAlert = true
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Sell Back Cosmetics")
+                            .font(.system(.body, design: .rounded))
+                        Text(cosmetic.count > 0
+                             ? "Refund \(cosmetic.count) cosmetic\(cosmetic.count == 1 ? "" : "s") for full coin value and tidy your locker"
+                             : "Return your look to the default")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color(white: 0.45))
+                    }
+                    Spacer()
+                    if cosmetic.coins > 0 {
+                        HStack(spacing: 3) {
+                            Text("+\(cosmetic.coins)")
+                                .font(.system(.footnote, design: .rounded).weight(.semibold))
+                            CoinIcon(size: 13)
+                        }
+                        .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.32))
+                    }
+                }
+                .foregroundStyle(Color(white: 0.9))
+                .padding()
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            }
+            .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
+            .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
+            if let m = cosmeticResetMessage {
+                Text(m)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(red: 0.3, green: 0.8, blue: 0.45))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // ── Danger Zone — the one destructive, unrecoverable reset, gated
+            //    behind a typed "STARTOVER" confirmation. ──
+            sectionHeader("Danger Zone")
+                .padding(.top, 10)
+            Button {
+                showResetConfirm = true
             } label: {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")
@@ -396,42 +440,6 @@ struct SettingsView: View {
                 .padding()
                 .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
-            Button {
-                showCosmeticResetAlert = true
-            } label: {
-                HStack {
-                    Image(systemName: "paintbrush.pointed")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Reset Cosmetics")
-                            .font(.system(.body, design: .rounded))
-                        Text(cosmetic.count > 0
-                             ? "Reset look · refund \(cosmetic.count) coin item\(cosmetic.count == 1 ? "" : "s")"
-                             : "Reset your look to default")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(Color(white: 0.4))
-                    }
-                    Spacer()
-                    if cosmetic.coins > 0 {
-                        HStack(spacing: 3) {
-                            Text("+\(cosmetic.coins)")
-                                .font(.system(.footnote, design: .rounded))
-                                .foregroundStyle(Color(white: 0.4))
-                            CoinIcon(size: 13)
-                        }
-                    }
-                }
-                .foregroundStyle(Color(red: 0.95, green: 0.3, blue: 0.3))
-                .padding()
-                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-            }
-            .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
-            .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
-            if let m = cosmeticResetMessage {
-                Text(m)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(Color(red: 0.3, green: 0.8, blue: 0.45))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 
@@ -444,6 +452,89 @@ struct SettingsView: View {
             .foregroundStyle(Color(white: 0.45))
     }
 
+}
+
+/// Typed-confirmation sheet for the unrecoverable "Reset Level Progress" action:
+/// the player must type STARTOVER exactly before the Reset button enables, so the
+/// wipe can't happen on a stray tap.
+private struct ResetProgressConfirmSheet: View {
+    let currentLevel: Int
+    let onConfirm: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var typed = ""
+
+    private var matches: Bool {
+        typed.trimmingCharacters(in: .whitespacesAndNewlines) == "STARTOVER"
+    }
+    private let danger = Color(red: 0.95, green: 0.3, blue: 0.3)
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(danger)
+                .padding(.top, 28)
+
+            Text("Reset Level Progress?")
+                .font(.system(.title3, design: .rounded).weight(.bold))
+                .foregroundStyle(.white)
+
+            Text("This wipes all level progress — stars, coins, and best times — and drops you back to Level 1 (you're on Level \(currentLevel)). Your cosmetics, nickname, and settings are kept. This can't be undone.")
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(Color(white: 0.6))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Type STARTOVER to confirm")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5))
+                TextField("STARTOVER", text: $typed)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(12)
+                    .background(Color(white: 0.12).clipShape(RoundedRectangle(cornerRadius: 10)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(matches ? danger : Color(white: 0.22), lineWidth: 1)
+                    )
+            }
+
+            HStack(spacing: 12) {
+                Button { dismiss() } label: {
+                    Text("Cancel")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color(white: 0.16).clipShape(RoundedRectangle(cornerRadius: 12)))
+                        .foregroundStyle(.white)
+                }
+                Button {
+                    onConfirm()
+                    dismiss()
+                } label: {
+                    Text("Reset")
+                        .font(.system(.body, design: .rounded).weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background((matches ? danger : Color(white: 0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 12)))
+                        .foregroundStyle(matches ? .white : Color(white: 0.45))
+                }
+                .disabled(!matches)
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 28)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity)
+        .background(Color(white: 0.09).ignoresSafeArea())
+        .presentationDetents([.height(400)])
+        .presentationDragIndicator(.visible)
+    }
 }
 
 #Preview {
