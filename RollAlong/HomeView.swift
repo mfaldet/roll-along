@@ -240,9 +240,11 @@ struct HomeView: View {
                         } else {
                             liveBall
                                 .position(ballPos)
-                            // Coin Pit arms the home marble with the player's
-                            // name tag, just as it appears in the game itself.
-                            if gameState.currentModeID == "goldrush" {
+                            // Competitive modes arm the home marble with the
+                            // player's name tag, just as it appears in the game
+                            // itself (Coin Pit, Comet Clash, Sumo Survival,
+                            // Paint Ball, Marble Cup, King of the Hill).
+                            if gameState.currentMode.section == .competitive {
                                 RivalNameTag(
                                     label: gameState.playerName.isEmpty ? "YOU" : gameState.playerName,
                                     color: Color(red: 0.28, green: 0.85, blue: 0.45),
@@ -296,25 +298,23 @@ struct HomeView: View {
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
 
-                    // Per-mode status — sits JUST ABOVE Play so it reads as
-                    // "what you're about to launch": a Level Select button for
-                    // the climb / challenge packs, a stat readout for the
-                    // mini-games, or competitive wins.
-                    modeHeader
-                        .homeBallCollider()
-                        .padding(.bottom, 10)
-
-                    // Bottom control grid — 3 rows, up to 4 columns wide:
-                    //   • Play (full width)
+                    // Bottom control grid — 3 rows, 4 columns wide:
+                    //   • Mode indicator (1 col) · Play (3 cols)
                     //   • Leaderboard · Game Modes (2-wide) · Shop
                     //   • Profile · Friends · Clans · Settings
+                    // The per-mode indicator (Level Select / wins / best …) sits
+                    // in the LEFT QUARTER of the Play row so it reads as "what
+                    // you're about to launch" right beside the button.
                     // Every cell is a collider like the rest of the home UI, so
                     // the roaming ball bounces off them.
                     Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                         GridRow {
+                            modeHeader
+                                .homeBallCollider()
+                                .gridCellColumns(1)
                             playButton
                                 .homeBallCollider()
-                                .gridCellColumns(4)
+                                .gridCellColumns(3)
                         }
                         GridRow {
                             squareNavButton("trophy.fill", "Leaderboard", HomeRoute.leaderboard)
@@ -774,11 +774,13 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.25), value: gameState.currentModeID)
     }
 
-    // MARK: - Per-mode status header (sits just above the Play button)
+    // MARK: - Per-mode indicator (left quarter of the Play row)
 
-    /// A Level Select button for the climb / challenge packs, or a stat readout
-    /// for the mini-games (high score, zen time, coins earned, competitive
-    /// wins).  Coin Pit also floats a name tag on the marble.
+    /// A compact Level Select button for the climb / challenge packs, or a stat
+    /// readout for the other modes (pinball best, zen time, coins earned,
+    /// competitive wins).  Sized to fill the narrow left-quarter cell beside the
+    /// Play button at the same height; competitive modes also float a name tag
+    /// on the home marble.
     @ViewBuilder
     private var modeHeader: some View {
         let id = gameState.currentModeID
@@ -788,64 +790,95 @@ struct HomeView: View {
             levelSelectButton(route: .challengeTracks)
         } else if id == "pinball" {
             statChip(icon: "gamecontroller.fill",
-                     text: "Best  \(gameState.pinballBest.formatted())")
+                     value: shortCount(gameState.pinballBest), caption: "best")
         } else if id == "zen" {
-            statChip(icon: "leaf.fill", text: zenTimePhrase(gameState.zenSeconds))
+            statChip(icon: "leaf.fill",
+                     value: zenTimeShort(gameState.zenSeconds), caption: "zen")
         } else if id == "coinpit" {   // displayed "Gold Rush"
             statChip(icon: "dollarsign.circle.fill",
-                     text: "\(gameState.goldrushCoinsTotal.formatted()) coins earned")
+                     value: shortCount(gameState.goldrushCoinsTotal), caption: "earned")
         } else if gameState.currentMode.section == .competitive {
             let w = gameState.minigameWins[id] ?? 0
-            statChip(icon: "trophy.fill", text: "\(w) win\(w == 1 ? "" : "s")")
+            statChip(icon: "trophy.fill", value: "\(w)", caption: w == 1 ? "win" : "wins")
         }
     }
 
+    /// Compact, full-cell Level Select button — icon over a short label, sized
+    /// to the Play button's height so it reads as a sibling in the same row.
     private func levelSelectButton(route: HomeRoute) -> some View {
         NavigationLink(value: route) {
-            HStack(spacing: 6) {
+            VStack(spacing: 3) {
                 Image(systemName: "square.grid.3x3.fill")
-                    .font(.system(size: 12, weight: .bold))
-                Text("Level Select")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold))
+                Text("Levels")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 16).padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .padding(.horizontal, 2)
             .background(
-                Capsule().fill(Color(white: 0.16))
-                    .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 1))
+                RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.16))
+                    .overlay(RoundedRectangle(cornerRadius: 14)
+                        .stroke(.white.opacity(0.18), lineWidth: 1))
             )
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("LevelSelectButton")
+        .accessibilityLabel("Level Select")
     }
 
-    private func statChip(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
+    /// Compact, full-cell stat readout — icon, value, tiny caption — sized to
+    /// the Play button's height for the left-quarter cell.
+    private func statChip(icon: String, value: String, caption: String) -> some View {
+        VStack(spacing: 1) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color(white: 0.75))
-            Text(text)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color(white: 0.78))
+            Text(value)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+            Text(caption)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.5))
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .padding(.horizontal, 3)
         .background(
-            Capsule().fill(Color(white: 0.14))
-                .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 1))
+            RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14))
+                .overlay(RoundedRectangle(cornerRadius: 14)
+                    .stroke(.white.opacity(0.12), lineWidth: 1))
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(value) \(caption)")
     }
 
-    /// Humorous Zen Garden time readout — scales the unit with the total time
-    /// ("48 minutes at peace" → "3 hours successfully relaxed" → "2 days
-    /// without worries").
-    private func zenTimePhrase(_ seconds: Int) -> String {
-        if seconds < 60 { return "\(max(0, seconds))s of calm" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes) minute\(minutes == 1 ? "" : "s") at peace" }
-        let hours = minutes / 60
-        if hours < 24 { return "\(hours) hour\(hours == 1 ? "" : "s") successfully relaxed" }
-        let days = hours / 24
-        return "\(days) day\(days == 1 ? "" : "s") without worries"
+    /// Compact integer formatting for the narrow indicator cell: 1.2k / 3.4M.
+    private func shortCount(_ n: Int) -> String {
+        if n < 1_000 { return "\(n)" }
+        if n < 1_000_000 {
+            let k = Double(n) / 1_000
+            return k < 10 ? String(format: "%.1fk", k) : "\(Int(k))k"
+        }
+        let m = Double(n) / 1_000_000
+        return m < 10 ? String(format: "%.1fM", m) : "\(Int(m))M"
+    }
+
+    /// Very short Zen time for the indicator cell ("48m", "3h", "2d").
+    private func zenTimeShort(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(max(0, seconds))s" }
+        let m = seconds / 60
+        if m < 60 { return "\(m)m" }
+        let h = m / 60
+        if h < 24 { return "\(h)h" }
+        return "\(h / 24)d"
     }
 
     /// Floating coin-balance pill in the top-right corner.  Tappable —
