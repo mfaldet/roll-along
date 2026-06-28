@@ -11,6 +11,9 @@ struct SettingsView: View {
     @State private var showDeleteAccountAlert = false
     @State private var isDeletingAccount = false
     @State private var deleteAccountError: String?
+    @State private var showRestoreResult = false
+    @State private var restoreResultMessage = ""
+    @State private var isRestoring = false
     @FocusState private var nameFocused: Bool
 
     var body: some View {
@@ -20,8 +23,8 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
                     personalizationSection
-                    accountSection
                     gameSection
+                    accountSection
                     purchasesSection
                     resetSection
                 }
@@ -302,34 +305,60 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Purchases")
             VStack(spacing: 0) {
+                // Restore Purchases is App Store–required for non-consumable IAPs
+                // (Unlimited Lives, Starter Pack). It re-activates them on a new
+                // device / after a reinstall, and now reports a clear result so
+                // it never feels like a dead button.
                 Button {
-                    Task { await store.restore() }
+                    Task { await restorePurchases() }
                 } label: {
-                    HStack {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(Color(white: 0.55))
-                        Text("Restore Purchases")
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(Color(white: 0.85))
+                    HStack(spacing: 12) {
+                        if isRestoring {
+                            ProgressView().tint(Color(white: 0.6))
+                                .frame(width: 18)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(Color(white: 0.55))
+                                .frame(width: 18)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(isRestoring ? "Restoring…" : "Restore Purchases")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.85))
+                            Text("Re-activate past purchases on this device")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
                         Spacer()
                     }
                     .padding()
                 }
-                if gameState.unlimitedLives {
-                    Divider().background(Color(white: 0.22)).padding(.leading, 16)
-                    HStack {
-                        Image(systemName: "infinity")
-                            .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                        Text("Unlimited Lives — Active")
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(Color(red: 1.00, green: 0.88, blue: 0.55))
-                        Spacer()
-                    }
-                    .padding()
-                }
+                .disabled(isRestoring)
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
         }
+        .alert("Restore Purchases", isPresented: $showRestoreResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(restoreResultMessage)
+        }
+    }
+
+    /// Run the StoreKit restore and surface a clear result (the old button gave
+    /// no feedback, which is why it felt like it "did nothing").
+    private func restorePurchases() async {
+        isRestoring = true
+        await store.restore()
+        isRestoring = false
+        if store.lastError?.hasPrefix("Restore") == true {
+            restoreResultMessage = store.lastError
+                ?? "Restore failed. Check your connection and try again."
+        } else if gameState.unlimitedLives {
+            restoreResultMessage = "Restore complete — your purchases are active on this device."
+        } else {
+            restoreResultMessage = "Restore complete. No previous purchases were found to restore."
+        }
+        showRestoreResult = true
     }
 
     private var resetSection: some View {
