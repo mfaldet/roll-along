@@ -444,6 +444,24 @@ struct RollUpMode: GameMode {
     let showsScore                   = true
 }
 
+/// Disco Ball — a memorization + coordination game.  Memorize a lit path across
+/// a tile floor between two safe zones, then roll it without a wrong step; score
+/// is total crossings.  No life cost (pure score attack).  Self-contained
+/// DiscoBallView; listed under "New ways to play".
+struct DiscoBallMode: GameMode {
+    let id          = "disco"
+    let displayName = "Disco Ball"
+    let tagline     = "Memorize the lit path. Roll across without a wrong step."
+    let section:     GameModeSection = .solo
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .endRun
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .unlimited
+    let hasHoles                     = false
+    let showsScore                   = true
+}
+
 /// Challenge of the Day — a short (1–3 level), brutally hard daily gauntlet that
 /// rotates every day, deterministically derived from the date so every player
 /// gets the same one.  Reuses the climb's level generator at very high level
@@ -595,6 +613,7 @@ enum GameModeCatalogue {
         (PinballMode(),      true),    // self-contained PinballView — live
         (RollOutMode(),      true),    // self-contained RollOutView — live
         (RollUpMode(),       true),    // self-contained RollUpView — live
+        (DiscoBallMode(),    true),    // self-contained DiscoBallView — live
         // ── Challenge Tracks ─────────────────────────────────────────────
         // S19: existing-bundle tracks — engine + generator live
         (frozenPeaks,    true),
@@ -695,6 +714,11 @@ struct ModeTutorial {
                          goal: "Climb the floating platforms as high as you can.",
                          hazard: "Fall off the bottom and the run ends — costing a life.",
                          reward: "Coins for your height, plus a bonus on a new best.")
+        case "disco":
+            return .init(controls: "Tilt to roll. Memorize the lit path, then tap to cross.",
+                         goal: "Roll between the safe zones, back and forth, as many times as you can.",
+                         hazard: "Touch a tile that isn't on the lit path and the run is over.",
+                         reward: "Coins for every crossing, plus a bonus on a new best.")
         default:
             return nil
         }

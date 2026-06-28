@@ -438,6 +438,10 @@ struct HomeView: View {
                     RollUpView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("rollup")]) }
                         .firstPlayTutorial("rollup")
+                case .mode("disco"):
+                    DiscoBallView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("disco")]) }
+                        .firstPlayTutorial("disco")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
                 case .player(let p):    PublicProfileView(player: p)
@@ -832,6 +836,9 @@ struct HomeView: View {
         } else if id == "coinpit" {   // displayed "Gold Rush"
             statChip(icon: "dollarsign.circle.fill",
                      value: shortCount(gameState.goldrushCoinsTotal), caption: "earned")
+        } else if id == "disco" {
+            statChip(icon: "circle.grid.3x3.fill",
+                     value: shortCount(gameState.minigameBests["disco", default: 0]), caption: "best")
         } else if gameState.currentMode.section == .competitive {
             let w = gameState.minigameWins[id] ?? 0
             statChip(icon: "trophy.fill", value: "\(w)", caption: w == 1 ? "win" : "wins")
