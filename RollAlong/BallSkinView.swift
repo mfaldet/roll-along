@@ -3677,15 +3677,17 @@ struct BallSkinView: View {
 
     // ── Trophy ───────────────────────────────────────────────────────────────
     // The Golden Gauntlet's exclusive prize — a lustrous prize-gold sphere with a
-    // raised, mirror-bright CHAMPION STAR embossed at its heart, a soft victory
-    // halo that breathes behind it, a specular highlight that orbits the surface
-    // like light catching polished metal as it rolls, and gold sparkle glints
-    // that twinkle across the finish.  Made to feel earned, not bought.
+    // raised, iridescent CHAMPION STAR at its heart that shimmers through every
+    // hue of the rainbow, a soft victory halo that breathes behind it, a specular
+    // highlight that orbits the surface like light catching polished metal as it
+    // rolls, and sparkle glints that twinkle across the finish.  Made to feel
+    // earned, not bought.
     //
     // Rendering layers:
     //   1. Polished gold base (bright crown highlight → deep bronze rim)
     //   2. Victory halo behind the emblem (gentle breathing pulse)
-    //   3. Embossed champion star (engraved drop-shadow + raised gold + bevel)
+    //   3. Iridescent champion star (drifting rainbow fill + pearlescent sheen +
+    //      bevel + twinkling sparkles riding on the star)
     //   4. Orbiting mirror specular
     //   5. Twinkling gold sparkle glints
     //   6. Warm reflected rim light (lower-right)
@@ -3729,27 +3731,53 @@ struct BallSkinView: View {
                         ]),
                         center: center, startRadius: 0, endRadius: r * 0.80))
 
-                // ── 3. Embossed champion star ────────────────────────────
+                // ── 3. Iridescent champion star ──────────────────────────
                 let starR  = r * 0.55
                 let starIn = r * 0.225
                 let rot    = -Double.pi / 2          // one point up
+                let star   = Self.starPath(center: center, outer: starR, inner: starIn, rotation: rot)
                 // 3a. engraved drop-shadow (down-right → raised toward the light)
                 ctx.fill(Self.starPath(center: CGPoint(x: cx + r * 0.045, y: cy + r * 0.055),
                                        outer: starR, inner: starIn, rotation: rot),
-                         with: .color(Color(red: 0.20, green: 0.12, blue: 0.01).opacity(0.55)))
-                // 3b. raised gold star
-                let star = Self.starPath(center: center, outer: starR, inner: starIn, rotation: rot)
+                         with: .color(Color(red: 0.07, green: 0.06, blue: 0.10).opacity(0.55)))
+                // 3b. dark base under the star so the iridescence reads vividly
+                ctx.fill(star, with: .color(Color(red: 0.09, green: 0.07, blue: 0.13)))
+                // 3c. iridescent rainbow — a hue band drifts through the star while
+                //     the gradient direction slowly rotates (prismatic shimmer).
+                let hueShift = reduceMotion ? 0.0 : (t * 0.11).truncatingRemainder(dividingBy: 1.0)
+                let irisStops: [Gradient.Stop] = (0...6).map { i in
+                    let loc = Double(i) / 6.0
+                    let hue = (loc + hueShift).truncatingRemainder(dividingBy: 1.0)
+                    return .init(color: Color(hue: hue, saturation: 0.82, brightness: 1.0), location: loc)
+                }
+                let irisAng = reduceMotion ? 0.7 : t * 0.22
+                let idx = CGFloat(cos(irisAng)) * starR
+                let idy = CGFloat(sin(irisAng)) * starR
+                ctx.fill(star, with: .linearGradient(
+                    Gradient(stops: irisStops),
+                    startPoint: CGPoint(x: cx - idx, y: cy - idy),
+                    endPoint:   CGPoint(x: cx + idx, y: cy + idy)))
+                // 3d. pearlescent sheen on the upper half (glossy lacquer)
                 ctx.fill(star, with: .linearGradient(
                     Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.99, blue: 0.86), location: 0.0),
-                        .init(color: Color(red: 0.99, green: 0.81, blue: 0.31), location: 0.5),
-                        .init(color: Color(red: 0.76, green: 0.49, blue: 0.08), location: 1.0),
+                        .init(color: .white.opacity(0.55), location: 0.0),
+                        .init(color: .white.opacity(0.06), location: 0.42),
+                        .init(color: .clear, location: 0.62),
                     ]),
-                    startPoint: CGPoint(x: cx - starR, y: cy - starR),
-                    endPoint:   CGPoint(x: cx + starR, y: cy + starR)))
-                // 3c. bright bevel edge
-                ctx.stroke(star, with: .color(Color(red: 1.0, green: 0.98, blue: 0.82).opacity(0.92)),
-                           lineWidth: max(0.5, r * 0.022))
+                    startPoint: CGPoint(x: cx, y: cy - starR),
+                    endPoint:   CGPoint(x: cx, y: cy + starR)))
+                // 3e. bright white bevel edge
+                ctx.stroke(star, with: .color(.white.opacity(0.92)), lineWidth: max(0.5, r * 0.022))
+                // 3f. twinkling sparkles riding on the star
+                let starGlints: [(CGFloat, CGFloat, Double)] = [
+                    (0.0, -0.60, 0.0), (-0.30, 0.18, 2.1), (0.32, 0.10, 4.0),
+                ]
+                for (gx, gy, ph) in starGlints {
+                    let tw = reduceMotion ? 0.7 : max(0.0, sin(t * 3.0 + ph))
+                    if tw <= 0.05 { continue }
+                    let p = CGPoint(x: cx + gx * starR, y: cy + gy * starR)
+                    trophyGlint(ctx, at: p, size: r * 0.11 * CGFloat(0.55 + 0.5 * tw), opacity: tw)
+                }
 
                 // ── 4. Orbiting mirror specular ──────────────────────────
                 let orbit = t * 0.6 - 2.2

@@ -119,9 +119,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case trench     = "Trench"
 
     // ── Golden Gauntlet exclusive (pack-exclusive, never coin-purchasable) ─
-    //   • trophy — lustrous prize-gold sphere with a raised, mirror-bright
-    //     champion star embossed at its heart, a breathing victory halo, an
-    //     orbiting specular, and twinkling gold glints.  Awarded ONLY by
+    //   • trophy — lustrous prize-gold sphere with a raised, iridescent
+    //     rainbow champion star at its heart, a breathing victory halo, an
+    //     orbiting specular, and twinkling glints.  Awarded ONLY by
     //     completing the Golden Gauntlet challenge track; hidden from the
     //     shop grid.
     case trophy     = "Trophy"
