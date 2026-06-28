@@ -36,7 +36,7 @@ struct DiscoBallView: View {
     // MARK: - Tunables
     private let cols = 5
     private let rows = 6
-    private let ballRadius:  CGFloat = 13
+    private let ballRadius:  CGFloat = 10
     private let moveAccel:   CGFloat = 1_500
     private let friction:    CGFloat = 0.94
     private let maxSpeed:    CGFloat = 700
@@ -170,6 +170,7 @@ struct DiscoBallView: View {
 
     private var ballLayer: some View {
         BallSkinView(skin: gameState.activeSkin, diameter: ballRadius * 2)
+            .frame(width: ballRadius * 2, height: ballRadius * 2)
             .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
             .position(ball)
             .allowsHitTesting(false)
