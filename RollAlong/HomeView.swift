@@ -442,6 +442,10 @@ struct HomeView: View {
                     DiscoBallView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("disco")]) }
                         .firstPlayTutorial("disco")
+                case .mode("discohard"):
+                    DiscoBallView(hardcore: true)
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("discohard")]) }
+                        .firstPlayTutorial("discohard")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
                 case .player(let p):    PublicProfileView(player: p)
@@ -839,6 +843,9 @@ struct HomeView: View {
         } else if id == "disco" {
             statChip(icon: "circle.grid.3x3.fill",
                      value: shortCount(gameState.minigameBests["disco", default: 0]), caption: "best")
+        } else if id == "discohard" {
+            statChip(icon: "bolt.fill",
+                     value: shortCount(gameState.minigameBests["discohard", default: 0]), caption: "best")
         } else if gameState.currentMode.section == .competitive {
             let w = gameState.minigameWins[id] ?? 0
             statChip(icon: "trophy.fill", value: "\(w)", caption: w == 1 ? "win" : "wins")
