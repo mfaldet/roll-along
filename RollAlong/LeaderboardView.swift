@@ -185,6 +185,10 @@ struct LeaderboardView: View {
     private static let meAccent = Color(red: 0.28, green: 0.82, blue: 0.52)
     private static let panelFill = Color(white: 0.11)
     private static let hairline  = Color(white: 0.16)
+    /// Shared surface for the filter pill + sort segmented control.
+    private static let controlTrack  = Color(white: 0.12)
+    private static let controlBorder = Color(white: 0.22)
+    private static let controlPill   = Color(white: 0.22)   // selected segment
 
     /// The columns shown on every row of the current board.
     private var columns: [StatColumn] {
@@ -365,18 +369,24 @@ struct LeaderboardView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 9)
                 .background(
-                    Capsule().fill(Color(white: 0.13))
-                        .overlay(Capsule().stroke(Color(white: 0.24), lineWidth: 1))
+                    Capsule().fill(Self.controlTrack)
+                        .overlay(Capsule().stroke(Self.controlBorder, lineWidth: 1))
                 )
             }
 
-            // Sort toggles — only meaningful for the Roll Along board.
+            // Sort selector — a segmented control (Roll Along board only),
+            // matching the filter pill's surface.
             if selectedBoard == .rollAlong {
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
                     ForEach(SortKey.allCases) { key in
-                        sortChip(key)
+                        sortSegment(key)
                     }
                 }
+                .padding(3)
+                .background(
+                    Capsule().fill(Self.controlTrack)
+                        .overlay(Capsule().stroke(Self.controlBorder, lineWidth: 1))
+                )
             }
         }
         .frame(maxWidth: .infinity)
@@ -385,18 +395,20 @@ struct LeaderboardView: View {
         .padding(.bottom, 12)
     }
 
-    private func sortChip(_ key: SortKey) -> some View {
+    /// One segment of the sort selector: an elevated pill with gold text when
+    /// active, plain gray otherwise.
+    private func sortSegment(_ key: SortKey) -> some View {
         let active = (sortKey == key)
-        return Button { sortKey = key } label: {
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { sortKey = key }
+        } label: {
             Text(key.rawValue)
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(active ? .black : Color(white: 0.72))
-                .padding(.horizontal, 16)
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(active ? Self.starTint : Color(white: 0.55))
+                .padding(.horizontal, 18)
                 .padding(.vertical, 7)
                 .background(
-                    Capsule().fill(active
-                        ? Color(red: 1.00, green: 0.84, blue: 0.30)
-                        : Color(white: 0.16))
+                    Capsule().fill(active ? Self.controlPill : Color.clear)
                 )
         }
         .buttonStyle(.plain)
