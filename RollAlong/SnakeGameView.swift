@@ -58,7 +58,9 @@ struct SnakeGameView: View {
     private let rivalCount     = 3                 // AI rival comets
 
     // Rival AI
-    private let aiAccel:       CGFloat = 1_200
+    private let aiAccelBase:   CGFloat = 1_200
+    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
+    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let aiLookAhead:   CGFloat = 78         // forward probe distance for avoidance
     private let aiTurn:        CGFloat = 0.85       // radians to swing when the path ahead is blocked
     private let aiAvoidRadius: CGFloat = 34         // a probe within this of a wall counts as blocked
@@ -343,6 +345,8 @@ struct SnakeGameView: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
+            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
+                .padding(.top, 6)
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -354,7 +358,8 @@ struct SnakeGameView: View {
         let power = playerCycle?.power ?? 0
         let kills = playerCycle?.kills ?? 0
         let collects = playerCycle?.collects ?? 0
-        let banked = power * coinsPerPower + (playerWon ? winBonus : 0)
+        let banked = gameState.minigamePayout(base: power * coinsPerPower + (playerWon ? winBonus : 0),
+                                              difficulty: gameState.minigameDifficulty)
         let title = playerWon ? "You Win!" : "Eliminated"
         let titleColor: Color = playerWon ? Color(red: 0.45, green: 0.88, blue: 0.55)
                                           : Color(red: 1.00, green: 0.45, blue: 0.45)
@@ -486,20 +491,25 @@ struct SnakeGameView: View {
             let power = playerCycle?.power ?? 0
             let kills = playerCycle?.kills ?? 0
             let collects = playerCycle?.collects ?? 0
-            let banked = power * coinsPerPower + (didWin ? winBonus : 0)
-            if banked > 0 { gameState.addCoins(banked) }
+            let base = power * coinsPerPower + (didWin ? winBonus : 0)
             gameState.recordCompetitiveScore("snake", power)   // leaderboard best
+            // Difficulty scales the payout + records the attempt/win for tracking
+            // (also banks the coins and, on a win, bumps the tally + ticket).
+            let banked = gameState.recordMinigameResult(
+                modeID: "snake", difficulty: gameState.minigameDifficulty,
+                won: didWin, basePayout: base)
             AnalyticsClient.shared.track(
                 "comet_round_over",
                 properties: ["won": .bool(didWin),
+                             "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "power": .int(power),
                              "kills": .int(kills),
                              "collects": .int(collects),
+                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)]
             )
             if didWin {
-                gameState.recordCompetitiveWin("snake")   // win tally + Gold Rush ticket
                 AnalyticsClient.shared.track("ticket_earned",
                                              properties: ["source": .string("snake")])
             }

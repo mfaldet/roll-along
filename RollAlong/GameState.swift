@@ -275,6 +275,18 @@ final class GameState: ObservableObject {
         didSet { save(minigameBests, trackProgressKey: "ra_minigameBests") }
     }
 
+    /// Per game+difficulty attempt counts, keyed "modeID|difficulty"
+    /// (e.g. "snake|hard").  Paired with `minigameDifficultyWins` to derive the
+    /// success rate that calibrates the difficulty/payout tables.  See
+    /// docs/minigame-difficulty.md.
+    @Published var minigameDifficultyPlays: [String: Int] {
+        didSet { save(minigameDifficultyPlays, trackProgressKey: "ra_minigameDiffPlays") }
+    }
+    /// Per game+difficulty win counts, keyed "modeID|difficulty".
+    @Published var minigameDifficultyWins: [String: Int] {
+        didSet { save(minigameDifficultyWins, trackProgressKey: "ra_minigameDiffWins") }
+    }
+
     /// Set of Challenge Track IDs fully completed (level 100 cleared).
     /// The reward bundle is granted exactly once when a track enters this set.
     @Published var completedTracks: Set<String> {
@@ -492,6 +504,8 @@ final class GameState: ObservableObject {
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         minigameWins   = Self.loadTrackProgress(key: "ra_minigameWins", defaults)
         minigameBests  = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
+        minigameDifficultyPlays = Self.loadTrackProgress(key: "ra_minigameDiffPlays", defaults)
+        minigameDifficultyWins  = Self.loadTrackProgress(key: "ra_minigameDiffWins", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
@@ -1058,6 +1072,58 @@ final class GameState: ObservableObject {
         syncMinigameStats()   // publish the bumped win tally to the leaderboard
     }
 
+    /// Difficulty-scaled coin payout for a competitive minigame (pure — no side
+    /// effects).  Use it to preview payouts in the start picker and to show the
+    /// banked total on the result screen so display + award always agree.
+    func minigamePayout(base: Int, difficulty: MinigameDifficulty) -> Int {
+        Int((Double(base) * difficulty.payoutMultiplier).rounded())
+    }
+
+    /// Record one finished competitive match: count the attempt (always) and the
+    /// win (if won) per game+difficulty for success-rate tracking, award the
+    /// difficulty-scaled payout, and on a win bump the lifetime tally + ticket.
+    /// Returns the scaled payout actually banked.  See docs/minigame-difficulty.md.
+    @discardableResult
+    func recordMinigameResult(modeID: String,
+                              difficulty: MinigameDifficulty,
+                              won: Bool,
+                              basePayout: Int) -> Int {
+        let key = Self.minigameDifficultyKey(modeID, difficulty)
+        minigameDifficultyPlays[key, default: 0] += 1
+        if won {
+            minigameDifficultyWins[key, default: 0] += 1
+            recordCompetitiveWin(modeID)
+        }
+        let payout = minigamePayout(base: basePayout, difficulty: difficulty)
+        if payout > 0 { addCoins(payout) }
+        AnalyticsClient.shared.track(
+            "minigame_result",
+            properties: [
+                "game":        .string(modeID),
+                "difficulty":  .string(difficulty.rawValue),
+                "won":         .bool(won),
+                "base_payout": .int(basePayout),
+                "payout":      .int(payout),
+            ]
+        )
+        return payout
+    }
+
+    /// Observed win-rate for a game+difficulty (wins / attempts), or nil if it's
+    /// never been played.  Drives manual calibration of the difficulty/payout
+    /// tables against `MinigameDifficulty.targetWinRate`.
+    func minigameSuccessRate(_ modeID: String, _ difficulty: MinigameDifficulty) -> Double? {
+        let key = Self.minigameDifficultyKey(modeID, difficulty)
+        let plays = minigameDifficultyPlays[key, default: 0]
+        guard plays > 0 else { return nil }
+        return Double(minigameDifficultyWins[key, default: 0]) / Double(plays)
+    }
+
+    /// Composite key for the per game+difficulty tracking dictionaries.
+    static func minigameDifficultyKey(_ modeID: String, _ difficulty: MinigameDifficulty) -> String {
+        "\(modeID)|\(difficulty.rawValue)"
+    }
+
     /// Spend tickets.  Returns false (no-op) if the balance is short.
     @discardableResult
     func spendTickets(_ amount: Int) -> Bool {
@@ -1440,6 +1506,40 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
         case .easy:   return 0.72
         case .normal: return 0.85
         case .hard:   return 1.0
+        }
+    }
+
+    /// Payout multiplier applied to a competitive minigame's coin winnings.
+    /// Higher difficulty = harder to win = bigger reward for the risk taken.
+    /// Spread: Easy 0.5× · Normal 1× · Hard 2× (today's payout == Normal).
+    /// Calibrate against `targetWinRate` from the tracked success rates so the
+    /// expected value per play stays fair — see docs/minigame-difficulty.md.
+    var payoutMultiplier: Double {
+        switch self {
+        case .easy:   return 0.5
+        case .normal: return 1.0
+        case .hard:   return 2.0
+        }
+    }
+
+    /// Short payout descriptor for the pre-game picker (relative to Normal).
+    var payoutLabel: String {
+        switch self {
+        case .easy:   return "0.5× coins"
+        case .normal: return "1× coins"
+        case .hard:   return "2× coins"
+        }
+    }
+
+    /// The win-rate each difficulty is *designed* to land near — the calibration
+    /// target for `payoutMultiplier` (payout ≈ inversely proportional to win
+    /// odds → roughly even expected value).  Retune the scale tables when the
+    /// tracked rates (`GameState.minigameSuccessRate`) drift far from these.
+    var targetWinRate: Double {
+        switch self {
+        case .easy:   return 0.80
+        case .normal: return 0.45
+        case .hard:   return 0.22
         }
     }
 }

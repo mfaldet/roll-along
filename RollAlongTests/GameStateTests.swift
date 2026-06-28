@@ -35,6 +35,67 @@ final class GameStateTests: XCTestCase {
         GameState(defaults: defaults)
     }
 
+    // MARK: - Minigame difficulty (payout scaling + success tracking)
+
+    func testMinigamePayout_scalesByDifficulty() {
+        let gs = makeGameState()
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .easy),   50)
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .normal), 100)
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .hard),   200)
+        // Rounds to the nearest coin.
+        XCTAssertEqual(gs.minigamePayout(base: 5, difficulty: .easy), 3)   // 2.5 -> 3
+    }
+
+    func testPayoutMultiplier_spreadIsHalfOneTwo() {
+        XCTAssertEqual(MinigameDifficulty.easy.payoutMultiplier,   0.5)
+        XCTAssertEqual(MinigameDifficulty.normal.payoutMultiplier, 1.0)
+        XCTAssertEqual(MinigameDifficulty.hard.payoutMultiplier,   2.0)
+    }
+
+    func testRecordMinigameResult_loss_countsAttemptAndAwardsScaledPayout() {
+        let gs = makeGameState()
+        gs.coinBalance = 0
+        let paid = gs.recordMinigameResult(modeID: "snake", difficulty: .hard,
+                                           won: false, basePayout: 30)
+        XCTAssertEqual(paid, 60, "30 base × 2.0 (hard)")
+        XCTAssertEqual(gs.coinBalance, 60)
+        XCTAssertEqual(gs.minigameDifficultyPlays["snake|hard"], 1)
+        XCTAssertNil(gs.minigameDifficultyWins["snake|hard"], "a loss is not a win")
+        XCTAssertEqual(gs.minigameWins["snake"] ?? 0, 0, "lifetime win tally untouched on a loss")
+        XCTAssertEqual(gs.minigameSuccessRate("snake", .hard), 0.0)
+    }
+
+    func testRecordMinigameResult_win_countsWinAndBumpsLifetimeTally() {
+        let gs = makeGameState()
+        gs.coinBalance = 0
+        let paid = gs.recordMinigameResult(modeID: "sumo", difficulty: .easy,
+                                           won: true, basePayout: 10)
+        XCTAssertEqual(paid, 5, "10 base × 0.5 (easy)")
+        XCTAssertEqual(gs.coinBalance, 5)
+        XCTAssertEqual(gs.minigameDifficultyPlays["sumo|easy"], 1)
+        XCTAssertEqual(gs.minigameDifficultyWins["sumo|easy"], 1)
+        XCTAssertEqual(gs.minigameWins["sumo"], 1, "win bumps the lifetime tally")
+        XCTAssertEqual(gs.minigameSuccessRate("sumo", .easy), 1.0)
+    }
+
+    func testMinigameSuccessRate_aggregatesAndIsNilWhenUnplayed() {
+        let gs = makeGameState()
+        XCTAssertNil(gs.minigameSuccessRate("koth", .normal), "never played → nil")
+        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: true,  basePayout: 0)
+        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: false, basePayout: 0)
+        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: false, basePayout: 0)
+        XCTAssertEqual(gs.minigameDifficultyPlays["koth|normal"], 3)
+        XCTAssertEqual(gs.minigameSuccessRate("koth", .normal) ?? -1, 1.0 / 3.0, accuracy: 0.0001)
+    }
+
+    func testMinigameDifficultyTracking_persistsAcrossReload() {
+        let gs = makeGameState()
+        gs.recordMinigameResult(modeID: "paintball", difficulty: .hard, won: true, basePayout: 0)
+        let reloaded = GameState(defaults: defaults)
+        XCTAssertEqual(reloaded.minigameDifficultyPlays["paintball|hard"], 1)
+        XCTAssertEqual(reloaded.minigameDifficultyWins["paintball|hard"], 1)
+    }
+
     // MARK: - Challenge of the Day
 
     func testDailyChallenge_fullPass_awards30CoinsAndLocksDay() {

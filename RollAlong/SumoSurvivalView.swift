@@ -38,7 +38,9 @@ struct SumoSurvivalView: View {
 
     private let marbleRadius: CGFloat = 19
     private let playerAccel:  CGFloat = 1_520     // your tilt → acceleration
-    private let aiAccel:      CGFloat = 900       // rival acceleration (≈60% of you — easier)
+    private let aiAccelBase:  CGFloat = 900       // rival acceleration (≈60% of you — easier)
+    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
+    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let friction:     CGFloat = 0.992     // marbles glide on the floor
     private let maxSpeed:     CGFloat = 780
     private let restitution:  CGFloat = 0.92      // bounciness of marble hits
@@ -377,6 +379,11 @@ struct SumoSurvivalView: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
+            // Difficulty is locked in at the match start (round 1 only).
+            if round == 1 {
+                MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
+                    .padding(.top, 6)
+            }
         }
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
@@ -427,7 +434,9 @@ struct SumoSurvivalView: View {
     private var matchOverOverlay: some View {
         let order = rankedRoster
         let playerRank = (order.firstIndex(where: { $0.isPlayer }) ?? 0)
-        let playerCoins = placementCoins[min(playerRank, placementCoins.count - 1)]
+        let playerCoins = gameState.minigamePayout(
+            base: placementCoins[min(playerRank, placementCoins.count - 1)],
+            difficulty: gameState.minigameDifficulty)
         let won = playerRank == 0
         return ZStack {
             Color.black.opacity(0.78).ignoresSafeArea()
@@ -611,15 +620,19 @@ struct SumoSurvivalView: View {
         awarded = true
         let order = rankedRoster
         let playerRank = order.firstIndex(where: { $0.isPlayer }) ?? (order.count - 1)
-        let coins = placementCoins[min(playerRank, placementCoins.count - 1)]
-        gameState.addCoins(coins)
+        let base = placementCoins[min(playerRank, placementCoins.count - 1)]
         let points = order.first(where: { $0.isPlayer })?.points ?? 0
         gameState.recordCompetitiveScore("sumo", points)   // leaderboard best
-        if playerRank == 0 { gameState.recordCompetitiveWin("sumo") }
+        // Difficulty scales the payout + records the attempt/win for tracking.
+        let coins = gameState.recordMinigameResult(
+            modeID: "sumo", difficulty: gameState.minigameDifficulty,
+            won: playerRank == 0, basePayout: base)
         AnalyticsClient.shared.track(
             "sumo_match_over",
             properties: ["placement": .int(playerRank + 1),
-                         "points": .int(order.first(where: { $0.isPlayer })?.points ?? 0),
+                         "difficulty": .string(gameState.minigameDifficulty.rawValue),
+                         "points": .int(points),
+                         "base_coins": .int(base),
                          "coins": .int(coins),
                          "map_name": .string(SumoMaps.maps[mapIndex % SumoMaps.maps.count].name)]
         )
