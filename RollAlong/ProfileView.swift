@@ -17,6 +17,10 @@ struct ProfileView: View {
     @State private var leaderboardRank: Int? = nil
     @State private var rankLoading:     Bool = false
 
+    // Measured height of the loadout name-list, so the diorama beside it can
+    // match the left column's height for a clean split.
+    @State private var loadoutListHeight: CGFloat = 200
+
     // ── Derived convenience ────────────────────────────────────────────────
     private var levelsCompleted: Int  { max(0, gameState.highestUnlocked - 1) }
     private var totalPossibleStars: Int { levelsCompleted * 3 }
@@ -185,93 +189,120 @@ struct ProfileView: View {
     // so the profile shows off what you've earned/collected at a glance.
     // =========================================================================
     private var loadoutCard: some View {
+        // Tapping the loadout opens the Locker to equip cosmetics. The Locker
+        // reads the route beneath it (.profile) to show a "< Profile" back button.
+        NavigationLink(value: HomeRoute.locker) {
         VStack(spacing: 14) {
             sectionLabel("My Loadout")
 
-            VStack(spacing: 10) {
-                loadoutRow(category: "Ball",
-                           name: gameState.activeSkin.displayName,
-                           tier: gameState.activeSkin.tier) {
-                    MiniBall(skin: gameState.activeSkin, size: 26)
-                }
-                loadoutRow(category: "Trail",
-                           name: gameState.equippedTrail.displayName,
-                           tier: gameState.equippedTrail.tier) {
-                    Capsule()
-                        .fill(gameState.equippedTrail == .none
-                              ? Color(white: 0.30)
-                              : gameState.equippedTrail.color)
-                        .frame(width: 24, height: 7)
-                }
-                loadoutRow(category: "Goal",
-                           name: gameState.equippedGoal.displayName,
-                           tier: gameState.equippedGoal.tier) {
-                    // Actual goal colour, not a tinted flag — so the swatch
-                    // matches what's equipped (including the default).
-                    Circle()
-                        .fill(GoalSkin.previewGradient(for: gameState.equippedGoal))
-                        .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
-                        .frame(width: 22, height: 22)
-                }
-                loadoutRow(category: "Floor",
-                           name: gameState.equippedFloor.displayName,
-                           tier: gameState.equippedFloor.tier) {
-                    // The floor's real colour — "Classic" included.
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(gameState.equippedFloor.color)
-                        .overlay(RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(white: 0.32), lineWidth: 0.6))
-                        .frame(width: 24, height: 24)
-                }
-                loadoutRow(category: "Pit",
-                           name: gameState.equippedPit.displayName,
-                           tier: gameState.equippedPit.tier) {
-                    // A mini pit — dark well with the pit's real colour bar,
-                    // matching the Locker preview ("Classic" included).
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.16))
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(gameState.equippedPit.color)
-                            .frame(width: 16, height: 8)
+            // Split down the middle: the equipped items (names) on the left, an
+            // animated diorama of them "in action" on the right. The rarity
+            // badges are gone — the scene is the showcase now.
+            HStack(alignment: .top, spacing: 16) {
+                VStack(spacing: 10) {
+                    loadoutRow(category: "Ball",
+                               name: gameState.activeSkin.displayName) {
+                        MiniBall(skin: gameState.activeSkin, size: 24)
                     }
-                    .frame(width: 24, height: 24)
+                    loadoutRow(category: "Trail",
+                               name: gameState.equippedTrail.displayName) {
+                        Capsule()
+                            .fill(gameState.equippedTrail == .none
+                                  ? Color(white: 0.30)
+                                  : gameState.equippedTrail.color)
+                            .frame(width: 22, height: 7)
+                    }
+                    loadoutRow(category: "Goal",
+                               name: gameState.equippedGoal.displayName) {
+                        // Actual goal colour, not a tinted flag — so the swatch
+                        // matches what's equipped (including the default).
+                        Circle()
+                            .fill(GoalSkin.previewGradient(for: gameState.equippedGoal))
+                            .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
+                            .frame(width: 20, height: 20)
+                    }
+                    loadoutRow(category: "Floor",
+                               name: gameState.equippedFloor.displayName) {
+                        // The floor's real colour — "Classic" included.
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(gameState.equippedFloor.color)
+                            .overlay(RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color(white: 0.32), lineWidth: 0.6))
+                            .frame(width: 22, height: 22)
+                    }
+                    loadoutRow(category: "Pit",
+                               name: gameState.equippedPit.displayName) {
+                        // A mini pit — dark well with the pit's real colour bar.
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.16))
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(gameState.equippedPit.color)
+                                .frame(width: 14, height: 7)
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    loadoutRow(category: "Boundary",
+                               name: gameState.equippedBoundary.displayName) {
+                        // A mini wall segment in the boundary's real colour.
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(gameState.equippedBoundary.color)
+                            .overlay(RoundedRectangle(cornerRadius: 4)
+                                .stroke(gameState.equippedBoundary.edgeColor, lineWidth: 1))
+                            .frame(width: 10, height: 22)
+                    }
+                    loadoutRow(category: "Music",
+                               name: gameState.equippedMusic.displayName) {
+                        Image(systemName: gameState.equippedMusic == .none
+                              ? "speaker.slash.fill" : "music.note")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(gameState.equippedMusic.tier.color)
+                    }
                 }
-                loadoutRow(category: "Music",
-                           name: gameState.equippedMusic.displayName,
-                           tier: gameState.equippedMusic.tier) {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(gameState.equippedMusic.tier.color)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(GeometryReader { g in
+                    Color.clear.preference(key: LoadoutHeightKey.self,
+                                           value: g.size.height)
+                })
+
+                LoadoutScene(ball:     gameState.activeSkin,
+                             trail:    gameState.equippedTrail,
+                             goal:     gameState.equippedGoal,
+                             floor:    gameState.equippedFloor,
+                             pit:      gameState.equippedPit,
+                             boundary: gameState.equippedBoundary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: max(150, loadoutListHeight))
             }
+            .onPreferenceChange(LoadoutHeightKey.self) { loadoutListHeight = $0 }
         }
         .padding(18)
         .profileCard()
+        }
+        .buttonStyle(.plain)
     }
 
-    /// One equipped-cosmetic row: a small preview, the category + item name,
-    /// and its rarity badge (right-aligned).
+    /// One equipped-cosmetic row: a small preview swatch + the category and item
+    /// name.  Rarity now lives in the animated scene, not a per-row badge.
     private func loadoutRow<Leading: View>(
         category: String,
         name: String,
-        tier: CosmeticTier,
         @ViewBuilder leading: () -> Leading
     ) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             leading()
-                .frame(width: 28, height: 28)
+                .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(category.uppercased())
                     .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(white: 0.5))
                     .tracking(1)
                 Text(name)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
-            Spacer()
-            TierBadge(tier: tier)
+            Spacer(minLength: 0)
         }
     }
 
@@ -623,6 +654,251 @@ private struct ProfileCardModifier: ViewModifier {
 
 private extension View {
     func profileCard() -> some View { modifier(ProfileCardModifier()) }
+}
+
+/// Reports the loadout name-list's height up to the card so the diorama can
+/// match it.
+private struct LoadoutHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+// ===========================================================================
+// LoadoutScene — a small, looping diorama of the equipped cosmetics "in
+// action": the ball rolls along the floor, hops up and over the pit, bounces
+// off the boundary wall, and settles into the goal — a tail in the equipped
+// trail colour following it the whole way.  (The equipped music is heard, not
+// drawn.)  Pure-value inputs so it renders identically in the profile and in
+// previews.  Respects Reduce Motion by freezing on the final frame.
+// ===========================================================================
+private struct LoadoutScene: View {
+    let ball:     BallSkin
+    let trail:    TrailColor
+    let goal:     GoalSkin
+    let floor:    Floor
+    let pit:      Pit
+    let boundary: Boundary
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // ── Scene geometry (normalised: x 0→1 left→right, y 0→1 top→bottom) ──────
+    private let floorTopY:  CGFloat = 0.60   // top surface of the floor
+    private let floorThick: CGFloat = 0.12
+    private let pitX:       CGFloat = 0.40   // centre of the pit gap
+    private let pitHalf:    CGFloat = 0.07
+    private let wallX:      CGFloat = 0.88   // boundary-wall centre
+    private let wallHalf:   CGFloat = 0.038
+    private let goalCenter  = CGPoint(x: 0.62, y: 0.52)
+
+    // The ball's journey, as waypoints densified into a smooth polyline that
+    // both the trail stroke and the ball position read from.
+    private static let waypoints: [CGPoint] = [
+        CGPoint(x: 0.10, y: 0.52),   // start on the floor (left)
+        CGPoint(x: 0.30, y: 0.52),   // roll right
+        CGPoint(x: 0.40, y: 0.32),   // hop up and over the pit
+        CGPoint(x: 0.54, y: 0.52),   // land past the pit
+        CGPoint(x: 0.82, y: 0.50),   // roll up to the boundary wall
+        CGPoint(x: 0.84, y: 0.42),   // bounce off the wall
+        CGPoint(x: 0.66, y: 0.54),   // arc back down-left
+        CGPoint(x: 0.62, y: 0.52),   // settle into the goal
+    ]
+    private static let path: [CGPoint] = catmullRom(waypoints, samplesPerSegment: 20)
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = geo.size
+            ZStack {
+                background
+                setPieces(s)
+                if reduceMotion {
+                    movers(s, f: 1.0, alpha: 1.0)
+                } else {
+                    TimelineView(.animation) { tl in
+                        let c = Self.cycle(at: tl.date)
+                        movers(s, f: c.f, alpha: c.alpha)
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+        }
+    }
+
+    // ── Backdrop ────────────────────────────────────────────────────────────
+    private var background: some View {
+        LinearGradient(
+            colors: [Color(red: 0.05, green: 0.06, blue: 0.10),
+                     Color(red: 0.08, green: 0.09, blue: 0.14)],
+            startPoint: .top, endPoint: .bottom
+        )
+    }
+
+    // ── Static set pieces: floor (split by the pit), pit well, boundary wall,
+    //    and the goal target ────────────────────────────────────────────────
+    @ViewBuilder
+    private func setPieces(_ s: CGSize) -> some View {
+        // Floor ledges, left + right of the pit gap.
+        ledge(rect(0.02, floorTopY, pitX - pitHalf - 0.02, floorThick, s))
+        ledge(rect(pitX + pitHalf, floorTopY, 0.84 - (pitX + pitHalf), floorThick, s))
+
+        // Pit — a darkening well between the ledges.
+        pitWell(rect(pitX - pitHalf, floorTopY, pitHalf * 2, 0.24, s))
+
+        // Boundary wall on the right that the ball bounces off.
+        wall(rect(wallX - wallHalf, 0.30, wallHalf * 2, floorTopY + 0.04 - 0.30, s))
+
+        // Goal target, resting on the floor.
+        Circle()
+            .fill(GoalSkin.previewGradient(for: goal))
+            .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
+            .frame(width: goalD(s), height: goalD(s))
+            .position(scale(goalCenter, s))
+            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+    }
+
+    private func ledge(_ r: CGRect) -> some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(floor.color)
+            // Top highlight so even near-black floors read against the backdrop.
+            .overlay(alignment: .top) {
+                Rectangle().fill(Color.white.opacity(0.16)).frame(height: 1)
+            }
+            .overlay(RoundedRectangle(cornerRadius: 3)
+                .stroke(Color.black.opacity(0.25), lineWidth: 0.5))
+            .frame(width: r.width, height: r.height)
+            .position(x: r.midX, y: r.midY)
+    }
+
+    private func pitWell(_ r: CGRect) -> some View {
+        RoundedRectangle(cornerRadius: 5)
+            .fill(pit.color)
+            .overlay(
+                LinearGradient(colors: [.clear, .black.opacity(0.5)],
+                               startPoint: .top, endPoint: .bottom)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 5)
+                .stroke(Color.black.opacity(0.35), lineWidth: 0.8))
+            .frame(width: r.width, height: r.height)
+            .position(x: r.midX, y: r.midY)
+    }
+
+    private func wall(_ r: CGRect) -> some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(boundary.color)
+            // Lit left face (the side the ball strikes) + a darker outline.
+            .overlay(alignment: .leading) {
+                Rectangle().fill(boundary.edgeColor.opacity(0.9)).frame(width: 2)
+            }
+            .overlay(RoundedRectangle(cornerRadius: 4)
+                .stroke(boundary.deepColor, lineWidth: 0.8))
+            .frame(width: r.width, height: r.height)
+            .position(x: r.midX, y: r.midY)
+    }
+
+    // ── Moving parts: the trail tail + the ball ──────────────────────────────
+    @ViewBuilder
+    private func movers(_ s: CGSize, f: CGFloat, alpha: Double) -> some View {
+        let pts = Self.path
+        let n   = pts.count
+        let bIdx = clampIndex(Int((f * CGFloat(n - 1)).rounded()), n)
+        let aIdx = clampIndex(Int((max(0, f - 0.30) * CGFloat(n - 1)).rounded()), n)
+        let bd   = ballD(s)
+
+        if bIdx > aIdx {
+            trailPath(from: aIdx, to: bIdx, s: s)
+                .stroke(trailStroke,
+                        style: StrokeStyle(lineWidth: bd * 0.42,
+                                           lineCap: .round, lineJoin: .round))
+                .opacity(alpha)
+        }
+
+        MiniBall(skin: ball, size: bd)
+            .rotationEffect(.degrees(Double(f) * 760))
+            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+            .position(scale(pts[bIdx], s))
+            .opacity(alpha)
+    }
+
+    private var trailStroke: Color {
+        trail == .none ? Color.white.opacity(0.5) : trail.color
+    }
+
+    private func trailPath(from a: Int, to b: Int, s: CGSize) -> Path {
+        var p = Path()
+        let pts = Self.path
+        guard a < b else { return p }
+        p.move(to: scale(pts[a], s))
+        for i in (a + 1)...b { p.addLine(to: scale(pts[i], s)) }
+        return p
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    private func scale(_ p: CGPoint, _ s: CGSize) -> CGPoint {
+        CGPoint(x: p.x * s.width, y: p.y * s.height)
+    }
+    private func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat,
+                      _ s: CGSize) -> CGRect {
+        CGRect(x: x * s.width, y: y * s.height, width: w * s.width, height: h * s.height)
+    }
+    private func ballD(_ s: CGSize) -> CGFloat {
+        min(34, max(16, min(s.width, s.height) * 0.16))
+    }
+    private func goalD(_ s: CGSize) -> CGFloat {
+        min(44, max(22, min(s.width, s.height) * 0.24))
+    }
+    private func clampIndex(_ i: Int, _ n: Int) -> Int { max(0, min(n - 1, i)) }
+
+    /// Loop clock → (position fraction `f`, `alpha`).  The ball reaches the
+    /// goal at 80% and rests; alpha fades in/out at the seam to hide the reset.
+    private static func cycle(at date: Date) -> (f: CGFloat, alpha: Double) {
+        let period = 4.2
+        let raw = date.timeIntervalSinceReferenceDate
+            .truncatingRemainder(dividingBy: period) / period          // 0…1
+        let f = smoothstep(CGFloat(min(1.0, raw / 0.80)))
+        let alpha: Double
+        if raw < 0.05      { alpha = raw / 0.05 }                       // fade in
+        else if raw > 0.93 { alpha = max(0, (1.0 - raw) / 0.07) }       // fade out
+        else               { alpha = 1.0 }
+        return (f, alpha)
+    }
+    private static func smoothstep(_ t: CGFloat) -> CGFloat {
+        let x = min(1, max(0, t)); return x * x * (3 - 2 * x)
+    }
+
+    /// Catmull-Rom spline through `pts`, sampled into a dense polyline.
+    private static func catmullRom(_ pts: [CGPoint],
+                                   samplesPerSegment: Int) -> [CGPoint] {
+        guard pts.count >= 2 else { return pts }
+        var out: [CGPoint] = []
+        let n = pts.count
+        for i in 0..<(n - 1) {
+            let p0 = pts[max(0, i - 1)]
+            let p1 = pts[i]
+            let p2 = pts[i + 1]
+            let p3 = pts[min(n - 1, i + 2)]
+            for k in 0..<samplesPerSegment {
+                let t = CGFloat(k) / CGFloat(samplesPerSegment)
+                out.append(catmull(p0, p1, p2, p3, t))
+            }
+        }
+        out.append(pts[n - 1])
+        return out
+    }
+    private static func catmull(_ p0: CGPoint, _ p1: CGPoint,
+                                _ p2: CGPoint, _ p3: CGPoint, _ t: CGFloat) -> CGPoint {
+        let t2 = t * t, t3 = t2 * t
+        func c(_ a: CGFloat, _ b: CGFloat, _ cc: CGFloat, _ d: CGFloat) -> CGFloat {
+            0.5 * (2 * b + (-a + cc) * t
+                   + (2 * a - 5 * b + 4 * cc - d) * t2
+                   + (-a + 3 * b - 3 * cc + d) * t3)
+        }
+        return CGPoint(x: c(p0.x, p1.x, p2.x, p3.x),
+                       y: c(p0.y, p1.y, p2.y, p3.y))
+    }
 }
 
 // ===========================================================================
