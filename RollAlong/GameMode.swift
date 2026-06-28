@@ -462,23 +462,6 @@ struct DiscoBallMode: GameMode {
     let showsScore                   = true
 }
 
-/// Disco Hardcore — the brutal variant of Disco Ball: a 10×10 floor, a smaller
-/// ball, and the path flashes ONCE before the zone auto-unlocks with a 10-second
-/// countdown to get across.  Same `DiscoBallView`, launched with `hardcore: true`.
-struct DiscoHardMode: GameMode {
-    let id          = "discohard"
-    let displayName = "Disco Hardcore"
-    let tagline     = "One look at the path, then a 10-second dash across the 10×10 floor."
-    let section:     GameModeSection = .solo
-    let control:     ControlScheme   = .tiltAccel
-    let goal:        GoalKind        = .score
-    let onFail:      FailKind        = .endRun
-    let progression: ProgressionKind = .none
-    let lives:       LivesPolicy     = .unlimited
-    let hasHoles                     = false
-    let showsScore                   = true
-}
-
 /// Challenge of the Day — a short (1–3 level), brutally hard daily gauntlet that
 /// rotates every day, deterministically derived from the date so every player
 /// gets the same one.  Reuses the climb's level generator at very high level
@@ -631,7 +614,6 @@ enum GameModeCatalogue {
         (RollOutMode(),      true),    // self-contained RollOutView — live
         (RollUpMode(),       true),    // self-contained RollUpView — live
         (DiscoBallMode(),    true),    // self-contained DiscoBallView — live
-        (DiscoHardMode(),    true),    // DiscoBallView(hardcore: true) — live
         // ── Challenge Tracks ─────────────────────────────────────────────
         // S19: existing-bundle tracks — engine + generator live
         (frozenPeaks,    true),
@@ -733,14 +715,9 @@ struct ModeTutorial {
                          hazard: "Fall off the bottom and the run ends — costing a life.",
                          reward: "Coins for your height, plus a bonus on a new best.")
         case "disco":
-            return .init(controls: "Tilt to roll. Memorize the lit path, then tap to cross.",
+            return .init(controls: "Pick Normal or Hardcore, then tilt to roll. Memorize the lit path before you cross.",
                          goal: "Roll between the safe zones, back and forth, as many times as you can.",
-                         hazard: "Touch a tile that isn't on the lit path and the run is over.",
-                         reward: "Coins for every crossing, plus a bonus on a new best.")
-        case "discohard":
-            return .init(controls: "Tilt to roll. The path flashes ONCE, then the zone auto-unlocks.",
-                         goal: "Cross the 10×10 floor within 10 seconds — back and forth, as many times as you can.",
-                         hazard: "A wrong tile OR the timer running out ends the run.",
+                         hazard: "Touch a tile that isn't on the lit path and the run is over (Hardcore also adds a 10s timer).",
                          reward: "Coins for every crossing, plus a bonus on a new best.")
         default:
             return nil

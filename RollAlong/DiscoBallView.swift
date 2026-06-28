@@ -33,10 +33,10 @@ struct DiscoBallView: View {
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
-    /// Hardcore variant: a bigger 10×10 grid, a smaller ball, and — instead of a
-    /// looping reveal you tap to leave — the path flashes ONCE, then the zone
-    /// auto-unlocks with a 10-second countdown to get across.
-    var hardcore: Bool = false
+    /// Chosen at the start screen each run.  Hardcore: a bigger 10×10 grid, a
+    /// smaller ball, and — instead of a looping reveal you tap to leave — the
+    /// path flashes ONCE, then the zone auto-unlocks with a 10-second countdown.
+    @State private var hardcore = false
 
     // MARK: - Tunables
     private var cols: Int { hardcore ? 10 : 5 }
@@ -61,11 +61,11 @@ struct DiscoBallView: View {
 
     // MARK: - Model
     private struct GridPos: Hashable { let row: Int; let col: Int }
-    private enum Phase { case memorize, crossing, celebrate, failed, gameOver }
+    private enum Phase { case choosing, memorize, crossing, celebrate, failed, gameOver }
 
     // MARK: - State
     @State private var arena: CGSize = .zero
-    @State private var phase: Phase = .memorize
+    @State private var phase: Phase = .choosing
     @State private var atBottom = true             // current safe zone
     @State private var crossings = 0
     @State private var startedEver = false         // controls the intro hint
@@ -115,6 +115,7 @@ struct DiscoBallView: View {
             HomeQuitButton()
             if hardcore && phase == .crossing { countdownHUD }
             if phase == .memorize { memorizeHint }
+            if phase == .choosing { difficultySelect }
             if phase == .gameOver { gameOverOverlay }
         }
         .navigationBarBackButtonHidden(true)
@@ -188,6 +189,8 @@ struct DiscoBallView: View {
 
     private func tileFill(_ pos: GridPos) -> Color {
         switch phase {
+        case .choosing:
+            return Self.tileOff
         case .memorize:
             guard let idx = pathIndex[pos] else { return Self.tileOff }
             let d = revealHead - Double(idx)
@@ -299,6 +302,68 @@ struct DiscoBallView: View {
         .accessibilityHidden(true)
     }
 
+    /// Start-screen difficulty selector — pick Normal or Hardcore before each
+    /// run, mirroring how the competitive games offer a difficulty first.
+    private var difficultySelect: some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+            VStack(spacing: 14) {
+                Text("DISCO BALL")
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .tracking(2)
+                    .foregroundStyle(.white)
+                Text("Memorize the lit path, then roll across.")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.62))
+                VStack(spacing: 10) {
+                    modeChoiceButton(hard: false, icon: "circle.grid.3x3.fill",
+                                     title: "Normal", accent: Self.revealColor,
+                                     subtitle: "5×6 floor · study at your own pace, tap to cross")
+                    modeChoiceButton(hard: true, icon: "bolt.fill",
+                                     title: "Hardcore", accent: Color(red: 1.0, green: 0.4, blue: 0.4),
+                                     subtitle: "10×10 floor · one look, then a 10-second dash")
+                }
+                .padding(.top, 4)
+            }
+            .padding(24)
+            .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.6)))
+            .padding(.horizontal, 24)
+        }
+    }
+
+    private func modeChoiceButton(hard: Bool, icon: String, title: String,
+                                  accent: Color, subtitle: String) -> some View {
+        Button { startWith(hardcore: hard) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(accent)
+                    .frame(width: 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.6))
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color(white: 0.4))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.16))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.5), lineWidth: 1))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title). \(subtitle)")
+    }
+
     private var gameOverOverlay: some View {
         let isBest = crossings > 0 && crossings >= best
         return ZStack {
@@ -366,6 +431,14 @@ struct DiscoBallView: View {
         crossings = 0
         atBottom = true
         startedEver = false
+        touched = []
+        phase = .choosing          // pick Normal / Hardcore before each run
+        spawnBallInSafeZone()
+    }
+
+    /// Start a run at the chosen difficulty (from the start-screen selector).
+    private func startWith(hardcore hard: Bool) {
+        hardcore = hard
         beginMemorize()
     }
 
@@ -436,6 +509,8 @@ struct DiscoBallView: View {
         blinkFrame = clock.tickCount / 6
 
         switch phase {
+        case .choosing:
+            break
         case .memorize:
             revealHead += revealSpeed
             if hardcore {
