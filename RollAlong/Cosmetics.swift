@@ -2487,6 +2487,37 @@ enum RivalCosmetics {
 
 /// A small floating tag above a competitive marble — a bold "YOU" for the
 /// player, the rival's nickname otherwise.  `color` is the racer's identity rim.
+/// The floating bottom-left "home" button used by the solo minigames — the same
+/// affordance the climb / Zen Garden show in BallGameView, so leaving a game is
+/// consistent everywhere.  Always tappable; pops back to the home screen.
+struct HomeQuitButton: View {
+    @EnvironmentObject private var nav: Navigator
+
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Button { nav.goHome() } label: {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(white: 0.38))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(Color(white: 1.0, opacity: 0.85))
+                                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                        )
+                }
+                .accessibilityLabel("Quit to home screen")
+                Spacer()
+            }
+            .padding(.leading, 22)
+            .padding(.bottom, 16)
+        }
+        .allowsHitTesting(true)
+    }
+}
+
 /// Shared pre-game difficulty selector for the competitive minigames.  Each
 /// option shows its coin-payout multiplier so the player sees the reward for
 /// the risk before committing.  Binds straight to the remembered
