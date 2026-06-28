@@ -322,10 +322,10 @@ struct HomeView: View {
                             squareNavButton("bag.fill", "Shop", HomeRoute.shop)
                         }
                         GridRow {
-                            squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
-                            squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
-                            squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
                             squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
+                            squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
+                            squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
+                            squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
                         }
                     }
                     .padding(.horizontal, 30)
