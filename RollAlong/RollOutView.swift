@@ -178,6 +178,7 @@ struct RollOutView: View {
 
             tableBorder.allowsHitTesting(false)
             topBar
+            HomeQuitButton()
             if phase == .ready && !outOfLives { startPrompt }
             if phase == .cleared { clearedOverlay }
             if phase == .fell && !outOfLives { fellOverlay }
@@ -300,15 +301,9 @@ struct RollOutView: View {
     private var topBar: some View {
         VStack {
             HStack {
-                Button { nav.goHome() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(Circle().fill(Color(white: 0.16)))
-                }
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("RollOutCloseButton")
+                // Home is now the floating bottom-left button (HomeQuitButton),
+                // matching the climb / Zen Garden; keep the slot to centre the score.
+                Color.clear.frame(width: 36, height: 36)
                 Spacer()
                 VStack(spacing: 1) {
                     Text("Maze \(mazeIndex + 1)")
