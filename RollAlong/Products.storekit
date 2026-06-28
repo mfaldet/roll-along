@@ -113,13 +113,28 @@
       "internalID": "11000008",
       "localizations": [
         {
-          "description": "3,000 coins — biggest pack.",
+          "description": "3,000 coins — a big haul.",
           "displayName": "3,000 coins",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.coins.3000",
       "referenceName": "3,000 Coins $19.99",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "49.99",
+      "familyShareable": false,
+      "internalID": "11000010",
+      "localizations": [
+        {
+          "description": "10,000 coins — double the coins-per-dollar of the base pack. Best value.",
+          "displayName": "10,000 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.macfaldet.RollAlong.coins.10000",
+      "referenceName": "10,000 Coins $49.99",
       "type": "Consumable"
     },
     {

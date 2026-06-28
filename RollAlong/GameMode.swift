@@ -409,6 +409,41 @@ struct PinballMode: GameMode {
     let showsScore                   = true
 }
 
+/// Roll Out — a true marble maze.  Tilt an extra-small ball through screen-
+/// filling maze walls from the start to the goal without dropping into a hole.
+/// Shares the climb's life economy: each fall costs a real life.  Self-contained
+/// RollOutView; listed under "New ways to play".
+struct RollOutMode: GameMode {
+    let id          = "rollout"
+    let displayName = "Roll Out"
+    let tagline     = "A true marble maze. Reach the goal — don't fall in a hole."
+    let section:     GameModeSection = .solo
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .reachGoal
+    let onFail:      FailKind        = .loseLifeAndRetry
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .consume
+    let hasHoles                     = true
+}
+
+/// Roll Up — a vertical jump-platformer.  Gravity pulls the ball down; tilt to
+/// steer left/right and tap to pop it up onto floating platforms, climbing as
+/// high as possible.  Each run (a fall off the bottom) costs a real life.
+/// Self-contained RollUpView; listed under "New ways to play".
+struct RollUpMode: GameMode {
+    let id          = "rollup"
+    let displayName = "Roll Up"
+    let tagline     = "Tilt to steer, tap to jump. Climb the platforms as high as you can."
+    let section:     GameModeSection = .solo
+    let control:     ControlScheme   = .tiltAccel
+    let goal:        GoalKind        = .score
+    let onFail:      FailKind        = .endRun
+    let progression: ProgressionKind = .none
+    let lives:       LivesPolicy     = .consume
+    let hasHoles                     = false
+    let showsScore                   = true
+}
+
 /// Challenge of the Day — a short (1–3 level), brutally hard daily gauntlet that
 /// rotates every day, deterministically derived from the date so every player
 /// gets the same one.  Reuses the climb's level generator at very high level
@@ -558,6 +593,8 @@ enum GameModeCatalogue {
         (MarbleCupMode(),    true),    // self-contained MarbleCupView — live
         (KingOfTheHillMode(),true),    // self-contained KingOfTheHillView — live
         (PinballMode(),      true),    // self-contained PinballView — live
+        (RollOutMode(),      true),    // self-contained RollOutView — live
+        (RollUpMode(),       true),    // self-contained RollUpView — live
         // ── Challenge Tracks ─────────────────────────────────────────────
         // S19: existing-bundle tracks — engine + generator live
         (frozenPeaks,    true),
@@ -648,6 +685,16 @@ struct ModeTutorial {
                          goal: "Bash the bumpers up top for the highest score.",
                          hazard: "Don't let all three balls drain past the flippers.",
                          reward: "Your final score banks as coins.")
+        case "rollout":
+            return .init(controls: "Tilt to roll the tiny ball through the maze.",
+                         goal: "Reach the flag at the top of each maze.",
+                         hazard: "Fall in a hole and it costs a life.",
+                         reward: "Coins for every maze you clear.")
+        case "rollup":
+            return .init(controls: "Tilt to steer left/right. Tap to jump.",
+                         goal: "Climb the floating platforms as high as you can.",
+                         hazard: "Fall off the bottom and the run ends — costing a life.",
+                         reward: "Coins for your height, plus a bonus on a new best.")
         default:
             return nil
         }

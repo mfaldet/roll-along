@@ -430,6 +430,14 @@ struct HomeView: View {
                     PinballView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("pinball")]) }
                         .firstPlayTutorial("pinball")
+                case .mode("rollout"):
+                    RollOutView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("rollout")]) }
+                        .firstPlayTutorial("rollout")
+                case .mode("rollup"):
+                    RollUpView()
+                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("rollup")]) }
+                        .firstPlayTutorial("rollup")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
                 case .player(let p):    PublicProfileView(player: p)
@@ -1203,6 +1211,8 @@ struct HomeView: View {
         case "paintball": return "60s · most paint wins"
         case "marblecup": return "90s · marble soccer"
         case "koth":      return "60s · hold the hill"
+        case "rollout":   return "Reach the goal · mind the holes"
+        case "rollup":    return "Jump as high as you can"
         default:          return nil
         }
     }

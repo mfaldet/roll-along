@@ -42,6 +42,8 @@
 		D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */; };
 		D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */; };
 		D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF42FD5024E00CA86BD /* PinballView.swift */; };
+		FA0017010000000000000001 /* RollOutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0017010000000000000002 /* RollOutView.swift */; };
+		FA0017010000000000000003 /* RollUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0017010000000000000004 /* RollUpView.swift */; };
 		D569BB9A2FEE4DF6008E91A6 /* Chipmunk in Frameworks */ = {isa = PBXBuildFile; productRef = D569BB992FEE4DF6008E91A6 /* Chipmunk */; };
 		DA11FEED0000000000000001 /* DailyRewardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000002 /* DailyRewardView.swift */; };
 		DA11FEED0000000000000003 /* BallSkinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000004 /* BallSkinView.swift */; };
@@ -117,6 +119,8 @@
 		D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarbleCupView.swift; sourceTree = "<group>"; };
 		D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KingOfTheHillView.swift; sourceTree = "<group>"; };
 		D502FEF42FD5024E00CA86BD /* PinballView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinballView.swift; sourceTree = "<group>"; };
+		FA0017010000000000000002 /* RollOutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollOutView.swift; sourceTree = "<group>"; };
+		FA0017010000000000000004 /* RollUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollUpView.swift; sourceTree = "<group>"; };
 		D569BB962FD5B4AB008E91A6 /* RollAlong.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RollAlong.entitlements; sourceTree = "<group>"; };
 		DA11FEED0000000000000002 /* DailyRewardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRewardView.swift; sourceTree = "<group>"; };
 		DA11FEED0000000000000004 /* BallSkinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BallSkinView.swift; sourceTree = "<group>"; };
@@ -197,6 +201,8 @@
 				D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */,
 				D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */,
 				D502FEF42FD5024E00CA86BD /* PinballView.swift */,
+				FA0017010000000000000002 /* RollOutView.swift */,
+				FA0017010000000000000004 /* RollUpView.swift */,
 				AA000001000000000000AA00 /* RollAlongApp.swift */,
 				AA000002000000000000AA00 /* ContentView.swift */,
 				AA000099000000000000AA00 /* IntroView.swift */,
@@ -415,6 +421,8 @@
 				D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */,
 				D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */,
 				D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */,
+				FA0017010000000000000001 /* RollOutView.swift in Sources */,
+				FA0017010000000000000003 /* RollUpView.swift in Sources */,
 				D502FED52FD5024E00CA86BD /* GameMode.swift in Sources */,
 				QE3A0001000000000000AA01 /* PhysicsHelpers.swift in Sources */,
 				FC000001000000000000FC01 /* GoldRushEngine.swift in Sources */,
