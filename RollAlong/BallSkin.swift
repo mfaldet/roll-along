@@ -119,8 +119,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case trench     = "Trench"
 
     // ── Golden Gauntlet exclusive (pack-exclusive, never coin-purchasable) ─
-    //   • trophy — polished deep gold sphere with a slow-rotating obsidian
-    //     counter-swirl band and a large mirror specular.  Awarded ONLY by
+    //   • trophy — lustrous prize-gold sphere with a raised, mirror-bright
+    //     champion star embossed at its heart, a breathing victory halo, an
+    //     orbiting specular, and twinkling gold glints.  Awarded ONLY by
     //     completing the Golden Gauntlet challenge track; hidden from the
     //     shop grid.
     case trophy     = "Trophy"
@@ -700,14 +701,14 @@ enum BallSkin: String, CaseIterable, Identifiable {
             ]
 
         case .trophy:
-            // Polished prestige gold with obsidian swirl — mirror highlight
-            // → rich gold → dark bronze → near-black obsidian shadow.
-            // Animated swirl rendered by trophyCanvas in BallSkinView.
+            // Polished prize gold — bright crown highlight → rich gold → bronze
+            // → deep bronze rim.  Static fallback; the champion star, halo,
+            // orbiting specular and glints are rendered by trophyCanvas.
             return [
-                Color(red: 1.00, green: 0.95, blue: 0.62),
-                Color(red: 0.94, green: 0.72, blue: 0.18),
-                Color(red: 0.60, green: 0.42, blue: 0.06),
-                Color(red: 0.12, green: 0.08, blue: 0.02),
+                Color(red: 1.00, green: 0.97, blue: 0.72),
+                Color(red: 0.99, green: 0.81, blue: 0.28),
+                Color(red: 0.66, green: 0.45, blue: 0.08),
+                Color(red: 0.16, green: 0.10, blue: 0.01),
             ]
 
         // ── Starter Pack exclusive ──
