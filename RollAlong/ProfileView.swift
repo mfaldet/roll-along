@@ -639,6 +639,7 @@ struct PlayerRanksCard: View {
     let playerId: UUID?
 
     @State private var ranks:   [String: Int] = [:]   // board.rawValue → rank
+    @State private var diffRanks: [String: Int] = [:] // "game|difficulty" → rank
     @State private var loading = false
     @State private var loaded  = false
 
@@ -679,32 +680,59 @@ struct PlayerRanksCard: View {
     private func rankRow(_ board: LeaderboardBoard) -> some View {
         let played = board.hasPlayed(profile)
         let rank   = ranks[board.rawValue]
-        return HStack(spacing: 12) {
-            Image(systemName: Self.icon(board))
-                .font(.system(size: 15))
-                .foregroundStyle(played ? Self.tint(board) : Color(white: 0.30))
-                .frame(width: 24)
+        let diffs  = perDifficultyRanks(board)
+        return VStack(spacing: 6) {
+            HStack(spacing: 12) {
+                Image(systemName: Self.icon(board))
+                    .font(.system(size: 15))
+                    .foregroundStyle(played ? Self.tint(board) : Color(white: 0.30))
+                    .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(board.title)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(played ? .white : Color(white: 0.45))
-                Text(played ? board.statText(profile) : "Not played yet")
-                    .font(.system(size: 11, design: .rounded))
-                    .foregroundStyle(Color(white: 0.5))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(board.title)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(played ? .white : Color(white: 0.45))
+                    Text(played ? board.statText(profile) : "Not played yet")
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(Color(white: 0.5))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+
+                Spacer(minLength: 8)
+
+                rankChip(rank: rank, played: played)
             }
 
-            Spacer(minLength: 8)
-
-            rankChip(rank: rank, played: played)
+            // Per-difficulty ranks (competitive boards), where the player is ranked.
+            if !diffs.isEmpty {
+                HStack(spacing: 10) {
+                    ForEach(diffs, id: \.label) { d in
+                        Text("\(d.label) #\(d.rank)")
+                            .font(.system(size: 10, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(d.rank <= 3
+                                             ? Color(red: 1.0, green: 0.81, blue: 0.30)
+                                             : Color(white: 0.55))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, 36)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 10).fill(Color(white: 0.125))
         )
+    }
+
+    /// Per-difficulty ranks (Easy/Normal/Hard) for a competitive board, in order,
+    /// only where the player is actually ranked.
+    private func perDifficultyRanks(_ board: LeaderboardBoard) -> [(label: String, rank: Int)] {
+        guard let mode = board.competitiveModeID else { return [] }
+        return [("easy", "Easy"), ("normal", "Normal"), ("hard", "Hard")].compactMap { (key, label) in
+            diffRanks["\(mode)|\(key)"].map { (label: label, rank: $0) }
+        }
     }
 
     @ViewBuilder
@@ -735,7 +763,10 @@ struct PlayerRanksCard: View {
         guard !loaded, canRank, let id = playerId else { return }
         loaded = true
         loading = true; defer { loading = false }
-        ranks = await SocialClient.shared.fetchAllRanks(for: id)
+        async let overall = SocialClient.shared.fetchAllRanks(for: id)
+        async let perDiff = SocialClient.shared.fetchMinigameDifficultyRanks(for: id)
+        ranks = await overall
+        diffRanks = await perDiff
     }
 
     // Per-board icon + tint (the data model stays UI-free).
