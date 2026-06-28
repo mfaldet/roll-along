@@ -392,9 +392,15 @@ struct CosmeticShopView: View {
         case .goal:
             categoryGrid(items: GoalSkin.allCases)
         case .trail:
-            categoryGrid(items: TrailColor.allCases)
+            // Bundle-exclusive trails (Money Roll) hidden unless owned — same
+            // rule as the Ball grid.
+            categoryGrid(items: TrailColor.allCases.filter {
+                !$0.isBundleExclusive || gameState.isOwned($0)
+            })
         case .floor:
-            categoryGrid(items: Floor.allCases)
+            categoryGrid(items: Floor.allCases.filter {
+                !$0.isBundleExclusive || gameState.isOwned($0)
+            })
         case .pit:
             categoryGrid(items: Pit.allCases)
         case .boundary:

@@ -108,6 +108,9 @@ final class StoreKitManager: ObservableObject {
         let lives: Int
         let coins: Int
         let unlimitedActivated: Bool
+        /// Display name of a secret cosmetic dropped alongside this purchase
+        /// (the 10,000-coin pack's random "Money" unlock), or nil.
+        var grantedCosmeticName: String? = nil
     }
 
     // MARK: - Transaction listener
@@ -290,6 +293,7 @@ final class StoreKitManager: ObservableObject {
 
     private func deliverReward(for productID: ProductID) async {
         guard let gameState else { return }
+        var grantedCosmetic: String? = nil
         switch productID.category {
         case .lifePack:
             // Lives from purchases stockpile unbounded.  $9.99 = 78 lives
@@ -303,6 +307,11 @@ final class StoreKitManager: ObservableObject {
 
         case .coinPack:
             gameState.addCoins(productID.rewardCoins)
+            // The 10,000-coin pack also drops ONE random not-yet-owned "Money"
+            // cosmetic — up to three unlock across repeat purchases.
+            if productID == .coins10000 {
+                grantedCosmetic = grantRandomMoneyCosmetic(gameState)
+            }
 
         case .unlimitedUnlock:
             gameState.unlimitedLives = true
@@ -316,12 +325,27 @@ final class StoreKitManager: ObservableObject {
             gameState.starterPackClaimed = true
         }
         lastDelivery = DeliveryReceipt(
-            productID:          productID,
-            lives:              productID.rewardLives,
-            coins:              productID.rewardCoins,
-            unlimitedActivated: productID.category == .unlimitedUnlock
+            productID:           productID,
+            lives:               productID.rewardLives,
+            coins:               productID.rewardCoins,
+            unlimitedActivated:  productID.category == .unlimitedUnlock,
+            grantedCosmeticName: grantedCosmetic
         )
         deliveryCount += 1
+    }
+
+    /// Grant ONE random "Money" cosmetic the player doesn't yet own — the ball,
+    /// trail, or floor.  Returns its display name (for the celebration) or nil if
+    /// all three are already owned.  Deliberately one-at-a-time so the trio
+    /// unlocks across repeat 10,000-coin purchases rather than all at once.
+    private func grantRandomMoneyCosmetic(_ gs: GameState) -> String? {
+        var pool: [(name: String, grant: () -> Void)] = []
+        if !gs.isOwned(BallSkin.moneyBall)   { pool.append(("Money Ball", { gs.grant(BallSkin.moneyBall) })) }
+        if !gs.isOwned(TrailColor.moneyRoll) { pool.append(("Money Roll", { gs.grant(TrailColor.moneyRoll) })) }
+        if !gs.isOwned(Floor.moneyFull)      { pool.append(("Money Full", { gs.grant(Floor.moneyFull) })) }
+        guard let pick = pool.randomElement() else { return nil }
+        pick.grant()
+        return pick.name
     }
 
     // MARK: - Background transaction listener

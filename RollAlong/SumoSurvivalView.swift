@@ -48,8 +48,8 @@ struct SumoSurvivalView: View {
     private let shrinkFrac:    CGFloat = 0.42     // ring closes to 58% of full…
     private let shrinkOverTicks     = 35 * 60     // …across ~35s, so rounds resolve
     private let edgePull       = 0.55             // AI retreats from the rim past this × radius (self-preserving)
-    private let aiJitter:     CGFloat = 0.16      // radians of aim wobble (imperfect AI)
-    private let aiHesitationChance  = 0.10        // chance per tick a rival eases off
+    // Aim wobble + ease-off are now difficulty-scaled (MinigameDifficulty
+    // aiAimError / aiHesitationChance) so Easy/Normal rivals feel beatable.
     private let aiStrength:   CGFloat = 0.45      // AI's duel "push" (< a firm player tilt of ~0.8–1.0)
     private let pushGain:     CGFloat = 2.4       // how much drive-into-contact adds to collision mass
 
@@ -656,7 +656,7 @@ struct SumoSurvivalView: View {
                 bumpers[i].vel.dy += g.dy * playerAccel * dt
                 bumpers[i].drive = clampedDrive(g)
             } else {
-                let r = aiSteer(for: bumpers[i])
+                let r = aiSteer(for: bumpers[i], seed: i)
                 bumpers[i].vel.dx += r.steer.dx * dt
                 bumpers[i].vel.dy += r.steer.dy * dt
                 bumpers[i].drive = r.drive
@@ -706,7 +706,7 @@ struct SumoSurvivalView: View {
     /// Gentle, self-preserving AI: chase the nearest marble with wobbly aim,
     /// retreat from the rim early, and occasionally ease off.  Returns the
     /// acceleration to apply and the duel drive (unit dir × aiStrength).
-    private func aiSteer(for b: Bumper) -> (steer: CGVector, drive: CGVector) {
+    private func aiSteer(for b: Bumper, seed: Int) -> (steer: CGVector, drive: CGVector) {
         var target: CGPoint?
         var best = CGFloat.greatestFiniteMagnitude
         for o in bumpers where o.id != b.id {
@@ -716,9 +716,9 @@ struct SumoSurvivalView: View {
         var dir = CGVector(dx: 0, dy: 0)
         if let t = target { dir = unitVec(dx: t.x - b.pos.x, dy: t.y - b.pos.y) }
 
-        // Imperfect aim — wobble the heading a little.
-        let wob = CGFloat.random(in: -aiJitter...aiJitter)
-        dir = rotate(dir, by: wob)
+        // Imperfect aim — a slow organic weave, wider on lower difficulties.
+        dir = rotate(dir, by: MinigameAI.weaveAngle(seed: seed, tick: localTick,
+                                                    difficulty: gameState.minigameDifficulty))
 
         // Self-preservation: bias hard toward center when near the rim.
         let fromC = CGVector(dx: b.pos.x - center.x, dy: b.pos.y - center.y)
@@ -730,7 +730,7 @@ struct SumoSurvivalView: View {
         }
 
         // Occasionally hesitate (ease off) so they don't laser-charge.
-        let strength: CGFloat = (Double.random(in: 0..<1) < aiHesitationChance) ? 0.25 : 1.0
+        let strength: CGFloat = (Double.random(in: 0..<1) < gameState.minigameDifficulty.aiHesitationChance) ? 0.25 : 1.0
         return (CGVector(dx: dir.dx * aiAccel * strength, dy: dir.dy * aiAccel * strength),
                 CGVector(dx: dir.dx * aiStrength * strength, dy: dir.dy * aiStrength * strength))
     }

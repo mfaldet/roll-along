@@ -35,9 +35,9 @@ struct RollUpView: View {
     private let ballRadius:   CGFloat = 18      // matches Roll Along's ball (BallGameView.ballRadius)
     private let gravity:      CGFloat = 2_200     // px/s² downward
     private let jumpSpeed:    CGFloat = 980       // px/s upward on a jump
-    private let moveAccel:    CGFloat = 3_450     // tilt → horizontal accel (3× more sensitive)
+    private let moveAccel:    CGFloat = 6_900     // tilt → horizontal accel (2× the previous sensitivity)
     private let airFriction:  CGFloat = 0.90
-    private let maxVx:        CGFloat = 540
+    private let maxVx:        CGFloat = 1_080      // raised with moveAccel so terminal steering speed actually doubles (cap doesn't clip)
     private let maxFall:      CGFloat = 1_500
     private let cameraTargetFrac: CGFloat = 0.46  // keep the ball ~46% down the screen
     private let pixelsPerMeter:  CGFloat = 12      // height → "m" score

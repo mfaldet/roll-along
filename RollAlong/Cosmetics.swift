@@ -43,7 +43,7 @@ extension BallSkin {
     /// diamond), or seasonal-event drops — so the coin-liquidation reset keeps them.
     static let coinExclusiveBalls: Set<BallSkin> =
         [.trophy, .aurora, .beachBall, .pumpkin, .ornament, .heartstone,
-         .shamrock, .confetti, .speckledEgg, .diamond]
+         .shamrock, .confetti, .speckledEgg, .diamond, .moneyBall]
     var isCoinPurchasable: Bool { tier != .starter && !Self.coinExclusiveBalls.contains(self) }
 }
 
@@ -166,7 +166,8 @@ extension BallSkin: CosmeticItem {
              .shamrock,        // stpatricks-2027-exclusive; never coin-purchasable
              .confetti,        // newyear-2027-exclusive; never coin-purchasable
              .speckledEgg,     // spring-2027-exclusive; never coin-purchasable
-             .diamond:         // Diamond Balls IAP-exclusive; never coin-purchasable
+             .diamond,         // Diamond Balls IAP-exclusive; never coin-purchasable
+             .moneyBall:       // 10,000-coin IAP secret exclusive; never coin-purchasable
             return .exclusive  // 500 coins (Legendary) — animated / special / planets
         }
     }
@@ -631,12 +632,14 @@ enum TrailColor: String, CosmeticItem {
     case snake          // grows longer every coin you pick up
     case air            // pillowy jet-stream (Golf bundle)
     case raybeam        // glowing laser streak (Space Travel bundle)
+    case moneyRoll      // ★ 10,000-coin IAP secret — green trail + fluttering bills
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .none:        return "Off"
         case .graphite:    return "Graphite"
+        case .moneyRoll:   return "Money Roll"
         case .ink:         return "Ink"
         case .fire:        return "Fire"
         case .ice:         return "Ice"
@@ -675,10 +678,17 @@ enum TrailColor: String, CosmeticItem {
             return .standard   //  50 coins — solid mono colour
         case .snake, .raybeam, .gilded, .graphite, .roseTrail:
             return .rare       // 100 coins — distinctive textured trails
-        case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air:
+        case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air,
+             .moneyRoll:       // 10,000-coin IAP secret — Legendary, never coin-bought
             return .exclusive  // 500 coins — animated / special-effect
         }
     }
+
+    /// Hidden from the shop/catalog grid (shown only once owned) and never
+    /// surfaced as a coin purchase — the Money Roll trail is granted ONLY by the
+    /// $49.99 / 10,000-coin pack, mirroring the Diamond ball.
+    var isBundleExclusive: Bool { self == .moneyRoll }
+    var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
 
     /// SwiftUI Color used when rendering this trail.  `.none` returns
     /// clear; `.rainbow` returns a placeholder colour (the actual
@@ -703,6 +713,7 @@ enum TrailColor: String, CosmeticItem {
         case .snake:       return Color(red: 0.20, green: 0.65, blue: 0.22).opacity(0.92)
         case .air:         return Color.white.opacity(0.65)   // additional decay in trail renderer
         case .raybeam:     return Color(red: 0.20, green: 1.00, blue: 0.70).opacity(0.95)  // glow added in renderer
+        case .moneyRoll:   return Color(red: 0.20, green: 0.62, blue: 0.34).opacity(0.85)  // money green; bills in renderer
         }
     }
 }
@@ -751,10 +762,14 @@ enum Floor: String, CosmeticItem {
     case gridCity         // Neon City bundle — synthwave neon perspective grid
     case brass            // Clockwork bundle — riveted brass/bronze plating
 
+    // 10,000-coin IAP secret — overlapping stack of $100 bills
+    case moneyFull
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .classic:    return "Classic"
+        case .moneyFull:  return "Money Full"
         case .inverted:   return "Inverted"
         case .twilight:   return "Twilight"
         case .ember:      return "Ember"
@@ -798,7 +813,8 @@ enum Floor: String, CosmeticItem {
              .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
             return .standard   //  50 coins
-        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass:
+        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass,
+             .moneyFull:       // 10,000-coin IAP secret — Legendary, never coin-bought
             return .exclusive  // 500 coins — animated / textured overlay
         }
     }
@@ -837,8 +853,15 @@ enum Floor: String, CosmeticItem {
         case .felt:       return Color(red: 0.18,  green: 0.48,  blue: 0.24 )  // pool-table green
         case .gridCity:   return Color(red: 0.03,  green: 0.02,  blue: 0.08 )  // near-black; neon grid paints over
         case .brass:      return Color(red: 0.52,  green: 0.37,  blue: 0.16 )  // warm bronze; plating paints over
+        case .moneyFull:  return Color(red: 0.74,  green: 0.83,  blue: 0.72 )  // pale bill-green; $100s paint over
         }
     }
+
+    /// Hidden from the shop/catalog grid (shown only once owned) and never a coin
+    /// purchase — the Money Full floor is granted ONLY by the $49.99 /
+    /// 10,000-coin pack, mirroring the Diamond ball.
+    var isBundleExclusive: Bool { self == .moneyFull }
+    var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
 
     /// Whether this floor has the Paper-world graphite-trail mechanic.
     var paperTrailEnabled: Bool {
@@ -853,7 +876,7 @@ enum Floor: String, CosmeticItem {
     /// tufts, etc.).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass: return true
+        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass, .moneyFull: return true
         default: return false
         }
     }
@@ -1275,14 +1298,16 @@ enum ShopRotation {
         BallSkin.allCases.filter { !$0.isBundleExclusive && $0.tier != .starter }
     }
     static var trailPool: [TrailColor] {
-        // Exclude the free default (graphite) and the bundle-only trails.
-        TrailColor.allCases.filter { $0.tier != .starter && $0 != .graphite && $0 != .air && $0 != .raybeam }
+        // Exclude the free default (graphite), the bundle-only trails, and the
+        // IAP-secret Money Roll.
+        TrailColor.allCases.filter { $0.tier != .starter && !$0.isBundleExclusive
+            && $0 != .graphite && $0 != .air && $0 != .raybeam }
     }
     static var goalPool: [GoalSkin] {
         GoalSkin.allCases.filter { $0.tier != .starter }
     }
     static var floorPool: [Floor] {
-        Floor.allCases.filter { $0.tier != .starter }
+        Floor.allCases.filter { $0.tier != .starter && !$0.isBundleExclusive }
     }
     static var pitPool: [Pit] {
         Pit.allCases.filter { $0.tier != .starter }
@@ -2717,6 +2742,7 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth)
     case .graphite:        trailGraphite(ctx, pts, n, baseWidth)
     case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth, times)
+    case .moneyRoll:       trailMoney(ctx, pts, n, t, baseWidth, times)
     default:
         trailTapered(ctx, pts, n, baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded || trail == .ember)
@@ -3028,6 +3054,81 @@ private func drawPetal(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ rot
     petal.addQuadCurve(to: rp(0, -s), control: rp(-s * 0.9, 0))
     petal.closeSubpath()
     ctx.fill(petal, with: .color(color))
+}
+
+/// Money Roll — a money-green streak that sheds little dollar bills.  Each bill
+/// is pinned to the spot it was laid: it pops in, then flutters (sways + tumbles)
+/// and floats up a touch IN PLACE while it fades, then vanishes.  Whether a spot
+/// sheds a bill is a stable function of position, so the scatter doesn't flicker
+/// as the FIFO buffer shifts indices underneath it.
+private func trailMoney(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
+                        _ times: [Double]?) {
+    let lifetime = 1.2
+    let green = Color(red: 0.16, green: 0.55, blue: 0.30)
+
+    // Faint green streak connecting recent points, fading as it ages.
+    for i in 1..<n {
+        let age = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let env = max(0, 1 - age / lifetime)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        ctx.stroke(p, with: .color(green.opacity(0.34 * env)),
+                   style: StrokeStyle(lineWidth: baseWidth * 0.55, lineCap: .round, lineJoin: .round))
+    }
+
+    // Bills shed along the path.
+    for i in 0..<n {
+        let p = pts[i]
+        let seed = trailSeed(p)
+        let r1 = seed.truncatingRemainder(dividingBy: 1.0)
+        guard r1 < 0.40 else { continue }                    // stable thinning of shed spots
+        let age = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let life = age / lifetime
+        let rise = min(1.0, age / 0.05)                      // pop in when shed
+        let fade = life < 0.6 ? 1.0 : 1.0 - (life - 0.6) / 0.4
+        let env  = rise * max(0, fade)
+        guard env > 0.02 else { continue }
+
+        let r2   = (seed * 2.13).truncatingRemainder(dividingBy: 1.0)
+        let r3   = (seed * 5.70).truncatingRemainder(dividingBy: 1.0)
+        let side = r2 < 0.5 ? CGFloat(-1) : CGFloat(1)
+        let scatter = baseWidth * (0.2 + 0.7 * CGFloat(r2))
+        let sway = CGFloat(sin(t * 3.0 + seed * 6.283)) * baseWidth * 0.5 * CGFloat(1 - life * 0.4)
+        let lift = -CGFloat(life) * baseWidth * 0.6          // float upward as it fades
+        let cx = p.x + side * scatter + sway
+        let cy = p.y + lift
+        let sz = baseWidth * CGFloat(0.55 + 0.30 * r3)
+        let rot = seed * 6.283 + t * (1.4 + r3) + Double(side) * Double(life) * 2.0   // tumble in place
+        drawBill(ctx, CGPoint(x: cx, y: cy), sz, rot, env)
+    }
+}
+
+/// One little fluttering dollar bill — a green rounded card with a faint
+/// "portrait" oval and corner pips, rotated by `rot`.
+private func drawBill(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ rot: Double, _ env: Double) {
+    var ctx = ctx
+    ctx.translateBy(x: c.x, y: c.y)
+    ctx.rotate(by: .radians(rot))
+    let w = s * 2.0, h = s * 1.1
+    let rect = CGRect(x: -w / 2, y: -h / 2, width: w, height: h)
+    let paper = Color(red: 0.40, green: 0.66, blue: 0.44)
+    let ink   = Color(red: 0.10, green: 0.34, blue: 0.20)
+    let bill  = Path(roundedRect: rect, cornerRadius: s * 0.12)
+    ctx.fill(bill, with: .color(paper.opacity(0.92 * env)))
+    ctx.stroke(bill, with: .color(ink.opacity(0.55 * env)), lineWidth: max(0.4, s * 0.07))
+    let ow = w * 0.34, oh = h * 0.6
+    ctx.stroke(Path(ellipseIn: CGRect(x: -ow / 2, y: -oh / 2, width: ow, height: oh)),
+               with: .color(ink.opacity(0.5 * env)), lineWidth: max(0.3, s * 0.05))
+    let pr = s * 0.12
+    for sx in [CGFloat(-1), 1] {
+        for sy in [CGFloat(-1), 1] {
+            ctx.fill(Path(ellipseIn: CGRect(x: sx * (w / 2 - pr * 1.6) - pr,
+                                            y: sy * (h / 2 - pr * 1.6) - pr,
+                                            width: pr * 2, height: pr * 2)),
+                     with: .color(ink.opacity(0.5 * env)))
+        }
+    }
 }
 
 /// Fire — flickering little flames left along the trail.

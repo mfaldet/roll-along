@@ -701,14 +701,14 @@ struct BuyCoinsSheet: View {
     }
 
     /// Hoard art for a coin pack — escalates with pack size:
-    /// a few coins → a money bag → a treasure chest (gems on the big one) →
-    /// a jewel-stuffed vault for the top pack.
+    /// a few coins → a pile of coins → a money bag → a gem-stuffed treasure
+    /// chest → a jewel-stuffed vault for the top pack.
     @ViewBuilder
     private func coinPackIcon(for pid: StoreKitManager.ProductID) -> some View {
         switch pid {
         case .coins100:   FewCoinsIcon()
-        case .coins600:   CoinBagIcon()
-        case .coins1300:  TreasureChestIcon(gems: false)
+        case .coins600:   CoinPileIcon()
+        case .coins1300:  CoinBagIcon()
         case .coins3000:  TreasureChestIcon(gems: true)
         case .coins10000: VaultIcon()
         default:          FewCoinsIcon()
@@ -949,6 +949,26 @@ private struct FewCoinsIcon: View {
             CoinIcon(size: 17).offset(x: -7, y: 7)
             CoinIcon(size: 17).offset(x:  6, y: 8)
             CoinIcon(size: 20).offset(x: -1, y: -3)
+        }
+    }
+}
+
+/// Second tier — a heaped pile of many coins (apex peeking, front row nearest).
+private struct CoinPileIcon: View {
+    var body: some View {
+        ZStack {
+            // Apex — peeks over the top, drawn first so the heap stacks in front.
+            CoinIcon(size: 16).offset(x: -4, y: -6)
+            CoinIcon(size: 16).offset(x:  4, y: -7)
+            // Middle row.
+            CoinIcon(size: 16).offset(x: -8.5, y: 2)
+            CoinIcon(size: 17).offset(x:  0,   y: 1)
+            CoinIcon(size: 16).offset(x:  8.5, y: 2)
+            // Bottom-front row — nearest, on top.
+            CoinIcon(size: 16).offset(x: -13,  y: 11)
+            CoinIcon(size: 17).offset(x: -4.5, y: 12)
+            CoinIcon(size: 17).offset(x:  4.5, y: 12)
+            CoinIcon(size: 16).offset(x:  13,  y: 11)
         }
     }
 }
@@ -1286,8 +1306,11 @@ private struct PurchaseCelebrationOverlay: View {
             } else { return }
         case .coins:
             guard r.coins > 0 else { return }
+            // The 10,000-coin pack may also drop a secret "Money" cosmetic —
+            // announce it in place of the usual subtitle.
+            let sub = r.grantedCosmeticName.map { "🎉 Unlocked \($0)!" } ?? "Added to your balance"
             content = BadgeContent(title: "+\(r.coins.formatted(.number)) coins",
-                                   subtitle: "Added to your balance", kind: .coins)
+                                   subtitle: sub, kind: .coins)
         }
 
         // Fanfare + haptic, gated by the player's toggles.

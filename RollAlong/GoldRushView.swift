@@ -537,6 +537,7 @@ struct GoldRushView: View {
         let difficulty = gameState.minigameDifficulty
         engine.aiAccelScale = difficulty.aiAccelScale
         engine.aiSpeedScale = difficulty.aiSpeedScale
+        engine.difficulty   = difficulty
         let wasOver = engine.isOver
         engine.tick()
         syncFromEngine()

@@ -213,6 +213,9 @@ struct BallSkinView: View {
         case .diamond:
             diamondCanvas.clipShape(Circle()).overlay(planetRim)
 
+        case .moneyBall:
+            moneyBallCanvas.clipShape(Circle()).overlay(planetRim)
+
         // ── Premium bundle skins ────────────────────────────────────────
         case .highRoller:
             highRollerCanvas
@@ -1938,6 +1941,69 @@ struct BallSkinView: View {
         }
         star.closeSubpath()
         ctx.fill(star, with: .color(.white.opacity(min(1.0, 0.95 * opacity))))
+    }
+
+    // =========================================================================
+    // MARK: - Money Ball  (10,000-coin IAP secret · Legendary)
+    // A rolled-up wad of dollar bills: a money-green body with the rolled paper
+    // edges reading as stacked striations, a gold currency band strapped around
+    // the middle with a "$", and a crisp specular.  Static.  Clipped to a circle
+    // by the body switch caller.
+    // =========================================================================
+    private var moneyBallCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+
+            // 1. Money-green body.
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: [
+                    Color(red: 0.80, green: 0.91, blue: 0.76),
+                    Color(red: 0.44, green: 0.68, blue: 0.46),
+                    Color(red: 0.18, green: 0.44, blue: 0.27),
+                    Color(red: 0.07, green: 0.21, blue: 0.14)]),
+                center: CGPoint(x: cx - r * 0.28, y: cy - r * 0.30), startRadius: 0, endRadius: r * 1.25))
+
+            // 2. Rolled-bill striations — the stacked paper edges of the roll.
+            //    Each edge is a faintly-bowed line with a thin highlight above it.
+            let edge   = Color(red: 0.09, green: 0.29, blue: 0.18).opacity(0.50)
+            let hilite = Color(red: 0.88, green: 0.96, blue: 0.84).opacity(0.32)
+            let lines  = 9
+            for i in 0..<lines {
+                let frac = CGFloat(i) / CGFloat(lines - 1)        // 0…1
+                let y = cy - r * 0.80 + frac * r * 1.60
+                var p = Path()
+                p.move(to: CGPoint(x: cx - r, y: y))
+                p.addQuadCurve(to: CGPoint(x: cx + r, y: y), control: CGPoint(x: cx, y: y + r * 0.05))
+                ctx.stroke(p, with: .color(edge), lineWidth: max(0.6, r * 0.028))
+                var p2 = Path()
+                p2.move(to: CGPoint(x: cx - r, y: y - r * 0.03))
+                p2.addQuadCurve(to: CGPoint(x: cx + r, y: y - r * 0.03), control: CGPoint(x: cx, y: y - r * 0.03 + r * 0.05))
+                ctx.stroke(p2, with: .color(hilite), lineWidth: max(0.4, r * 0.014))
+            }
+
+            // 3. Gold currency band (the strap) wrapping the roll vertically.
+            let bandW = r * 0.52
+            let band  = CGRect(x: cx - bandW / 2, y: cy - r, width: bandW, height: r * 2)
+            ctx.fill(Path(band), with: .linearGradient(
+                Gradient(colors: [Color(red: 0.96, green: 0.84, blue: 0.40),
+                                  Color(red: 0.82, green: 0.64, blue: 0.22),
+                                  Color(red: 0.66, green: 0.48, blue: 0.14)]),
+                startPoint: CGPoint(x: band.minX, y: 0), endPoint: CGPoint(x: band.maxX, y: 0)))
+            ctx.stroke(Path(band), with: .color(.black.opacity(0.22)), lineWidth: max(0.5, r * 0.02))
+
+            // 4. "$" stamped on the band.
+            let dollar = ctx.resolve(
+                Text("$").font(.system(size: r * 0.66, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color(red: 0.16, green: 0.40, blue: 0.25)))
+            ctx.draw(dollar, at: CGPoint(x: cx, y: cy), anchor: .center)
+
+            // 5. Crisp top-left specular.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.74, width: r * 0.46, height: r * 0.28)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.60), startRadius: 0, endRadius: r * 0.5))
+        }
     }
 
     // =========================================================================

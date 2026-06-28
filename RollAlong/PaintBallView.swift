@@ -685,7 +685,9 @@ struct PaintBallView: View {
             p.retargetAt = localTick + retargetTicks
         }
         let dt: CGFloat = 1.0 / 60.0
-        let s = unit(dx: p.target.x - p.pos.x, dy: p.target.y - p.pos.y, scale: aiAccel)
+        let s = MinigameAI.humanizedSteer(dx: p.target.x - p.pos.x, dy: p.target.y - p.pos.y,
+                                          scale: aiAccel, seed: p.colorIndex, tick: localTick,
+                                          difficulty: gameState.minigameDifficulty)
         p.vel.dx += s.dx * dt
         p.vel.dy += s.dy * dt
     }

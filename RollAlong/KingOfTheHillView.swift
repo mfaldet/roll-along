@@ -518,8 +518,11 @@ struct KingOfTheHillView: View {
                 racers[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
                 racers[i].vel.dy += CGFloat(motion.gravity.y) * playerAccel * dt
             } else {
-                let s = unit(dx: zoneCenter.x - racers[i].pos.x,
-                             dy: zoneCenter.y - racers[i].pos.y, scale: aiAccel)
+                let s = MinigameAI.humanizedSteer(
+                    dx: zoneCenter.x - racers[i].pos.x,
+                    dy: zoneCenter.y - racers[i].pos.y, scale: aiAccel,
+                    seed: racers[i].colorIndex, tick: localTick,
+                    difficulty: gameState.minigameDifficulty)
                 racers[i].vel.dx += s.dx * dt
                 racers[i].vel.dy += s.dy * dt
             }
