@@ -186,6 +186,20 @@ struct GameMenuView: View {
         let settled = done || failed   // no replays once the day is decided
         let green   = Color(red: 0.30, green: 0.92, blue: 0.50)
 
+        // Card fill: cleared → emerald success (matches the green check + border),
+        // failed → muted grey, fresh → the orange challenge gradient.
+        let fillColors: [Color] =
+            done   ? [Color(red: 0.11, green: 0.50, blue: 0.31),
+                      Color(red: 0.17, green: 0.66, blue: 0.40)]
+          : failed ? [Color(white: 0.22), Color(white: 0.14)]
+          :          [Color(red: 0.96, green: 0.34, blue: 0.24),
+                      Color(red: 0.99, green: 0.63, blue: 0.20)]
+        // Matching glow: green when cleared, orange when fresh, none when failed.
+        let glow: Color =
+            done   ? green.opacity(0.35)
+          : failed ? .clear
+          :          Color(red: 0.96, green: 0.4, blue: 0.2).opacity(0.35)
+
         return NavigationLink(value: HomeRoute.mode("daily")) {
             HStack(spacing: 14) {
                 // Leading mark: a GREEN check when cleared, otherwise the bolt
@@ -218,7 +232,9 @@ struct GameMenuView: View {
                         Text("+\(ch.rewardCoins)")
                             .font(.system(size: 17, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
-                        CoinIcon(size: 18)
+                        // Sized to the cap height of the "+30" text so the coin
+                        // reads as the same height as the lettering.
+                        CoinIcon(size: 14)
                     }
                 } else if !failed {
                     Image(systemName: "play.fill")
@@ -232,20 +248,16 @@ struct GameMenuView: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 18)
-                    .fill(LinearGradient(
-                        colors: settled
-                            ? [Color(white: 0.22), Color(white: 0.14)]
-                            : [Color(red: 0.96, green: 0.34, blue: 0.24),
-                               Color(red: 0.99, green: 0.63, blue: 0.20)],
-                        startPoint: .leading, endPoint: .trailing))
+                    .fill(LinearGradient(colors: fillColors,
+                                         startPoint: .leading, endPoint: .trailing))
             )
             // Green border ONLY when cleared.  Failed/fresh have no border.
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(green, lineWidth: done ? 2.5 : 0)
             )
-            .shadow(color: Color(red: 0.96, green: 0.4, blue: 0.2).opacity(settled ? 0 : 0.35), radius: 8, y: 4)
-            // Fully greyed when the day was failed.
+            .shadow(color: glow, radius: 8, y: 4)
+            // Dimmed only when the day was failed; a cleared day stays vibrant.
             .opacity(failed ? 0.55 : 1)
         }
         .buttonStyle(.plain)

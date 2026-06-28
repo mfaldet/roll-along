@@ -37,10 +37,16 @@ struct KingOfTheHillView: View {
     private let friction:     CGFloat = 0.990
     private let maxSpeed:     CGFloat = 660
     private let wallBounce:   CGFloat = 0.70
-    private let restitution:  CGFloat = 0.86
+    private let restitution:  CGFloat = 0.86   // used for marble↔pillar bounces
+    /// Ball-to-ball knockback: a struck marble flies off at this multiple of the
+    /// impact (closing) speed…
+    private let knockbackGain: CGFloat = 2.0
+    /// …and never separates slower than this, so AI marbles can't jam up and
+    /// stalemate on the now single-marble hill.
+    private let minKnockSpeed: CGFloat = 200
     private let rivalCount         = 3
     private let roundSeconds       = 60
-    private let zoneRadius:   CGFloat = 66
+    private let zoneRadius:   CGFloat = 28      // tight — fits a single marble at a time
     private let zoneDriftSpeed: CGFloat = 42       // points per second the hill wanders
     private let zoneRepickDist: CGFloat = 14       // re-aim when this close to its target
     private let coinsPerHoldSec    = 2
@@ -593,15 +599,23 @@ struct KingOfTheHillView: View {
                 let dist = hypot(dx, dy)
                 guard dist > 0, dist < minDist else { continue }
                 let nx = dx / dist, ny = dy / dist
+                // Separate the overlap so the marbles no longer intersect.
                 let overlap = (minDist - dist) / 2
                 racers[i].pos.x -= nx * overlap
                 racers[i].pos.y -= ny * overlap
                 racers[j].pos.x += nx * overlap
                 racers[j].pos.y += ny * overlap
+
+                // Forceful knockback.  `relVel` < 0 means the marbles are closing.
+                // We force them to fly apart at `knockbackGain ×` the impact speed,
+                // but never slower than `minKnockSpeed` — so a fast hit launches the
+                // other marble hard, and two marbles jammed on the hill (impact ≈ 0)
+                // still get popped apart instead of stalemating.
                 let relVel = (racers[j].vel.dx - racers[i].vel.dx) * nx
                            + (racers[j].vel.dy - racers[i].vel.dy) * ny
-                guard relVel < 0 else { continue }
-                let jImp = -(1 + restitution) * relVel / 2
+                let desiredSep = max(minKnockSpeed, -relVel * knockbackGain)
+                guard relVel < desiredSep else { continue }   // already parting fast enough
+                let jImp = (desiredSep - relVel) / 2
                 racers[i].vel.dx -= jImp * nx
                 racers[i].vel.dy -= jImp * ny
                 racers[j].vel.dx += jImp * nx

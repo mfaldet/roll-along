@@ -13,7 +13,7 @@ import SwiftUI
 // ---------------------------------------------------------------------------
 
 private enum ShopCategory: String, CaseIterable, Identifiable {
-    case collections, ball, goal, trail, floor, pit, music
+    case collections, ball, goal, trail, floor, pit, boundary, music
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -23,6 +23,7 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
         case .trail:       return "scribble.variable"
         case .floor:       return "square.fill.on.square.fill"
         case .pit:         return "circle.dotted"
+        case .boundary:    return "square.dashed"
         case .music:       return "music.note"
         }
     }
@@ -34,6 +35,7 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
         case .trail:       return "Trail"
         case .floor:       return "Floor"
         case .pit:         return "Pit"
+        case .boundary:    return "Boundary"
         case .music:       return "Music"
         }
     }
@@ -191,8 +193,9 @@ struct CosmeticShopView: View {
                     }
                 }
 
-                // Odds-and-ends — one featured pick from each of the six
-                // cosmetic categories (ball · trail · goal · floor · pit · music).
+                // Odds-and-ends — one featured pick from each of the seven
+                // cosmetic categories (ball · trail · goal · floor · pit ·
+                // boundary · music).
                 VStack(alignment: .leading, spacing: 10) {
                     sectionLabel("TODAY'S PICKS")
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 14),
@@ -203,6 +206,7 @@ struct CosmeticShopView: View {
                         if let g  = ShopRotation.featuredGoal()  { itemCell(item: g) }
                         if let f  = ShopRotation.featuredFloor() { itemCell(item: f) }
                         if let p  = ShopRotation.featuredPit()   { itemCell(item: p) }
+                        if let bd = ShopRotation.featuredBoundary() { itemCell(item: bd) }
                         if let m  = ShopRotation.featuredMusic() { itemCell(item: m) }
                     }
                 }
@@ -393,6 +397,8 @@ struct CosmeticShopView: View {
             categoryGrid(items: Floor.allCases)
         case .pit:
             categoryGrid(items: Pit.allCases)
+        case .boundary:
+            categoryGrid(items: Boundary.allCases)
         case .music:
             categoryGrid(items: MusicTrack.allCases)
         }
@@ -642,6 +648,7 @@ struct CosmeticShopView: View {
         case let t as TrailColor: gameState.equippedTrail = t
         case let f as Floor:      gameState.equippedFloor = f
         case let p as Pit:        gameState.equippedPit = p
+        case let b as Boundary:   gameState.equippedBoundary = b
         case let m as MusicTrack: gameState.equippedMusic = m
         default: break
         }
@@ -654,6 +661,7 @@ struct CosmeticShopView: View {
         case let t as TrailColor: return t == gameState.equippedTrail
         case let f as Floor:      return f == gameState.equippedFloor
         case let p as Pit:        return p == gameState.equippedPit
+        case let b as Boundary:   return b == gameState.equippedBoundary
         case let m as MusicTrack: return m == gameState.equippedMusic
         default: return false
         }
@@ -673,9 +681,24 @@ struct CosmeticShopView: View {
         case let t as TrailColor: trailPreview(t)
         case let f as Floor:      floorPreview(f)
         case let p as Pit:        pitPreview(p)
+        case let b as Boundary:   boundaryPreview(b)
         case let m as MusicTrack: musicPreview(m)
         default: EmptyView()
         }
+    }
+
+    /// A short length of wall in the Boundary's colours — base fill, a lit top
+    /// edge, and a darker base, the same recipe the games render walls with.
+    private func boundaryPreview(_ boundary: Boundary) -> some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(LinearGradient(colors: [boundary.color, boundary.deepColor],
+                                 startPoint: .top, endPoint: .bottom))
+            .frame(width: 86, height: 22)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(boundary.edgeColor.opacity(0.9), lineWidth: 1.5)
+            )
+            .shadow(color: Color.black.opacity(0.4), radius: 5, x: 0, y: 3)
     }
 
     private func ballPreview(_ skin: BallSkin) -> some View {

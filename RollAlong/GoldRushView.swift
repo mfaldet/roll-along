@@ -171,9 +171,9 @@ struct GoldRushView: View {
                 let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
                 let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
                 var path = Path(); path.move(to: p1); path.addLine(to: p2)
-                ctx.stroke(path, with: .color(Color(white: 0.32).opacity(0.9)),
+                ctx.stroke(path, with: .color(gameState.equippedBoundary.color.opacity(0.95)),
                            style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                ctx.stroke(path, with: .color(Color(white: 0.55).opacity(0.5)),
+                ctx.stroke(path, with: .color(gameState.equippedBoundary.edgeColor.opacity(0.6)),
                            style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
         }
