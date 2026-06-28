@@ -626,7 +626,7 @@ struct SumoSurvivalView: View {
         // Difficulty scales the payout + records the attempt/win for tracking.
         let coins = gameState.recordMinigameResult(
             modeID: "sumo", difficulty: gameState.minigameDifficulty,
-            won: playerRank == 0, basePayout: base)
+            won: playerRank == 0, score: points, basePayout: base)
         AnalyticsClient.shared.track(
             "sumo_match_over",
             properties: ["placement": .int(playerRank + 1),

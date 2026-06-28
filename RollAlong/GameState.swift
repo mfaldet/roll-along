@@ -303,6 +303,12 @@ final class GameState: ObservableObject {
     @Published var minigameDifficultyWins: [String: Int] {
         didSet { save(minigameDifficultyWins, trackProgressKey: "ra_minigameDiffWins") }
     }
+    /// Per game+difficulty BEST score (snake power, sumo points, paintball
+    /// coverage, …), keyed "modeID|difficulty".  Feeds the per-difficulty
+    /// leaderboard (synced to `minigame_scores` via recordMinigameResult).
+    @Published var minigameDifficultyBests: [String: Int] {
+        didSet { save(minigameDifficultyBests, trackProgressKey: "ra_minigameDiffBests") }
+    }
 
     /// Set of Challenge Track IDs fully completed (level 100 cleared).
     /// The reward bundle is granted exactly once when a track enters this set.
@@ -529,6 +535,7 @@ final class GameState: ObservableObject {
         minigameBests  = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
         minigameDifficultyPlays = Self.loadTrackProgress(key: "ra_minigameDiffPlays", defaults)
         minigameDifficultyWins  = Self.loadTrackProgress(key: "ra_minigameDiffWins", defaults)
+        minigameDifficultyBests = Self.loadTrackProgress(key: "ra_minigameDiffBests", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
@@ -1118,12 +1125,25 @@ final class GameState: ObservableObject {
     func recordMinigameResult(modeID: String,
                               difficulty: MinigameDifficulty,
                               won: Bool,
+                              score: Int,
                               basePayout: Int) -> Int {
         let key = Self.minigameDifficultyKey(modeID, difficulty)
         minigameDifficultyPlays[key, default: 0] += 1
         if won {
             minigameDifficultyWins[key, default: 0] += 1
             recordCompetitiveWin(modeID)
+        }
+        if score > minigameDifficultyBests[key, default: 0] {
+            minigameDifficultyBests[key] = score
+        }
+        // Publish this game+difficulty's wins/best to the per-difficulty
+        // leaderboard (best-effort; a no-op when signed out).
+        let rowWins = minigameDifficultyWins[key, default: 0]
+        let rowBest = minigameDifficultyBests[key, default: 0]
+        Task {
+            try? await SocialClient.shared.syncMinigameScore(
+                game: modeID, difficulty: difficulty.rawValue,
+                wins: rowWins, best: rowBest)
         }
         let payout = minigamePayout(base: basePayout, difficulty: difficulty)
         if payout > 0 { addCoins(payout) }

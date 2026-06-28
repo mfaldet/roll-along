@@ -499,7 +499,7 @@ struct SnakeGameView: View {
             // (also banks the coins and, on a win, bumps the tally + ticket).
             let banked = gameState.recordMinigameResult(
                 modeID: "snake", difficulty: gameState.minigameDifficulty,
-                won: didWin, basePayout: base)
+                won: didWin, score: power, basePayout: base)
             AnalyticsClient.shared.track(
                 "comet_round_over",
                 properties: ["won": .bool(didWin),

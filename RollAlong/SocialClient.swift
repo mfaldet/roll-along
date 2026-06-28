@@ -187,6 +187,74 @@ final class SocialClient: @unchecked Sendable {
         return try decode([PlayerProfile].self, from: data)
     }
 
+    // MARK: - Per-difficulty minigame leaderboard (minigame_scores table)
+
+    private struct MinigameScoreUpsert: Encodable {
+        let player_id: String
+        let game: String
+        let difficulty: String
+        let wins: Int
+        let best: Int
+    }
+
+    /// Upsert this player's wins + best for one competitive game at one
+    /// difficulty.  Best-effort; signed-in only (the caller wraps it in try?).
+    func syncMinigameScore(game: String, difficulty: String,
+                           wins: Int, best: Int) async throws {
+        let me = try requireSession()
+        let body = MinigameScoreUpsert(player_id: me.userId.uuidString, game: game,
+                                       difficulty: difficulty, wins: wins, best: best)
+        _ = try await send(method: "POST", path: "minigame_scores",
+                           query: "on_conflict=player_id,game,difficulty",
+                           bodyData: try encoder.encode(body),
+                           prefer: "resolution=merge-duplicates,return=minimal")
+    }
+
+    private struct MinigameScoreRow: Decodable {
+        let player_id: UUID
+        let wins: Int
+        let best: Int
+        let players: Embedded?
+        struct Embedded: Decodable {
+            let display_name: String?
+            let climb_level: Int?
+            let total_stars: Int?
+            let highest_unlocked: Int?
+            let lives: Int?
+        }
+    }
+
+    /// Per-(game, difficulty) leaderboard rows, ranked by wins then best.  Mapped
+    /// onto `PlayerProfile` with the chosen game's wins/best fields holding the
+    /// per-difficulty values, so the leaderboard renders them like any board.
+    func fetchMinigameDifficultyLeaderboard(game: String, difficulty: String,
+                                            limit: Int = 100) async throws -> [PlayerProfile] {
+        let sel = "player_id,wins,best,players(display_name,climb_level,total_stars,highest_unlocked,lives)"
+        let query = "select=\(sel)&game=eq.\(game)&difficulty=eq.\(difficulty)"
+                  + "&order=wins.desc,best.desc&limit=\(limit)"
+        let data = try await send(method: "GET", path: "minigame_scores", query: query)
+        let rows = try decode([MinigameScoreRow].self, from: data)
+        return rows.map { row in
+            let p = row.players
+            var prof = PlayerProfile(id: row.player_id,
+                                     displayName: p?.display_name ?? "",
+                                     climbLevel: p?.climb_level ?? 1,
+                                     highestUnlocked: p?.highest_unlocked ?? 1,
+                                     totalStars: p?.total_stars ?? 0,
+                                     lives: p?.lives ?? 0)
+            switch game {
+            case "snake":     prof.snakeWins = row.wins;     prof.snakeBest = row.best
+            case "sumo":      prof.sumoWins = row.wins;      prof.sumoBest = row.best
+            case "paintball": prof.paintballWins = row.wins; prof.paintballBest = row.best
+            case "goldrush":  prof.goldrushWins = row.wins;  prof.goldrushBest = row.best
+            case "marblecup": prof.marblecupWins = row.wins; prof.marblecupBest = row.best
+            case "koth":      prof.kothWins = row.wins;      prof.kothBest = row.best
+            default: break
+            }
+            return prof
+        }
+    }
+
     /// The player's rank (1-based) on every `LeaderboardBoard`, computed exactly
     /// like the on-screen leaderboard: position among players who have actually
     /// played that board.  Boards the player hasn't played are omitted from the

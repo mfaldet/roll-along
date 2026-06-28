@@ -482,7 +482,7 @@ struct KingOfTheHillView: View {
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "koth", difficulty: gameState.minigameDifficulty,
-                won: playerWon, basePayout: base)
+                won: playerWon, score: holdSec, basePayout: base)
             AnalyticsClient.shared.track(
                 "koth_round_over",
                 properties: ["won": .bool(playerWon),

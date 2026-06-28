@@ -28,12 +28,30 @@ struct LeaderboardView: View {
 
     @State private var sortKey:       SortKey         = .level
     @State private var selectedBoard: LeaderboardBoard = .rollAlong
+    @State private var diffFilter:    DiffFilter      = .overall
 
     /// Which Roll Along stat the board ranks by.  (Speed was dropped — we lean
     /// on stars for skill.)  Only changes ranking — never which columns show.
     private enum SortKey: String, CaseIterable, Identifiable {
         case level = "Level", stars = "Stars", coins = "Coins"
         var id: String { rawValue }
+    }
+
+    /// Difficulty filter for the competitive boards.  `.overall` is the combined
+    /// all-difficulty totals (today's aggregate); the others rank by that
+    /// difficulty's per-(game,difficulty) `minigame_scores` rows.
+    private enum DiffFilter: String, CaseIterable, Identifiable {
+        case overall = "Overall", easy = "Easy", normal = "Normal", hard = "Hard"
+        var id: String { rawValue }
+        /// nil for Overall (aggregate); else the MinigameDifficulty rawValue.
+        var key: String? {
+            switch self {
+            case .overall: return nil
+            case .easy:    return "easy"
+            case .normal:  return "normal"
+            case .hard:    return "hard"
+            }
+        }
     }
 
     // The set of boards (identity / ranking order / "has played") lives in the
@@ -88,7 +106,13 @@ struct LeaderboardView: View {
             }
         }
         .task { await load() }
-        .onChange(of: selectedBoard) { _, _ in
+        .onChange(of: selectedBoard) { _, board in
+            // Difficulty only applies to competitive boards; reset it otherwise.
+            if board.competitiveModeID == nil { diffFilter = .overall }
+            rows = []
+            Task { await load() }
+        }
+        .onChange(of: diffFilter) { _, _ in
             rows = []
             Task { await load() }
         }
@@ -374,6 +398,21 @@ struct LeaderboardView: View {
                 )
             }
 
+            // Difficulty selector — competitive boards only, sits above the sort.
+            // Overall = the combined totals; Easy/Normal/Hard = per-difficulty.
+            if selectedBoard.competitiveModeID != nil {
+                HStack(spacing: 0) {
+                    ForEach(DiffFilter.allCases) { d in
+                        diffSegment(d)
+                    }
+                }
+                .padding(3)
+                .background(
+                    Capsule().fill(Self.controlTrack)
+                        .overlay(Capsule().stroke(Self.controlBorder, lineWidth: 1))
+                )
+            }
+
             // Sort selector — a segmented control (Roll Along board only),
             // matching the filter pill's surface.
             if selectedBoard == .rollAlong {
@@ -406,6 +445,26 @@ struct LeaderboardView: View {
                 .font(.system(.subheadline, design: .rounded).weight(.bold))
                 .foregroundStyle(active ? Self.starTint : Color(white: 0.55))
                 .padding(.horizontal, 18)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(active ? Self.controlPill : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// One segment of the difficulty selector (Overall / Easy / Normal / Hard),
+    /// full-width so the four share the row.
+    private func diffSegment(_ d: DiffFilter) -> some View {
+        let active = (diffFilter == d)
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { diffFilter = d }
+        } label: {
+            Text(d.rawValue)
+                .font(.system(.footnote, design: .rounded).weight(.bold))
+                .foregroundStyle(active ? Self.starTint : Color(white: 0.55))
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
                 .background(
                     Capsule().fill(active ? Self.controlPill : Color.clear)
@@ -517,7 +576,13 @@ struct LeaderboardView: View {
         isLoading = true
         errorText = nil
         do {
-            rows = try await SocialClient.shared.fetchLeaderboard(order: selectedBoard.order)
+            if let game = selectedBoard.competitiveModeID, let diff = diffFilter.key {
+                // Per-(game, difficulty) board from the minigame_scores table.
+                rows = try await SocialClient.shared.fetchMinigameDifficultyLeaderboard(
+                    game: game, difficulty: diff)
+            } else {
+                rows = try await SocialClient.shared.fetchLeaderboard(order: selectedBoard.order)
+            }
         } catch {
             errorText = "The ranking server is unreachable right now. Pull to refresh or try again."
         }

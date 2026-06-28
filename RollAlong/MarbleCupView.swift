@@ -534,7 +534,7 @@ struct MarbleCupView: View {
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "marblecup", difficulty: gameState.minigameDifficulty,
-                won: playerWon, basePayout: base)
+                won: playerWon, score: playerGoals, basePayout: base)
             AnalyticsClient.shared.track(
                 "marblecup_match_over",
                 properties: ["won": .bool(playerWon),
