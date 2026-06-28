@@ -38,6 +38,18 @@ final class GameState: ObservableObject {
     @Published var playerName: String {
         didSet { defaults.set(playerName, forKey: "ra_name") }
     }
+    /// Player-chosen accent colour (persisted as "#RRGGBB").  Used for niche
+    /// personalisation — e.g. the rim around their nickname in competitive games.
+    @Published var primaryColorHex: String {
+        didSet { defaults.set(primaryColorHex, forKey: "ra_primaryColorHex") }
+    }
+    static let defaultPrimaryHex = "#48D188"   // the scoreboard green
+    static let defaultPrimaryColor = Color(red: 0.28, green: 0.82, blue: 0.52)
+    /// `primaryColorHex` as a SwiftUI Color (for binding to a ColorPicker).
+    var primaryColor: Color {
+        get { Color(hexRGB: primaryColorHex) ?? Self.defaultPrimaryColor }
+        set { primaryColorHex = newValue.hexRGB }
+    }
     @Published var hapticsEnabled: Bool {
         didSet { defaults.set(hapticsEnabled, forKey: "ra_haptics") }
     }
@@ -443,6 +455,7 @@ final class GameState: ObservableObject {
         currentLevel = level
         activeSkin = BallSkin(rawValue: defaults.string(forKey: "ra_skin") ?? "") ?? .red
         playerName = defaults.string(forKey: "ra_name") ?? ""
+        primaryColorHex = defaults.string(forKey: "ra_primaryColorHex") ?? Self.defaultPrimaryHex
         hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
         introEnabled = defaults.object(forKey: "ra_introEnabled") as? Bool ?? false

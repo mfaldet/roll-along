@@ -117,7 +117,7 @@ struct GoldRushView: View {
                         marble(r)
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: r.isPlayer ? "YOU" : (rivalLooks[r.colorIndex]?.name ?? "Rival"),
-                                             color: Self.racerColors[r.colorIndex],
+                                             color: r.isPlayer ? gameState.primaryColor : Self.racerColors[r.colorIndex],
                                              isPlayer: r.isPlayer,
                                              isLeader: isLeader(r))
                                     .offset(y: -15).allowsHitTesting(false)

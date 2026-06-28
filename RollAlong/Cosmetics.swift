@@ -2512,6 +2512,62 @@ enum RivalCosmetics {
 
 /// A small floating tag above a competitive marble — a bold "YOU" for the
 /// player, the rival's nickname otherwise.  `color` is the racer's identity rim.
+
+// MARK: - Color ⇄ hex (persists the player's primary color)
+
+extension Color {
+    /// "#RRGGBB" → opaque Color.  nil on malformed input.
+    init?(hexRGB: String) {
+        var s = hexRGB.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let v = UInt64(s, radix: 16) else { return nil }
+        self.init(.sRGB,
+                  red:   Double((v >> 16) & 0xFF) / 255,
+                  green: Double((v >>  8) & 0xFF) / 255,
+                  blue:  Double( v        & 0xFF) / 255,
+                  opacity: 1)
+    }
+
+    /// Resolve to an opaque "#RRGGBB" string.
+    var hexRGB: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let clamp = { (x: CGFloat) in Int((max(0, min(1, x)) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", clamp(r), clamp(g), clamp(b))
+    }
+}
+
+/// The floating bottom-left "home" button used by the solo minigames — the same
+/// affordance the climb / Zen Garden show in BallGameView, so leaving a game is
+/// consistent everywhere.  Always tappable; pops back to the home screen.
+struct HomeQuitButton: View {
+    @EnvironmentObject private var nav: Navigator
+
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Button { nav.goHome() } label: {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(white: 0.38))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(Color(white: 1.0, opacity: 0.85))
+                                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                        )
+                }
+                .accessibilityLabel("Quit to home screen")
+                Spacer()
+            }
+            .padding(.leading, 22)
+            .padding(.bottom, 16)
+        }
+        .allowsHitTesting(true)
+    }
+}
+
 /// Shared pre-game difficulty selector for the competitive minigames.  Each
 /// option shows its coin-payout multiplier so the player sees the reward for
 /// the risk before committing.  Binds straight to the remembered

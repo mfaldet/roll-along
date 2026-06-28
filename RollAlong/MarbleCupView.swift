@@ -125,7 +125,7 @@ struct MarbleCupView: View {
                         moverView(m)
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: m.role == .player ? "YOU" : (rivalLook?.name ?? "Rival"),
-                                             color: m.role == .player ? Self.playerAccent : Self.aiAccent,
+                                             color: m.role == .player ? gameState.primaryColor : Self.aiAccent,
                                              isPlayer: m.role == .player,
                                              isLeader: isLeader(m))
                                     .offset(y: -15).allowsHitTesting(false)

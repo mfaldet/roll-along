@@ -41,10 +41,14 @@ struct RollOutMaze {
 }
 
 enum RollOutMazes {
+    /// Active catalogue: a bundled `rollout.json` (authored in Marble Mapper)
+    /// overrides the built-in mazes; absent/empty → built-in list (unchanged).
+    static var all: [RollOutMaze] { RollOutMazeStore.mazes ?? builtin }
+
     /// Hand-built ladder of rising difficulty.  Start sits at the bottom, goal
     /// at the top; walls form a serpentine the ball weaves up, holes force a
     /// careful line.  Cleared mazes advance; the run ends when lives run out.
-    static let all: [RollOutMaze] = [
+    static let builtin: [RollOutMaze] = [
 
         // 1 — Warm-Up: two offset dividers, no holes.  Learn the weave.
         RollOutMaze(name: "Warm-Up",
@@ -174,6 +178,7 @@ struct RollOutView: View {
 
             tableBorder.allowsHitTesting(false)
             topBar
+            HomeQuitButton()
             if phase == .ready && !outOfLives { startPrompt }
             if phase == .cleared { clearedOverlay }
             if phase == .fell && !outOfLives { fellOverlay }
@@ -296,15 +301,9 @@ struct RollOutView: View {
     private var topBar: some View {
         VStack {
             HStack {
-                Button { nav.goHome() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(Circle().fill(Color(white: 0.16)))
-                }
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("RollOutCloseButton")
+                // Home is now the floating bottom-left button (HomeQuitButton),
+                // matching the climb / Zen Garden; keep the slot to centre the score.
+                Color.clear.frame(width: 36, height: 36)
                 Spacer()
                 VStack(spacing: 1) {
                     Text("Maze \(mazeIndex + 1)")
@@ -621,5 +620,43 @@ struct RollOutView: View {
         RollOutView()
             .environmentObject(GameState())
             .environmentObject(Navigator())
+    }
+}
+
+// ===========================================================================
+// RollOutMazeStore — JSON override seam for the Roll Out maze catalogue.
+//
+// Mirrors the climb's LevelOverrideStore + the minigame seams. If a bundled
+// `rollout.json` (authored in Marble Mapper) is present and non-empty, it
+// REPLACES the built-in mazes; otherwise the built-ins are used unchanged.
+//
+// File shape:
+//   { "schemaVersion": 1,
+//     "mazes": [ { "name": "…", "walls": [ {"x1":,"y1":,"x2":,"y2":} ],
+//                  "holes": [ {"cx":,"cy":,"r":} ],
+//                  "start": {"x":,"y":}, "goal": {"x":,"y":} } ] }
+// ===========================================================================
+private struct ROPointDTO:  Decodable { let x, y: CGFloat }
+private struct ROCircleDTO: Decodable { let cx, cy, r: CGFloat }
+private struct ROWallDTO:   Decodable { let x1, y1, x2, y2: CGFloat }
+private struct ROMazeDTO:   Decodable { let name: String?; let walls: [ROWallDTO]?; let holes: [ROCircleDTO]?; let start: ROPointDTO; let goal: ROPointDTO }
+private struct ROFile:      Decodable { let schemaVersion: Int; let mazes: [ROMazeDTO] }
+
+enum RollOutMazeStore {
+    static let mazes: [RollOutMaze]? = load()
+
+    private static func load() -> [RollOutMaze]? {
+        guard let url = Bundle.main.url(forResource: "rollout", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let file = try? JSONDecoder().decode(ROFile.self, from: data),
+              !file.mazes.isEmpty else { return nil }
+        return file.mazes.map { m in
+            RollOutMaze(
+                name:  m.name ?? "Maze",
+                walls: (m.walls ?? []).map { WallSegFrac(x1: $0.x1, y1: $0.y1, x2: $0.x2, y2: $0.y2) },
+                holes: (m.holes ?? []).map { RollOutHole(cx: $0.cx, cy: $0.cy, r: $0.r) },
+                start: CGPoint(x: m.start.x, y: m.start.y),
+                goal:  CGPoint(x: m.goal.x,  y: m.goal.y))
+        }
     }
 }
