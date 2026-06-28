@@ -5,7 +5,7 @@ import StoreKit
 // StoreKitManager — StoreKit 2 wrapper.
 //
 // Responsibilities:
-//   • Fetch the 9 App Store product records on app launch.
+//   • Fetch the 10 App Store product records on app launch.
 //   • Drive purchase + restore flows from UI.
 //   • Listen for Transaction updates from the App Store in the background
 //     (foreground processing for purchases made on other devices, refunds,
@@ -36,6 +36,7 @@ final class StoreKitManager: ObservableObject {
         case coins600     = "com.macfaldet.RollAlong.coins.600"
         case coins1300    = "com.macfaldet.RollAlong.coins.1300"
         case coins3000    = "com.macfaldet.RollAlong.coins.3000"
+        case coins10000   = "com.macfaldet.RollAlong.coins.10000"
         /// One-time welcome offer: 500 coins + exclusive Aurora ball skin.
         /// Non-consumable so it can be restored on a new device; delivery
         /// is idempotent (grantCosmetic + addCoins are safe to call twice
@@ -56,7 +57,7 @@ final class StoreKitManager: ObservableObject {
             switch self {
             case .livesPack1, .livesPack5, .livesPack10: return .lifePack
             case .unlimited:                              return .unlimitedUnlock
-            case .coins100, .coins600, .coins1300, .coins3000: return .coinPack
+            case .coins100, .coins600, .coins1300, .coins3000, .coins10000: return .coinPack
             case .starterPack:                            return .starterPackUnlock
             }
         }
@@ -78,6 +79,7 @@ final class StoreKitManager: ObservableObject {
             case .coins600:    return 600
             case .coins1300:   return 1300
             case .coins3000:   return 3000
+            case .coins10000:  return 10000
             case .starterPack: return 500
             default:           return 0
             }
@@ -90,6 +92,11 @@ final class StoreKitManager: ObservableObject {
     @Published private(set) var purchaseInProgress: ProductID? = nil
     @Published private(set) var lastError: String? = nil
     @Published private(set) var lastDelivery: DeliveryReceipt? = nil
+    /// Monotonic counter bumped once per successful delivery.  UI observes this
+    /// (rather than `lastDelivery`) to fire a celebration on *every* purchase —
+    /// `lastDelivery` is Equatable, so buying the same pack twice in a row would
+    /// not register as a change.
+    @Published private(set) var deliveryCount: Int = 0
 
     /// Called by purchase-sheet alert dismiss to clear the error so the same
     /// error string can re-trigger onChange on a subsequent attempt.
@@ -314,6 +321,7 @@ final class StoreKitManager: ObservableObject {
             coins:              productID.rewardCoins,
             unlimitedActivated: productID.category == .unlimitedUnlock
         )
+        deliveryCount += 1
     }
 
     // MARK: - Background transaction listener
