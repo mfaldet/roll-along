@@ -120,7 +120,7 @@ struct SettingsView: View {
                                            set:  { gameState.primaryColor = $0 }),
                         supportsOpacity: false) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Primary Color")
+                    Text("Accent Color")
                         .font(.system(.body, design: .rounded))
                         .foregroundStyle(Color(white: 0.75))
                     Text("Outlines your nickname in competitive games")
