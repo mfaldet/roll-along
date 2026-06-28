@@ -134,7 +134,7 @@ struct KingOfTheHillView: View {
                         marble(r)
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: r.isPlayer ? "YOU" : (rivalLooks[r.colorIndex]?.name ?? "Rival"),
-                                             color: r.isPlayer ? Self.playerColor : Self.palette[r.colorIndex % Self.palette.count],
+                                             color: r.isPlayer ? gameState.primaryColor : Self.palette[r.colorIndex % Self.palette.count],
                                              isPlayer: r.isPlayer,
                                              isLeader: isLeader(r))
                                     .offset(y: -15).allowsHitTesting(false)
