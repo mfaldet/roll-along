@@ -551,6 +551,9 @@ struct BuyCoinsSheet: View {
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
     @State private var purchaseError: String? = nil
+    // Open tall so every pack (down to the $49.99 tier) is visible without a
+    // drag; .medium stays available as a drag-down resting position.
+    @State private var detent: PresentationDetent = .large
 
     var body: some View {
         NavigationStack {
@@ -579,7 +582,7 @@ struct BuyCoinsSheet: View {
             // No Restore/Done buttons — swipe down (or tap above) to close.
             // Restore Purchases lives in Settings.
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
         .onChange(of: store.lastError) { _, err in purchaseError = err }
         .alert("Purchase Failed", isPresented: Binding(
             get: { purchaseError != nil },
