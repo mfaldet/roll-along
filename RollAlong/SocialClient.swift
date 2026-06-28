@@ -277,6 +277,33 @@ final class SocialClient: @unchecked Sendable {
         }
     }
 
+    private struct GameDifficultyKey: Decodable { let game: String; let difficulty: String }
+
+    /// The player's rank on each per-difficulty board they actually appear on.
+    /// First finds which (game,difficulty) rows they have in `minigame_scores`,
+    /// then computes each rank concurrently.  Keyed "game|difficulty".  Drives
+    /// the per-difficulty lines in the profile's Player Ranks section.
+    func fetchMinigameDifficultyRanks(for playerId: UUID, limit: Int = 500) async -> [String: Int] {
+        guard let data = try? await send(method: "GET", path: "minigame_scores",
+                  query: "select=game,difficulty&player_id=eq.\(playerId.uuidString)"),
+              let mine = try? decode([GameDifficultyKey].self, from: data), !mine.isEmpty
+        else { return [:] }
+
+        return await withTaskGroup(of: (String, Int?).self) { group in
+            for gd in mine {
+                group.addTask {
+                    let rows = (try? await self.fetchMinigameDifficultyLeaderboard(
+                        game: gd.game, difficulty: gd.difficulty, limit: limit)) ?? []
+                    let rank = rows.firstIndex { $0.id == playerId }.map { $0 + 1 }
+                    return ("\(gd.game)|\(gd.difficulty)", rank)
+                }
+            }
+            var out: [String: Int] = [:]
+            for await (key, rank) in group { if let rank { out[key] = rank } }
+            return out
+        }
+    }
+
     // MARK: - Life gifts
 
     /// Send 1–5 lives to another player (caps enforced by RLS + table CHECKs).
