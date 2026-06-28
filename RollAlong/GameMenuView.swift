@@ -419,6 +419,7 @@ struct GameMenuView: View {
         case "rollout":  return ("circle.grid.cross.fill",   [c(0.30, 0.78, 0.58), c(0.16, 0.52, 0.50)])
         case "rollup":   return ("arrow.up.circle.fill",     [c(0.36, 0.62, 1.00), c(0.40, 0.34, 0.92)])
         case "disco":    return ("circle.grid.3x3.fill",     [c(0.32, 0.85, 1.00), c(0.80, 0.30, 0.95)])
+        case "discohard":return ("bolt.fill",                [c(0.95, 0.30, 0.45), c(0.55, 0.15, 0.85)])
         default:         return ("gamecontroller.fill",      [c(0.40, 0.55, 0.95), c(0.30, 0.35, 0.80)])
         }
     }

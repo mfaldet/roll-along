@@ -33,10 +33,15 @@ struct DiscoBallView: View {
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
+    /// Hardcore variant: a bigger 10×10 grid, a smaller ball, and — instead of a
+    /// looping reveal you tap to leave — the path flashes ONCE, then the zone
+    /// auto-unlocks with a 10-second countdown to get across.
+    var hardcore: Bool = false
+
     // MARK: - Tunables
-    private let cols = 5
-    private let rows = 6
-    private let ballRadius:  CGFloat = 10
+    private var cols: Int { hardcore ? 10 : 5 }
+    private var rows: Int { hardcore ? 10 : 6 }
+    private var ballRadius: CGFloat { hardcore ? 8 : 10 }
     private let moveAccel:   CGFloat = 1_500
     private let friction:    CGFloat = 0.94
     private let maxSpeed:    CGFloat = 700
@@ -44,6 +49,7 @@ struct DiscoBallView: View {
     private let revealSpeed:  Double = 0.14        // path-reveal head, tiles/tick
     private let celebrateDuration: TimeInterval = 2.6
     private let failDuration:      TimeInterval = 1.4
+    private let hardcoreCrossLimit: TimeInterval = 10
     private static let coinsPerCrossing = 3
 
     // MARK: - Palette
@@ -73,6 +79,7 @@ struct DiscoBallView: View {
     @State private var touched:   Set<GridPos> = []
     @State private var revealHead: Double = 0
     @State private var phaseEndAt: Date? = nil
+    @State private var crossDeadline: Date? = nil      // hardcore 10s timer
     @State private var blinkFrame = 0
 
     // MARK: - Derived geometry
@@ -82,7 +89,8 @@ struct DiscoBallView: View {
     private var gridH:      CGFloat { gridBottom - gridTop }
     private var tileW:      CGFloat { arena.width / CGFloat(cols) }
     private var tileH:      CGFloat { gridH / CGFloat(rows) }
-    private var best: Int { gameState.minigameBests["disco", default: 0] }
+    private var bestKey: String { hardcore ? "discohard" : "disco" }
+    private var best: Int { gameState.minigameBests[bestKey, default: 0] }
     /// Coins this run would bank right now.
     private var runCoins: Int { crossings * Self.coinsPerCrossing }
 
@@ -104,6 +112,7 @@ struct DiscoBallView: View {
             }
 
             topBar
+            if hardcore && phase == .crossing { countdownHUD }
             if phase == .memorize { memorizeHint }
             if phase == .gameOver { gameOverOverlay }
         }
@@ -256,13 +265,15 @@ struct DiscoBallView: View {
         VStack {
             Spacer()
             VStack(spacing: 4) {
-                Text("MEMORIZE THE PATH")
+                Text(hardcore ? "ONE LOOK!" : "MEMORIZE THE PATH")
                     .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .tracking(1.5)
-                    .foregroundStyle(Self.revealColor)
-                Text(startedEver
-                     ? "Line up at the start · tap to roll"
-                     : "Roll to the start tile · tap to cross without a wrong step")
+                    .foregroundStyle(hardcore ? Color(red: 1.0, green: 0.4, blue: 0.4) : Self.revealColor)
+                Text(hardcore
+                     ? "The path flashes once — then it's a 10s dash across"
+                     : (startedEver
+                        ? "Line up at the start · tap to roll"
+                        : "Roll to the start tile · tap to cross without a wrong step"))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(white: 0.7))
                     .multilineTextAlignment(.center)
@@ -272,6 +283,24 @@ struct DiscoBallView: View {
             Spacer()
         }
         .allowsHitTesting(false)
+    }
+
+    private var countdownHUD: some View {
+        let remaining = max(0, crossDeadline?.timeIntervalSinceNow ?? 0)
+        let urgent = remaining <= 3
+        return VStack {
+            Spacer().frame(height: 58)
+            Text(String(format: "%.1f", remaining))
+                .font(.system(size: 30, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(urgent ? Color(red: 1.0, green: 0.30, blue: 0.30) : .white)
+                .padding(.horizontal, 18).padding(.vertical, 5)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
+                .scaleEffect(urgent ? 1.12 : 1.0)
+            Spacer()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private var gameOverOverlay: some View {
@@ -306,7 +335,7 @@ struct DiscoBallView: View {
                             .background(RoundedRectangle(cornerRadius: 18).fill(Self.revealColor))
                     }
                     ResultShareButton(result: ShareableResult(
-                        mode: "Disco Ball",
+                        mode: hardcore ? "Disco Hardcore" : "Disco Ball",
                         headline: "\(crossings) crossings",
                         subtitle: "Best \(max(best, crossings))",
                         skin: gameState.activeSkin,
@@ -348,6 +377,7 @@ struct DiscoBallView: View {
         touched = []
         revealHead = 0
         phaseEndAt = nil
+        crossDeadline = nil
         generatePath()
         spawnBallInSafeZone()
         phase = .memorize
@@ -388,13 +418,19 @@ struct DiscoBallView: View {
     private func handleTap() {
         switch phase {
         case .memorize:
-            startedEver = true
-            phase = .crossing
+            // Hardcore auto-unlocks after a single reveal — taps don't start it.
+            if !hardcore { startCrossing() }
         case .celebrate:
             advanceAfterCelebrate()
         default:
             break
         }
+    }
+
+    private func startCrossing() {
+        startedEver = true
+        crossDeadline = hardcore ? Date().addingTimeInterval(hardcoreCrossLimit) : nil
+        phase = .crossing
     }
 
     // MARK: - Simulation
@@ -405,12 +441,18 @@ struct DiscoBallView: View {
 
         switch phase {
         case .memorize:
-            let loopLen = Double(pathOrder.count) + 8     // pause before repeating
             revealHead += revealSpeed
-            if revealHead >= loopLen { revealHead = 0 }
+            if hardcore {
+                // Flash the path exactly once, hold a beat, then auto-unlock.
+                if revealHead >= Double(pathOrder.count) + 4 { startCrossing() }
+            } else {
+                let loopLen = Double(pathOrder.count) + 8     // pause before repeating
+                if revealHead >= loopLen { revealHead = 0 }
+            }
             stepPhysics(confineToSafeZone: true)
         case .crossing:
             stepPhysics(confineToSafeZone: false)
+            if let dl = crossDeadline, Date() >= dl { failCrossing(); return }
             evaluateCrossing()
         case .celebrate:
             stepPhysics(confineToSafeZone: false)
@@ -491,13 +533,14 @@ struct DiscoBallView: View {
 
     private func endGame() {
         let wasBest = crossings > best
-        if wasBest { gameState.minigameBests["disco"] = crossings }
+        if wasBest { gameState.minigameBests[bestKey] = crossings }
         if runCoins > 0 { gameState.addCoins(runCoins) }
         if wasBest && crossings > 0 { gameState.addCoins(GameState.minigameBestBonus) }
         AnalyticsClient.shared.track(
             "disco_game_over",
             properties: ["crossings": .int(crossings),
-                         "best": .int(max(best, crossings))]
+                         "best": .int(max(best, crossings)),
+                         "hardcore": .bool(hardcore)]
         )
         phase = .gameOver
     }
