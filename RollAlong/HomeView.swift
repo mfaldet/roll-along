@@ -852,20 +852,20 @@ struct HomeView: View {
         .accessibilityLabel("Level Select")
     }
 
-    /// Stat half of the Play row — icon on the LEFT, value + caption on the
-    /// RIGHT (e.g. "🏆  0 wins"), laid out horizontally.  Flat dark fill (the
-    /// unified row owns the rounding); fills its cell.
+    /// Stat half of the Play row — icon on the LEFT, with the value stacked over
+    /// the unit on the RIGHT (e.g. "🏆" then "0" over "wins").  Flat dark fill
+    /// (the unified row owns the rounding); fills its cell.
     private func statChip(icon: String, value: String, caption: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color(white: 0.78))
-            HStack(spacing: 3) {
+            VStack(spacing: 0) {
                 Text(value)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                 Text(caption)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(white: 0.55))
             }
             .minimumScaleFactor(0.5)
