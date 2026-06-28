@@ -56,7 +56,7 @@ final class GameStateTests: XCTestCase {
         let gs = makeGameState()
         gs.coinBalance = 0
         let paid = gs.recordMinigameResult(modeID: "snake", difficulty: .hard,
-                                           won: false, basePayout: 30)
+                                           won: false, score: 0, basePayout: 30)
         XCTAssertEqual(paid, 60, "30 base × 2.0 (hard)")
         XCTAssertEqual(gs.coinBalance, 60)
         XCTAssertEqual(gs.minigameDifficultyPlays["snake|hard"], 1)
@@ -69,7 +69,7 @@ final class GameStateTests: XCTestCase {
         let gs = makeGameState()
         gs.coinBalance = 0
         let paid = gs.recordMinigameResult(modeID: "sumo", difficulty: .easy,
-                                           won: true, basePayout: 10)
+                                           won: true, score: 0, basePayout: 10)
         XCTAssertEqual(paid, 5, "10 base × 0.5 (easy)")
         XCTAssertEqual(gs.coinBalance, 5)
         XCTAssertEqual(gs.minigameDifficultyPlays["sumo|easy"], 1)
@@ -81,19 +81,30 @@ final class GameStateTests: XCTestCase {
     func testMinigameSuccessRate_aggregatesAndIsNilWhenUnplayed() {
         let gs = makeGameState()
         XCTAssertNil(gs.minigameSuccessRate("koth", .normal), "never played → nil")
-        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: true,  basePayout: 0)
-        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: false, basePayout: 0)
-        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: false, basePayout: 0)
+        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: true,  score: 0, basePayout: 0)
+        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: false, score: 0, basePayout: 0)
+        gs.recordMinigameResult(modeID: "koth", difficulty: .normal, won: false, score: 0, basePayout: 0)
         XCTAssertEqual(gs.minigameDifficultyPlays["koth|normal"], 3)
         XCTAssertEqual(gs.minigameSuccessRate("koth", .normal) ?? -1, 1.0 / 3.0, accuracy: 0.0001)
     }
 
     func testMinigameDifficultyTracking_persistsAcrossReload() {
         let gs = makeGameState()
-        gs.recordMinigameResult(modeID: "paintball", difficulty: .hard, won: true, basePayout: 0)
+        gs.recordMinigameResult(modeID: "paintball", difficulty: .hard, won: true, score: 0, basePayout: 0)
         let reloaded = GameState(defaults: defaults)
         XCTAssertEqual(reloaded.minigameDifficultyPlays["paintball|hard"], 1)
         XCTAssertEqual(reloaded.minigameDifficultyWins["paintball|hard"], 1)
+    }
+
+    func testMinigameDifficultyBest_keepsTheMaxPerDifficulty() {
+        let gs = makeGameState()
+        gs.recordMinigameResult(modeID: "snake", difficulty: .hard, won: false, score: 40, basePayout: 0)
+        gs.recordMinigameResult(modeID: "snake", difficulty: .hard, won: true,  score: 25, basePayout: 0)
+        XCTAssertEqual(gs.minigameDifficultyBests["snake|hard"], 40, "best keeps the max, not the latest")
+        // A different difficulty is tracked independently.
+        gs.recordMinigameResult(modeID: "snake", difficulty: .easy, won: true, score: 12, basePayout: 0)
+        XCTAssertEqual(gs.minigameDifficultyBests["snake|easy"], 12)
+        XCTAssertEqual(gs.minigameDifficultyBests["snake|hard"], 40)
     }
 
     // MARK: - Challenge of the Day

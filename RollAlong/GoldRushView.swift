@@ -508,6 +508,7 @@ struct GoldRushView: View {
             modeID: "goldrush",
             difficulty: gameState.minigameDifficulty,
             won: engine.playerWon,
+            score: engine.playerScore,
             basePayout: base)
         AnalyticsClient.shared.track(
             "goldrush_round_over",

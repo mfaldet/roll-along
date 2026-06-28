@@ -425,3 +425,30 @@ grant select, update on public.clan_members to service_role;
 -- from life_gifts
 -- where recipient_id = '<me>' and claimed_at is null
 -- order by created_at;
+
+-- ---------------------------------------------------------------------------
+-- minigame_scores — per-(game, difficulty) competitive leaderboard rows.
+-- Added 2026-06-28 (migration minigame_scores_per_difficulty). The players
+-- table keeps aggregate totals (snake_wins, …) for the "Overall" board; this
+-- table holds the per-difficulty breakdown that the leaderboard's difficulty
+-- selector (Easy/Normal/Hard) ranks by. Populated going forward by
+-- SocialClient.syncMinigameScore (upsert on game-over); reads embed players.
+-- ---------------------------------------------------------------------------
+-- create table public.minigame_scores (
+--   player_id  uuid not null references public.players(id) on delete cascade,
+--   game       text not null,        -- snake|sumo|paintball|goldrush|marblecup|koth
+--   difficulty text not null,        -- easy|normal|hard
+--   wins       integer not null default 0,
+--   best       integer not null default 0,
+--   updated_at timestamptz not null default now(),
+--   primary key (player_id, game, difficulty)
+-- );
+-- RLS: select using(true); insert/update where player_id = auth.uid().
+-- index minigame_scores_board_idx (game, difficulty, wins desc, best desc).
+--
+-- Leaderboard query (per game+difficulty), embedding the player:
+-- select player_id, wins, best,
+--        players(display_name, climb_level, total_stars, highest_unlocked, lives)
+-- from minigame_scores
+-- where game = 'snake' and difficulty = 'hard'
+-- order by wins desc, best desc limit 100;

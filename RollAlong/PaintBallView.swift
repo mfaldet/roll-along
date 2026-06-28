@@ -589,7 +589,7 @@ struct PaintBallView: View {
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "paintball", difficulty: gameState.minigameDifficulty,
-                won: playerWon, basePayout: base)
+                won: playerWon, score: pct, basePayout: base)
             AnalyticsClient.shared.track(
                 "paintball_round_over",
                 properties: ["won": .bool(playerWon),
