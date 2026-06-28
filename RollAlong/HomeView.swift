@@ -307,25 +307,25 @@ struct HomeView: View {
                     // you're about to launch" right beside the button.
                     // Every cell is a collider like the rest of the home UI, so
                     // the roaming ball bounces off them.
-                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                        GridRow {
-                            modeHeader
-                                .homeBallCollider()
-                                .gridCellColumns(1)
-                            playButton
-                                .homeBallCollider()
-                                .gridCellColumns(3)
-                        }
-                        GridRow {
-                            squareNavButton("trophy.fill", "Leaderboard", HomeRoute.leaderboard)
-                            gameModesGridButton.gridCellColumns(2)
-                            squareNavButton("bag.fill", "Shop", HomeRoute.shop)
-                        }
-                        GridRow {
-                            squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
-                            squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
-                            squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
-                            squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
+                    VStack(spacing: 10) {
+                        // Indicator + Play read as ONE button split by a single
+                        // divider line — indicator (left quarter), Play (right
+                        // three-quarters). Each half is its own tap target.
+                        unifiedPlayRow
+                            .homeBallCollider()
+
+                        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                            GridRow {
+                                squareNavButton("trophy.fill", "Leaderboard", HomeRoute.leaderboard)
+                                gameModesGridButton.gridCellColumns(2)
+                                squareNavButton("bag.fill", "Shop", HomeRoute.shop)
+                            }
+                            GridRow {
+                                squareNavButton("gearshape.fill", "Settings", HomeRoute.settings)
+                                squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans)
+                                squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends)
+                                squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
+                            }
                         }
                     }
                     .padding(.horizontal, 30)
@@ -784,11 +784,38 @@ struct HomeView: View {
 
     // MARK: - Per-mode indicator (left quarter of the Play row)
 
+    /// The Play row drawn as a SINGLE button split into two tappable pieces by
+    /// one divider line: the per-mode indicator (left quarter) and Play (right
+    /// three-quarters).  Both halves are flush, clipped to one rounded shape.
+    private var unifiedPlayRow: some View {
+        GeometryReader { geo in
+            // Match the indicator to one cell of the 4-column nav grid below
+            // (which has 3 × 10pt inter-column gaps) so it lines up under it.
+            let indicatorW = max(60, (geo.size.width - 30) / 4)
+            HStack(spacing: 0) {
+                modeHeader
+                    .frame(width: indicatorW)
+                Rectangle()
+                    .fill(Color(white: 0.42))
+                    .frame(width: 1)
+                playButton
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
+            .shadow(color: .white.opacity(0.12), radius: 8, y: 3)
+        }
+        .frame(height: 56)
+    }
+
     /// A compact Level Select button for the climb / challenge packs, or a stat
     /// readout for the other modes (pinball best, zen time, coins earned,
-    /// competitive wins).  Sized to fill the narrow left-quarter cell beside the
-    /// Play button at the same height; competitive modes also float a name tag
-    /// on the home marble.
+    /// competitive wins).  Fills the narrow left-quarter cell of the Play row;
+    /// competitive modes also float a name tag on the home marble.
     @ViewBuilder
     private var modeHeader: some View {
         let id = gameState.currentModeID
@@ -811,59 +838,50 @@ struct HomeView: View {
         }
     }
 
-    /// Compact, full-cell Level Select button — icon over a short label, sized
-    /// to the Play button's height so it reads as a sibling in the same row.
+    /// Level Select half of the Play row — icon on the left, "Levels" on the
+    /// right.  Flat dark fill (the unified row owns the rounding); fills its cell.
     private func levelSelectButton(route: HomeRoute) -> some View {
         NavigationLink(value: route) {
-            VStack(spacing: 3) {
+            HStack(spacing: 5) {
                 Image(systemName: "square.grid.3x3.fill")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                 Text("Levels")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .minimumScaleFactor(0.7)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .minimumScaleFactor(0.6)
                     .lineLimit(1)
             }
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .padding(.horizontal, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.16))
-                    .overlay(RoundedRectangle(cornerRadius: 14)
-                        .stroke(.white.opacity(0.18), lineWidth: 1))
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 5)
+            .background(Color(white: 0.16))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("LevelSelectButton")
         .accessibilityLabel("Level Select")
     }
 
-    /// Compact, full-cell stat readout — icon, value, tiny caption — sized to
-    /// the Play button's height for the left-quarter cell.
+    /// Stat half of the Play row — icon on the LEFT, with the value stacked over
+    /// the unit on the RIGHT (e.g. "🏆" then "0" over "wins").  Flat dark fill
+    /// (the unified row owns the rounding); fills its cell.
     private func statChip(icon: String, value: String, caption: String) -> some View {
-        VStack(spacing: 1) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color(white: 0.78))
-            Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.5)
-                .lineLimit(1)
-            Text(caption)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(white: 0.5))
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
+            VStack(spacing: 0) {
+                Text(value)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(caption)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            .minimumScaleFactor(0.5)
+            .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 56)
-        .padding(.horizontal, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14))
-                .overlay(RoundedRectangle(cornerRadius: 14)
-                    .stroke(.white.opacity(0.12), lineWidth: 1))
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 5)
+        .background(Color(white: 0.14))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(value) \(caption)")
     }
@@ -1297,7 +1315,6 @@ struct HomeView: View {
                                        t: tl.date.timeIntervalSinceReferenceDate)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 20))
 
             // Bold black label
             VStack(spacing: 2) {
@@ -1327,7 +1344,6 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 56)
-        .shadow(color: .white.opacity(0.22), radius: 12, y: 4)
     }
 
     // Shifting colour blobs + white sparkle accents — liquid "AI" gradient

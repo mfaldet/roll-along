@@ -6070,15 +6070,58 @@ final class AudioManager {
         engine.attach(player)
         let format = engine.outputNode.outputFormat(forBus: 0)
         engine.connect(player, to: engine.mainMixerNode, format: format)
+        winBuffer = makeWinBuffer(format: format)
+
+        engine.prepare()
         try? engine.start()
 
-        winBuffer = makeWinBuffer(format: format)
+        // Keep the engine warm.  The system STOPS the engine on an audio
+        // interruption (call, Siri, another app) or an engine-config change
+        // (route change — e.g. plugging in headphones), and a freshly-stopped
+        // engine can't be played until it has rendered an IO cycle.  Restarting
+        // on those events means playWin() rarely has to cold-start, which is
+        // what triggers the "player did not see an IO cycle" crash.
+        let nc = NotificationCenter.default
+        nc.addObserver(forName: AVAudioSession.interruptionNotification,
+                       object: nil, queue: .main) { [weak self] note in
+            guard let self,
+                  let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+            self.restartEngine()
+        }
+        nc.addObserver(forName: .AVAudioEngineConfigurationChange,
+                       object: engine, queue: .main) { [weak self] _ in
+            self?.restartEngine()
+        }
+        // Returning from the background re-activates the session and restarts the
+        // engine, so the engine is already warm by the time the player wins.
+        nc.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                       object: nil, queue: .main) { [weak self] _ in
+            self?.restartEngine()
+        }
+    }
+
+    /// Re-activate the session and restart the engine if the system stopped it.
+    private func restartEngine() {
+        try? AVAudioSession.sharedInstance().setActive(true)
+        guard !engine.isRunning else { return }
+        engine.prepare()
+        try? engine.start()
     }
 
     func playWin(enabled: Bool) {
         guard enabled, let buffer = winBuffer else { return }
-        if !engine.isRunning {
+        // Only play when the engine is ALREADY running — i.e. it has been
+        // rendering IO cycles.  If the system stopped it (interruption / route
+        // change / backgrounding), restart it for next time but SKIP this one
+        // sound: calling play() on a just-started engine that hasn't yet
+        // rendered an IO cycle throws "player did not see an IO cycle" and
+        // crashes.  A rare missed win chime beats a crash.
+        guard engine.isRunning else {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            engine.prepare()
             try? engine.start()
+            return
         }
         player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
         if !player.isPlaying {
