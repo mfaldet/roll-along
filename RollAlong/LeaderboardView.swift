@@ -108,19 +108,59 @@ struct LeaderboardView: View {
             emptyState
         } else {
             VStack(spacing: 0) {
+                statusStrip
+                Divider().overlay(Self.hairline)
                 columnHeader
+                Divider().overlay(Self.hairline)
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 0) {
                         ForEach(Array(displayRows.enumerated()), id: \.element.id) { index, profile in
                             leaderboardRow(rank: index + 1, profile: profile)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
                 }
                 .refreshable { await load() }
             }
+            .background(Self.panelFill)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(white: 0.18), lineWidth: 1))
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
         }
+    }
+
+    /// Ranked-player count + the signed-in player's own position — the
+    /// "your holding" line of the scoreboard.
+    private var rankedCount: Int { displayRows.count }
+    private var myRank: Int? {
+        guard let myId else { return nil }
+        return displayRows.firstIndex(where: { $0.id == myId }).map { $0 + 1 }
+    }
+
+    @ViewBuilder
+    private var statusStrip: some View {
+        HStack {
+            HStack(spacing: 5) {
+                Circle().fill(Self.starTint).frame(width: 6, height: 6)
+                Text("\(rankedCount) RANKED")
+                    .font(Self.headerFont)
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            Spacer()
+            if let r = myRank {
+                HStack(spacing: 5) {
+                    Text("YOU")
+                        .font(Self.headerFont)
+                        .foregroundStyle(Color(white: 0.55))
+                    Text("#\(r)")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Self.meAccent)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Column model
@@ -141,6 +181,10 @@ struct LeaderboardView: View {
     private static let pinTint  = Color(red: 0.30, green: 0.62, blue: 1.00)
     private static let zenTint  = Color(red: 0.40, green: 0.82, blue: 0.55)
     private static let winTint  = Color(red: 1.00, green: 0.81, blue: 0.30)
+    /// Highlight for the signed-in player's own row (scoreboard green).
+    private static let meAccent = Color(red: 0.28, green: 0.82, blue: 0.52)
+    private static let panelFill = Color(white: 0.11)
+    private static let hairline  = Color(white: 0.16)
 
     /// The columns shown on every row of the current board.
     private var columns: [StatColumn] {
@@ -178,18 +222,19 @@ struct LeaderboardView: View {
     /// Column titles above the list — aligned to the row columns by width.
     private var columnHeader: some View {
         HStack(spacing: 12) {
-            Color.clear.frame(width: 34, height: 1)          // rank-badge gutter
-            Text("PLAYER").font(Self.headerFont).foregroundStyle(Color(white: 0.45))
+            Text("#").font(Self.headerFont).foregroundStyle(Color(white: 0.40))
+                .frame(width: 30)
+            Text("PLAYER").font(Self.headerFont).foregroundStyle(Color(white: 0.40))
             Spacer(minLength: 0)
             ForEach(columns) { col in
                 Text(col.id)
                     .font(Self.headerFont)
-                    .foregroundStyle(col.highlighted ? Self.starTint : Color(white: 0.45))
-                    .frame(width: col.width)
+                    .foregroundStyle(col.highlighted ? Self.starTint : Color(white: 0.40))
+                    .frame(width: col.width, alignment: .trailing)
             }
         }
-        .padding(.horizontal, 30)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
     }
 
     private static let headerFont = Font.system(size: 10, weight: .heavy, design: .rounded)
@@ -202,29 +247,33 @@ struct LeaderboardView: View {
             rankBadge(rank)
 
             Text(profile.displayName.isEmpty ? "Climber" : profile.displayName)
-                .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
-                .foregroundStyle(.white)
+                .font(.system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold))
+                .foregroundStyle(isMe ? .white : Color(white: 0.92))
                 .lineLimit(1)
+
+            if isMe {
+                Text("YOU")
+                    .font(.system(size: 8, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(Capsule().fill(Self.meAccent))
+            }
 
             Spacer(minLength: 0)
 
             ForEach(cols) { col in
-                col.cell(profile).frame(width: col.width)
+                col.cell(profile).frame(width: col.width, alignment: .trailing)
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(isMe ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.18)
-                           : Color(white: 0.14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(isMe ? Color(red: 0.30, green: 0.58, blue: 0.98).opacity(0.7)
-                                     : Color.clear,
-                                lineWidth: 1.2)
-                )
-        )
+        .padding(.vertical, 11)
+        .background(isMe ? Self.meAccent.opacity(0.10) : Color.clear)
+        .overlay(alignment: .leading) {
+            if isMe { Rectangle().fill(Self.meAccent).frame(width: 3) }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Self.hairline).frame(height: 0.5).padding(.leading, 14)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(rowAccessibilityLabel(rank: rank, profile: profile, isMe: isMe))
     }
@@ -295,21 +344,30 @@ struct LeaderboardView: View {
                 ForEach(LeaderboardBoard.allCases) { g in
                     Button { selectedBoard = g } label: {
                         if selectedBoard == g {
-                            Label(g.rawValue, systemImage: "checkmark")
+                            Label(g.title, systemImage: "checkmark")
                         } else {
-                            Text(g.rawValue)
+                            Text(g.title)
                         }
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Self.starTint)
                     Text(selectedBoard.title)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(.headline, design: .rounded).weight(.heavy))
                         .foregroundStyle(.white)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color(white: 0.6))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color(white: 0.5))
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule().fill(Color(white: 0.13))
+                        .overlay(Capsule().stroke(Color(white: 0.24), lineWidth: 1))
+                )
             }
 
             // Sort toggles — only meaningful for the Roll Along board.
@@ -356,14 +414,20 @@ struct LeaderboardView: View {
         }()
 
         return ZStack {
-            Circle()
-                .fill(medal ?? Color(white: 0.20))
-                .frame(width: 34, height: 34)
-            Text("\(rank)")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(medal == nil ? Color(white: 0.7) : .black)
-                .monospacedDigit()
+            if let medal {
+                Circle().fill(medal).frame(width: 28, height: 28)
+                Text("\(rank)")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
+                    .monospacedDigit()
+            } else {
+                Text("\(rank)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
+                    .monospacedDigit()
+            }
         }
+        .frame(width: 30)
     }
 
     // MARK: - Empty / error / signed-out states
