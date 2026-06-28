@@ -3676,16 +3676,22 @@ struct BallSkinView: View {
     }
 
     // ── Trophy ───────────────────────────────────────────────────────────────
-    // Polished prestige gold sphere with a slow counter-rotating obsidian swirl
-    // band across the equator, and a large mirror-quality specular crescent.
+    // The Golden Gauntlet's exclusive prize — a lustrous prize-gold sphere with a
+    // raised, mirror-bright CHAMPION STAR embossed at its heart, a soft victory
+    // halo that breathes behind it, a specular highlight that orbits the surface
+    // like light catching polished metal as it rolls, and gold sparkle glints
+    // that twinkle across the finish.  Made to feel earned, not bought.
     //
     // Rendering layers:
-    //   1. Gold radial gradient base
-    //   2. Obsidian swirl — sinusoidal vertical strip that rotates over ~12 s
-    //   3. Metallic sheen overlay (subtle warm-to-cool gradient across the sphere)
-    //   4. Large mirror specular (upper-left, sharp highlight → soft falloff)
+    //   1. Polished gold base (bright crown highlight → deep bronze rim)
+    //   2. Victory halo behind the emblem (gentle breathing pulse)
+    //   3. Embossed champion star (engraved drop-shadow + raised gold + bevel)
+    //   4. Orbiting mirror specular
+    //   5. Twinkling gold sparkle glints
+    //   6. Warm reflected rim light (lower-right)
     //
-    // Freezes at t = 0 when reduceMotion is on.
+    // Freezes at t = 0 when reduceMotion is on (halo at mid-breath, light fixed
+    // upper-left, sparkles held at a steady gleam).
     private var trophyCanvas: some View {
         return TimelineView(.animation) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
@@ -3695,69 +3701,130 @@ struct BallSkinView: View {
                 let r  = min(size.width, size.height) * 0.5
                 let cx = size.width  * 0.5
                 let cy = size.height * 0.5
+                let center = CGPoint(x: cx, y: cy)
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
 
-                // ── 1. Gold base gradient ────────────────────────────────
+                // ── 1. Polished gold base ────────────────────────────────
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.98, blue: 0.80), location: 0.00),
+                        .init(color: Color(red: 0.99, green: 0.84, blue: 0.34), location: 0.34),
+                        .init(color: Color(red: 0.82, green: 0.57, blue: 0.11), location: 0.66),
+                        .init(color: Color(red: 0.44, green: 0.28, blue: 0.04), location: 0.90),
+                        .init(color: Color(red: 0.19, green: 0.11, blue: 0.01), location: 1.00),
+                    ]),
+                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.26),
+                    startRadius: 0, endRadius: r * 1.15))
+
+                // ── 2. Victory halo behind the emblem (breathing pulse) ──
+                let pulse = reduceMotion ? 0.5 : 0.5 + 0.5 * sin(t * 1.5)
                 ctx.fill(
-                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    Path(ellipseIn: CGRect(x: cx - r * 0.80, y: cy - r * 0.80,
+                                           width: r * 1.60, height: r * 1.60)),
                     with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(red: 1.00, green: 0.96, blue: 0.66), location: 0.00),
-                            .init(color: Color(red: 0.94, green: 0.72, blue: 0.18), location: 0.38),
-                            .init(color: Color(red: 0.62, green: 0.44, blue: 0.07), location: 0.72),
-                            .init(color: Color(red: 0.14, green: 0.09, blue: 0.02), location: 1.00),
+                            .init(color: Color(red: 1.0, green: 0.93, blue: 0.62).opacity(0.0), location: 0.30),
+                            .init(color: Color(red: 1.0, green: 0.90, blue: 0.54).opacity(0.10 + 0.13 * pulse), location: 0.60),
+                            .init(color: .clear, location: 0.92),
                         ]),
-                        center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
-                        startRadius: 0,
-                        endRadius: r * 1.05))
+                        center: center, startRadius: 0, endRadius: r * 0.80))
 
-                // ── 2. Obsidian counter-swirl band ───────────────────────
-                // The band sweeps across the equator and rotates slowly.
-                // We approximate it as a sinusoidal vertical slice.
-                let swirlAngle = t * (.pi / 6.0)          // ~12 s full rotation
-                let bandCX     = cx + r * CGFloat(cos(swirlAngle)) * 0.70
-                let bandW      = r * 0.32
-                let bandRect   = CGRect(x: bandCX - bandW * 0.5,
-                                        y: cy - r,
-                                        width: bandW,
-                                        height: r * 2)
-                ctx.fill(
-                    Path(ellipseIn: bandRect),
-                    with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: Color(red: 0.06, green: 0.04, blue: 0.02).opacity(0.58), location: 0.5),
-                            .init(color: .clear, location: 1),
-                        ]),
-                        startPoint: CGPoint(x: bandCX - bandW, y: 0),
-                        endPoint:   CGPoint(x: bandCX + bandW, y: 0)))
+                // ── 3. Embossed champion star ────────────────────────────
+                let starR  = r * 0.55
+                let starIn = r * 0.225
+                let rot    = -Double.pi / 2          // one point up
+                // 3a. engraved drop-shadow (down-right → raised toward the light)
+                ctx.fill(Self.starPath(center: CGPoint(x: cx + r * 0.045, y: cy + r * 0.055),
+                                       outer: starR, inner: starIn, rotation: rot),
+                         with: .color(Color(red: 0.20, green: 0.12, blue: 0.01).opacity(0.55)))
+                // 3b. raised gold star
+                let star = Self.starPath(center: center, outer: starR, inner: starIn, rotation: rot)
+                ctx.fill(star, with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.99, blue: 0.86), location: 0.0),
+                        .init(color: Color(red: 0.99, green: 0.81, blue: 0.31), location: 0.5),
+                        .init(color: Color(red: 0.76, green: 0.49, blue: 0.08), location: 1.0),
+                    ]),
+                    startPoint: CGPoint(x: cx - starR, y: cy - starR),
+                    endPoint:   CGPoint(x: cx + starR, y: cy + starR)))
+                // 3c. bright bevel edge
+                ctx.stroke(star, with: .color(Color(red: 1.0, green: 0.98, blue: 0.82).opacity(0.92)),
+                           lineWidth: max(0.5, r * 0.022))
 
-                // ── 3. Metallic warm sheen (left-to-right) ───────────────
+                // ── 4. Orbiting mirror specular ──────────────────────────
+                let orbit = t * 0.6 - 2.2
+                let sx = cx + r * 0.34 * CGFloat(cos(orbit))
+                let sy = cy + r * 0.34 * CGFloat(sin(orbit)) - r * 0.28
                 ctx.fill(
-                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
-                    with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: Color(red: 1.0, green: 0.88, blue: 0.40).opacity(0.12), location: 0.0),
-                            .init(color: .clear, location: 0.5),
-                            .init(color: Color(red: 0.30, green: 0.18, blue: 0.00).opacity(0.16), location: 1.0),
-                        ]),
-                        startPoint: CGPoint(x: cx - r, y: cy),
-                        endPoint:   CGPoint(x: cx + r, y: cy)))
-
-                // ── 4. Mirror specular (upper-left) ─────────────────────
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.72,
-                                           width: r * 0.50, height: r * 0.28)),
+                    Path(ellipseIn: CGRect(x: sx - r * 0.30, y: sy - r * 0.16,
+                                           width: r * 0.60, height: r * 0.32)),
                     with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color.white.opacity(0.88), location: 0.00),
-                            .init(color: Color.white.opacity(0.42), location: 0.40),
-                            .init(color: Color(red: 1.0, green: 0.92, blue: 0.60).opacity(0.15), location: 0.75),
-                            .init(color: .clear, location: 1.00),
+                            .init(color: .white.opacity(0.78), location: 0.0),
+                            .init(color: .white.opacity(0.22), location: 0.45),
+                            .init(color: .clear, location: 1.0),
                         ]),
-                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.62),
-                        startRadius: 0, endRadius: r * 0.36))
+                        center: CGPoint(x: sx, y: sy), startRadius: 0, endRadius: r * 0.32))
+
+                // ── 5. Twinkling gold sparkle glints ─────────────────────
+                let glints: [(CGFloat, CGFloat, Double)] = [
+                    (0.30, 0.30, 0.0), (0.74, 0.40, 1.9), (0.60, 0.74, 3.6), (0.34, 0.64, 5.1),
+                ]
+                for (gx, gy, ph) in glints {
+                    let tw = reduceMotion ? 0.5 : max(0.0, sin(t * 2.1 + ph))
+                    if tw <= 0.02 { continue }
+                    let p = CGPoint(x: cx + (gx - 0.5) * 2 * r * 0.82,
+                                    y: cy + (gy - 0.5) * 2 * r * 0.82)
+                    if hypot(p.x - cx, p.y - cy) > r * 0.92 { continue }
+                    trophyGlint(ctx, at: p, size: r * 0.13 * CGFloat(0.6 + 0.4 * tw), opacity: tw)
+                }
+
+                // ── 6. Warm reflected rim light (lower-right) ────────────
+                ctx.stroke(
+                    Path(ellipseIn: sphere.insetBy(dx: r * 0.04, dy: r * 0.04)),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: .clear, location: 0.30),
+                            .init(color: Color(red: 1.0, green: 0.90, blue: 0.55).opacity(0.5), location: 0.62),
+                            .init(color: .clear, location: 0.85),
+                        ]),
+                        startPoint: CGPoint(x: cx - r, y: cy - r),
+                        endPoint:   CGPoint(x: cx + r, y: cy + r)),
+                    lineWidth: max(0.6, r * 0.03))
             }
         }
+    }
+
+    /// A pointed star path (default 5 points), used for the Trophy's champion emblem.
+    private static func starPath(center c: CGPoint, outer R: CGFloat, inner: CGFloat,
+                                 points: Int = 5, rotation rot: Double) -> Path {
+        var p = Path()
+        for k in 0..<(points * 2) {
+            let a   = rot + Double(k) * .pi / Double(points)
+            let rad = (k % 2 == 0) ? R : inner
+            let pt  = CGPoint(x: c.x + CGFloat(cos(a)) * rad, y: c.y + CGFloat(sin(a)) * rad)
+            if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        p.closeSubpath()
+        return p
+    }
+
+    /// A warm 4-point sparkle flare for the Trophy's gleam (gold-tinted bloom + white star).
+    private func trophyGlint(_ ctx: GraphicsContext, at c: CGPoint, size: CGFloat, opacity: Double) {
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - size, y: c.y - size, width: size * 2, height: size * 2)),
+                 with: .radialGradient(Gradient(colors: [
+                    Color(red: 1.0, green: 0.96, blue: 0.78).opacity(0.5 * opacity), .clear]),
+                    center: c, startRadius: 0, endRadius: size))
+        var star = Path()
+        let L = size, inr = size * 0.18
+        for k in 0..<8 {
+            let a   = Double(k) * .pi / 4 - .pi / 2
+            let rad = (k % 2 == 0) ? L : inr
+            let p   = CGPoint(x: c.x + CGFloat(cos(a)) * rad, y: c.y + CGFloat(sin(a)) * rad)
+            if k == 0 { star.move(to: p) } else { star.addLine(to: p) }
+        }
+        star.closeSubpath()
+        ctx.fill(star, with: .color(.white.opacity(min(1.0, 0.9 * opacity))))
     }
 
     // =========================================================================
