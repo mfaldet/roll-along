@@ -50,7 +50,8 @@ final class CosmeticsTests: XCTestCase {
         let expected: Set<String> = [
             "Pluto", "Aurora", "Beach Ball", "Pumpkin", "Ornament",
             "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy",
-            "Diamond"   // Diamond Balls IAP exclusive
+            "Diamond",     // Diamond Balls IAP exclusive
+            "Money Ball"   // 10,000-coin IAP secret exclusive
         ]
         let actual = Set(BallSkin.allCases.filter { $0.isBundleExclusive }.map { $0.rawValue })
         XCTAssertEqual(actual, expected,
@@ -240,5 +241,64 @@ final class CosmeticsTests: XCTestCase {
                 XCTAssertEqual(actual % 5, 0, "shopPrice must be a clean multiple of 5")
             }
         }
+    }
+
+    // MARK: - Bundle rarity + Iconic (Phase 1)
+
+    /// Probe: prints the bundle cost distribution so thresholds can be tuned to
+    /// the live catalogue, and asserts every rarity band is represented (a
+    /// healthy Standard tier is required for the post-tutorial gift picker).
+    func test_bundleRarityDistribution() {
+        let sorted = CosmeticBundle.catalogue.sorted { $0.fullPrice() < $1.fullPrice() }
+        for b in sorted {
+            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(b.fullPrice())  \(b.id)")
+        }
+        let buckets = Dictionary(grouping: CosmeticBundle.catalogue, by: { $0.rarity })
+        print("RARITYDIST counts:",
+              BundleRarity.allCases.map { "\($0.label)=\(buckets[$0]?.count ?? 0)" }.joined(separator: " "))
+        for r in BundleRarity.allCases {
+            XCTAssertGreaterThan(buckets[r]?.count ?? 0, 0, "no bundles in rarity band \(r.label)")
+        }
+    }
+
+    /// Iconic = the un-sellable specials.  Starter look + earned/IAP exclusives
+    /// read "Iconic"; coin-purchasable items keep their tier rarity.
+    func testIconic_classification() {
+        XCTAssertTrue(BallSkin.red.isIconic, "the classic starter ball is Iconic")
+        XCTAssertEqual(BallSkin.red.rarityLabel, "Iconic")
+        XCTAssertTrue(BallSkin.diamond.isIconic, "Diamond (IAP) is Iconic")
+        XCTAssertTrue(BallSkin.trophy.isIconic, "Trophy (earned) is Iconic")
+        XCTAssertTrue(TrailColor.moneyRoll.isIconic, "Money Roll (IAP) is Iconic")
+
+        // Seasonal / limited-time exclusives are NOT iconic — they're sellable
+        // (liquidated back into coins), even though they're not shop-buyable.
+        XCTAssertFalse(BallSkin.pumpkin.isIconic, "seasonal balls are sellable, not Iconic")
+        XCTAssertTrue(BallSkin.pumpkin.isSellable)
+        XCTAssertFalse(BallSkin.pumpkin.isCoinPurchasable, "…but still not bought in the regular shop")
+        XCTAssertEqual(BallSkin.pumpkin.rarityLabel, BallSkin.pumpkin.tier.label, "shows a tier rarity, not Iconic")
+
+        if let coinBall = BallSkin.allCases.first(where: { $0.isCoinPurchasable }) {
+            XCTAssertFalse(coinBall.isIconic)
+            XCTAssertTrue(coinBall.isSellable)
+            XCTAssertEqual(coinBall.rarityLabel, coinBall.tier.label)
+        }
+    }
+
+    /// Sell Back now liquidates seasonal / limited-time exclusives for coins,
+    /// while still keeping the permanent Iconic specials.
+    func testLiquidate_sellsSeasonalExclusives_keepsIconic() {
+        let gs = makeCleanState()
+        gs.coinBalance = 0
+        gs.ownedBallSkins.insert(BallSkin.pumpkin.rawValue)   // seasonal exclusive → sellable now
+        gs.ownedBallSkins.insert(BallSkin.diamond.rawValue)   // iconic → kept
+
+        let preview = gs.coinLiquidationPreview()
+        XCTAssertEqual(preview.count, 1, "only the seasonal pumpkin is sellable")
+        XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost)
+
+        let r = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost)
+        XCTAssertFalse(gs.ownedBallSkins.contains(BallSkin.pumpkin.rawValue), "seasonal ball sold + relocked")
+        XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.diamond.rawValue), "iconic Diamond kept")
     }
 }

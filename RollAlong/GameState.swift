@@ -625,12 +625,13 @@ final class GameState: ObservableObject {
 
     // MARK: - Cosmetic liquidation ("Reset Cosmetics")
 
-    /// Dry run: how many owned cosmetics were bought with coins, and the coins
-    /// they'd refund.  Powers the Danger-Zone button label + confirm dialog.
+    /// Dry run: how many owned cosmetics are sellable (coin-bought plus seasonal
+    /// / limited-time specials), and the coins they'd refund.  Powers the
+    /// Danger-Zone button label + confirm dialog.
     func coinLiquidationPreview() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
-            for item in Item.allCases where item.isCoinPurchasable && owned.contains(item.rawValue) {
+            for item in Item.allCases where item.isSellable && owned.contains(item.rawValue) {
                 count += 1; coins += item.coinCost
             }
         }
@@ -641,15 +642,16 @@ final class GameState: ObservableObject {
         return (count, coins)
     }
 
-    /// Relock every coin-bought cosmetic and refund its coins, KEEPING starters
-    /// and exclusives (challenge-pack earned, IAP/indirect like the Diamond &
-    /// Aurora skins).  Re-equips the starter for any slot whose item was
-    /// liquidated.  Returns what was liquidated.  Level progress is untouched.
+    /// Relock every SELLABLE cosmetic and refund its coins — coin-bought items
+    /// plus seasonal / limited-time specials — KEEPING the starter look and the
+    /// permanent Iconic specials (Trophy, Diamond, Money, Aurora).  Re-equips the
+    /// starter for any slot whose item was liquidated.  Returns what was
+    /// liquidated.  Level progress is untouched.
     @discardableResult
     func liquidateCoinCosmetics() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
-            for item in Item.allCases where item.isCoinPurchasable && owned.contains(item.rawValue) {
+            for item in Item.allCases where item.isSellable && owned.contains(item.rawValue) {
                 count += 1; coins += item.coinCost
                 owned.remove(item.rawValue)
             }

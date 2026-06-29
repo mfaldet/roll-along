@@ -32,10 +32,44 @@ protocol CosmeticItem: Hashable, Identifiable, CaseIterable, Codable
     /// event-only) item. A protocol REQUIREMENT (not just an extension method)
     /// so generic code dispatches to a type's override. Defaulted below.
     var isCoinPurchasable: Bool { get }
+    /// Un-sellable special (starter look + permanent earned/IAP specials). A
+    /// protocol REQUIREMENT so generic Sell-Back code dispatches to a type's
+    /// override. Defaulted to starter-only below; seasonal items are NOT iconic.
+    var isIconic: Bool { get }
 }
 
 extension CosmeticItem {
     var isCoinPurchasable: Bool { tier != .starter }
+
+    // MARK: - Iconic & sellability
+
+    /// "Iconic" = the un-sellable special cosmetics: the classic starter look and
+    /// the permanent earned/IAP specials (Diamond, Money, Trophy, Aurora).  These
+    /// are kept by Sell Back and carry the "Iconic" badge instead of a tier
+    /// rarity.  Default is starter-only; types with permanent specials override.
+    /// IMPORTANT: seasonal / limited-time cosmetics are NOT iconic — they're
+    /// sellable (liquidated back into coins, per design).
+    var isIconic: Bool { tier == .starter }
+
+    /// True when Sell Back can liquidate this item for coins — everything that
+    /// isn't the starter look or a permanent Iconic special, including seasonal /
+    /// limited-time cosmetics.
+    var isSellable: Bool { !isIconic }
+
+    /// Player-facing rarity word: "Iconic" for un-sellable specials, otherwise
+    /// the tier's rarity name (Standard / Rare / Epic / Legendary).
+    var rarityLabel: String { isIconic ? "Iconic" : tier.label }
+
+    /// Badge accent — a distinct prismatic magenta for Iconic, else the tier color.
+    var rarityColor: Color { isIconic ? Self.iconicColor : tier.color }
+
+    /// Every item earns a badge now: Iconic items included (the plain classic
+    /// look reads as "Iconic"), so this is always true.
+    var showsRarityBadge: Bool { true }
+
+    /// Shared Iconic accent — sits apart from the gray→blue→cyan→purple→gold
+    /// tier ramp so "Iconic" reads as its own thing, above Legendary.
+    static var iconicColor: Color { Color(red: 0.96, green: 0.45, blue: 0.85) }
 }
 
 extension BallSkin {
@@ -45,6 +79,13 @@ extension BallSkin {
         [.trophy, .aurora, .beachBall, .pumpkin, .ornament, .heartstone,
          .shamrock, .confetti, .speckledEgg, .diamond, .moneyBall]
     var isCoinPurchasable: Bool { tier != .starter && !Self.coinExclusiveBalls.contains(self) }
+
+    /// Permanent un-sellable specials (Iconic): earned (Trophy), IAP (Diamond,
+    /// Money) and Aurora.  The OTHER `coinExclusiveBalls` (beachBall, pumpkin,
+    /// ornament, heartstone, shamrock, confetti, speckledEgg) are seasonal /
+    /// limited-time event balls — now SELLABLE via Sell Back.
+    static let iconicBalls: Set<BallSkin> = [.trophy, .diamond, .moneyBall, .aurora]
+    var isIconic: Bool { tier == .starter || Self.iconicBalls.contains(self) }
 }
 
 /// Tier roughly corresponds to price + rarity.
@@ -800,6 +841,7 @@ enum TrailColor: String, CosmeticItem {
     /// $49.99 / 10,000-coin pack, mirroring the Diamond ball.
     var isBundleExclusive: Bool { self == .moneyRoll }
     var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
+    var isIconic: Bool { tier == .starter || self == .moneyRoll }   // Money Roll = IAP secret
 
     /// SwiftUI Color used when rendering this trail.  `.none` returns
     /// clear; `.rainbow` returns a placeholder colour (the actual
@@ -973,6 +1015,7 @@ enum Floor: String, CosmeticItem {
     /// 10,000-coin pack, mirroring the Diamond ball.
     var isBundleExclusive: Bool { self == .moneyFull }
     var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
+    var isIconic: Bool { tier == .starter || self == .moneyFull }   // Money Full = IAP secret
 
     /// Whether this floor has the Paper-world graphite-trail mechanic.
     var paperTrailEnabled: Bool {
@@ -1510,6 +1553,35 @@ enum ShopRotation {
     }
 }
 
+/// A bundle's overall rarity, derived from its total coin value.  Three bands so
+/// the shop reads at a glance and the post-tutorial gift can filter to Standard.
+enum BundleRarity: String, CaseIterable {
+    case standard, rare, legendary
+
+    /// Cost thresholds (in coins).  `fullPrice < rareFloor` → Standard;
+    /// `< legendaryFloor` → Rare; otherwise Legendary.  Tuned to the live
+    /// catalogue (bundles run 450–1950) so the split is ~7 / 17 / 33.
+    static let rareFloor      = 700
+    static let legendaryFloor = 1100
+
+    var label: String {
+        switch self {
+        case .standard:  return "Standard"
+        case .rare:      return "Rare"
+        case .legendary: return "Legendary"
+        }
+    }
+
+    /// Mirrors the item tier ramp — Standard blue, Rare cyan, Legendary gold.
+    var color: Color {
+        switch self {
+        case .standard:  return Color(red: 0.45, green: 0.62, blue: 0.85)
+        case .rare:      return Color(red: 0.28, green: 0.78, blue: 0.95)
+        case .legendary: return Color(red: 1.00, green: 0.78, blue: 0.28)
+        }
+    }
+}
+
 struct CosmeticBundle: Identifiable {
     /// Stable persistence key.
     let id: String
@@ -1604,6 +1676,18 @@ struct CosmeticBundle: Identifiable {
         let pitSum:   Int = pits.reduce(0)   { $0 + $1.coinCost }
         let musicSum: Int = music.reduce(0)  { $0 + $1.coinCost }
         return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
+    }
+
+    /// Bundle rarity — derived from the bundle's TOTAL coin value (`fullPrice`),
+    /// since price already encodes per-item rarity.  Thresholds tuned to the live
+    /// catalogue so a healthy number of cheaper bundles land in Standard (those
+    /// are the ones offered as the post-tutorial gift).
+    var rarity: BundleRarity {
+        switch fullPrice() {
+        case ..<BundleRarity.rareFloor:       return .standard
+        case ..<BundleRarity.legendaryFloor:  return .rare
+        default:                              return .legendary
+        }
     }
 
     /// The prorated price — the sum of only the items the player does NOT
@@ -2796,18 +2880,35 @@ struct MiniBall: View {
 /// colour.  Surfaces rarity-as-status in the shop and profile.  Renders nothing
 /// for starter/free items.
 struct TierBadge: View {
-    let tier: CosmeticTier
+    let label: String
+    let color: Color
+    var shows: Bool = true
     var compact: Bool = false
+
+    /// Item-aware: shows "Iconic" for un-sellable specials, else the tier rarity.
+    init<Item: CosmeticItem>(item: Item, compact: Bool = false) {
+        self.init(label: item.rarityLabel, color: item.rarityColor,
+                  shows: item.showsRarityBadge, compact: compact)
+    }
+    /// Plain tier badge (kept for callers that only have a `CosmeticTier`).
+    init(tier: CosmeticTier, compact: Bool = false) {
+        self.init(label: tier.label, color: tier.color,
+                  shows: tier.showsBadge, compact: compact)
+    }
+    init(label: String, color: Color, shows: Bool = true, compact: Bool = false) {
+        self.label = label; self.color = color; self.shows = shows; self.compact = compact
+    }
+
     var body: some View {
-        if tier.showsBadge {
-            Text(tier.label.uppercased())
+        if shows {
+            Text(label.uppercased())
                 .font(.system(size: compact ? 8 : 9, weight: .black, design: .rounded))
                 .tracking(0.5)
-                .foregroundStyle(tier.color)
+                .foregroundStyle(color)
                 .padding(.horizontal, compact ? 5 : 7)
                 .padding(.vertical, compact ? 2 : 3)
-                .background(Capsule().fill(tier.color.opacity(0.16)))
-                .overlay(Capsule().stroke(tier.color.opacity(0.55), lineWidth: 1))
+                .background(Capsule().fill(color.opacity(0.16)))
+                .overlay(Capsule().stroke(color.opacity(0.55), lineWidth: 1))
                 .fixedSize()
         }
     }
