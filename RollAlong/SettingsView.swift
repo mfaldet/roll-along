@@ -111,6 +111,12 @@ struct SettingsView: View {
                     .focused($nameFocused)
                     .submitLabel(.done)
                     .onSubmit { nameFocused = false }
+                    .autocorrectionDisabled()
+                    .onChange(of: gameState.playerName) { _, newValue in
+                        // Nickname: letters and numbers only, max 12 characters.
+                        let cleaned = String(newValue.filter { $0.isLetter || $0.isNumber }.prefix(12))
+                        if cleaned != newValue { gameState.playerName = cleaned }
+                    }
             }
             .padding()
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
@@ -185,7 +191,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
                 }
 
-                Text("Deleting your account permanently removes your profile, friends, clan membership, and leaderboard standing. Your level progress stays on this device.")
+                Text("Permanently removes your profile, friends, clan, and leaderboard rank. Level progress stays on this device.")
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color(white: 0.45))
             } else {
@@ -339,7 +345,7 @@ struct SettingsView: View {
                             Text(isRestoring ? "Restoring…" : "Restore Purchases")
                                 .font(.system(.body, design: .rounded))
                                 .foregroundStyle(Color(white: 0.85))
-                            Text("Brings back anything you bought with real money (like Unlimited Lives) on a new phone or after reinstalling. Won't touch your coins or cosmetics.")
+                            Text("Restores real-money purchases (like Unlimited Lives) after reinstalling or on a new phone.")
                                 .font(.system(.caption, design: .rounded))
                                 .foregroundStyle(Color(white: 0.42))
                                 .fixedSize(horizontal: false, vertical: true)
@@ -393,12 +399,12 @@ struct SettingsView: View {
                         Text("Sell Back Cosmetics")
                             .font(.system(.body, design: .rounded))
                         Text(cosmetic.count > 0
-                             ? "Sell your cosmetics back for a full coin refund — including seasonal & limited-time pieces — and tidy your locker."
+                             ? "Refunds every cosmetic for full coin value, seasonal pieces included."
                              : "Return your equipped look to the default.")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.45))
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Keeps only your Iconic items (the classic look + secret rewards like Diamond & Trophy).")
+                        Text("Keeps your Iconic items (classic look, Diamond, Trophy).")
                             .font(.system(.caption2, design: .rounded))
                             .foregroundStyle(Color(white: 0.38))
                             .fixedSize(horizontal: false, vertical: true)
@@ -438,7 +444,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Reset Level Progress")
                             .font(.system(.body, design: .rounded))
-                        Text("Wipes every level back to Level 1 — keeps your cosmetics, nickname & settings. Can't be undone.")
+                        Text("Resets all levels to Level 1. Keeps cosmetics, nickname & settings. Can't be undone.")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(red: 0.78, green: 0.42, blue: 0.42))
                             .fixedSize(horizontal: false, vertical: true)
