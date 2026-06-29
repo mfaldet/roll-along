@@ -303,4 +303,32 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertFalse(gs.ownedBallSkins.contains(BallSkin.pumpkin.rawValue), "seasonal ball sold + relocked")
         XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.diamond.rawValue), "iconic Diamond kept")
     }
+
+    // MARK: - Free-granted bundle gift (Phase 4 — post-tutorial)
+
+    /// A gifted Standard bundle is granted, marked non-refundable, and Sell Back
+    /// keeps it (no coins refunded) — it's un-redeemable.
+    func testGrantBundleFree_isKeptAndNeverRefunded() {
+        let gs = makeCleanState()
+        gs.coinBalance = 0
+        guard let bundle = CosmeticBundle.catalogue.first(where: { $0.rarity == .standard }) else {
+            return XCTFail("expected at least one Standard bundle for the tutorial gift")
+        }
+
+        gs.grantBundleFree(bundle)
+        // Every member is now owned and recorded as free-granted.
+        for b in bundle.balls  { XCTAssertTrue(gs.isOwned(b)); XCTAssertTrue(gs.freeGrantedItems.contains(b.rawValue)) }
+        for g in bundle.goals  { XCTAssertTrue(gs.isOwned(g)) }
+        XCTAssertTrue(gs.ownedBundles.contains(bundle.id))
+
+        // Sell Back must NOT refund the gift, and must keep its items.
+        let preview = gs.coinLiquidationPreview()
+        XCTAssertEqual(preview.count, 0, "gifted bundle items are not sellable")
+        XCTAssertEqual(preview.coins, 0)
+        gs.liquidateCoinCosmetics()
+        for b in bundle.balls where b.tier != .starter {
+            XCTAssertTrue(gs.ownedBallSkins.contains(b.rawValue), "gifted ball kept after Sell Back")
+        }
+        XCTAssertEqual(gs.coinBalance, 0, "no coins handed out for the gift")
+    }
 }
