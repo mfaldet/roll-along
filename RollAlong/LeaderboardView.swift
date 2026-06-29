@@ -29,6 +29,7 @@ struct LeaderboardView: View {
     @State private var sortKey:       SortKey         = .level
     @State private var selectedBoard: LeaderboardBoard = .rollAlong
     @State private var diffFilter:    DiffFilter      = .overall
+    @State private var showBoardPicker = false
 
     /// Which Roll Along stat the board ranks by.  (Speed was dropped — we lean
     /// on stars for skill.)  Only changes ranking — never which columns show.
@@ -341,39 +342,113 @@ struct LeaderboardView: View {
     // Stat formatting (zen time, competitive best) is shared with the profile
     // via `LeaderboardBoard`'s static helpers — see Self → LeaderboardBoard.
 
+    // MARK: - Board picker (game filter)
+
+    /// Per-board usage for the local player — drives the filter's "most played
+    /// first" ordering.  Competitive boards use real play counts; Pinball/Zen
+    /// have no play counter, so a binary "played" signal is used (ties fall back
+    /// to alphabetical).  Roll Along uses climb level.
+    private func boardUsage(_ b: LeaderboardBoard) -> Int {
+        if let mode = b.competitiveModeID {
+            return gameState.minigameDifficultyPlays
+                .filter { $0.key.hasPrefix(mode + "|") }
+                .reduce(0) { $0 + $1.value }
+        }
+        switch b {
+        case .rollAlong: return gameState.currentLevel
+        case .pinball:   return gameState.pinballBest > 0 ? 1 : 0
+        case .zenGarden: return gameState.zenSeconds   > 0 ? 1 : 0
+        default:         return 0
+        }
+    }
+
+    /// Boards in one category, most-played first; not-yet-played games sink to
+    /// the bottom in alphabetical order.
+    private func boards(in category: BoardCategory) -> [LeaderboardBoard] {
+        LeaderboardBoard.allCases
+            .filter { $0.category == category }
+            .sorted { a, b in
+                let ua = boardUsage(a), ub = boardUsage(b)
+                let pa = ua > 0, pb = ub > 0
+                if pa != pb     { return pa }          // played before not-played
+                if pa, ua != ub { return ua > ub }     // both played: most used first
+                return a.title < b.title                // tie / unplayed: alphabetical
+            }
+    }
+
+    /// Grouped, bigger-named game picker presented from the filter pill.
+    private var boardPicker: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                ForEach(BoardCategory.allCases, id: \.self) { cat in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(cat.title.uppercased())
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .kerning(1.5)
+                            .foregroundStyle(Self.starTint)
+                            .padding(.bottom, 6)
+                        ForEach(boards(in: cat)) { b in
+                            Button {
+                                selectedBoard = b
+                                showBoardPicker = false
+                            } label: {
+                                HStack {
+                                    Text(b.title)
+                                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                                        .foregroundStyle(b == selectedBoard ? Self.starTint : .white)
+                                    Spacer(minLength: 8)
+                                    if b == selectedBoard {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundStyle(Self.starTint)
+                                    }
+                                }
+                                .padding(.vertical, 9)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 26)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color(white: 0.07).ignoresSafeArea())
+    }
+
     // MARK: - Header (game filter + sort)
 
     private var leaderboardHeader: some View {
         VStack(spacing: 12) {
-            // Game filter — a dropdown sitting just under the nav title.
-            Menu {
-                ForEach(LeaderboardBoard.allCases) { g in
-                    Button { selectedBoard = g } label: {
-                        if selectedBoard == g {
-                            Label(g.title, systemImage: "checkmark")
-                        } else {
-                            Text(g.title)
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
+            // Game filter — opens a grouped picker (bigger names, sorted by
+            // category then by how much the player has played each game).
+            Button { showBoardPicker = true } label: {
+                HStack(spacing: 9) {
                     Image(systemName: "trophy.fill")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(Self.starTint)
                     Text(selectedBoard.title)
-                        .font(.system(.headline, design: .rounded).weight(.heavy))
+                        .font(.system(.title3, design: .rounded).weight(.heavy))
                         .foregroundStyle(.white)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color(white: 0.5))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
                 .background(
                     Capsule().fill(Self.controlTrack)
                         .overlay(Capsule().stroke(Self.controlBorder, lineWidth: 1))
                 )
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showBoardPicker) {
+                boardPicker
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
 
             // Difficulty selector — competitive boards only, sits above the sort.
