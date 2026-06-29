@@ -345,18 +345,21 @@ struct CosmeticShopView: View {
         .accessibilityHint("Opens the get-coins shop.")
     }
 
-    // MARK: - Tab bar
+    // MARK: - Category filter (persistent square tiles)
 
+    /// A non-scrolling row of square category tiles.  It lives ABOVE the
+    /// ScrollView (see `body`), so every cosmetic type stays visible and one tap
+    /// away while the player scrolls the Catalog — no horizontal swiping to reach
+    /// a filter, and the bar never scrolls off the top.
     private var tabBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(ShopCategory.allCases) { cat in
-                    tabButton(cat)
-                }
+        HStack(spacing: 5) {
+            ForEach(ShopCategory.allCases) { cat in
+                tabButton(cat)
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 6)
         }
+        .padding(.horizontal, 10)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
     }
 
     private func tabButton(_ cat: ShopCategory) -> some View {
@@ -364,20 +367,29 @@ struct CosmeticShopView: View {
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) { category = cat }
         } label: {
-            HStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Image(systemName: cat.icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                 Text(cat.displayName)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
             }
-            .foregroundStyle(isActive ? .black : Color(white: 0.80))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .foregroundStyle(isActive ? .black : Color(white: 0.82))
+            .frame(maxWidth: .infinity)   // equal-width tiles fill the row, no scroll
+            .frame(height: 54)
             .background(
-                Capsule()
+                RoundedRectangle(cornerRadius: 13)
                     .fill(isActive ? Color.white : Color(white: 0.16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13)
+                            .stroke(isActive ? Color.clear : Color(white: 0.24), lineWidth: 0.8)
+                    )
             )
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(cat.displayName)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Grid
@@ -796,60 +808,21 @@ struct CosmeticShopView: View {
     // The featured collection (weekly rotation) gets a gold border and badge.
     // =========================================================================
 
-    /// Weekly-rotating featured bundle — drawn only from permanent (non-seasonal)
-    /// bundles so seasonal items don't occupy two sections at once.
-    private var permanentFeaturedBundle: CosmeticBundle {
-        let permanent = CosmeticBundle.catalogue.filter { !$0.isLimitedTime }
-        guard !permanent.isEmpty else { return CosmeticBundle.catalogue[0] }
-        let week = Calendar.current.component(.weekOfYear, from: Date())
-        return permanent[week % permanent.count]
-    }
-
     @ViewBuilder
     private var collectionsView: some View {
-        let seasonal  = CosmeticBundle.catalogue.filter { $0.isLimitedTime && $0.isAvailable }
-        let permanent = CosmeticBundle.catalogue.filter { !$0.isLimitedTime }
-        let featured  = permanentFeaturedBundle
-
+        // The Catalog lists every collection plainly — no "limited time"
+        // countdown and no "featured this week" spotlight.  Browsing is the
+        // point; a bundle is the one thing you can actually buy here.  (Seasonal
+        // bundles still appear only while their window is open, so they can't be
+        // bought out of season.)
+        let bundles = CosmeticBundle.catalogue.filter { !$0.isLimitedTime || $0.isAvailable }
         LazyVStack(alignment: .leading, spacing: 0) {
-            // ── Limited-time seasonal bundles (top of shop) ───────────────
-            if !seasonal.isEmpty {
-                limitedTimeSectionHeader
-                    .padding(.bottom, 8)
-                ForEach(seasonal) { bundle in
-                    collectionCard(bundle, isFeatured: false)
-                        .padding(.bottom, 12)
-                }
-                Color(white: 0.20)
-                    .frame(height: 0.5)
-                    .padding(.vertical, 14)
-            }
-
-            // ── Weekly featured (permanent rotation) ─────────────────────
-            sectionLabel("FEATURED THIS WEEK")
-                .padding(.bottom, 8)
-            collectionCard(featured, isFeatured: true)
-                .padding(.bottom, 22)
-
-            // ── All permanent collections ─────────────────────────────────
             sectionLabel("ALL COLLECTIONS")
                 .padding(.bottom, 8)
-            ForEach(permanent.filter { $0.id != featured.id }) { bundle in
+            ForEach(bundles) { bundle in
                 collectionCard(bundle, isFeatured: false)
                     .padding(.bottom, 12)
             }
-        }
-    }
-
-    private var limitedTimeSectionHeader: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color(red: 1.00, green: 0.42, blue: 0.18))
-            Text("LIMITED TIME")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .kerning(1.4)
-                .foregroundStyle(Color(red: 1.00, green: 0.42, blue: 0.18))
         }
     }
 
@@ -874,7 +847,9 @@ struct CosmeticShopView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     // Chips row — ⚡ DEAL, ⭐ FEATURED and/or 🔥 LIMITED
                     let showFeatured = isFeatured
-                    let showLimited  = bundle.isLimitedTime && bundle.isAvailable
+                    // Limited-time framing is a Shop-only nudge — the Catalog
+                    // stays a plain, pressure-free browse.
+                    let showLimited  = isShop && bundle.isLimitedTime && bundle.isAvailable
                     if discounted || showFeatured || showLimited {
                         HStack(spacing: 6) {
                             if discounted {
@@ -990,7 +965,7 @@ struct CosmeticShopView: View {
         // Owned/complete → gold.  Currently the Shop's featured (buyable) bundle → blue.
         if bundleOwned                                       { return Color(red: 1.00, green: 0.82, blue: 0.30).opacity(0.85) }
         if ShopRotation.featuredBundle()?.id == bundle.id    { return Color(red: 0.30, green: 0.62, blue: 1.00).opacity(0.85) }
-        if bundle.isLimitedTime && bundle.isAvailable        { return limitedTimeColor(for: bundle).opacity(0.50) }
+        if mode == .shop && bundle.isLimitedTime && bundle.isAvailable { return limitedTimeColor(for: bundle).opacity(0.50) }
         if isFeatured                                        { return Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40) }
         return .clear
     }
