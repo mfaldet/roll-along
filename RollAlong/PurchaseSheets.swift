@@ -551,38 +551,46 @@ struct BuyCoinsSheet: View {
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
     @State private var purchaseError: String? = nil
-    // Open tall so every pack (down to the $49.99 tier) is visible without a
-    // drag; .medium stays available as a drag-down resting position.
-    @State private var detent: PresentationDetent = .large
+    // Self-size to the content so the sheet opens exactly tall enough to show
+    // every pack (down to the $49.99 tier) with no empty space below — the same
+    // content-fit approach BuyLivesSheet uses.
+    @State private var fitHeight: CGFloat = 580   // content height; set on first layout
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(white: 0.08).ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        header
-                        coinPackCards
-                        Spacer().frame(height: 24)
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
+        ZStack {
+            Color(white: 0.08).ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Title lives in the content (no nav bar) so the sheet can
+                    // size itself to exactly fit the packs.
+                    Text("Get Coins")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.bottom, 2)
+                    header
+                    coinPackCards
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 18)
+                .background(GeometryReader { geo in
+                    Color.clear.preference(key: SheetFitHeightKey.self, value: geo.size.height)
+                })
             }
-            // Confetti + fanfare on every successful coin purchase.
-            .overlay {
-                PurchaseCelebrationOverlay(trigger: store.deliveryCount,
-                                           kind: .coins,
-                                           receipt: store.lastDelivery)
-            }
-            .navigationTitle("Get Coins")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            // No Restore/Done buttons — swipe down (or tap above) to close.
-            // Restore Purchases lives in Settings.
         }
-        .presentationDetents([.medium, .large], selection: $detent)
+        // Confetti + fanfare on every successful coin purchase.
+        .overlay {
+            PurchaseCelebrationOverlay(trigger: store.deliveryCount,
+                                       kind: .coins,
+                                       receipt: store.lastDelivery)
+        }
+        .preferredColorScheme(.dark)
+        // Size the sheet to its content — every pack visible, no gap below.
+        // Swipe down (the grabber) to close; Restore Purchases lives in Settings.
+        .presentationDetents([.height(fitHeight)])
+        .presentationDragIndicator(.visible)
+        .onPreferenceChange(SheetFitHeightKey.self) { fitHeight = max($0, 200) }
         .onChange(of: store.lastError) { _, err in purchaseError = err }
         .alert("Purchase Failed", isPresented: Binding(
             get: { purchaseError != nil },

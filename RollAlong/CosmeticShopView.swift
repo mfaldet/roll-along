@@ -171,21 +171,46 @@ struct CosmeticShopView: View {
 
     private var shopFront: some View {
         ScrollView {
-            VStack(spacing: 22) {
-                // Refresh countdown — the whole shop rotates every 2 hours.
-                TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Refreshes in \(ShopRotation.countdown(at: ctx.date))")
-                            .monospacedDigit()
-                    }
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.55))
-                    .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 24) {
+                // ── Top nav: Locker + Catalog, side by side ───────────────
+                HStack(spacing: 12) {
+                    topNavButton(title: "Locker",
+                                 subtitle: "Equip what you own",
+                                 icon: "tshirt.fill",
+                                 colors: [Color(red: 0.10, green: 0.62, blue: 0.55),
+                                          Color(red: 0.16, green: 0.44, blue: 0.72)],
+                                 route: .locker)
+                    topNavButton(title: "Catalog",
+                                 subtitle: "Browse everything",
+                                 icon: "square.grid.2x2.fill",
+                                 colors: [Color(red: 0.30, green: 0.42, blue: 0.95),
+                                          Color(red: 0.56, green: 0.30, blue: 0.95)],
+                                 route: .catalog)
                 }
 
-                // The single bundle buyable right now.
+                // ── Big enticing title + rotation countdown ───────────────
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Limited Deals & Rare Finds")
+                        .font(.system(size: 27, weight: .black, design: .rounded))
+                        .foregroundStyle(LinearGradient(
+                            colors: [Color(red: 1.00, green: 0.86, blue: 0.42),
+                                     Color(red: 1.00, green: 0.55, blue: 0.30)],
+                            startPoint: .leading, endPoint: .trailing))
+                        .fixedSize(horizontal: false, vertical: true)
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Fresh picks in \(ShopRotation.countdown(at: ctx.date))")
+                                .monospacedDigit()
+                        }
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // ── Bundle — one random featured collection ───────────────
                 if let bundle = ShopRotation.featuredBundle() {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionLabel("FEATURED BUNDLE")
@@ -193,123 +218,69 @@ struct CosmeticShopView: View {
                     }
                 }
 
-                // Odds-and-ends — one featured pick from each of the seven
-                // cosmetic categories (ball · trail · goal · floor · pit ·
-                // boundary · music).
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionLabel("TODAY'S PICKS")
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14),
-                                        GridItem(.flexible(), spacing: 14),
-                                        GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                        if let b  = ShopRotation.featuredBall()  { itemCell(item: b) }
-                        if let tr = ShopRotation.featuredTrail() { itemCell(item: tr) }
-                        if let g  = ShopRotation.featuredGoal()  { itemCell(item: g) }
-                        if let f  = ShopRotation.featuredFloor() { itemCell(item: f) }
-                        if let p  = ShopRotation.featuredPit()   { itemCell(item: p) }
-                        if let bd = ShopRotation.featuredBoundary() { itemCell(item: bd) }
-                        if let m  = ShopRotation.featuredMusic() { itemCell(item: m) }
-                    }
-                }
-
-                // The player's wardrobe — equip what they already own.  Sits
-                // just above the Catalog so "equip" reads before "browse/buy".
-                NavigationLink(value: HomeRoute.locker) {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.white.opacity(0.18))
-                                .frame(width: 58, height: 58)
-                            Image(systemName: "tshirt.fill")
-                                .font(.system(size: 26, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Open Your Locker")
-                                .font(.system(size: 20, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text("Equip the balls, trails, goals, floors & more you own")
-                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.82))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 4)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 20)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 22)
-                            .fill(LinearGradient(
-                                colors: [Color(red: 0.10, green: 0.62, blue: 0.55),
-                                         Color(red: 0.16, green: 0.44, blue: 0.72)],
-                                startPoint: .topLeading, endPoint: .bottomTrailing))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22)
-                            .stroke(.white.opacity(0.20), lineWidth: 1)
-                    )
-                    .shadow(color: Color(red: 0.12, green: 0.52, blue: 0.55).opacity(0.45),
-                            radius: 16, y: 7)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
-
-                // Everything else lives in the browsable Catalog — a big,
-                // gradient call-to-action so it reads as the next thing to do.
-                NavigationLink(value: HomeRoute.catalog) {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.white.opacity(0.18))
-                                .frame(width: 58, height: 58)
-                            Image(systemName: "square.grid.2x2.fill")
-                                .font(.system(size: 27, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Browse Full Catalog")
-                                .font(.system(size: 20, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text("Every ball, trail, goal, floor & more — buy complete sets")
-                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.82))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 4)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 20)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 22)
-                            .fill(LinearGradient(
-                                colors: [Color(red: 0.30, green: 0.42, blue: 0.95),
-                                         Color(red: 0.56, green: 0.30, blue: 0.95)],
-                                startPoint: .topLeading, endPoint: .bottomTrailing))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22)
-                            .stroke(.white.opacity(0.20), lineWidth: 1)
-                    )
-                    .shadow(color: Color(red: 0.42, green: 0.34, blue: 0.95).opacity(0.45),
-                            radius: 16, y: 7)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
+                // ── One section per cosmetic category: three picks each
+                //    (two Standard + one better), in the requested order. ───
+                shopPicksSection("BALLS",      items: ShopRotation.featuredBalls())
+                shopPicksSection("TRAILS",     items: ShopRotation.featuredTrails())
+                shopPicksSection("FLOORS",     items: ShopRotation.featuredFloors())
+                shopPicksSection("PITS",       items: ShopRotation.featuredPits())
+                shopPicksSection("BOUNDARIES", items: ShopRotation.featuredBoundaries())
+                shopPicksSection("GOALS",      items: ShopRotation.featuredGoals())
+                shopPicksSection("MUSIC",      items: ShopRotation.featuredMusicSet())
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 36)
+        }
+    }
+
+    /// A compact gradient nav button (Locker / Catalog) for the top of the Shop.
+    private func topNavButton(title: String, subtitle: String, icon: String,
+                              colors: [Color], route: HomeRoute) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(.white.opacity(0.18)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.82))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(LinearGradient(colors: colors,
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// One Shop category section: a label over a 3-up row of buyable item cells.
+    private func shopPicksSection<Item: CosmeticItem>(_ title: String,
+                                                      items: [Item]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(title)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ForEach(items, id: \.id) { item in
+                    itemCell(item: item)
+                }
+            }
         }
     }
 
@@ -345,18 +316,21 @@ struct CosmeticShopView: View {
         .accessibilityHint("Opens the get-coins shop.")
     }
 
-    // MARK: - Tab bar
+    // MARK: - Category filter (persistent square tiles)
 
+    /// A non-scrolling row of square category tiles.  It lives ABOVE the
+    /// ScrollView (see `body`), so every cosmetic type stays visible and one tap
+    /// away while the player scrolls the Catalog — no horizontal swiping to reach
+    /// a filter, and the bar never scrolls off the top.
     private var tabBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(ShopCategory.allCases) { cat in
-                    tabButton(cat)
-                }
+        HStack(spacing: 5) {
+            ForEach(ShopCategory.allCases) { cat in
+                tabButton(cat)
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 6)
         }
+        .padding(.horizontal, 10)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
     }
 
     private func tabButton(_ cat: ShopCategory) -> some View {
@@ -364,20 +338,29 @@ struct CosmeticShopView: View {
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) { category = cat }
         } label: {
-            HStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Image(systemName: cat.icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                 Text(cat.displayName)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
             }
-            .foregroundStyle(isActive ? .black : Color(white: 0.80))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .foregroundStyle(isActive ? .black : Color(white: 0.82))
+            .frame(maxWidth: .infinity)   // equal-width tiles fill the row, no scroll
+            .frame(height: 54)
             .background(
-                Capsule()
+                RoundedRectangle(cornerRadius: 13)
                     .fill(isActive ? Color.white : Color(white: 0.16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13)
+                            .stroke(isActive ? Color.clear : Color(white: 0.24), lineWidth: 0.8)
+                    )
             )
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(cat.displayName)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Grid
@@ -796,60 +779,21 @@ struct CosmeticShopView: View {
     // The featured collection (weekly rotation) gets a gold border and badge.
     // =========================================================================
 
-    /// Weekly-rotating featured bundle — drawn only from permanent (non-seasonal)
-    /// bundles so seasonal items don't occupy two sections at once.
-    private var permanentFeaturedBundle: CosmeticBundle {
-        let permanent = CosmeticBundle.catalogue.filter { !$0.isLimitedTime }
-        guard !permanent.isEmpty else { return CosmeticBundle.catalogue[0] }
-        let week = Calendar.current.component(.weekOfYear, from: Date())
-        return permanent[week % permanent.count]
-    }
-
     @ViewBuilder
     private var collectionsView: some View {
-        let seasonal  = CosmeticBundle.catalogue.filter { $0.isLimitedTime && $0.isAvailable }
-        let permanent = CosmeticBundle.catalogue.filter { !$0.isLimitedTime }
-        let featured  = permanentFeaturedBundle
-
+        // The Catalog lists every collection plainly — no "limited time"
+        // countdown and no "featured this week" spotlight.  Browsing is the
+        // point; a bundle is the one thing you can actually buy here.  (Seasonal
+        // bundles still appear only while their window is open, so they can't be
+        // bought out of season.)
+        let bundles = CosmeticBundle.catalogue.filter { !$0.isLimitedTime || $0.isAvailable }
         LazyVStack(alignment: .leading, spacing: 0) {
-            // ── Limited-time seasonal bundles (top of shop) ───────────────
-            if !seasonal.isEmpty {
-                limitedTimeSectionHeader
-                    .padding(.bottom, 8)
-                ForEach(seasonal) { bundle in
-                    collectionCard(bundle, isFeatured: false)
-                        .padding(.bottom, 12)
-                }
-                Color(white: 0.20)
-                    .frame(height: 0.5)
-                    .padding(.vertical, 14)
-            }
-
-            // ── Weekly featured (permanent rotation) ─────────────────────
-            sectionLabel("FEATURED THIS WEEK")
-                .padding(.bottom, 8)
-            collectionCard(featured, isFeatured: true)
-                .padding(.bottom, 22)
-
-            // ── All permanent collections ─────────────────────────────────
             sectionLabel("ALL COLLECTIONS")
                 .padding(.bottom, 8)
-            ForEach(permanent.filter { $0.id != featured.id }) { bundle in
+            ForEach(bundles) { bundle in
                 collectionCard(bundle, isFeatured: false)
                     .padding(.bottom, 12)
             }
-        }
-    }
-
-    private var limitedTimeSectionHeader: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color(red: 1.00, green: 0.42, blue: 0.18))
-            Text("LIMITED TIME")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .kerning(1.4)
-                .foregroundStyle(Color(red: 1.00, green: 0.42, blue: 0.18))
         }
     }
 
@@ -874,7 +818,9 @@ struct CosmeticShopView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     // Chips row — ⚡ DEAL, ⭐ FEATURED and/or 🔥 LIMITED
                     let showFeatured = isFeatured
-                    let showLimited  = bundle.isLimitedTime && bundle.isAvailable
+                    // Limited-time framing is a Shop-only nudge — the Catalog
+                    // stays a plain, pressure-free browse.
+                    let showLimited  = isShop && bundle.isLimitedTime && bundle.isAvailable
                     if discounted || showFeatured || showLimited {
                         HStack(spacing: 6) {
                             if discounted {
@@ -990,7 +936,7 @@ struct CosmeticShopView: View {
         // Owned/complete → gold.  Currently the Shop's featured (buyable) bundle → blue.
         if bundleOwned                                       { return Color(red: 1.00, green: 0.82, blue: 0.30).opacity(0.85) }
         if ShopRotation.featuredBundle()?.id == bundle.id    { return Color(red: 0.30, green: 0.62, blue: 1.00).opacity(0.85) }
-        if bundle.isLimitedTime && bundle.isAvailable        { return limitedTimeColor(for: bundle).opacity(0.50) }
+        if mode == .shop && bundle.isLimitedTime && bundle.isAvailable { return limitedTimeColor(for: bundle).opacity(0.50) }
         if isFeatured                                        { return Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40) }
         return .clear
     }

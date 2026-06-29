@@ -631,6 +631,11 @@ struct BallGameView: View {
                         case .prism:       prismGoal
                         case .obsidian:    obsidianGoal
                         case .quasar:      quasarGoal
+                        case .frost, .ember, .meadow, .bullion,
+                             .amethyst, .candy, .slate:
+                            bandedTargetGoal(gameState.equippedGoal.targetBands ?? [])
+                        case .vortex, .wormhole:
+                            ringPortalGoal(gameState.equippedGoal.portalStops ?? [])
                         default:           rainbowHole   // .rainbow + any future goal
                         }
                     }
@@ -2015,6 +2020,85 @@ struct BallGameView: View {
                 )
             }
         }
+    }
+
+    /// Reusable static banded-target renderer for the Standard goals — the same
+    /// recipe as `simpleBullseyeTarget`, driven by a caller-supplied colour ramp
+    /// (OUTER → INNER, from the goal's `targetBands`).  No particles; a faint
+    /// breathe keeps it alive.
+    private func bandedTargetGoal(_ colors: [Color]) -> some View {
+        let ramp = colors.isEmpty ? [Color.gray] : colors
+        return TimelineView(.animation) { timeline in
+            Canvas { ctx, size in
+                let t       = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let breathe = 1.0 + sin(t * 1.3) * 0.025
+                let cx = size.width / 2, cy = size.height / 2
+                let maxR = min(size.width, size.height) / 2 * 0.95 * breathe
+                let n = ramp.count
+                let step = n > 1 ? 0.70 / Double(n - 1) : 0    // 1.0 … 0.30 spread
+
+                for (i, color) in ramp.enumerated() {
+                    let r = maxR * CGFloat(1.0 - Double(i) * step)
+                    ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                             with: .color(color))
+                }
+                // Outer dark rim — defines the shape against any background.
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - maxR, y: cy - maxR, width: maxR * 2, height: maxR * 2)),
+                           with: .color(Color.black.opacity(0.55)), lineWidth: 1.4)
+                // Band dividers.
+                for i in 1..<max(1, n) {
+                    let r = maxR * CGFloat(1.0 - Double(i) * step)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                               with: .color(Color.black.opacity(0.30)), lineWidth: 0.7)
+                }
+                // Soft top-left highlight — subtle depth.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - maxR, y: cy - maxR, width: maxR * 2, height: maxR * 2)),
+                         with: .radialGradient(Gradient(colors: [Color.white.opacity(0.18), .clear]),
+                                               center: CGPoint(x: cx - maxR * 0.30, y: cy - maxR * 0.30),
+                                               startRadius: 0, endRadius: maxR * 0.95))
+            }
+        }
+    }
+
+    /// Reusable static ring-portal renderer for the portal-style Standard goals
+    /// — concentric glowing rings (OUTER dark → INNER bright, from the goal's
+    /// `portalStops`) reading as a tunnel.  Static: no particles, just a faint
+    /// breathe + a soft core glow.
+    private func ringPortalGoal(_ colors: [Color]) -> some View {
+        let ramp  = colors.isEmpty ? [Color.black, Color.white] : colors
+        let inner = Array(ramp.reversed())             // bright centre first
+        return TimelineView(.animation) { timeline in
+            Canvas { ctx, size in
+                let t       = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let breathe = 1.0 + sin(t * 1.3) * 0.03
+                let cx = size.width / 2, cy = size.height / 2
+                let maxR = min(size.width, size.height) / 2 * 0.95 * breathe
+
+                // Base radial fill: bright centre → dark edge.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - maxR, y: cy - maxR, width: maxR * 2, height: maxR * 2)),
+                         with: .radialGradient(Gradient(colors: inner),
+                                               center: CGPoint(x: cx, y: cy),
+                                               startRadius: 0, endRadius: maxR))
+                // Concentric ring strokes for tunnel depth (additive glow).
+                var g = ctx; g.blendMode = .plusLighter
+                let rings = max(3, inner.count + 1)
+                for i in 0..<rings {
+                    let r = maxR * CGFloat(0.92 - Double(i) * (0.74 / Double(rings)))
+                    let c = inner[min(inner.count - 1, i)]
+                    g.stroke(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                             with: .color(c.opacity(0.5)), lineWidth: max(1.0, maxR * 0.05))
+                }
+                // Bright core glow.
+                let cr = maxR * 0.26
+                g.fill(Path(ellipseIn: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2)),
+                       with: .radialGradient(Gradient(colors: [Color.white.opacity(0.95), .clear]),
+                                             center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
+                // Outer dark rim.
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - maxR, y: cy - maxR, width: maxR * 2, height: maxR * 2)),
+                           with: .color(Color.black.opacity(0.55)), lineWidth: 1.4)
+            }
+        }
+        .clipShape(Circle())
     }
 
     /// Hole-in-One goal (Golf bundle) — a golf-green disc with a
