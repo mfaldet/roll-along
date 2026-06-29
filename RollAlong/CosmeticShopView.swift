@@ -504,11 +504,10 @@ struct CosmeticShopView: View {
                             .stroke(border ?? .clear, lineWidth: border == nil ? 0 : 2)
                     )
             )
-            // Rarity gem in the card's top-right corner (silver/gold/diamond).
+            // Rarity corner tab — a colored triangle + white star in the top-right.
             .overlay(alignment: .topTrailing) {
-                TierBadge(item: item)
+                RarityCornerTab(colors: item.rarityGemColors, side: 40, corner: 16)
                     .opacity(greyed ? 0.5 : 1.0)
-                    .padding(8)
             }
         }
         .buttonStyle(.plain)
@@ -890,7 +889,6 @@ struct CosmeticShopView: View {
                         .kerning(1.2)
                         .foregroundStyle(limitedTimeColor(for: bundle))
                     }
-                    TierBadge(rarity: bundle.rarity, compact: true)
                     Text(bundle.displayName)
                         .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
@@ -900,14 +898,18 @@ struct CosmeticShopView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                // Top-right: the big "% OFF" sticker on a discounted (featured)
-                // bundle, otherwise the X/Y collection-progress counter.
+                // Top-right, just LEFT of the rarity corner tab: the big "% OFF"
+                // sticker on a discounted (featured) bundle, otherwise the X/Y
+                // collection-progress counter.
                 if discounted {
                     discountSticker(discount)
                 } else if !bundleOwned {
                     collectionProgressBadge(owned: owned, total: total)
                 }
             }
+            // Reserve the top-right corner for the rarity tab so the title and
+            // the %-OFF / X-of-Y sticker sit to its left.
+            .padding(.trailing, 40)
 
             // ── 6-slot item row ──────────────────────────────────────────
             collectionSlotRow(bundle)
@@ -972,6 +974,10 @@ struct CosmeticShopView: View {
                                 lineWidth: 1.2)
                 )
         )
+        // Rarity corner tab — colored triangle + white star, top-right.
+        .overlay(alignment: .topTrailing) {
+            RarityCornerTab(colors: bundle.rarity.gemColors, side: 44, corner: 18)
+        }
     }
 
     /// Border color for a collection card — priority: complete > seasonal > featured > none.
@@ -1407,6 +1413,38 @@ struct CosmeticShopView: View {
     // (Coin glyph rendering moved to the shared CoinIcon view in
     // BallGameView.swift — every screen uses the same paw-print
     // minted-coin graphic now.)
+}
+
+/// The rarity marker used on Shop / Catalog cards: a colored right-triangle in
+/// the top-right corner (the card's corner radius is rounded to match) with a
+/// white star.  Color = the item/bundle's rarity gem ramp.  Replaces the inline
+/// gem badge.  Not used in Locker / Loadout / Profile.
+struct RarityCornerTab: View {
+    let colors: [Color]            // rarity gem ramp (top-left → bottom-right)
+    var side: CGFloat = 44
+    var corner: CGFloat = 16
+
+    var body: some View {
+        ZStack {
+            Path { p in
+                p.move(to: .zero)
+                p.addLine(to: CGPoint(x: side, y: 0))
+                p.addLine(to: CGPoint(x: side, y: side))
+                p.closeSubpath()
+            }
+            .fill(LinearGradient(colors: colors.isEmpty ? [Color(white: 0.5)] : colors,
+                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+            Image(systemName: "star.fill")
+                .font(.system(size: side * 0.30, weight: .bold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.28), radius: 0.5, y: 0.5)
+                .position(x: side * 0.66, y: side * 0.34)
+        }
+        .frame(width: side, height: side)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
+                                          bottomTrailingRadius: 0, topTrailingRadius: corner))
+        .allowsHitTesting(false)
+    }
 }
 
 #Preview {
