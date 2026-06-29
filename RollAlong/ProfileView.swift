@@ -13,10 +13,6 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject var gameState: GameState
 
-    // ── Social rank ────────────────────────────────────────────────────────
-    @State private var leaderboardRank: Int? = nil
-    @State private var rankLoading:     Bool = false
-
     // Measured height of the loadout name-list, so the diorama beside it can
     // match the left column's height for a clean split.
     @State private var loadoutListHeight: CGFloat = 200
@@ -57,83 +53,38 @@ struct ProfileView: View {
             for: .navigationBar
         )
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .task { await loadLeaderboardRank() }
     }
 
     // =========================================================================
     // MARK: - Hero card
-    // Ball preview · player name · level badge · optional unlimited badge
-    // · social rank or sign-in nudge · ShareLink
+    // Ball preview (with the level marker on its top-right) · player name ·
+    // ShareLink.  (Lives count and global Rank were removed — Rank will be
+    // replaced by nuanced awards/titles.)
     // =========================================================================
     private var heroCard: some View {
         VStack(spacing: 14) {
             // ── Ball preview ─────────────────────────────────────────────
             // No completionist ring here — that only appears in the Shop and
             // the Settings cosmetics picker, not on the Profile.
+            // ── Ball preview with the level marker on its top-right ──────
             ZStack {
                 BallSkinView(skin: gameState.activeSkin, diameter: 88)
                     .frame(width: 88, height: 88)
                     .shadow(color: .black.opacity(0.72), radius: 18, x: 0, y: 10)
+                    .overlay(alignment: .topTrailing) {
+                        levelMarker
+                            .offset(x: 16, y: -6)
+                    }
             }
-            .frame(width: 116, height: 116)
+            .frame(width: 124, height: 116)
 
             // ── Name ─────────────────────────────────────────────────────
             Text(gameState.playerName.isEmpty ? "Anonymous Roller" : gameState.playerName)
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            // ── Badges row ───────────────────────────────────────────────
-            HStack(spacing: 8) {
-                pillBadge(
-                    text: "\(gameState.currentLevel)",
-                    bg: Color(red: 0.26, green: 0.16, blue: 0.58),
-                    border: Color(red: 0.50, green: 0.38, blue: 0.90).opacity(0.55),
-                    fg: .white
-                )
-                if gameState.unlimitedLives {
-                    HStack(spacing: 4) {
-                        Image(systemName: "infinity")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("Unlimited")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.22))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule()
-                            .fill(Color(red: 0.22, green: 0.16, blue: 0.04))
-                            .overlay(Capsule().stroke(Color(red: 0.93, green: 0.65, blue: 0.10).opacity(0.55), lineWidth: 1))
-                    )
-                }
-            }
-
-            // ── Social rank ──────────────────────────────────────────────
-            if SocialClient.shared.isSignedIn {
-                Group {
-                    if rankLoading {
-                        HStack(spacing: 6) {
-                            ProgressView().scaleEffect(0.70)
-                            Text("Fetching rank…")
-                                .font(.system(size: 12, design: .rounded))
-                                .foregroundStyle(Color(white: 0.50))
-                        }
-                    } else if let rank = leaderboardRank {
-                        HStack(spacing: 5) {
-                            Image(systemName: "trophy.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.22))
-                            Text("Rank #\(rank) globally")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(white: 0.68))
-                        }
-                    }
-                }
-            } else {
-                Text("Sign in to rank globally")
-                    .font(.system(size: 12, design: .rounded))
-                    .foregroundStyle(Color(white: 0.38))
-            }
+            // Lives count and global Rank were removed here — Rank is being
+            // replaced by nuanced awards/titles.
 
             Divider()
                 .background(Color(white: 0.22))
@@ -604,34 +555,33 @@ struct ProfileView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// A tinted pill badge used in the hero section.
-    private func pillBadge(text: String, bg: Color, border: Color, fg: Color) -> some View {
-        Text(text)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(fg)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(bg)
-                    .overlay(Capsule().stroke(border, lineWidth: 1))
-            )
+    /// The level marker badge that sits on the marble's top-right corner —
+    /// a small "LVL" eyebrow over a large level number.
+    private var levelMarker: some View {
+        VStack(spacing: -2) {
+            Text("LVL")
+                .font(.system(size: 8, weight: .heavy, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(.white.opacity(0.85))
+            Text("\(gameState.currentLevel)")
+                .font(.system(size: 22, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+        .frame(minWidth: 42)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(red: 0.26, green: 0.16, blue: 0.58))
+                .overlay(RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color(red: 0.50, green: 0.38, blue: 0.90).opacity(0.75), lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.45), radius: 4, y: 2)
+        )
     }
 
 
-    // =========================================================================
-    // MARK: - Social rank loader
-    // Fetches the global leaderboard (up to 500) and finds the signed-in
-    // player's position.  Fire-and-forget on appear; rank is purely cosmetic.
-    // =========================================================================
-    private func loadLeaderboardRank() async {
-        guard SocialClient.shared.isSignedIn,
-              let myId = SocialClient.shared.currentUserId else { return }
-        rankLoading = true
-        defer { rankLoading = false }
-        guard let board = try? await SocialClient.shared.fetchLeaderboard(limit: 500) else { return }
-        leaderboardRank = board.firstIndex(where: { $0.id == myId }).map { $0 + 1 }
-    }
 }
 
 // ---------------------------------------------------------------------------
