@@ -76,7 +76,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This returns the cosmetics you bought with coins for a full refund and resets your equipped look to default — handy for tidying your locker and freeing up coins to spend on something new. Earned cosmetics (challenge-pack rewards) and ones that came with a purchase (Diamond & Aurora) are kept, just unequipped. You can re-buy anything anytime. Your level progress is untouched.")
+            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for a full coin refund, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
         }
     }
 
@@ -393,12 +393,12 @@ struct SettingsView: View {
                         Text("Sell Back Cosmetics")
                             .font(.system(.body, design: .rounded))
                         Text(cosmetic.count > 0
-                             ? "Sell the cosmetics you bought with coins back for a full refund and tidy your locker."
+                             ? "Sell your cosmetics back for a full coin refund — including seasonal & limited-time pieces — and tidy your locker."
                              : "Return your equipped look to the default.")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.45))
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Keeps the cosmetics you earned or bought with cash — re-buy anything anytime.")
+                        Text("Keeps only your Iconic items (the classic look + secret rewards like Diamond & Trophy).")
                             .font(.system(.caption2, design: .rounded))
                             .foregroundStyle(Color(white: 0.38))
                             .fixedSize(horizontal: false, vertical: true)

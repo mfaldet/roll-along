@@ -466,7 +466,7 @@ struct CosmeticShopView: View {
                             .fill(Color(white: 0.10))
                     )
                     .overlay(alignment: .topTrailing) {
-                        TierBadge(tier: item.tier, compact: true)
+                        TierBadge(item: item, compact: true)
                             .padding(6)
                     }
 
@@ -851,6 +851,7 @@ struct CosmeticShopView: View {
                             }
                         }
                     }
+                    TierBadge(label: bundle.rarity.label, color: bundle.rarity.color, compact: true)
                     Text(bundle.displayName)
                         .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
