@@ -306,10 +306,12 @@ enum GoalSkin: String, CosmeticItem {
     case halo           // Heavens bundle — radiant golden halo + light rays
     case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
     case soccerNet      // Soccer bundle — goal mouth with white netting
+    case aurora         // Aurora bundle — glowing northern-lights portal
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
+        case .aurora:    return "Aurora"
         case .target:    return "Target"
         case .archery:   return "Archery"
         case .frost:     return "Frost"
@@ -365,7 +367,7 @@ enum GoalSkin: String, CosmeticItem {
     var holeStyle: HoleStyle {
         switch self {
         case .target, .archery, .holeInOne, .tractorBeam,
-             .inferno, .halo, .doodle, .soccerNet,
+             .inferno, .halo, .doodle, .soccerNet, .aurora,
              .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
              .vortex, .wormhole:
             // Not actually consumed (their renderers are bespoke / static), but
@@ -475,6 +477,18 @@ enum GoalSkin: String, CosmeticItem {
     /// accepts any `ShapeStyle`.
     static func previewGradient(for goal: GoalSkin) -> AnyShapeStyle {
         switch goal {
+        case .aurora:
+            // Glowing aurora portal — bright teal-cyan core fading out through
+            // violet, on the deep night sky.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.80, green: 1.00, blue: 0.92), location: 0.00),
+                    .init(color: Color(red: 0.24, green: 0.90, blue: 0.74), location: 0.30),
+                    .init(color: Color(red: 0.26, green: 0.66, blue: 0.95), location: 0.58),
+                    .init(color: Color(red: 0.55, green: 0.40, blue: 1.00), location: 0.82),
+                    .init(color: Color(red: 0.04, green: 0.06, blue: 0.14), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
         case .target:
             // Simple 3-ring red/white/red bullseye — the new default.
             // Hard transitions via paired stops at the same location.
@@ -732,6 +746,7 @@ enum GoalSkin: String, CosmeticItem {
     /// goal reads consistently everywhere, not just on the in-game portal.
     var accentColor: Color {
         switch self {
+        case .aurora:      return Color(red: 0.30, green: 0.88, blue: 0.74)   // aurora teal-cyan
         case .target:      return Color(red: 0.90, green: 0.18, blue: 0.20)
         case .archery:     return Color(red: 1.00, green: 0.80, blue: 0.20)
         case .frost:       return Color(red: 0.50, green: 0.82, blue: 1.00)
@@ -786,7 +801,7 @@ enum GoalSkin: String, CosmeticItem {
              .mirage, .obsidian:
             return .premium    // 200 coins — animated, tight palette
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
-             .inferno, .halo, .doodle, .soccerNet:
+             .inferno, .halo, .doodle, .soccerNet, .aurora:
             return .exclusive  // 500 coins — animated, full-spectrum, or bespoke
         }
     }
@@ -816,11 +831,13 @@ enum TrailColor: String, CosmeticItem {
     case air            // pillowy jet-stream (Golf bundle)
     case raybeam        // glowing laser streak (Space Travel bundle)
     case moneyRoll      // ★ 10,000-coin IAP secret — green trail + fluttering bills
+    case aurora         // Aurora bundle — teal→cyan→violet shimmer ribbon
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .none:        return "Off"
+        case .aurora:      return "Aurora"
         case .graphite:    return "Graphite"
         case .moneyRoll:   return "Money Roll"
         case .ink:         return "Ink"
@@ -861,7 +878,7 @@ enum TrailColor: String, CosmeticItem {
             return .standard   //  50 coins — solid mono colour
         case .snake, .raybeam, .gilded, .graphite, .roseTrail:
             return .rare       // 100 coins — distinctive textured trails
-        case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air,
+        case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air, .aurora,
              .moneyRoll:       // 10,000-coin IAP secret — Legendary, never coin-bought
             return .exclusive  // 500 coins — animated / special-effect
         }
@@ -880,6 +897,7 @@ enum TrailColor: String, CosmeticItem {
     var color: Color {
         switch self {
         case .none:        return .clear
+        case .aurora:      return Color(red: 0.28, green: 0.92, blue: 0.78).opacity(0.85)   // teal base; renderer adds the violet shimmer
         case .graphite:    return Color(red: 0.20, green: 0.20, blue: 0.22).opacity(0.70)
         case .ink:         return Color(red: 0.09, green: 0.09, blue: 0.14).opacity(0.80)
         case .fire:        return Color(red: 0.95, green: 0.42, blue: 0.10).opacity(0.75)
@@ -1028,7 +1046,7 @@ enum Floor: String, CosmeticItem {
         case .stormcloud: return Color(red: 0.32,  green: 0.36,  blue: 0.44 )  // slate storm
         case .sugar:      return Color(red: 0.99,  green: 0.92,  blue: 0.95 )  // pale candy-pink
         case .fog:        return Color(red: 0.66,  green: 0.69,  blue: 0.70 )  // cold grey mist
-        case .aurora:     return Color(red: 0.380, green: 0.620, blue: 0.560)
+        case .aurora:     return Color(red: 0.045, green: 0.075, blue: 0.150)  // deep night sky; aurora glows over it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
@@ -1183,7 +1201,7 @@ enum Pit: String, CosmeticItem {
         case .sunset:     return Color(red: 0.30,  green: 0.06,  blue: 0.04 )
         case .origami:    return Color(red: 0.094, green: 0.078, blue: 0.063)
         case .mirage:     return Color(red: 0.22,  green: 0.14,  blue: 0.05 )
-        case .aurora:     return Color(red: 0.000, green: 0.000, blue: 0.000)
+        case .aurora:     return Color(red: 0.020, green: 0.030, blue: 0.090)  // deep indigo aurora void
         case .canyon:     return Color(red: 0.32,  green: 0.14,  blue: 0.08 )  // deep rust gorge
         case .downpour:   return Color(red: 0.10,  green: 0.16,  blue: 0.26 )  // dark rainy blue
         case .syrup:      return Color(red: 0.20,  green: 0.06,  blue: 0.10 )  // dark molasses
@@ -1342,11 +1360,13 @@ enum MusicTrack: String, CosmeticItem {
     case celestial
     case mysterium
     case opus
+    case aurora         // Aurora bundle — ambient, drifting pads
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .none:        return "Off"
+        case .aurora:      return "Aurora"
         case .ambient:     return "Ambient"
         case .piano:       return "Piano"
         case .chiptune:    return "Chiptune"
@@ -1378,7 +1398,7 @@ enum MusicTrack: String, CosmeticItem {
             return .standard   // 50 coins
         case .lofi, .downtempo, .retrowave, .cinematic, .dreamscape:
             return .premium    // 200 coins
-        case .celestial, .mysterium, .opus:
+        case .celestial, .mysterium, .opus, .aurora:
             return .exclusive  // 500 coins
         }
     }
@@ -2005,14 +2025,14 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "aurora",
             displayName:    "Aurora",
-            tagline:        "Northern lights over a shimmering field.",
-            contentSummary: "Galaxy ball · Prism goal · Smoke trail · Aurora floor · Aurora pit · Celestial music",
-            balls:  [.galaxy],
-            goals:  [.prism],
-            trails: [.smoke],
+            tagline:        "Chase the northern lights.",
+            contentSummary: "Aurora ball · Aurora goal · Aurora trail · Aurora floor · Aurora pit · Aurora music",
+            balls:  [.aurora],
+            goals:  [.aurora],
+            trails: [.aurora],
             floors: [.aurora],
             pits:   [.aurora],
-            music:  [.celestial]
+            music:  [.aurora]
         ),
 
         CosmeticBundle(
@@ -3041,6 +3061,7 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .graphite:        trailGraphite(ctx, pts, n, baseWidth)
     case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth, times)
     case .moneyRoll:       trailMoney(ctx, pts, n, t, baseWidth, times)
+    case .aurora:          trailAurora(ctx, pts, n, t, baseWidth)
     default:
         trailTapered(ctx, pts, n, baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded || trail == .ember)
@@ -3080,6 +3101,35 @@ private func trailTapered(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int,
         ctx.stroke(p, with: .color(color.opacity(0.12 + 0.70 * age)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
     }
+}
+
+/// Aurora — a luminous ribbon whose hue flows teal-green → cyan → violet along
+/// its length and shimmers over time, with an additive outer glow and a bright
+/// white-teal core, so the streak reads like a sliver of northern lights.
+private func trailAurora(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int,
+                         _ t: Double, _ baseWidth: CGFloat) {
+    var ctx = ctx
+    ctx.blendMode = .plusLighter
+    for i in 1..<n {
+        let age = Double(i) / Double(n - 1)                 // 0 tail … 1 head
+        let w   = baseWidth * CGFloat(0.30 + 0.95 * age)
+        // Hue waves teal(0.42) → violet(0.74) down the length, drifting in time.
+        let hue = 0.42 + 0.32 * (0.5 + 0.5 * sin(Double(i) * 0.45 - t * 2.0))
+        let col = Color(hue: hue, saturation: 0.80, brightness: 1.0)
+        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        // Outer glow.
+        ctx.stroke(p, with: .color(col.opacity(0.16 * age)),
+                   style: StrokeStyle(lineWidth: w * 2.8, lineCap: .round))
+        // Body.
+        ctx.stroke(p, with: .color(col.opacity(0.18 + 0.65 * age)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        // Bright core on the fresher half.
+        if age > 0.45 {
+            ctx.stroke(p, with: .color(Color(red: 0.85, green: 1.0, blue: 0.95).opacity(0.5 * age)),
+                       style: StrokeStyle(lineWidth: w * 0.4, lineCap: .round))
+        }
+    }
+    ctx.blendMode = .normal
 }
 
 /// Snake — a fat scaled body that tapers to the tail, with a head + eyes +

@@ -762,10 +762,27 @@ struct CosmeticShopView: View {
         }
     }
 
+    /// Aurora swatch gradient — teal-green → cyan → violet, the bundle palette.
+    /// Used to give the deep-night Aurora floor/pit a luminous shop preview.
+    private var auroraSwatchGradient: LinearGradient {
+        LinearGradient(colors: [
+            Color(red: 0.18, green: 0.88, blue: 0.66).opacity(0.85),
+            Color(red: 0.23, green: 0.78, blue: 0.95).opacity(0.65),
+            Color(red: 0.60, green: 0.42, blue: 1.00).opacity(0.80),
+        ], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
     private func floorPreview(_ floor: Floor) -> some View {
         RoundedRectangle(cornerRadius: 10)
             .fill(floor.color)
             .frame(width: 90, height: 60)
+            .overlay {
+                if floor == .aurora {
+                    auroraSwatchGradient
+                        .blendMode(.plusLighter)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.black.opacity(0.25), lineWidth: 0.6)
@@ -779,6 +796,13 @@ struct CosmeticShopView: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(pit.color)
                 .frame(width: 38, height: 22)
+                .overlay {
+                    if pit == .aurora {
+                        auroraSwatchGradient.opacity(0.7)
+                            .blendMode(.plusLighter)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                }
         }
         .frame(width: 90, height: 60)
         .overlay(
