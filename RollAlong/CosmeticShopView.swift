@@ -42,7 +42,7 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
 }
 
 /// The store has two faces:
-///   • `.shop`    — a curated front: the 2-hour rotating featured bundle + a
+///   • `.shop`    — a curated front: the hourly-rotating featured bundle + a
 ///                  few odds-and-ends cosmetics.  The ONLY place to buy.
 ///   • `.catalog` — the full browsable grid (reached from the Shop).  Browse +
 ///                  equip-owned only; purchasing happens in the Shop.
@@ -201,11 +201,12 @@ struct CosmeticShopView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "clock.arrow.circlepath")
                                 .font(.system(size: 12, weight: .bold))
-                            Text("Fresh picks in \(ShopRotation.countdown(at: ctx.date))")
+                            Text("New shop items in \(ShopRotation.countdown(at: ctx.date))")
                                 .monospacedDigit()
                         }
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.55))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

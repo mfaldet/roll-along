@@ -1424,7 +1424,7 @@ enum MusicTrack: String, CosmeticItem {
 
 /// A randomized discount applied to the Shop's featured bundle.  The four
 /// tiers mirror the cosmetic rarity ramp so a deep discount reads as a
-/// "lucky drop".  Rolled once per Shop window (stable for 2 hours) by
+/// "lucky drop".  Rolled once per Shop window (stable for 1 hour) by
 /// `ShopRotation.featuredDiscount`.
 enum BundleDiscount: String, CaseIterable {
     case common, rare, epic, legendary
@@ -1475,13 +1475,13 @@ enum BundleDiscount: String, CaseIterable {
 }
 
 // ===========================================================================
-// Shop rotation — the curated storefront refreshes every 2 hours.  A
+// Shop rotation — the curated storefront refreshes every hour.  A
 // deterministic window index seeds which bundle + odds-and-ends cosmetics are
 // featured, so the selection is stable within a window and identical
 // everywhere (the Shop display AND the Catalog's "available now" markers).
 // ===========================================================================
 enum ShopRotation {
-    static let windowSeconds: TimeInterval = 2 * 60 * 60   // 2 hours
+    static let windowSeconds: TimeInterval = 1 * 60 * 60   // 1 hour
 
     static func window(at date: Date = Date()) -> Int {
         Int(date.timeIntervalSince1970 / windowSeconds)
@@ -1489,7 +1489,7 @@ enum ShopRotation {
     static func refreshDate(at date: Date = Date()) -> Date {
         Date(timeIntervalSince1970: Double(window(at: date) + 1) * windowSeconds)
     }
-    /// "1:59:42" until the next refresh.
+    /// "0:59:42" until the next refresh.
     static func countdown(at date: Date = Date()) -> String {
         let s = max(0, Int(refreshDate(at: date).timeIntervalSince(date)))
         return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
@@ -1548,7 +1548,7 @@ enum ShopRotation {
 
     // MARK: Storefront multi-picks (one section per category)
 
-    /// Deterministic shuffle of `pool` for `window` — stable within the 2-hour
+    /// Deterministic shuffle of `pool` for `window` — stable within the 1-hour
     /// window, rotates with it.  xorshift64 seeded by window+salt.
     private static func shuffled<T>(_ pool: [T], _ window: Int, salt: Int) -> [T] {
         guard pool.count > 1 else { return pool }
