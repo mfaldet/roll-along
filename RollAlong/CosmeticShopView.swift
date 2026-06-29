@@ -422,7 +422,7 @@ struct CosmeticShopView: View {
             // if the user does NOT own them — purchase path is via the IAP
             // bundle, not the coin shop.  Owned bundle-exclusive skins ARE
             // shown so the user can equip them (possession implies legitimate
-            // acquisition via the bundle, starter pack, or challenge track).
+            // acquisition via the bundle or challenge track).
             categoryGrid(items: BallSkin.allCases.filter {
                 !$0.isBundleExclusive || gameState.isOwned($0)
             })

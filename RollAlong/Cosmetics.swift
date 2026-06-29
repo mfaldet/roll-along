@@ -75,16 +75,20 @@ extension CosmeticItem {
 extension BallSkin {
     /// Exclusive balls are never coin-purchasable — earned (trophy), IAP (aurora,
     /// diamond), or seasonal-event drops — so the coin-liquidation reset keeps them.
+    // Aurora is no longer here — the Starter Pack IAP was retired and Aurora is
+    // now an ownable item in its own coin bundle (it stays `isBundleExclusive`,
+    // so it's earned via the Aurora bundle, and is sellable like other bundle
+    // balls).
     static let coinExclusiveBalls: Set<BallSkin> =
-        [.trophy, .aurora, .beachBall, .pumpkin, .ornament, .heartstone,
+        [.trophy, .beachBall, .pumpkin, .ornament, .heartstone,
          .shamrock, .confetti, .speckledEgg, .diamond, .moneyBall]
     var isCoinPurchasable: Bool { tier != .starter && !Self.coinExclusiveBalls.contains(self) }
 
-    /// Permanent un-sellable specials (Iconic): earned (Trophy), IAP (Diamond,
-    /// Money) and Aurora.  The OTHER `coinExclusiveBalls` (beachBall, pumpkin,
-    /// ornament, heartstone, shamrock, confetti, speckledEgg) are seasonal /
-    /// limited-time event balls — now SELLABLE via Sell Back.
-    static let iconicBalls: Set<BallSkin> = [.trophy, .diamond, .moneyBall, .aurora]
+    /// Permanent un-sellable specials (Iconic): earned (Trophy) and the IAP
+    /// secrets (Diamond, Money).  The OTHER `coinExclusiveBalls` (beachBall,
+    /// pumpkin, ornament, heartstone, shamrock, confetti, speckledEgg) are
+    /// seasonal / limited-time event balls — SELLABLE via Sell Back.
+    static let iconicBalls: Set<BallSkin> = [.trophy, .diamond, .moneyBall]
     var isIconic: Bool { tier == .starter || Self.iconicBalls.contains(self) }
 }
 
@@ -199,7 +203,7 @@ extension BallSkin: CosmeticItem {
              .earth, .mars, .saturn, .mercury,        // planets are Legendary now
              .neptune, .jupiter, .venus, .uranus,
              .trophy,           // golden-gauntlet-exclusive; never coin-purchasable
-             .aurora,          // starter-pack-exclusive; never coin-purchasable
+             .aurora,          // Legendary — coin-buyable; anchors the Aurora bundle
              .beachBall,       // summer-2026-exclusive; never coin-purchasable
              .pumpkin,         // halloween-2026-exclusive; never coin-purchasable
              .ornament,        // winter-2026-exclusive; never coin-purchasable

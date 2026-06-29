@@ -1337,7 +1337,7 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Aurora  (Starter Pack exclusive · Legendary)
+    // MARK: - Aurora  (Legendary · anchors the Aurora bundle)
     // A dark night sky with Northern Lights that fade in and out and drift, the
     // way they really do.  TWO MeshGradient layers: a constant dark-sky base,
     // and an additive aurora layer whose green/teal/violet patches each pulse
