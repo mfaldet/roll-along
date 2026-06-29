@@ -3323,9 +3323,15 @@ struct BallGameView: View {
     private func placeOrRemoveZenProp(_ item: ZenItem, at location: CGPoint, in size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         let hitR: CGFloat = 28
-        if let idx = zenDecorations.firstIndex(where: {
-            hypot($0.pos.x * size.width - location.x, $0.pos.y * size.height - location.y) < hitR
-        }) {
+        // Explicit types + broken-up sub-expressions: the single chained hypot
+        // form below pushed the Swift type-checker over its per-expression time
+        // budget on some machines (cascading "cannot find type" errors).
+        let hit: (ZenDecoration) -> Bool = { d in
+            let dx: CGFloat = d.pos.x * size.width  - location.x
+            let dy: CGFloat = d.pos.y * size.height - location.y
+            return hypot(dx, dy) < hitR
+        }
+        if let idx = zenDecorations.firstIndex(where: hit) {
             zenDecorations.remove(at: idx)
         } else {
             let frac = CGPoint(x: location.x / size.width, y: location.y / size.height)
