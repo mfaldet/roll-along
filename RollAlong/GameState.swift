@@ -199,6 +199,14 @@ final class GameState: ObservableObject {
         didSet { defaults.set(coinBalance, forKey: "ra_coinBalance") }
     }
 
+    /// Compact coin-pill text: balances of 10,000+ abbreviate to one decimal
+    /// place, ALWAYS rounded DOWN (truncated) — 10_000 → "10.0K",
+    /// 134_678 → "134.6K".  Anything below 10,000 renders in full.
+    static func coinPillText(_ n: Int) -> String {
+        guard n >= 10_000 else { return "\(n)" }
+        return "\(n / 1000).\((n % 1000) / 100)K"
+    }
+
     // ── Minigame personal bests (drive the per-game leaderboards) ──────────
     // pinballBest  — best single Pinball score.
     // zenSeconds   — total seconds spent in Zen Garden (accumulates).

@@ -178,6 +178,18 @@ extension CosmeticTier {
                                  Color(red: 0.38, green: 0.80, blue: 0.98)]              // diamond
         }
     }
+
+    /// Catalog sort order — ascending rarity: the free/"iconic" starter items up
+    /// top, then Standard, Rare, Epic, and Legendary (exclusive) last.
+    var sortRank: Int {
+        switch self {
+        case .starter:   return 0
+        case .standard:  return 1
+        case .rare:      return 2
+        case .premium:   return 3
+        case .exclusive: return 4
+        }
+    }
 }
 
 // MARK: - Ball skins

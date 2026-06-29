@@ -820,9 +820,10 @@ struct HomeView: View {
     /// three-quarters).  Both halves are flush, clipped to one rounded shape.
     private var unifiedPlayRow: some View {
         GeometryReader { geo in
-            // Match the indicator to one cell of the 4-column nav grid below
-            // (which has 3 × 10pt inter-column gaps) so it lines up under it.
-            let indicatorW = max(60, (geo.size.width - 30) / 4)
+            // The indicator (the "Flex" half) is 50% wider than one cell of the
+            // 4-column nav grid below — base cell is (width − 30)/4, scaled ×1.5
+            // — so it reads clearly, leaving Play the narrower remainder.
+            let indicatorW = max(90, (geo.size.width - 30) / 4 * 1.5)
             HStack(spacing: 0) {
                 modeHeader
                     .frame(width: indicatorW)
@@ -1016,7 +1017,7 @@ struct HomeView: View {
                         // the detail reads inside the small pill.
                         CoinIcon(size: 18)
 
-                        Text("\(gameState.coinBalance)")
+                        Text(GameState.coinPillText(gameState.coinBalance))
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .monospacedDigit()
