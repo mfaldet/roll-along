@@ -191,7 +191,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
                 }
 
-                Text("Permanently removes your profile, friends, clan, and leaderboard rank. Level progress stays on this device.")
+                Text("Permanently remove your profile, friends, clan membership, and leaderboard standing.\nUnlocked items, cosmetic, coins all stay on this device.")
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color(white: 0.45))
             } else {
@@ -324,39 +324,29 @@ struct SettingsView: View {
     private var purchasesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Purchases")
-            VStack(spacing: 0) {
-                // Restore Purchases is App Store–required for non-consumable IAPs
-                // (Unlimited Lives, Starter Pack). It re-activates them on a new
-                // device / after a reinstall, and now reports a clear result so
-                // it never feels like a dead button.
-                Button {
-                    Task { await restorePurchases() }
-                } label: {
-                    HStack(spacing: 12) {
-                        if isRestoring {
-                            ProgressView().tint(Color(white: 0.6))
-                                .frame(width: 18)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(Color(white: 0.55))
-                                .frame(width: 18)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(isRestoring ? "Restoring…" : "Restore Purchases")
-                                .font(.system(.body, design: .rounded))
-                                .foregroundStyle(Color(white: 0.85))
-                            Text("Restores real-money purchases (like Unlimited Lives) after reinstalling or on a new phone.")
-                                .font(.system(.caption, design: .rounded))
-                                .foregroundStyle(Color(white: 0.42))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer()
+            // Restore Purchases is App Store–required for non-consumable IAPs
+            // (Unlimited Lives, Starter Pack) — re-activates them on a new device
+            // / after a reinstall, and reports a clear result.
+            Button {
+                Task { await restorePurchases() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isRestoring {
+                        ProgressView().tint(Color(red: 1.0, green: 0.60, blue: 0.20))
                     }
-                    .padding()
+                    Text(isRestoring ? "Restoring…" : "Restore Purchases")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
                 }
-                .disabled(isRestoring)
+                .foregroundStyle(Color(red: 1.0, green: 0.60, blue: 0.20))   // orange
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color(white: 0.12).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
-            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            .disabled(isRestoring)
+
+            Text("New device? Your purchases are always yours.\nClick to download anything you've bought with real money.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
         }
         .alert("Restore Purchases", isPresented: $showRestoreResult) {
             Button("OK", role: .cancel) {}
@@ -393,38 +383,19 @@ struct SettingsView: View {
             Button {
                 showCosmeticResetAlert = true
             } label: {
-                HStack {
-                    Image(systemName: "arrow.uturn.backward.circle")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sell Back Cosmetics")
-                            .font(.system(.body, design: .rounded))
-                        Text(cosmetic.count > 0
-                             ? "Refunds every cosmetic for full coin value, seasonal pieces included."
-                             : "Return your equipped look to the default.")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(Color(white: 0.45))
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text("Keeps your Iconic items (classic look, Diamond, Trophy).")
-                            .font(.system(.caption2, design: .rounded))
-                            .foregroundStyle(Color(white: 0.38))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                    if cosmetic.coins > 0 {
-                        HStack(spacing: 3) {
-                            Text("+\(cosmetic.coins)")
-                                .font(.system(.footnote, design: .rounded).weight(.semibold))
-                            CoinIcon(size: 13)
-                        }
-                        .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.32))
-                    }
-                }
-                .foregroundStyle(Color(white: 0.9))
-                .padding()
-                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+                Text("Sell Back Cosmetics")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color(white: 0.9))   // uncolored
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(white: 0.12).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
             .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
             .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
+
+            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, receive a full coin refund.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
             if let m = cosmeticResetMessage {
                 Text(m)
                     .font(.system(.caption, design: .rounded))
@@ -439,25 +410,17 @@ struct SettingsView: View {
             Button {
                 showResetConfirm = true
             } label: {
-                HStack(alignment: .top) {
-                    Image(systemName: "arrow.counterclockwise")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Reset Level Progress")
-                            .font(.system(.body, design: .rounded))
-                        Text("Resets all levels to Level 1. Keeps cosmetics, nickname & settings. Can't be undone.")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(Color(red: 0.78, green: 0.42, blue: 0.42))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                    Text("Level \(gameState.currentLevel)")
-                        .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(Color(white: 0.4))
-                }
-                .foregroundStyle(Color(red: 0.95, green: 0.3, blue: 0.3))
-                .padding()
-                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+                Text("Reset Level Progress")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color(red: 0.95, green: 0.3, blue: 0.3))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(white: 0.12).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
+
+            Text("Reset your Roll Along core game level progress.\nKeeps settings, cosmetics, and all other game progress, awards and rankings.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
         }
     }
 
