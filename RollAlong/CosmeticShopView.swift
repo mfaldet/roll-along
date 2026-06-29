@@ -841,7 +841,16 @@ struct CosmeticShopView: View {
         // point; a bundle is the one thing you can actually buy here.  (Seasonal
         // bundles still appear only while their window is open, so they can't be
         // bought out of season.)
-        let bundles = CosmeticBundle.catalogue.filter { !$0.isLimitedTime || $0.isAvailable }
+        // Sorted by original full price — the simplest, cheapest collections up
+        // top and the most enhanced at the bottom — then alphabetically for any
+        // equal-priced bundles.
+        let bundles = CosmeticBundle.catalogue
+            .filter { !$0.isLimitedTime || $0.isAvailable }
+            .sorted {
+                $0.fullPrice() != $1.fullPrice()
+                    ? $0.fullPrice() < $1.fullPrice()
+                    : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            }
         LazyVStack(alignment: .leading, spacing: 0) {
             sectionLabel("ALL COLLECTIONS")
                 .padding(.bottom, 8)
