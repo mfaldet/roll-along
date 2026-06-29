@@ -64,11 +64,7 @@ struct GameMenuView: View {
                     levelsLink
                     challengeOfTheDay
 
-                    shelf("CHALLENGE PACKS",
-                          "Themed hundred-level gauntlets — clear one for its cosmetics.") {
-                        ForEach(packs, id: \.id) { packWidget($0) }
-                        allPacksWidget
-                    }
+                    challengePacksSection
 
                     shelf("COMPETITIVE",
                           "Mini-games vs. rivals — climb the boards, earn tickets.") {
@@ -402,37 +398,71 @@ struct GameMenuView: View {
         }
     }
 
-    private func packWidget(_ track: ChallengeTrackMode) -> some View {
-        let s = Self.packStyle(for: track.trackID)
-        return Button { select(track.id) } label: {
-            widgetCard(icon: s.icon, colors: s.colors, title: track.displayName)
+    /// CHALLENGE PACKS — an 8-tile illustrative grid that taps through as a whole
+    /// to the full Challenge Tracks page (replaces the old horizontal shelf + its
+    /// "See all" tail tile).  No per-pack selection here; that lives on the
+    /// Challenge Tracks page.
+    private var challengePacksSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CHALLENGE PACKS")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .tracking(2)
+                        .foregroundStyle(.white)
+                    Text("Themed hundred-level gauntlets — clear one for its cosmetics.")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.5))
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 2) {
+                    Text("See all")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(Color(white: 0.6))
+            }
+            NavigationLink(value: HomeRoute.challengeTracks) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
+                          spacing: 12) {
+                    ForEach(packs, id: \.id) { packTile($0) }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color(white: 0.10))
+                        .overlay(RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color(white: 0.20), lineWidth: 1))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 20))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tracks")
+            .accessibilityLabel("Challenge Packs. Open all challenge tracks.")
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("pack.\(track.trackID)")
     }
 
-    /// Tail widget on the packs shelf — opens the full Challenge Tracks page
-    /// (also carries the "tracks" smoke-test anchor).
-    private var allPacksWidget: some View {
-        NavigationLink(value: HomeRoute.challengeTracks) {
-            VStack(spacing: 8) {
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(Color(white: 0.8))
-                Text("See all")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+    /// One small illustrative tile in the Challenge Packs grid — the pack's glyph
+    /// on its gradient + its name.  Not individually tappable; the whole grid
+    /// navigates to the Challenge Tracks page.
+    private func packTile(_ track: ChallengeTrackMode) -> some View {
+        let s = Self.packStyle(for: track.trackID)
+        return VStack(spacing: 5) {
+            ZStack {
+                LinearGradient(colors: s.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                Image(systemName: s.icon)
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
             }
-            .frame(width: 132, height: 152)
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(Color(white: 0.14))
-                    .overlay(RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color(white: 0.26), lineWidth: 1))
-            )
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            Text(track.displayName)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.72))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("tracks")
     }
 
     /// The shared game tile — a wide, centered, individually-branded card: a big
