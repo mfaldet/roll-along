@@ -153,13 +153,8 @@ struct LeaderboardView: View {
         }
     }
 
-    /// Ranked-player count + the signed-in player's own position — the
-    /// "your holding" line of the scoreboard.
+    /// Ranked-player count shown in the status strip.
     private var rankedCount: Int { displayRows.count }
-    private var myRank: Int? {
-        guard let myId else { return nil }
-        return displayRows.firstIndex(where: { $0.id == myId }).map { $0 + 1 }
-    }
 
     @ViewBuilder
     private var statusStrip: some View {
@@ -171,17 +166,6 @@ struct LeaderboardView: View {
                     .foregroundStyle(Color(white: 0.55))
             }
             Spacer()
-            if let r = myRank {
-                HStack(spacing: 5) {
-                    Text("YOU")
-                        .font(Self.headerFont)
-                        .foregroundStyle(Color(white: 0.55))
-                    Text("#\(r)")
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(Self.meAccent)
-                }
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -274,18 +258,12 @@ struct LeaderboardView: View {
         return HStack(spacing: 12) {
             rankBadge(rank)
 
+            // The own-row is already cued by the green tint + left bar and the
+            // player's own nickname, so no "YOU" badge is needed.
             Text(profile.displayName.isEmpty ? "Climber" : profile.displayName)
                 .font(.system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold))
                 .foregroundStyle(isMe ? .white : Color(white: 0.92))
                 .lineLimit(1)
-
-            if isMe {
-                Text("YOU")
-                    .font(.system(size: 8, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 5).padding(.vertical, 2)
-                    .background(Capsule().fill(Self.meAccent))
-            }
 
             Spacer(minLength: 0)
 
