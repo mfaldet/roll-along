@@ -136,21 +136,6 @@
       "productID": "com.macfaldet.RollAlong.coins.10000",
       "referenceName": "10,000 Coins $49.99",
       "type": "Consumable"
-    },
-    {
-      "displayPrice": "1.99",
-      "familyShareable": false,
-      "internalID": "11000009",
-      "localizations": [
-        {
-          "description": "One-time welcome gift: 500 coins + the exclusive Aurora ball (never sold separately).",
-          "displayName": "Starter Pack",
-          "locale": "en_US"
-        }
-      ],
-      "productID": "com.macfaldet.RollAlong.starterpack",
-      "referenceName": "Starter Pack $1.99",
-      "type": "NonConsumable"
     }
   ],
   "settings": {},

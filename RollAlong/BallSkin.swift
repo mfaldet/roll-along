@@ -126,11 +126,11 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     shop grid.
     case trophy     = "Trophy"
 
-    // ── Starter Pack exclusive ──────────────────────────────────────────
+    // ── Aurora (Legendary, coin-buyable; anchors the Aurora bundle) ──────
     //   • aurora — deep midnight sphere with animated teal-green and violet
-    //     Northern Lights bands and twinkling stars.  Available ONLY via
-    //     the one-time $1.99 Starter Pack offer; never purchasable with
-    //     coins and hidden from the regular shop grid.
+    //     Northern Lights bands and twinkling stars.  Once the Starter Pack
+    //     IAP exclusive; that pack is retired, so Aurora is now a regular
+    //     coin-buyable Legendary ball and the centerpiece of the Aurora bundle.
     case aurora = "Aurora"
 
     // ── Summer 2026 seasonal exclusive ──────────────────────────────────
@@ -285,12 +285,15 @@ enum BallSkin: String, CaseIterable, Identifiable {
     /// are hidden from the standalone shop's individual Ball grid.
     var isBundleExclusive: Bool {
         switch self {
-        case .pluto, .aurora, .beachBall, .pumpkin, .ornament,
+        case .pluto, .beachBall, .pumpkin, .ornament,
              .heartstone, .shamrock, .confetti, .speckledEgg,
              .trophy,    // Golden Gauntlet completion exclusive
              .diamond,   // Diamond Balls IAP exclusive
              .moneyBall: // 10,000-coin IAP secret exclusive
             return true
+        // Aurora was the Starter Pack IAP exclusive; that pack is retired, so
+        // Aurora is now a regular coin-buyable Legendary ball (and the anchor of
+        // the Aurora bundle) — no longer bundle-locked.
         default:                          return false
         }
     }

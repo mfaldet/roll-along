@@ -339,7 +339,7 @@ struct SettingsView: View {
                             Text(isRestoring ? "Restoring…" : "Restore Purchases")
                                 .font(.system(.body, design: .rounded))
                                 .foregroundStyle(Color(white: 0.85))
-                            Text("Brings back anything you bought with real money — Unlimited Lives and the Starter Pack — on a new phone or after reinstalling. Won't touch your coins or cosmetics.")
+                            Text("Brings back anything you bought with real money (like Unlimited Lives) on a new phone or after reinstalling. Won't touch your coins or cosmetics.")
                                 .font(.system(.caption, design: .rounded))
                                 .foregroundStyle(Color(white: 0.42))
                                 .fixedSize(horizontal: false, vertical: true)

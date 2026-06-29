@@ -189,9 +189,10 @@ final class StoreKitManager: ObservableObject {
             }
         }
         if unlimitedSeen   { gameState?.unlimitedLives = true; gameState?.grant(BallSkin.diamond) }
-        if starterPackSeen {
-            guard let gs = gameState, !gs.starterPackClaimed else { return }
-            gs.addCoins(ProductID.starterPack.rewardCoins)
+        // Legacy: the Starter Pack IAP is retired (no longer sold).  Past
+        // purchasers still get their Aurora skin back on restore (one-time) —
+        // but NOT the 500 coins, which were a one-time consumable already spent.
+        if starterPackSeen, let gs = gameState, !gs.starterPackClaimed {
             gs.grant(BallSkin.aurora)
             gs.starterPackClaimed = true
         }

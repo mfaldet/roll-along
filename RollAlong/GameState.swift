@@ -1245,28 +1245,10 @@ final class GameState: ObservableObject {
         return amount
     }
 
-    // MARK: - Starter Pack offer
-
-    /// Fires once: true the first time `coinBalance` reaches 50 AND the
-    /// player hasn't claimed or permanently dismissed the offer yet.
-    /// HomeView observes `coinBalance` and checks this to auto-present
-    /// the sheet.
-    var shouldTriggerStarterPack: Bool {
-        !starterPackClaimed && starterPackShownAt == nil && coinBalance >= 50
-    }
-
-    /// True while the 48-hour countdown is still ticking — the offer sheet
-    /// is still worth showing (e.g., player re-opens the app mid-window).
-    var starterPackOfferActive: Bool {
-        guard !starterPackClaimed, let shownAt = starterPackShownAt else { return false }
-        return Date().timeIntervalSince(shownAt) < 48 * 3_600
-    }
-
-    /// Seconds remaining in the 48-hour offer window (0 when expired/unclaimed).
-    var starterPackSecondsRemaining: TimeInterval {
-        guard let shownAt = starterPackShownAt else { return 0 }
-        return max(0, 48 * 3_600 - Date().timeIntervalSince(shownAt))
-    }
+    // The Starter Pack one-time IAP offer was retired — its auto-presented sheet
+    // and 48-hour-window logic are gone.  `starterPackClaimed` is kept (persisted)
+    // only so StoreKitManager can re-grant the Aurora skin once to past buyers on
+    // restore.  Aurora is now an ownable coin ball + part of the Aurora bundle.
 
     // MARK: - Ratings prompt
 
