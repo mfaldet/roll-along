@@ -279,10 +279,12 @@ enum GoalSkin: String, CosmeticItem {
     case halo           // Heavens bundle — radiant golden halo + light rays
     case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
     case soccerNet      // Soccer bundle — goal mouth with white netting
+    case aurora         // Aurora bundle — glowing northern-lights portal
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
+        case .aurora:    return "Aurora"
         case .target:    return "Target"
         case .archery:   return "Archery"
         case .frost:     return "Frost"
@@ -338,7 +340,7 @@ enum GoalSkin: String, CosmeticItem {
     var holeStyle: HoleStyle {
         switch self {
         case .target, .archery, .holeInOne, .tractorBeam,
-             .inferno, .halo, .doodle, .soccerNet,
+             .inferno, .halo, .doodle, .soccerNet, .aurora,
              .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
              .vortex, .wormhole:
             // Not actually consumed (their renderers are bespoke / static), but
@@ -448,6 +450,18 @@ enum GoalSkin: String, CosmeticItem {
     /// accepts any `ShapeStyle`.
     static func previewGradient(for goal: GoalSkin) -> AnyShapeStyle {
         switch goal {
+        case .aurora:
+            // Glowing aurora portal — bright teal-cyan core fading out through
+            // violet, on the deep night sky.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.80, green: 1.00, blue: 0.92), location: 0.00),
+                    .init(color: Color(red: 0.24, green: 0.90, blue: 0.74), location: 0.30),
+                    .init(color: Color(red: 0.26, green: 0.66, blue: 0.95), location: 0.58),
+                    .init(color: Color(red: 0.55, green: 0.40, blue: 1.00), location: 0.82),
+                    .init(color: Color(red: 0.04, green: 0.06, blue: 0.14), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: 28))
         case .target:
             // Simple 3-ring red/white/red bullseye — the new default.
             // Hard transitions via paired stops at the same location.
@@ -705,6 +719,7 @@ enum GoalSkin: String, CosmeticItem {
     /// goal reads consistently everywhere, not just on the in-game portal.
     var accentColor: Color {
         switch self {
+        case .aurora:      return Color(red: 0.30, green: 0.88, blue: 0.74)   // aurora teal-cyan
         case .target:      return Color(red: 0.90, green: 0.18, blue: 0.20)
         case .archery:     return Color(red: 1.00, green: 0.80, blue: 0.20)
         case .frost:       return Color(red: 0.50, green: 0.82, blue: 1.00)
@@ -759,7 +774,7 @@ enum GoalSkin: String, CosmeticItem {
              .mirage, .obsidian:
             return .premium    // 200 coins — animated, tight palette
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
-             .inferno, .halo, .doodle, .soccerNet:
+             .inferno, .halo, .doodle, .soccerNet, .aurora:
             return .exclusive  // 500 coins — animated, full-spectrum, or bespoke
         }
     }

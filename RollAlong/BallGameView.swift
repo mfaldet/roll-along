@@ -636,6 +636,7 @@ struct BallGameView: View {
                             bandedTargetGoal(gameState.equippedGoal.targetBands ?? [])
                         case .vortex, .wormhole:
                             ringPortalGoal(gameState.equippedGoal.portalStops ?? [])
+                        case .aurora:      auroraGoal
                         default:           rainbowHole   // .rainbow + any future goal
                         }
                     }
@@ -2110,6 +2111,79 @@ struct BallGameView: View {
                          with: .radialGradient(Gradient(colors: [Color.white.opacity(0.18), .clear]),
                                                center: CGPoint(x: cx - maxR * 0.30, y: cy - maxR * 0.30),
                                                startRadius: 0, endRadius: maxR * 0.95))
+            }
+        }
+    }
+
+    /// Aurora goal — a glowing northern-lights PORTAL: a deep-night disc with
+    /// soft aurora light-clouds drifting and hue-shifting inside it, a breathing
+    /// outer halo, a luminous teal-cyan rim with a bright glint that orbits it,
+    /// and a bright inner core.  The signature animated centerpiece of the
+    /// Aurora bundle.  Freezes gracefully under Reduce Motion.
+    private var auroraGoal: some View {
+        TimelineView(.animation) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2
+                let R  = min(w, h) / 2
+                let center = CGPoint(x: cx, y: cy)
+                let teal   = Color(red: 0.32, green: 0.96, blue: 0.80)
+
+                // ── 1. Breathing outer halo ────────────────────────────────
+                let pulse = 0.5 + 0.5 * sin(t * 1.6)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - R, y: cy - R, width: R * 2, height: R * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: teal.opacity(0.0),                 location: 0.46),
+                        .init(color: teal.opacity(0.16 + 0.14 * pulse), location: 0.78),
+                        .init(color: .clear,                            location: 1.0),
+                    ]), center: center, startRadius: 0, endRadius: R))
+
+                // ── 2. Portal disc (deep night) ────────────────────────────
+                let pr = R * 0.74
+                let disc = Path(ellipseIn: CGRect(x: cx - pr, y: cy - pr, width: pr * 2, height: pr * 2))
+                ctx.fill(disc, with: .radialGradient(Gradient(stops: [
+                    .init(color: Color(red: 0.06, green: 0.11, blue: 0.20), location: 0.0),
+                    .init(color: Color(red: 0.03, green: 0.06, blue: 0.13), location: 0.7),
+                    .init(color: Color(red: 0.01, green: 0.02, blue: 0.06), location: 1.0),
+                ]), center: center, startRadius: 0, endRadius: pr))
+
+                // ── 3. Aurora light-clouds drifting inside the portal ──────
+                ctx.drawLayer { lc in
+                    lc.clip(to: disc)
+                    lc.blendMode = .plusLighter
+                    let clouds: [(Double, Double, Double)] = [   // baseHue, phase, speed
+                        (0.42, 0.0, 0.55), (0.54, 2.1, 0.40),
+                        (0.74, 4.0, 0.46), (0.48, 5.4, 0.33),
+                    ]
+                    for (hue0, ph, spd) in clouds {
+                        let hue = (hue0 + t * 0.04).truncatingRemainder(dividingBy: 1.0)
+                        let col = Color(hue: hue, saturation: 0.74, brightness: 1.0)
+                        let bx  = cx + CGFloat(cos(t * spd + ph)) * pr * 0.42
+                        let by  = cy + CGFloat(sin(t * spd * 1.3 + ph)) * pr * 0.42
+                        let br  = pr * 0.85
+                        lc.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                                with: .radialGradient(Gradient(colors: [col.opacity(0.42), .clear]),
+                                    center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
+                    }
+                }
+
+                // ── 4. Bright inner core ───────────────────────────────────
+                let cr = pr * 0.42
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2)),
+                    with: .radialGradient(Gradient(colors: [
+                        Color.white.opacity(0.85), teal.opacity(0.5), .clear]),
+                        center: center, startRadius: 0, endRadius: cr))
+
+                // ── 5. Luminous rim + an orbiting glint ────────────────────
+                ctx.stroke(disc, with: .color(teal.opacity(0.9)), lineWidth: max(1.4, R * 0.045))
+                let ga = t * 0.9
+                let gx = cx + CGFloat(cos(ga)) * pr
+                let gy = cy + CGFloat(sin(ga)) * pr
+                let gs = R * 0.18
+                ctx.fill(Path(ellipseIn: CGRect(x: gx - gs, y: gy - gs, width: gs * 2, height: gs * 2)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.9), teal.opacity(0.4), .clear]),
+                        center: CGPoint(x: gx, y: gy), startRadius: 0, endRadius: gs))
             }
         }
     }
