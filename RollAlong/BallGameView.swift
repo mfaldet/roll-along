@@ -41,15 +41,6 @@ private enum GamePhase: Equatable {
 /// modal.  Each case wraps the picked item from its respective
 /// category; the modal holds at most one of these at a time, so a
 /// pick in any row replaces a pick in any other row.
-enum TutorialPick: Equatable {
-    case ball(BallSkin)
-    case goal(GoalSkin)
-    case trail(TrailColor)
-    case floor(Floor)
-    case pit(Pit)
-    case music(MusicTrack)
-}
-
 /// Phases of the first-time Level 1 tutorial.  The level layout is
 /// gradually revealed: ball alone → ball + coins → ball + coins + hole.
 /// `notTutorial` is used both for L1 replays (after the first clear)
@@ -97,10 +88,10 @@ struct BallGameView: View {
     @State private var showTutorialReward: Bool      = false
 
     // Tutorial-reward pick.  Player chooses ONE free standard-tier
-    // cosmetic from ANY category — picking a new item replaces any
-    // prior selection (across all categories), and the Claim button
-    // unlocks as soon as something is selected.
-    @State private var tutorialPick: TutorialPick? = nil
+    // Standard COLLECTION (bundle) — picking a card selects the whole set; the
+    // Claim button unlocks as soon as a collection is selected.  Stores the
+    // selected bundle's id.
+    @State private var tutorialBundlePick: String? = nil
 
     // Lives system (Sprint 4c)
     @State private var showOutOfLives:                Bool   = false
@@ -4539,16 +4530,9 @@ struct BallGameView: View {
     // item is granted + equipped on Claim.
 
     private var tutorialRewardOverlay: some View {
-        // Selected-item derivations — only one of these is non-nil at a
-        // time, mirroring the single-pick rule.
-        let selBall:  BallSkin?    = { if case let .ball(v)  = tutorialPick { return v } else { return nil } }()
-        let selGoal:  GoalSkin?    = { if case let .goal(v)  = tutorialPick { return v } else { return nil } }()
-        let selTrail: TrailColor?  = { if case let .trail(v) = tutorialPick { return v } else { return nil } }()
-        let selFloor: Floor?       = { if case let .floor(v) = tutorialPick { return v } else { return nil } }()
-        let selPit:   Pit?         = { if case let .pit(v)   = tutorialPick { return v } else { return nil } }()
-        let selMusic: MusicTrack?  = { if case let .music(v) = tutorialPick { return v } else { return nil } }()
-
-        let hasPick = tutorialPick != nil
+        // The post-tutorial gift: pick ONE entire Standard-rarity collection.
+        let bundles = CosmeticBundle.catalogue.filter { $0.rarity == .standard && $0.isAvailable }
+        let hasPick = tutorialBundlePick != nil
 
         return ZStack {
             Color.black.opacity(0.88).ignoresSafeArea()
@@ -4559,7 +4543,7 @@ struct BallGameView: View {
                     Text("Tutorial Complete!")
                         .font(.system(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Text("Pick one free cosmetic — from any category.")
+                    Text("Pick a free starter collection — the whole set is yours to keep.")
                         .font(.system(size: 14, weight: .regular, design: .rounded))
                         .foregroundStyle(Color(white: 0.70))
                         .multilineTextAlignment(.center)
@@ -4569,40 +4553,19 @@ struct BallGameView: View {
                 .padding(.bottom, 18)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        rewardRow(label: "Ball",
-                                  items: BallSkin.allCases.filter { $0.tier == .standard },
-                                  selected: selBall,
-                                  onPick: { tutorialPick = .ball($0) })
-                        rewardRow(label: "Goal",
-                                  items: GoalSkin.allCases.filter { $0.tier == .standard },
-                                  selected: selGoal,
-                                  onPick: { tutorialPick = .goal($0) })
-                        rewardRow(label: "Trail",
-                                  items: TrailColor.allCases.filter { $0.tier == .standard },
-                                  selected: selTrail,
-                                  onPick: { tutorialPick = .trail($0) })
-                        rewardRow(label: "Floor",
-                                  items: Floor.allCases.filter { $0.tier == .standard },
-                                  selected: selFloor,
-                                  onPick: { tutorialPick = .floor($0) })
-                        rewardRow(label: "Pit",
-                                  items: Pit.allCases.filter { $0.tier == .standard },
-                                  selected: selPit,
-                                  onPick: { tutorialPick = .pit($0) })
-                        rewardRow(label: "Music",
-                                  items: MusicTrack.allCases.filter { $0.tier == .standard },
-                                  selected: selMusic,
-                                  onPick: { tutorialPick = .music($0) })
+                    VStack(spacing: 14) {
+                        ForEach(bundles) { bundle in
+                            tutorialBundleCard(bundle, selected: tutorialBundlePick == bundle.id)
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 24)
                 }
 
                 Button {
-                    claimTutorialReward()
+                    claimTutorialBundle()
                 } label: {
-                    Text(hasPick ? "Claim cosmetic" : "Pick a cosmetic")
+                    Text(hasPick ? "Claim collection" : "Pick a collection")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(hasPick ? .black : Color(white: 0.55))
                         .frame(maxWidth: .infinity)
@@ -4620,53 +4583,52 @@ struct BallGameView: View {
         .transition(.opacity)
     }
 
-    /// One row of pick-able cosmetic items for the tutorial reward modal.
-    private func rewardRow<Item: CosmeticItem>(
-        label: String,
-        items: [Item],
-        selected: Item?,
-        onPick: @escaping (Item) -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label.uppercased())
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .kerning(1.5)
-                .foregroundStyle(Color(white: 0.55))
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(items, id: \.id) { item in
-                        let isSelected = selected.map { $0.id == item.id } ?? false
-                        Button {
-                            onPick(item)
-                        } label: {
-                            VStack(spacing: 6) {
-                                rewardPreview(for: item)
-                                    .frame(width: 56, height: 56)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color(white: 0.10))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(isSelected ? Color.white : Color.clear,
-                                                    lineWidth: 2.0)
-                                    )
-                                Text(item.displayName)
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(isSelected ? .white : Color(white: 0.70))
-                                    .lineLimit(1)
-                            }
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(isSelected ? Color(white: 0.18) : Color.clear)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+    /// One selectable Standard-collection card: name + rarity badge, a row of the
+    /// six contained cosmetic previews, and the tagline.
+    private func tutorialBundleCard(_ bundle: CosmeticBundle, selected: Bool) -> some View {
+        Button {
+            tutorialBundlePick = bundle.id
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(bundle.displayName)
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    TierBadge(rarity: bundle.rarity, compact: true)
                 }
+                HStack(spacing: 7) {
+                    if let b = bundle.balls.first  { bundleSlotTile(b) }
+                    if let g = bundle.goals.first  { bundleSlotTile(g) }
+                    if let t = bundle.trails.first { bundleSlotTile(t) }
+                    if let f = bundle.floors.first { bundleSlotTile(f) }
+                    if let p = bundle.pits.first   { bundleSlotTile(p) }
+                    if let m = bundle.music.first  { bundleSlotTile(m) }
+                    Spacer(minLength: 0)
+                }
+                Text(bundle.tagline)
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18)
+                .fill(selected ? Color(white: 0.17) : Color(white: 0.09)))
+            .overlay(RoundedRectangle(cornerRadius: 18)
+                .stroke(selected ? Color.white : Color(white: 0.20),
+                        lineWidth: selected ? 2 : 1))
         }
+        .buttonStyle(.plain)
+    }
+
+    /// A 40×40 preview tile for one of a bundle's cosmetics (reuses rewardPreview).
+    @ViewBuilder
+    private func bundleSlotTile<Item: CosmeticItem>(_ item: Item) -> some View {
+        rewardPreview(for: item)
+            .frame(width: 40, height: 40)
+            .background(RoundedRectangle(cornerRadius: 9).fill(Color(white: 0.13)))
     }
 
     /// Compact previews mirror the shop's category-specific renderings.
@@ -4902,44 +4864,25 @@ struct BallGameView: View {
     /// single picked cosmetic, marks the moment as seen, then advances
     /// to Level 11.  No-op if the player somehow lands here without a
     /// selection (Claim is disabled until then, so shouldn't happen).
-    private func claimTutorialReward() {
-        guard let pick = tutorialPick else { return }
+    private func claimTutorialBundle() {
+        guard let id = tutorialBundlePick,
+              let bundle = CosmeticBundle.catalogue.first(where: { $0.id == id })
+        else { return }
 
-        let (category, itemRaw): (String, String)
-        switch pick {
-        case .ball(let b):
-            gameState.grant(b)
-            gameState.equipBall(b)
-            (category, itemRaw) = ("ball", b.rawValue)
-        case .goal(let g):
-            gameState.grant(g)
-            gameState.equippedGoal = g
-            (category, itemRaw) = ("goal", g.rawValue)
-        case .trail(let t):
-            gameState.grant(t)
-            gameState.equippedTrail = t
-            (category, itemRaw) = ("trail", t.rawValue)
-        case .floor(let f):
-            gameState.grant(f)
-            gameState.equippedFloor = f
-            (category, itemRaw) = ("floor", f.rawValue)
-        case .pit(let p):
-            gameState.grant(p)
-            gameState.equippedPit = p
-            (category, itemRaw) = ("pit", p.rawValue)
-        case .music(let m):
-            gameState.grant(m)
-            gameState.equippedMusic = m
-            (category, itemRaw) = ("music", m.rawValue)
-        }
+        // Gift the whole collection (un-redeemable — never refundable on Sell Back).
+        gameState.grantBundleFree(bundle)
+        // Equip the full look from the gifted collection so the change is instant.
+        if let b = bundle.balls.first  { gameState.equipBall(b) }
+        if let g = bundle.goals.first  { gameState.equippedGoal  = g }
+        if let t = bundle.trails.first { gameState.equippedTrail = t }
+        if let f = bundle.floors.first { gameState.equippedFloor = f }
+        if let p = bundle.pits.first   { gameState.equippedPit   = p }
+        if let m = bundle.music.first  { gameState.equippedMusic = m }
 
         gameState.seenTutorialReward = true
         AnalyticsClient.shared.track(
-            "tutorial_reward_claimed",
-            properties: [
-                "category": .string(category),
-                "item":     .string(itemRaw),
-            ]
+            "tutorial_bundle_claimed",
+            properties: ["bundle": .string(bundle.id)]
         )
         withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = false }
         gameState.advanceLevel()

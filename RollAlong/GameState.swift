@@ -13,7 +13,7 @@ import SwiftUI
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
 //   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
 //   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBoundaries,
-//   ra_ownedBundles, ra_ownedPacks,
+//   ra_ownedBundles, ra_ownedPacks, ra_freeGrantedItems,
 //   ra_ownedMusic, ra_trackProgress, ra_completedTracks, ra_equippedGoal,
 //   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedBoundary,
 //   ra_equippedMusic, ra_equippedPack.
@@ -262,6 +262,12 @@ final class GameState: ObservableObject {
     /// purchase time, so this is purely for UI state).
     @Published var ownedBundles: Set<String> {
         didSet { saveStringSet(ownedBundles, forKey: "ra_ownedBundles") }
+    }
+    /// rawValues of cosmetics that were GIFTED (e.g. the post-tutorial Standard
+    /// bundle) rather than bought with coins.  Sell Back keeps these and never
+    /// refunds them — they're un-redeemable.  Persisted.
+    @Published var freeGrantedItems: Set<String> {
+        didSet { saveStringSet(freeGrantedItems, forKey: "ra_freeGrantedItems") }
     }
     /// Owned Ball-Pack IDs.  Buying a Pack also adds its member skins to
     /// `ownedBallSkins` (so they're individually equippable); this set
@@ -538,6 +544,7 @@ final class GameState: ObservableObject {
         ownedMusic     = loadedOwnedMusic
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
+        freeGrantedItems = Self.loadStringSet(forKey: "ra_freeGrantedItems", defaults)
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         minigameWins   = Self.loadTrackProgress(key: "ra_minigameWins", defaults)
         minigameBests  = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
@@ -639,7 +646,7 @@ final class GameState: ObservableObject {
     func coinLiquidationPreview() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
-            for item in Item.allCases where item.isSellable && owned.contains(item.rawValue) {
+            for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
                 count += 1; coins += item.coinCost
             }
         }
@@ -659,7 +666,7 @@ final class GameState: ObservableObject {
     func liquidateCoinCosmetics() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
-            for item in Item.allCases where item.isSellable && owned.contains(item.rawValue) {
+            for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
                 count += 1; coins += item.coinCost
                 owned.remove(item.rawValue)
             }
@@ -1308,6 +1315,21 @@ final class GameState: ObservableObject {
         else { return }
         bundle.grantContents(to: self)
         ownedBundles.insert(bundleID)
+    }
+
+    /// Gift an entire bundle for free (the post-tutorial Standard-bundle reward).
+    /// Grants every item, marks them all as `freeGrantedItems` so Sell Back keeps
+    /// them and never refunds them (un-redeemable), and records the bundle as
+    /// owned.  Does NOT charge coins.
+    func grantBundleFree(_ bundle: CosmeticBundle) {
+        bundle.grantContents(to: self)
+        freeGrantedItems.formUnion(bundle.balls.map(\.rawValue))
+        freeGrantedItems.formUnion(bundle.goals.map(\.rawValue))
+        freeGrantedItems.formUnion(bundle.trails.map(\.rawValue))
+        freeGrantedItems.formUnion(bundle.floors.map(\.rawValue))
+        freeGrantedItems.formUnion(bundle.pits.map(\.rawValue))
+        freeGrantedItems.formUnion(bundle.music.map(\.rawValue))
+        ownedBundles.insert(bundle.id)
     }
 
     // MARK: - Completionist tracking
