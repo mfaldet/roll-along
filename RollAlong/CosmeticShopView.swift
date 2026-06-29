@@ -816,40 +816,23 @@ struct CosmeticShopView: View {
             // ── Title row ────────────────────────────────────────────────
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    // Chips row — ⚡ DEAL, ⭐ FEATURED and/or 🔥 LIMITED
-                    let showFeatured = isFeatured
-                    // Limited-time framing is a Shop-only nudge — the Catalog
-                    // stays a plain, pressure-free browse.
-                    let showLimited  = isShop && bundle.isLimitedTime && bundle.isAvailable
-                    if discounted || showFeatured || showLimited {
-                        HStack(spacing: 6) {
-                            if discounted {
-                                Text("⚡ \(discount.label.uppercased()) DEAL · \(discount.percent)% OFF")
-                                    .font(.system(size: 9, weight: .black, design: .rounded))
-                                    .kerning(1.2)
-                                    .foregroundStyle(discount.color)
-                            }
-                            if showFeatured {
-                                Text("⭐ FEATURED")
-                                    .font(.system(size: 9, weight: .black, design: .rounded))
-                                    .kerning(1.4)
-                                    .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
-                            }
-                            if showLimited {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "flame.fill")
-                                        .font(.system(size: 9, weight: .bold))
-                                    if let label = bundle.timeRemainingLabel {
-                                        Text(label.uppercased())
-                                    } else {
-                                        Text("LIMITED TIME")
-                                    }
-                                }
-                                .font(.system(size: 9, weight: .black, design: .rounded))
-                                .kerning(1.2)
-                                .foregroundStyle(limitedTimeColor(for: bundle))
+                    // Chips row — limited-time flag only.  The discount now lives
+                    // in the corner "% OFF" sticker, and "Featured" is implied by
+                    // the section header, so neither rides here anymore.
+                    let showLimited = isShop && bundle.isLimitedTime && bundle.isAvailable
+                    if showLimited {
+                        HStack(spacing: 3) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 9, weight: .bold))
+                            if let label = bundle.timeRemainingLabel {
+                                Text(label.uppercased())
+                            } else {
+                                Text("LIMITED TIME")
                             }
                         }
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .kerning(1.2)
+                        .foregroundStyle(limitedTimeColor(for: bundle))
                     }
                     TierBadge(label: bundle.rarity.label, color: bundle.rarity.color, compact: true)
                     Text(bundle.displayName)
@@ -861,8 +844,11 @@ struct CosmeticShopView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                // X/Y progress badge
-                if !bundleOwned {
+                // Top-right: the big "% OFF" sticker on a discounted (featured)
+                // bundle, otherwise the X/Y collection-progress counter.
+                if discounted {
+                    discountSticker(discount)
+                } else if !bundleOwned {
                     collectionProgressBadge(owned: owned, total: total)
                 }
             }
@@ -976,6 +962,34 @@ struct CosmeticShopView: View {
         .padding(.vertical, 4)
         .background(Capsule().fill(Color(white: 0.12)))
         .animation(.easeInOut(duration: 0.3), value: fraction)
+    }
+
+    /// Big "% OFF" sticker for the Shop's discounted featured bundle — sits in
+    /// the card's top-right corner in place of the progress counter.  Tinted by
+    /// the discount tier (deeper deals run hotter), dark text for contrast, and
+    /// tilted a touch so it reads as a slapped-on price sticker.
+    private func discountSticker(_ discount: BundleDiscount) -> some View {
+        VStack(spacing: -2) {
+            Text("\(discount.percent)%")
+                .font(.system(size: 19, weight: .black, design: .rounded))
+            Text("OFF")
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .kerning(2)
+        }
+        .foregroundStyle(.black)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(LinearGradient(colors: [discount.color, discount.color.opacity(0.82)],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(.white.opacity(0.35), lineWidth: 1))
+                .shadow(color: discount.color.opacity(0.55), radius: 5, y: 2)
+        )
+        .rotationEffect(.degrees(-6))
+        .accessibilityLabel("\(discount.percent) percent off")
     }
 
     // ── 6-slot item row ──────────────────────────────────────────────────────
