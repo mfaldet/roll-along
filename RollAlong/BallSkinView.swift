@@ -2424,9 +2424,10 @@ struct BallSkinView: View {
                         let lx = start.x + (endP.x - start.x) * f
                         let ly = start.y + (endP.y - start.y) * f
                         // Perpendicular jitter that shrinks toward the endpoint.
-                        let perp = aim + .pi / 2
-                        let jAmp = r * 0.16 * Double(f) * (1 - Double(f) + 0.25)
-                        let jit = CGFloat(sin(t * 6 + Double(i) * 3 + Double(s) * 1.9)) * CGFloat(jAmp)
+                        let perp: Double = aim + .pi / 2
+                        let jAmp: Double = Double(r) * 0.16 * Double(f) * (1 - Double(f) + 0.25)
+                        let jitArg: Double = t * 6 + Double(i) * 3 + Double(s) * 1.9
+                        let jit: CGFloat = CGFloat(sin(jitArg) * jAmp)
                         let px = lx + CGFloat(cos(perp)) * jit
                         let py = ly + CGFloat(sin(perp)) * jit
                         path.addLine(to: CGPoint(x: px, y: py))
@@ -3801,10 +3802,12 @@ struct BallSkinView: View {
                 for (gx, gy, ph) in glints {
                     let tw = reduceMotion ? 0.5 : max(0.0, sin(t * 2.1 + ph))
                     if tw <= 0.02 { continue }
-                    let p = CGPoint(x: cx + (gx - 0.5) * 2 * r * 0.82,
-                                    y: cy + (gy - 0.5) * 2 * r * 0.82)
+                    let ox: CGFloat = (gx - 0.5) * 2 * r * 0.82
+                    let oy: CGFloat = (gy - 0.5) * 2 * r * 0.82
+                    let p = CGPoint(x: cx + ox, y: cy + oy)
                     if hypot(p.x - cx, p.y - cy) > r * 0.92 { continue }
-                    trophyGlint(ctx, at: p, size: r * 0.13 * CGFloat(0.6 + 0.4 * tw), opacity: tw)
+                    let glintSize: CGFloat = r * 0.13 * CGFloat(0.6 + 0.4 * tw)
+                    trophyGlint(ctx, at: p, size: glintSize, opacity: tw)
                 }
 
                 // ── 6. Warm reflected rim light (lower-right) ────────────
