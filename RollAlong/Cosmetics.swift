@@ -1001,7 +1001,7 @@ enum Floor: String, CosmeticItem {
         case .stormcloud: return Color(red: 0.32,  green: 0.36,  blue: 0.44 )  // slate storm
         case .sugar:      return Color(red: 0.99,  green: 0.92,  blue: 0.95 )  // pale candy-pink
         case .fog:        return Color(red: 0.66,  green: 0.69,  blue: 0.70 )  // cold grey mist
-        case .aurora:     return Color(red: 0.380, green: 0.620, blue: 0.560)
+        case .aurora:     return Color(red: 0.045, green: 0.075, blue: 0.150)  // deep night sky; aurora glows over it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
@@ -1156,7 +1156,7 @@ enum Pit: String, CosmeticItem {
         case .sunset:     return Color(red: 0.30,  green: 0.06,  blue: 0.04 )
         case .origami:    return Color(red: 0.094, green: 0.078, blue: 0.063)
         case .mirage:     return Color(red: 0.22,  green: 0.14,  blue: 0.05 )
-        case .aurora:     return Color(red: 0.000, green: 0.000, blue: 0.000)
+        case .aurora:     return Color(red: 0.020, green: 0.030, blue: 0.090)  // deep indigo aurora void
         case .canyon:     return Color(red: 0.32,  green: 0.14,  blue: 0.08 )  // deep rust gorge
         case .downpour:   return Color(red: 0.10,  green: 0.16,  blue: 0.26 )  // dark rainy blue
         case .syrup:      return Color(red: 0.20,  green: 0.06,  blue: 0.10 )  // dark molasses

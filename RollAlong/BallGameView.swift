@@ -1741,33 +1741,87 @@ struct BallGameView: View {
     /// purple gradient blobs on top of the floor base color.  Drawn at 30Hz
     /// (minimumInterval) to keep CPU cost modest — physics still runs at 60Hz
     /// via the CADisplayLink.
+    // Aurora floor — a living northern-lights sky: a broad colour wash of soft
+    // hue-drifting glow blobs, four wavy vertical light CURTAINS that undulate
+    // and slide (the signature aurora ribbons), and a twinkling starfield.  All
+    // additive over the deep-night floor base so the colours luminesce.
     private var auroraShimmerOverlay: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
 
-                // 4 large soft blobs in the aurora palette
+                // ── 1. Soft aurora glow wash ───────────────────────────────
+                ctx.blendMode = .plusLighter
                 let blobs: [(Double, Double, Double, Double)] = [
-                    (0.0, 0.0, 0.42, 0.08),   // teal-green
-                    (1.7, 2.4, 0.62, 0.10),   // blue
-                    (3.5, 1.1, 0.75, 0.07),   // purple
-                    (5.2, 4.0, 0.50, 0.09),   // cyan
+                    (0.0, 0.0, 0.42, 0.07),   // teal-green
+                    (1.7, 2.4, 0.52, 0.09),   // cyan
+                    (3.5, 1.1, 0.74, 0.06),   // violet
+                    (5.2, 4.0, 0.46, 0.08),   // aqua
+                    (2.4, 5.1, 0.66, 0.07),   // indigo-violet
                 ]
-                let r = size.width * 0.85
+                let r = w * 0.9
                 for (xSeed, ySeed, hueSeed, speed) in blobs {
-                    let bx = size.width  * CGFloat(0.5 + 0.55 * sin(t * speed       + xSeed))
-                    let by = size.height * CGFloat(0.5 + 0.45 * sin(t * speed * 1.3 + ySeed))
-                    let hue = (hueSeed + t * 0.012).truncatingRemainder(dividingBy: 1.0)
-                    let color = Color(hue: hue, saturation: 0.55, brightness: 0.92)
+                    let bx = w * CGFloat(0.5 + 0.55 * sin(t * speed       + xSeed))
+                    let by = h * CGFloat(0.40 + 0.40 * sin(t * speed * 1.3 + ySeed))
+                    let hue = (hueSeed + t * 0.010).truncatingRemainder(dividingBy: 1.0)
+                    let color = Color(hue: hue, saturation: 0.60, brightness: 0.95)
                     ctx.fill(
-                        Path(ellipseIn: CGRect(x: bx - r, y: by - r,
-                                                width: r * 2, height: r * 2)),
+                        Path(ellipseIn: CGRect(x: bx - r, y: by - r, width: r * 2, height: r * 2)),
                         with: .radialGradient(
-                            Gradient(colors: [color.opacity(0.32), .clear]),
-                            center: CGPoint(x: bx, y: by),
-                            startRadius: 0, endRadius: r
-                        )
-                    )
+                            Gradient(colors: [color.opacity(0.20), .clear]),
+                            center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: r))
+                }
+
+                // ── 2. Aurora curtains — wavy vertical light ribbons ───────
+                // x-fraction, base hue, phase, drift speed.
+                let curtains: [(CGFloat, Double, Double, Double)] = [
+                    (0.18, 0.40, 0.0, 0.45),
+                    (0.42, 0.52, 1.9, 0.32),
+                    (0.66, 0.74, 3.4, 0.38),
+                    (0.85, 0.46, 5.0, 0.28),
+                ]
+                let steps = 16
+                for (xf, hue0, ph, spd) in curtains {
+                    let hue = (hue0 + t * 0.008).truncatingRemainder(dividingBy: 1.0)
+                    let col = Color(hue: hue, saturation: 0.72, brightness: 1.0)
+                    let baseX = w * xf + CGFloat(sin(t * spd + ph)) * w * 0.06
+                    let bandW = w * 0.14
+                    var leftPts: [CGPoint] = [], rightPts: [CGPoint] = []
+                    for s in 0...steps {
+                        let yf = Double(s) / Double(steps)
+                        let y  = h * CGFloat(yf)
+                        let sway  = CGFloat(sin(t * spd * 1.4 + ph + yf * 3.4)) * w * 0.05
+                        let half  = bandW * CGFloat(0.35 + 0.65 * sin(yf * .pi))  // pinch top & bottom
+                        leftPts.append(CGPoint(x: baseX + sway - half, y: y))
+                        rightPts.append(CGPoint(x: baseX + sway + half, y: y))
+                    }
+                    var path = Path()
+                    path.move(to: leftPts[0])
+                    for p in leftPts.dropFirst() { path.addLine(to: p) }
+                    for p in rightPts.reversed() { path.addLine(to: p) }
+                    path.closeSubpath()
+                    ctx.fill(path, with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: col.opacity(0.0),  location: 0.0),
+                            .init(color: col.opacity(0.30), location: 0.32),
+                            .init(color: col.opacity(0.12), location: 0.68),
+                            .init(color: .clear,            location: 1.0),
+                        ]),
+                        startPoint: CGPoint(x: baseX, y: 0), endPoint: CGPoint(x: baseX, y: h)))
+                }
+                ctx.blendMode = .normal
+
+                // ── 3. Twinkling starfield ─────────────────────────────────
+                for i in 0..<24 {
+                    let fx = abs((sin(Double(i) * 12.9898) * 43758.5453).truncatingRemainder(dividingBy: 1.0))
+                    let fy = abs((sin(Double(i) * 78.2330) * 12543.1234).truncatingRemainder(dividingBy: 1.0))
+                    let tw = 0.4 + 0.6 * sin(t * 1.8 + Double(i) * 1.3)
+                    if tw < 0.2 { continue }
+                    let px = w * CGFloat(fx), py = h * CGFloat(fy) * 0.72
+                    let s  = CGFloat(0.7 + 1.1 * tw)
+                    ctx.fill(Path(ellipseIn: CGRect(x: px - s, y: py - s, width: s * 2, height: s * 2)),
+                             with: .color(.white.opacity(0.45 * tw)))
                 }
             }
         }
