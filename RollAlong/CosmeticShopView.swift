@@ -465,10 +465,6 @@ struct CosmeticShopView: View {
                         RoundedRectangle(cornerRadius: 14)
                             .fill(Color(white: 0.10))
                     )
-                    .overlay(alignment: .topTrailing) {
-                        TierBadge(item: item, compact: true)
-                            .padding(6)
-                    }
 
                 Text(item.displayName)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -496,6 +492,12 @@ struct CosmeticShopView: View {
                             .stroke(border ?? .clear, lineWidth: border == nil ? 0 : 2)
                     )
             )
+            // Rarity gem in the card's top-right corner (silver/gold/diamond).
+            .overlay(alignment: .topTrailing) {
+                TierBadge(item: item)
+                    .opacity(greyed ? 0.5 : 1.0)
+                    .padding(8)
+            }
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -534,24 +536,42 @@ struct CosmeticShopView: View {
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(inCatalog ? Color(white: 0.20)
-                                        : (canAfford(item) ? Color(red: 0.20, green: 0.78, blue: 0.38).opacity(0.85)
-                                                           : Color(white: 0.22)))
-                )
+                .background(costPillBackground(inCatalog: inCatalog, affordable: canAfford(item)))
             }
+        }
+    }
+
+    /// Background for the price pill.  The affordable (Shop) state used to be a
+    /// solid bright-green fill that washed out the white coin amount; it's now a
+    /// muted top-to-bottom opacity gradient over the dark card, so the lettering
+    /// reads clearly while still signalling "you can buy this".
+    @ViewBuilder
+    private func costPillBackground(inCatalog: Bool, affordable: Bool) -> some View {
+        if inCatalog {
+            Capsule().fill(Color(white: 0.20))
+        } else if affordable {
+            Capsule()
+                .fill(LinearGradient(
+                    colors: [Color(red: 0.22, green: 0.74, blue: 0.42).opacity(0.55),
+                             Color(red: 0.12, green: 0.42, blue: 0.24).opacity(0.28)],
+                    startPoint: .top, endPoint: .bottom))
+                .overlay(
+                    Capsule().stroke(Color(red: 0.32, green: 0.84, blue: 0.52).opacity(0.45),
+                                     lineWidth: 0.8))
+        } else {
+            Capsule().fill(Color(white: 0.22))
         }
     }
 
     private func accessibilityLabel<Item: CosmeticItem>(item: Item, owned: Bool, equipped: Bool) -> String {
         let category = String(describing: type(of: item))
-        if equipped { return "\(item.displayName) \(category), equipped." }
-        if owned    { return "\(item.displayName) \(category), owned. Double-tap to equip." }
+        let rarity = item.showsRarityBadge ? ", \(item.rarityLabel)" : ""
+        if equipped { return "\(item.displayName) \(category)\(rarity), equipped." }
+        if owned    { return "\(item.displayName) \(category)\(rarity), owned. Double-tap to equip." }
         if mode == .catalog {
-            return "\(item.displayName) \(category), \(item.coinCost) coins. Sold as part of a bundle — double-tap for details."
+            return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Sold as part of a bundle — double-tap for details."
         }
-        return "\(item.displayName) \(category), \(item.coinCost) coins. Double-tap to buy."
+        return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Double-tap to buy."
     }
 
     // MARK: - Tap handling
@@ -834,7 +854,7 @@ struct CosmeticShopView: View {
                         .kerning(1.2)
                         .foregroundStyle(limitedTimeColor(for: bundle))
                     }
-                    TierBadge(label: bundle.rarity.label, color: bundle.rarity.color, compact: true)
+                    TierBadge(rarity: bundle.rarity, compact: true)
                     Text(bundle.displayName)
                         .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(.white)

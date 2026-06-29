@@ -63,6 +63,11 @@ extension CosmeticItem {
     /// Badge accent — a distinct prismatic magenta for Iconic, else the tier color.
     var rarityColor: Color { isIconic ? Self.iconicColor : tier.color }
 
+    /// Metallic gem colours for the shop-card rarity gem — silver / gold /
+    /// amethyst / diamond by tier, with a vivid prismatic gradient for Iconic.
+    /// Mirrors `rarityColor`, but feeds the gem badge's gradient.
+    var rarityGemColors: [Color] { isIconic ? Self.iconicGemColors : tier.gemColors }
+
     /// Every item earns a badge now: Iconic items included (the plain classic
     /// look reads as "Iconic"), so this is always true.
     var showsRarityBadge: Bool { true }
@@ -70,6 +75,12 @@ extension CosmeticItem {
     /// Shared Iconic accent — sits apart from the gray→blue→cyan→purple→gold
     /// tier ramp so "Iconic" reads as its own thing, above Legendary.
     static var iconicColor: Color { Color(red: 0.96, green: 0.45, blue: 0.85) }
+
+    /// Iconic gem gradient — prismatic magenta→violet, set apart from the
+    /// metallic tier ramp so "Iconic" reads as its own thing.
+    static var iconicGemColors: [Color] {
+        [Color(red: 1.00, green: 0.62, blue: 0.96), Color(red: 0.70, green: 0.30, blue: 0.95)]
+    }
 }
 
 extension BallSkin {
@@ -151,6 +162,22 @@ extension CosmeticTier {
 
     /// starter/free items don't earn a badge (it's the implicit default).
     var showsBadge: Bool { self != .starter }
+
+    /// Metallic gem ramp for the shop-card rarity gem — silver → gold →
+    /// amethyst → diamond.  (`color` above stays the flat legacy accent used
+    /// elsewhere, e.g. the profile music chip.)  Lighter shade first.
+    var gemColors: [Color] {
+        switch self {
+        case .starter:   return [Color(white: 0.78), Color(white: 0.50)]
+        case .standard:  return [Color(white: 0.95), Color(white: 0.62)]                 // silver
+        case .rare:      return [Color(red: 1.00, green: 0.87, blue: 0.48),
+                                 Color(red: 0.84, green: 0.55, blue: 0.15)]              // gold
+        case .premium:   return [Color(red: 0.82, green: 0.58, blue: 1.00),
+                                 Color(red: 0.50, green: 0.26, blue: 0.80)]              // amethyst (Epic)
+        case .exclusive: return [Color(red: 0.85, green: 0.97, blue: 1.00),
+                                 Color(red: 0.38, green: 0.80, blue: 0.98)]              // diamond
+        }
+    }
 }
 
 // MARK: - Ball skins
@@ -1584,6 +1611,17 @@ enum BundleRarity: String, CaseIterable {
         case .legendary: return Color(red: 1.00, green: 0.78, blue: 0.28)
         }
     }
+
+    /// Metallic gem ramp for the bundle's rarity gem — silver / gold / diamond.
+    var gemColors: [Color] {
+        switch self {
+        case .standard:  return [Color(white: 0.95), Color(white: 0.62)]                 // silver
+        case .rare:      return [Color(red: 1.00, green: 0.87, blue: 0.48),
+                                 Color(red: 0.84, green: 0.55, blue: 0.15)]              // gold
+        case .legendary: return [Color(red: 0.85, green: 0.97, blue: 1.00),
+                                 Color(red: 0.38, green: 0.80, blue: 0.98)]              // diamond
+        }
+    }
 }
 
 struct CosmeticBundle: Identifiable {
@@ -2883,37 +2921,46 @@ struct MiniBall: View {
 /// A small rarity pill — "Standard" / "Epic" / "Legendary" in the tier's accent
 /// colour.  Surfaces rarity-as-status in the shop and profile.  Renders nothing
 /// for starter/free items.
+/// Rarity badge: a faceted gem in the rarity's metallic colour (silver / gold /
+/// amethyst / diamond, prismatic for Iconic), sized for a card's top-right
+/// corner.  Colour carries the rarity; `label` rides along for VoiceOver.
 struct TierBadge: View {
     let label: String
-    let color: Color
+    let gemColors: [Color]
     var shows: Bool = true
     var compact: Bool = false
 
-    /// Item-aware: shows "Iconic" for un-sellable specials, else the tier rarity.
+    /// Item-aware: the Iconic prismatic gem for un-sellable specials, else the
+    /// metallic tier gem (silver / gold / amethyst / diamond).
     init<Item: CosmeticItem>(item: Item, compact: Bool = false) {
-        self.init(label: item.rarityLabel, color: item.rarityColor,
+        self.init(label: item.rarityLabel, gemColors: item.rarityGemColors,
                   shows: item.showsRarityBadge, compact: compact)
     }
-    /// Plain tier badge (kept for callers that only have a `CosmeticTier`).
+    /// Plain tier gem (kept for callers that only have a `CosmeticTier`).
     init(tier: CosmeticTier, compact: Bool = false) {
-        self.init(label: tier.label, color: tier.color,
+        self.init(label: tier.label, gemColors: tier.gemColors,
                   shows: tier.showsBadge, compact: compact)
     }
-    init(label: String, color: Color, shows: Bool = true, compact: Bool = false) {
-        self.label = label; self.color = color; self.shows = shows; self.compact = compact
+    /// Bundle rarity gem.
+    init(rarity: BundleRarity, compact: Bool = false) {
+        self.init(label: rarity.label, gemColors: rarity.gemColors, compact: compact)
+    }
+    init(label: String, gemColors: [Color], shows: Bool = true, compact: Bool = false) {
+        self.label = label; self.gemColors = gemColors; self.shows = shows; self.compact = compact
     }
 
     var body: some View {
         if shows {
-            Text(label.uppercased())
-                .font(.system(size: compact ? 8 : 9, weight: .black, design: .rounded))
-                .tracking(0.5)
-                .foregroundStyle(color)
-                .padding(.horizontal, compact ? 5 : 7)
-                .padding(.vertical, compact ? 2 : 3)
-                .background(Capsule().fill(color.opacity(0.16)))
-                .overlay(Capsule().stroke(color.opacity(0.55), lineWidth: 1))
-                .fixedSize()
+            Image(systemName: "diamond.fill")
+                .font(.system(size: compact ? 12 : 14, weight: .black))
+                .foregroundStyle(
+                    LinearGradient(colors: gemColors,
+                                   startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(4)
+                .background(Circle().fill(Color.black.opacity(0.42)))
+                .overlay(Circle().stroke((gemColors.first ?? .white).opacity(0.70), lineWidth: 0.8))
+                .shadow(color: (gemColors.first ?? .white).opacity(0.55), radius: 2.5)
+                .accessibilityLabel("\(label) rarity")
         }
     }
 }
