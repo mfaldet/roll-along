@@ -297,7 +297,7 @@ struct CosmeticShopView: View {
         } label: {
             HStack(spacing: 6) {
                 CoinIcon(size: 16)
-                Text("\(gameState.coinBalance)")
+                Text(GameState.coinPillText(gameState.coinBalance))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .monospacedDigit()
@@ -324,7 +324,11 @@ struct CosmeticShopView: View {
     /// away while the player scrolls the Catalog — no horizontal swiping to reach
     /// a filter, and the bar never scrolls off the top.
     private var tabBar: some View {
-        HStack(spacing: 5) {
+        // Two rows of four filter tiles (8 categories) instead of one tight row
+        // of eight — each tile is ~twice as wide, so the icon + label are bigger
+        // and easier to read.  Still no scrolling; same filter behaviour.
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4),
+                  spacing: 6) {
             ForEach(ShopCategory.allCases) { cat in
                 tabButton(cat)
             }
@@ -339,17 +343,17 @@ struct CosmeticShopView: View {
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) { category = cat }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 Image(systemName: cat.icon)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                 Text(cat.displayName)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.65)
             }
             .foregroundStyle(isActive ? .black : Color(white: 0.82))
-            .frame(maxWidth: .infinity)   // equal-width tiles fill the row, no scroll
-            .frame(height: 54)
+            .frame(maxWidth: .infinity)   // equal-width tiles fill each column
+            .frame(height: 58)
             .background(
                 RoundedRectangle(cornerRadius: 13)
                     .fill(isActive ? Color.white : Color(white: 0.16))
@@ -395,8 +399,15 @@ struct CosmeticShopView: View {
     }
 
     private func categoryGrid<Item: CosmeticItem>(items: [Item]) -> some View {
-        LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(items, id: \.id) { item in
+        // Sort every Catalog page by rarity — "iconic" (free starter) up top,
+        // then Standard, Rare, Epic, Legendary.  Pairing the tier rank with the
+        // original index keeps the sort stable, so items within a tier hold their
+        // natural catalogue order.
+        let sorted = items.enumerated()
+            .sorted { ($0.element.tier.sortRank, $0.offset) < ($1.element.tier.sortRank, $1.offset) }
+            .map(\.element)
+        return LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(sorted, id: \.id) { item in
                 itemCell(item: item)
             }
         }

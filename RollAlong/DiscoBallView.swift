@@ -33,15 +33,16 @@ struct DiscoBallView: View {
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
-    /// Chosen at the start screen each run.  Hardcore: a bigger 10×10 grid, a
-    /// smaller ball, and — instead of a looping reveal you tap to leave — the
-    /// path flashes ONCE, then the zone auto-unlocks with a 10-second countdown.
+    /// Chosen at the start screen each run.  Hardcore: a bigger 8×14 hex grid
+    /// (vs 6×10 normal), a smaller ball, and — instead of a looping reveal you
+    /// tap to leave — the path flashes ONCE, then the zone auto-unlocks with a
+    /// 10-second countdown.
     @State private var hardcore = false
 
     // MARK: - Tunables
-    private var cols: Int { hardcore ? 10 : 5 }
-    private var rows: Int { hardcore ? 10 : 6 }
-    private var ballRadius: CGFloat { hardcore ? 8 : 10 }
+    private var cols: Int { hardcore ? 8 : 6 }
+    private var rows: Int { hardcore ? 14 : 10 }
+    private var ballRadius: CGFloat { hardcore ? 9 : 11 }
     private let moveAccel:   CGFloat = 1_500
     private let friction:    CGFloat = 0.94
     private let maxSpeed:    CGFloat = 700
@@ -57,7 +58,8 @@ struct DiscoBallView: View {
     private static let tileEdge    = Color(white: 0.20)
     private static let revealColor = Color(red: 0.32, green: 0.85, blue: 1.00)   // cyan path
     private static let greenLit    = Color(red: 0.25, green: 0.90, blue: 0.46)
-    private static let safeFill    = Color(red: 0.16, green: 0.16, blue: 0.22)
+    private static let safeTop     = Color(red: 0.12, green: 0.09, blue: 0.24)   // glossy stage panel
+    private static let safeBottom  = Color(red: 0.04, green: 0.03, blue: 0.09)
 
     // MARK: - Model
     private struct GridPos: Hashable { let row: Int; let col: Int }
@@ -87,8 +89,18 @@ struct DiscoBallView: View {
     private var gridTop:    CGFloat { safeH }
     private var gridBottom: CGFloat { arena.height - safeH }
     private var gridH:      CGFloat { gridBottom - gridTop }
-    private var tileW:      CGFloat { arena.width / CGFloat(cols) }
-    private var tileH:      CGFloat { gridH / CGFloat(rows) }
+    // Pointy-top hexagons in offset rows fill the space between the safe zones.
+    // hexW is the column pitch (the +0.5 leaves room for the odd-row stagger);
+    // hexHeight is sized so `rows` rows exactly fill gridH at a 0.75·height pitch.
+    private var hexW:       CGFloat { arena.width / (CGFloat(cols) + 0.5) }
+    private var hexHeight:  CGFloat { gridH / (0.75 * CGFloat(rows) + 0.25) }
+    private var rowSpacing: CGFloat { hexHeight * 0.75 }
+    /// Centre of the hex at (row, col); odd rows shift right by half a hex.
+    private func hexCenter(_ row: Int, _ col: Int) -> CGPoint {
+        let stagger: CGFloat = (row & 1) == 1 ? hexW / 2 : 0
+        return CGPoint(x: (CGFloat(col) + 0.5) * hexW + stagger,
+                       y: gridTop + hexHeight / 2 + CGFloat(row) * rowSpacing)
+    }
     private var bestKey: String { hardcore ? "discohard" : "disco" }
     private var best: Int { gameState.minigameBests[bestKey, default: 0] }
     /// Coins this run would bank right now.
@@ -139,28 +151,49 @@ struct DiscoBallView: View {
 
     private var safeZonesLayer: some View {
         VStack(spacing: 0) {
-            safeZone(isTarget: phase == .crossing && atBottom)     // top band
+            safeZone(isTarget: phase == .crossing && atBottom,  isTopBand: true)   // top band
             Spacer(minLength: 0)
-            safeZone(isTarget: phase == .crossing && !atBottom)    // bottom band
+            safeZone(isTarget: phase == .crossing && !atBottom, isTopBand: false)  // bottom band
         }
         .allowsHitTesting(false)
     }
 
-    private func safeZone(isTarget: Bool) -> some View {
-        ZStack {
-            Rectangle().fill(Self.safeFill)
-            Rectangle()
-                .fill(Self.greenLit.opacity(isTarget ? 0.22 : 0))
-            Text("SAFE")
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .tracking(3)
-                .foregroundStyle(Color(white: isTarget ? 0.75 : 0.40))
+    /// A safe zone styled as a glossy neon "landing stage" — a smooth gradient
+    /// panel, a row of round stage-lights, and a glowing boundary strip facing
+    /// the floor.  Deliberately nothing like the square disco tiles.  Cyan when
+    /// idle, green when it's the current target to reach.
+    private func safeZone(isTarget: Bool, isTopBand: Bool) -> some View {
+        let accent: Color = isTarget ? Self.greenLit : Self.revealColor
+        let gridEdge: Alignment = isTopBand ? .bottom : .top
+        return ZStack {
+            // Glossy stage panel — smooth, not a grid of tiles.
+            LinearGradient(colors: [Self.safeTop, Self.safeBottom],
+                           startPoint: .top, endPoint: .bottom)
+            // Accent wash rising from the floor-facing edge (brighter on target).
+            LinearGradient(colors: [accent.opacity(isTarget ? 0.30 : 0.12), .clear],
+                           startPoint: isTopBand ? .bottom : .top,
+                           endPoint:   isTopBand ? .top    : .bottom)
+            // A row of round stage-lights — round, so it reads nothing like the
+            // square disco floor tiles.
+            HStack(spacing: 0) {
+                ForEach(0..<11, id: \.self) { _ in
+                    Circle()
+                        .fill(accent.opacity(isTarget ? 0.95 : 0.7))
+                        .frame(width: 4, height: 4)
+                        .shadow(color: accent.opacity(0.8), radius: 3)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, 12)
         }
         .frame(height: safeH)
-        .overlay(alignment: isTarget ? .center : .center) {
+        .overlay(alignment: gridEdge) {
+            // Glowing neon boundary strip where the stage meets the floor.
             Rectangle()
-                .fill(Self.greenLit.opacity(isTarget ? 0.9 : 0.18))
-                .frame(height: 2)
+                .fill(accent)
+                .frame(height: 2.5)
+                .shadow(color: accent.opacity(0.9), radius: 6)
+                .shadow(color: accent.opacity(0.5), radius: 12)
         }
     }
 
@@ -168,12 +201,11 @@ struct DiscoBallView: View {
         ForEach(0..<rows, id: \.self) { r in
             ForEach(0..<cols, id: \.self) { c in
                 let pos = GridPos(row: r, col: c)
-                RoundedRectangle(cornerRadius: 6)
+                HexTile()
                     .fill(tileFill(pos))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Self.tileEdge, lineWidth: 1))
-                    .frame(width: max(1, tileW - 5), height: max(1, tileH - 5))
-                    .position(x: (CGFloat(c) + 0.5) * tileW,
-                              y: gridTop + (CGFloat(r) + 0.5) * tileH)
+                    .overlay(HexTile().stroke(Self.tileEdge, lineWidth: 1))
+                    .frame(width: max(1, hexW - 4), height: max(1, hexHeight - 4))
+                    .position(hexCenter(r, c))
             }
         }
         .allowsHitTesting(false)
@@ -459,22 +491,36 @@ struct DiscoBallView: View {
         vel = .zero
     }
 
-    /// A connected staircase path from the near safe-zone row to the far one.
+    /// A connected path of hex-adjacent tiles from the near safe-zone row to the
+    /// far one: a horizontal wander along each row, then ONE diagonal hex step to
+    /// the next row.  In an offset honeycomb a vertical step shifts the column by
+    /// {0, −1} on even rows and {+1, 0} on odd rows (the two down/up neighbours),
+    /// so every consecutive pair of tiles stays edge-adjacent.
     private func generatePath() {
         let shift = 1 + min(crossings / 3, 2)          // winds more as you go
         let near  = atBottom ? rows - 1 : 0
+        let far   = atBottom ? 0 : rows - 1
         let step  = atBottom ? -1 : 1
         var order: [GridPos] = []
         var col = Int.random(in: 0..<cols)
         var row = near
-        for _ in 0..<rows {
+        while true {
+            // Horizontal wander within this row (E/W neighbours).
             let target = max(0, min(cols - 1, col + Int.random(in: -shift...shift)))
             let dir = col <= target ? 1 : -1
             for c in stride(from: col, through: target, by: dir) {
-                order.append(GridPos(row: row, col: c))
+                let pos = GridPos(row: row, col: c)
+                if order.last != pos { order.append(pos) }
             }
             col = target
+            if row == far { break }
+            // One diagonal step to the next row (a real hex neighbour).  Clamping
+            // at an edge lands on the other valid neighbour, so it stays adjacent.
+            let goRight = Bool.random()
+            let cOffset = (row & 1) == 0 ? (goRight ? 0 : -1) : (goRight ? 1 : 0)
+            col = max(0, min(cols - 1, col + cOffset))
             row += step
+            order.append(GridPos(row: row, col: col))
         }
         pathOrder = order
         pathSet = Set(order)
@@ -569,17 +615,32 @@ struct DiscoBallView: View {
         let reachedFar = atBottom ? (ball.y <= gridTop) : (ball.y >= gridBottom)
         if reachedFar { succeedCrossing(); return }
 
-        // Inside the grid? Check the tile under the ball's centre.
+        // Inside the grid? Light the hex under the ball's centre, or fail.
         guard ball.y > gridTop, ball.y < gridBottom else { return }
-        let c = Int((ball.x / tileW).rounded(.down))
-        let r = Int(((ball.y - gridTop) / tileH).rounded(.down))
-        guard c >= 0, c < cols, r >= 0, r < rows else { return }
-        let pos = GridPos(row: r, col: c)
+        guard let pos = hexUnder(ball) else { return }
         if pathSet.contains(pos) {
             touched.insert(pos)
         } else {
             failCrossing()
         }
+    }
+
+    /// The hex whose centre is nearest the point — the honeycomb analogue of the
+    /// old `floor(x / tileW)` cell lookup (each point belongs to exactly one
+    /// nearest hex).  Brute-force over the ≤112-tile grid; cheap per tick.
+    private func hexUnder(_ p: CGPoint) -> GridPos? {
+        guard cols > 0, rows > 0 else { return nil }
+        var best: GridPos? = nil
+        var bestD = CGFloat.greatestFiniteMagnitude
+        for r in 0..<rows {
+            for c in 0..<cols {
+                let ctr = hexCenter(r, c)
+                let dx = p.x - ctr.x, dy = p.y - ctr.y
+                let d = dx * dx + dy * dy
+                if d < bestD { bestD = d; best = GridPos(row: r, col: c) }
+            }
+        }
+        return best
     }
 
     private func succeedCrossing() {
@@ -614,5 +675,24 @@ struct DiscoBallView: View {
                          "hardcore": .bool(hardcore)]
         )
         phase = .gameOver
+    }
+}
+
+/// A pointy-top hexagon filling its frame — the Disco floor tile.  Pointy-top so
+/// the rows tessellate vertically (offset every other row) between the safe
+/// zones.  Vertices: top + bottom points, with the four side vertices inset a
+/// quarter-height from the top and bottom edges.
+private struct HexTile: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let q = rect.height / 4
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))          // top point
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY - q))   // upper-right
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY + q))   // lower-right
+        p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))       // bottom point
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.midY + q))   // lower-left
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.midY - q))   // upper-left
+        p.closeSubpath()
+        return p
     }
 }
