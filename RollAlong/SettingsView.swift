@@ -339,9 +339,10 @@ struct SettingsView: View {
                             Text(isRestoring ? "Restoring…" : "Restore Purchases")
                                 .font(.system(.body, design: .rounded))
                                 .foregroundStyle(Color(white: 0.85))
-                            Text("Re-activate past purchases on this device")
+                            Text("Brings back anything you bought with real money — Unlimited Lives and the Starter Pack — on a new phone or after reinstalling. Won't touch your coins or cosmetics.")
                                 .font(.system(.caption, design: .rounded))
                                 .foregroundStyle(Color(white: 0.42))
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
                     }
@@ -392,10 +393,15 @@ struct SettingsView: View {
                         Text("Sell Back Cosmetics")
                             .font(.system(.body, design: .rounded))
                         Text(cosmetic.count > 0
-                             ? "Refund \(cosmetic.count) cosmetic\(cosmetic.count == 1 ? "" : "s") for full coin value and tidy your locker"
-                             : "Return your look to the default")
+                             ? "Sell the cosmetics you bought with coins back for a full refund and tidy your locker."
+                             : "Return your equipped look to the default.")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.45))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Keeps the cosmetics you earned or bought with cash — re-buy anything anytime.")
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color(white: 0.38))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
                     if cosmetic.coins > 0 {
@@ -427,10 +433,16 @@ struct SettingsView: View {
             Button {
                 showResetConfirm = true
             } label: {
-                HStack {
+                HStack(alignment: .top) {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("Reset Level Progress")
-                        .font(.system(.body, design: .rounded))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Reset Level Progress")
+                            .font(.system(.body, design: .rounded))
+                        Text("Wipes every level back to Level 1 — keeps your cosmetics, nickname & settings. Can't be undone.")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color(red: 0.78, green: 0.42, blue: 0.42))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     Spacer()
                     Text("Level \(gameState.currentLevel)")
                         .font(.system(.footnote, design: .rounded))
