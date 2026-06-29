@@ -1331,10 +1331,12 @@ struct BallGameView: View {
                 for i in 0..<flameCount {
                     let seed = Double(i) * 0.73 + 0.11
                     let baseX = size.width * CGFloat(Double(i) + 0.5) / CGFloat(flameCount)
-                    let flicker = sin(t * 7 + seed * 4) * 0.30
-                                + sin(t * 13 + seed * 1.6) * 0.15
-                    let flameW = (size.width / CGFloat(flameCount)) * (0.70 + 0.50 * CGFloat(flicker.magnitude))
-                    let flameH = size.height * CGFloat(0.55 + 0.25 * sin(t * 4 + seed * 2))
+                    let flicker: Double = sin(t * 7 + seed * 4) * 0.30
+                                        + sin(t * 13 + seed * 1.6) * 0.15
+                    let flickScale: CGFloat = 0.70 + 0.50 * CGFloat(flicker.magnitude)
+                    let flameW = size.width / CGFloat(flameCount) * flickScale
+                    let flameHFrac: Double = 0.55 + 0.25 * sin(t * 4 + seed * 2)
+                    let flameH = size.height * CGFloat(flameHFrac)
                     let flameX = baseX - flameW / 2
                     let flameY = size.height - flameH
                     let centre = CGPoint(x: flameX + flameW / 2, y: flameY + flameH * 0.75)
@@ -1465,9 +1467,11 @@ struct BallGameView: View {
                 let bands = max(4, Int(size.height / 26))
                 for b in 0..<bands {
                     let by = (CGFloat(b) + 0.5) / CGFloat(bands) * size.height
-                    let drift = sin(t * 1.1 + Double(b) * 0.9)
-                    let bx = size.width * (0.5 + 0.32 * CGFloat(drift))
-                    let bw = size.width * CGFloat(0.30 + 0.12 * sin(t * 0.7 + Double(b)))
+                    let drift: Double = sin(t * 1.1 + Double(b) * 0.9)
+                    let bxScale: CGFloat = 0.5 + 0.32 * CGFloat(drift)
+                    let bx = size.width * bxScale
+                    let bwFrac: Double = 0.30 + 0.12 * sin(t * 0.7 + Double(b))
+                    let bw = size.width * CGFloat(bwFrac)
                     let bh = max(3, size.height * 0.05)
                     caustic.fill(
                         Path(ellipseIn: CGRect(x: bx - bw / 2, y: by - bh / 2, width: bw, height: bh)),
@@ -1754,8 +1758,10 @@ struct BallGameView: View {
                 ]
                 let r = w * 0.9
                 for (xSeed, ySeed, hueSeed, speed) in blobs {
-                    let bx = w * CGFloat(0.5 + 0.55 * sin(t * speed       + xSeed))
-                    let by = h * CGFloat(0.40 + 0.40 * sin(t * speed * 1.3 + ySeed))
+                    let bxFrac: Double = 0.5 + 0.55 * sin(t * speed       + xSeed)
+                    let byFrac: Double = 0.40 + 0.40 * sin(t * speed * 1.3 + ySeed)
+                    let bx = w * CGFloat(bxFrac)
+                    let by = h * CGFloat(byFrac)
                     let hue = (hueSeed + t * 0.010).truncatingRemainder(dividingBy: 1.0)
                     let color = Color(hue: hue, saturation: 0.60, brightness: 0.95)
                     ctx.fill(
@@ -1777,14 +1783,17 @@ struct BallGameView: View {
                 for (xf, hue0, ph, spd) in curtains {
                     let hue = (hue0 + t * 0.008).truncatingRemainder(dividingBy: 1.0)
                     let col = Color(hue: hue, saturation: 0.72, brightness: 1.0)
-                    let baseX = w * xf + CGFloat(sin(t * spd + ph)) * w * 0.06
+                    let baseSway: CGFloat = CGFloat(sin(t * spd + ph)) * w * 0.06
+                    let baseX = w * xf + baseSway
                     let bandW = w * 0.14
                     var leftPts: [CGPoint] = [], rightPts: [CGPoint] = []
                     for s in 0...steps {
                         let yf = Double(s) / Double(steps)
                         let y  = h * CGFloat(yf)
-                        let sway  = CGFloat(sin(t * spd * 1.4 + ph + yf * 3.4)) * w * 0.05
-                        let half  = bandW * CGFloat(0.35 + 0.65 * sin(yf * .pi))  // pinch top & bottom
+                        let swayArg: Double = t * spd * 1.4 + ph + yf * 3.4
+                        let sway:  CGFloat = CGFloat(sin(swayArg) * Double(w) * 0.05)
+                        let halfFrac: Double = 0.35 + 0.65 * sin(yf * Double.pi)  // pinch top & bottom
+                        let half:  CGFloat = bandW * CGFloat(halfFrac)
                         leftPts.append(CGPoint(x: baseX + sway - half, y: y))
                         rightPts.append(CGPoint(x: baseX + sway + half, y: y))
                     }
@@ -2667,7 +2676,7 @@ struct BallGameView: View {
                         let px = cx + CGFloat(cos(ang)) * rad
                         let py = cy + CGFloat(sin(ang)) * rad
                         let sz = CGFloat(1.2 + 2.0 * (1 - f))
-                        let hue = 0.60 + 0.15 * sin(f * 6 + t)
+                        let hue: Double = 0.60 + 0.15 * sin(f * 6 + t)
                         g.fill(Path(ellipseIn: CGRect(x: px-sz, y: py-sz, width: sz*2, height: sz*2)),
                             with: .color(Color(hue: hue, saturation: 0.6, brightness: 1).opacity(0.8 * (1 - f) + 0.2)))
                     }
@@ -3126,10 +3135,10 @@ struct BallGameView: View {
                         let phase = Double(i) / Double(count)
 
                         let dir: Double = ringIdx % 2 == 0 ? 1 : -1
-                        let speed = dir * (speedBase + Double(i % 5) * 0.10)
-                        let angle = phase * 2 * .pi + t * speed
+                        let speed: Double = dir * (speedBase + Double(i % 5) * 0.10)
+                        let angle: Double = phase * 2 * Double.pi + t * speed
 
-                        let breathe = sin(t * 1.5 + phase * 5.8 + Double(ringIdx) * 1.1) * 0.10
+                        let breathe: Double = sin(t * 1.5 + phase * 5.8 + Double(ringIdx) * 1.1) * 0.10
                         let r = maxR * (rFrac + breathe)
 
                         let px = cx + cos(angle) * r
