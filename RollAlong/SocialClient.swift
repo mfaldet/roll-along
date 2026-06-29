@@ -739,10 +739,32 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
 // can never drift apart.  Pure data (Foundation only); the icon/colour mapping
 // lives in the view layer.
 // ===========================================================================
+/// Groups the leaderboard boards for the game-filter picker.  Ordered: the
+/// Adventure climb, the solo games, then the competitive games.
+enum BoardCategory: Int, CaseIterable {
+    case adventure, solo, competitive
+    var title: String {
+        switch self {
+        case .adventure:   return "Adventure"
+        case .solo:        return "Solo"
+        case .competitive: return "Competitive"
+        }
+    }
+}
+
 enum LeaderboardBoard: String, CaseIterable, Identifiable {
     case rollAlong, pinball, zenGarden
     case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
     var id: String { rawValue }
+
+    /// Which category this board belongs to (drives the filter's grouping).
+    var category: BoardCategory {
+        switch self {
+        case .rollAlong:           return .adventure
+        case .pinball, .zenGarden: return .solo
+        default:                   return .competitive   // the six competitive boards
+        }
+    }
 
     /// Player-facing board name.
     var title: String {
