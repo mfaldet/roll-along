@@ -1256,6 +1256,14 @@ struct CosmeticShopView: View {
         _ = gameState.spendCoins(cost)
         bundle.grantContents(to: gameState)
         gameState.ownedBundles.insert(bundle.id)
+        // Auto-equip the new set so the purchase shows up instantly — the buyer
+        // sees their new look right away instead of equipping each piece by hand.
+        if let b = bundle.balls.first  { gameState.equipBall(b) }
+        if let g = bundle.goals.first  { gameState.equippedGoal  = g }
+        if let t = bundle.trails.first { gameState.equippedTrail = t }
+        if let f = bundle.floors.first { gameState.equippedFloor = f }
+        if let p = bundle.pits.first   { gameState.equippedPit   = p }
+        if let m = bundle.music.first  { gameState.equippedMusic = m }
         AnalyticsClient.shared.track(
             "bundle_purchased",
             properties: [
