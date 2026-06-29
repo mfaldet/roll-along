@@ -317,45 +317,66 @@ struct GameMenuView: View {
     private var goldRushBanner: some View {
         let mode = GameModeCatalogue.enabled.first { $0.id == Self.goldRushID }
         let s = Self.style(for: Self.goldRushID)
-        return Button { select(Self.goldRushID) } label: {
-            HStack(spacing: 14) {
-                Image(systemName: s.icon)
-                    .font(.system(size: 27, weight: .bold))
+        let tickets = gameState.tickets
+        let noTickets = tickets <= 0
+        return VStack(alignment: .leading, spacing: 6) {
+            // No tickets to spend → say how to earn them, above a greyed card.
+            if noTickets {
+                Text("Win competitive games to earn tickets")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+                    .padding(.leading, 4)
+            }
+            Button { select(Self.goldRushID) } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: s.icon)
+                        .font(.system(size: 27, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("REWARD ROUND")
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .tracking(1.5)
+                            .foregroundStyle(.white.opacity(0.85))
+                        Text(mode?.displayName ?? "Gold Rush")
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(mode?.tagline ?? "Thirty seconds. Up to a hundred coins. Go.")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    Spacer()
+                    // Ticket balance (spent to play Gold Rush) — replaces the play
+                    // glyph; reads as "N 🎟" in white straight over the gradient.
+                    HStack(spacing: 5) {
+                        Text("\(tickets)")
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .monospacedDigit()
+                        Image(systemName: "ticket.fill")
+                            .font(.system(size: 16, weight: .bold))
+                    }
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("REWARD ROUND")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .tracking(1.5)
-                        .foregroundStyle(.white.opacity(0.85))
-                    Text(mode?.displayName ?? "Gold Rush")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text(mode?.tagline ?? "Thirty seconds. Up to a hundred coins. Go.")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
                 }
-                Spacer()
-                Image(systemName: "play.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.black)
-                    .padding(11)
-                    .background(Circle().fill(.white))
+                .padding(16)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(LinearGradient(colors: s.colors,
+                                             startPoint: .leading, endPoint: .trailing))
+                )
+                .shadow(color: (s.colors.first ?? .black).opacity(0.40), radius: 8, y: 4)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(LinearGradient(colors: s.colors,
-                                         startPoint: .leading, endPoint: .trailing))
-            )
-            .shadow(color: (s.colors.first ?? .black).opacity(0.40), radius: 8, y: 4)
+            .buttonStyle(.plain)
+            .grayscale(noTickets ? 0.9 : 0)
+            .opacity(noTickets ? 0.6 : 1)
+            .accessibilityIdentifier(Self.goldRushID)
+            .accessibilityLabel("\(mode?.displayName ?? "Gold Rush"). \(mode?.tagline ?? ""). " +
+                                (noTickets ? "No tickets. Win competitive games to earn tickets."
+                                           : "\(tickets) ticket\(tickets == 1 ? "" : "s")."))
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(Self.goldRushID)
-        .accessibilityLabel("\(mode?.displayName ?? "Gold Rush"). \(mode?.tagline ?? "")")
     }
 
     // MARK: - Shelves
