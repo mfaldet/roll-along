@@ -192,8 +192,23 @@ enum GoalSkin: String, CosmeticItem {
     // Starter — new default
     case target         // clean 3-ring red/white/red
 
-    // Standard (50 coins) — particle portals + the FITA archery target
+    // Standard (50 coins) — the FITA archery target
     case archery        // 5-band FITA target (was the default during dev)
+    // Standard (50 coins) — static banded targets (no particles / animation),
+    // themed so thematically-related bundles can share one goal.
+    case frost          // icy blue + white rings
+    case ember          // warm red → orange → yellow rings
+    case meadow         // forest-green + cream rings
+    case bullion        // bronze → gold → cream rings
+    case amethyst       // deep-violet + lavender rings
+    case candy          // rose → white → pink rings
+    case slate          // greyscale rings
+    // Standard (50 coins) — static ring-portals (glowing concentric tunnels,
+    // no particles / animation, so still Standard tier).
+    case vortex         // cosmic-blue glowing portal
+    case wormhole       // violet/magenta glowing portal
+
+    // Epic / Legendary — particle portals (animated)
     case galaxy         // deep-space spiral
     case crystal        // prismatic shards
     case flame          // warm orange/red particles
@@ -225,6 +240,15 @@ enum GoalSkin: String, CosmeticItem {
         switch self {
         case .target:    return "Target"
         case .archery:   return "Archery"
+        case .frost:     return "Frost"
+        case .ember:     return "Ember"
+        case .meadow:    return "Meadow"
+        case .bullion:   return "Bullion"
+        case .amethyst:  return "Amethyst"
+        case .candy:     return "Candy"
+        case .slate:     return "Slate"
+        case .vortex:    return "Vortex"
+        case .wormhole:  return "Wormhole"
         case .galaxy:    return "Galaxy"
         case .crystal:   return "Crystal"
         case .flame:     return "Flame"
@@ -269,8 +293,10 @@ enum GoalSkin: String, CosmeticItem {
     var holeStyle: HoleStyle {
         switch self {
         case .target, .archery, .holeInOne, .tractorBeam,
-             .inferno, .halo, .doodle, .soccerNet:
-            // Not actually consumed (their renderers are bespoke), but
+             .inferno, .halo, .doodle, .soccerNet,
+             .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
+             .vortex, .wormhole:
+            // Not actually consumed (their renderers are bespoke / static), but
             // we keep a placeholder so callers can read it uniformly.
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
 
@@ -548,11 +574,85 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.30, green: 0.60, blue: 0.26), location: 1.00),
                 ],
                 center: .center, startRadius: 0, endRadius: 28))
+        case .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate:
+            return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? []))
+        case .vortex, .wormhole:
+            return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? []))
         }
     }
     var coinCost: Int { tier.basePrice }
     var unlockLevel: Int { 0 }
     static var starter: GoalSkin { .target }
+
+    /// Ordered band colours (OUTER → INNER) for the static banded-target
+    /// Standard goals.  nil for goals with bespoke / particle renderers.  Read
+    /// by BOTH the thumbnail preview and the in-game `bandedTargetGoal` renderer
+    /// so a goal looks identical everywhere.
+    var targetBands: [Color]? {
+        switch self {
+        case .frost:    return [Color(red: 0.16, green: 0.40, blue: 0.72), .white,
+                                Color(red: 0.46, green: 0.80, blue: 0.99)]
+        case .ember:    return [Color(red: 0.45, green: 0.08, blue: 0.05),
+                                Color(red: 1.00, green: 0.52, blue: 0.16),
+                                Color(red: 1.00, green: 0.84, blue: 0.32)]
+        case .meadow:   return [Color(red: 0.10, green: 0.36, blue: 0.16),
+                                Color(red: 0.95, green: 0.96, blue: 0.84),
+                                Color(red: 0.42, green: 0.78, blue: 0.34)]
+        case .bullion:  return [Color(red: 0.45, green: 0.32, blue: 0.10),
+                                Color(red: 0.98, green: 0.92, blue: 0.70),
+                                Color(red: 0.96, green: 0.78, blue: 0.26)]
+        case .amethyst: return [Color(red: 0.28, green: 0.12, blue: 0.48),
+                                Color(red: 0.86, green: 0.80, blue: 0.98),
+                                Color(red: 0.62, green: 0.36, blue: 0.95)]
+        case .candy:    return [Color(red: 0.90, green: 0.28, blue: 0.50), .white,
+                                Color(red: 1.00, green: 0.58, blue: 0.78)]
+        case .slate:    return [Color(red: 0.20, green: 0.22, blue: 0.26),
+                                Color(red: 0.82, green: 0.84, blue: 0.88),
+                                Color(red: 0.42, green: 0.45, blue: 0.50)]
+        default:        return nil
+        }
+    }
+
+    /// Concentric portal colours (OUTER dark → INNER bright) for the static
+    /// ring-portal Standard goals.  nil for non-portal goals.
+    var portalStops: [Color]? {
+        switch self {
+        case .vortex:   return [Color(red: 0.02, green: 0.02, blue: 0.09),
+                                Color(red: 0.10, green: 0.20, blue: 0.55),
+                                Color(red: 0.20, green: 0.50, blue: 0.95),
+                                Color(red: 0.55, green: 0.90, blue: 1.00)]
+        case .wormhole: return [Color(red: 0.04, green: 0.00, blue: 0.07),
+                                Color(red: 0.28, green: 0.06, blue: 0.48),
+                                Color(red: 0.82, green: 0.16, blue: 0.85),
+                                Color(red: 1.00, green: 0.62, blue: 0.96)]
+        default:        return nil
+        }
+    }
+
+    /// Thumbnail builder: hard concentric bands (OUTER → INNER), reading as a
+    /// ringed target at swatch size.
+    static func bandedTargetPreview(_ bands: [Color]) -> RadialGradient {
+        guard !bands.isEmpty else {
+            return RadialGradient(colors: [.gray], center: .center, startRadius: 0, endRadius: 28)
+        }
+        let inner = Array(bands.reversed())            // index 0 = centre
+        let n = inner.count
+        var stops: [Gradient.Stop] = []
+        for (i, c) in inner.enumerated() {
+            stops.append(.init(color: c, location: Double(i)     / Double(n)))
+            stops.append(.init(color: c, location: Double(i + 1) / Double(n)))
+        }
+        return RadialGradient(stops: stops, center: .center, startRadius: 0, endRadius: 28)
+    }
+
+    /// Thumbnail builder: a smooth glowing portal (bright centre → dark edge).
+    static func ringPortalPreview(_ stops: [Color]) -> RadialGradient {
+        guard !stops.isEmpty else {
+            return RadialGradient(colors: [.black], center: .center, startRadius: 0, endRadius: 28)
+        }
+        return RadialGradient(colors: Array(stops.reversed()),   // bright centre first
+                              center: .center, startRadius: 0, endRadius: 28)
+    }
 
     /// Representative accent colour for this goal.  Used to theme effects that
     /// reference the equipped goal but aren't the full portal art — the launch
@@ -562,6 +662,15 @@ enum GoalSkin: String, CosmeticItem {
         switch self {
         case .target:      return Color(red: 0.90, green: 0.18, blue: 0.20)
         case .archery:     return Color(red: 1.00, green: 0.80, blue: 0.20)
+        case .frost:       return Color(red: 0.50, green: 0.82, blue: 1.00)
+        case .ember:       return Color(red: 1.00, green: 0.55, blue: 0.18)
+        case .meadow:      return Color(red: 0.42, green: 0.80, blue: 0.34)
+        case .bullion:     return Color(red: 0.98, green: 0.80, blue: 0.30)
+        case .amethyst:    return Color(red: 0.66, green: 0.42, blue: 0.98)
+        case .candy:       return Color(red: 1.00, green: 0.58, blue: 0.80)
+        case .slate:       return Color(red: 0.62, green: 0.68, blue: 0.78)
+        case .vortex:      return Color(red: 0.40, green: 0.80, blue: 1.00)
+        case .wormhole:    return Color(red: 0.92, green: 0.35, blue: 0.92)
         case .galaxy:      return Color(red: 0.55, green: 0.55, blue: 1.00)
         case .crystal:     return Color(red: 0.55, green: 0.88, blue: 1.00)
         case .flame:       return Color(red: 1.00, green: 0.50, blue: 0.12)
@@ -586,8 +695,8 @@ enum GoalSkin: String, CosmeticItem {
         }
     }
     /// Tier rule (player-facing: Standard / Epic / Legendary):
-    ///   • Standard  — truly static, solid-banded targets (no
-    ///                 particles, no animation).
+    ///   • Standard  — truly static art: solid-banded targets OR static
+    ///                 ring-portals (no particles, no animation).
     ///   • Epic      — particle portals with a tight palette / mono
     ///                 hue range (animated but visually focused).
     ///   • Legendary — animated portals whose particles span the full
@@ -596,8 +705,10 @@ enum GoalSkin: String, CosmeticItem {
         switch self {
         case .target:
             return .starter
-        case .archery:
-            return .standard   //  50 coins — static, solid bands
+        case .archery,
+             .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
+             .vortex, .wormhole:
+            return .standard   //  50 coins — static targets + static ring-portals
         case .galaxy, .crystal, .flame, .blossom,
              .ripple, .comet, .eclipse, .plasma,
              .mirage, .obsidian:
@@ -1326,13 +1437,6 @@ enum ShopRotation {
     }
 
     static func featuredBundle(at date: Date = Date()) -> CosmeticBundle? { pick(bundlePool, window(at: date), salt: 0) }
-    static func featuredBall(at date: Date = Date())   -> BallSkin?       { pick(ballPool,   window(at: date), salt: 7) }
-    static func featuredTrail(at date: Date = Date())  -> TrailColor?     { pick(trailPool,  window(at: date), salt: 13) }
-    static func featuredGoal(at date: Date = Date())   -> GoalSkin?       { pick(goalPool,   window(at: date), salt: 19) }
-    static func featuredFloor(at date: Date = Date())  -> Floor?          { pick(floorPool,  window(at: date), salt: 29) }
-    static func featuredPit(at date: Date = Date())    -> Pit?            { pick(pitPool,    window(at: date), salt: 37) }
-    static func featuredBoundary(at date: Date = Date()) -> Boundary?     { pick(boundaryPool, window(at: date), salt: 43) }
-    static func featuredMusic(at date: Date = Date())  -> MusicTrack?     { pick(musicPool,  window(at: date), salt: 41) }
 
     /// The randomized discount applied to the featured bundle this window.
     /// Loot-weighted (see `BundleDiscount.weight`) so deep discounts are
@@ -1348,19 +1452,61 @@ enum ShopRotation {
         return .common
     }
 
-    /// True if `item` is one of the individually-featured odds-and-ends OR a
-    /// member of the featured bundle — i.e. buyable in the Shop right now.
+    // MARK: Storefront multi-picks (one section per category)
+
+    /// Deterministic shuffle of `pool` for `window` — stable within the 2-hour
+    /// window, rotates with it.  xorshift64 seeded by window+salt.
+    private static func shuffled<T>(_ pool: [T], _ window: Int, salt: Int) -> [T] {
+        guard pool.count > 1 else { return pool }
+        var arr = pool
+        var seed = UInt64(bitPattern: Int64(window &* 2_654_435_761 &+ salt)) | 1
+        func next() -> UInt64 {
+            seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; return seed
+        }
+        for i in stride(from: arr.count - 1, to: 0, by: -1) {
+            arr.swapAt(i, Int(next() % UInt64(i + 1)))
+        }
+        return arr
+    }
+
+    /// Three picks for a category: two Standard-tier items + one better-than-
+    /// Standard (Rare/Epic/Legendary), deterministic per window.  Falls back to
+    /// filling from the whole pool when a tier is too small to supply its share.
+    private static func triplePick<T: CosmeticItem>(_ pool: [T], _ window: Int, salt: Int) -> [T] {
+        let standard = pool.filter { $0.tier == .standard }
+        let better   = pool.filter { $0.tier != .standard }   // pool already excludes starter
+        var picks = Array(shuffled(standard, window, salt: salt).prefix(2))
+        if let top = shuffled(better, window, salt: salt &+ 1).first { picks.append(top) }
+        if picks.count < 3 {
+            let extra = shuffled(pool.filter { !picks.contains($0) }, window, salt: salt &+ 2)
+            picks.append(contentsOf: extra.prefix(3 - picks.count))
+        }
+        return picks
+    }
+
+    static func featuredBalls(at date: Date = Date())      -> [BallSkin]   { triplePick(ballPool,     window(at: date), salt: 71) }
+    static func featuredTrails(at date: Date = Date())     -> [TrailColor] { triplePick(trailPool,    window(at: date), salt: 73) }
+    static func featuredGoals(at date: Date = Date())      -> [GoalSkin]   { triplePick(goalPool,     window(at: date), salt: 79) }
+    static func featuredFloors(at date: Date = Date())     -> [Floor]      { triplePick(floorPool,    window(at: date), salt: 83) }
+    static func featuredPits(at date: Date = Date())       -> [Pit]        { triplePick(pitPool,      window(at: date), salt: 89) }
+    static func featuredBoundaries(at date: Date = Date()) -> [Boundary]   { triplePick(boundaryPool, window(at: date), salt: 97) }
+    static func featuredMusicSet(at date: Date = Date())   -> [MusicTrack] { triplePick(musicPool,    window(at: date), salt: 101) }
+
+    /// True if `item` is one of the Shop's current picks (any category's three)
+    /// OR a member of the featured bundle — i.e. buyable in the Shop right now.
     /// (Used by the Catalog to draw the blue "available now" border.)
     static func isFeatured<Item: CosmeticItem>(_ item: Item, at date: Date = Date()) -> Bool {
-        if let b = item as? BallSkin    { if b == featuredBall(at: date) { return true } }
-        if let t = item as? TrailColor  { if t == featuredTrail(at: date) { return true } }
-        if let g = item as? GoalSkin    { if g == featuredGoal(at: date) { return true } }
-        if let f = item as? Floor       { if f == featuredFloor(at: date) { return true } }
-        if let p = item as? Pit         { if p == featuredPit(at: date) { return true } }
-        if let bd = item as? Boundary   { if bd == featuredBoundary(at: date) { return true } }
-        if let m = item as? MusicTrack  { if m == featuredMusic(at: date) { return true } }
-        guard let bundle = featuredBundle(at: date) else { return false }
-        return bundle.contains(item)
+        switch item {
+        case let b  as BallSkin:   if featuredBalls(at: date).contains(b)       { return true }
+        case let t  as TrailColor: if featuredTrails(at: date).contains(t)      { return true }
+        case let g  as GoalSkin:   if featuredGoals(at: date).contains(g)       { return true }
+        case let f  as Floor:      if featuredFloors(at: date).contains(f)      { return true }
+        case let p  as Pit:        if featuredPits(at: date).contains(p)        { return true }
+        case let bd as Boundary:   if featuredBoundaries(at: date).contains(bd) { return true }
+        case let m  as MusicTrack: if featuredMusicSet(at: date).contains(m)    { return true }
+        default: break
+        }
+        return featuredBundle(at: date)?.contains(item) ?? false
     }
 }
 
