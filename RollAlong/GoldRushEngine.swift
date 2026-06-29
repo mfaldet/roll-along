@@ -52,11 +52,11 @@ final class GoldRushEngine {
     // and its speed cap is lifted for `chargeBoostTicks`, after which friction
     // blends it back to normal play.  A marble only knocks coins loose from a
     // rival WHILE it is charging — an ordinary bump no longer spills anything.
-    // Charge is gated to once per `chargeCooldownTicks` (3 s).  The aggro "bully"
-    // rival charges too, so it can still threaten the player's hoard.
+    // Charge is gated to once per `chargeCooldownTicks` (1.5 s).  The aggro
+    // "bully" rival charges too, so it can still threaten the player's hoard.
     private let chargeSpeed:          CGFloat = 760
     private let chargeBoostTicks              = 15
-    private let chargeCooldownTicks           = 180   // 3 s @ 60 fps
+    private let chargeCooldownTicks           = 90    // 1.5 s @ 60 fps
     private let chargeAITriggerRange: CGFloat = 150   // bully commits a charge inside this gap
     private let chargeSpillImpact:    CGFloat = 120   // min closing speed for a charge to spill
 

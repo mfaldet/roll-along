@@ -33,14 +33,14 @@ struct MarbleCupView: View {
 
     private let marbleRadius: CGFloat = 18
     private let ballRadius:   CGFloat = 14
-    private let playerAccel:  CGFloat = 1_550
-    private let aiAccelBase:  CGFloat = 1_250     // a touch slower than you
+    private let playerAccel:  CGFloat = 1_320     // calmer roll — the match was too hectic
+    private let aiAccelBase:  CGFloat = 1_060     // a touch slower than you
     /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
     private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let marbleFriction: CGFloat = 0.990
     private let ballFriction:   CGFloat = 0.993   // the ball glides further
-    private let marbleMaxSpeed: CGFloat = 660
-    private let ballMaxSpeed:   CGFloat = 920      // a clean strike rockets it
+    private let marbleMaxSpeed: CGFloat = 560      // calmer roll (was 660)
+    private let ballMaxSpeed:   CGFloat = 830      // a clean strike still rockets it
     private let marbleWallBounce: CGFloat = 0.55
     private let ballWallBounce:   CGFloat = 0.72
     private let marbleMass: CGFloat = 3.2          // heavy — barely flinches
@@ -52,6 +52,14 @@ struct MarbleCupView: View {
     private let coinsPerGoal       = 6
     private let winBonus           = 15
 
+    // Tap-to-dash (speed burst) — mirrored from Smash and Grab, minus the
+    // coin-spill: a tap overrides the player marble's velocity to `chargeSpeed`
+    // in the tilt direction and lifts its cap for `chargeBoostTicks`, then it's
+    // gated for `chargeCooldownTicks` (1.5 s).  AI marbles don't dash.
+    private let chargeSpeed:        CGFloat = 720
+    private let chargeBoostTicks            = 15
+    private let chargeCooldownTicks         = 90    // 1.5 s @ 60 fps
+
     private var roundTicks: Int { roundSeconds * 60 }
 
     private static let playerAccent = Color(red: 0.30, green: 0.62, blue: 1.00)
@@ -60,6 +68,8 @@ struct MarbleCupView: View {
     // MARK: - Model
 
     private enum Role { case player, ai, ball }
+    /// 1v1 (you vs one CPU) or 2v2 (you + one AI ally vs two AI rivals).
+    private enum MatchMode { case oneVone, twoVtwo }
 
     private struct Mover: Identifiable {
         let id = UUID()
@@ -68,13 +78,23 @@ struct MarbleCupView: View {
         let role: Role
         let radius: CGFloat
         let mass: CGFloat
+        /// Which goal this mover attacks — true = the TOP mouth (the player's
+        /// team), false = the BOTTOM mouth (the rival team).  Drives AI steering
+        /// and the team tint.  Ignored for the ball.
+        var attacksTop: Bool = false
+        /// Tap-to-dash state (player only): ticks of active dash + cooldown.
+        var charging: Int = 0
+        var chargeCD: Int = 0
     }
 
     // MARK: - State
 
     @State private var movers: [Mover] = []
-    /// The single AI rival's keystone look (skin+trail+name), dealt in reset().
-    @State private var rivalLook: RivalCosmetics.Look?
+    /// Per-AI keystone look (skin+trail+name), keyed by mover id, dealt in
+    /// `placeForKickoff()`.  2v2 deals an ally + two rivals.
+    @State private var aiLooks: [UUID: RivalCosmetics.Look] = [:]
+    /// Chosen on the start screen each match.
+    @State private var mode: MatchMode = .oneVone
     /// Recent positions per mover (id → points) for the trail layer (ball excluded).
     @State private var trails: [UUID: [CGPoint]] = [:]
     @State private var arena:  CGSize  = .zero
@@ -124,8 +144,8 @@ struct MarbleCupView: View {
                     ForEach(movers.filter { $0.role != .ball }) { m in
                         moverView(m)
                             .overlay(alignment: .top) {
-                                RivalNameTag(label: m.role == .player ? "YOU" : (rivalLook?.name ?? "Rival"),
-                                             color: m.role == .player ? gameState.primaryColor : Self.aiAccent,
+                                RivalNameTag(label: nameTagLabel(m),
+                                             color: nameTagColor(m),
                                              isPlayer: m.role == .player,
                                              isLeader: isLeader(m))
                                     .offset(y: -15).allowsHitTesting(false)
@@ -141,17 +161,14 @@ struct MarbleCupView: View {
                     if wasEmpty { reset() }
                 }
                 .onTapGesture {
-                    if !started && !isOver {
-                        started = true
-                        AnalyticsClient.shared.track(
-                            "marblecup_match_started",
-                            properties: ["map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
-                        )
-                    }
+                    // Tap during play = dash.  Before the match, the start
+                    // overlay's 1v1 / 2v2 buttons handle the tap instead.
+                    if started && !isOver && !celebrating { firePlayerCharge() }
                 }
             }
 
             topBar
+            if started && !isOver { dashIndicator }
             if celebrating && started && !isOver { goalBanner }
             if !started && !isOver { startPrompt }
             if isOver { matchOverOverlay }
@@ -258,7 +275,7 @@ struct MarbleCupView: View {
     private func trailFor(_ m: Mover) -> TrailColor {
         switch m.role {
         case .player: return gameState.equippedTrail
-        case .ai:     return rivalLook?.trail ?? .none
+        case .ai:     return aiLooks[m.id]?.trail ?? .none
         case .ball:   return .none
         }
     }
@@ -271,13 +288,24 @@ struct MarbleCupView: View {
         }
     }
 
-    /// The current match leader (more goals) — wears the crown; tie → neither.
+    /// Every mover on the leading team wears the crown; tie → neither.
     private func isLeader(_ m: Mover) -> Bool {
-        switch m.role {
-        case .player: return playerGoals > aiGoals
-        case .ai:     return aiGoals > playerGoals
-        case .ball:   return false
-        }
+        guard m.role != .ball else { return false }
+        let onPlayerTeam = (m.role == .player) || m.attacksTop
+        return onPlayerTeam ? (playerGoals > aiGoals) : (aiGoals > playerGoals)
+    }
+
+    /// Name-tag label: YOU, ALLY (an AI on your team), or the rival's dealt name.
+    private func nameTagLabel(_ m: Mover) -> String {
+        if m.role == .player { return "YOU" }
+        if m.attacksTop      { return "ALLY" }
+        return aiLooks[m.id]?.name ?? "Rival"
+    }
+
+    /// Name-tag tint: you keep your colour, your ally is blue, rivals are red.
+    private func nameTagColor(_ m: Mover) -> Color {
+        if m.role == .player { return gameState.primaryColor }
+        return m.attacksTop ? Self.playerAccent : Self.aiAccent
     }
 
     private func moverView(_ m: Mover) -> some View {
@@ -291,8 +319,8 @@ struct MarbleCupView: View {
             case .player:
                 BallSkinView(skin: gameState.activeSkin, diameter: m.radius * 2)
             case .ai:
-                // Keystone: the rival shows off a real, desirable ball skin.
-                BallSkinView(skin: rivalLook?.skin ?? .red, diameter: m.radius * 2)
+                // Keystone: each AI shows off a real, desirable ball skin.
+                BallSkinView(skin: aiLooks[m.id]?.skin ?? .red, diameter: m.radius * 2)
             }
         }
         .frame(width: m.radius * 2, height: m.radius * 2)
@@ -330,7 +358,7 @@ struct MarbleCupView: View {
                         .font(.system(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(Self.playerAccent)
                         .monospacedDigit()
-                    Text("YOU")
+                    Text(mode == .twoVtwo ? "TEAM" : "YOU")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .foregroundStyle(Self.playerAccent.opacity(0.8))
                         .tracking(1)
@@ -343,7 +371,7 @@ struct MarbleCupView: View {
                         .font(.system(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(Self.aiAccent)
                         .monospacedDigit()
-                    Text("CPU")
+                    Text(mode == .twoVtwo ? "RIVALS" : "CPU")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .foregroundStyle(Self.aiAccent.opacity(0.8))
                         .tracking(1)
@@ -365,7 +393,9 @@ struct MarbleCupView: View {
             Text("GOAL!")
                 .font(.system(size: 56, weight: .black, design: .rounded))
                 .foregroundStyle(lastScorerPlayer ? Self.playerAccent : Self.aiAccent)
-            Text(lastScorerPlayer ? "You scored!" : "CPU scored")
+            Text(lastScorerPlayer
+                 ? (mode == .twoVtwo ? "Your team scored!" : "You scored!")
+                 : (mode == .twoVtwo ? "Rivals scored" : "CPU scored"))
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
         }
@@ -391,24 +421,97 @@ struct MarbleCupView: View {
     }
 
     private var startPrompt: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             Image(systemName: "soccerball")
-                .font(.system(size: 38, weight: .light))
+                .font(.system(size: 34, weight: .light))
                 .foregroundStyle(.white)
-            Text("Tilt to play")
+            Text("Marble Cup")
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
             Text("Knock the ball into the top goal.\nMost goals in 90 seconds wins.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
+
+            // Choose the match format — this also starts the match.
+            HStack(spacing: 12) {
+                modeButton(.oneVone, title: "1 v 1", subtitle: "You vs CPU")
+                modeButton(.twoVtwo, title: "2 v 2", subtitle: "You + ally vs 2")
+            }
+
+            HStack(spacing: 5) {
+                Image(systemName: "bolt.fill").font(.system(size: 11, weight: .bold))
+                Text("Tap anywhere during play to dash")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(Self.playerAccent)
+
             MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
-                .padding(.top, 6)
+                .padding(.top, 2)
         }
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Marble Cup. Tilt to knock the ball into the opponent's goal. Most goals in 90 seconds wins. Tap anywhere to begin.")
+        .padding(26)
+        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.62)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Marble Cup. Choose 1 v 1 or 2 v 2 to start. Tilt to knock the ball into the top goal; tap to dash. Most goals in 90 seconds wins.")
+    }
+
+    private func modeButton(_ m: MatchMode, title: String, subtitle: String) -> some View {
+        Button { startMatch(m) } label: {
+            VStack(spacing: 3) {
+                Text(title)
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.66))
+            }
+            .frame(width: 132)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.16))
+                    .overlay(RoundedRectangle(cornerRadius: 16)
+                        .stroke(Self.playerAccent.opacity(0.5), lineWidth: 1.5))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(subtitle)")
+    }
+
+    // MARK: - Dash HUD
+
+    private var playerChargeCD: Int { movers.first(where: { $0.role == .player })?.chargeCD ?? 0 }
+    private var dashReady: Bool { started && !isOver && playerChargeCD == 0 }
+    private var dashProgress: Double {
+        chargeCooldownTicks > 0 ? 1 - Double(playerChargeCD) / Double(chargeCooldownTicks) : 1
+    }
+
+    /// A compact bottom-centre pill: bright "TAP TO DASH" when ready, otherwise a
+    /// dimmed pill that refills left-to-right over the 1.5 s cooldown.
+    private var dashIndicator: some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill").font(.system(size: 12, weight: .bold))
+                Text(dashReady ? "TAP TO DASH" : "DASH")
+                    .font(.system(size: 12, weight: .black, design: .rounded)).tracking(1)
+            }
+            .foregroundStyle(dashReady ? .black : Color(white: 0.7))
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color(white: 0.16))
+                    GeometryReader { g in
+                        Capsule()
+                            .fill(dashReady ? Self.playerAccent : Color(white: 0.32))
+                            .frame(width: g.size.width * CGFloat(dashProgress))
+                    }
+                }
+            )
+            .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            .padding(.bottom, 34)
+            .allowsHitTesting(false)   // taps fall through to the dash gesture
+        }
     }
 
     private var matchOverOverlay: some View {
@@ -510,17 +613,55 @@ struct MarbleCupView: View {
         showMapName = true
     }
 
-    /// Ball at centre, marbles back in their halves, all stationary.
+    /// Ball at centre, marbles back in their halves, all stationary.  The player
+    /// + ally attack the TOP mouth; the rival(s) attack the BOTTOM.
     private func placeForKickoff() {
-        let p = Mover(pos: CGPoint(x: field.midX, y: field.minY + field.height * 0.72),
-                      role: .player, radius: marbleRadius, mass: marbleMass)
-        let a = Mover(pos: CGPoint(x: field.midX, y: field.minY + field.height * 0.28),
-                      role: .ai, radius: marbleRadius, mass: marbleMass)
-        let b = Mover(pos: CGPoint(x: field.midX, y: field.midY),
-                      role: .ball, radius: ballRadius, mass: ballMass)
-        movers = [p, a, b]
-        rivalLook = RivalCosmetics.deal(1).first   // keystone: deal the AI rival a showcase look
+        let cx = field.midX, w = field.width
+        let bottomY = field.minY + field.height * 0.72
+        let topY    = field.minY + field.height * 0.28
+
+        // Player always attacks the top goal.
+        let playerX = mode == .twoVtwo ? cx + w * 0.15 : cx
+        let player = Mover(pos: CGPoint(x: playerX, y: bottomY),
+                           role: .player, radius: marbleRadius, mass: marbleMass,
+                           attacksTop: true)
+
+        var ais: [Mover] = []
+        if mode == .twoVtwo {
+            // Ally (player's team) in the bottom half + two rivals up top.
+            ais.append(Mover(pos: CGPoint(x: cx - w * 0.18, y: field.minY + field.height * 0.80),
+                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: true))
+            ais.append(Mover(pos: CGPoint(x: cx - w * 0.15, y: topY),
+                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: false))
+            ais.append(Mover(pos: CGPoint(x: cx + w * 0.18, y: field.minY + field.height * 0.20),
+                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: false))
+        } else {
+            ais.append(Mover(pos: CGPoint(x: cx, y: topY),
+                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: false))
+        }
+
+        let ball = Mover(pos: CGPoint(x: cx, y: field.midY),
+                         role: .ball, radius: ballRadius, mass: ballMass)
+        movers = [player] + ais + [ball]
+
+        // Keystone: deal each AI a showcase look (ally first, then rivals).
+        let looks = RivalCosmetics.deal(ais.count)
+        var byId: [UUID: RivalCosmetics.Look] = [:]
+        for (k, ai) in ais.enumerated() where k < looks.count { byId[ai.id] = looks[k] }
+        aiLooks = byId
         trails = [:]
+    }
+
+    /// Pick the format and kick off.  (Tapping a start-screen button calls this.)
+    private func startMatch(_ m: MatchMode) {
+        mode = m
+        placeForKickoff()
+        started = true
+        AnalyticsClient.shared.track(
+            "marblecup_match_started",
+            properties: ["map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name),
+                         "mode": .string(m == .twoVtwo ? "2v2" : "1v1")]
+        )
     }
 
     private func endMatch() {
@@ -568,6 +709,10 @@ struct MarbleCupView: View {
         let dt: CGFloat = 1.0 / 60.0
 
         for i in movers.indices {
+            // Tick down the dash window + cooldown (only the player ever sets these).
+            if movers[i].charging > 0 { movers[i].charging -= 1 }
+            if movers[i].chargeCD  > 0 { movers[i].chargeCD  -= 1 }
+
             switch movers[i].role {
             case .player:
                 movers[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
@@ -582,7 +727,9 @@ struct MarbleCupView: View {
             let fr = movers[i].role == .ball ? ballFriction : marbleFriction
             movers[i].vel.dx *= fr
             movers[i].vel.dy *= fr
-            let mx = movers[i].role == .ball ? ballMaxSpeed : marbleMaxSpeed
+            // A live dash lifts the player's cap to `chargeSpeed` so it reads.
+            let baseMx = movers[i].role == .ball ? ballMaxSpeed : marbleMaxSpeed
+            let mx = movers[i].charging > 0 ? max(baseMx, chargeSpeed) : baseMx
             let sp = hypot(movers[i].vel.dx, movers[i].vel.dy)
             if sp > mx { let k = mx / sp; movers[i].vel.dx *= k; movers[i].vel.dy *= k }
             movers[i].pos.x += movers[i].vel.dx * dt
@@ -599,24 +746,52 @@ struct MarbleCupView: View {
         if !isOver && roundTick >= roundTicks { endMatch() }
     }
 
-    /// AI: defend the top goal when the ball is in its third, otherwise line up
-    /// behind the ball and shove it toward the bottom goal.
+    /// AI: defend its own goal when the ball is in its defensive third, otherwise
+    /// line up behind the ball and shove it toward the goal it attacks.  Works for
+    /// both teams via `ai.attacksTop` (top-attackers are the player's ally).
     private func botSteer(_ ai: Mover, ballPos: CGPoint, seed: Int) -> CGVector {
-        let topGoal = CGPoint(x: field.midX, y: field.minY)       // AI defends this
-        let bottomGoal = CGPoint(x: field.midX, y: field.maxY)    // AI attacks this
-        let defThird = field.minY + field.height * 0.36
+        let attackGoal = CGPoint(x: field.midX, y: ai.attacksTop ? field.minY : field.maxY)
+        let defendGoal = CGPoint(x: field.midX, y: ai.attacksTop ? field.maxY : field.minY)
+        // The ball is in our defensive third (near the goal we defend)?
+        let inDefThird = ai.attacksTop
+            ? (ballPos.y > field.maxY - field.height * 0.36)
+            : (ballPos.y < field.minY + field.height * 0.36)
         let target: CGPoint
-        if ballPos.y < defThird {
-            target = CGPoint(x: (ballPos.x + topGoal.x) / 2,
-                             y: (ballPos.y + topGoal.y) / 2 + 8)
+        if inDefThird {
+            target = CGPoint(x: (ballPos.x + defendGoal.x) / 2,
+                             y: (ballPos.y + defendGoal.y) / 2 + (ai.attacksTop ? -8 : 8))
         } else {
-            let dir = unit(dx: ballPos.x - bottomGoal.x, dy: ballPos.y - bottomGoal.y, scale: 1)
+            // Position on the far side of the ball from the attack goal.
+            let dir = unit(dx: ballPos.x - attackGoal.x, dy: ballPos.y - attackGoal.y, scale: 1)
             target = CGPoint(x: ballPos.x + dir.dx * (ballRadius + marbleRadius * 0.9),
                              y: ballPos.y + dir.dy * (ballRadius + marbleRadius * 0.9))
         }
         return MinigameAI.humanizedSteer(dx: target.x - ai.pos.x, dy: target.y - ai.pos.y,
                                          scale: aiAccel, seed: seed, tick: localTick,
                                          difficulty: gameState.minigameDifficulty)
+    }
+
+    /// Tap-to-dash: override the player marble's velocity to a burst in the tilt
+    /// direction (fallback: current heading) and arm the dash window + cooldown.
+    private func firePlayerCharge() {
+        guard let i = movers.firstIndex(where: { $0.role == .player }),
+              movers[i].chargeCD == 0 else { return }
+        let aim = CGVector(dx: CGFloat(motion.gravity.x), dy: CGFloat(motion.gravity.y))
+        guard let d = chargeDir(aim: aim, fallback: movers[i].vel) else { return }
+        movers[i].vel = CGVector(dx: d.dx * chargeSpeed, dy: d.dy * chargeSpeed)
+        movers[i].charging = chargeBoostTicks
+        movers[i].chargeCD = chargeCooldownTicks
+        if gameState.hapticsEnabled { Haptics.medium() }
+    }
+
+    /// Unit dash direction: the tilt vector when meaningful, else the marble's
+    /// heading, else nil (truly still + level → no dash).
+    private func chargeDir(aim: CGVector, fallback vel: CGVector) -> CGVector? {
+        let am = hypot(aim.dx, aim.dy)
+        if am > 0.05 { return CGVector(dx: aim.dx / am, dy: aim.dy / am) }
+        let vm = hypot(vel.dx, vel.dy)
+        if vm > 1 { return CGVector(dx: vel.dx / vm, dy: vel.dy / vm) }
+        return nil
     }
 
     private func inMouth(_ x: CGFloat) -> Bool { abs(x - field.midX) <= goalHalf }
