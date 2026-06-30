@@ -48,6 +48,88 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
 ///                  equip-owned only; purchasing happens in the Shop.
 enum ShopMode { case shop, catalog }
 
+/// Payload for the Catalog "where to buy" popup — shown when the player taps an
+/// unowned individual cosmetic (which isn't sold directly in the Catalog).
+private struct CatalogPurchaseInfo: Identifiable {
+    let id = UUID()
+    let name: String
+    let bundles: [String]     // collections that include this item (may be empty)
+    let preview: AnyView      // the cosmetic's own preview, used as the card hero
+}
+
+/// Catalog "Collections" filter — derived from each bundle's existing data (its
+/// limited-time window + ball count), so no per-bundle tagging is required.
+private enum BundleFilter: String, CaseIterable, Identifiable {
+    case all, seasonal, space, nature, sports, nightlife, luxe, fire, mystic, sweet, art
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .all:       return "All Collections"
+        case .seasonal:  return "Seasonal & Holiday"
+        case .space:     return "Space"
+        case .nature:    return "Nature"
+        case .sports:    return "Sports"
+        case .nightlife: return "Nightlife"
+        case .luxe:      return "Luxe"
+        case .fire:      return "Fire"
+        case .mystic:    return "Mystic"
+        case .sweet:     return "Sweet"
+        case .art:       return "Art"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .all:       return "square.stack.3d.up.fill"
+        case .seasonal:  return "gift.fill"
+        case .space:     return "moon.stars.fill"
+        case .nature:    return "leaf.fill"
+        case .sports:    return "sportscourt.fill"
+        case .nightlife: return "music.note"
+        case .luxe:      return "crown.fill"
+        case .fire:      return "flame.fill"
+        case .mystic:    return "wand.and.stars"
+        case .sweet:     return "birthday.cake.fill"
+        case .art:       return "paintbrush.fill"
+        }
+    }
+
+    /// "Seasonal & Holiday" derives from the limited-time window; the themed
+    /// categories come from `themeMap` (keyed by bundle id, so adding a category
+    /// never means editing the bundle initializers).  A limited-time bundle also
+    /// carries a theme, so it shows under both its theme and Seasonal & Holiday.
+    func matches(_ b: CosmeticBundle) -> Bool {
+        switch self {
+        case .all:      return true
+        case .seasonal: return b.isLimitedTime
+        default:        return BundleFilter.themeMap[b.id] == self
+        }
+    }
+
+    private static let themeMap: [String: BundleFilter] = {
+        var m: [String: BundleFilter] = [:]
+        func tag(_ t: BundleFilter, _ ids: [String]) { ids.forEach { m[$0] = t } }
+        tag(.space,     ["planets", "space-travel", "cosmos", "eclipse", "aurora"])
+        tag(.nature,    ["winter", "nature", "ocean", "bloom", "zen-garden", "aquarium",
+                         "dune", "abyssal-depths", "summer-2026", "winter-2026",
+                         "stpatricks-2027", "spring-2027", "harvest-2026", "earthday-2027"])
+        tag(.sports,    ["golf", "soccer", "full-court", "billiards-hall", "champion",
+                         "sports-balls"])
+        tag(.nightlife, ["nightclub", "arcade", "neon", "midnight-carnival", "lava-lamp",
+                         "plasma-globe", "neon-city", "clockwork", "newyear-2027",
+                         "july4-2026", "mardigras-2027", "pride-2027", "oktoberfest-2026"])
+        tag(.luxe,      ["velvet-night", "golden-hour", "midas", "diamond",
+                         "high-roller", "quicksilver"])
+        tag(.fire,      ["hellfire", "citrus", "lava-flow", "magma-core"])
+        tag(.mystic,    ["heavens", "noir", "realistic-marble", "glass-marbles", "tempest",
+                         "haunted", "ancient-temple", "crystal-cavern", "oracle", "geode",
+                         "halloween-2026", "muertos-2026", "lunar-2027"])
+        tag(.sweet,     ["pastel", "candyland", "valentines-2027"])
+        tag(.art,       ["paper-world", "sketchbook", "cathedral", "backtoschool-2026"])
+        return m
+    }()
+}
+
 struct CosmeticShopView: View {
     var mode: ShopMode = .catalog
 
@@ -65,6 +147,12 @@ struct CosmeticShopView: View {
     /// Non-nil while the collection-complete toast is visible.  Holds the
     /// display name of the newly completed bundle.
     @State private var completionToastBundle: String? = nil
+    /// Non-nil while the Catalog "where to buy" popup is showing (tap an unowned
+    /// individual cosmetic).  Replaces the old coin-shortfall "Heads up" alert.
+    @State private var catalogInfo: CatalogPurchaseInfo? = nil
+    /// Catalog → Collections type filter (the dropdown that replaced the
+    /// "ALL COLLECTIONS" header).
+    @State private var bundleFilter: BundleFilter = .all
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
@@ -122,6 +210,12 @@ struct CosmeticShopView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .allowsHitTesting(false)
             }
+
+            // Catalog "where to buy" popup — replaces the old Heads-up alert for
+            // tapping an unowned individual cosmetic.  Tap anywhere to close.
+            if let info = catalogInfo {
+                catalogPurchasePopup(info)
+            }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.72), value: completionToastBundle)
         .navigationTitle(mode == .shop ? "Shop" : "Catalog")
@@ -165,6 +259,99 @@ struct CosmeticShopView: View {
             set: { _ in purchaseError = nil; store.clearLastError() }
         ), actions: { Button("OK", role: .cancel) {} },
         message: { Text(purchaseError ?? "") })
+    }
+
+    // MARK: - Catalog "where to buy" popup
+
+    /// Tapping an unowned individual cosmetic in the Catalog can't buy it (they're
+    /// only sold in the Shop, or by buying a Collection).  This card makes that
+    /// obvious at a glance and points to the two routes.  Tap anywhere to close.
+    private func catalogPurchasePopup(_ info: CatalogPurchaseInfo) -> some View {
+        ZStack {
+            Color.black.opacity(0.62).ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                // Hero — the cosmetic itself.
+                info.preview
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 92)
+                    .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.10)))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.10), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+
+                VStack(spacing: 5) {
+                    Text(info.name)
+                        .font(.system(size: 21, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Text("Not sold individually in the Catalog —\nhere's where to unlock it:")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.62))
+                        .multilineTextAlignment(.center)
+                }
+
+                VStack(spacing: 10) {
+                    purchaseRouteRow(icon: "bag.fill",
+                                     tint: Color(red: 0.34, green: 0.66, blue: 1.00),
+                                     title: "Buy it in the Shop",
+                                     subtitle: "Cosmetics rotate through the Shop's picks")
+                    if !info.bundles.isEmpty {
+                        purchaseRouteRow(icon: "square.stack.3d.up.fill",
+                                         tint: Color(red: 1.00, green: 0.80, blue: 0.34),
+                                         title: "Or unlock the Collection",
+                                         subtitle: collectionRouteSubtitle(info.bundles))
+                    }
+                }
+
+                Text("Tap anywhere to close")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
+            }
+            .padding(24)
+            .frame(maxWidth: 330)
+            .background(
+                RoundedRectangle(cornerRadius: 26)
+                    .fill(Color(white: 0.13))
+                    .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.12), lineWidth: 1))
+            )
+            .shadow(color: .black.opacity(0.55), radius: 26, y: 12)
+            .padding(.horizontal, 28)
+        }
+        // Tap anywhere — dim OR card — closes the popup.
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { catalogInfo = nil } }
+        .transition(.opacity)
+    }
+
+    private func purchaseRouteRow(icon: String, tint: Color,
+                                  title: String, subtitle: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(Circle().fill(tint.opacity(0.16)))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.10)))
+    }
+
+    private func collectionRouteSubtitle(_ bundles: [String]) -> String {
+        let shown = bundles.prefix(2).joined(separator: ", ")
+        let more  = bundles.count > 2 ? " +\(bundles.count - 2) more" : ""
+        let noun  = bundles.count > 1 ? "collections" : "collection"
+        return "Part of the \(shown)\(more) \(noun)"
     }
 
     // MARK: - Shop front (curated, rotating storefront)
@@ -454,18 +641,11 @@ struct CosmeticShopView: View {
     private func itemCell<Item: CosmeticItem>(item: Item) -> some View {
         let owned = gameState.isOwned(item)
         let equipped = isEquipped(item)
-        let inShop = ShopRotation.isFeatured(item)
-        let bundleComplete = owned && CosmeticBundle.catalogue.contains {
-            gameState.completedBundleIDs.contains($0.id) && $0.contains(item)
-        }
-        // In the Catalog, locked items grey out; the strongest status border
-        // wins: equipped (green) ▸ bundle-complete (gold) ▸ in-shop-now (blue).
-        let greyed = (mode == .catalog) && !owned
-        let border: Color? =
-            equipped         ? Color(red: 0.28, green: 0.85, blue: 0.45)
-            : bundleComplete ? Color(red: 1.00, green: 0.82, blue: 0.30)
-            : (mode == .catalog && !owned && inShop) ? Color(red: 0.30, green: 0.62, blue: 1.00)
-            : nil
+        // In the Catalog the art, name, and collection caption stay fully visible
+        // even for unowned items — only the price pill reads as greyed (you buy
+        // in the Shop / a Collection, not here).  Equipped items keep the green
+        // status border.
+        let border: Color? = equipped ? Color(red: 0.28, green: 0.85, blue: 0.45) : nil
         return Button {
             handleTap(item: item, owned: owned, equipped: equipped)
         } label: {
@@ -494,7 +674,6 @@ struct CosmeticShopView: View {
 
                 stateBadge(item: item, owned: owned, equipped: equipped)
             }
-            .opacity(greyed ? 0.5 : 1.0)
             .padding(10)
             .background(
                 RoundedRectangle(cornerRadius: 16)
@@ -507,7 +686,6 @@ struct CosmeticShopView: View {
             // Rarity corner tab — a colored triangle + white star in the top-right.
             .overlay(alignment: .topTrailing) {
                 RarityCornerTab(colors: item.rarityGemColors, side: 40, corner: 16)
-                    .opacity(greyed ? 0.5 : 1.0)
             }
         }
         .buttonStyle(.plain)
@@ -526,11 +704,11 @@ struct CosmeticShopView: View {
                     .padding(.vertical, 4)
                     .background(Capsule().fill(Color.white))
             } else if owned {
-                Text("OWNED — TAP TO EQUIP")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .kerning(0.8)
+                Text("OWNED")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .kerning(1.0)
                     .foregroundStyle(Color(white: 0.85))
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(Capsule().fill(Color(white: 0.22)))
             } else {
@@ -548,6 +726,9 @@ struct CosmeticShopView: View {
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(costPillBackground(inCatalog: inCatalog, affordable: canAfford(item)))
+                // Catalog: the price is informational only — grey the pill so it's
+                // clear the item isn't bought here.
+                .opacity(inCatalog ? 0.5 : 1.0)
             }
         }
     }
@@ -608,15 +789,15 @@ struct CosmeticShopView: View {
             if let bundle = lastItemBundle(for: item) {
                 handleBundleTap(bundle, owned: false)
             } else {
+                // Individual cosmetics aren't bought in the Catalog — show a
+                // custom "where to buy" card (Shop / Collections) instead of the
+                // coin-shortfall alert.
                 let names = CosmeticBundle.bundles(containing: item).map(\.displayName)
-                if names.isEmpty {
-                    alertMessage = "\(item.displayName) shows up in the Shop's daily picks — grab it there."
-                } else {
-                    let list = names.joined(separator: ", ")
-                    let noun = names.count > 1 ? "bundles" : "bundle"
-                    alertMessage = "\(item.displayName) is part of the \(list) \(noun). Buy the \(noun) from the Collections tab to unlock it."
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+                    catalogInfo = CatalogPurchaseInfo(name: item.displayName,
+                                                      bundles: names,
+                                                      preview: AnyView(preview(for: item)))
                 }
-                showAlert = true
             }
             return
         }
@@ -841,24 +1022,63 @@ struct CosmeticShopView: View {
         // point; a bundle is the one thing you can actually buy here.  (Seasonal
         // bundles still appear only while their window is open, so they can't be
         // bought out of season.)
-        // Sorted by original full price — the simplest, cheapest collections up
-        // top and the most enhanced at the bottom — then alphabetically for any
-        // equal-priced bundles.
+        // Filtered by the chosen collection type, then sorted by full price
+        // (simplest/cheapest up top), alphabetically for equal-priced bundles.
+        // Seasonal bundles still appear only while their window is open.
         let bundles = CosmeticBundle.catalogue
             .filter { !$0.isLimitedTime || $0.isAvailable }
+            .filter { bundleFilter.matches($0) }
             .sorted {
                 $0.fullPrice() != $1.fullPrice()
                     ? $0.fullPrice() < $1.fullPrice()
                     : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
             }
         LazyVStack(alignment: .leading, spacing: 0) {
-            sectionLabel("ALL COLLECTIONS")
-                .padding(.bottom, 8)
-            ForEach(bundles) { bundle in
-                collectionCard(bundle, isFeatured: false)
-                    .padding(.bottom, 12)
+            collectionFilterMenu
+                .padding(.bottom, 10)
+            if bundles.isEmpty {
+                Text("No collections match this filter.")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else {
+                ForEach(bundles) { bundle in
+                    collectionCard(bundle, isFeatured: false)
+                        .padding(.bottom, 12)
+                }
             }
         }
+    }
+
+    /// Dropdown that replaced the old "ALL COLLECTIONS" header — filters the
+    /// Collections list by type (Seasonal / Holiday / Ball Packs / Evergreen).
+    private var collectionFilterMenu: some View {
+        Menu {
+            Picker("Filter collections", selection: $bundleFilter) {
+                ForEach(BundleFilter.allCases) { f in
+                    Label(f.label, systemImage: f.icon).tag(f)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: bundleFilter.icon)
+                    .font(.system(size: 12, weight: .bold))
+                Text(bundleFilter.label.uppercased())
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .kerning(1.2)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(
+                Capsule().fill(Color(white: 0.16))
+                    .overlay(Capsule().stroke(Color(white: 0.26), lineWidth: 0.8))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func collectionCard(_ bundle: CosmeticBundle, isFeatured: Bool) -> some View {
@@ -977,10 +1197,7 @@ struct CosmeticShopView: View {
                 .fill(Color(white: isFeatured ? 0.14 : 0.12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .stroke(borderColor(bundle: bundle,
-                                            isFeatured: isFeatured,
-                                            bundleOwned: bundleOwned),
-                                lineWidth: 1.2)
+                        .stroke(borderColor(bundle: bundle), lineWidth: 1.2)
                 )
         )
         // Rarity corner tab — colored triangle + white star, top-right.
@@ -989,13 +1206,13 @@ struct CosmeticShopView: View {
         }
     }
 
-    /// Border color for a collection card — priority: complete > seasonal > featured > none.
-    private func borderColor(bundle: CosmeticBundle, isFeatured: Bool, bundleOwned: Bool) -> Color {
-        // Owned/complete → gold.  Currently the Shop's featured (buyable) bundle → blue.
-        if bundleOwned                                       { return Color(red: 1.00, green: 0.82, blue: 0.30).opacity(0.85) }
-        if ShopRotation.featuredBundle()?.id == bundle.id    { return Color(red: 0.30, green: 0.62, blue: 1.00).opacity(0.85) }
-        if mode == .shop && bundle.isLimitedTime && bundle.isAvailable { return limitedTimeColor(for: bundle).opacity(0.50) }
-        if isFeatured                                        { return Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.40) }
+    /// Border color for a collection card.  The gold "complete / featured" and
+    /// blue "buyable now" status borders were removed for a cleaner card; only
+    /// the seasonal "limited time" accent remains (Shop only).
+    private func borderColor(bundle: CosmeticBundle) -> Color {
+        if mode == .shop && bundle.isLimitedTime && bundle.isAvailable {
+            return limitedTimeColor(for: bundle).opacity(0.50)
+        }
         return .clear
     }
 
@@ -1355,11 +1572,11 @@ struct CosmeticShopView: View {
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(Capsule().fill(Color.white))
         } else if owned {
-            Text("OWNED — TAP TO EQUIP")
-                .font(.system(size: 9, weight: .bold, design: .rounded))
-                .kerning(0.8)
+            Text("OWNED")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .kerning(1.0)
                 .foregroundStyle(Color(white: 0.85))
-                .padding(.horizontal, 8).padding(.vertical, 4)
+                .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(Capsule().fill(Color(white: 0.22)))
         } else {
             let affordable = gameState.coinBalance >= pack.price(in: gameState)
