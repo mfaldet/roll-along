@@ -116,8 +116,13 @@ struct LockerView: View {
 
     // MARK: - Category row
 
-    /// One category row: kerned uppercase label + horizontal scroll of owned
-    /// items.  Selected item gets a white ring + slight scale-up.
+    /// Fixed 5-column grid for the Locker — every category wraps into as many
+    /// rows of five as it needs (≤5 → one row, 6–10 → two, 11–15 → three, …)
+    /// instead of scrolling sideways, so all owned items are visible at once.
+    private static let lockerColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+
+    /// One category row: kerned uppercase label above a wrapping 5-up grid of
+    /// owned items.  Selected item gets a white ring + slight scale-up.
     private func cosmeticRow<Item: CosmeticItem>(
         label: String,
         items: [Item],
@@ -129,47 +134,16 @@ struct LockerView: View {
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .kerning(1.5)
                 .foregroundStyle(Color(white: 0.55))
-            // Wrap a crowded category into two stacked rows: more than 5 owned
-            // items split into a first-half row on top and the rest below,
-            // instead of one long horizontal strip.  5 or fewer stay a single
-            // row, and every category decides independently (others unaffected).
-            ScrollView(.horizontal, showsIndicators: false) {
-                Group {
-                    if items.count > 5 {
-                        VStack(alignment: .leading, spacing: 12) {
-                            cosmeticCellsRow(items.prefix((items.count + 1) / 2),
-                                             isEquipped: isEquipped, onTap: onTap)
-                            cosmeticCellsRow(items.suffix(items.count / 2),
-                                             isEquipped: isEquipped, onTap: onTap)
-                        }
-                    } else {
-                        cosmeticCellsRow(items[...], isEquipped: isEquipped, onTap: onTap)
+            LazyVGrid(columns: Self.lockerColumns, alignment: .leading, spacing: 14) {
+                ForEach(items, id: \.id) { item in
+                    cosmeticCell(item: item, selected: isEquipped(item)) {
+                        onTap(item)
                     }
                 }
-                .padding(.horizontal, 2)
-                // Vertical breathing room — the selected cell uses
-                // .scaleEffect(1.06) + a 2pt border, which together push it
-                // ~4pt taller; without this padding the ScrollView clips the
-                // selected cell's top/bottom border.
-                .padding(.vertical, 6)
             }
-        }
-    }
-
-    /// One horizontal strip of cosmetic cells.  Shared by `cosmeticRow` so a
-    /// single category can render as one strip (≤5 owned) or two stacked strips
-    /// (>5 owned) without duplicating the cell layout.
-    private func cosmeticCellsRow<Item: CosmeticItem>(
-        _ items: ArraySlice<Item>,
-        isEquipped: @escaping (Item) -> Bool,
-        onTap: @escaping (Item) -> Void
-    ) -> some View {
-        HStack(spacing: 14) {
-            ForEach(items, id: \.id) { item in
-                cosmeticCell(item: item, selected: isEquipped(item)) {
-                    onTap(item)
-                }
-            }
+            // Breathing room so the selected cell's 1.06 scale + 2pt border
+            // isn't clipped against the rows above/below.
+            .padding(.vertical, 4)
         }
     }
 
@@ -201,7 +175,7 @@ struct LockerView: View {
             }
         }
         .buttonStyle(.plain)
-        .frame(width: 64)
+        .frame(maxWidth: .infinity)
     }
 
     /// Packs inventory row — owned ball Packs, shown beneath the Ball row.
@@ -217,17 +191,14 @@ struct LockerView: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .kerning(1.5)
                     .foregroundStyle(Color(white: 0.55))
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(owned) { pack in
-                            packCell(pack: pack, selected: gameState.isPackEquipped(pack)) {
-                                gameState.equipPack(pack)
-                            }
+                LazyVGrid(columns: Self.lockerColumns, alignment: .leading, spacing: 14) {
+                    ForEach(owned) { pack in
+                        packCell(pack: pack, selected: gameState.isPackEquipped(pack)) {
+                            gameState.equipPack(pack)
                         }
                     }
-                    .padding(.horizontal, 2)
-                    .padding(.vertical, 6)
                 }
+                .padding(.vertical, 4)
             }
         }
     }
@@ -269,7 +240,7 @@ struct LockerView: View {
             }
         }
         .buttonStyle(.plain)
-        .frame(width: 64)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Per-item preview
