@@ -467,3 +467,51 @@ final class GameStateTests: XCTestCase {
                        "Mutating an isolated GameState must not write to UserDefaults.standard")
     }
 }
+
+// ---------------------------------------------------------------------------
+// LevelOverridesTests — guardrail for the JSON single-source-of-truth.
+//
+// The climb's hand-crafted levels now live in the bundled LevelOverrides.json
+// (authored in Marble Mapper); the Swift `handCrafted` array is intentionally
+// empty.  LevelOverrideStore.loadBundled() fails SILENTLY to [:] on a missing,
+// truncated, or corrupt file — which would quietly regress every authored level
+// to the procedural generator with no crash and no error.  These tests fail
+// loudly instead, so a bad export can't ship.  (Runs in-process against the
+// app bundle: the test target is app-hosted, so Bundle.main is RollAlong.app.)
+// ---------------------------------------------------------------------------
+final class LevelOverridesTests: XCTestCase {
+
+    /// The bundled overrides must cover a contiguous 1...N authored range
+    /// (currently 1...100).  A gap means a level silently falls through to the
+    /// generator instead of its designed layout.
+    func testBundledClimbOverridesCoverAuthoredRange() {
+        let overrides = LevelLayout.overrides
+        XCTAssertFalse(overrides.isEmpty,
+                       "LevelOverrides.json decoded to empty — bundled file missing/corrupt? "
+                       + "With handCrafted retired, every climb level would regress to generated().")
+        let keys = Set(overrides.keys)
+        let maxLevel = keys.max() ?? 0
+        XCTAssertGreaterThanOrEqual(maxLevel, 100,
+                                    "Authored climb range shrank below 100 levels (max key = \(maxLevel)).")
+        let missing = (1...maxLevel).filter { !keys.contains($0) }
+        XCTAssertTrue(missing.isEmpty,
+                      "LevelOverrides.json has gaps in the authored range: \(Array(missing.prefix(10)))")
+    }
+
+    /// A decoded override must carry real content (the migration/publish wrote a
+    /// usable layout, not an empty husk).  L1 = 1 designed hole + 2 side-walls
+    /// auto-added on decode, plus its 3 coins.
+    func testDecodedClimbOverrideHasContent() {
+        guard let l1 = LevelLayout.overrides[1] else { return XCTFail("missing level 1") }
+        XCTAssertEqual(l1.coins.count, 3, "L1 should decode 3 coins")
+        XCTAssertGreaterThanOrEqual(l1.holeRects.count, 1, "L1 should decode holes (designed + side-walls)")
+    }
+
+    /// The migration preserved the `verified` flag exactly: levels 1-10 were
+    /// authored `verified: true`, all later levels `false`.
+    func testVerifiedFlagPreservedThroughMigration() {
+        XCTAssertEqual(LevelLayout.overrides[1]?.verified, true, "L1 should be verified")
+        XCTAssertEqual(LevelLayout.overrides[10]?.verified, true, "L10 should be verified")
+        XCTAssertEqual(LevelLayout.overrides[50]?.verified, false, "L50 should not be verified")
+    }
+}
