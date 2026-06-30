@@ -35,6 +35,54 @@ final class GameStateTests: XCTestCase {
         GameState(defaults: defaults)
     }
 
+    // MARK: - Notification scheduling logic
+
+    /// The lives-full notification fires at the deterministic regen restock
+    /// instant: lastLifeLostAt + (10 − lives) × 6 min.
+    func testLivesRestockDate() {
+        let gs = makeGameState()
+        gs.unlimitedLives = false
+        let t0 = Date()
+        gs.lives = 7
+        gs.lastLifeLostAt = t0
+        XCTAssertEqual(gs.livesRestockDate?.timeIntervalSince(t0) ?? -1,
+                       Double(10 - 7) * GameState.livesRegenInterval, accuracy: 0.5)
+        // Full bar → nothing pending.
+        gs.lives = 10
+        gs.lastLifeLostAt = nil
+        XCTAssertNil(gs.livesRestockDate)
+        // Unlimited → never schedules.
+        gs.lives = 5
+        gs.lastLifeLostAt = Date()
+        gs.unlimitedLives = true
+        XCTAssertNil(gs.livesRestockDate)
+    }
+
+    /// `livesRestockDate` is invariant under `commitRegen()` — the absolute
+    /// restock instant doesn't drift as regen ticks accrue/commit.
+    func testLivesRestockDateInvariantUnderRegen() {
+        let gs = makeGameState()
+        gs.unlimitedLives = false
+        gs.lives = 6
+        gs.lastLifeLostAt = Date().addingTimeInterval(-400)   // ~1 tick accrued, uncommitted
+        let before = gs.livesRestockDate
+        gs.commitRegen()                                       // promotes the accrued tick
+        let after = gs.livesRestockDate
+        XCTAssertNotNil(before); XCTAssertNotNil(after)
+        XCTAssertEqual(before!.timeIntervalSinceReferenceDate,
+                       after!.timeIntervalSinceReferenceDate, accuracy: 0.5)
+    }
+
+    /// The shop-fresh notification targets the next hourly rotation boundary.
+    func testShopRefreshBoundaryIsNextHour() {
+        let now = Date()
+        let next = ShopRotation.refreshDate(at: now)
+        XCTAssertGreaterThan(next.timeIntervalSince(now), 0)
+        XCTAssertLessThanOrEqual(next.timeIntervalSince(now), 3600)
+        XCTAssertEqual(next.timeIntervalSince1970.truncatingRemainder(dividingBy: 3600),
+                       0, accuracy: 0.001, "must land exactly on an hourly boundary")
+    }
+
     // MARK: - Minigame difficulty (payout scaling + success tracking)
 
     func testMinigamePayout_scalesByDifficulty() {

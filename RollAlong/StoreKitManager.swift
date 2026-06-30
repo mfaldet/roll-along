@@ -305,6 +305,7 @@ final class StoreKitManager: ObservableObject {
             // Clearing lastLifeLostAt stops the regen timer; the stockpile
             // doesn't need regen and the timer would just churn confusingly.
             gameState.lastLifeLostAt = nil
+            gameState.reconcileLivesNotification()   // now full → cancel any pending alert
 
         case .coinPack:
             gameState.addCoins(productID.rewardCoins)
@@ -317,6 +318,7 @@ final class StoreKitManager: ObservableObject {
         case .unlimitedUnlock:
             gameState.unlimitedLives = true
             gameState.grant(BallSkin.diamond)   // exclusive Diamond ball skin
+            gameState.reconcileLivesNotification()   // unlimited → no restock alert
 
         case .starterPackUnlock:
             // Only deliver once — guard lets restore calls be idempotent.

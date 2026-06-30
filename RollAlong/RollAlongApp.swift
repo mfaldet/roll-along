@@ -56,6 +56,13 @@ struct RollAlongApp: App {
                         ]
                     )
                 }
+                .onAppear {
+                    // Install the foreground-presentation delegate and bring the
+                    // lives-restock notification in line with the current state
+                    // (it may have fired / become moot while the app was closed).
+                    NotificationManager.shared.start()
+                    gameState.reconcileLivesNotification()
+                }
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
@@ -69,6 +76,10 @@ struct RollAlongApp: App {
                 // Threshold: 5 minutes.  Implemented inside startNewSession
                 // via tracking the last-active timestamp.
                 AnalyticsClient.shared.track("app_resume")
+                // Re-affirm the lives-restock alert against time elapsed while
+                // backgrounded (regen kept accruing; the alert may need to be
+                // rescheduled or cleared).
+                gameState.reconcileLivesNotification()
             @unknown default:
                 break
             }
