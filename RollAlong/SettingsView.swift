@@ -24,6 +24,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 32) {
                     personalizationSection
                     gameSection
+                    notificationsSection
                     accountSection
                     purchasesSection
                     resetSection
@@ -316,6 +317,68 @@ struct SettingsView: View {
                 }
                 .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
                 .padding()
+            }
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+        }
+    }
+
+    // Opt-in local notifications.  Default OFF; flipping one ON asks for system
+    // permission.  Scheduling itself lives in GameState (recordShopViewed /
+    // reconcileLivesNotification) → NotificationManager.
+    private var notificationsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Notifications")
+
+            VStack(spacing: 0) {
+                Toggle(isOn: $gameState.shopFreshNotifEnabled) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Shop Restock")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.75))
+                            Text("Once when the shop has fresh items since you last looked")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
+                    } icon: {
+                        Image(systemName: "bag.fill")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
+                .padding()
+                .onChange(of: gameState.shopFreshNotifEnabled) { _, on in
+                    if on { NotificationManager.shared.requestAuthorization() }
+                    else  { NotificationManager.shared.cancelShopFresh() }
+                }
+
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+
+                Toggle(isOn: $gameState.livesFullNotifEnabled) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Lives Full")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.75))
+                            Text("When your lives refill to 10")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
+                    } icon: {
+                        Image(systemName: "heart.fill")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
+                .padding()
+                .onChange(of: gameState.livesFullNotifEnabled) { _, on in
+                    if on {
+                        NotificationManager.shared.requestAuthorization()
+                        gameState.reconcileLivesNotification()
+                    } else {
+                        NotificationManager.shared.cancelLivesFull()
+                    }
+                }
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
         }

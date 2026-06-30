@@ -56,6 +56,15 @@ final class GameState: ObservableObject {
     @Published var soundEnabled: Bool {
         didSet { defaults.set(soundEnabled, forKey: "ra_sound") }
     }
+    /// Local-notification opt-ins (Settings → Notifications).  Default OFF;
+    /// enabling one requests system permission.  Scheduling lives in
+    /// `recordShopViewed()` / `reconcileLivesNotification()` → NotificationManager.
+    @Published var shopFreshNotifEnabled: Bool {
+        didSet { defaults.set(shopFreshNotifEnabled, forKey: "ra_notifShopFresh") }
+    }
+    @Published var livesFullNotifEnabled: Bool {
+        didSet { defaults.set(livesFullNotifEnabled, forKey: "ra_notifLivesFull") }
+    }
     /// Plays the cinematic opening-credits intro on cold launch.  Defaults
     /// OFF — pre-launch feature flag, flipped on from Settings once vetted
     /// on-device.  See IntroView / ContentView.
@@ -480,6 +489,8 @@ final class GameState: ObservableObject {
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
         introEnabled = defaults.object(forKey: "ra_introEnabled") as? Bool ?? false
         ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
+        shopFreshNotifEnabled = defaults.object(forKey: "ra_notifShopFresh") as? Bool ?? false
+        livesFullNotifEnabled = defaults.object(forKey: "ra_notifLivesFull") as? Bool ?? false
         minigameDifficulty = MinigameDifficulty(
             rawValue: defaults.string(forKey: "ra_minigameDifficulty") ?? "") ?? .normal
         seenOnboarding = defaults.bool(forKey: "ra_seenOnboarding")
@@ -930,6 +941,7 @@ final class GameState: ObservableObject {
         if lives < Self.livesMax && lastLifeLostAt == nil {
             lastLifeLostAt = .now
         }
+        reconcileLivesNotification()
         return true
     }
 
@@ -946,6 +958,43 @@ final class GameState: ObservableObject {
         if lives >= Self.livesMax {
             lastLifeLostAt = nil
         }
+        reconcileLivesNotification()
+    }
+
+    // MARK: - Notifications (lives-full / shop-fresh)
+
+    /// The deterministic Date at which free 6-minute regen brings lives back to
+    /// the cap, or nil when not regenerating (full, stockpiled, or unlimited).
+    /// "Had fallen below 10" is implicit: this is non-nil only while lives are
+    /// actively regenerating.  Invariant under `commitRegen()` — stale stored
+    /// `lives` + `lastLifeLostAt` still yield the same absolute restock instant.
+    var livesRestockDate: Date? {
+        guard !unlimitedLives, lives < Self.livesMax, let last = lastLifeLostAt else { return nil }
+        return last.addingTimeInterval(Double(Self.livesMax - lives) * Self.livesRegenInterval)
+    }
+
+    /// Re-schedule (or cancel) the "lives full" local notification from the
+    /// current lives state.  Called after every lives change and on app
+    /// foreground.  Earning a life to the cap, an IAP top-up, or the unlimited
+    /// unlock all leave `livesRestockDate == nil`, which cancels the alert.
+    func reconcileLivesNotification() {
+        commitRegen()   // snapshot any accrued regen so the math is current
+        guard livesFullNotifEnabled, let restock = livesRestockDate else {
+            NotificationManager.shared.cancelLivesFull()
+            return
+        }
+        NotificationManager.shared.scheduleLivesFull(at: restock)
+    }
+
+    /// The player is viewing the shop — arm ONE "fresh items" notification for
+    /// the next rotation boundary (replacing any prior request).  Re-viewing
+    /// re-arms it; once it fires there's nothing more until they view again.
+    func recordShopViewed() {
+        guard shopFreshNotifEnabled else {
+            NotificationManager.shared.cancelShopFresh()
+            return
+        }
+        NotificationManager.shared.scheduleShopFresh(at: ShopRotation.refreshDate(at: .now))
     }
 
     // MARK: - Cosmetic economy

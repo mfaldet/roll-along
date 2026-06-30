@@ -21,6 +21,7 @@
 		AA00000E000000000000AA01 /* Cosmetics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000E000000000000AA00 /* Cosmetics.swift */; };
 		AA00000F000000000000AA01 /* CosmeticShopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000F000000000000AA00 /* CosmeticShopView.swift */; };
 		AA000013000000000000AA01 /* AnalyticsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000013000000000000AA00 /* AnalyticsClient.swift */; };
+		AA0000E7000000000000AA01 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000E7000000000000AA00 /* NotificationManager.swift */; };
 		AA000014000000000000AA01 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014000000000000AA00 /* StoreKitManager.swift */; };
 		AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000015000000000000AA00 /* PurchaseSheets.swift */; };
 		AA000016000000000000AA02 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA000016000000000000AA00 /* Products.storekit */; };
@@ -101,6 +102,7 @@
 		AA00000E000000000000AA00 /* Cosmetics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cosmetics.swift; sourceTree = "<group>"; };
 		AA00000F000000000000AA00 /* CosmeticShopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmeticShopView.swift; sourceTree = "<group>"; };
 		AA000013000000000000AA00 /* AnalyticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsClient.swift; sourceTree = "<group>"; };
+		AA0000E7000000000000AA00 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		AA000014000000000000AA00 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		AA000015000000000000AA00 /* PurchaseSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseSheets.swift; sourceTree = "<group>"; };
 		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
@@ -222,6 +224,7 @@
 				AA00000E000000000000AA00 /* Cosmetics.swift */,
 				AA00000F000000000000AA00 /* CosmeticShopView.swift */,
 				AA000013000000000000AA00 /* AnalyticsClient.swift */,
+				AA0000E7000000000000AA00 /* NotificationManager.swift */,
 				AA000014000000000000AA00 /* StoreKitManager.swift */,
 				AA000015000000000000AA00 /* PurchaseSheets.swift */,
 				AA000016000000000000AA00 /* Products.storekit */,
@@ -409,6 +412,7 @@
 				AA00000E000000000000AA01 /* Cosmetics.swift in Sources */,
 				AA00000F000000000000AA01 /* CosmeticShopView.swift in Sources */,
 				AA000013000000000000AA01 /* AnalyticsClient.swift in Sources */,
+				AA0000E7000000000000AA01 /* NotificationManager.swift in Sources */,
 				D502FED82FD52BAB00CA86BD /* AppleAuthManager.swift in Sources */,
 				AA000014000000000000AA01 /* StoreKitManager.swift in Sources */,
 				AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */,

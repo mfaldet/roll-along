@@ -259,6 +259,11 @@ struct CosmeticShopView: View {
             set: { _ in purchaseError = nil; store.clearLastError() }
         ), actions: { Button("OK", role: .cancel) {} },
         message: { Text(purchaseError ?? "") })
+        .onAppear {
+            // Viewing the Shop (not the Catalog) resets the "shop fresh" alert:
+            // re-arm it for the next rotation boundary.
+            if mode == .shop { gameState.recordShopViewed() }
+        }
     }
 
     // MARK: - Catalog "where to buy" popup
