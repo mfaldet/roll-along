@@ -130,6 +130,16 @@ private enum BundleFilter: String, CaseIterable, Identifiable {
     }()
 }
 
+/// One row in the collection detail popup — a single cosmetic from the bundle,
+/// shown the way the loadout lists equipped items (preview + category + name).
+private struct BundleItemRow: Identifiable {
+    let id = UUID()
+    let category: String
+    let name: String
+    let owned: Bool
+    let preview: AnyView
+}
+
 struct CosmeticShopView: View {
     var mode: ShopMode = .catalog
 
@@ -153,6 +163,8 @@ struct CosmeticShopView: View {
     /// Catalog → Collections type filter (the dropdown that replaced the
     /// "ALL COLLECTIONS" header).
     @State private var bundleFilter: BundleFilter = .all
+    /// Non-nil while the collection detail popup is open (tap a collection card).
+    @State private var detailBundle: CosmeticBundle? = nil
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
@@ -215,6 +227,11 @@ struct CosmeticShopView: View {
             // tapping an unowned individual cosmetic.  Tap anywhere to close.
             if let info = catalogInfo {
                 catalogPurchasePopup(info)
+            }
+
+            // Collection detail popup — opened by tapping a collection card.
+            if let bundle = detailBundle {
+                collectionDetailPopup(bundle)
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.72), value: completionToastBundle)
@@ -1087,27 +1104,22 @@ struct CosmeticShopView: View {
     }
 
     private func collectionCard(_ bundle: CosmeticBundle, isFeatured: Bool) -> some View {
-        // A set the player already owns in full (bought as a unit OR every
-        // item owned individually) reads as complete — no buy button.
         let bundleOwned = gameState.completedBundleIDs.contains(bundle.id)
         let owned       = ownedCount(in: bundle)
         let total       = bundle.itemCount
-        // Catalog sells bundles at the full prorated price; the Shop sells the
-        // featured bundle at the window's randomized discount off that price.
         let isShop      = mode == .shop
         let discount    = ShopRotation.featuredDiscount()
-        let prorated    = bundle.proratedPrice(in: gameState)
-        let cost        = bundleCost(bundle)
-        let discounted  = isShop && cost < prorated
-        let canAfford   = gameState.coinBalance >= cost
+        // Shop's featured bundle is discounted off the prorated price.
+        let discounted  = isShop && bundleCost(bundle) < bundle.proratedPrice(in: gameState)
 
-        return VStack(alignment: .leading, spacing: 10) {
+        let cost      = bundleCost(bundle)
+        let prorated  = bundle.proratedPrice(in: gameState)
+        let canAfford = gameState.coinBalance >= cost
+
+        let card = VStack(alignment: .leading, spacing: 10) {
             // ── Title row ────────────────────────────────────────────────
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    // Chips row — limited-time flag only.  The discount now lives
-                    // in the corner "% OFF" sticker, and "Featured" is implied by
-                    // the section header, so neither rides here anymore.
                     let showLimited = isShop && bundle.isLimitedTime && bundle.isAvailable
                     if showLimited {
                         HStack(spacing: 3) {
@@ -1130,70 +1142,75 @@ struct CosmeticShopView: View {
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.58))
                         .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
                 Spacer()
-                // Top-right, just LEFT of the rarity corner tab: the big "% OFF"
-                // sticker on a discounted (featured) bundle, otherwise the X/Y
-                // collection-progress counter.
+                // % OFF sticker on a discounted (Shop) bundle; in the Catalog an
+                // OWNED tag for a complete set; otherwise the X/Y counter.
                 if discounted {
                     discountSticker(discount)
+                } else if bundleOwned && !isShop {
+                    ownedTag
                 } else if !bundleOwned {
                     collectionProgressBadge(owned: owned, total: total)
                 }
             }
-            // Reserve the top-right corner for the rarity tab so the title and
-            // the %-OFF / X-of-Y sticker sit to its left.
             .padding(.trailing, 40)
 
             // ── 6-slot item row ──────────────────────────────────────────
             collectionSlotRow(bundle)
 
-            // ── Action button ────────────────────────────────────────────
-            if bundleOwned {
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Collection Complete")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
-                .padding(.top, 2)
-            } else {
-                Button {
-                    handleBundleTap(bundle, owned: bundleOwned)
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(owned > 0 ? "Complete the Set" : "Get Bundle")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(canAfford ? .black : Color(white: 0.50))
-                        Spacer()
-                        HStack(spacing: 5) {
-                            if discounted {
-                                Text("\(prorated)")
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .strikethrough(true, color: (canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
-                                    .foregroundStyle((canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
-                            }
-                            HStack(spacing: 3) {
-                                CoinIcon(size: 13)
-                                Text("\(cost)")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+            // ── Action button — SHOP ONLY ────────────────────────────────
+            // The Shop keeps the large inline "Buy the Collection" / "Complete
+            // the Set" CTA.  The Catalog has no inline button — tapping the card
+            // opens the detail popup instead (handled below).
+            if isShop {
+                if bundleOwned {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Collection Complete")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+                    .padding(.top, 2)
+                } else {
+                    Button {
+                        handleBundleTap(bundle, owned: false)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(owned > 0 ? "Complete the Set" : "Buy the Collection")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(canAfford ? .black : Color(white: 0.50))
+                            Spacer()
+                            HStack(spacing: 5) {
+                                if discounted {
+                                    Text("\(prorated)")
+                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                        .strikethrough(true, color: (canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                                        .foregroundStyle((canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                                }
+                                HStack(spacing: 3) {
+                                    CoinIcon(size: 13)
+                                    Text("\(cost)")
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+                                }
                             }
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(canAfford
+                                      ? (owned > 0
+                                         ? Color(red: 0.30, green: 0.86, blue: 0.56)   // teal-green "complete set"
+                                         : Color.white)                                  // white "buy collection"
+                                      : Color(white: 0.20))
+                        )
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(canAfford
-                                  ? (owned > 0
-                                     ? Color(red: 0.30, green: 0.86, blue: 0.56)   // teal-green for "complete set"
-                                     : Color.white)                                  // white for "get bundle"
-                                  : Color(white: 0.20))
-                    )
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(14)
@@ -1209,6 +1226,233 @@ struct CosmeticShopView: View {
         .overlay(alignment: .topTrailing) {
             RarityCornerTab(colors: bundle.rarity.gemColors, side: 44, corner: 18)
         }
+
+        // Catalog: the whole card is a button that opens the detail popup.  Shop:
+        // the card stays a plain container so its inline button owns the taps.
+        return Group {
+            if isShop {
+                card
+            } else {
+                Button {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) { detailBundle = bundle }
+                } label: { card }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// Small green "owned" tag shown where the X/Y progress badge sits, for a
+    /// fully-owned collection.
+    private var ownedTag: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
+            Text("OWNED").font(.system(size: 10, weight: .black, design: .rounded)).tracking(0.5)
+        }
+        .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(Capsule().fill(Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.16)))
+    }
+
+    // MARK: - Collection detail popup
+
+    private func dismissDetail() {
+        withAnimation(.easeOut(duration: 0.2)) { detailBundle = nil }
+    }
+
+    /// Opened by tapping a collection card.  Demonstrates every cosmetic in the
+    /// set (the way the loadout lists equipped items), with one purchase button
+    /// and a close option (X or tap the backdrop).
+    private func collectionDetailPopup(_ bundle: CosmeticBundle) -> some View {
+        let bundleOwned = gameState.completedBundleIDs.contains(bundle.id)
+        let owned       = ownedCount(in: bundle)
+        let cost        = bundleCost(bundle)
+        let prorated    = bundle.proratedPrice(in: gameState)
+        let discounted  = mode == .shop && cost < prorated
+        let canAfford   = gameState.coinBalance >= cost
+
+        return ZStack {
+            Color.black.opacity(0.64).ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { dismissDetail() }
+
+            VStack(spacing: 14) {
+                // Header — name + tagline, with an X to close.
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(bundle.displayName)
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(bundle.tagline)
+                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color(white: 0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Button { dismissDetail() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color(white: 0.72))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color(white: 0.18)))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Each cosmetic in the set.
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(bundleDetailRows(bundle)) { collectionItemRow($0) }
+                    }
+                }
+                .frame(maxHeight: 300)
+
+                // Footer — purchase, or a complete badge if already owned.
+                if bundleOwned {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 15, weight: .bold))
+                        Text("Collection Complete")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.10)))
+                } else {
+                    Button {
+                        handleBundleTap(bundle, owned: false)
+                        // Close on a successful buy; a shortfall keeps it open
+                        // (the shortfall alert shows over the popup).
+                        if gameState.ownedBundles.contains(bundle.id) { dismissDetail() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(owned > 0 ? "Complete the Set" : "Get Bundle")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(canAfford ? .black : Color(white: 0.5))
+                            Spacer()
+                            HStack(spacing: 5) {
+                                if discounted {
+                                    Text("\(prorated)")
+                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                        .strikethrough(true, color: (canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                                        .foregroundStyle((canAfford ? Color.black : Color(white: 0.45)).opacity(0.55))
+                                }
+                                CoinIcon(size: 14)
+                                Text("\(cost)")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(canAfford ? .black : Color(white: 0.45))
+                            }
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 13)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(canAfford
+                                      ? (owned > 0 ? Color(red: 0.30, green: 0.86, blue: 0.56) : Color.white)
+                                      : Color(white: 0.20))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 26)
+                    .fill(Color(white: 0.12))
+                    .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.12), lineWidth: 1))
+            )
+            .shadow(color: .black.opacity(0.55), radius: 28, y: 14)
+            .padding(.horizontal, 22)
+        }
+        .transition(.opacity)
+    }
+
+    /// The bundle's cosmetics as loadout-style rows (every item in every category).
+    private func bundleDetailRows(_ b: CosmeticBundle) -> [BundleItemRow] {
+        var rows: [BundleItemRow] = []
+        for x in b.balls {
+            rows.append(BundleItemRow(category: "Ball", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(BallSkinView(skin: x, diameter: 30))))
+        }
+        for x in b.goals {
+            rows.append(BundleItemRow(category: "Goal", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(Circle().fill(GoalSkin.previewGradient(for: x))
+                                        .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
+                                        .frame(width: 28, height: 28))))
+        }
+        for x in b.trails {
+            rows.append(BundleItemRow(category: "Trail", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(trailSwatch(x))))
+        }
+        for x in b.floors {
+            rows.append(BundleItemRow(category: "Floor", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(RoundedRectangle(cornerRadius: 6).fill(x.color)
+                                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.black.opacity(0.2), lineWidth: 0.6))
+                                        .frame(width: 30, height: 24))))
+        }
+        for x in b.pits {
+            rows.append(BundleItemRow(category: "Pit", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(pitSwatch(x))))
+        }
+        for x in b.music {
+            rows.append(BundleItemRow(category: "Music", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(musicSwatch(x))))
+        }
+        return rows
+    }
+
+    private func collectionItemRow(_ row: BundleItemRow) -> some View {
+        HStack(spacing: 12) {
+            row.preview
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.category.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5)).tracking(1)
+                Text(row.name)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+            if row.owned {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+                    Text("Owned").font(.system(size: 10, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.09)))
+    }
+
+    @ViewBuilder private func trailSwatch(_ trail: TrailColor) -> some View {
+        Canvas { ctx, size in
+            var p = Path()
+            p.move(to: CGPoint(x: size.width * 0.12, y: size.height * 0.85))
+            p.addLine(to: CGPoint(x: size.width * 0.88, y: size.height * 0.15))
+            ctx.stroke(p, with: .color(trail == .none ? Color(white: 0.30) : trail.color),
+                       style: StrokeStyle(lineWidth: 4, lineCap: .round))
+        }
+    }
+    @ViewBuilder private func pitSwatch(_ pit: Pit) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.20))
+            RoundedRectangle(cornerRadius: 3).fill(pit.color).frame(width: 16, height: 9)
+        }
+    }
+    @ViewBuilder private func musicSwatch(_ track: MusicTrack) -> some View {
+        Image(systemName: track == .none ? "speaker.slash.fill" : "music.note")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(LinearGradient(
+                colors: [Color(red: 0.45, green: 0.65, blue: 1.00),
+                         Color(red: 0.25, green: 0.40, blue: 0.85)],
+                startPoint: .top, endPoint: .bottom))
     }
 
     /// Border color for a collection card.  The gold "complete / featured" and
