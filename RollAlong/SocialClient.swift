@@ -143,7 +143,8 @@ final class SocialClient: @unchecked Sendable {
                            sumoBest: Int, sumoWins: Int,
                            paintballBest: Int, paintballWins: Int,
                            marblecupBest: Int, marblecupWins: Int,
-                           kothBest: Int, kothWins: Int) async throws {
+                           kothBest: Int, kothWins: Int,
+                           rollupBest: Int, rollupBestSeconds: Int) async throws {
         let me = try requireSession()
         let body = MinigamePatch(pinball_best: pinballBest,
                                  zen_seconds: zenSeconds,
@@ -158,7 +159,9 @@ final class SocialClient: @unchecked Sendable {
                                  paintball_wins: paintballWins,
                                  marblecup_wins: marblecupWins,
                                  koth_wins: kothWins,
-                                 goldrush_wins: goldrushWins)
+                                 goldrush_wins: goldrushWins,
+                                 rollup_best: rollupBest,
+                                 rollup_best_seconds: rollupBestSeconds)
         _ = try await send(method: "PATCH", path: "players",
                            query: "id=eq.\(me.userId.uuidString)",
                            bodyData: try encoder.encode(body),
@@ -181,7 +184,8 @@ final class SocialClient: @unchecked Sendable {
         let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
                  + "coins_collected,pinball_best,zen_seconds,goldrush_best,lives,"
                  + "snake_best,sumo_best,paintball_best,marblecup_best,koth_best,"
-                 + "snake_wins,sumo_wins,paintball_wins,marblecup_wins,koth_wins,goldrush_wins"
+                 + "snake_wins,sumo_wins,paintball_wins,marblecup_wins,koth_wins,goldrush_wins,"
+                 + "rollup_best,rollup_best_seconds"
         let query = "select=\(cols)&order=\(order)&limit=\(limit)"
         let data = try await send(method: "GET", path: "players", query: query)
         return try decode([PlayerProfile].self, from: data)
@@ -637,6 +641,9 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     var marblecupWins: Int?
     var kothWins: Int?
     var goldrushWins: Int?
+    // Roll Up: best height (meters) + the duration (seconds) of that best run.
+    var rollupBest: Int?
+    var rollupBestSeconds: Int?
     // Server-managed timestamps; present on reads, omitted on writes.
     var createdAt: String?
     var updatedAt: String?
@@ -656,6 +663,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
          marblecupBest: Int? = nil, kothBest: Int? = nil,
          snakeWins: Int? = nil, sumoWins: Int? = nil, paintballWins: Int? = nil,
          marblecupWins: Int? = nil, kothWins: Int? = nil, goldrushWins: Int? = nil,
+         rollupBest: Int? = nil, rollupBestSeconds: Int? = nil,
          createdAt: String? = nil, updatedAt: String? = nil,
          lastSeenAt: String? = nil, needsLivesAt: String? = nil) {
         self.id = id; self.displayName = displayName; self.climbLevel = climbLevel
@@ -668,6 +676,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         self.snakeWins = snakeWins; self.sumoWins = sumoWins
         self.paintballWins = paintballWins; self.marblecupWins = marblecupWins
         self.kothWins = kothWins; self.goldrushWins = goldrushWins
+        self.rollupBest = rollupBest; self.rollupBestSeconds = rollupBestSeconds
         self.createdAt = createdAt; self.updatedAt = updatedAt
         self.lastSeenAt = lastSeenAt; self.needsLivesAt = needsLivesAt
     }
@@ -723,6 +732,8 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case marblecupWins    = "marblecup_wins"
         case kothWins         = "koth_wins"
         case goldrushWins     = "goldrush_wins"
+        case rollupBest       = "rollup_best"
+        case rollupBestSeconds = "rollup_best_seconds"
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
@@ -753,16 +764,16 @@ enum BoardCategory: Int, CaseIterable {
 }
 
 enum LeaderboardBoard: String, CaseIterable, Identifiable {
-    case rollAlong, pinball, zenGarden
+    case rollAlong, pinball, zenGarden, rollUp
     case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
     var id: String { rawValue }
 
     /// Which category this board belongs to (drives the filter's grouping).
     var category: BoardCategory {
         switch self {
-        case .rollAlong:           return .adventure
-        case .pinball, .zenGarden: return .solo
-        default:                   return .competitive   // the six competitive boards
+        case .rollAlong:                    return .adventure
+        case .pinball, .zenGarden, .rollUp: return .solo
+        default:                            return .competitive   // the six competitive boards
         }
     }
 
@@ -772,6 +783,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong:  return "Roll Along"
         case .pinball:    return "Pinball"
         case .zenGarden:  return "Zen Garden"
+        case .rollUp:     return "Roll Up"
         case .cometClash: return "Comet Clash"
         case .sumo:       return "Sumo Survival"
         case .paintBall:  return "Paint Ball"
@@ -801,6 +813,9 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong:  return "climb_level.desc,total_stars.desc"
         case .pinball:    return "pinball_best.desc"
         case .zenGarden:  return "zen_seconds.desc"
+        // Default (Height) order; LeaderboardView swaps in the Time order when
+        // the Roll Up board's sort toggle is set to Time.
+        case .rollUp:     return "rollup_best.desc,rollup_best_seconds.desc"
         case .cometClash: return "snake_wins.desc,snake_best.desc"
         case .sumo:       return "sumo_wins.desc,sumo_best.desc"
         case .paintBall:  return "paintball_wins.desc,paintball_best.desc"
@@ -820,6 +835,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong: return true                       // everyone has a climb level
         case .pinball:   return (p.pinballBest ?? 0) > 0
         case .zenGarden: return (p.zenSeconds ?? 0) > 0
+        case .rollUp:    return (p.rollupBest ?? 0) > 0
         default:         return true
         }
     }
@@ -835,6 +851,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong: return "Lv \(p.climbLevel) · \(p.totalStars)★ · \(p.coinsCollected ?? 0) coins"
         case .pinball:   return "\((p.pinballBest ?? 0).formatted()) pts"
         case .zenGarden: return Self.zenText(p.zenSeconds ?? 0)
+        case .rollUp:    return "\(p.rollupBest ?? 0) m · \(Self.rollUpTime(p.rollupBestSeconds ?? 0))"
         default:         return ""
         }
     }
@@ -858,6 +875,10 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     /// Seconds → "1m 20s" / "45s" (KotH hold time — keeps the seconds).
     static func holdText(_ s: Int) -> String {
         s >= 60 ? "\(s / 60)m \(s % 60)s" : "\(s)s"
+    }
+    /// Seconds → "m:ss" clock (Roll Up run duration), e.g. 125 → "2:05".
+    static func rollUpTime(_ s: Int) -> String {
+        String(format: "%d:%02d", s / 60, s % 60)
     }
 }
 
@@ -1003,6 +1024,8 @@ private struct MinigamePatch: Encodable {
     let marblecup_wins: Int
     let koth_wins: Int
     let goldrush_wins: Int
+    let rollup_best: Int
+    let rollup_best_seconds: Int
 }
 
 private struct GiftInsert: Encodable {

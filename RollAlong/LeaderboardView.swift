@@ -29,7 +29,23 @@ struct LeaderboardView: View {
     @State private var sortKey:       SortKey         = .level
     @State private var selectedBoard: LeaderboardBoard = .rollAlong
     @State private var diffFilter:    DiffFilter      = .overall
+    @State private var rollUpSort:    RollUpSort      = .height
     @State private var showBoardPicker = false
+
+    /// Roll Up ranks by best height OR by the endurance (longest run) of that
+    /// best run.  Unlike the Roll Along sort (a client re-sort), each order is a
+    /// different top-N, so changing it re-fetches with a new server order.
+    private enum RollUpSort: String, CaseIterable, Identifiable {
+        case height = "Height", time = "Time"
+        var id: String { rawValue }
+        /// PostgREST order clause for this sort.
+        var order: String {
+            switch self {
+            case .height: return "rollup_best.desc,rollup_best_seconds.desc"
+            case .time:   return "rollup_best_seconds.desc,rollup_best.desc"
+            }
+        }
+    }
 
     /// Which Roll Along stat the board ranks by.  (Speed was dropped — we lean
     /// on stars for skill.)  Only changes ranking — never which columns show.
@@ -114,6 +130,10 @@ struct LeaderboardView: View {
             Task { await load() }
         }
         .onChange(of: diffFilter) { _, _ in
+            rows = []
+            Task { await load() }
+        }
+        .onChange(of: rollUpSort) { _, _ in
             rows = []
             Task { await load() }
         }
@@ -219,6 +239,17 @@ struct LeaderboardView: View {
             return [ StatColumn(id: "TIME", width: 92, highlighted: true) { p in
                 AnyView(self.iconCell(system: "leaf.fill", tint: Self.zenTint,
                                       value: LeaderboardBoard.zenText(p.zenSeconds ?? 0))) } ]
+        case .rollUp:
+            // Height (meters) + the duration of that run. The highlighted column
+            // tracks the active sort.
+            return [
+                StatColumn(id: "HEIGHT", width: 66, highlighted: rollUpSort == .height) { p in
+                    AnyView(self.iconCell(system: "arrow.up.forward", tint: Self.pinTint,
+                                          value: "\(p.rollupBest ?? 0) m")) },
+                StatColumn(id: "TIME", width: 62, highlighted: rollUpSort == .time) { p in
+                    AnyView(self.iconCell(system: "stopwatch.fill", tint: Self.zenTint,
+                                          value: LeaderboardBoard.rollUpTime(p.rollupBestSeconds ?? 0))) },
+            ]
         default:
             // Competitive boards: Wins (ranking) + Best.
             let mode = selectedBoard.competitiveModeID ?? ""
@@ -298,6 +329,9 @@ struct LeaderboardView: View {
             parts.append("best \(profile.pinballBest ?? 0)")
         case .zenGarden:
             parts.append("\(LeaderboardBoard.zenText(profile.zenSeconds ?? 0)) in the garden")
+        case .rollUp:
+            parts.append("\(profile.rollupBest ?? 0) meters")
+            parts.append("in \(LeaderboardBoard.rollUpTime(profile.rollupBestSeconds ?? 0))")
         default:
             let mode = selectedBoard.competitiveModeID ?? ""
             parts.append("\(profile.competitiveWins(mode)) wins")
@@ -358,6 +392,7 @@ struct LeaderboardView: View {
         case .rollAlong: return gameState.currentLevel
         case .pinball:   return gameState.pinballBest > 0 ? 1 : 0
         case .zenGarden: return gameState.zenSeconds   > 0 ? 1 : 0
+        case .rollUp:    return gameState.rollupBest   > 0 ? 1 : 0
         default:         return 0
         }
     }
@@ -480,6 +515,20 @@ struct LeaderboardView: View {
                         .overlay(Capsule().stroke(Self.controlBorder, lineWidth: 1))
                 )
             }
+
+            // Roll Up sort — rank by best Height, or by the longest run (Time).
+            if selectedBoard == .rollUp {
+                HStack(spacing: 0) {
+                    ForEach(RollUpSort.allCases) { s in
+                        rollUpSortSegment(s)
+                    }
+                }
+                .padding(3)
+                .background(
+                    Capsule().fill(Self.controlTrack)
+                        .overlay(Capsule().stroke(Self.controlBorder, lineWidth: 1))
+                )
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
@@ -495,6 +544,25 @@ struct LeaderboardView: View {
             withAnimation(.easeInOut(duration: 0.18)) { sortKey = key }
         } label: {
             Text(key.rawValue)
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(active ? Self.starTint : Color(white: 0.55))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(active ? Self.controlPill : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// One segment of the Roll Up sort selector (Height / Time).  Changing it
+    /// re-fetches with the matching server order (see `load`).
+    private func rollUpSortSegment(_ s: RollUpSort) -> some View {
+        let active = (rollUpSort == s)
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { rollUpSort = s }
+        } label: {
+            Text(s.rawValue)
                 .font(.system(.subheadline, design: .rounded).weight(.bold))
                 .foregroundStyle(active ? Self.starTint : Color(white: 0.55))
                 .padding(.horizontal, 18)
@@ -634,7 +702,10 @@ struct LeaderboardView: View {
                 rows = try await SocialClient.shared.fetchMinigameDifficultyLeaderboard(
                     game: game, difficulty: diff)
             } else {
-                rows = try await SocialClient.shared.fetchLeaderboard(order: selectedBoard.order)
+                // Roll Up swaps in its Height/Time order; every other board uses
+                // its fixed server order.
+                let order = selectedBoard == .rollUp ? rollUpSort.order : selectedBoard.order
+                rows = try await SocialClient.shared.fetchLeaderboard(order: order)
             }
         } catch {
             errorText = "The ranking server is unreachable right now. Pull to refresh or try again."
