@@ -867,6 +867,9 @@ struct HomeView: View {
         } else if id == "disco" {
             statChip(icon: "circle.grid.3x3.fill",
                      value: shortCount(gameState.minigameBests["disco", default: 0]), caption: "best")
+        } else if id == "rollup" {
+            statChip(icon: "arrow.up.circle.fill",
+                     value: shortCount(gameState.rollupBest), caption: "m")
         } else if gameState.currentMode.section == .competitive {
             let w = gameState.minigameWins[id] ?? 0
             statChip(icon: "trophy.fill", value: "\(w)", caption: w == 1 ? "win" : "wins")
