@@ -47,7 +47,10 @@ enum ZenPattern: String, CaseIterable, Identifiable {
     }
 
     /// The ball's position along this pattern at `progress`, in `size`'s
-    /// coordinates.  Walks the space-filling polyline at constant speed.
+    /// coordinates.  The path is one FIXED, CLOSED, continuous loop (its last
+    /// point equals its first), so as `progress` wraps the ball rolls straight
+    /// through the seam — it is never picked up or teleported.  One loop lays
+    /// the whole pattern; the ball then keeps rolling the same grooves.
     func point(progress: Double, in size: CGSize) -> CGPoint {
         let pts = pathPoints(in: size)
         guard pts.count > 1 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
@@ -69,64 +72,74 @@ enum ZenPattern: String, CaseIterable, Identifiable {
         return pts[pts.count - 1]
     }
 
-    /// One full-coverage pass as a polyline in `size`'s pixel space.
+    /// The pattern as one closed polyline in `size`'s pixel space.
     func pathPoints(in size: CGSize) -> [CGPoint] {
         let w = Double(size.width), h = Double(size.height)
-        let m = min(w, h) * 0.075
+        let m = min(w, h) * 0.03             // small margin; the border fills the rest
         let x0 = m, y0 = m, x1 = w - m, y1 = h - m
-        let gap = min(w, h) * 0.12            // spacing between raked lanes
+        // Wide (≈ ball-width) grooves need wide spacing so they read as distinct
+        // rake lines.  Rows fill from a loose first pass down to `combGap/N`; the
+        // spiral lays its rings directly at the final spacing.
         switch self {
-        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: true)
-        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: false)
-        case .spiral:  return Self.rectSpiral(x0, y0, x1, y1, gap: gap)
+        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: min(w, h) * 0.39, horizontal: true)
+        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: min(w, h) * 0.39, horizontal: false)
+        case .spiral:  return Self.spiral(x0, y0, x1, y1, gap: min(w, h) * 0.10)
         }
     }
 
-    /// Boustrophedon (back-and-forth lanes) with rounded U-turns.  `horizontal`
-    /// sweeps left/right down the rows; the vertical form is the same path
-    /// transposed, so columns get identical even spacing.
+    /// Passes before the fill repeats.  Each pass is a full even comb, offset
+    /// perpendicular by `gap/N` from the last, so the final groove spacing is
+    /// `gap/N` (chosen so the broad grooves sit distinct with a sand ridge
+    /// between) and no line is retraced until the garden is full.
+    private static let fillPasses = 4
+
+    /// Comb evenly DOWN, then shift `gap/N` and comb evenly UP into the gaps,
+    /// then shift and comb down, … — `N` adjacent-row passes forming ONE
+    /// continuous CLOSED loop.  Every pass lays fresh grooves between the
+    /// previous pass's rows (no retrace), the connections between rows are all
+    /// ≤ `gap` (the ball only ever rolls — never a pick-up), and the loop closes
+    /// seamlessly.  `horizontal` = rows; columns is the same path transposed.
     private static func serpentine(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
                                    gap: Double, horizontal: Bool) -> [CGPoint] {
         if !horizontal {
             return serpentine(y0, x0, y1, x1, gap: gap, horizontal: true).map { CGPoint(x: $0.y, y: $0.x) }
         }
+        let n = fillPasses
+        let lanesPerPass = Int((y1 - y0) / gap) + 1          // fixed → controls sweep parity
         var pts: [CGPoint] = []
-        let span = y1 - y0
-        let lanes = max(2, Int((span / gap).rounded()) + 1)
-        let g = span / Double(lanes - 1)
-        let r = g / 2
-        for i in 0..<lanes {
-            let y = y0 + Double(i) * g
-            let ltr = i % 2 == 0
-            pts.append(CGPoint(x: ltr ? x0 : x1, y: y))
-            pts.append(CGPoint(x: ltr ? x1 : x0, y: y))
-            if i < lanes - 1 {                          // rounded U-turn into the next lane
-                let xEdge = ltr ? x1 : x0
-                let sign  = ltr ? 1.0 : -1.0
-                let yc = y + r
-                for k in 1...10 {
-                    let th = -Double.pi / 2 + Double.pi * Double(k) / 10
-                    pts.append(CGPoint(x: xEdge + sign * r * cos(th), y: yc + r * sin(th)))
-                }
+        var atLeft = true
+        for k in 0..<n {
+            let off = Double(k) * gap / Double(n)
+            let down = k % 2 == 0
+            var lanes = (0..<lanesPerPass).map { y0 + off + Double($0) * gap }
+            if !down { lanes.reverse() }
+            for y in lanes {
+                pts.append(CGPoint(x: atLeft ? x0 : x1, y: y))
+                pts.append(CGPoint(x: atLeft ? x1 : x0, y: y))
+                atLeft.toggle()
             }
         }
+        pts.append(CGPoint(x: atLeft ? x0 : x1, y: y0))      // parity-robust close to the start
+        pts.append(CGPoint(x: x0, y: y0))
         return pts
     }
 
-    /// Rectangular concentric spiral, worked inward from the outer edge.
-    private static func rectSpiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
-                                   gap: Double) -> [CGPoint] {
-        var pts: [CGPoint] = [CGPoint(x: x0, y: y0)]
-        var (a, b, c, d) = (x0, y0, x1, y1)
+    /// A CLOSED rectangular spiral that winds IN to the centre (covering the
+    /// middle) then back OUT to the start — one continuous loop at ring spacing
+    /// `gap`, no pick-up, no un-raked core.
+    private static func spiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
+                               gap: Double) -> [CGPoint] {
+        var inp: [CGPoint] = []
+        var a = x0, b = y0, c = x1, d = y1
+        inp.append(CGPoint(x: a, y: b))
         while c - a > gap && d - b > gap {
-            pts.append(CGPoint(x: c, y: b))
-            pts.append(CGPoint(x: c, y: d))
-            pts.append(CGPoint(x: a, y: d))
-            pts.append(CGPoint(x: a, y: b + gap))
+            inp.append(CGPoint(x: c, y: b)); inp.append(CGPoint(x: c, y: d))
+            inp.append(CGPoint(x: a, y: d)); inp.append(CGPoint(x: a, y: b + gap))
             a += gap; b += gap; c -= gap; d -= gap
-            pts.append(CGPoint(x: a, y: b))
+            inp.append(CGPoint(x: a, y: b))
         }
-        return pts
+        inp.append(CGPoint(x: c, y: b)); inp.append(CGPoint(x: c, y: d))   // innermost covers the centre
+        return inp + Array(inp.dropLast().reversed())        // in, then back out to close
     }
 }
 
