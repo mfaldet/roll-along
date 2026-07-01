@@ -284,9 +284,9 @@ struct HomeView: View {
                 .zIndex(launching ? 60 : 0)
 
                 VStack(spacing: 0) {
-                    // Hug the top pills — the greeting + title sit right
-                    // below the lives / coins indicators.
-                    Spacer().frame(height: 48)
+                    // Sit below the top pills with a little breathing room so the
+                    // greeting + title don't feel crowded against them.
+                    Spacer().frame(height: 64)
 
                     greeting
                         .homeBallCollider()
