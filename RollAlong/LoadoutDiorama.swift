@@ -22,6 +22,23 @@ struct Loadout: Equatable {
     }
 }
 
+extension Loadout {
+    /// Build a preview Loadout from a CosmeticBundle: the first cosmetic in each
+    /// slot the bundle defines, falling back to the starter/classic look for any
+    /// slot it omits (e.g. Planets carries only balls).  Bundles carry no
+    /// boundary, so the boundary is always the classic wall.
+    init(bundle: CosmeticBundle) {
+        self.init(
+            ball:     bundle.balls.first  ?? .red,
+            trail:    bundle.trails.first ?? .graphite,
+            goal:     bundle.goals.first  ?? .target,
+            floor:    bundle.floors.first ?? .classic,
+            pit:      bundle.pits.first   ?? .classic,
+            boundary: .classic
+        )
+    }
+}
+
 // ===========================================================================
 // LoadoutDiorama — a small, looping diorama of a loadout "in action".
 //
