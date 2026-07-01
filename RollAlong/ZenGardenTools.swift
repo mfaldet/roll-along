@@ -47,20 +47,18 @@ enum ZenPattern: String, CaseIterable, Identifiable {
     }
 
     /// The ball's position along this pattern at `progress`, in `size`'s
-    /// coordinates.  `progress` counts full coverages; each successive lap is
-    /// shifted a golden-ratio fraction of a lane (perpendicular to the grooves)
-    /// so the rake never retraces the same line — it fills the ridges between
-    /// lanes, densifying toward a fully-raked, touching-groove garden.
+    /// coordinates.  The path is one FIXED, CLOSED, continuous loop (its last
+    /// point equals its first), so as `progress` wraps the ball rolls straight
+    /// through the seam — it is never picked up or teleported.  One loop lays
+    /// the whole pattern; the ball then keeps rolling the same grooves.
     func point(progress: Double, in size: CGSize) -> CGPoint {
-        let lap = progress.rounded(.down)
-        var u = progress - lap
-        if u < 0 { u += 1 }
-        let offsetFrac = (lap * 0.6180339887498949).truncatingRemainder(dividingBy: 1)
-        let pts = pathPoints(in: size, offsetFrac: offsetFrac)
+        let pts = pathPoints(in: size)
         guard pts.count > 1 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
         var total: CGFloat = 0
         for i in 1..<pts.count { total += hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) }
         guard total > 0 else { return pts[0] }
+        var u = progress.truncatingRemainder(dividingBy: 1)
+        if u < 0 { u += 1 }
         var target = CGFloat(u) * total
         for i in 1..<pts.count {
             let seg = hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
@@ -74,68 +72,71 @@ enum ZenPattern: String, CaseIterable, Identifiable {
         return pts[pts.count - 1]
     }
 
-    /// One pass as a polyline in `size`'s pixel space.  `offsetFrac` (0…1)
-    /// shifts the lanes/rings perpendicular by that fraction of a gap so each
-    /// lap lays fresh grooves in the ridges rather than retracing.
-    func pathPoints(in size: CGSize, offsetFrac: Double = 0) -> [CGPoint] {
+    /// The pattern as one closed polyline in `size`'s pixel space.
+    func pathPoints(in size: CGSize) -> [CGPoint] {
         let w = Double(size.width), h = Double(size.height)
         let m = min(w, h) * 0.075
         let x0 = m, y0 = m, x1 = w - m, y1 = h - m
         let gap = min(w, h) * 0.05            // tight rake-tine spacing
-        let off = gap * offsetFrac
         switch self {
-        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: gap, offset: off, horizontal: true)
-        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: gap, offset: off, horizontal: false)
-        case .spiral:  return Self.rectSpiral(x0, y0, x1, y1, gap: gap, offset: off)
+        case .rows:    return Self.comb(x0, y0, x1, y1, gap: gap, horizontal: true)
+        case .columns: return Self.comb(x0, y0, x1, y1, gap: gap, horizontal: false)
+        case .spiral:  return Self.spiral(x0, y0, x1, y1, gap: gap)
         }
     }
 
-    /// Boustrophedon (back-and-forth lanes) with rounded U-turns, at a FIXED
-    /// `gap`, the first lane `offset` in from the top.  `horizontal` sweeps
-    /// left/right down the rows; the vertical form is the same path transposed.
-    private static func serpentine(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
-                                   gap: Double, offset: Double, horizontal: Bool) -> [CGPoint] {
+    /// A CLOSED comb: sweep the even lanes top-to-bottom, then the odd lanes
+    /// back up, then close to the start.  Every lane is raked once (no retrace)
+    /// at spacing `gap`, and the whole thing is one continuous loop — the ball
+    /// rolls it forever without a single pick-up.  `horizontal` = rows; the
+    /// vertical form (columns) is the same path transposed.
+    private static func comb(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
+                             gap: Double, horizontal: Bool) -> [CGPoint] {
         if !horizontal {
-            return serpentine(y0, x0, y1, x1, gap: gap, offset: offset, horizontal: true).map { CGPoint(x: $0.y, y: $0.x) }
+            return comb(y0, x0, y1, x1, gap: gap, horizontal: true).map { CGPoint(x: $0.y, y: $0.x) }
         }
-        var pts: [CGPoint] = []
-        let r = gap / 2
-        var y = y0 + offset
-        var i = 0
-        while y <= y1 + 0.01 {
-            let ltr = i % 2 == 0
-            pts.append(CGPoint(x: ltr ? x0 : x1, y: y))
-            pts.append(CGPoint(x: ltr ? x1 : x0, y: y))
-            let ny = y + gap
-            if ny <= y1 + 0.01 {                        // rounded U-turn into the next lane
-                let xEdge = ltr ? x1 : x0
-                let sign  = ltr ? 1.0 : -1.0
-                let yc = y + r
-                for k in 1...8 {
-                    let th = -Double.pi / 2 + Double.pi * Double(k) / 8
-                    pts.append(CGPoint(x: xEdge + sign * r * cos(th), y: yc + r * sin(th)))
-                }
-            }
-            y = ny
-            i += 1
+        let n = Int((y1 - y0) / gap + 1e-9)
+        func yl(_ i: Int) -> Double { y0 + Double(i) * gap }
+        var evens: [Int] = [], odds: [Int] = []
+        for i in 0...n { if i % 2 == 0 { evens.append(i) } else { odds.append(i) } }
+        var pts: [CGPoint] = [CGPoint(x: x0, y: yl(evens[0]))]
+        var atRight = false
+        for k in 0..<evens.count {                          // down the even lanes
+            let y = yl(evens[k]); let t = atRight ? x0 : x1
+            pts.append(CGPoint(x: t, y: y)); atRight.toggle()
+            if k < evens.count - 1 { pts.append(CGPoint(x: t, y: yl(evens[k + 1]))) }
         }
+        for i in odds.reversed() {                          // up the odd lanes (the ridges)
+            let y = yl(i); let cx = pts[pts.count - 1].x
+            pts.append(CGPoint(x: cx, y: y))
+            let t = atRight ? x0 : x1
+            pts.append(CGPoint(x: t, y: y)); atRight.toggle()
+        }
+        let endX = pts[pts.count - 1].x                     // parity-robust close to the start
+        pts.append(CGPoint(x: endX, y: y0))
+        pts.append(CGPoint(x: x0, y: y0))
         return pts
     }
 
-    /// Rectangular concentric spiral inward, its outer ring inset by `offset`.
-    private static func rectSpiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
-                                   gap: Double, offset: Double) -> [CGPoint] {
-        var (a, b, c, d) = (x0 + offset, y0 + offset, x1 - offset, y1 - offset)
-        var pts: [CGPoint] = [CGPoint(x: a, y: b)]
+    /// A CLOSED rectangular spiral that winds IN to the centre (covering the
+    /// middle) then retraces back OUT to the start — one continuous loop, no
+    /// pick-up, no un-raked core.
+    private static func spiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
+                               gap: Double) -> [CGPoint] {
+        var inp: [CGPoint] = []
+        var a = x0, b = y0, c = x1, d = y1
+        inp.append(CGPoint(x: a, y: b))
         while c - a > gap && d - b > gap {
-            pts.append(CGPoint(x: c, y: b))
-            pts.append(CGPoint(x: c, y: d))
-            pts.append(CGPoint(x: a, y: d))
-            pts.append(CGPoint(x: a, y: b + gap))
+            inp.append(CGPoint(x: c, y: b))
+            inp.append(CGPoint(x: c, y: d))
+            inp.append(CGPoint(x: a, y: d))
+            inp.append(CGPoint(x: a, y: b + gap))
             a += gap; b += gap; c -= gap; d -= gap
-            pts.append(CGPoint(x: a, y: b))
+            inp.append(CGPoint(x: a, y: b))
         }
-        return pts
+        inp.append(CGPoint(x: c, y: b))
+        inp.append(CGPoint(x: c, y: d))                     // innermost sweep covers the centre
+        return inp + Array(inp.dropLast().reversed())       // in, then back out to close
     }
 }
 
