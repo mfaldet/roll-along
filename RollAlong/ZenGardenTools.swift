@@ -6,10 +6,11 @@ import SwiftUI
 // ball, this file owns the types, the bottom-right dropdown UI, and the prop
 // rendering so the shared engine stays lean.
 //
-//   • ZenPattern  — parametric auto-track paths (circle, figure-8, spiral,
-//                   rose, square).  BallGameView advances a phase each tick and
-//                   reads `point(phase:in:)` to drive the ball along the path.
-//   • ZenSpeed    — how fast the phase advances on an auto-track.
+//   • ZenPattern  — full-coverage auto-track paths (rows, columns, spiral).
+//                   BallGameView advances a progress each tick and reads
+//                   `point(progress:in:)` to drive the ball along the path.
+//   • ZenSpeedBar — continuous drag bar (upper-right) that sets how fast the
+//                   auto-track advances.
 //   • ZenItem     — placeable decorations (stones, pavers, bonsai, lantern…).
 //   • ZenToolsOverlay — the bottom-right "drop down" button that pops a list of
 //                   tools above it (wind ▸ pattern ▸ tree), each with its own
@@ -19,114 +20,114 @@ import SwiftUI
 
 // MARK: - Pattern
 
-/// Parametric auto-track paths.  `phase` is an angle in radians advanced over
-/// time; one full loop is 2π.  Returns a point in arena (point) coordinates.
+/// Full-coverage auto-track paths.  Each pattern is one LARGE space-filling
+/// rake sweep that spans the whole garden with evenly spaced lanes and minimal
+/// retracing — the geometric "lawn-mowing" look — not a small motif.  `progress`
+/// counts full coverages (integer part = passes done, fraction = position along
+/// the current pass); the polyline is arc-length parametrised so the ball moves
+/// at an even pace.  Speed is set separately by the ZenSpeedBar.
 enum ZenPattern: String, CaseIterable, Identifiable {
-    case circle, figureEight, spiral, rose, square
+    case rows, columns, spiral
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .circle:      return "Circle"
-        case .figureEight: return "Figure 8"
-        case .spiral:      return "Spiral"
-        case .rose:        return "Rose"
-        case .square:      return "Square"
+        case .rows:    return "Rows"
+        case .columns: return "Columns"
+        case .spiral:  return "Spiral"
         }
     }
 
     var icon: String {
         switch self {
-        case .circle:      return "circle"
-        case .figureEight: return "infinity"
-        case .spiral:      return "hurricane"
-        case .rose:        return "camera.macro"
-        case .square:      return "square"
+        case .rows:    return "line.3.horizontal"
+        case .columns: return "rectangle.split.3x1"
+        case .spiral:  return "hurricane"
         }
     }
 
-    /// The ball's position on this path at `phase`, centred in `size`.
-    ///
-    /// Each pattern is a fast LOCAL motif (its signature shape) riding a slow
-    /// full-screen DRIFT.  The drift is a Lissajous sweep whose two frequencies
-    /// are in the golden ratio — an irrational ratio, so the trajectory never
-    /// exactly repeats and is *dense* in the screen rectangle.  Left running,
-    /// every pattern therefore eventually rakes the entire garden (a space-
-    /// filling sweep, in the spirit of the requested fractal fill) rather than
-    /// retracing one closed loop forever.
-    func point(phase: Double, in size: CGSize) -> CGPoint {
-        let w = Double(size.width), h = Double(size.height)
-        let brushR = min(w, h) * 0.14            // size of the local motif
-        let margin = brushR + 10
-        let ampX = max(0, w / 2 - margin)
-        let ampY = max(0, h / 2 - margin)
-
-        // Slow drift across the whole interior.  φ = golden ratio makes the two
-        // axes incommensurate → dense (eventually visits everywhere).
-        let drift = 0.20
-        let phi   = 1.6180339887498949
-        let cx = w / 2 + ampX * sin(phase * drift)
-        let cy = h / 2 + ampY * sin(phase * drift * phi + .pi / 2)
-
-        // Fast local motif — stamped as the drift carries it across the sand.
-        let a = phase * 5
-        let m = motif(a, r: brushR)
-        return CGPoint(x: CGFloat(cx + m.dx), y: CGFloat(cy + m.dy))
+    /// The ball's position along this pattern at `progress`, in `size`'s
+    /// coordinates.  Walks the space-filling polyline at constant speed.
+    func point(progress: Double, in size: CGSize) -> CGPoint {
+        let pts = pathPoints(in: size)
+        guard pts.count > 1 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        var total: CGFloat = 0
+        for i in 1..<pts.count { total += hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) }
+        guard total > 0 else { return pts[0] }
+        var u = progress.truncatingRemainder(dividingBy: 1)
+        if u < 0 { u += 1 }
+        var target = CGFloat(u) * total
+        for i in 1..<pts.count {
+            let seg = hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+            if target <= seg {
+                let t = seg > 0 ? target / seg : 0
+                return CGPoint(x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t,
+                               y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t)
+            }
+            target -= seg
+        }
+        return pts[pts.count - 1]
     }
 
-    /// The pattern's signature shape as an (dx, dy) offset from the drifting
-    /// centre, at brush radius `r`.
-    private func motif(_ a: Double, r: Double) -> (dx: Double, dy: Double) {
+    /// One full-coverage pass as a polyline in `size`'s pixel space.
+    func pathPoints(in size: CGSize) -> [CGPoint] {
+        let w = Double(size.width), h = Double(size.height)
+        let m = min(w, h) * 0.075
+        let x0 = m, y0 = m, x1 = w - m, y1 = h - m
+        let gap = min(w, h) * 0.12            // spacing between raked lanes
         switch self {
-        case .circle:
-            return (r * cos(a), r * sin(a))
-        case .figureEight:
-            return (r * sin(a), r * 0.6 * sin(2 * a))
-        case .spiral:
-            // Spiral out then back in over 3 turns (triangle wave on radius).
-            let turns = 3.0
-            let frac = (a / (2 * .pi * turns)).truncatingRemainder(dividingBy: 1.0)
-            let tri = 1 - abs(2 * frac - 1)                 // 0→1→0
-            let rr = r * (0.15 + 0.85 * tri)
-            return (rr * cos(a), rr * sin(a))
-        case .rose:
-            let rr = r * cos(2 * a)                          // 4-petal rosette
-            return (rr * cos(a), rr * sin(a))
-        case .square:
-            // Walk the perimeter of a square of half-size r, one lap per 2π.
-            let s = (a / (2 * .pi)).truncatingRemainder(dividingBy: 1.0)
-            let seg = s * 4
-            let side = Int(seg)
-            let f = seg - Double(side)
-            switch side {
-            case 0:  return (-r + 2 * r * f, -r)            // top L→R
-            case 1:  return ( r,             -r + 2 * r * f) // right ↓
-            case 2:  return ( r - 2 * r * f,  r)            // bottom R→L
-            default: return (-r,              r - 2 * r * f) // left ↑
+        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: true)
+        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: false)
+        case .spiral:  return Self.rectSpiral(x0, y0, x1, y1, gap: gap)
+        }
+    }
+
+    /// Boustrophedon (back-and-forth lanes) with rounded U-turns.  `horizontal`
+    /// sweeps left/right down the rows; the vertical form is the same path
+    /// transposed, so columns get identical even spacing.
+    private static func serpentine(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
+                                   gap: Double, horizontal: Bool) -> [CGPoint] {
+        if !horizontal {
+            return serpentine(y0, x0, y1, x1, gap: gap, horizontal: true).map { CGPoint(x: $0.y, y: $0.x) }
+        }
+        var pts: [CGPoint] = []
+        let span = y1 - y0
+        let lanes = max(2, Int((span / gap).rounded()) + 1)
+        let g = span / Double(lanes - 1)
+        let r = g / 2
+        for i in 0..<lanes {
+            let y = y0 + Double(i) * g
+            let ltr = i % 2 == 0
+            pts.append(CGPoint(x: ltr ? x0 : x1, y: y))
+            pts.append(CGPoint(x: ltr ? x1 : x0, y: y))
+            if i < lanes - 1 {                          // rounded U-turn into the next lane
+                let xEdge = ltr ? x1 : x0
+                let sign  = ltr ? 1.0 : -1.0
+                let yc = y + r
+                for k in 1...10 {
+                    let th = -Double.pi / 2 + Double.pi * Double(k) / 10
+                    pts.append(CGPoint(x: xEdge + sign * r * cos(th), y: yc + r * sin(th)))
+                }
             }
         }
+        return pts
     }
-}
 
-/// How fast an auto-track advances (radians / second).
-enum ZenSpeed: String, CaseIterable, Identifiable {
-    case slow, medium, fast
-    var id: String { rawValue }
-    var rate: Double {
-        switch self {
-        case .slow:   return 0.5
-        case .medium: return 1.0
-        case .fast:   return 1.9
+    /// Rectangular concentric spiral, worked inward from the outer edge.
+    private static func rectSpiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
+                                   gap: Double) -> [CGPoint] {
+        var pts: [CGPoint] = [CGPoint(x: x0, y: y0)]
+        var (a, b, c, d) = (x0, y0, x1, y1)
+        while c - a > gap && d - b > gap {
+            pts.append(CGPoint(x: c, y: b))
+            pts.append(CGPoint(x: c, y: d))
+            pts.append(CGPoint(x: a, y: d))
+            pts.append(CGPoint(x: a, y: b + gap))
+            a += gap; b += gap; c -= gap; d -= gap
+            pts.append(CGPoint(x: a, y: b))
         }
+        return pts
     }
-    var icon: String {
-        switch self {
-        case .slow:   return "tortoise.fill"
-        case .medium: return "figure.walk"
-        case .fast:   return "hare.fill"
-        }
-    }
-    var label: String { rawValue.capitalized }
 }
 
 // MARK: - Decorations
@@ -281,7 +282,6 @@ struct ZenToolsOverlay: View {
     @Binding var menuOpen: Bool
     @Binding var submenu: ZenSubmenu
     @Binding var pattern: ZenPattern?
-    @Binding var speed: ZenSpeed
     @Binding var placingItem: ZenItem?
     let haptics: Bool
     let onSmoothSand: () -> Void
@@ -338,11 +338,6 @@ struct ZenToolsOverlay: View {
                 // Stop the auto-track (back to manual roll).
                 optionButton(icon: "stop.fill", on: pattern == nil, tint: Color(red: 0.85, green: 0.4, blue: 0.35)) {
                     tap(); pattern = nil
-                }
-            }
-            HStack(spacing: 8) {
-                ForEach(ZenSpeed.allCases) { s in
-                    optionButton(icon: s.icon, on: speed == s) { tap(); speed = s }
                 }
             }
         }
@@ -432,6 +427,50 @@ struct ZenToolsOverlay: View {
     }
 
     private func tap() { if haptics { Haptics.soft() } }
+}
+
+/// Continuous speed control for the auto-track — a vertical drag bar on the
+/// upper-right.  Drag up to send the rake faster along its pattern, down to
+/// slow it.  Shown only while a pattern is running.
+struct ZenSpeedBar: View {
+    @Binding var fraction: Double        // 0 = slow, 1 = fast
+    let haptics: Bool
+
+    private let sand = Color(red: 0.52, green: 0.43, blue: 0.28)
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "hare.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(sand)
+            GeometryReader { geo in
+                let h = geo.size.height
+                ZStack(alignment: .bottom) {
+                    Capsule().fill(Color(white: 1.0, opacity: 0.85))
+                    Capsule()
+                        .fill(Color(red: 0.34, green: 0.60, blue: 0.42))
+                        .frame(height: max(14, h * CGFloat(fraction)))
+                }
+                .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { v in
+                            let f = 1 - Double(v.location.y / max(h, 1))
+                            let clamped = min(max(f, 0), 1)
+                            if haptics && abs(clamped - fraction) > 0.1 { Haptics.soft() }
+                            fraction = clamped
+                        }
+                )
+            }
+            .frame(width: 12)
+            Image(systemName: "tortoise.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(sand)
+        }
+        .frame(height: 210)
+        .accessibilityLabel("Auto-track speed")
+    }
 }
 
 /// Which tool sub-panel is showing in the Zen dropdown.

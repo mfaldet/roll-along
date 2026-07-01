@@ -157,9 +157,10 @@ struct BallGameView: View {
     @State private var zenSubmenu:    ZenSubmenu = .none
     /// Active auto-track pattern, or nil for manual touch-roll.
     @State private var zenPattern:    ZenPattern? = nil
-    /// How fast the auto-track advances.
-    @State private var zenSpeed:      ZenSpeed = .medium
-    /// Phase along the active pattern (radians), advanced each tick.
+    /// Auto-track speed as a 0…1 fraction (set by the ZenSpeedBar), mapped to a
+    /// pattern-advance rate in the tick.  Replaces the old discrete ZenSpeed.
+    @State private var zenSpeedFraction: Double = 0.3
+    /// Progress along the active pattern (full coverages), advanced each tick.
     @State private var zenPatternPhase = 0.0
     /// Currently-selected prop to drop on the next garden tap (nil = none).
     @State private var zenPlacingItem: ZenItem? = nil
@@ -782,13 +783,24 @@ struct BallGameView: View {
                         menuOpen:    $zenMenuOpen,
                         submenu:     $zenSubmenu,
                         pattern:     $zenPattern,
-                        speed:       $zenSpeed,
                         placingItem: $zenPlacingItem,
                         haptics:     gameState.hapticsEnabled,
                         onSmoothSand: { smoothSand() },
                         onClearItems: { zenDecorations.removeAll() }
                     )
                     .padding(.bottom, geo.safeAreaInsets.bottom)
+                }
+
+                // Continuous auto-track speed — a vertical drag bar on the upper
+                // half of the right edge, shown only while a pattern is running.
+                if usesSandTrail && zenPattern != nil && !zenTouching {
+                    HStack {
+                        Spacer()
+                        ZenSpeedBar(fraction: $zenSpeedFraction, haptics: gameState.hapticsEnabled)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, geo.safeAreaInsets.top + 54)
+                    .padding(.trailing, 18)
                 }
 
                 if showWelcomeMoment       { welcomeMomentOverlay }
@@ -842,6 +854,9 @@ struct BallGameView: View {
             if phase == .background { clock.stop(); motion.stop() }
             else if phase == .active && self.phase == .playing { clock.start(); motion.start() }
         }
+        // Start each newly-selected auto-track from its origin (top-left / outer
+        // corner) so the pattern lays down cleanly rather than mid-sweep.
+        .onChange(of: zenPattern) { _, _ in zenPatternPhase = 0 }
     }
 
     // MARK: - Border
@@ -3375,19 +3390,26 @@ struct BallGameView: View {
         if d > 90 { lastSandPoint = p; return }
 
         let fmt = UIGraphicsImageRendererFormat.default()
-        fmt.scale = 1            // point-resolution — plenty for a soft groove, cheap to redraw
+        fmt.scale = 2            // retina-ish: crisp groove edges without the full 3× redraw cost
         fmt.opaque = false
         let img = UIGraphicsImageRenderer(size: size, format: fmt).image { rc in
             sandAccumImage?.draw(at: .zero)
             let cg = rc.cgContext
             cg.setLineCap(.round); cg.setLineJoin(.round)
-            // Soft wide depression…
-            cg.setStrokeColor(UIColor(red: 0.40, green: 0.32, blue: 0.22, alpha: 0.22).cgColor)
-            cg.setLineWidth(7.0)
+            // OPAQUE strokes (alpha 1): each move bakes ONE short segment onto the
+            // accumulating image, and consecutive round caps overlap at every
+            // joint.  With translucent strokes that overlap stacks alpha into a
+            // dark bead every few px, so the groove reads as a dotted/dashed
+            // line.  Opaque colours (sitting just off the warm-sand bed
+            // 0.90,0.78,0.55) overwrite instead of stacking, so the furrow is a
+            // single continuous carved line.
+            // Soft darker depression…
+            cg.setStrokeColor(UIColor(red: 0.75, green: 0.63, blue: 0.43, alpha: 1.0).cgColor)
+            cg.setLineWidth(9.0)
             cg.move(to: last); cg.addLine(to: p); cg.strokePath()
-            // …under a thin pale carved highlight.
-            cg.setStrokeColor(UIColor(red: 0.96, green: 0.91, blue: 0.80, alpha: 0.55).cgColor)
-            cg.setLineWidth(2.6)
+            // …with a crisp pale carved centre.
+            cg.setStrokeColor(UIColor(red: 0.98, green: 0.92, blue: 0.76, alpha: 1.0).cgColor)
+            cg.setLineWidth(3.2)
             cg.move(to: last); cg.addLine(to: p); cg.strokePath()
         }
         sandAccumImage = img
@@ -5050,8 +5072,11 @@ struct BallGameView: View {
         //     garden (manual roll falls through to the normal tilt physics).
         if usesSandTrail {
             if let pattern = zenPattern {
-                zenPatternPhase += zenSpeed.rate * Double(dt)
-                let p = pattern.point(phase: zenPatternPhase, in: geoSize)
+                // Map the 0…1 speed fraction to coverages-per-second (~one full
+                // pass every ~65s slow → ~9s fast).
+                let rate = 0.015 + 0.10 * zenSpeedFraction
+                zenPatternPhase += rate * Double(dt)
+                let p = pattern.point(progress: zenPatternPhase, in: geoSize)
                 b.position = p
                 b.velocity = .zero
                 ball = b
