@@ -1298,13 +1298,20 @@ struct CosmeticShopView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Each cosmetic in the set.
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(bundleDetailRows(bundle)) { collectionItemRow($0) }
+                // Each cosmetic in the set (left) beside a live diorama of the
+                // whole loadout in action (right) — the same "list + illustrate"
+                // format as the profile's My Loadout.
+                HStack(alignment: .top, spacing: 12) {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(bundleDetailRows(bundle)) { collectionItemRow($0) }
+                        }
                     }
+                    .frame(maxHeight: 250)
+
+                    LoadoutDiorama(loadout: Loadout(bundle: bundle))
+                        .frame(width: 126, height: 250)
                 }
-                .frame(maxHeight: 300)
 
                 // Footer — purchase, or a complete badge if already owned.
                 if bundleOwned {

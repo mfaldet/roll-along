@@ -444,18 +444,14 @@ struct GameMenuView: View {
                 .foregroundStyle(Color(white: 0.6))
             }
             NavigationLink(value: HomeRoute.challengeTracks) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
-                          spacing: 12) {
-                    ForEach(packs, id: \.id) { packTile($0) }
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(white: 0.10))
-                        .overlay(RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(white: 0.20), lineWidth: 1))
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 20))
+                // A looping "video" that revolves through each pack's reward
+                // collection, shown as a live loadout diorama.
+                ChallengePackShowcase(entries: packShowcaseEntries)
+                    .frame(height: 158)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color(white: 0.20), lineWidth: 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 18))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("tracks")
@@ -463,26 +459,21 @@ struct GameMenuView: View {
         }
     }
 
-    /// One small illustrative tile in the Challenge Packs grid — the pack's glyph
-    /// on its gradient + its name.  Not individually tappable; the whole grid
-    /// navigates to the Challenge Tracks page.
-    private func packTile(_ track: ChallengeTrackMode) -> some View {
-        let s = Self.packStyle(for: track.trackID)
-        return VStack(spacing: 5) {
-            ZStack {
-                LinearGradient(colors: s.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-                Image(systemName: s.icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
-            }
-            .aspectRatio(1, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            Text(track.displayName)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(white: 0.72))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+    /// The challenge-pack collections the showcase cycles through: each track
+    /// paired with the loadout of the cosmetic bundle it unlocks, plus the pack's
+    /// glyph/accent for the corner chip.
+    private var packShowcaseEntries: [ChallengePackShowcase.Entry] {
+        packs.compactMap { track in
+            guard let bid = ChallengeTrackMode.rewardBundleID(for: track.trackID),
+                  let bundle = CosmeticBundle.catalogue.first(where: { $0.id == bid })
+            else { return nil }
+            let style = Self.packStyle(for: track.trackID)
+            return ChallengePackShowcase.Entry(
+                id:      track.trackID,
+                name:    track.displayName,
+                icon:    style.icon,
+                accent:  style.colors.first ?? .white,
+                loadout: Loadout(bundle: bundle))
         }
     }
 
@@ -604,5 +595,73 @@ struct GameMenuView: View {
         GameMenuView()
             .environmentObject(Navigator())
             .environmentObject(GameState())
+    }
+}
+
+// ===========================================================================
+// ChallengePackShowcase — a looping "video" for the Challenge Packs section:
+// it revolves through each pack's reward collection, cross-fading a live
+// LoadoutDiorama from one collection to the next every few seconds, with the
+// pack's name + glyph in the corner.  One shared clock drives the rotation.
+// ===========================================================================
+private struct ChallengePackShowcase: View {
+    struct Entry: Identifiable {
+        let id:      String
+        let name:    String
+        let icon:    String
+        let accent:  Color
+        let loadout: Loadout
+    }
+
+    let entries: [Entry]
+    /// Seconds each collection is shown before cross-fading to the next.
+    var slot: Double = 3.8
+
+    var body: some View {
+        if entries.isEmpty {
+            Color(white: 0.10)
+        } else {
+            TimelineView(.animation) { tl in
+                let count = entries.count
+                let pos   = tl.date.timeIntervalSinceReferenceDate / slot
+                let base  = pos.rounded(.down)
+                let i     = ((Int(base) % count) + count) % count
+                let frac  = pos - base                        // 0…1 within this slot
+                // Cross-fade to the next collection over the slot's final 16%.
+                let fadeStart = 0.84
+                let x = frac <= fadeStart ? 0.0
+                        : Double((frac - fadeStart) / (1 - fadeStart))
+                ZStack {
+                    Color.black
+                    cell(entries[i]).opacity(1 - x)
+                    if x > 0 { cell(entries[(i + 1) % count]).opacity(x) }
+                }
+            }
+        }
+    }
+
+    private func cell(_ e: Entry) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            LoadoutDiorama(loadout: e.loadout)
+
+            // Bottom scrim so the label reads over any floor colour.
+            LinearGradient(colors: [.clear, .black.opacity(0.55)],
+                           startPoint: .center, endPoint: .bottom)
+                .allowsHitTesting(false)
+
+            HStack(spacing: 7) {
+                Image(systemName: e.icon)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(e.accent.opacity(0.9)))
+                Text(e.name)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
+            }
+            .padding(12)
+        }
     }
 }
