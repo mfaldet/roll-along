@@ -188,7 +188,12 @@ final class StoreKitManager: ObservableObject {
             default: break
             }
         }
-        if unlimitedSeen   { gameState?.unlimitedLives = true; gameState?.grant(BallSkin.diamond) }
+        // The unlimited entitlement IS the source of truth: mirror it exactly, so
+        // removing the purchase (a refund, or deleting a StoreKit test transaction)
+        // turns unlimited lives back off on the next launch.  Only *grant* the
+        // Diamond ball when entitled — never revoke a cosmetic already owned.
+        gameState?.unlimitedLives = unlimitedSeen
+        if unlimitedSeen { gameState?.grant(BallSkin.diamond) }
         // Legacy: the Starter Pack IAP is retired (no longer sold).  Past
         // purchasers still get their Aurora skin back on restore (one-time) —
         // but NOT the 500 coins, which were a one-time consumable already spent.

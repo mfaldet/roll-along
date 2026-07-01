@@ -78,9 +78,9 @@ struct BuyLivesSheet: View {
         .preferredColorScheme(.dark)
         // Size the sheet to its content — Diamond Balls fully visible, no gap below.
         .presentationDetents([.height(fitHeight)])
-        // Diamond Balls owners see a grabber bar: the celebration has no buttons,
-        // so the bar signals "drag down (or tap above) to close".
-        .presentationDragIndicator(gameState.unlimitedLives ? .visible : .hidden)
+        // Grabber bar signals "drag down (or tap above) to close" — always shown,
+        // matching the Get Coins sheet.
+        .presentationDragIndicator(.visible)
         .onPreferenceChange(SheetFitHeightKey.self) { fitHeight = max($0, 200) }
         .onAppear { if !reduceMotion { celebrate = true } }
         .onChange(of: store.lastError) { _, err in purchaseError = err }
