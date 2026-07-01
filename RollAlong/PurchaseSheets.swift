@@ -93,20 +93,22 @@ struct BuyLivesSheet: View {
 
     private var header: some View {
         let unlimited = gameState.unlimitedLives
-        return HStack(spacing: 6) {
+        // Balls spread evenly across the full width (a Spacer after each), with
+        // the count at the right edge — no dead gap between the two.
+        return HStack(spacing: 0) {
             ForEach(0..<GameState.livesMax, id: \.self) { i in
                 // Diamond Balls owners: every slot is a filled diamond marble.
                 lifeMarble(filled: unlimited || i < gameState.displayedLives,
                            diamond: unlimited)
+                Spacer(minLength: 2)
             }
-            Spacer()
             if unlimited {
                 Image(systemName: "infinity")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(Self.diamondLifeGradient)
             } else {
                 Text("\(gameState.displayedLives) / \(GameState.livesMax)")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 17, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color(white: 0.75))
             }
         }
@@ -118,7 +120,7 @@ struct BuyLivesSheet: View {
     /// the familiar red ball here too instead of a flat disc.  An empty slot
     /// is a hollow outline, also matching the pill.
     private func lifeMarble(filled: Bool, diamond: Bool = false) -> some View {
-        let size: CGFloat = 18
+        let size: CGFloat = 20
         return ZStack {
             Circle()
                 .stroke(Color(white: 0.40).opacity(0.7), lineWidth: 1.0)
