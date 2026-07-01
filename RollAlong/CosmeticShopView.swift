@@ -48,6 +48,15 @@ private enum ShopCategory: String, CaseIterable, Identifiable {
 ///                  equip-owned only; purchasing happens in the Shop.
 enum ShopMode { case shop, catalog }
 
+/// Measures the collection popup's cosmetic-list height so the diorama beside it
+/// can match (list shows the whole set, no inner scroll).
+private struct DetailListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 /// Payload for the Catalog "where to buy" popup — shown when the player taps an
 /// unowned individual cosmetic (which isn't sold directly in the Catalog).
 private struct CatalogPurchaseInfo: Identifiable {
@@ -165,6 +174,9 @@ struct CosmeticShopView: View {
     @State private var bundleFilter: BundleFilter = .all
     /// Non-nil while the collection detail popup is open (tap a collection card).
     @State private var detailBundle: CosmeticBundle? = nil
+    /// Measured height of the popup's cosmetic list, so the diorama beside it
+    /// can match — the whole set stays visible with no inner scroll.
+    @State private var detailListHeight: CGFloat = 0
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
@@ -1298,20 +1310,24 @@ struct CosmeticShopView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Each cosmetic in the set (left) beside a live diorama of the
+                // Every cosmetic in the set (left) beside a live diorama of the
                 // whole loadout in action (right) — the same "list + illustrate"
-                // format as the profile's My Loadout.
+                // format as the profile's My Loadout.  The list shows the full
+                // set with no inner scroll; the diorama matches its height.
                 HStack(alignment: .top, spacing: 12) {
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            ForEach(bundleDetailRows(bundle)) { collectionItemRow($0) }
-                        }
+                    VStack(spacing: 8) {
+                        ForEach(bundleDetailRows(bundle)) { collectionItemRow($0) }
                     }
-                    .frame(maxHeight: 250)
+                    .frame(maxWidth: .infinity)
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: DetailListHeightKey.self,
+                                               value: g.size.height)
+                    })
 
                     LoadoutDiorama(loadout: Loadout(bundle: bundle))
-                        .frame(width: 126, height: 250)
+                        .frame(width: 126, height: max(180, detailListHeight))
                 }
+                .onPreferenceChange(DetailListHeightKey.self) { detailListHeight = $0 }
 
                 // Footer — purchase, or a complete badge if already owned.
                 if bundleOwned {
