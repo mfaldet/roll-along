@@ -565,6 +565,13 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Zen Garden — a permanent raked border framing the sand, filling
+                // the outer margin the rake pattern doesn't reach.
+                if usesSandTrail {
+                    zenBorderOverlay(size: geo.size)
+                        .allowsHitTesting(false)
+                }
+
                 // Zen Garden props (stones, bonsai…) — under the ball so the
                 // marble rolls over them.
                 if usesSandTrail {
@@ -1874,6 +1881,20 @@ struct BallGameView: View {
                           trail: gameState.equippedTrail,
                           t: Date().timeIntervalSinceReferenceDate,
                           times: trailTimes)
+        }
+    }
+
+    /// A permanent raked border framing the Zen sand — fills the outer margin
+    /// the rake pattern leaves.  Same carved look as the trail (soft depression
+    /// + pale carved centre); unaffected by "smooth sand".
+    private func zenBorderOverlay(size: CGSize) -> some View {
+        Canvas { ctx, _ in
+            let inset: CGFloat = 15
+            let rect = CGRect(x: inset, y: inset,
+                              width: size.width - 2 * inset, height: size.height - 2 * inset)
+            let frame = Path(roundedRect: rect, cornerRadius: 30)
+            ctx.stroke(frame, with: .color(Color(red: 0.69, green: 0.55, blue: 0.29)), lineWidth: 26)
+            ctx.stroke(frame, with: .color(Color(red: 0.98, green: 0.93, blue: 0.79)), lineWidth: 6)
         }
     }
 
@@ -3403,15 +3424,16 @@ struct BallGameView: View {
             // line.  Opaque colours (sitting just off the warm-sand bed
             // 0.90,0.78,0.55) overwrite instead of stacking, so the furrow is a
             // single continuous carved line.
-            // Thin so tightly-packed lanes stay DISTINCT rake lines (a rake's
-            // fine tines) instead of merging into a solid mass as offset laps
-            // fill in.  Soft darker depression…
+            // Groove roughly as wide as the ball (Ø ≈ 36pt) so the trail reads
+            // like the marble carved it.  The lane spacing is set wider to match,
+            // so the broad grooves stay DISTINCT with a sand ridge between them.
+            // Soft darker depression…
             cg.setStrokeColor(UIColor(red: 0.69, green: 0.55, blue: 0.29, alpha: 1.0).cgColor)
-            cg.setLineWidth(5.5)
+            cg.setLineWidth(26)
             cg.move(to: last); cg.addLine(to: p); cg.strokePath()
             // …with a crisp pale carved centre.
             cg.setStrokeColor(UIColor(red: 0.98, green: 0.93, blue: 0.79, alpha: 1.0).cgColor)
-            cg.setLineWidth(1.8)
+            cg.setLineWidth(6)
             cg.move(to: last); cg.addLine(to: p); cg.strokePath()
         }
         sandAccumImage = img
@@ -5077,7 +5099,7 @@ struct BallGameView: View {
                 // Map the 0…1 speed fraction to loops-per-second.  One loop is
                 // the full multi-pass fill (a long path), so the rate is small —
                 // the ball's visible pace stays calm (very slow → brisk).
-                let rate = 0.0015 + 0.012 * zenSpeedFraction
+                let rate = 0.008 + 0.04 * zenSpeedFraction
                 zenPatternPhase += rate * Double(dt)
                 let p = pattern.point(progress: zenPatternPhase, in: geoSize)
                 b.position = p

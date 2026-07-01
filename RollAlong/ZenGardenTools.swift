@@ -75,19 +75,22 @@ enum ZenPattern: String, CaseIterable, Identifiable {
     /// The pattern as one closed polyline in `size`'s pixel space.
     func pathPoints(in size: CGSize) -> [CGPoint] {
         let w = Double(size.width), h = Double(size.height)
-        let m = min(w, h) * 0.075
+        let m = min(w, h) * 0.03             // small margin; the border fills the rest
         let x0 = m, y0 = m, x1 = w - m, y1 = h - m
-        let gap = min(w, h) * 0.06            // first-pass row spacing (fills to gap/N)
+        // Wide (≈ ball-width) grooves need wide spacing so they read as distinct
+        // rake lines.  Rows fill from a loose first pass down to `combGap/N`; the
+        // spiral lays its rings directly at the final spacing.
         switch self {
-        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: true)
-        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: false)
-        case .spiral:  return Self.spiral(x0, y0, x1, y1, gap: gap)
+        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: min(w, h) * 0.39, horizontal: true)
+        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: min(w, h) * 0.39, horizontal: false)
+        case .spiral:  return Self.spiral(x0, y0, x1, y1, gap: min(w, h) * 0.10)
         }
     }
 
-    /// Passes before the fill repeats.  Each pass is a full even comb; each is
-    /// offset perpendicular by `gap/N` from the last, so the net groove spacing
-    /// is `gap/N` (touching) and no line is retraced until the garden is full.
+    /// Passes before the fill repeats.  Each pass is a full even comb, offset
+    /// perpendicular by `gap/N` from the last, so the final groove spacing is
+    /// `gap/N` (chosen so the broad grooves sit distinct with a sand ridge
+    /// between) and no line is retraced until the garden is full.
     private static let fillPasses = 4
 
     /// Comb evenly DOWN, then shift `gap/N` and comb evenly UP into the gaps,
@@ -121,34 +124,22 @@ enum ZenPattern: String, CaseIterable, Identifiable {
         return pts
     }
 
-    /// The spiral equivalent: wind IN to the centre, then (offset by `gap/N`)
-    /// wind back OUT through the ridges, in, out, … — `N` interleaved passes as
-    /// ONE continuous CLOSED loop.  Covers the middle, never retraces a ring
-    /// until full, and the ball is never picked up.
+    /// A CLOSED rectangular spiral that winds IN to the centre (covering the
+    /// middle) then back OUT to the start — one continuous loop at ring spacing
+    /// `gap`, no pick-up, no un-raked core.
     private static func spiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
                                gap: Double) -> [CGPoint] {
-        func ring(_ off: Double) -> [CGPoint] {
-            var p: [CGPoint] = []
-            var a = x0 + off, b = y0 + off, c = x1 - off, d = y1 - off
-            p.append(CGPoint(x: a, y: b))
-            while c - a > gap && d - b > gap {
-                p.append(CGPoint(x: c, y: b)); p.append(CGPoint(x: c, y: d))
-                p.append(CGPoint(x: a, y: d)); p.append(CGPoint(x: a, y: b + gap))
-                a += gap; b += gap; c -= gap; d -= gap
-                p.append(CGPoint(x: a, y: b))
-            }
-            p.append(CGPoint(x: c, y: b)); p.append(CGPoint(x: c, y: d))   // innermost covers the centre
-            return p
+        var inp: [CGPoint] = []
+        var a = x0, b = y0, c = x1, d = y1
+        inp.append(CGPoint(x: a, y: b))
+        while c - a > gap && d - b > gap {
+            inp.append(CGPoint(x: c, y: b)); inp.append(CGPoint(x: c, y: d))
+            inp.append(CGPoint(x: a, y: d)); inp.append(CGPoint(x: a, y: b + gap))
+            a += gap; b += gap; c -= gap; d -= gap
+            inp.append(CGPoint(x: a, y: b))
         }
-        let n = fillPasses
-        var path: [CGPoint] = []
-        for k in 0..<n {
-            var pass = ring(Double(k) * gap / Double(n))
-            if k % 2 == 1 { pass.reverse() }                 // wind OUT on alternate passes
-            path += pass
-        }
-        if let first = path.first { path.append(first) }     // close
-        return path
+        inp.append(CGPoint(x: c, y: b)); inp.append(CGPoint(x: c, y: d))   // innermost covers the centre
+        return inp + Array(inp.dropLast().reversed())        // in, then back out to close
     }
 }
 
