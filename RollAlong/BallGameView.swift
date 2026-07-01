@@ -3355,8 +3355,14 @@ struct BallGameView: View {
     /// image keeps this O(1) per frame.
     private func addSandPoint(_ p: CGPoint, size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
-        // (Re)start the canvas on first use or a size change (rotation).
-        if sandAccumImage == nil || sandCanvasSize != size {
+        // (Re)start the canvas on a size change (rotation) or first use — keyed
+        // on SIZE ONLY.  Also testing `sandAccumImage == nil` here deadlocked
+        // the trail: while the image is still nil (before the very first stroke
+        // is baked), every call re-nil'd `lastSandPoint`, so the `guard let
+        // last` below always failed, the draw code never ran, and the image
+        // stayed nil forever — the ball never left a mark.  `sandCanvasSize`
+        // starts `.zero`, so the first real call still initialises here.
+        if sandCanvasSize != size {
             sandCanvasSize = size
             sandAccumImage = nil
             lastSandPoint  = nil

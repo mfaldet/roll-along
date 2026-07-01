@@ -385,11 +385,18 @@ struct ZenToolsOverlay: View {
             }
             tap()
         } label: {
-            Image(systemName: menuOpen ? "chevron.down.circle.fill" : "chevron.up.circle.fill")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(sand)
-                .background(Circle().fill(Color(white: 1.0, opacity: 0.9)).padding(2))
-                .shadow(color: .black.opacity(0.2), radius: 5, y: 2)
+            // Mirror the game's white home button (bottom-left): a subtle
+            // dark-grey glyph on a white circle, so the tools toggle reads as a
+            // clean white button rather than the old brown chevron-in-circle.
+            Image(systemName: menuOpen ? "chevron.down" : "chevron.up")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color(white: 0.38))
+                .frame(width: 34, height: 34)
+                .background(
+                    Circle()
+                        .fill(Color(white: 1.0, opacity: 0.85))
+                        .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                )
         }
         .accessibilityLabel(menuOpen ? "Close tools" : "Zen tools")
         .accessibilityHint("Wind to smooth the sand, patterns to auto-roll, and props to decorate.")
