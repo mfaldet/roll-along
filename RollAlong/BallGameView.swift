@@ -5074,10 +5074,10 @@ struct BallGameView: View {
         //     garden (manual roll falls through to the normal tilt physics).
         if usesSandTrail {
             if let pattern = zenPattern {
-                // Map the 0…1 speed fraction to coverages-per-second.  A pass now
-                // has ~2.4× more (tighter) lanes, so the rate is scaled down to
-                // keep the ball's visible pace calm (very slow → brisk).
-                let rate = 0.004 + 0.04 * zenSpeedFraction
+                // Map the 0…1 speed fraction to loops-per-second.  One loop is
+                // the full multi-pass fill (a long path), so the rate is small —
+                // the ball's visible pace stays calm (very slow → brisk).
+                let rate = 0.0015 + 0.012 * zenSpeedFraction
                 zenPatternPhase += rate * Double(dt)
                 let p = pattern.point(progress: zenPatternPhase, in: geoSize)
                 b.position = p
