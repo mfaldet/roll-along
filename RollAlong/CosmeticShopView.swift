@@ -1535,7 +1535,8 @@ struct CosmeticShopView: View {
         HStack(spacing: 6) {
             // Ball
             collectionSlot(label: "Ball",
-                           isOwned: bundle.balls.first.map { gameState.isOwned($0) }) {
+                           isOwned: bundle.balls.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.balls.first.map { isEquipped($0) } ?? false) {
                 if let ball = bundle.balls.first {
                     BallSkinView(skin: ball, diameter: 34)
                         .frame(width: 34, height: 34)
@@ -1551,7 +1552,8 @@ struct CosmeticShopView: View {
             }
             // Goal
             collectionSlot(label: "Goal",
-                           isOwned: bundle.goals.first.map { gameState.isOwned($0) }) {
+                           isOwned: bundle.goals.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.goals.first.map { isEquipped($0) } ?? false) {
                 if let goal = bundle.goals.first {
                     Circle()
                         .fill(GoalSkin.previewGradient(for: goal))
@@ -1560,7 +1562,8 @@ struct CosmeticShopView: View {
             }
             // Trail
             collectionSlot(label: "Trail",
-                           isOwned: bundle.trails.first.map { gameState.isOwned($0) }) {
+                           isOwned: bundle.trails.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.trails.first.map { isEquipped($0) } ?? false) {
                 if let trail = bundle.trails.first {
                     Canvas { ctx, size in
                         var p = Path()
@@ -1574,7 +1577,8 @@ struct CosmeticShopView: View {
             }
             // Floor
             collectionSlot(label: "Floor",
-                           isOwned: bundle.floors.first.map { gameState.isOwned($0) }) {
+                           isOwned: bundle.floors.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.floors.first.map { isEquipped($0) } ?? false) {
                 if let floor = bundle.floors.first {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(floor.color)
@@ -1583,7 +1587,8 @@ struct CosmeticShopView: View {
             }
             // Pit
             collectionSlot(label: "Pit",
-                           isOwned: bundle.pits.first.map { gameState.isOwned($0) }) {
+                           isOwned: bundle.pits.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.pits.first.map { isEquipped($0) } ?? false) {
                 if let pit = bundle.pits.first {
                     ZStack {
                         RoundedRectangle(cornerRadius: 6)
@@ -1597,7 +1602,8 @@ struct CosmeticShopView: View {
             }
             // Music
             collectionSlot(label: "Music",
-                           isOwned: bundle.music.first.map { gameState.isOwned($0) }) {
+                           isOwned: bundle.music.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.music.first.map { isEquipped($0) } ?? false) {
                 if let track = bundle.music.first {
                     Image(systemName: track == .none ? "speaker.slash.fill" : "music.note")
                         .font(.system(size: 20, weight: .semibold))
@@ -1614,12 +1620,14 @@ struct CosmeticShopView: View {
     }
 
     /// A single item slot in a collection card.  `isOwned == nil` means the
-    /// bundle has no item in this category → renders a dotted empty placeholder.
-    /// `isOwned == false` → dimmed preview + lock icon.
-    /// `isOwned == true`  → full-colour preview + subtle green ring.
+    /// bundle has no item in this category → dotted empty placeholder.
+    /// `isOwned == false` → dimmed preview + lock icon.  `isOwned == true` →
+    /// full-colour preview.  The green ring appears ONLY when the item is the one
+    /// currently equipped (`isEquipped`), not merely owned.
     private func collectionSlot<Content: View>(
         label: String,
         isOwned: Bool?,
+        isEquipped: Bool = false,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         let owned   = isOwned == true
@@ -1635,12 +1643,12 @@ struct CosmeticShopView: View {
                             .strokeBorder(
                                 isEmpty
                                     ? Color(white: 0.22).opacity(0.60)
-                                    : (owned
-                                       ? Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.55)
+                                    : (isEquipped
+                                       ? Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.85)
                                        : Color.clear),
                                 style: isEmpty
                                     ? StrokeStyle(lineWidth: 1.0, dash: [3, 3])
-                                    : StrokeStyle(lineWidth: 1.2)
+                                    : StrokeStyle(lineWidth: isEquipped ? 2.0 : 1.2)
                             )
                     )
 
