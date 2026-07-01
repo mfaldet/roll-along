@@ -47,15 +47,20 @@ enum ZenPattern: String, CaseIterable, Identifiable {
     }
 
     /// The ball's position along this pattern at `progress`, in `size`'s
-    /// coordinates.  Walks the space-filling polyline at constant speed.
+    /// coordinates.  `progress` counts full coverages; each successive lap is
+    /// shifted a golden-ratio fraction of a lane (perpendicular to the grooves)
+    /// so the rake never retraces the same line — it fills the ridges between
+    /// lanes, densifying toward a fully-raked, touching-groove garden.
     func point(progress: Double, in size: CGSize) -> CGPoint {
-        let pts = pathPoints(in: size)
+        let lap = progress.rounded(.down)
+        var u = progress - lap
+        if u < 0 { u += 1 }
+        let offsetFrac = (lap * 0.6180339887498949).truncatingRemainder(dividingBy: 1)
+        let pts = pathPoints(in: size, offsetFrac: offsetFrac)
         guard pts.count > 1 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
         var total: CGFloat = 0
         for i in 1..<pts.count { total += hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) }
         guard total > 0 else { return pts[0] }
-        var u = progress.truncatingRemainder(dividingBy: 1)
-        if u < 0 { u += 1 }
         var target = CGFloat(u) * total
         for i in 1..<pts.count {
             let seg = hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
@@ -69,55 +74,59 @@ enum ZenPattern: String, CaseIterable, Identifiable {
         return pts[pts.count - 1]
     }
 
-    /// One full-coverage pass as a polyline in `size`'s pixel space.
-    func pathPoints(in size: CGSize) -> [CGPoint] {
+    /// One pass as a polyline in `size`'s pixel space.  `offsetFrac` (0…1)
+    /// shifts the lanes/rings perpendicular by that fraction of a gap so each
+    /// lap lays fresh grooves in the ridges rather than retracing.
+    func pathPoints(in size: CGSize, offsetFrac: Double = 0) -> [CGPoint] {
         let w = Double(size.width), h = Double(size.height)
         let m = min(w, h) * 0.075
         let x0 = m, y0 = m, x1 = w - m, y1 = h - m
-        let gap = min(w, h) * 0.12            // spacing between raked lanes
+        let gap = min(w, h) * 0.05            // tight rake-tine spacing
+        let off = gap * offsetFrac
         switch self {
-        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: true)
-        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: gap, horizontal: false)
-        case .spiral:  return Self.rectSpiral(x0, y0, x1, y1, gap: gap)
+        case .rows:    return Self.serpentine(x0, y0, x1, y1, gap: gap, offset: off, horizontal: true)
+        case .columns: return Self.serpentine(x0, y0, x1, y1, gap: gap, offset: off, horizontal: false)
+        case .spiral:  return Self.rectSpiral(x0, y0, x1, y1, gap: gap, offset: off)
         }
     }
 
-    /// Boustrophedon (back-and-forth lanes) with rounded U-turns.  `horizontal`
-    /// sweeps left/right down the rows; the vertical form is the same path
-    /// transposed, so columns get identical even spacing.
+    /// Boustrophedon (back-and-forth lanes) with rounded U-turns, at a FIXED
+    /// `gap`, the first lane `offset` in from the top.  `horizontal` sweeps
+    /// left/right down the rows; the vertical form is the same path transposed.
     private static func serpentine(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
-                                   gap: Double, horizontal: Bool) -> [CGPoint] {
+                                   gap: Double, offset: Double, horizontal: Bool) -> [CGPoint] {
         if !horizontal {
-            return serpentine(y0, x0, y1, x1, gap: gap, horizontal: true).map { CGPoint(x: $0.y, y: $0.x) }
+            return serpentine(y0, x0, y1, x1, gap: gap, offset: offset, horizontal: true).map { CGPoint(x: $0.y, y: $0.x) }
         }
         var pts: [CGPoint] = []
-        let span = y1 - y0
-        let lanes = max(2, Int((span / gap).rounded()) + 1)
-        let g = span / Double(lanes - 1)
-        let r = g / 2
-        for i in 0..<lanes {
-            let y = y0 + Double(i) * g
+        let r = gap / 2
+        var y = y0 + offset
+        var i = 0
+        while y <= y1 + 0.01 {
             let ltr = i % 2 == 0
             pts.append(CGPoint(x: ltr ? x0 : x1, y: y))
             pts.append(CGPoint(x: ltr ? x1 : x0, y: y))
-            if i < lanes - 1 {                          // rounded U-turn into the next lane
+            let ny = y + gap
+            if ny <= y1 + 0.01 {                        // rounded U-turn into the next lane
                 let xEdge = ltr ? x1 : x0
                 let sign  = ltr ? 1.0 : -1.0
                 let yc = y + r
-                for k in 1...10 {
-                    let th = -Double.pi / 2 + Double.pi * Double(k) / 10
+                for k in 1...8 {
+                    let th = -Double.pi / 2 + Double.pi * Double(k) / 8
                     pts.append(CGPoint(x: xEdge + sign * r * cos(th), y: yc + r * sin(th)))
                 }
             }
+            y = ny
+            i += 1
         }
         return pts
     }
 
-    /// Rectangular concentric spiral, worked inward from the outer edge.
+    /// Rectangular concentric spiral inward, its outer ring inset by `offset`.
     private static func rectSpiral(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double,
-                                   gap: Double) -> [CGPoint] {
-        var pts: [CGPoint] = [CGPoint(x: x0, y: y0)]
-        var (a, b, c, d) = (x0, y0, x1, y1)
+                                   gap: Double, offset: Double) -> [CGPoint] {
+        var (a, b, c, d) = (x0 + offset, y0 + offset, x1 - offset, y1 - offset)
+        var pts: [CGPoint] = [CGPoint(x: a, y: b)]
         while c - a > gap && d - b > gap {
             pts.append(CGPoint(x: c, y: b))
             pts.append(CGPoint(x: c, y: d))

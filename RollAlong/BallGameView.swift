@@ -3403,13 +3403,15 @@ struct BallGameView: View {
             // line.  Opaque colours (sitting just off the warm-sand bed
             // 0.90,0.78,0.55) overwrite instead of stacking, so the furrow is a
             // single continuous carved line.
-            // Soft darker depression…
-            cg.setStrokeColor(UIColor(red: 0.75, green: 0.63, blue: 0.43, alpha: 1.0).cgColor)
-            cg.setLineWidth(9.0)
+            // Thin so tightly-packed lanes stay DISTINCT rake lines (a rake's
+            // fine tines) instead of merging into a solid mass as offset laps
+            // fill in.  Soft darker depression…
+            cg.setStrokeColor(UIColor(red: 0.69, green: 0.55, blue: 0.29, alpha: 1.0).cgColor)
+            cg.setLineWidth(5.5)
             cg.move(to: last); cg.addLine(to: p); cg.strokePath()
             // …with a crisp pale carved centre.
-            cg.setStrokeColor(UIColor(red: 0.98, green: 0.92, blue: 0.76, alpha: 1.0).cgColor)
-            cg.setLineWidth(3.2)
+            cg.setStrokeColor(UIColor(red: 0.98, green: 0.93, blue: 0.79, alpha: 1.0).cgColor)
+            cg.setLineWidth(1.8)
             cg.move(to: last); cg.addLine(to: p); cg.strokePath()
         }
         sandAccumImage = img
@@ -5072,9 +5074,10 @@ struct BallGameView: View {
         //     garden (manual roll falls through to the normal tilt physics).
         if usesSandTrail {
             if let pattern = zenPattern {
-                // Map the 0…1 speed fraction to coverages-per-second (~one full
-                // pass every ~65s slow → ~9s fast).
-                let rate = 0.015 + 0.10 * zenSpeedFraction
+                // Map the 0…1 speed fraction to coverages-per-second.  A pass now
+                // has ~2.4× more (tighter) lanes, so the rate is scaled down to
+                // keep the ball's visible pace calm (very slow → brisk).
+                let rate = 0.004 + 0.04 * zenSpeedFraction
                 zenPatternPhase += rate * Double(dt)
                 let p = pattern.point(progress: zenPatternPhase, in: geoSize)
                 b.position = p
