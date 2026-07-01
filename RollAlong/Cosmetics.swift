@@ -487,7 +487,7 @@ enum GoalSkin: String, CosmeticItem {
     /// target, while every other skin keeps its existing linear
     /// gradient.  Callers fill a Circle with this — `Circle().fill(...)`
     /// accepts any `ShapeStyle`.
-    static func previewGradient(for goal: GoalSkin) -> AnyShapeStyle {
+    static func previewGradient(for goal: GoalSkin, endRadius: CGFloat = 28) -> AnyShapeStyle {
         switch goal {
         case .aurora:
             // Glowing aurora portal — bright teal-cyan core fading out through
@@ -500,7 +500,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.55, green: 0.40, blue: 1.00), location: 0.82),
                     .init(color: Color(red: 0.04, green: 0.06, blue: 0.14), location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .target:
             // Simple 3-ring red/white/red bullseye — the new default.
             // Hard transitions via paired stops at the same location.
@@ -513,7 +513,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.85, green: 0.12, blue: 0.18), location: 0.70),
                     .init(color: Color(red: 0.85, green: 0.12, blue: 0.18), location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28
+                center: .center, startRadius: 0, endRadius: endRadius
             ))
         case .archery:
             // FITA-style 5-band target: white outer → black → blue → red → yellow.
@@ -530,7 +530,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color.white,                                 location: 0.80),
                     .init(color: Color.white,                                 location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28
+                center: .center, startRadius: 0, endRadius: endRadius
             ))
         case .rainbow:
             // Original sparkly-portal preview — purple→blue→green→yellow→red.
@@ -582,7 +582,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.95, green: 0.45, blue: 0.10),  location: 0.55),
                     .init(color: Color(red: 0.55, green: 0.10, blue: 0.05),  location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .plasma:
             return AnyShapeStyle(LinearGradient(
                 colors: [Color(red: 0.85, green: 0.30, blue: 1.00),
@@ -618,7 +618,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.30, green: 0.55, blue: 0.20),     location: 0.30),
                     .init(color: Color(red: 0.45, green: 0.72, blue: 0.30),     location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .tractorBeam:
             // Preview: a glowing green beam column on near-black —
             // bright core fading to the edges.  The in-game renderer
@@ -639,7 +639,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.95, green: 0.30, blue: 0.05), location: 0.78),
                     .init(color: Color(red: 1.00, green: 0.74, blue: 0.22), location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .halo:
             // Heavenly glow — warm white-gold core into soft sky blue.
             return AnyShapeStyle(RadialGradient(
@@ -648,7 +648,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 1.00, green: 0.86, blue: 0.40), location: 0.45),
                     .init(color: Color(red: 0.74, green: 0.86, blue: 1.00), location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .doodle:
             // Pencil bullseye on cream paper — grey rings, dark centre.
             return AnyShapeStyle(RadialGradient(
@@ -661,7 +661,7 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.97, green: 0.96, blue: 0.90), location: 0.72),
                     .init(color: Color(red: 0.35, green: 0.35, blue: 0.40), location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .soccerNet:
             // White net over a dark goal mouth with a green grass base.
             return AnyShapeStyle(RadialGradient(
@@ -671,11 +671,11 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.18, green: 0.22, blue: 0.28), location: 0.80),
                     .init(color: Color(red: 0.30, green: 0.60, blue: 0.26), location: 1.00),
                 ],
-                center: .center, startRadius: 0, endRadius: 28))
+                center: .center, startRadius: 0, endRadius: endRadius))
         case .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate:
-            return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? []))
+            return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .vortex, .wormhole:
-            return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? []))
+            return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? [], endRadius: endRadius))
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -729,9 +729,9 @@ enum GoalSkin: String, CosmeticItem {
 
     /// Thumbnail builder: hard concentric bands (OUTER → INNER), reading as a
     /// ringed target at swatch size.
-    static func bandedTargetPreview(_ bands: [Color]) -> RadialGradient {
+    static func bandedTargetPreview(_ bands: [Color], endRadius: CGFloat = 28) -> RadialGradient {
         guard !bands.isEmpty else {
-            return RadialGradient(colors: [.gray], center: .center, startRadius: 0, endRadius: 28)
+            return RadialGradient(colors: [.gray], center: .center, startRadius: 0, endRadius: endRadius)
         }
         let inner = Array(bands.reversed())            // index 0 = centre
         let n = inner.count
@@ -740,16 +740,16 @@ enum GoalSkin: String, CosmeticItem {
             stops.append(.init(color: c, location: Double(i)     / Double(n)))
             stops.append(.init(color: c, location: Double(i + 1) / Double(n)))
         }
-        return RadialGradient(stops: stops, center: .center, startRadius: 0, endRadius: 28)
+        return RadialGradient(stops: stops, center: .center, startRadius: 0, endRadius: endRadius)
     }
 
     /// Thumbnail builder: a smooth glowing portal (bright centre → dark edge).
-    static func ringPortalPreview(_ stops: [Color]) -> RadialGradient {
+    static func ringPortalPreview(_ stops: [Color], endRadius: CGFloat = 28) -> RadialGradient {
         guard !stops.isEmpty else {
-            return RadialGradient(colors: [.black], center: .center, startRadius: 0, endRadius: 28)
+            return RadialGradient(colors: [.black], center: .center, startRadius: 0, endRadius: endRadius)
         }
         return RadialGradient(colors: Array(stops.reversed()),   // bright centre first
-                              center: .center, startRadius: 0, endRadius: 28)
+                              center: .center, startRadius: 0, endRadius: endRadius)
     }
 
     /// Representative accent colour for this goal.  Used to theme effects that
