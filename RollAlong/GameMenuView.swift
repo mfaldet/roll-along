@@ -642,7 +642,9 @@ private struct ChallengePackShowcase: View {
 
     private func cell(_ e: Entry) -> some View {
         ZStack(alignment: .bottomLeading) {
-            LoadoutDiorama(loadout: e.loadout)
+            // The showcase card already clips to radius 18, so let this fill it
+            // squarely rather than nesting a second rounded clip + hairline.
+            LoadoutDiorama(loadout: e.loadout, cornerRadius: nil)
 
             // Bottom scrim so the label reads over any floor colour.
             LinearGradient(colors: [.clear, .black.opacity(0.55)],
