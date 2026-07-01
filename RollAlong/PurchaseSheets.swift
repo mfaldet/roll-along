@@ -41,12 +41,14 @@ struct BuyLivesSheet: View {
                         celebrationView
                     } else {
                         // Title lives in the content now (no nav bar) so the sheet
-                        // can size itself to exactly fit the content.
+                        // can size itself to exactly fit the content.  Matches the
+                        // Get Coins title: size 24, centred, with top room so it
+                        // sits centred between the grabber and the row below it.
                         Text("Get Lives")
-                            .font(.system(size: 19, weight: .bold, design: .rounded))
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.bottom, 2)
+                            .padding(.top, 12)
                         header
                         statusBlock
                         lifePackCards
@@ -562,17 +564,18 @@ struct BuyCoinsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     // Title lives in the content (no nav bar) so the sheet can
-                    // size itself to exactly fit the packs.
+                    // size itself to exactly fit the packs.  The extra top padding
+                    // + matching gap below centre it between the grabber and the
+                    // coins/"earn coins" row.
                     Text("Get Coins")
-                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.bottom, 2)
                     header
                     coinPackCards
                 }
                 .padding(.horizontal, 18)
-                .padding(.top, 14)
+                .padding(.top, 26)
                 .padding(.bottom, 18)
                 .background(GeometryReader { geo in
                     Color.clear.preference(key: SheetFitHeightKey.self, value: geo.size.height)
