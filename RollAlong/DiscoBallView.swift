@@ -33,16 +33,23 @@ struct DiscoBallView: View {
     @StateObject private var motion = BallMotion()
     @StateObject private var clock  = PhysicsClock()
 
-    /// Chosen at the start screen each run.  Hardcore: a bigger 8×14 hex grid
-    /// (vs 6×10 normal), a smaller ball, and — instead of a looping reveal you
-    /// tap to leave — the path flashes ONCE, then the zone auto-unlocks with a
-    /// 10-second countdown.
-    @State private var hardcore = false
+    /// Chosen at the start screen each run.  Easy (4×8, big ball) and Normal
+    /// (6×10) both loop the reveal + tap-to-cross; Hard (8×14, small ball) shows
+    /// the path ONCE then auto-unlocks with a 10-second countdown.
+    @State private var difficulty: Difficulty = .normal
+    private var isHard: Bool { difficulty == .hard }
 
     // MARK: - Tunables
-    private var cols: Int { hardcore ? 8 : 6 }
-    private var rows: Int { hardcore ? 14 : 10 }
-    private var ballRadius: CGFloat { hardcore ? 9 : 11 }
+    private var cols: Int {
+        switch difficulty { case .easy: 4; case .normal: 6; case .hard: 8 }
+    }
+    private var rows: Int {
+        switch difficulty { case .easy: 8; case .normal: 10; case .hard: 14 }
+    }
+    // Slightly bigger balls on the easier modes; Hard stays small.
+    private var ballRadius: CGFloat {
+        switch difficulty { case .easy: 13; case .normal: 12; case .hard: 9 }
+    }
     private let moveAccel:   CGFloat = 1_500
     private let friction:    CGFloat = 0.94
     private let maxSpeed:    CGFloat = 700
@@ -64,13 +71,13 @@ struct DiscoBallView: View {
     // MARK: - Model
     private struct GridPos: Hashable { let row: Int; let col: Int }
     private enum Phase { case choosing, memorize, crossing, celebrate, failed, gameOver }
+    private enum Difficulty { case easy, normal, hard }
 
     // MARK: - State
     @State private var arena: CGSize = .zero
     @State private var phase: Phase = .choosing
     @State private var atBottom = true             // current safe zone
     @State private var crossings = 0
-    @State private var startedEver = false         // controls the intro hint
 
     @State private var ball: CGPoint = .zero
     @State private var vel: CGVector = .zero
@@ -101,7 +108,15 @@ struct DiscoBallView: View {
         return CGPoint(x: (CGFloat(col) + 0.5) * hexW + stagger,
                        y: gridTop + hexHeight / 2 + CGFloat(row) * rowSpacing)
     }
-    private var bestKey: String { hardcore ? "discohard" : "disco" }
+    private var bestKey: String {
+        switch difficulty { case .easy: "discoeasy"; case .normal: "disco"; case .hard: "discohard" }
+    }
+    private var difficultyLabel: String {
+        switch difficulty { case .easy: "Easy"; case .normal: "Normal"; case .hard: "Hardcore" }
+    }
+    private var shareMode: String {
+        switch difficulty { case .easy: "Disco Easy"; case .normal: "Disco Ball"; case .hard: "Disco Hardcore" }
+    }
     private var best: Int { gameState.minigameBests[bestKey, default: 0] }
     /// Coins this run would bank right now.
     private var runCoins: Int { crossings * Self.coinsPerCrossing }
@@ -125,7 +140,7 @@ struct DiscoBallView: View {
 
             topBar
             HomeQuitButton()
-            if hardcore && phase == .crossing { countdownHUD }
+            if isHard && phase == .crossing { countdownHUD }
             if phase == .memorize { memorizeHint }
             if phase == .choosing { difficultySelect }
             if phase == .gameOver { gameOverOverlay }
@@ -231,7 +246,9 @@ struct DiscoBallView: View {
         case .crossing:
             return touched.contains(pos) ? Self.greenLit : Self.tileOff
         case .celebrate:
-            return discoColor(pos)
+            // The path the ball took stays green (flashing shades of green);
+            // every other tile flashes random disco colours.
+            return touched.contains(pos) ? greenDiscoColor(pos) : discoColor(pos)
         case .failed:
             return redBlink(pos)
         case .gameOver:
@@ -241,6 +258,14 @@ struct DiscoBallView: View {
 
     private func discoColor(_ pos: GridPos) -> Color {
         Color(hue: seed(pos, blinkFrame), saturation: 0.9, brightness: 1.0)
+    }
+    /// Flashing shades of GREEN — the successful path keeps its colour through the
+    /// celebrate flash while the rest of the floor goes full disco.
+    private func greenDiscoColor(_ pos: GridPos) -> Color {
+        let s = seed(pos, blinkFrame)
+        return Color(hue: 0.30 + s * 0.10,             // 0.30–0.40 → green range
+                     saturation: 0.60 + s * 0.35,
+                     brightness: 0.60 + s * 0.40)
     }
     private func redBlink(_ pos: GridPos) -> Color {
         seed(pos, blinkFrame) > 0.4
@@ -296,15 +321,13 @@ struct DiscoBallView: View {
         VStack {
             Spacer()
             VStack(spacing: 4) {
-                Text(hardcore ? "ONE LOOK!" : "MEMORIZE THE PATH")
+                Text(isHard ? "ONE LOOK!" : "MEMORIZE THE PATH")
                     .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .tracking(1.5)
-                    .foregroundStyle(hardcore ? Color(red: 1.0, green: 0.4, blue: 0.4) : Self.revealColor)
-                Text(hardcore
+                    .foregroundStyle(isHard ? Color(red: 1.0, green: 0.4, blue: 0.4) : Self.revealColor)
+                Text(isHard
                      ? "The path flashes once — then it's a 10s dash across"
-                     : (startedEver
-                        ? "Line up at the start · tap to roll"
-                        : "Roll to the start tile · tap to cross without a wrong step"))
+                     : "Roll across without a wrong step")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(white: 0.7))
                     .multilineTextAlignment(.center)
@@ -348,12 +371,15 @@ struct DiscoBallView: View {
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(white: 0.62))
                 VStack(spacing: 10) {
-                    modeChoiceButton(hard: false, icon: "circle.grid.3x3.fill",
+                    modeChoiceButton(.easy, icon: "tortoise.fill",
+                                     title: "Easy", accent: Color(red: 0.40, green: 0.85, blue: 0.55),
+                                     subtitle: "4×8 floor · roomy tiles, take your time")
+                    modeChoiceButton(.normal, icon: "circle.grid.3x3.fill",
                                      title: "Normal", accent: Self.revealColor,
-                                     subtitle: "5×6 floor · study at your own pace, tap to cross")
-                    modeChoiceButton(hard: true, icon: "bolt.fill",
+                                     subtitle: "6×10 floor · study at your own pace, tap to cross")
+                    modeChoiceButton(.hard, icon: "bolt.fill",
                                      title: "Hardcore", accent: Color(red: 1.0, green: 0.4, blue: 0.4),
-                                     subtitle: "10×10 floor · one look, then a 10-second dash")
+                                     subtitle: "8×14 floor · one look, then a 10-second dash")
                 }
                 .padding(.top, 4)
             }
@@ -363,9 +389,9 @@ struct DiscoBallView: View {
         }
     }
 
-    private func modeChoiceButton(hard: Bool, icon: String, title: String,
+    private func modeChoiceButton(_ diff: Difficulty, icon: String, title: String,
                                   accent: Color, subtitle: String) -> some View {
-        Button { startWith(hardcore: hard) } label: {
+        Button { startWith(diff) } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .bold))
@@ -428,7 +454,7 @@ struct DiscoBallView: View {
                             .background(RoundedRectangle(cornerRadius: 18).fill(Self.revealColor))
                     }
                     ResultShareButton(result: ShareableResult(
-                        mode: hardcore ? "Disco Hardcore" : "Disco Ball",
+                        mode: shareMode,
                         headline: "\(crossings) crossings",
                         subtitle: "Best \(max(best, crossings))",
                         skin: gameState.activeSkin,
@@ -462,15 +488,14 @@ struct DiscoBallView: View {
     private func resetGame() {
         crossings = 0
         atBottom = true
-        startedEver = false
         touched = []
-        phase = .choosing          // pick Normal / Hardcore before each run
+        phase = .choosing          // pick Easy / Normal / Hardcore before each run
         spawnBallInSafeZone()
     }
 
     /// Start a run at the chosen difficulty (from the start-screen selector).
-    private func startWith(hardcore hard: Bool) {
-        hardcore = hard
+    private func startWith(_ diff: Difficulty) {
+        difficulty = diff
         beginMemorize()
     }
 
@@ -534,7 +559,7 @@ struct DiscoBallView: View {
         switch phase {
         case .memorize:
             // Hardcore auto-unlocks after a single reveal — taps don't start it.
-            if !hardcore { startCrossing() }
+            if !isHard { startCrossing() }
         case .celebrate:
             advanceAfterCelebrate()
         default:
@@ -543,8 +568,7 @@ struct DiscoBallView: View {
     }
 
     private func startCrossing() {
-        startedEver = true
-        crossDeadline = hardcore ? Date().addingTimeInterval(hardcoreCrossLimit) : nil
+        crossDeadline = isHard ? Date().addingTimeInterval(hardcoreCrossLimit) : nil
         phase = .crossing
     }
 
@@ -559,7 +583,7 @@ struct DiscoBallView: View {
             break
         case .memorize:
             revealHead += revealSpeed
-            if hardcore {
+            if isHard {
                 // Flash the path exactly once, hold a beat, then auto-unlock.
                 if revealHead >= Double(pathOrder.count) + 4 { startCrossing() }
             } else {
@@ -672,7 +696,7 @@ struct DiscoBallView: View {
             "disco_game_over",
             properties: ["crossings": .int(crossings),
                          "best": .int(max(best, crossings)),
-                         "hardcore": .bool(hardcore)]
+                         "difficulty": .string(difficultyLabel)]
         )
         phase = .gameOver
     }
