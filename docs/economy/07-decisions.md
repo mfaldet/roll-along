@@ -227,3 +227,15 @@ cascades).
    rather than a few big saves; watch mid-game purchase-milestone feel.
 5. **Lever-3 tutorial regression** (stale `tutorialCoinBonus` after a pit
    fall on the first L1 run) must land before the calibration branch merges.
+
+## Addendum — trophy-system ruling (2026-07-02)
+
+Mac ruled the trophy system's reward policy (see `docs/trophies/design.md` §11):
+trophies are pure recognition — prestige plus a small set of **earned-only
+regalia cosmetics** at true milestones. **Trophies never mint coins.** No trophy
+grant, live or retroactive, may call `addCoins`; this is a standing economy
+invariant, not a tuning choice. Relatedly, the trophy stat layer's
+lifetime-earned counter excludes the three refund-shaped credits (IAP grants,
+Sell Back refunds, `grantBundleFree` compensation) so trophy thresholds can't
+be inflated by wardrobe churn. Enforced by economy-invariant unit tests from
+trophy Sprint 0 onward (`docs/trophies/sprint-plan.md` §5).
