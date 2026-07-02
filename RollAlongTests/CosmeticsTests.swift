@@ -321,16 +321,49 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
+    /// Pin of the member-tier rarity rule itself, on synthetic bundles with a
+    /// hand-picked tier mix (music tracks: piano/jazz/chiptune = Standard,
+    /// lofi/downtempo = Epic, celestial/mysterium = Legendary) plus a couple
+    /// of live-catalogue anchors.  Rule: ≥2 legendary members → Legendary;
+    /// ≥2 epic-or-legendary members → Rare; otherwise Standard.
+    func test_bundleRarity_isDerivedFromMemberTiers() {
+        func bundle(music: [MusicTrack]) -> CosmeticBundle {
+            CosmeticBundle(id: "test", displayName: "Test", tagline: "", contentSummary: "",
+                           balls: [], goals: [], trails: [], floors: [], pits: [], music: music)
+        }
+        XCTAssertEqual(bundle(music: [.piano, .jazz, .chiptune]).rarity, .standard,
+                       "an all-standard bundle is Standard")
+        XCTAssertEqual(bundle(music: [.piano, .jazz, .celestial]).rarity, .standard,
+                       "one showpiece doesn't lift a bundle out of Standard")
+        XCTAssertEqual(bundle(music: [.piano, .lofi, .downtempo]).rarity, .rare,
+                       "two epic members make a bundle Rare")
+        XCTAssertEqual(bundle(music: [.piano, .lofi, .celestial]).rarity, .rare,
+                       "an epic + a legendary member make a bundle Rare")
+        XCTAssertEqual(bundle(music: [.piano, .celestial, .mysterium]).rarity, .legendary,
+                       "two legendary members make a bundle Legendary")
+
+        // Live-catalogue anchors (the price a bundle totals to is irrelevant).
+        let byID = Dictionary(uniqueKeysWithValues: CosmeticBundle.catalogue.map { ($0.id, $0) })
+        XCTAssertEqual(byID["nature"]?.rarity, .standard, "nature (5 standard + 1 epic) is Standard")
+        XCTAssertEqual(byID["champion"]?.rarity, .legendary, "champion carries 2 legendary members")
+        XCTAssertEqual(byID["planets"]?.rarity, .legendary, "planets (9 legendary) is Legendary")
+    }
+
     /// Regression guard for the post-tutorial gift (BallGameView filters
     /// `rarity == .standard && isAvailable`): the PERMANENT (non-seasonal)
     /// Standard-rarity pool must never be empty, or the gift picker
-    /// dead-ends the moment no seasonal window is open.  A future price or
-    /// floor change that empties this pool must fail here, not in prod.
+    /// dead-ends the moment no seasonal window is open.  A rarity-rule or
+    /// catalogue change that empties this pool must fail here, not in prod.
+    /// Per docs/economy/08-reprice.md the pool is specified to hold 4–8
+    /// bundles — small enough to stay curated, big enough to feel like a
+    /// choice — so drifting outside that band also fails.
     func testTutorialGift_permanentStandardBundlePool_neverEmpty() {
         let pool = CosmeticBundle.catalogue.filter { !$0.isLimitedTime && $0.rarity == .standard }
         print("GIFTPOOL permanent Standard bundles:", pool.map { $0.id }.joined(separator: ", "))
         XCTAssertFalse(pool.isEmpty,
                        "The permanent Standard-rarity bundle pool is empty — the post-tutorial gift dead-ends")
+        XCTAssertTrue((4...8).contains(pool.count),
+                      "The permanent Standard pool must hold 4–8 bundles, got \(pool.count)")
         // Every permanent Standard bundle is (trivially) always available, so
         // the gift picker's `isAvailable` filter can never see fewer options
         // than this pool.
