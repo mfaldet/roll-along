@@ -77,7 +77,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for a full coin refund, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
+            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for half their current coin value, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
         }
     }
 
@@ -438,8 +438,8 @@ struct SettingsView: View {
     private var resetSection: some View {
         let cosmetic = gameState.coinLiquidationPreview()
         return VStack(alignment: .leading, spacing: 12) {
-            // ── Cosmetics — beneficial: sell coin-bought cosmetics back for a
-            //    full refund and tidy the locker.  Sits ABOVE the Danger Zone
+            // ── Cosmetics — beneficial: sell coin-bought cosmetics back for
+            //    half their current value and tidy the locker.  Sits ABOVE the Danger Zone
             //    because it's recoverable (re-buy anything anytime), so it gets
             //    an inviting, non-alarming treatment.
             sectionHeader("Cosmetics")
@@ -456,7 +456,7 @@ struct SettingsView: View {
             .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
             .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
 
-            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, receive a full coin refund.")
+            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, sell them back for half their current value.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
             if let m = cosmeticResetMessage {

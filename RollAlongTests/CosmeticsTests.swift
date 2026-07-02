@@ -130,7 +130,7 @@ final class CosmeticsTests: XCTestCase {
 
         let preview = gs.coinLiquidationPreview()
         XCTAssertEqual(preview.count, 2)   // .blue + .galaxy; .diamond excluded
-        XCTAssertEqual(preview.coins, BallSkin.blue.coinCost + GoalSkin.galaxy.coinCost)
+        XCTAssertEqual(preview.coins, BallSkin.blue.coinCost / 2 + GoalSkin.galaxy.coinCost / 2)   // 50% refund
 
         let r = gs.liquidateCoinCosmetics()
         XCTAssertEqual(r.count, 2)
@@ -169,7 +169,7 @@ final class CosmeticsTests: XCTestCase {
 
         let first = gs.liquidateCoinCosmetics()
         XCTAssertEqual(first.count, 2)   // .blue + .fire; graphite NOT refunded
-        XCTAssertEqual(first.coins, BallSkin.blue.coinCost + TrailColor.fire.coinCost)
+        XCTAssertEqual(first.coins, BallSkin.blue.coinCost / 2 + TrailColor.fire.coinCost / 2)   // 50% refund
         XCTAssertTrue(gs.ownedTrails.contains(TrailColor.graphite.rawValue))   // starter kept
 
         let second = gs.liquidateCoinCosmetics()
@@ -335,10 +335,15 @@ final class CosmeticsTests: XCTestCase {
 
         let preview = gs.coinLiquidationPreview()
         XCTAssertEqual(preview.count, 1, "only the seasonal pumpkin is sellable")
-        XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost)
+        XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost / 2)   // 50% refund
+
+        // Sell Back pays 50% of the CURRENT item cost: a 500-coin exclusive
+        // refunds exactly 250.
+        XCTAssertEqual(BallSkin.pumpkin.coinCost, 500, "pumpkin is a 500-coin exclusive")
+        XCTAssertEqual(preview.coins, 250, "a 500-coin exclusive refunds 250")
 
         let r = gs.liquidateCoinCosmetics()
-        XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost)
+        XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost / 2)
         XCTAssertFalse(gs.ownedBallSkins.contains(BallSkin.pumpkin.rawValue), "seasonal ball sold + relocked")
         XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.diamond.rawValue), "iconic Diamond kept")
     }

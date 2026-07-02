@@ -660,13 +660,14 @@ final class GameState: ObservableObject {
     // MARK: - Cosmetic liquidation ("Reset Cosmetics")
 
     /// Dry run: how many owned cosmetics are sellable (coin-bought plus seasonal
-    /// / limited-time specials), and the coins they'd refund.  Powers the
-    /// Danger-Zone button label + confirm dialog.
+    /// / limited-time specials), and the coins they'd refund — 50% of each
+    /// item's CURRENT `coinCost` (all tier prices are even, so the integer
+    /// halving is exact).  Powers the Danger-Zone button label + confirm dialog.
     func coinLiquidationPreview() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
             for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
-                count += 1; coins += item.coinCost
+                count += 1; coins += item.coinCost / 2
             }
         }
         tally(ownedBallSkins, BallSkin.self); tally(ownedGoals, GoalSkin.self)
@@ -676,7 +677,8 @@ final class GameState: ObservableObject {
         return (count, coins)
     }
 
-    /// Relock every SELLABLE cosmetic and refund its coins — coin-bought items
+    /// Relock every SELLABLE cosmetic and refund HALF its current `coinCost`
+    /// (live price at sell time, not what was paid) — coin-bought items
     /// plus seasonal / limited-time specials — KEEPING the starter look and the
     /// permanent Iconic specials (Trophy, Diamond, Money, Aurora).  Re-equips the
     /// starter for any slot whose item was liquidated.  Returns what was
@@ -686,7 +688,7 @@ final class GameState: ObservableObject {
         var count = 0, coins = 0
         func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
             for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
-                count += 1; coins += item.coinCost
+                count += 1; coins += item.coinCost / 2
                 owned.remove(item.rawValue)
             }
             owned.insert(Item.starter.rawValue)   // the starter is always owned
