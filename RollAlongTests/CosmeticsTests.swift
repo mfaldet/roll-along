@@ -156,6 +156,45 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(gs.isLoadoutDefault)
     }
 
+    /// Sell Back re-grants every category's starter, so refunding a starter
+    /// would mint coins on every pass.  TrailColor's starter is Graphite —
+    /// tier .rare, NOT tier .starter — which used to slip through the iconic
+    /// filter and pay out +100 coins per Sell Back, forever (infinite faucet).
+    func testLiquidate_secondPassRefundsNothing_starterIsNotAFaucet() {
+        let gs = makeCleanState()
+        gs.coinBalance = 0
+        gs.ownedBallSkins.insert(BallSkin.blue.rawValue)             // coin-bought
+        gs.ownedTrails.insert(TrailColor.graphite.rawValue)          // the starter
+        gs.ownedTrails.insert(TrailColor.fire.rawValue)              // coin-bought
+
+        let first = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(first.count, 2)   // .blue + .fire; graphite NOT refunded
+        XCTAssertEqual(first.coins, BallSkin.blue.coinCost + TrailColor.fire.coinCost)
+        XCTAssertTrue(gs.ownedTrails.contains(TrailColor.graphite.rawValue))   // starter kept
+
+        let second = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(second.count, 0, "second consecutive Sell Back must refund nothing")
+        XCTAssertEqual(second.coins, 0)
+        XCTAssertEqual(gs.coinBalance, first.coins)   // balance unchanged by second pass
+
+        // The preview must agree with liquidation — no phantom starter refunds
+        // in the Danger-Zone confirm dialog either.
+        let preview = gs.coinLiquidationPreview()
+        XCTAssertEqual(preview.count, 0)
+        XCTAssertEqual(preview.coins, 0)
+    }
+
+    /// No category's starter may ever be sellable, regardless of its tier.
+    func testStarters_areNeverSellable() {
+        XCTAssertFalse(BallSkin.starter.isSellable)
+        XCTAssertFalse(GoalSkin.starter.isSellable)
+        XCTAssertFalse(TrailColor.starter.isSellable)   // Graphite — tier .rare but still the starter
+        XCTAssertFalse(Floor.starter.isSellable)
+        XCTAssertFalse(Pit.starter.isSellable)
+        XCTAssertFalse(MusicTrack.starter.isSellable)
+        XCTAssertFalse(Boundary.starter.isSellable)
+    }
+
     func testBundleDiscount_percentMapping() {
         XCTAssertEqual(BundleDiscount.common.percent,    10)
         XCTAssertEqual(BundleDiscount.rare.percent,      15)
