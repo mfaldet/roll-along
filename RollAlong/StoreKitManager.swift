@@ -302,7 +302,7 @@ final class StoreKitManager: ObservableObject {
         var grantedCosmetic: String? = nil
         switch productID.category {
         case .lifePack:
-            // Lives from purchases stockpile unbounded.  $9.99 = 78 lives
+            // Lives from purchases stockpile unbounded.  $9.99 = 130 lives
             // promised in the App Store Connect product description; the
             // player gets exactly that.  Earlier code clamped to 24 — that
             // was a bug, fixed here.

@@ -8,13 +8,13 @@
       "internalID": "11000001",
       "localizations": [
         {
-          "description": "6 lives instantly delivered.",
+          "description": "10 lives instantly delivered.",
           "displayName": "1 full reload",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.lives.pack1",
-      "referenceName": "1 Full Reload (6 lives) $0.99",
+      "referenceName": "1 Full Reload (10 lives) $0.99",
       "type": "Consumable"
     },
     {
@@ -23,13 +23,13 @@
       "internalID": "11000002",
       "localizations": [
         {
-          "description": "36 lives — best value for casual play.",
+          "description": "60 lives — best value for casual play.",
           "displayName": "6 full reloads",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.lives.pack5",
-      "referenceName": "6 Full Reloads (36 lives) $4.99",
+      "referenceName": "6 Full Reloads (60 lives) $4.99",
       "type": "Consumable"
     },
     {
@@ -38,13 +38,13 @@
       "internalID": "11000003",
       "localizations": [
         {
-          "description": "78 lives — for serious chasers.",
+          "description": "130 lives — for serious chasers.",
           "displayName": "13 full reloads",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.lives.pack10",
-      "referenceName": "13 Full Reloads (78 lives) $9.99",
+      "referenceName": "13 Full Reloads (130 lives) $9.99",
       "type": "Consumable"
     },
     {
