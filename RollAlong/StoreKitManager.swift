@@ -358,17 +358,73 @@ final class StoreKitManager: ObservableObject {
 
     // MARK: - Background transaction listener
 
+    /// What the listener should do with a *verified* transaction update.
+    /// Pure decision logic, split out of `listenForTransactions()` so unit
+    /// tests can pin the refund handling without constructing real StoreKit
+    /// transactions (which require Apple-signed JWS payloads).
+    enum VerifiedUpdateAction: Equatable {
+        /// Deliver the reward (fresh purchase, Ask to Buy approval,
+        /// sync from another device).
+        case deliver(ProductID)
+        /// Refund or Family Sharing revocation — finish WITHOUT delivering.
+        case skipRevoked
+        /// Product retired from the catalogue — finish so it stops
+        /// re-delivering; nothing to grant.
+        case skipUnknownProduct
+    }
+
+    nonisolated static func verifiedUpdateAction(
+        productID: String,
+        revocationDate: Date?
+    ) -> VerifiedUpdateAction {
+        // Revocation wins over everything else: StoreKit delivers refunds and
+        // Family Sharing revocations through Transaction.updates as *verified*
+        // transactions with revocationDate set.  Delivering here would mint
+        // the reward a second time on top of the money back (e.g., refund the
+        // 10,000-coin pack → another 10,000 coins + a Money cosmetic, forever
+        // repeatable).
+        if revocationDate != nil { return .skipRevoked }
+        guard let productID = ProductID(rawValue: productID) else {
+            return .skipUnknownProduct
+        }
+        return .deliver(productID)
+    }
+
     private func listenForTransactions() async {
         for await update in Transaction.updates {
             switch update {
             case .verified(let transaction):
-                guard let productID = ProductID(rawValue: transaction.productID) else {
-                    // Unknown product ID (e.g., old product retired from the
-                    // catalogue).  Finish so it doesn't keep re-delivering.
-                    await transaction.finish()
-                    continue
+                switch Self.verifiedUpdateAction(productID: transaction.productID,
+                                                 revocationDate: transaction.revocationDate) {
+                case .deliver(let productID):
+                    await deliverReward(for: productID)
+                case .skipRevoked:
+                    // A refunded unlimited unlock should stop granting free
+                    // lives right away, not at the next launch (where
+                    // refreshEntitlements re-mirrors the entitlement anyway).
+                    // Consumables aren't clawed back: coins/lives already
+                    // granted may be spent, and Apple owns the refund risk.
+                    if transaction.productID == ProductID.unlimited.rawValue {
+                        gameState?.unlimitedLives = false
+                    }
+                    let reason: String
+                    if let revocationReason = transaction.revocationReason {
+                        reason = revocationReason == .developerIssue ? "developer_issue" : "other"
+                    } else {
+                        reason = "unknown"
+                    }
+                    AnalyticsClient.shared.track(
+                        "iap_revoked",
+                        properties: [
+                            "product_id": .string(transaction.productID),
+                            "reason":     .string(reason),
+                        ]
+                    )
+                case .skipUnknownProduct:
+                    break
                 }
-                await deliverReward(for: productID)
+                // Finish verified updates whether delivered or skipped, so
+                // StoreKit stops re-delivering them.
                 await transaction.finish()
             case .unverified(_, let verificationError):
                 // Apple's JWS signature check failed.  Do NOT grant any
