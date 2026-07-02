@@ -1682,23 +1682,24 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
     }
 
     /// Payout multiplier applied to a competitive minigame's coin winnings.
-    /// Higher difficulty = harder to win = bigger reward for the risk taken.
-    /// Spread: Easy 0.5× · Normal 1× · Hard 2× (today's payout == Normal).
-    /// Calibrate against `targetWinRate` from the tracked success rates so the
-    /// expected value per play stays fair — see docs/minigame-difficulty.md.
+    /// Compressed spread (2026-07-01 economy calibration, see
+    /// docs/economy/07-decisions.md): Easy 1× · Normal 1.5× · Hard 2×.
+    /// Easy no longer pays below par — combined with `targetWinRate`, Easy is
+    /// deliberately the EV-optimal per-attempt pick; Hard still pays the most
+    /// per WIN.  See docs/minigame-difficulty.md for the honest EV math.
     var payoutMultiplier: Double {
         switch self {
-        case .easy:   return 0.5
-        case .normal: return 1.0
+        case .easy:   return 1.0
+        case .normal: return 1.5
         case .hard:   return 2.0
         }
     }
 
-    /// Short payout descriptor for the pre-game picker (relative to Normal).
+    /// Short payout descriptor for the pre-game picker.
     var payoutLabel: String {
         switch self {
-        case .easy:   return "0.5× coins"
-        case .normal: return "1× coins"
+        case .easy:   return "1× coins"
+        case .normal: return "1.5× coins"
         case .hard:   return "2× coins"
         }
     }
