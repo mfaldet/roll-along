@@ -1013,9 +1013,12 @@ final class GameState: ObservableObject {
     /// up to 3 currency-coins on the floor → 0…3 coins per first clear
     /// from pickups alone.
     static let coinPerPickup: Int = 1
-    /// Flat coin award the first time a player clears a level.  Stacks
-    /// with pickups so a perfect first clear yields `coinPerClear + 3`
-    /// coins.  Subsequent clears award 0 (no farming).
+    /// Flat coin award on EVERY climb clear — first time or replay.  The
+    /// grind is blessed (2026-07-01 economy calibration): replaying a level
+    /// pays this bonus again, exactly like the Challenge Tracks, whether the
+    /// player pushes to level 10,000 or replays level 1 ten thousand times.
+    /// Stacks with pickups, so a perfect first clear yields `coinPerClear +
+    /// 3` coins; pickup coins stay sticky and pay only once per level.
     static let coinPerClear:  Int = 2
 
     /// Maximum coins grantable in a single `addCoins` call.
