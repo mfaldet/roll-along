@@ -126,7 +126,7 @@ struct RollOutView: View {
     private let friction:    CGFloat = 0.984
     private let maxSpeed:    CGFloat = 430
     private let wallBounce:  CGFloat = 0.45   // dull bounce so the ball settles
-    private let coinsPerClear      = 4
+    private let coinsPerClear      = 10
 
     // MARK: - Phase
     private enum Phase { case ready, playing, cleared, fell }
@@ -585,10 +585,13 @@ struct RollOutView: View {
     private func clearMaze() {
         phase = .cleared
         gameState.addCoins(coinsPerClear)
-        // Best = furthest maze reached (1-based).
+        // Best = furthest maze reached (1-based).  A new best pays the shared
+        // 100-coin bonus, matching the other solo modes (see DiscoBallView).
         let reached = mazeIndex + 1
-        if reached > gameState.minigameBests["rollout", default: 0] {
+        let wasBest = reached > gameState.minigameBests["rollout", default: 0]
+        if wasBest {
             gameState.minigameBests["rollout"] = reached
+            gameState.addCoins(GameState.minigameBestBonus)
         }
         if gameState.hapticsEnabled { Haptics.success() }
         AudioManager.shared.playWin(enabled: gameState.soundEnabled)

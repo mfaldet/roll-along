@@ -146,7 +146,7 @@ struct PinballView: View {
         guard !didSubmit else { return }
         didSubmit = true
         let s = model.score
-        if s / 250 > 0 { gameState.addCoins(s / 250) }
+        if s / 125 > 0 { gameState.addCoins(s / 125) }
         gameState.recordPinballScore(s)
         if gameState.hapticsEnabled { Haptics.success() }
     }

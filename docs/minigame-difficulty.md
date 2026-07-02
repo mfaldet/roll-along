@@ -43,7 +43,7 @@ are the only things you edit to retune.**
 ## How payout is applied
 
 Each game computes a raw `basePayout` from its own formula (e.g. Sumo placement
-coins `[10,5,3,2]`; Comet Clash `power×3 + winBonus`; Smash and Grab = coins
+coins `[60,30,15,8]`; Comet Clash `power×3 + winBonus`; Smash and Grab = coins
 collected). The award and the on-screen "+N coins" both run through:
 
 - `GameState.minigamePayout(base:difficulty:)` — pure, for the result-screen and

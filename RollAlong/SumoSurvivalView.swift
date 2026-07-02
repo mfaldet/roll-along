@@ -14,7 +14,7 @@ import SwiftUI
 //     last marble standing → 5.
 //   • Fall and you SPECTATE — the round plays on (AI vs AI) until one remains.
 //   • After three rounds, total points decide placement → coins:
-//     1st 10 · 2nd 5 · 3rd 3 · 4th 2.  Placing 1st is a competitive win.
+//     1st 60 · 2nd 30 · 3rd 15 · 4th 8.  Placing 1st is a competitive win.
 //
 // TILT DUELS: collisions are mass-weighted by how hard each marble is driving
 // INTO the contact.  Tilt harder into a rival than they're pushing back and
@@ -55,7 +55,7 @@ struct SumoSurvivalView: View {
 
     private let roundCount     = 3
     private let winnerPoints   = 5
-    private let placementCoins = [10, 5, 3, 2]    // 1st…4th by total points
+    private let placementCoins = [60, 30, 15, 8]  // 1st…4th by total points
 
     /// Points for the `orderIndex`-th marble to fall (0-based): 1, 2, 3.
     private func fallPoints(orderIndex: Int) -> Int { orderIndex + 1 }
@@ -613,7 +613,7 @@ struct SumoSurvivalView: View {
         if gameState.hapticsEnabled { Haptics.warning() }
     }
 
-    /// Final placement → coins (10/5/3/2) + a competitive win for 1st.  Guarded
+    /// Final placement → coins (60/30/15/8) + a competitive win for 1st.  Guarded
     /// so it pays exactly once.
     private func finishMatch() {
         guard !awarded else { return }
