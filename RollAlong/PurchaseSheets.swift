@@ -145,9 +145,10 @@ struct BuyLivesSheet: View {
     }
 
     /// Live status + explanation block under the marble-row header.  Shows
-    /// the next-life countdown when regen is active and the standing rule
-    /// (1 life every 6 min, up to 10).  Hidden for unlimited subscribers
-    /// — we tell them they're set instead.
+    /// the next-life countdown when regen is active, the purchased-reserve
+    /// count when one exists, and the standing rule (1 life every 6 min, up
+    /// to 10).  Hidden for unlimited subscribers — we tell them they're set
+    /// instead.
     private var statusBlock: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
             VStack(alignment: .leading, spacing: 6) {
@@ -170,6 +171,12 @@ struct BuyLivesSheet: View {
                                 .monospacedDigit()
                         }
                         .foregroundStyle(Color(white: 0.78))
+                    }
+                    if gameState.purchasedLives > 0 {
+                        // Same yellow as the pill's running-on-reserve state.
+                        Text("+\(gameState.purchasedLives) in reserve — used when your free lives run out.")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 1.00, green: 0.83, blue: 0.25))
                     }
                     Text("You earn 1 life every 6 minutes, up to \(GameState.livesMax).")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
@@ -420,21 +427,21 @@ struct BuyLivesSheet: View {
         VStack(spacing: 10) {
             productCard(
                 pid: .livesPack1,
-                title: "1 full reload",
-                subtitle: "10 lives",
+                title: "10 Lives",
+                subtitle: "Added to your reserve",
                 buttonLabel: store.displayPrice(for: .livesPack1, fallback: "$0.99")
             )
             productCard(
                 pid: .livesPack5,
-                title: "6 full reloads",
-                subtitle: "60 lives — best value casual",
+                title: "60 Lives",
+                subtitle: "Added to your reserve",
                 bonus: lifeBonus(.livesPack5, lives: 60),
                 buttonLabel: store.displayPrice(for: .livesPack5, fallback: "$4.99")
             )
             productCard(
                 pid: .livesPack10,
-                title: "13 full reloads",
-                subtitle: "130 lives — for chasers",
+                title: "130 Lives",
+                subtitle: "Added to your reserve — best value",
                 bonus: lifeBonus(.livesPack10, lives: 130),
                 buttonLabel: store.displayPrice(for: .livesPack10, fallback: "$9.99")
             )

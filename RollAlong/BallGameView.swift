@@ -723,10 +723,10 @@ struct BallGameView: View {
 
                 // Lives HUD — top-left.  Always visible (including tutorial
                 // levels) so the player has a consistent place to check on
-                // their marble stockpile.  Failure on tutorial levels still
+                // their lives.  Failure on tutorial levels still
                 // doesn't cost a life — that's handled in handleFell —
                 // but the HUD itself is permanent UI furniture.
-                // Only consume-lives modes show the marble stockpile HUD;
+                // Only consume-lives modes show the lives HUD;
                 // unlimited modes (Zen, Coin Pit) have no lives to display.
                 // ClimbMode consumes, so this stays visible today.
                 if activeMode.lives == .consume {
@@ -845,7 +845,7 @@ struct BallGameView: View {
             .onAppear {
                 arenaSize = geo.size
                 // Snapshot any accumulated regen ticks into stored `lives`
-                // before we read displayedLives in spawnBall.
+                // before we read totalLives in spawnBall.
                 gameState.commitRegen()
                 spawnBall(in: geo.size)
             }
@@ -3475,11 +3475,13 @@ struct BallGameView: View {
     /// without us having to manually call `commitRegen` on a timer.
     private func livesHUDOverlay(safeTop: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-            // One marble + the live count.  When running low (< 6 lives) a
-            // countdown to the next free life appears beside it.  Diamond Balls
-            // owners see a diamond marble + ∞.
+            // One marble + the TOTAL life count (regen bar + purchased
+            // reserve), colour-coded by state.  The countdown to the next
+            // free life sits beside it whenever the regen bar isn't full.
+            // Diamond Balls owners see a diamond marble + ∞.
             let unlimited = gameState.unlimitedLives
-            let display   = gameState.displayedLives
+            let regen     = gameState.displayedLives
+            let total     = gameState.totalLives
 
             HStack(spacing: 6) {
                 lifeIcon(filled: true, gold: unlimited)
@@ -3489,12 +3491,12 @@ struct BallGameView: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Self.diamondLifeGradient)
                 } else {
-                    Text("\(display)")
+                    Text("\(total)")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Self.livesCountColor(regen: regen, total: total))
                         .monospacedDigit()
 
-                    if display < 6, let secs = gameState.timeToNextLife() {
+                    if let secs = gameState.timeToNextLife() {
                         HStack(spacing: 3) {
                             Image(systemName: "clock")
                                 .font(.system(size: 10, weight: .semibold))
@@ -3628,12 +3630,11 @@ struct BallGameView: View {
         if gameState.unlimitedLives {
             return "Unlimited lives."
         }
-        let display    = gameState.displayedLives
-        let filled     = min(display, GameState.livesMax)
-        let stockpile  = max(0, display - GameState.livesMax)
-        var label = "\(filled) of \(GameState.livesMax) lives."
-        if stockpile > 0 {
-            label += " Plus \(stockpile) stockpiled."
+        let regen   = gameState.displayedLives
+        let reserve = gameState.purchasedLives
+        var label = "\(regen) of \(GameState.livesMax) lives."
+        if reserve > 0 {
+            label += " Plus \(reserve) in reserve."
         }
         if let next = gameState.timeToNextLife() {
             label += " Next life in \(Self.formatCountdown(next))."
@@ -3681,6 +3682,17 @@ struct BallGameView: View {
             }
         }
         .frame(width: size, height: size)
+    }
+
+    /// Count colour for the lives pill (matches HomeView.livesCountColor so
+    /// the two pills read identically): red at 0 total, orange at ≤3 total,
+    /// yellow while running on the purchased reserve (regen bar dry), white
+    /// while regenerative lives remain.
+    private static func livesCountColor(regen: Int, total: Int) -> Color {
+        if total <= 0 { return Color(red: 0.95, green: 0.36, blue: 0.36) }
+        if total <= 3 { return Color(red: 0.99, green: 0.63, blue: 0.20) }
+        if regen <= 0 { return Color(red: 1.00, green: 0.83, blue: 0.25) }
+        return .white
     }
 
     private static let redLifeGradient = LinearGradient(
@@ -3847,9 +3859,9 @@ struct BallGameView: View {
     /// gets a consistent read of their state regardless of context.
     private var outOfLivesMarbleRow: some View {
         let unlimited     = gameState.unlimitedLives
-        let display       = gameState.displayedLives
-        let filledMarbles = unlimited ? GameState.livesMax : min(display, GameState.livesMax)
-        let stockpile     = unlimited ? 0 : max(0, display - GameState.livesMax)
+        let filledMarbles = unlimited ? GameState.livesMax
+                                      : min(gameState.displayedLives, GameState.livesMax)
+        let reserve       = unlimited ? 0 : gameState.purchasedLives
         let regen         = unlimited ? nil : gameState.regenProgress()
 
         return HStack(spacing: 6) {
@@ -3870,10 +3882,12 @@ struct BallGameView: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Self.diamondLifeGradient)
                     .padding(.leading, 2)
-            } else if stockpile > 0 {
-                Text("+\(stockpile)")
+            } else if reserve > 0 {
+                // Reserve count in the same yellow as the pill's
+                // running-on-reserve state, so the colour language sticks.
+                Text("+\(reserve)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(red: 1.00, green: 0.83, blue: 0.25))
                     .padding(.leading, 2)
             }
         }
@@ -3900,14 +3914,14 @@ struct BallGameView: View {
                         Text("Out of Lives")
                             .font(.system(size: 36, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("Lives refill 1 every 10 minutes.")
+                        Text("Lives refill 1 every 6 minutes.")
                             .font(.system(size: 14, weight: .regular, design: .rounded))
                             .foregroundStyle(Color(white: 0.70))
                     }
 
                     // Identical to the home pill — 20pt marbles, 6pt
                     // spacing, regen progress shown as a bottom-up
-                    // partial fill on the next-empty marble, stockpile
+                    // partial fill on the next-empty marble, reserve
                     // "+N" or unlimited ∞ trailing.  Capsule background
                     // matches the home/coin pill aesthetic.
                     outOfLivesMarbleRow
@@ -3915,8 +3929,9 @@ struct BallGameView: View {
                     Spacer()
 
                     VStack(spacing: 10) {
-                        // Play Now appears when a regen tick has filled a life.
-                        if gameState.displayedLives > 0 {
+                        // Play Now appears when a regen tick, ad, or purchase
+                        // has put any life back in reach (regen or reserve).
+                        if gameState.totalLives > 0 {
                             Button {
                                 gameState.commitRegen()
                                 withAnimation(.easeInOut(duration: 0.28)) {
@@ -3955,9 +3970,9 @@ struct BallGameView: View {
                                 adInFlight = false
                                 // Lives are granted inside AdManager's reward
                                 // handler — no extra plumbing needed here.
-                                // If the ad earned a reward, gameState.lives
-                                // already bumped; the regen / Play Now button
-                                // path can resume naturally.
+                                // If the ad earned a reward, the purchased
+                                // reserve already bumped; the regen / Play Now
+                                // button path can resume naturally.
                             }
                         } label: {
                             HStack(spacing: 8) {
@@ -4977,7 +4992,7 @@ struct BallGameView: View {
         if activeMode.lives == .consume,
            !gameState.isTutorialLevel(gameState.currentLevel),
            !gameState.unlimitedLives,
-           gameState.displayedLives <= 0 {
+           gameState.totalLives <= 0 {
             withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }
             return
         }
@@ -5423,10 +5438,10 @@ struct BallGameView: View {
 
         // If that was the player's last life, go straight to Out of Lives;
         // otherwise show the Oops screen.  Tutorial levels (lives not
-        // consumed) keep displayedLives > 0 and always take the Oops path.
+        // consumed) keep totalLives > 0 and always take the Oops path.
         if !gameState.isTutorialLevel(gameState.currentLevel),
            !gameState.unlimitedLives,
-           gameState.displayedLives <= 0 {
+           gameState.totalLives <= 0 {
             withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }
         } else {
             withAnimation(.easeIn(duration: 0.22)) { phase = .fell }

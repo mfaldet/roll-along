@@ -9,7 +9,7 @@ import SwiftUI
 //   ra_startAtTop, ra_minigameDifficulty, ra_seenOnboarding, ra_seenWelcomeMoment,
 //   ra_seenTutorialReward,
 //   ra_bestStars, ra_bestTime, ra_collectedCoins, ra_highestUnlocked,
-//   ra_lives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
+//   ra_lives, ra_purchasedLives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
 //   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
 //   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBoundaries,
@@ -117,8 +117,11 @@ final class GameState: ObservableObject {
     }
 
     // ── Lives system (Sprint 4c) ───────────────────────────────────────────
-    // lives             : stored count, 0…10.  May be stale w.r.t. regen —
-    //                     use displayedLives for the live value.
+    // lives             : regenerative lives, 0…10.  May be stale w.r.t.
+    //                     regen — use displayedLives for the live value.
+    // purchasedLives    : reserve queue of granted lives (IAP packs, rewarded
+    //                     ads, friend gifts).  Unbounded, never regenerates,
+    //                     and only drains once the regen bar is empty.
     // lastLifeLostAt    : timestamp of the most recent life consumption.
     //                     Drives regen.  nil when lives == max.
     // unlimitedLives    : true if the $20 unlimited subscription is active.
@@ -131,6 +134,9 @@ final class GameState: ObservableObject {
 
     @Published var lives: Int {
         didSet { defaults.set(lives, forKey: "ra_lives") }
+    }
+    @Published var purchasedLives: Int {
+        didSet { defaults.set(purchasedLives, forKey: "ra_purchasedLives") }
     }
     @Published var lastLifeLostAt: Date? {
         didSet {
@@ -523,7 +529,18 @@ final class GameState: ObservableObject {
         // Lives — default to a full bar.  `as? Int ?? Self.livesMax` covers
         // the case where no key has been written yet (fresh install).
         // `max(0, ...)` guards against a corrupt negative value.
-        lives          = max(0, defaults.object(forKey: "ra_lives") as? Int ?? Self.livesMax)
+        // Migration: pre-reserve saves stockpiled purchased lives inside
+        // `ra_lives` (values above the 10 cap) — move the overflow into the
+        // reserve queue.  didSet doesn't fire during init, so persist the
+        // split explicitly.
+        let storedLives   = max(0, defaults.object(forKey: "ra_lives") as? Int ?? Self.livesMax)
+        let storedReserve = max(0, defaults.object(forKey: "ra_purchasedLives") as? Int ?? 0)
+        lives          = min(storedLives, Self.livesMax)
+        purchasedLives = storedReserve + max(0, storedLives - Self.livesMax)
+        if storedLives > Self.livesMax {
+            defaults.set(min(storedLives, Self.livesMax), forKey: "ra_lives")
+            defaults.set(storedReserve + storedLives - Self.livesMax, forKey: "ra_purchasedLives")
+        }
         lastLifeLostAt = defaults.object(forKey: "ra_lastLifeLostAt") as? Date
         unlimitedLives = defaults.bool(forKey: "ra_unlimitedLives")
 
@@ -909,9 +926,11 @@ final class GameState: ObservableObject {
         addCoins(todaysDailyChallenge.rewardCoins)
     }
 
-    /// Current life count including any regen that has accumulated since
-    /// `lastLifeLostAt`.  Read this for display + gating.  Stored `lives`
-    /// only updates when `commitRegen()` or `consumeLife()` is called.
+    /// Current regenerative life count (0…livesMax) including any regen that
+    /// has accumulated since `lastLifeLostAt`.  Purchased reserve lives are
+    /// NOT included — read `totalLives` for gating and the HUD pill count.
+    /// Stored `lives` only updates when `commitRegen()` or `consumeLife()`
+    /// is called.
     var displayedLives: Int {
         if unlimitedLives { return Self.livesMax }
         guard lives < Self.livesMax, let last = lastLifeLostAt else { return lives }
@@ -919,6 +938,10 @@ final class GameState: ObservableObject {
         let regenCount = Int(elapsed / Self.livesRegenInterval)
         return min(Self.livesMax, lives + regenCount)
     }
+
+    /// Everything the player can spend: the regenerative bar plus the
+    /// purchased reserve queue.  This is the number the lives pill shows.
+    var totalLives: Int { displayedLives + purchasedLives }
 
     /// Seconds until the next regen tick, or nil if not regenerating.
     func timeToNextLife() -> TimeInterval? {
@@ -964,48 +987,45 @@ final class GameState: ObservableObject {
         }
     }
 
-    /// Decrement lives by 1.  Returns true if a life was consumed, false if
-    /// the player was already at zero.  Unlimited-lives subscribers always
-    /// return true without decrementing.
+    /// Decrement lives by 1 — the regenerative bar drains first, then the
+    /// purchased reserve queue.  Returns true if a life was consumed, false
+    /// if the player was already at zero everywhere.  Unlimited-lives
+    /// subscribers always return true without decrementing.
     ///
-    /// The regen timer only starts when the player's count drops BELOW
-    /// `livesMax`.  Otherwise a player with 78 stockpiled lives would
-    /// see the regen clock churning the moment they lose their first one,
-    /// which is confusing.  Stockpile drains silently until you hit the
-    /// natural bar, then regen kicks in.
+    /// Draining regen first is deliberate: the bar starts refilling on the
+    /// 6-minute timer immediately, so reserve lives stretch further.
     @discardableResult
     func consumeLife() -> Bool {
         if unlimitedLives { return true }
         commitRegen()
-        if lives <= 0 { return false }
-        lives -= 1
-        if lives < Self.livesMax && lastLifeLostAt == nil {
-            lastLifeLostAt = .now
+        if lives > 0 {
+            lives -= 1
+            if lives < Self.livesMax && lastLifeLostAt == nil {
+                lastLifeLostAt = .now
+            }
+        } else if purchasedLives > 0 {
+            purchasedLives -= 1
+        } else {
+            return false
         }
         reconcileLivesNotification()
         return true
     }
 
-    /// Award lives (e.g. from rewarded ad or IAP grant).  No cap — lives
-    /// stockpile unbounded so the HUD can show 6 marbles + a "+N" indicator
-    /// for whatever the player has banked.
+    /// Award lives (rewarded ad, friend gift, or IAP grant).  Granted lives
+    /// go to the purchased reserve queue — the regen bar only ever fills on
+    /// the 6-minute timer, so a grant never pauses or resets regen (and the
+    /// lives-full notification schedule is unaffected).
     func addLives(_ count: Int) {
         guard count > 0 else { return }
         if unlimitedLives { return }
-        commitRegen()
-        lives += count
-        // Stockpiled lives don't need the regen timer running.  Clear it
-        // so it isn't ticking through scenarios it can't affect.
-        if lives >= Self.livesMax {
-            lastLifeLostAt = nil
-        }
-        reconcileLivesNotification()
+        purchasedLives += count
     }
 
     // MARK: - Notifications (lives-full / shop-fresh)
 
     /// The deterministic Date at which free 6-minute regen brings lives back to
-    /// the cap, or nil when not regenerating (full, stockpiled, or unlimited).
+    /// the cap, or nil when not regenerating (full or unlimited).
     /// "Had fallen below 10" is implicit: this is non-nil only while lives are
     /// actively regenerating.  Invariant under `commitRegen()` — stale stored
     /// `lives` + `lastLifeLostAt` still yield the same absolute restock instant.

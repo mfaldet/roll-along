@@ -5,8 +5,8 @@ import GoogleMobileAds
 // ---------------------------------------------------------------------------
 // AdManager — Google Mobile Ads SDK wrapper for rewarded video.
 //
-// One ad unit (rewarded video) → 1 life on completion.  No cap (lives
-// stockpile unbounded after PR #19).
+// One ad unit (rewarded video) → 1 life on completion, granted into the
+// purchased-lives reserve queue.  No cap (the reserve is unbounded).
 //
 // The SDK is initialised once at app launch.  An ad is pre-loaded so the
 // out-of-lives overlay's "Watch ad" button is instant when tapped, then
