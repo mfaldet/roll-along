@@ -1201,12 +1201,15 @@ final class GameState: ObservableObject {
 
     // ── Gold Rush tickets ───────────────────────────────────────────────
     /// ECONOMY: one ticket per competitive-minigame win.  A Gold Rush round
-    /// is bought up front: each TIME ticket = 30 s of play, each COIN ticket
-    /// adds +1x to the coins dropped (1 → x2 … 9 → x10), at most
-    /// `goldRushMaxStake` tickets per round.  Quitting early refunds one
-    /// ticket per FULL un-played 30 s block (coin tickets never refund).
+    /// is bought up front on the stake overlay: each TIME ticket buys 30 s
+    /// on the clock, and you can stake as many as you hold (no per-round
+    /// cap).  The only in-round upsell is the ×2-coins boost — a flat
+    /// 2 tickets, once per round — which doubles the PAYOUT per catch
+    /// (and back-pays the haul caught so far), never the coin count /
+    /// drop density (scaling density tanked the frame rate).  Quitting
+    /// early refunds one TIME ticket per FULL un-played 30 s block;
+    /// boost tickets never refund.  See docs/gold-rush-economy.md.
     static let maxTicketBalance = 999
-    static let goldRushMaxStake = 10
     static let goldRushSecondsPerTicket: TimeInterval = 30
 
     /// Award tickets (competitive win; future promos).  Mirrors addCoins'
