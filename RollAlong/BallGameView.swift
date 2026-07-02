@@ -409,6 +409,18 @@ struct BallGameView: View {
         }
     }
 
+    /// Coin indices already banked for the level being played — CLIMB ONLY.
+    /// Challenge Tracks and the Daily Challenge bank nothing, and in those
+    /// modes `gameState.currentLevel` still points at the player's parked
+    /// climb level — reading it there would mask coins on a completely
+    /// different map (dimmed + uncollectible wherever the climb level's
+    /// banked indices happen to land).  Non-climb modes therefore always
+    /// present their full coin set.
+    private var bankedCoinIndices: Set<Int> {
+        guard activeMode.progression.banksPickupCoins else { return [] }
+        return gameState.coinsCollected(for: gameState.currentLevel)
+    }
+
     /// Equipped Floor and Pit — read from GameState so the view
     /// re-renders when either is swapped.  Replaces the old `theme`
     /// abstraction since Floor and Pit are now independent picks.
@@ -961,7 +973,7 @@ struct BallGameView: View {
     /// across past attempts render dimmed but visible (signal that this slot
     /// has already been collected).
     private func coinLayer(geo: GeometryProxy) -> some View {
-        let banked = gameState.coinsCollected(for: gameState.currentLevel)
+        let banked = bankedCoinIndices
         return ForEach(Array(effectiveLayout.coins.enumerated()), id: \.offset) { idx, norm in
             if !coinsPickedThisAttempt.contains(idx) {
                 coinView(banked: banked.contains(idx), index: idx)
@@ -5210,7 +5222,7 @@ struct BallGameView: View {
         // Multiple coins can be collected per run.  Driven by
         // effectiveLayout so the L1 tutorial doesn't allow pickups while
         // coins aren't yet "revealed".
-        let banked = gameState.coinsCollected(for: gameState.currentLevel)
+        let banked = bankedCoinIndices
         for (idx, c) in effectiveLayout.coins.enumerated() {
             if coinsPickedThisAttempt.contains(idx) { continue }
             if banked.contains(idx) { continue }
@@ -5609,21 +5621,22 @@ struct BallGameView: View {
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
-        // ── Challenge of the Day fast-path ──────────────────────────────────
-        // The daily is a one-shot gauntlet with its own flow: the win
-        // overlay's "Next Level"/"Finish" button advances the sub-level and
-        // banks the day (see advanceFromLevelClear →
-        // completeTodaysDailyChallenge, where the 30-coin reward lives).
-        // It must NOT fall through to the climb path below — recordResult
-        // would pollute the climb's bestTime/stars for whatever climb level
-        // the player happens to be parked on, and the climb's per-clear coin
-        // bonus would be a stray faucet on top of the daily's own reward.
+
+        // ── Daily Challenge (one-shot) fast-path ───────────────────────────
+        // The gauntlet plays generated maps that are NOT `currentLevel` — the
+        // player's parked climb level.  Falling through to the climb logic
+        // would stamp a bogus 3-star best + time onto that parked level
+        // (daily layouts carry sentinel 999 s targets), pay its first-clear
+        // bonus, and could bump `highestUnlocked` past the frontier.  A
+        // sub-level clear only surfaces gauntlet progress; the day's coin
+        // reward is banked once by `completeTodaysDailyChallenge()` when
+        // "Finish" is tapped on the last sub-level (see advanceFromLevelClear).
         if case .oneShot = activeMode.progression {
             lastClearedTime           = elapsed
             lastClearedStars          = stars
             lastClearedCoinIndices    = coinsPickedThisAttempt
-            lastClearedIsNewBestStars = false   // no persistent daily record
-            lastClearedCoinReward     = 0       // paid on full completion, not per clear
+            lastClearedIsNewBestStars = false   // no persistent record; nothing to best
+            lastClearedCoinReward     = 0       // day reward pays on completion, not per level
             AnalyticsClient.shared.track(
                 "daily_challenge_level_cleared",
                 properties: [
@@ -5635,6 +5648,10 @@ struct BallGameView: View {
             return
         }
         // ── Main climb (original logic below) ──────────────────────────────
+        // Everything past this point writes persistent records against
+        // `gameState.currentLevel` — only the climb's progression may.
+        assert(activeMode.progression.recordsClimbResult,
+               "mode \(activeMode.id) fell through to climb record-keeping")
 
         let level     = gameState.currentLevel
         let prevStars = gameState.stars(for: level)

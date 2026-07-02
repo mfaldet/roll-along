@@ -513,6 +513,20 @@ final class SocialClient: @unchecked Sendable {
                            query: "id=eq.\(id.uuidString)", prefer: "return=minimal")
     }
 
+    /// Rename a clan — the first of the owner's personalization knobs (the RLS
+    /// "clans update by owner" policy scopes the PATCH, so a non-owner's call
+    /// matches zero rows).  The unique lower(name) index makes a taken name
+    /// throw; surface it as "name taken".  Future clan preference columns
+    /// (description, tag, colors…) extend `ClanUpdatePatch` the same way.
+    func renameClan(id: UUID, name: String) async throws {
+        _ = try requireSession()
+        let body = ClanUpdatePatch(name: name)
+        _ = try await send(method: "PATCH", path: "clans",
+                           query: "id=eq.\(id.uuidString)",
+                           bodyData: try encoder.encode(body),
+                           prefer: "return=minimal")
+    }
+
     // MARK: - Ask for a life + clan activity feed  (schema v2)
 
     /// Flag yourself as needing lives ("Ask for a life") — clan-mates see it on
@@ -543,7 +557,11 @@ final class SocialClient: @unchecked Sendable {
         return try decode([ClanEvent].self, from: data)
     }
 
-    /// Post a clan activity event (joined / left / sent_life / requested_life / thanked).
+    /// Post a clan activity event.  Kinds (see docs/social-schema-v3.sql):
+    /// created / joined / left / sent_life / requested_life / thanked /
+    /// requested_promotion / renamed, plus the premade quick-chat kinds
+    /// (`chat_*`) — the chat text itself never leaves the device; the client
+    /// maps each kind to a fixed string.
     func postClanEvent(clanId: UUID, kind: String, target: UUID? = nil) async throws {
         let me = try requireSession()
         let body = ClanEventInsert(clan_id: clanId, actor_id: me.userId,
@@ -1059,6 +1077,12 @@ private struct ClanMemberInsert: Encodable {
     let clan_id: UUID
     let player_id: UUID
     let role: String
+}
+
+/// Owner-only clan edits (renameClan today; future personalization columns —
+/// description, tag, colors — become optional fields here).
+private struct ClanUpdatePatch: Encodable {
+    let name: String
 }
 
 private struct ClanEventInsert: Encodable {
