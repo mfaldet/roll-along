@@ -1778,6 +1778,20 @@ struct CosmeticBundle: Identifiable {
         return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
     }
 
+    /// Count of contained items per cosmetic tier (starter items included —
+    /// they're free and don't affect rarity).  Feeds `rarity` and the
+    /// distribution dump in CosmeticsTests.
+    func tierCounts() -> [CosmeticTier: Int] {
+        var counts: [CosmeticTier: Int] = [:]
+        for b in balls  { counts[b.tier, default: 0] += 1 }
+        for g in goals  { counts[g.tier, default: 0] += 1 }
+        for t in trails { counts[t.tier, default: 0] += 1 }
+        for f in floors { counts[f.tier, default: 0] += 1 }
+        for p in pits   { counts[p.tier, default: 0] += 1 }
+        for m in music  { counts[m.tier, default: 0] += 1 }
+        return counts
+    }
+
     /// Bundle rarity — derived from the bundle's TOTAL coin value (`fullPrice`),
     /// since price already encodes per-item rarity.  Thresholds tuned to the live
     /// catalogue so a healthy number of cheaper bundles land in Standard (those

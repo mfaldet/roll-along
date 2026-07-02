@@ -301,14 +301,17 @@ final class CosmeticsTests: XCTestCase {
 
     // MARK: - Bundle rarity + Iconic (Phase 1)
 
-    /// Probe: prints the bundle cost distribution so thresholds can be tuned to
-    /// the live catalogue, and asserts every rarity band is represented (a
-    /// healthy Standard tier is required for the post-tutorial gift picker).
+    /// Probe: prints each bundle's member-tier mix and derived rarity so the
+    /// derivation rule can be tuned to the live catalogue, and asserts every
+    /// rarity band is represented (a healthy Standard tier is required for the
+    /// post-tutorial gift picker).
     func test_bundleRarityDistribution() {
         let sorted = CosmeticBundle.catalogue.sorted { $0.fullPrice() < $1.fullPrice() }
         for b in sorted {
             let perm = b.isLimitedTime ? "seasonal " : "PERMANENT"
-            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(String(format: "%6d", b.fullPrice()))  \(perm)  \(b.id)")
+            let mix = b.tierCounts()
+            let mixStr = "std=\(mix[.standard] ?? 0) rare=\(mix[.rare] ?? 0) epic=\(mix[.premium] ?? 0) leg=\(mix[.exclusive] ?? 0) free=\(mix[.starter] ?? 0)"
+            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(String(format: "%6d", b.fullPrice()))  \(perm)  \(mixStr)  \(b.id)")
         }
         let buckets = Dictionary(grouping: CosmeticBundle.catalogue, by: { $0.rarity })
         print("RARITYDIST counts:",
