@@ -5371,6 +5371,11 @@ struct BallGameView: View {
         if gameState.currentLevel == 1 && tutorialPhase != .notTutorial {
             tutorialPhase = .notTutorial
             coinsPickedThisAttempt = []
+            // The mid-tour coin credit was already paid AND its coins are now
+            // banked (un-pickable on the respawn), so leaving the bonus set
+            // would subtract it from the eventual clear's payout — zero it so
+            // the clear pays its full tier bonus.
+            tutorialCoinBonus = 0
             levelStartTime = nil
             spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
             respawnAfterPitFall(in: geoSize)
