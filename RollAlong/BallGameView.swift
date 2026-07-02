@@ -5604,6 +5604,31 @@ struct BallGameView: View {
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
+        // ── Challenge of the Day fast-path ──────────────────────────────────
+        // The daily is a one-shot gauntlet with its own flow: the win
+        // overlay's "Next Level"/"Finish" button advances the sub-level and
+        // banks the day (see advanceFromLevelClear →
+        // completeTodaysDailyChallenge, where the 30-coin reward lives).
+        // It must NOT fall through to the climb path below — recordResult
+        // would pollute the climb's bestTime/stars for whatever climb level
+        // the player happens to be parked on, and the climb's per-clear coin
+        // bonus would be a stray faucet on top of the daily's own reward.
+        if case .oneShot = activeMode.progression {
+            lastClearedTime           = elapsed
+            lastClearedStars          = stars
+            lastClearedCoinIndices    = coinsPickedThisAttempt
+            lastClearedIsNewBestStars = false   // no persistent daily record
+            lastClearedCoinReward     = 0       // paid on full completion, not per clear
+            AnalyticsClient.shared.track(
+                "daily_challenge_level_cleared",
+                properties: [
+                    "sub_level": .int(gameState.dailyChallengeIndex),
+                    "time":      .double(elapsed),
+                ]
+            )
+            withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
+            return
+        }
         // ── Main climb (original logic below) ──────────────────────────────
 
         let level     = gameState.currentLevel
