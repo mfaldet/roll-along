@@ -218,10 +218,19 @@ invocations — comfortably a week of sessions at current cadence.
 
 ## Standing decisions needed from Mac
 
-1. **Track farm**: close (climb-parity) or bless (pickups-only, re-baseline)?
-2. **Target minutes per tier** (proposal in Workstream A).
-3. **Daily soft cap**: adopt diminishing returns? (proven pattern, also
-   future-proofs a Gold-Pass-style product).
-4. **Bundle discount + sell-back pairing** (20% off + refund-what-you-paid?).
-5. **Difficulty spread**: compress to ×0.7/1.4 or keep ×0.5/2.0 with
-   telemetry-verified targets?
+**All five DECIDED 2026-07-01 — rulings, implications, and what shipped
+against them are in [07-decisions.md](07-decisions.md).**
+
+1. **Track farm** — DECIDED: **blessed everywhere**; the track farm stays and
+   the climb gets replay parity (ruling 1).
+2. **Target minutes per tier** — DECIDED: **30/40/50/60 min**
+   (Standard/Rare/Epic/Legendary) of typical play (ruling 2). Price table
+   derivation is in 07, awaiting approval.
+3. **Daily soft cap** — DECIDED: **no cap, monitor only** via
+   `minigame_result` telemetry (ruling 3).
+4. **Bundle discount + sell-back pairing** — DECIDED: **Sell Back refunds
+   50% of the *current* individual cosmetic cost** (live `coinCost`);
+   prices drift up over time, refunds drift with them (ruling 4).
+5. **Difficulty spread** — DECIDED: **compress and reword to 1x/1.5x/2x**
+   (Easy/Normal/Hard); Easy is knowingly EV-optimal per attempt — see the
+   honest EV note in 07 (ruling 5).
