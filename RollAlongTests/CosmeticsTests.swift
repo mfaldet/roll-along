@@ -370,4 +370,76 @@ final class CosmeticsTests: XCTestCase {
         }
         XCTAssertEqual(gs.coinBalance, 0, "no coins handed out for the gift")
     }
+
+    // MARK: - Starter Pack → Aurora collection (StoreKitManager contract)
+
+    /// StoreKitManager.grantAuroraCollection looks the bundle up by the string
+    /// id "aurora" — renaming or removing it would silently turn the Starter
+    /// Pack IAP's cosmetic grant into a no-op.  Pin the id and the six-slot
+    /// shape of the collection.
+    func testAuroraBundle_existsWithOneItemPerCategory() {
+        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
+            return XCTFail("the \"aurora\" bundle must exist — the Starter Pack IAP grants it by id")
+        }
+        XCTAssertEqual(aurora.balls,  [.aurora])
+        XCTAssertEqual(aurora.goals,  [.aurora])
+        XCTAssertEqual(aurora.trails, [.aurora])
+        XCTAssertEqual(aurora.floors, [.aurora])
+        XCTAssertEqual(aurora.pits,   [.aurora])
+        XCTAssertEqual(aurora.music,  [.aurora])
+    }
+
+    /// The Starter Pack grants the Aurora bundle free-granted; Sell Back must
+    /// refund none of it.  The bundle liquidates for 2,550 coins, so a sellable
+    /// grant would let the $1.99 pack out-mint the $19.99 coin pack.
+    func testAuroraBundleGrantedFree_isNotACoinFaucet() {
+        let gs = makeCleanState()
+        gs.coinBalance = 0
+        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
+            return XCTFail("expected the \"aurora\" bundle in the catalogue")
+        }
+
+        gs.grantBundleFree(aurora)
+        XCTAssertTrue(gs.isOwned(BallSkin.aurora))
+        XCTAssertTrue(gs.isOwned(GoalSkin.aurora))
+        XCTAssertTrue(gs.isOwned(TrailColor.aurora))
+        XCTAssertTrue(gs.isOwned(Floor.aurora))
+        XCTAssertTrue(gs.isOwned(Pit.aurora))
+        XCTAssertTrue(gs.isOwned(MusicTrack.aurora))
+        XCTAssertTrue(gs.completedBundleIDs.contains("aurora"))
+
+        let preview = gs.coinLiquidationPreview()
+        XCTAssertEqual(preview.coins, 0, "pack-granted Aurora items must not be refundable")
+        gs.liquidateCoinCosmetics()
+        XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.aurora.rawValue), "collection kept after Sell Back")
+        XCTAssertEqual(gs.coinBalance, 0, "Sell Back minted coins from the $1.99 pack's items")
+    }
+
+    /// A player who coin-bought part of the collection before the free grant
+    /// is refunded those items' full coinCost up front — the grant must not
+    /// confiscate paid Sell Back value.  Uses the goal (rawValue "aurora",
+    /// shared with trail/floor/pit/music) AND the ball (rawValue "Aurora",
+    /// distinct) so both the colliding and non-colliding key paths are pinned.
+    func testGrantBundleFree_compensatesPreviouslyCoinBoughtItems() {
+        let gs = makeCleanState()
+        gs.coinBalance = GoalSkin.aurora.coinCost + BallSkin.aurora.coinCost
+        XCTAssertTrue(gs.purchase(GoalSkin.aurora))
+        XCTAssertTrue(gs.purchase(BallSkin.aurora))
+        XCTAssertEqual(gs.coinBalance, 0)
+        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
+            return XCTFail("expected the \"aurora\" bundle in the catalogue")
+        }
+
+        gs.grantBundleFree(aurora)
+        XCTAssertEqual(gs.coinBalance, GoalSkin.aurora.coinCost + BallSkin.aurora.coinCost,
+                       "coin-bought pieces are refunded at full coinCost")
+        XCTAssertTrue(gs.completedBundleIDs.contains("aurora"))
+        XCTAssertEqual(gs.coinLiquidationPreview().coins, 0,
+                       "after compensation the whole collection is free-granted, not sellable")
+
+        // Re-granting must not compensate again (items are now free-marked).
+        gs.grantBundleFree(aurora)
+        XCTAssertEqual(gs.coinBalance, GoalSkin.aurora.coinCost + BallSkin.aurora.coinCost,
+                       "second grant is a no-op, no double refund")
+    }
 }

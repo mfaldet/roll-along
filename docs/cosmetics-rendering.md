@@ -58,7 +58,8 @@ Notable bespoke renderers:
   6-armed feathered flakes plus ~52 cheap fine-snow dots, all swirling
   (orbit + fast epicycle).
 - **aurora** — flowing vertical Northern-Lights curtains (additive) over a
-  starry sphere. Starter-Pack exclusive.
+  starry sphere. Coin-buyable Legendary; anchors the Aurora bundle, which the
+  legacy Starter Pack IAP grants in full.
 - **diamond** — see below.
 
 ### Animation
@@ -102,7 +103,7 @@ Exclusive skins and their source:
 | Source | Skins |
 |---|---|
 | **Diamond Balls IAP** (`.unlimitedUnlock`) | **diamond** — granted in `StoreKitManager` on purchase *and* restore |
-| Starter Pack IAP | aurora |
+| Starter Pack IAP (legacy) | the full Aurora collection (ball · goal · trail · floor · pit · music), free-granted on purchase *and* restore — aurora itself stays coin-buyable, so it is NOT `isBundleExclusive` |
 | Seasonal bundles | beachBall, pumpkin, ornament, heartstone, shamrock, confetti, speckledEgg |
 | Challenge-track completion | trophy (Golden Gauntlet) |
 | Bundle-only | pluto |

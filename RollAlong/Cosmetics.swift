@@ -87,12 +87,14 @@ extension CosmeticItem {
 }
 
 extension BallSkin {
-    /// Exclusive balls are never coin-purchasable — earned (trophy), IAP (aurora,
-    /// diamond), or seasonal-event drops — so the coin-liquidation reset keeps them.
-    // Aurora is no longer here — the Starter Pack IAP was retired and Aurora is
-    // now an ownable item in its own coin bundle (it stays `isBundleExclusive`,
-    // so it's earned via the Aurora bundle, and is sellable like other bundle
-    // balls).
+    /// Exclusive balls are never coin-purchasable — earned (trophy), IAP
+    /// (diamond, money), or seasonal-event drops — so the coin-liquidation
+    /// reset keeps them.
+    // Aurora is no longer here — it is a regular coin-buyable Legendary ball
+    // anchoring the Aurora bundle, sellable when coin-bought.  The legacy
+    // Starter Pack IAP instead grants the whole Aurora collection free-granted
+    // (see StoreKitManager.grantAuroraCollection), which Sell Back keeps but
+    // never refunds.
     static let coinExclusiveBalls: Set<BallSkin> =
         [.trophy, .beachBall, .pumpkin, .ornament, .heartstone,
          .shamrock, .confetti, .speckledEgg, .diamond, .moneyBall]
