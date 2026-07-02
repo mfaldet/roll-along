@@ -130,7 +130,7 @@ final class CosmeticsTests: XCTestCase {
 
         let preview = gs.coinLiquidationPreview()
         XCTAssertEqual(preview.count, 2)   // .blue + .galaxy; .diamond excluded
-        XCTAssertEqual(preview.coins, BallSkin.blue.coinCost + GoalSkin.galaxy.coinCost)
+        XCTAssertEqual(preview.coins, BallSkin.blue.coinCost / 2 + GoalSkin.galaxy.coinCost / 2)   // 50% refund
 
         let r = gs.liquidateCoinCosmetics()
         XCTAssertEqual(r.count, 2)
@@ -169,7 +169,7 @@ final class CosmeticsTests: XCTestCase {
 
         let first = gs.liquidateCoinCosmetics()
         XCTAssertEqual(first.count, 2)   // .blue + .fire; graphite NOT refunded
-        XCTAssertEqual(first.coins, BallSkin.blue.coinCost + TrailColor.fire.coinCost)
+        XCTAssertEqual(first.coins, BallSkin.blue.coinCost / 2 + TrailColor.fire.coinCost / 2)   // 50% refund
         XCTAssertTrue(gs.ownedTrails.contains(TrailColor.graphite.rawValue))   // starter kept
 
         let second = gs.liquidateCoinCosmetics()
@@ -335,10 +335,15 @@ final class CosmeticsTests: XCTestCase {
 
         let preview = gs.coinLiquidationPreview()
         XCTAssertEqual(preview.count, 1, "only the seasonal pumpkin is sellable")
-        XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost)
+        XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost / 2)   // 50% refund
+
+        // Sell Back pays 50% of the CURRENT item cost: a 500-coin exclusive
+        // refunds exactly 250.
+        XCTAssertEqual(BallSkin.pumpkin.coinCost, 500, "pumpkin is a 500-coin exclusive")
+        XCTAssertEqual(preview.coins, 250, "a 500-coin exclusive refunds 250")
 
         let r = gs.liquidateCoinCosmetics()
-        XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost)
+        XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost / 2)
         XCTAssertFalse(gs.ownedBallSkins.contains(BallSkin.pumpkin.rawValue), "seasonal ball sold + relocked")
         XCTAssertTrue(gs.ownedBallSkins.contains(BallSkin.diamond.rawValue), "iconic Diamond kept")
     }
@@ -377,7 +382,9 @@ final class CosmeticsTests: XCTestCase {
     // bought below cost (the Shop's featured-bundle discount, Ball Packs'
     // 66% pricing) — buy a 2,550-coin bundle at 50% off for 1,275, liquidate
     // for 2,550, pocket 1,275, repeat every rotation window.  `paidPrices`
-    // now records the discounted price and Sell Back refunds that instead.
+    // records the discounted price, and Sell Back pays `sellBackValue`:
+    // half the CURRENT coinCost, capped at what was paid — so neither deep
+    // discounts nor future price bumps can ever refund more than was spent.
 
     /// Buying the featured bundle at the deepest (50%) discount and selling
     /// straight back must refund at most what was paid — never a profit.
@@ -430,15 +437,14 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertLessThanOrEqual(gs.coinBalance, start, "pack buy → Sell Back must not mint coins")
     }
 
-    /// Full-price paths are untouched: an individual Shop purchase still
-    /// refunds its full coinCost, and a Catalog bundle bought at the full
-    /// prorated price refunds (up to) that price.
-    func testFullPricePurchases_stillRefundFullCost() {
+    /// Full-price purchases take the standard rate: an individual Shop buy
+    /// refunds half its current coinCost (no paid-price cap in play).
+    func testFullPricePurchases_refundHalfCurrentCost() {
         let gs = makeCleanState()
         gs.coinBalance = BallSkin.blue.coinCost
         XCTAssertTrue(gs.purchase(BallSkin.blue))
         let r = gs.liquidateCoinCosmetics()
-        XCTAssertEqual(r.coins, BallSkin.blue.coinCost, "full-price purchase refunds the full cost")
+        XCTAssertEqual(r.coins, BallSkin.blue.coinCost / 2, "full-price purchase refunds half the current cost")
     }
 
     /// Re-buying an item at full price after a discounted purchase was sold
@@ -448,8 +454,8 @@ final class CosmeticsTests: XCTestCase {
         gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = 1   // stale discount record
         gs.coinBalance = BallSkin.blue.coinCost
         XCTAssertTrue(gs.purchase(BallSkin.blue))
-        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost,
-                       "full-price re-purchase refunds full cost again")
+        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost / 2,
+                       "full-price re-purchase refunds the standard half rate again")
     }
 
     /// `paidPrices` keys are category-qualified: five different cosmetics
@@ -459,16 +465,16 @@ final class CosmeticsTests: XCTestCase {
         let gs = makeCleanState()
         gs.paidPrices[GameState.paidPriceKey(BallSkin.aurora)] = 1
         XCTAssertEqual(gs.sellBackValue(BallSkin.aurora), 1)
-        XCTAssertEqual(gs.sellBackValue(TrailColor.aurora), TrailColor.aurora.coinCost)
-        XCTAssertEqual(gs.sellBackValue(GoalSkin.aurora), GoalSkin.aurora.coinCost)
-        XCTAssertEqual(gs.sellBackValue(Floor.aurora), Floor.aurora.coinCost)
+        XCTAssertEqual(gs.sellBackValue(TrailColor.aurora), TrailColor.aurora.coinCost / 2)
+        XCTAssertEqual(gs.sellBackValue(GoalSkin.aurora), GoalSkin.aurora.coinCost / 2)
+        XCTAssertEqual(gs.sellBackValue(Floor.aurora), Floor.aurora.coinCost / 2)
     }
 
-    /// `sellBackValue` never exceeds coinCost even if a corrupt/legacy record
-    /// says otherwise.
-    func testSellBackValue_isCappedAtCoinCost() {
+    /// `sellBackValue` never exceeds the standard half rate, even if a
+    /// corrupt/legacy record claims more was paid.
+    func testSellBackValue_isCappedAtHalfCurrentCost() {
         let gs = makeCleanState()
         gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = BallSkin.blue.coinCost * 10
-        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost)
+        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost / 2)
     }
 }

@@ -78,7 +78,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — refunding the coins you paid, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
+            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for half their current coin value, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
         }
     }
 
@@ -456,7 +456,7 @@ struct SettingsView: View {
             .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
             .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
 
-            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, get back the coins you paid.")
+            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, sell them back for half their current value.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
             if let m = cosmeticResetMessage {

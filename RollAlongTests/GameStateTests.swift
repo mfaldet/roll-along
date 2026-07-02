@@ -87,16 +87,16 @@ final class GameStateTests: XCTestCase {
 
     func testMinigamePayout_scalesByDifficulty() {
         let gs = makeGameState()
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .easy),   50)
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .normal), 100)
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .easy),   100)
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .normal), 150)
         XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .hard),   200)
         // Rounds to the nearest coin.
-        XCTAssertEqual(gs.minigamePayout(base: 5, difficulty: .easy), 3)   // 2.5 -> 3
+        XCTAssertEqual(gs.minigamePayout(base: 5, difficulty: .normal), 8)   // 7.5 -> 8
     }
 
-    func testPayoutMultiplier_spreadIsHalfOneTwo() {
-        XCTAssertEqual(MinigameDifficulty.easy.payoutMultiplier,   0.5)
-        XCTAssertEqual(MinigameDifficulty.normal.payoutMultiplier, 1.0)
+    func testPayoutMultiplier_spreadIsOneOneHalfTwo() {
+        XCTAssertEqual(MinigameDifficulty.easy.payoutMultiplier,   1.0)
+        XCTAssertEqual(MinigameDifficulty.normal.payoutMultiplier, 1.5)
         XCTAssertEqual(MinigameDifficulty.hard.payoutMultiplier,   2.0)
     }
 
@@ -118,8 +118,8 @@ final class GameStateTests: XCTestCase {
         gs.coinBalance = 0
         let paid = gs.recordMinigameResult(modeID: "sumo", difficulty: .easy,
                                            won: true, score: 0, basePayout: 10)
-        XCTAssertEqual(paid, 5, "10 base × 0.5 (easy)")
-        XCTAssertEqual(gs.coinBalance, 5)
+        XCTAssertEqual(paid, 10, "10 base × 1.0 (easy)")
+        XCTAssertEqual(gs.coinBalance, 10)
         XCTAssertEqual(gs.minigameDifficultyPlays["sumo|easy"], 1)
         XCTAssertEqual(gs.minigameDifficultyWins["sumo|easy"], 1)
         XCTAssertEqual(gs.minigameWins["sumo"], 1, "win bumps the lifetime tally")

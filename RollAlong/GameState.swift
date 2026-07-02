@@ -676,16 +676,20 @@ final class GameState: ObservableObject {
         "\(Item.self):\(item.rawValue)"
     }
 
-    /// What Sell Back pays for `item`: the recorded price when it was bought
-    /// below cost (discounted featured bundle, Ball Pack), else the full
-    /// `coinCost`.  Never more than `coinCost`.
+    /// What Sell Back pays for `item`: HALF its CURRENT `coinCost` (all tier
+    /// prices are even, so the halving is exact — and the refund deliberately
+    /// reads the live price, per Mac's calibration ruling), capped at the
+    /// recorded price when the item was bought below cost (discounted featured
+    /// bundle, Ball Pack).  The cap keeps discounts and future price bumps
+    /// from becoming a mint: a refund can never exceed what was paid.
     func sellBackValue<Item: CosmeticItem>(_ item: Item) -> Int {
-        min(item.coinCost, paidPrices[Self.paidPriceKey(item)] ?? item.coinCost)
+        min(item.coinCost / 2, paidPrices[Self.paidPriceKey(item)] ?? item.coinCost)
     }
 
     /// Dry run: how many owned cosmetics are sellable (coin-bought plus seasonal
-    /// / limited-time specials), and the coins they'd refund.  Powers the
-    /// Danger-Zone button label + confirm dialog.
+    /// / limited-time specials), and the coins they'd refund — `sellBackValue`
+    /// each: 50% of the CURRENT `coinCost`, capped at what was paid for
+    /// below-cost buys.  Powers the Danger-Zone button label + confirm dialog.
     func coinLiquidationPreview() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
@@ -700,7 +704,8 @@ final class GameState: ObservableObject {
         return (count, coins)
     }
 
-    /// Relock every SELLABLE cosmetic and refund its coins — coin-bought items
+    /// Relock every SELLABLE cosmetic and refund its `sellBackValue` (half the
+    /// live price at sell time, never more than was paid) — coin-bought items
     /// plus seasonal / limited-time specials — KEEPING the starter look and the
     /// permanent Iconic specials (Trophy, Diamond, Money, Aurora).  Re-equips the
     /// starter for any slot whose item was liquidated.  Returns what was
@@ -1037,10 +1042,26 @@ final class GameState: ObservableObject {
     /// up to 3 currency-coins on the floor → 0…3 coins per first clear
     /// from pickups alone.
     static let coinPerPickup: Int = 1
-    /// Flat coin award the first time a player clears a level.  Stacks
-    /// with pickups so a perfect first clear yields `coinPerClear + 3`
-    /// coins.  Subsequent clears award 0 (no farming).
+    /// Base flat coin award on EVERY climb clear — first time or replay.  The
+    /// grind is blessed (2026-07-01 economy calibration): replaying a level
+    /// pays this bonus again, exactly like the Challenge Tracks, whether the
+    /// player pushes to level 10,000 or replays level 1 ten thousand times.
+    /// Stacks with pickups, so a perfect first clear yields `clearCoins(for:)
+    /// + 3` coins; pickup coins stay sticky and pay only once per level.
+    /// The climb scales this by tier via `clearCoins(for:)` — this constant
+    /// is the easy-tier base (and the flat track-level bonus).
     static let coinPerClear:  Int = 2
+
+    /// Climb clear bonus scaled by the level's difficulty tier (the
+    /// last-digit rule — `DifficultyTier.tier(for:)`): easy 2 · hard 3 ·
+    /// veryHard 4.  Harder never pays less per clear.
+    static func clearCoins(for level: Int) -> Int {
+        switch DifficultyTier.tier(for: level) {
+        case .easy:     return 2
+        case .hard:     return 3
+        case .veryHard: return 4
+        }
+    }
 
     /// Maximum coins grantable in a single `addCoins` call.
     /// Highest legitimate single award is 10 000 (coins10000 IAP).
@@ -1209,12 +1230,15 @@ final class GameState: ObservableObject {
 
     // ── Gold Rush tickets ───────────────────────────────────────────────
     /// ECONOMY: one ticket per competitive-minigame win.  A Gold Rush round
-    /// is bought up front: each TIME ticket = 30 s of play, each COIN ticket
-    /// adds +1x to the coins dropped (1 → x2 … 9 → x10), at most
-    /// `goldRushMaxStake` tickets per round.  Quitting early refunds one
-    /// ticket per FULL un-played 30 s block (coin tickets never refund).
+    /// is bought up front on the stake overlay: each TIME ticket buys 30 s
+    /// on the clock, and you can stake as many as you hold (no per-round
+    /// cap).  The only in-round upsell is the ×2-coins boost — a flat
+    /// 2 tickets, once per round — which doubles the PAYOUT per catch
+    /// (and back-pays the haul caught so far), never the coin count /
+    /// drop density (scaling density tanked the frame rate).  Quitting
+    /// early refunds one TIME ticket per FULL un-played 30 s block;
+    /// boost tickets never refund.  See docs/gold-rush-economy.md.
     static let maxTicketBalance = 999
-    static let goldRushMaxStake = 10
     static let goldRushSecondsPerTicket: TimeInterval = 30
 
     /// Award tickets (competitive win; future promos).  Mirrors addCoins'
@@ -1758,23 +1782,24 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
     }
 
     /// Payout multiplier applied to a competitive minigame's coin winnings.
-    /// Higher difficulty = harder to win = bigger reward for the risk taken.
-    /// Spread: Easy 0.5× · Normal 1× · Hard 2× (today's payout == Normal).
-    /// Calibrate against `targetWinRate` from the tracked success rates so the
-    /// expected value per play stays fair — see docs/minigame-difficulty.md.
+    /// Compressed spread (2026-07-01 economy calibration, see
+    /// docs/economy/07-decisions.md): Easy 1× · Normal 1.5× · Hard 2×.
+    /// Easy no longer pays below par — combined with `targetWinRate`, Easy is
+    /// deliberately the EV-optimal per-attempt pick; Hard still pays the most
+    /// per WIN.  See docs/minigame-difficulty.md for the honest EV math.
     var payoutMultiplier: Double {
         switch self {
-        case .easy:   return 0.5
-        case .normal: return 1.0
+        case .easy:   return 1.0
+        case .normal: return 1.5
         case .hard:   return 2.0
         }
     }
 
-    /// Short payout descriptor for the pre-game picker (relative to Normal).
+    /// Short payout descriptor for the pre-game picker.
     var payoutLabel: String {
         switch self {
-        case .easy:   return "0.5× coins"
-        case .normal: return "1× coins"
+        case .easy:   return "1× coins"
+        case .normal: return "1.5× coins"
         case .hard:   return "2× coins"
         }
     }

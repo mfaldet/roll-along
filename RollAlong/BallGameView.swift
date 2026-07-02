@@ -5383,6 +5383,11 @@ struct BallGameView: View {
         if gameState.currentLevel == 1 && tutorialPhase != .notTutorial {
             tutorialPhase = .notTutorial
             coinsPickedThisAttempt = []
+            // The mid-tour coin credit was already paid AND its coins are now
+            // banked (un-pickable on the respawn), so leaving the bonus set
+            // would subtract it from the eventual clear's payout — zero it so
+            // the clear pays its full tier bonus.
+            tutorialCoinBonus = 0
             levelStartTime = nil
             spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
             respawnAfterPitFall(in: geoSize)
@@ -5653,30 +5658,28 @@ struct BallGameView: View {
 
         // Currency-coin reward.  Two stackable sources:
         //
-        //   1. Flat per-clear bonus (`coinPerClear`) — only on the FIRST
-        //      time the level is cleared.  We detect first clear by the
-        //      absence of a recorded best-time; `recordResult` (called
-        //      below) is what sets bestTime, so we can safely read it
-        //      here to decide.
+        //   1. Flat per-clear bonus (`clearCoins(for:)` — 2/3/4 by the
+        //      level's difficulty tier) — on EVERY clear, first time or
+        //      replay.  Replay farming is blessed (2026-07-01 economy
+        //      calibration): the climb pays like the Challenge Tracks,
+        //      whether the player pushes to level 10,000 or replays
+        //      level 1 ten thousand times.
         //
         //   2. Per-pickup (`coinPerPickup`) for each currency-coin grabbed
-        //      this run.  `coinsPickedThisAttempt` is already filtered
-        //      to first-time pickups at collection time.
+        //      this run.  Banked coins can't be re-picked (the pickup gate
+        //      skips them), so sticky pickups still pay only once ACROSS
+        //      attempts — only the flat bonus repeats.
         //
-        // A perfect first clear awards coinPerClear + 3.  Replays of an
-        // already-cleared level award only the value of any newly-banked
-        // pickup coins (typically 0 since they're sticky).
-        let newStars     = max(0, stars - prevStars)
-        let isFirstClear = gameState.time(for: level) == nil
-        // L1 tutorial may have already banked + paid out the three
-        // coins at the Phase-2→3 transition.  Filter those out so the
-        // player isn't rewarded twice for the same pickups.
-        let alreadyBanked = gameState.coinsCollected(for: level)
-        let newCoinsThisRun = coinsPickedThisAttempt.subtracting(alreadyBanked)
-        // `coinReward` is the amount we add to the balance HERE — the
-        // tutorial-bank moment already credited its own portion.
-        let coinReward = (isFirstClear ? GameState.coinPerClear : 0)
-                       + newCoinsThisRun.count * GameState.coinPerPickup
+        // A perfect first clear of an easy level awards 2 + 3.  Replays
+        // award the flat bonus plus any never-before-banked pickups.
+        let newStars = max(0, stars - prevStars)
+        // `coinReward` is the amount we add to the balance HERE.  The L1
+        // tutorial may have already banked + credited the three coins at
+        // the Phase-2→3 transition (`tutorialCoinBonus`); subtract that
+        // portion so the player isn't paid twice in the same attempt.
+        let coinReward = GameState.clearCoins(for: level)
+                       + coinsPickedThisAttempt.count * GameState.coinPerPickup
+                       - tutorialCoinBonus
         // `displayedCoinReward` is what the Level Clear screen shows
         // ("+N coins").  It surfaces the FULL haul from this attempt
         // — coinReward plus any tutorial bonus already paid out — so

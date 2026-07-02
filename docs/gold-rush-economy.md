@@ -21,8 +21,9 @@ Before the clock starts, `coinPitStakeOverlay` lets the player buy **time**:
 
 - **Every time ticket = +30 s** (`GameState.goldRushSecondsPerTicket`).
 - Stake **as many tickets as you hold** — there is no per-round cap. (The old
-  10-ticket `goldRushMaxStake` cap was removed.) The picker's upper bound is the
-  player's balance.
+  10-ticket `goldRushMaxStake` cap is gone: the constant lingered unreferenced
+  in `GameState` for a while and has now been deleted too.) The picker's upper
+  bound is the player's balance.
 - With exactly 1 ticket the picker is skipped — Start stakes it for a straight
   30 s round.
 - Tickets are consumed on **Start** (`startCoinPitRound`), which freezes
