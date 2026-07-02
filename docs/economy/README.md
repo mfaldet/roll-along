@@ -20,6 +20,7 @@ research into how top F2P games calibrate the same systems.
 | [09-telemetry-recheck.md](09-telemetry-recheck.md) | Runbook: recompute the real earn rate + win rates from live events |
 | [07-decisions.md](07-decisions.md) | Mac's five rulings, shipped calibration levers, post-change earn table, tier-price memo (approved → 08) |
 | [08-reprice.md](08-reprice.md) | The shipped reprice: tier ladder 750/1,000/1,250/1,500, derived bundle floors 5,500/6,500, IAP re-anchor, ASC follow-ups |
+| [ai-calibration-2026-07.md](ai-calibration-2026-07.md) | Headless AI win-rate harness (Gold Rush): architecture, first measurements vs 0.80/0.45/0.22 targets, calibration procedure |
 
 ## Headline findings
 
