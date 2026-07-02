@@ -32,7 +32,7 @@ final class CosmeticsTests: XCTestCase {
 
     /// Bundle-exclusive skins are always top-tier (`.exclusive`).  They're kept
     /// out of the coin shop by CosmeticShopView's owned-or-hidden filter, NOT by
-    /// price — `coinCost` reads through to `tier.basePrice` (500), so asserting a
+    /// price — `coinCost` reads through to `tier.basePrice` (1,500), so asserting a
     /// price of 0 would be wrong.  This guards against an event skin being
     /// mis-tiered into a cheap, coin-buyable slot.
     func testBundleExclusiveSkins_areExclusiveTier() {
@@ -53,7 +53,7 @@ final class CosmeticsTests: XCTestCase {
             "Pluto", "Beach Ball", "Pumpkin", "Ornament",
             "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy",
             "Diamond",     // Diamond Balls IAP exclusive
-            "Money Ball"   // 10,000-coin IAP secret exclusive
+            "Money Ball"   // top-coin-pack ($49.99) IAP secret exclusive
         ]
         let actual = Set(BallSkin.allCases.filter { $0.isBundleExclusive }.map { $0.rawValue })
         XCTAssertEqual(actual, expected,
@@ -97,9 +97,24 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(CosmeticTier.starter.basePrice, 0)
     }
 
+    /// The approved 2026-07 reprice (07-decisions ruling 2, shipped in
+    /// 08-reprice): 750 / 1,000 / 1,250 / 1,500.  Every price must be EVEN
+    /// forever — Sell Back refunds exactly half the CURRENT cost as an
+    /// integer, so an odd price would truncate the refund.
+    func testCosmeticTier_basePricesMatchApprovedLadderAndAreEven() {
+        XCTAssertEqual(CosmeticTier.standard.basePrice,  750)
+        XCTAssertEqual(CosmeticTier.rare.basePrice,      1000)
+        XCTAssertEqual(CosmeticTier.premium.basePrice,   1250)
+        XCTAssertEqual(CosmeticTier.exclusive.basePrice, 1500)
+        for tier in [CosmeticTier.starter, .standard, .rare, .premium, .exclusive] {
+            XCTAssertEqual(tier.basePrice % 2, 0,
+                           "Tier \(tier) price must stay even so sell-back halves exactly")
+        }
+    }
+
     func testCosmeticTier_basePricesAreMonotonicallyIncreasing() {
         // Ordered from cheapest to most expensive
-        let tiers: [CosmeticTier] = [.starter, .standard, .premium, .exclusive]
+        let tiers: [CosmeticTier] = [.starter, .standard, .rare, .premium, .exclusive]
         var previous = -1
         for tier in tiers {
             XCTAssertGreaterThan(tier.basePrice, previous,
@@ -292,7 +307,8 @@ final class CosmeticsTests: XCTestCase {
     func test_bundleRarityDistribution() {
         let sorted = CosmeticBundle.catalogue.sorted { $0.fullPrice() < $1.fullPrice() }
         for b in sorted {
-            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(b.fullPrice())  \(b.id)")
+            let perm = b.isLimitedTime ? "seasonal " : "PERMANENT"
+            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(String(format: "%6d", b.fullPrice()))  \(perm)  \(b.id)")
         }
         let buckets = Dictionary(grouping: CosmeticBundle.catalogue, by: { $0.rarity })
         print("RARITYDIST counts:",
@@ -300,6 +316,22 @@ final class CosmeticsTests: XCTestCase {
         for r in BundleRarity.allCases {
             XCTAssertGreaterThan(buckets[r]?.count ?? 0, 0, "no bundles in rarity band \(r.label)")
         }
+    }
+
+    /// Regression guard for the post-tutorial gift (BallGameView filters
+    /// `rarity == .standard && isAvailable`): the PERMANENT (non-seasonal)
+    /// Standard-rarity pool must never be empty, or the gift picker
+    /// dead-ends the moment no seasonal window is open.  A future price or
+    /// floor change that empties this pool must fail here, not in prod.
+    func testTutorialGift_permanentStandardBundlePool_neverEmpty() {
+        let pool = CosmeticBundle.catalogue.filter { !$0.isLimitedTime && $0.rarity == .standard }
+        print("GIFTPOOL permanent Standard bundles:", pool.map { $0.id }.joined(separator: ", "))
+        XCTAssertFalse(pool.isEmpty,
+                       "The permanent Standard-rarity bundle pool is empty — the post-tutorial gift dead-ends")
+        // Every permanent Standard bundle is (trivially) always available, so
+        // the gift picker's `isAvailable` filter can never see fewer options
+        // than this pool.
+        for b in pool { XCTAssertTrue(b.isAvailable, "permanent bundle \(b.id) must always be available") }
     }
 
     /// Iconic = the un-sellable specials.  Starter look + earned/IAP exclusives
@@ -337,10 +369,10 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(preview.count, 1, "only the seasonal pumpkin is sellable")
         XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost / 2)   // 50% refund
 
-        // Sell Back pays 50% of the CURRENT item cost: a 500-coin exclusive
-        // refunds exactly 250.
-        XCTAssertEqual(BallSkin.pumpkin.coinCost, 500, "pumpkin is a 500-coin exclusive")
-        XCTAssertEqual(preview.coins, 250, "a 500-coin exclusive refunds 250")
+        // Sell Back pays 50% of the CURRENT item cost: a 1,500-coin exclusive
+        // refunds exactly 750.
+        XCTAssertEqual(BallSkin.pumpkin.coinCost, 1500, "pumpkin is a 1,500-coin exclusive")
+        XCTAssertEqual(preview.coins, 750, "a 1,500-coin exclusive refunds 750")
 
         let r = gs.liquidateCoinCosmetics()
         XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost / 2)
@@ -395,8 +427,9 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// The Starter Pack grants the Aurora bundle free-granted; Sell Back must
-    /// refund none of it.  The bundle liquidates for 2,550 coins, so a sellable
-    /// grant would let the $1.99 pack out-mint the $19.99 coin pack.
+    /// refund none of it.  The bundle's items would sell back for 4,125 coins
+    /// (half of 8,250 under the 2026-07 reprice), so a sellable grant would
+    /// let the $1.99 pack rival the $4.99 coin pack.
     func testAuroraBundleGrantedFree_isNotACoinFaucet() {
         let gs = makeCleanState()
         gs.coinBalance = 0
@@ -470,8 +503,8 @@ final class CosmeticsTests: XCTestCase {
     //
     // Sell Back used to refund every item's full coinCost even when it was
     // bought below cost (the Shop's featured-bundle discount, Ball Packs'
-    // 66% pricing) — buy a 2,550-coin bundle at 50% off for 1,275, liquidate
-    // for 2,550, pocket 1,275, repeat every rotation window.  `paidPrices`
+    // 66% pricing) — buy a bundle at 50% off, liquidate for its full price,
+    // pocket the difference, repeat every rotation window.  `paidPrices`
     // records the discounted price, and Sell Back pays `sellBackValue`:
     // half the CURRENT coinCost, capped at what was paid — so neither deep
     // discounts nor future price bumps can ever refund more than was spent.

@@ -131,7 +131,12 @@ in code), Sumo ~90s (35s shrink forces resolution), Gold Rush score ~40/35,
 Pinball 10k in 4 min, Disco 12 crossings/75s, Roll Up 100m/90s, Roll Out
 60s/maze, Coin Pit 70% catch.
 
-## Tier-price derivation memo — **awaiting Mac's approval**
+## Tier-price derivation memo — **SHIPPED 2026-07-02**
+
+> **Status:** Mac approved the central scenario (750 / 1,000 / 1,250 /
+> 1,500) and it shipped with the re-derived bundle floors and the IAP
+> re-anchor — see [08-reprice.md](08-reprice.md) for what actually landed.
+> The memo below is preserved as the derivation record.
 
 Ruling 2 fixes the *time* targets; the price table follows from the assumed
 earn rate R. Three scenarios were derived; **nothing here is implemented yet**.

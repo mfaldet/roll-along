@@ -1066,10 +1066,13 @@ final class GameState: ObservableObject {
     }
 
     /// Maximum coins grantable in a single `addCoins` call.
-    /// Highest legitimate single award is 10 000 (coins10000 IAP).
+    /// Highest legitimate single award is 60 000 — the top coin pack
+    /// (the historical coins.10000 product ID) after the 2026-07 IAP
+    /// re-anchor.  This MUST track the biggest `rewardCoins` grant or the
+    /// $49.99 purchase would be silently clamped and short-deliver.
     /// Values exceeding this are clamped and printed in DEBUG so any
     /// runaway-reward bug surfaces during development.
-    private static let maxSingleAward: Int = 10_000
+    private static let maxSingleAward: Int = 60_000
 
     /// Hard ceiling on the stored coin balance — prevents overflows and
     /// absurd displays from a corrupted save or a future bug.
@@ -1340,9 +1343,9 @@ final class GameState: ObservableObject {
     /// day 7 the ladder repeats from the top, but `dailyStreak` keeps climbing
     /// so an unbroken streak still reads as a big number in the HUD.
     ///
-    /// ECONOMY: a perfect week pays 105 — about two standard-tier (50) skins,
-    /// half a premium (200).  Tuned down 2026-06-11 from [25,40,60,80,100,150,
-    /// 300] (= 755/week, several premium cosmetics for just signing in).
+    /// ECONOMY: a perfect week pays 105 — a top-up, not a wage: ~14% of a
+    /// Standard-tier (750) skin under the 2026-07 reprice.  Tuned down
+    /// 2026-06-11 from [25,40,60,80,100,150,300] (= 755/week).
     static let dailyRewardLadder: [Int] = [5, 8, 10, 12, 15, 20, 35]
 
     /// True when the player hasn't yet claimed today's reward.

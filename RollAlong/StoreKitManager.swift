@@ -32,6 +32,11 @@ final class StoreKitManager: ObservableObject {
         case livesPack5   = "com.macfaldet.RollAlong.lives.pack5"
         case livesPack10  = "com.macfaldet.RollAlong.lives.pack10"
         case unlimited    = "com.macfaldet.RollAlong.unlimited"
+        // Coin packs.  The numeric suffixes in the case names / product IDs
+        // are HISTORICAL — App Store Connect product IDs are immutable, so
+        // they still carry the pre-2026-07-reprice amounts.  The actual
+        // grant is `rewardCoins` below (750 / 4,500 / 10,000 / 22,500 /
+        // 60,000); display names come from ASC / Products.storekit.
         case coins100     = "com.macfaldet.RollAlong.coins.100"
         case coins600     = "com.macfaldet.RollAlong.coins.600"
         case coins1300    = "com.macfaldet.RollAlong.coins.1300"
@@ -73,14 +78,28 @@ final class StoreKitManager: ObservableObject {
         }
 
         /// Coins granted by this purchase.  Zero for non-coin products.
+        ///
+        /// 2026-07 reprice (docs/economy/08-reprice.md): amounts re-anchored
+        /// to the 750/1,000/1,250/1,500 tier ladder so the smallest pack buys
+        /// one Standard item.  Coins-per-dollar must rise MONOTONICALLY up
+        /// the ladder (bigger pack = strictly better rate):
+        ///
+        ///   product     $ price   coins    coins/$
+        ///   coins100      0.99       750     758
+        ///   coins600      4.99     4,500     902
+        ///   coins1300     9.99    10,000   1,001
+        ///   coins3000    19.99    22,500   1,126
+        ///   coins10000   49.99    60,000   1,200
+        ///
+        /// (Case names keep their historical amounts — see ProductID note.)
         var rewardCoins: Int {
             switch self {
-            case .coins100:    return 100
-            case .coins600:    return 600
-            case .coins1300:   return 1300
-            case .coins3000:   return 3000
-            case .coins10000:  return 10000
-            case .starterPack: return 500
+            case .coins100:    return 750
+            case .coins600:    return 4500
+            case .coins1300:   return 10000
+            case .coins3000:   return 22500
+            case .coins10000:  return 60000
+            case .starterPack: return 500   // retired product, historical grant
             default:           return 0
             }
         }
@@ -109,7 +128,7 @@ final class StoreKitManager: ObservableObject {
         let coins: Int
         let unlimitedActivated: Bool
         /// Display name of a secret cosmetic dropped alongside this purchase
-        /// (the 10,000-coin pack's random "Money" unlock), or nil.
+        /// (the top coin pack's random "Money" unlock), or nil.
         var grantedCosmeticName: String? = nil
     }
 
@@ -316,7 +335,8 @@ final class StoreKitManager: ObservableObject {
 
         case .coinPack:
             gameState.addCoins(productID.rewardCoins)
-            // The 10,000-coin pack also drops ONE random not-yet-owned "Money"
+            // The top coin pack (the historical coins.10000 product, now a
+            // 60,000-coin grant) also drops ONE random not-yet-owned "Money"
             // cosmetic — up to three unlock across repeat purchases.
             if productID == .coins10000 {
                 grantedCosmetic = grantRandomMoneyCosmetic(gameState)
@@ -350,9 +370,10 @@ final class StoreKitManager: ObservableObject {
     /// Grant the complete Aurora collection — every item in the "aurora"
     /// cosmetic bundle (ball, goal, trail, floor, pit, music) — via
     /// `grantBundleFree`, which marks the items free-granted so Sell Back keeps
-    /// them but never refunds them.  That marking is load-bearing: the bundle
-    /// liquidates for 2,550 coins, so a plain grant would let a $1.99 pack
-    /// out-mint the $19.99 coin pack.  Players who already coin-bought part of
+    /// them but never refunds them.  That marking is load-bearing: the bundle's
+    /// items would sell back for 4,125 coins (half their 8,250 catalogue value
+    /// under the 2026-07 reprice), so a plain grant would hand a $1.99 pack
+    /// nearly the $4.99 coin pack's worth.  Players who already coin-bought part of
     /// the collection are refunded those items' full coinCost by
     /// `grantBundleFree` before the marking, so no paid Sell Back value is
     /// confiscated.  No-ops when the player already owns all six items (a
@@ -371,7 +392,7 @@ final class StoreKitManager: ObservableObject {
     /// Grant ONE random "Money" cosmetic the player doesn't yet own — the ball,
     /// trail, or floor.  Returns its display name (for the celebration) or nil if
     /// all three are already owned.  Deliberately one-at-a-time so the trio
-    /// unlocks across repeat 10,000-coin purchases rather than all at once.
+    /// unlocks across repeat top-pack purchases rather than all at once.
     private func grantRandomMoneyCosmetic(_ gs: GameState) -> String? {
         var pool: [(name: String, grant: () -> Void)] = []
         if !gs.isOwned(BallSkin.moneyBall)   { pool.append(("Money Ball", { gs.grant(BallSkin.moneyBall) })) }
@@ -407,7 +428,7 @@ final class StoreKitManager: ObservableObject {
         // Family Sharing revocations through Transaction.updates as *verified*
         // transactions with revocationDate set.  Delivering here would mint
         // the reward a second time on top of the money back (e.g., refund the
-        // 10,000-coin pack → another 10,000 coins + a Money cosmetic, forever
+        // top coin pack → another 60,000 coins + a Money cosmetic, forever
         // repeatable).
         if revocationDate != nil { return .skipRevoked }
         guard let productID = ProductID(rawValue: productID) else {

@@ -28,10 +28,42 @@ final class StoreKitManagerTests: XCTestCase {
         }
     }
 
+    // MARK: - Coin pack rewards (2026-07 reprice)
+
+    /// Pins the re-anchored coin amounts (product IDs are immutable in App
+    /// Store Connect, so the case names keep their historical numbers).
+    func testCoinPackRewardCoins_matchRepricedAmounts() {
+        XCTAssertEqual(StoreKitManager.ProductID.coins100.rewardCoins,      750)
+        XCTAssertEqual(StoreKitManager.ProductID.coins600.rewardCoins,    4_500)
+        XCTAssertEqual(StoreKitManager.ProductID.coins1300.rewardCoins,  10_000)
+        XCTAssertEqual(StoreKitManager.ProductID.coins3000.rewardCoins,  22_500)
+        XCTAssertEqual(StoreKitManager.ProductID.coins10000.rewardCoins, 60_000)
+    }
+
+    /// Coins-per-dollar must rise strictly with pack size — a bigger pack is
+    /// never a worse deal (758 / 902 / 1,001 / 1,126 / 1,200 per $ at the
+    /// intended $0.99/$4.99/$9.99/$19.99/$49.99 price points).
+    func testCoinPacks_coinsPerDollarRiseMonotonically() {
+        let ladder: [(StoreKitManager.ProductID, Double)] = [
+            (.coins100,    0.99),
+            (.coins600,    4.99),
+            (.coins1300,   9.99),
+            (.coins3000,  19.99),
+            (.coins10000, 49.99),
+        ]
+        var previousRate = 0.0
+        for (pid, dollars) in ladder {
+            let rate = Double(pid.rewardCoins) / dollars
+            XCTAssertGreaterThan(rate, previousRate,
+                                 "\(pid.rawValue) must beat the smaller pack's coins-per-dollar")
+            previousRate = rate
+        }
+    }
+
     // MARK: - Refund / revocation
 
-    /// The refund exploit: buy the 10,000-coin pack, request an Apple refund,
-    /// and the revocation update must NOT mint another 10,000 coins (plus a
+    /// The refund exploit: buy the top ($49.99) coin pack, request an Apple refund,
+    /// and the revocation update must NOT mint another 60,000 coins (plus a
     /// Money cosmetic) on top of the money back.
     func testRevokedCoinPackDoesNotDeliver() {
         XCTAssertEqual(

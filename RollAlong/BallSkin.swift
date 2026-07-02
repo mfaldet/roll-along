@@ -14,7 +14,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
     // Starter
     case red    = "Classic Red"
 
-    // Standard (50 coins)
+    // Standard (750 coins)
     case blue   = "Ocean Blue"
     case green  = "Jade Green"
     case purple = "Deep Purple"
@@ -24,21 +24,21 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case slate  = "Slate"
     case lemon  = "Lemon"
 
-    // Premium / Epic (200 coins)
+    // Premium / Epic (1,250 coins)
     case gold   = "Fool's Gold"
     case silver = "Silver"
     case copper = "Copper"
     case jade   = "Jade"
     case ruby   = "Ruby"
 
-    // Exclusive / Legendary (500 coins) — animated / special-effect renderers
+    // Exclusive / Legendary (1,500 coins) — animated / special-effect renderers
     case galaxy    = "Galaxy"          // multi-colour gradient (kept here for parity)
     case nebula    = "Nebula"          // multi-colour gradient
     case opal      = "Opal"            // multi-colour gradient
     case snowglobe = "Snowglobe"       // glass marble with swirling snow inside
     case golfBall  = "Golf Ball"       // white with dimples (Golf bundle)
 
-    // Planets bundle (200 coins each — multi-colour gradient marbles).
+    // Planets bundle (1,500 coins each, Legendary tier — multi-colour gradient marbles).
     // Saturn gets a bespoke ringed Canvas in BallGameView; the rest are
     // pure radial-gradient marbles.
     case earth   = "Earth"
@@ -111,11 +111,11 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case baseball   = "Baseball"
     //   • lava — animated molten sphere with drifting dark amber blobs
     //     rising through a vivid orange-red magma field.  Coin-purchasable
-    //     (exclusive tier, 500 coins); also included in the Lava Flow bundle.
+    //     (exclusive tier, 1,500 coins); also included in the Lava Flow bundle.
     case lava       = "Lava"
     //   • trench — deep navy sphere with slowly pulsing bioluminescent teal
     //     dot clusters.  Animated Canvas; coin-purchasable (exclusive tier,
-    //     500 coins); also included in the Abyssal Depths challenge bundle.
+    //     1,500 coins); also included in the Abyssal Depths challenge bundle.
     case trench     = "Trench"
 
     // ── Golden Gauntlet exclusive (pack-exclusive, never coin-purchasable) ─
@@ -188,9 +188,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     purchasable and hidden from the regular shop grid.
     case diamond = "Diamond"
 
-    // ── 10,000-coin IAP secret exclusive ─────────────────────────────────
+    // ── top-coin-pack ($49.99) IAP secret exclusive ─────────────────────────────────
     //   • moneyBall — a rolled-up wad of dollar bills.  One of three "Money"
-    //     cosmetics granted at random ONLY by the $49.99 / 10,000-coin pack;
+    //     cosmetics granted at random ONLY by the $49.99 top coin pack (historical ID coins.10000);
     //     never coin-purchasable and hidden from the shop grid.
     case moneyBall = "Money Ball"
 
@@ -290,7 +290,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
              .heartstone, .shamrock, .confetti, .speckledEgg,
              .trophy,    // Golden Gauntlet completion exclusive
              .diamond,   // Diamond Balls IAP exclusive
-             .moneyBall: // 10,000-coin IAP secret exclusive
+             .moneyBall: // top-coin-pack ($49.99) IAP secret exclusive
             return true
         // Aurora was the Starter Pack IAP exclusive; that pack is retired, so
         // Aurora is now a regular coin-buyable Legendary ball (and the anchor of
@@ -823,7 +823,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.22, green: 0.45, blue: 0.74),
             ]
 
-        // ── 10,000-coin IAP secret exclusive ──
+        // ── top-coin-pack ($49.99) IAP secret exclusive ──
         case .moneyBall:
             // Currency green → the rolled-bill renderer paints paper + $ on top.
             return [

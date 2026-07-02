@@ -1944,7 +1944,7 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Money Ball  (10,000-coin IAP secret · Legendary)
+    // MARK: - Money Ball  (top-coin-pack ($49.99) IAP secret · Legendary)
     // A rolled-up wad of dollar bills: a money-green body with the rolled paper
     // edges reading as stacked striations, a gold currency band strapped around
     // the middle with a "$", and a crisp specular.  Static.  Clipped to a circle

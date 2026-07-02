@@ -17,7 +17,8 @@ research into how top F2P games calibrate the same systems.
 | [04-equity-gaps.md](04-equity-gaps.md) | Quantified inequities + the P0–P3 calibration levers (file:line) |
 | [05-benchmarks.md](05-benchmarks.md) | External research: how top games calibrate earn equity, rarity curves, IAP value |
 | [06-sprint-plan.md](06-sprint-plan.md) | Multi-agent sprint plan: standards, verification, AI calibration, QA |
-| [07-decisions.md](07-decisions.md) | Mac's five rulings, shipped calibration levers, post-change earn table, tier-price memo (pending approval) |
+| [07-decisions.md](07-decisions.md) | Mac's five rulings, shipped calibration levers, post-change earn table, tier-price memo (approved → 08) |
+| [08-reprice.md](08-reprice.md) | The shipped reprice: tier ladder 750/1,000/1,250/1,500, derived bundle floors 5,500/6,500, IAP re-anchor, ASC follow-ups |
 
 ## Headline findings
 

@@ -550,7 +550,7 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
-                // Money Full floor (10,000-coin IAP secret) — an overlapping
+                // Money Full floor (top-coin-pack ($49.99) IAP secret) — an overlapping
                 // tiled stack of $100 bills.  Static, so it renders under Reduce
                 // Motion too.
                 if floor == .moneyFull {
@@ -1200,7 +1200,7 @@ struct BallGameView: View {
         }
     }
 
-    /// Money Full floor (10,000-coin IAP secret) — a dense, overlapping tiling
+    /// Money Full floor (top-coin-pack ($49.99) IAP secret) — a dense, overlapping tiling
     /// of $100 bills laid out brick-fashion so they read as a heaped stack.
     /// Static + deterministic, so it renders identically every frame.
     private var moneyFloorOverlay: some View {

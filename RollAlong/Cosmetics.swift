@@ -114,6 +114,14 @@ extension BallSkin {
 /// `basePrice`.  Adjust the constants below to re-balance the whole
 /// catalogue at once.
 ///
+/// The ladder encodes the approved time-to-afford targets
+/// (docs/economy/07-decisions.md, ruling 2): Standard 30 min, Rare 40,
+/// Epic 50, Legendary 60 minutes of typical play at ~25 coins/min —
+/// hence 750 / 1,000 / 1,250 / 1,500.  Two invariants when repricing:
+///   1. Every price stays EVEN forever — Sell Back refunds exactly half
+///      the CURRENT cost as an integer (sellBackValue = min(cost/2, paid)).
+///   2. Only ever drift prices UP (ruling 4's planned inflation); never cut.
+///
 /// Naming convention exposed to players (in the shop UI) maps to:
 ///   • standard   → "Standard"
 ///   • rare       → "Rare"
@@ -121,23 +129,24 @@ extension BallSkin {
 ///   • exclusive  → "Legendary"
 enum CosmeticTier: String, Codable {
     case starter        // free, always owned
-    case standard       // 50  coins — entry-level skins, tutorial-reward eligible
-    case rare           // 100 coins — a notch up; distinctive but not flashy
-    case premium        // 200 coins — flashier visuals, mid-grind
-    case exclusive      // 500 coins — top-tier, multi-week grind or IAP territory
+    case standard       // 750 coins — entry-level skins, tutorial-reward eligible
+    case rare           // 1,000 coins — a notch up; distinctive but not flashy
+    case premium        // 1,250 coins — flashier visuals, mid-grind
+    case exclusive      // 1,500 coins — top-tier, the longest save or IAP territory
 }
 
 extension CosmeticTier {
     /// Single source of truth for every priceable cosmetic.  An item's
     /// `coinCost` just reads through to `tier.basePrice` — no per-item
     /// overrides.  Keeps the catalogue self-consistent.
+    /// 250-step ladder, all even (exact sell-back halves 375/500/625/750).
     var basePrice: Int {
         switch self {
         case .starter:   return 0
-        case .standard:  return 50
-        case .rare:      return 100
-        case .premium:   return 200
-        case .exclusive: return 500
+        case .standard:  return 750
+        case .rare:      return 1000
+        case .premium:   return 1250
+        case .exclusive: return 1500
         }
     }
 
@@ -219,14 +228,14 @@ extension BallSkin: CosmeticItem {
             return .starter
         case .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon,
              .gold, .silver, .copper, .jade, .ruby:
-            return .standard   //  50 coins — all mono-shaded
+            return .standard   //  750 coins — all mono-shaded
         case .galaxy, .nebula, .opal,
              .pastel, .neon, .dune, .paper,
              .basketball, .soccer, .baseball, .eightBall, .golfBall,
              .geode,           // Geode bundle — Epic (banded agate + druzy core)
              .lavaLamp,        // Lava Lamp bundle — Epic (animated wax blobs)
              .cathedral:       // Cathedral bundle — Epic (stained-glass rosette)
-            return .premium    // 200 coins (Epic) — colour blends + sports/paper balls
+            return .premium    // 1,250 coins (Epic) — colour blends + sports/paper balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
              .storm, .candy, .ghost, .lava, .trench, .disco,
              .highRoller,      // High Roller bundle — coin/bundle purchasable
@@ -256,8 +265,8 @@ extension BallSkin: CosmeticItem {
              .confetti,        // newyear-2027-exclusive; never coin-purchasable
              .speckledEgg,     // spring-2027-exclusive; never coin-purchasable
              .diamond,         // Diamond Balls IAP-exclusive; never coin-purchasable
-             .moneyBall:       // 10,000-coin IAP secret exclusive; never coin-purchasable
-            return .exclusive  // 500 coins (Legendary) — animated / special / planets
+             .moneyBall:       // top-coin-pack ($49.99) IAP secret exclusive; never coin-purchasable
+            return .exclusive  // 1,500 coins (Legendary) — animated / special / planets
         }
     }
 }
@@ -281,9 +290,9 @@ enum GoalSkin: String, CosmeticItem {
     // Starter — new default
     case target         // clean 3-ring red/white/red
 
-    // Standard (50 coins) — the FITA archery target
+    // Standard (750 coins) — the FITA archery target
     case archery        // 5-band FITA target (was the default during dev)
-    // Standard (50 coins) — static banded targets (no particles / animation),
+    // Standard (750 coins) — static banded targets (no particles / animation),
     // themed so thematically-related bundles can share one goal.
     case frost          // icy blue + white rings
     case ember          // warm red → orange → yellow rings
@@ -292,7 +301,7 @@ enum GoalSkin: String, CosmeticItem {
     case amethyst       // deep-violet + lavender rings
     case candy          // rose → white → pink rings
     case slate          // greyscale rings
-    // Standard (50 coins) — static ring-portals (glowing concentric tunnels,
+    // Standard (750 coins) — static ring-portals (glowing concentric tunnels,
     // no particles / animation, so still Standard tier).
     case vortex         // cosmic-blue glowing portal
     case wormhole       // violet/magenta glowing portal
@@ -306,14 +315,14 @@ enum GoalSkin: String, CosmeticItem {
     case ripple         // blue-cyan calm
     case comet          // pale white-blue streaks on near-black
 
-    // Premium / Epic (200 coins)
+    // Premium / Epic (1,250 coins)
     case rainbow        // ★ the sparkly full-spectrum portal (restored)
     case neon           // hot magenta-pink on pure black
     case eclipse        // orange-red corona around a black core
     case plasma         // saturated violet-purple
     case mirage         // shimmery yellow-orange
 
-    // Exclusive / Legendary (500 coins)
+    // Exclusive / Legendary (1,500 coins)
     case prism          // refracting full-spectrum desat
     case obsidian       // monochromatic deep-blue
     case quasar         // hot magenta + cyan, brightest in the catalogue
@@ -812,14 +821,14 @@ enum GoalSkin: String, CosmeticItem {
         case .archery,
              .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
              .vortex, .wormhole:
-            return .standard   //  50 coins — static targets + static ring-portals
+            return .standard   //  750 coins — static targets + static ring-portals
         case .galaxy, .crystal, .flame, .blossom,
              .ripple, .comet, .eclipse, .plasma,
              .mirage, .obsidian:
-            return .premium    // 200 coins — animated, tight palette
+            return .premium    // 1,250 coins — animated, tight palette
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora:
-            return .exclusive  // 500 coins — animated, full-spectrum, or bespoke
+            return .exclusive  // 1,500 coins — animated, full-spectrum, or bespoke
         }
     }
 }
@@ -847,7 +856,7 @@ enum TrailColor: String, CosmeticItem {
     case snake          // grows longer every coin you pick up
     case air            // pillowy jet-stream (Golf bundle)
     case raybeam        // glowing laser streak (Space Travel bundle)
-    case moneyRoll      // ★ 10,000-coin IAP secret — green trail + fluttering bills
+    case moneyRoll      // ★ top-coin-pack ($49.99) IAP secret — green trail + fluttering bills
     case aurora         // Aurora bundle — teal→cyan→violet shimmer ribbon
 
     var id: String { rawValue }
@@ -892,18 +901,18 @@ enum TrailColor: String, CosmeticItem {
         case .none:
             return .starter
         case .ink, .ember, .sky, .forest, .bubblegum:
-            return .standard   //  50 coins — solid mono colour
+            return .standard   //  750 coins — solid mono colour
         case .snake, .raybeam, .gilded, .graphite, .roseTrail:
-            return .rare       // 100 coins — distinctive textured trails
+            return .rare       // 1,000 coins — distinctive textured trails
         case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air, .aurora,
-             .moneyRoll:       // 10,000-coin IAP secret — Legendary, never coin-bought
-            return .exclusive  // 500 coins — animated / special-effect
+             .moneyRoll:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
+            return .exclusive  // 1,500 coins — animated / special-effect
         }
     }
 
     /// Hidden from the shop/catalog grid (shown only once owned) and never
     /// surfaced as a coin purchase — the Money Roll trail is granted ONLY by the
-    /// $49.99 / 10,000-coin pack, mirroring the Diamond ball.
+    /// $49.99 top coin pack (historical ID coins.10000), mirroring the Diamond ball.
     var isBundleExclusive: Bool { self == .moneyRoll }
     var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
     var isIconic: Bool { tier == .starter || self == .moneyRoll }   // Money Roll = IAP secret
@@ -945,7 +954,7 @@ enum Floor: String, CosmeticItem {
     // Starter
     case classic
 
-    // Standard (50 coins) — static solid floor colour
+    // Standard (750 coins) — static solid floor colour
     case inverted
     case twilight
     case ember
@@ -966,7 +975,7 @@ enum Floor: String, CosmeticItem {
     case sugar            // Round-5 Candyland bundle — pale candy-pink
     case fog              // Round-5 Haunted bundle — cold grey mist
 
-    // Exclusive / Legendary (500 coins) — animated floor overlays
+    // Exclusive / Legendary (1,500 coins) — animated floor overlays
     case aurora           // the original shimmer
     case disco            // colour-cycling dance-floor squares
     case grass            // golf-course turf with grass tufts (Golf bundle)
@@ -981,7 +990,7 @@ enum Floor: String, CosmeticItem {
     case gridCity         // Neon City bundle — synthwave neon perspective grid
     case brass            // Clockwork bundle — riveted brass/bronze plating
 
-    // 10,000-coin IAP secret — overlapping stack of $100 bills
+    // top-coin-pack ($49.99) IAP secret — overlapping stack of $100 bills
     case moneyFull
 
     var id: String { rawValue }
@@ -1031,10 +1040,10 @@ enum Floor: String, CosmeticItem {
              .parchment, .sketch, .velvet, .midnight, .sunset,
              .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
-            return .standard   //  50 coins
+            return .standard   //  750 coins
         case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass,
-             .moneyFull:       // 10,000-coin IAP secret — Legendary, never coin-bought
-            return .exclusive  // 500 coins — animated / textured overlay
+             .moneyFull:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
+            return .exclusive  // 1,500 coins — animated / textured overlay
         }
     }
 
@@ -1078,7 +1087,7 @@ enum Floor: String, CosmeticItem {
 
     /// Hidden from the shop/catalog grid (shown only once owned) and never a coin
     /// purchase — the Money Full floor is granted ONLY by the $49.99 /
-    /// 10,000-coin pack, mirroring the Diamond ball.
+    /// top ($49.99) coin pack, mirroring the Diamond ball.
     var isBundleExclusive: Bool { self == .moneyFull }
     var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
     var isIconic: Bool { tier == .starter || self == .moneyFull }   // Money Full = IAP secret
@@ -1111,7 +1120,7 @@ enum Pit: String, CosmeticItem {
     // Starter
     case classic
 
-    // Standard (50 coins) — static solid pit colour
+    // Standard (750 coins) — static solid pit colour
     case inverted
     case twilight
     case ember
@@ -1133,7 +1142,7 @@ enum Pit: String, CosmeticItem {
     case syrup            // Round-5 Candyland bundle — dark molasses
     case graveyard        // Round-5 Haunted bundle — near-black graveyard earth
 
-    // Exclusive / Legendary (500 coins) — animated pit overlays
+    // Exclusive / Legendary (1,500 coins) — animated pit overlays
     case evil             // burning fire-pit animation
     case sky              // sky-blue gradient with drifting clouds
     case pond             // water with ripples + lily pad (Golf bundle)
@@ -1191,9 +1200,9 @@ enum Pit: String, CosmeticItem {
              .parchment, .sketch, .velvet, .midnight, .sunset,
              .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard,
              .sideline, .pocket:
-            return .standard   //  50 coins
+            return .standard   //  750 coins
         case .evil, .sky, .pond, .space, .eclipse, .nightclub:
-            return .exclusive  // 500 coins — animated overlay
+            return .exclusive  // 1,500 coins — animated overlay
         }
     }
 
@@ -1257,7 +1266,7 @@ enum Boundary: String, CosmeticItem {
     // Starter — the neutral grey the games shipped with.
     case classic
 
-    // Standard (50 coins) — solid-colour walls
+    // Standard (750 coins) — solid-colour walls
     case slate
     case ember
     case mint
@@ -1265,12 +1274,12 @@ enum Boundary: String, CosmeticItem {
     case orchid
     case sand
 
-    // Rare (100 coins) — richer hues
+    // Rare (1,000 coins) — richer hues
     case neon
     case gold
     case ice
 
-    // Exclusive / Legendary (500 coins)
+    // Exclusive / Legendary (1,500 coins)
     case obsidian
     case candy
     case circuit
@@ -1301,11 +1310,11 @@ enum Boundary: String, CosmeticItem {
         case .classic:
             return .starter
         case .slate, .ember, .mint, .sky, .orchid, .sand:
-            return .standard   //  50 coins
+            return .standard   //  750 coins
         case .neon, .gold, .ice:
-            return .rare       // 100 coins
+            return .rare       // 1,000 coins
         case .obsidian, .candy, .circuit:
-            return .exclusive  // 500 coins
+            return .exclusive  // 1,500 coins
         }
     }
 
@@ -1356,7 +1365,7 @@ enum MusicTrack: String, CosmeticItem {
     case none           // silent
     case ambient        // light ambient pad
 
-    // Standard (50 coins)
+    // Standard (750 coins)
     case piano
     case chiptune
     case jazz
@@ -1366,14 +1375,14 @@ enum MusicTrack: String, CosmeticItem {
     case orchestral
     case synthwave
 
-    // Premium / Epic (200 coins)
+    // Premium / Epic (1,250 coins)
     case lofi
     case downtempo
     case retrowave
     case cinematic
     case dreamscape
 
-    // Exclusive / Legendary (500 coins)
+    // Exclusive / Legendary (1,500 coins)
     case celestial
     case mysterium
     case opus
@@ -1412,11 +1421,11 @@ enum MusicTrack: String, CosmeticItem {
             return .starter
         case .piano, .chiptune, .jazz, .classical,
              .electronic, .acoustic, .orchestral, .synthwave:
-            return .standard   // 50 coins
+            return .standard   // 750 coins
         case .lofi, .downtempo, .retrowave, .cinematic, .dreamscape:
-            return .premium    // 200 coins
+            return .premium    // 1,250 coins
         case .celestial, .mysterium, .opus, .aurora:
-            return .exclusive  // 500 coins
+            return .exclusive  // 1,500 coins
         }
     }
 }
@@ -1627,10 +1636,22 @@ enum BundleRarity: String, CaseIterable {
     case standard, rare, legendary
 
     /// Cost thresholds (in coins).  `fullPrice < rareFloor` → Standard;
-    /// `< legendaryFloor` → Rare; otherwise Legendary.  Tuned to the live
-    /// catalogue (bundles run 450–1950) so the split is ~7 / 17 / 33.
-    static let rareFloor      = 700
-    static let legendaryFloor = 1100
+    /// `< legendaryFloor` → Rare; otherwise Legendary.
+    ///
+    /// Re-derived for the 2026-07 tier reprice (750/1,000/1,250/1,500) from
+    /// the ACTUAL catalogue distribution (test_bundleRarityDistribution dump:
+    /// 66 bundles, fullPrice 4,500–13,500).  Chosen so that:
+    ///   • the split stays a pyramid — 6 / 20 / 40 (9% / 30% / 61%),
+    ///     proportionally close to the old 7 / 17 / 42;
+    ///   • the PERMANENT (non-seasonal) Standard pool feeding the
+    ///     post-tutorial gift picker holds 4 bundles (diamond, nature,
+    ///     citrus, sketchbook) + 2 seasonal windows (backtoschool-2026,
+    ///     earthday-2027) — guarded by
+    ///     testTutorialGift_permanentStandardBundlePool_neverEmpty.
+    /// Six bundles sit at exactly 5,500, so the next round step up (5,750)
+    /// would balloon the permanent gift pool to 10 — keep 5,500.
+    static let rareFloor      = 5500
+    static let legendaryFloor = 6500
 
     var label: String {
         switch self {
