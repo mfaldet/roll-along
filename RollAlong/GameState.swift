@@ -1064,10 +1064,13 @@ final class GameState: ObservableObject {
     }
 
     /// Maximum coins grantable in a single `addCoins` call.
-    /// Highest legitimate single award is 10 000 (coins10000 IAP).
+    /// Highest legitimate single award is 60 000 — the top coin pack
+    /// (the historical coins.10000 product ID) after the 2026-07 IAP
+    /// re-anchor.  This MUST track the biggest `rewardCoins` grant or the
+    /// $49.99 purchase would be silently clamped and short-deliver.
     /// Values exceeding this are clamped and printed in DEBUG so any
     /// runaway-reward bug surfaces during development.
-    private static let maxSingleAward: Int = 10_000
+    private static let maxSingleAward: Int = 60_000
 
     /// Hard ceiling on the stored coin balance — prevents overflows and
     /// absurd displays from a corrupted save or a future bug.

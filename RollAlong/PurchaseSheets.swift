@@ -628,24 +628,30 @@ struct BuyCoinsSheet: View {
 
     private var coinPackCards: some View {
         VStack(spacing: 10) {
-            coinCard(pid: .coins100,   amount: 100)
-            coinCard(pid: .coins600,   amount: 600)
-            coinCard(pid: .coins1300,  amount: 1300)
-            coinCard(pid: .coins3000,  amount: 3000)
-            coinCard(pid: .coins10000, amount: 10000)
+            // Amounts read from ProductID.rewardCoins — the single source of
+            // truth for what each pack actually grants (2026-07 reprice:
+            // 750 / 4,500 / 10,000 / 22,500 / 60,000).
+            coinCard(pid: .coins100,   amount: StoreKitManager.ProductID.coins100.rewardCoins)
+            coinCard(pid: .coins600,   amount: StoreKitManager.ProductID.coins600.rewardCoins)
+            coinCard(pid: .coins1300,  amount: StoreKitManager.ProductID.coins1300.rewardCoins)
+            coinCard(pid: .coins3000,  amount: StoreKitManager.ProductID.coins3000.rewardCoins)
+            coinCard(pid: .coins10000, amount: StoreKitManager.ProductID.coins10000.rewardCoins)
         }
     }
 
-    /// % more coins than buying the same spend as base 100-coin ($0.99) packs,
+    /// % more coins than buying the same spend as base 750-coin ($0.99) packs,
     /// rounded to the nearest 10%.  Nil for the base pack (it IS the base rate).
+    /// Post-reprice rates (758/902/1,001/1,126/1,200 coins per $) round to
+    /// +20% / +30% / +50% / +60%.
     private func coinBonus(_ pid: StoreKitManager.ProductID, amount: Int) -> String? {
-        let baseRate = 100.0 / 0.99          // coins per dollar at the base pack
+        let baseRate = Double(StoreKitManager.ProductID.coins100.rewardCoins) / 0.99   // coins per dollar at the base pack
         let price: Double
         switch pid {
-        case .coins600:  price = 4.99
-        case .coins1300: price = 9.99
-        case .coins3000: price = 19.99
-        default:         return nil
+        case .coins600:   price = 4.99
+        case .coins1300:  price = 9.99
+        case .coins3000:  price = 19.99
+        case .coins10000: price = 49.99
+        default:          return nil
         }
         let coinsIfBoughtAsBase = baseRate * price
         let pct = (Double(amount) / coinsIfBoughtAsBase - 1.0) * 100.0
@@ -671,9 +677,11 @@ struct BuyCoinsSheet: View {
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                 if isTopTier {
-                    // Top pack: shimmery-diamond "×2 coins" instead of the
-                    // plain green "+100% coins" bonus line.
-                    DiamondBonusLabel(text: "×2 coins")
+                    // Top pack: shimmery-diamond bonus label instead of the
+                    // plain green one.  Same honest math as the other packs
+                    // (+60% under the 2026-07 reprice — the old "×2 coins"
+                    // claim no longer holds).
+                    DiamondBonusLabel(text: bonus ?? "Best value")
                 } else if let bonus {
                     Text(bonus)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -1119,7 +1127,7 @@ private struct PurchaseCelebrationOverlay: View {
             } else { return }
         case .coins:
             guard r.coins > 0 else { return }
-            // The 10,000-coin pack may also drop a secret "Money" cosmetic —
+            // The top ($49.99) coin pack may also drop a secret "Money" cosmetic —
             // announce it in place of the usual subtitle.
             let sub = r.grantedCosmeticName.map { "🎉 Unlocked \($0)!" } ?? "Added to your balance"
             content = BadgeContent(title: "+\(r.coins.formatted(.number)) coins",

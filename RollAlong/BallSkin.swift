@@ -187,9 +187,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     purchasable and hidden from the regular shop grid.
     case diamond = "Diamond"
 
-    // ── 10,000-coin IAP secret exclusive ─────────────────────────────────
+    // ── top-coin-pack ($49.99) IAP secret exclusive ─────────────────────────────────
     //   • moneyBall — a rolled-up wad of dollar bills.  One of three "Money"
-    //     cosmetics granted at random ONLY by the $49.99 / 10,000-coin pack;
+    //     cosmetics granted at random ONLY by the $49.99 top coin pack (historical ID coins.10000);
     //     never coin-purchasable and hidden from the shop grid.
     case moneyBall = "Money Ball"
 
@@ -289,7 +289,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
              .heartstone, .shamrock, .confetti, .speckledEgg,
              .trophy,    // Golden Gauntlet completion exclusive
              .diamond,   // Diamond Balls IAP exclusive
-             .moneyBall: // 10,000-coin IAP secret exclusive
+             .moneyBall: // top-coin-pack ($49.99) IAP secret exclusive
             return true
         // Aurora was the Starter Pack IAP exclusive; that pack is retired, so
         // Aurora is now a regular coin-buyable Legendary ball (and the anchor of
@@ -822,7 +822,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.22, green: 0.45, blue: 0.74),
             ]
 
-        // ── 10,000-coin IAP secret exclusive ──
+        // ── top-coin-pack ($49.99) IAP secret exclusive ──
         case .moneyBall:
             // Currency green → the rolled-bill renderer paints paper + $ on top.
             return [

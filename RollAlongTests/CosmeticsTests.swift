@@ -53,7 +53,7 @@ final class CosmeticsTests: XCTestCase {
             "Pluto", "Beach Ball", "Pumpkin", "Ornament",
             "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy",
             "Diamond",     // Diamond Balls IAP exclusive
-            "Money Ball"   // 10,000-coin IAP secret exclusive
+            "Money Ball"   // top-coin-pack ($49.99) IAP secret exclusive
         ]
         let actual = Set(BallSkin.allCases.filter { $0.isBundleExclusive }.map { $0.rawValue })
         XCTAssertEqual(actual, expected,

@@ -263,7 +263,7 @@ extension BallSkin: CosmeticItem {
              .confetti,        // newyear-2027-exclusive; never coin-purchasable
              .speckledEgg,     // spring-2027-exclusive; never coin-purchasable
              .diamond,         // Diamond Balls IAP-exclusive; never coin-purchasable
-             .moneyBall:       // 10,000-coin IAP secret exclusive; never coin-purchasable
+             .moneyBall:       // top-coin-pack ($49.99) IAP secret exclusive; never coin-purchasable
             return .exclusive  // 1,500 coins (Legendary) — animated / special / planets
         }
     }
@@ -854,7 +854,7 @@ enum TrailColor: String, CosmeticItem {
     case snake          // grows longer every coin you pick up
     case air            // pillowy jet-stream (Golf bundle)
     case raybeam        // glowing laser streak (Space Travel bundle)
-    case moneyRoll      // ★ 10,000-coin IAP secret — green trail + fluttering bills
+    case moneyRoll      // ★ top-coin-pack ($49.99) IAP secret — green trail + fluttering bills
     case aurora         // Aurora bundle — teal→cyan→violet shimmer ribbon
 
     var id: String { rawValue }
@@ -903,14 +903,14 @@ enum TrailColor: String, CosmeticItem {
         case .snake, .raybeam, .gilded, .graphite, .roseTrail:
             return .rare       // 1,000 coins — distinctive textured trails
         case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air, .aurora,
-             .moneyRoll:       // 10,000-coin IAP secret — Legendary, never coin-bought
+             .moneyRoll:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
             return .exclusive  // 1,500 coins — animated / special-effect
         }
     }
 
     /// Hidden from the shop/catalog grid (shown only once owned) and never
     /// surfaced as a coin purchase — the Money Roll trail is granted ONLY by the
-    /// $49.99 / 10,000-coin pack, mirroring the Diamond ball.
+    /// $49.99 top coin pack (historical ID coins.10000), mirroring the Diamond ball.
     var isBundleExclusive: Bool { self == .moneyRoll }
     var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
     var isIconic: Bool { tier == .starter || self == .moneyRoll }   // Money Roll = IAP secret
@@ -988,7 +988,7 @@ enum Floor: String, CosmeticItem {
     case gridCity         // Neon City bundle — synthwave neon perspective grid
     case brass            // Clockwork bundle — riveted brass/bronze plating
 
-    // 10,000-coin IAP secret — overlapping stack of $100 bills
+    // top-coin-pack ($49.99) IAP secret — overlapping stack of $100 bills
     case moneyFull
 
     var id: String { rawValue }
@@ -1040,7 +1040,7 @@ enum Floor: String, CosmeticItem {
              .court, .felt:
             return .standard   //  750 coins
         case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass,
-             .moneyFull:       // 10,000-coin IAP secret — Legendary, never coin-bought
+             .moneyFull:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
             return .exclusive  // 1,500 coins — animated / textured overlay
         }
     }
@@ -1085,7 +1085,7 @@ enum Floor: String, CosmeticItem {
 
     /// Hidden from the shop/catalog grid (shown only once owned) and never a coin
     /// purchase — the Money Full floor is granted ONLY by the $49.99 /
-    /// 10,000-coin pack, mirroring the Diamond ball.
+    /// top ($49.99) coin pack, mirroring the Diamond ball.
     var isBundleExclusive: Bool { self == .moneyFull }
     var isCoinPurchasable: Bool { tier != .starter && !isBundleExclusive }
     var isIconic: Bool { tier == .starter || self == .moneyFull }   // Money Full = IAP secret
