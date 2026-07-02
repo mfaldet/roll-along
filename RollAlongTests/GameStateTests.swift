@@ -611,3 +611,62 @@ final class LevelOverridesTests: XCTestCase {
         XCTAssertEqual(LevelLayout.overrides[50]?.verified, false, "L50 should not be verified")
     }
 }
+
+// ---------------------------------------------------------------------------
+// CoinBankingGateTests — which modes may consult the climb's banked-coin set.
+//
+// `gameState.currentLevel` is always the player's parked CLIMB level, even
+// while a Challenge Track or the Daily Challenge is being played.  BallGame's
+// coin masking (dim + skip-pickup of already-banked indices) must therefore
+// apply ONLY on the main climb — every other progression generates its own
+// maps, banks nothing, and masking against the parked level would hide coins
+// the player never collected there.  Regression: track levels silently lost
+// whichever coin indices happened to be banked on the parked climb level.
+// ---------------------------------------------------------------------------
+final class CoinBankingGateTests: XCTestCase {
+
+    /// Enum-level truth table: only `.mainClimb` banks pickup coins.
+    func testBanksPickupCoins_onlyMainClimb() {
+        XCTAssertTrue(ProgressionKind.mainClimb.banksPickupCoins)
+        XCTAssertFalse(ProgressionKind.challengeTrack("frozen-peaks").banksPickupCoins)
+        XCTAssertFalse(ProgressionKind.oneShot.banksPickupCoins)
+        XCTAssertFalse(ProgressionKind.none.banksPickupCoins)
+    }
+
+    /// Registry sweep: the climb is the ONLY registered mode that banks.
+    /// Guards against a future mode accidentally shipping `.mainClimb`
+    /// progression (which would let it mask/bank against the parked level).
+    func testRegistry_onlyTheClimbBanksPickupCoins() {
+        for (mode, _) in GameModeCatalogue.registry {
+            if mode.id == GameModeCatalogue.climb.id {
+                XCTAssertTrue(mode.progression.banksPickupCoins,
+                              "the climb must bank pickup coins")
+            } else {
+                XCTAssertFalse(mode.progression.banksPickupCoins,
+                               "\(mode.id) must NOT consult the climb's banked coins")
+            }
+        }
+    }
+
+    /// The concrete regression scenario: coins banked on the parked climb
+    /// level exist in GameState, but a track/daily mode's progression says
+    /// not to consult them — so track maps present their full coin set.
+    func testBankedClimbCoins_doNotLeakIntoNonClimbModes() {
+        let suite = "CoinBankingGateTests.isolated"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let gs = GameState(defaults: defaults)
+        gs.bankCoins(for: gs.currentLevel, indices: [0, 1, 2])
+        XCTAssertEqual(gs.coinsCollected(for: gs.currentLevel), [0, 1, 2])
+
+        guard let track = GameModeCatalogue.challengeTracks.first else {
+            return XCTFail("at least one Challenge Track should be registered")
+        }
+        XCTAssertFalse(track.progression.banksPickupCoins,
+                       "a track must ignore the parked climb level's banked coins")
+        XCTAssertFalse(DailyChallengeMode().progression.banksPickupCoins,
+                       "the daily gauntlet must ignore the parked climb level's banked coins")
+    }
+}
