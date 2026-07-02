@@ -7,9 +7,12 @@ import SwiftUI
 // Secondary navigation (a segmented control), so you can always browse other
 // clans even while in one:
 //   • My Clan / Create — in a clan: header, stats, the lives loop (ask for a
-//                        life · send to members · fulfill), an activity feed,
-//                        an invite link, and Leave/Disband.  Not in a clan:
-//                        a "start your own" callout.
+//                        life · send to members · fulfill), the clan chat
+//                        (the activity feed as a conversation, with premade
+//                        quick-chat messages), an invite link, and a settings
+//                        sheet (members leave / ask for a promotion; the owner
+//                        renames — more personalization later — or disbands).
+//                        Not in a clan: a "start your own" callout.
 //   • Browse           — search + list of all clans; tap one to push its detail
 //                        (roster, stats → Join).
 //
@@ -49,14 +52,19 @@ struct ClansView: View {
     @State private var sentLifeIds: Set<UUID> = []
     @State private var thankedActorIds: Set<UUID> = []
     @State private var showCreate    = false
-    @State private var confirmLeave  = false
-    @State private var confirmDisband = false
+    @State private var settingsClan: Clan?     // non-nil → clan settings sheet
+    @State private var chatSending   = false   // a quick-chat post in flight
     @State private var banner: String?
 
     private var myId: UUID? { SocialClient.shared.currentUserId }
-    private var iAmOwner: Bool { membership?.isOwner ?? false }
     private var inClan:   Bool { membership != nil }
     private var iAmAsking: Bool { myId.flatMap { rosterProfiles[$0]?.isAskingForLives } ?? false }
+    /// True once my promotion ask is in the (recent) feed — keeps the settings
+    /// sheet's button from being re-tapped across sessions.
+    private var iAskedForPromotion: Bool {
+        guard let myId else { return false }
+        return events.contains { $0.kind == "requested_promotion" && $0.actorId == myId }
+    }
 
     // MARK: - Body
 
@@ -77,17 +85,27 @@ struct ClansView: View {
                         .foregroundStyle(.white)
                 }
             }
+            // Clan settings — members leave / ask for a promotion; the owner
+            // renames (more personalization later) or disbands.
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if let myClan {
+                    Button { settingsClan = myClan } label: {
+                        Image(systemName: "gearshape.fill").foregroundStyle(.white)
+                    }
+                    .accessibilityLabel("Clan settings")
+                }
+            }
         }
         .task { await load() }
         .sheet(isPresented: $showCreate) { ClanCreateSheet { Task { await load() } } }
-        .confirmationDialog("Leave this clan?", isPresented: $confirmLeave, titleVisibility: .visible) {
-            Button("Leave", role: .destructive) { Task { await leave() } }
-            Button("Cancel", role: .cancel) {}
-        }
-        .confirmationDialog("Disband this clan? It's removed for every member.",
-                            isPresented: $confirmDisband, titleVisibility: .visible) {
-            Button("Disband", role: .destructive) { Task { await disband() } }
-            Button("Cancel", role: .cancel) {}
+        .sheet(item: $settingsClan) { clan in
+            ClanSettingsSheet(clan: clan,
+                              role: membership?.role ?? "member",
+                              alreadyAskedPromotion: iAskedForPromotion,
+                              onRename:       { await rename(to: $0) },
+                              onAskPromotion: { await askForPromotion() },
+                              onLeave:        { Task { await leave() } },
+                              onDisband:      { Task { await disband() } })
         }
     }
 
@@ -139,8 +157,7 @@ struct ClansView: View {
         lifeLoopSection
         inviteRow
         rosterSection
-        if !events.isEmpty { activitySection }
-        membershipAction
+        chatSection
     }
 
     private var clanHeader: some View {
@@ -318,99 +335,208 @@ struct ClansView: View {
         }
     }
 
-    // MARK: - Activity feed
+    // MARK: - Clan chat (the activity feed as a conversation)
 
-    private var activitySection: some View {
+    /// Premade quick-chat messages — each is a fixed `chat_*` event kind and
+    /// the text is mapped on-device, so no free text ever reaches the server
+    /// (nothing to moderate).  Add a pair here to grow the vocabulary; the
+    /// schema allows any `chat_*` kind, so no migration is needed.
+    private static let quickChats: [(kind: String, text: String)] = [
+        ("chat_hi",        "Hi team! 👋"),
+        ("chat_lets_roll", "Let's roll! 🚀"),
+        ("chat_nice",      "Nice climbing! 🔥"),
+        ("chat_gl",        "Good luck! 🍀"),
+        ("chat_ty",        "Thank you! 💙"),
+    ]
+    private static let quickChatText: [String: String] =
+        Dictionary(uniqueKeysWithValues: quickChats.map { ($0.kind, $0.text) })
+
+    /// Membership / clan changes render as centered one-liners, not bubbles.
+    private static let systemKinds: Set<String> = ["created", "joined", "left", "renamed"]
+
+    private var chatSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("Activity", "sparkles")
-            ForEach(events) { eventRow($0) }
+            sectionHeader("Clan chat", "bubble.left.and.bubble.right.fill")
+            chatPanel
+            quickChatBar
         }
+    }
+
+    /// Oldest → newest, like any messages app (the server returns newest-first).
+    private var chronologicalEvents: [ClanEvent] { Array(events.reversed()) }
+
+    /// The scroll itself: bubbles + system lines, pinned to the newest entry,
+    /// with a light poll so clan-mates' posts appear while you're looking.
+    private var chatPanel: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 10) {
+                    if events.isEmpty {
+                        Text("It's quiet in here — send a quick message below 👇")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color(white: 0.45))
+                            .multilineTextAlignment(.center)
+                            .padding(.vertical, 36)
+                    }
+                    ForEach(chronologicalEvents) { e in
+                        chatRow(e).id(e.id)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity)
+            }
+            .frame(height: 320)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.11)))
+            .onAppear { scrollToLatest(proxy, animated: false) }
+            .onChange(of: events.count) { _, _ in scrollToLatest(proxy, animated: true) }
+            .task(id: myClan?.id) { await pollChat() }
+        }
+    }
+
+    private func scrollToLatest(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard let last = chronologicalEvents.last?.id else { return }
+        if animated { withAnimation { proxy.scrollTo(last, anchor: .bottom) } }
+        else        { proxy.scrollTo(last, anchor: .bottom) }
     }
 
     @ViewBuilder
-    private func eventRow(_ e: ClanEvent) -> some View {
-        let actor  = name(of: e.actorId)
-        let target = e.targetId.map { name(of: $0) }
-        let toMe   = e.targetId == myId
-        HStack(spacing: 12) {
-            Image(systemName: eventIcon(e.kind)).font(.system(size: 14))
-                .foregroundStyle(eventColor(e.kind)).frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(eventText(e.kind, actor: actor, target: target, toMe: toMe))
-                    .font(.system(.caption, design: .rounded)).foregroundStyle(Color(white: 0.78))
-                    .lineLimit(2)
-                if let t = relativeTime(e.createdAt) {
-                    Text(t).font(.system(.caption2, design: .rounded)).foregroundStyle(Color(white: 0.4))
-                }
-            }
-            Spacer(minLength: 8)
-            // Say thanks for a life someone sent ME (premade reaction).
-            if e.kind == "sent_life", toMe, e.actorId != myId {
-                if thankedActorIds.contains(e.actorId) {
-                    Text("Thanked 🙏").font(.system(.caption2, design: .rounded).weight(.semibold))
-                        .foregroundStyle(Color(white: 0.5))
-                } else {
-                    Button { Task { await thank(e.actorId) } } label: {
-                        Text("Thanks 🙏").font(.system(.caption, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
-                            .background(Capsule().fill(Color(red: 0.30, green: 0.62, blue: 0.42)))
-                    }.buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.12)))
+    private func chatRow(_ e: ClanEvent) -> some View {
+        if Self.systemKinds.contains(e.kind) { systemLine(e) } else { chatBubble(e) }
     }
 
-    private func eventText(_ kind: String, actor: String, target: String?, toMe: Bool) -> String {
-        switch kind {
-        case "created":        return "\(actor) created the clan"
-        case "joined":         return "\(actor) joined the clan"
-        case "left":           return "\(actor) left the clan"
-        case "requested_life": return "\(actor) is asking for a life"
-        case "sent_life":      return toMe ? "\(actor) sent you a life ♥"
-                                           : "\(actor) sent \(target ?? "a member") a life"
-        case "thanked":        return toMe ? "\(actor) thanked you 🙏"
-                                           : "\(actor) thanked \(target ?? "a member") 🙏"
-        default:               return "\(actor) did something"
+    private func systemLine(_ e: ClanEvent) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: eventIcon(e.kind)).font(.system(size: 10))
+            Text(systemText(e))
+            if let t = relativeTime(e.createdAt) {
+                Text("· \(t)").foregroundStyle(Color(white: 0.35))
+            }
+        }
+        .font(.system(.caption2, design: .rounded))
+        .foregroundStyle(Color(white: 0.45))
+        .frame(maxWidth: .infinity)
+    }
+
+    /// A speech bubble: mine right-aligned in clan blue, everyone else's on
+    /// the left under their name.  A life sent to me grows a Thanks reaction.
+    private func chatBubble(_ e: ClanEvent) -> some View {
+        let mine  = e.actorId == myId
+        let who   = name(of: e.actorId)
+        let world = World.world(for: max(1, rosterProfiles[e.actorId]?.climbLevel ?? 1))
+        return HStack(alignment: .bottom, spacing: 8) {
+            if mine {
+                Spacer(minLength: 44)
+            } else {
+                avatar(who, tint: world.accent, size: 28)
+            }
+            VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
+                if !mine {
+                    Text(who)
+                        .font(.system(.caption2, design: .rounded).weight(.semibold))
+                        .foregroundStyle(world.accent)
+                }
+                Text(bubbleText(e))
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(bubbleShape(mine: mine))
+                HStack(spacing: 8) {
+                    if let t = relativeTime(e.createdAt) {
+                        Text(t).font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color(white: 0.4))
+                    }
+                    thanksReaction(e)
+                }
+            }
+            if !mine { Spacer(minLength: 44) }
         }
     }
+
+    private func bubbleShape(mine: Bool) -> some View {
+        UnevenRoundedRectangle(topLeadingRadius: 14,
+                               bottomLeadingRadius: mine ? 14 : 4,
+                               bottomTrailingRadius: mine ? 4 : 14,
+                               topTrailingRadius: 14)
+            .fill(mine ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.55)
+                       : Color(white: 0.17))
+    }
+
+    /// Say thanks for a life someone sent ME (premade reaction).
+    @ViewBuilder
+    private func thanksReaction(_ e: ClanEvent) -> some View {
+        if e.kind == "sent_life", e.targetId == myId, e.actorId != myId {
+            if thankedActorIds.contains(e.actorId) {
+                Text("Thanked 🙏").font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color(white: 0.5))
+            } else {
+                Button { Task { await thank(e.actorId) } } label: {
+                    Text("Thanks 🙏").font(.system(.caption2, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white).padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Capsule().fill(Color(red: 0.30, green: 0.62, blue: 0.42)))
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// One-tap premade messages — the send side of the chat.
+    private var quickChatBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Self.quickChats, id: \.kind) { chat in
+                    Button { Task { await sendQuickChat(chat.kind) } } label: {
+                        Text(chat.text)
+                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 13).padding(.vertical, 8)
+                            .background(Capsule().fill(Color(white: 0.17))
+                                .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 1)))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(chatSending)
+                }
+            }
+            .opacity(chatSending ? 0.55 : 1)
+        }
+    }
+
+    /// Bubble copy reads as the speaker talking (their name sits above).
+    private func bubbleText(_ e: ClanEvent) -> String {
+        switch e.kind {
+        case "requested_life":      return "Could someone send me a life? ♥"
+        case "sent_life":           return e.targetId == myId
+                                        ? "Sent you a life ♥"
+                                        : "Sent \(e.targetId.map(name(of:)) ?? "a member") a life ♥"
+        case "thanked":             return e.targetId == myId
+                                        ? "Thanks for the life 🙏"
+                                        : "Thanks, \(e.targetId.map(name(of:)) ?? "team")! 🙏"
+        case "requested_promotion": return "May I have a promotion? 📣"
+        default:                    return Self.quickChatText[e.kind] ?? "✨"
+        }
+    }
+
+    private func systemText(_ e: ClanEvent) -> String {
+        let actor = name(of: e.actorId)
+        switch e.kind {
+        case "created": return "\(actor) created the clan"
+        case "joined":  return "\(actor) joined the clan"
+        case "left":    return "\(actor) left the clan"
+        case "renamed": return "\(actor) renamed the clan"
+        default:        return "\(actor) was here"
+        }
+    }
+
     private func eventIcon(_ kind: String) -> String {
         switch kind {
         case "joined", "created": return "person.fill.badge.plus"
         case "left":              return "person.fill.badge.minus"
-        case "requested_life":    return "heart.text.square"
-        case "sent_life":         return "heart.fill"
-        case "thanked":           return "hands.clap.fill"
+        case "renamed":           return "pencil.line"
         default:                  return "sparkle"
         }
     }
-    private func eventColor(_ kind: String) -> Color {
-        switch kind {
-        case "sent_life", "requested_life": return Color(red: 0.95, green: 0.32, blue: 0.45)
-        case "thanked":                     return Color(red: 0.40, green: 0.78, blue: 0.55)
-        case "left":                        return Color(white: 0.5)
-        default:                            return Color(red: 0.55, green: 0.78, blue: 1.0)
-        }
-    }
+
     private func name(of id: UUID) -> String {
         if id == myId { return "You" }
         return rosterProfiles[id]?.displayName.nonEmpty ?? "A climber"
-    }
-
-    @ViewBuilder
-    private var membershipAction: some View {
-        if iAmOwner {
-            Button { confirmDisband = true } label: {
-                actionLabel("Disband clan", busy: actionBusy, tint: Color(red: 0.90, green: 0.30, blue: 0.32))
-            }.disabled(actionBusy).buttonStyle(.plain)
-            Text("Disbanding removes the clan for everyone.")
-                .font(.system(.caption, design: .rounded)).foregroundStyle(Color(white: 0.4)).padding(.top, 2)
-        } else {
-            Button { confirmLeave = true } label: {
-                actionLabel("Leave clan", busy: actionBusy, tint: Color(white: 0.22))
-            }.disabled(actionBusy).buttonStyle(.plain)
-        }
     }
 
     // MARK: - Create callout (My Clan tab when not in a clan)
@@ -507,11 +633,11 @@ struct ClansView: View {
 
     // MARK: - Shared small UI
 
-    private func avatar(_ name: String, tint: Color) -> some View {
+    private func avatar(_ name: String, tint: Color, size: CGFloat = 38) -> some View {
         ZStack {
-            Circle().fill(tint.opacity(0.28)).frame(width: 38, height: 38)
+            Circle().fill(tint.opacity(0.28)).frame(width: size, height: size)
             Text(String(name.first ?? "?").uppercased())
-                .font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                .font(.system(size: size * 0.42, weight: .bold, design: .rounded)).foregroundStyle(.white)
         }
     }
 
@@ -699,7 +825,73 @@ struct ClansView: View {
         do {
             try await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "thanked", target: actorId)
             thankedActorIds.insert(actorId); flash("Thanks sent 🙏")
+            await refreshEvents()
         } catch { flash("Couldn't send thanks — try again.") }
+    }
+
+    /// Post a premade quick-chat message, then refresh just the feed so the
+    /// bubble (and anything clan-mates said meanwhile) appears immediately.
+    private func sendQuickChat(_ kind: String) async {
+        guard let clan = myClan else { return }
+        chatSending = true; defer { chatSending = false }
+        do {
+            try await SocialClient.shared.postClanEvent(clanId: clan.id, kind: kind)
+            await refreshEvents()
+        } catch { flash("Couldn't send — try again.") }
+    }
+
+    /// Refresh only the feed, plus profiles for anyone it mentions that we
+    /// haven't resolved yet — cheap enough to run from the chat poll.
+    private func refreshEvents() async {
+        guard let clan = myClan else { return }
+        guard let evs = try? await SocialClient.shared.fetchClanEvents(clanId: clan.id) else { return }
+        events = evs
+        let mentioned = Set(evs.flatMap { [$0.actorId, $0.targetId].compactMap { $0 } })
+        let unknown = mentioned.filter { rosterProfiles[$0] == nil }
+        if !unknown.isEmpty,
+           let profs = try? await SocialClient.shared.fetchProfiles(ids: Array(unknown)) {
+            for p in profs { rosterProfiles[p.id] = p }
+        }
+    }
+
+    /// Poll the feed every 20s while My Clan is on screen so the chat feels
+    /// live.  Cancelled automatically when the view (or clan) goes away.
+    private func pollChat() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            guard !Task.isCancelled else { return }
+            await refreshEvents()
+        }
+    }
+
+    /// Owner-only rename (the settings sheet calls this).  Returns a
+    /// user-facing error string, or nil on success.
+    private func rename(to newName: String) async -> String? {
+        guard let clan = myClan else { return "You're not in a clan." }
+        do {
+            try await SocialClient.shared.renameClan(id: clan.id, name: newName)
+            try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "renamed")
+            await load()
+            flash("Clan renamed to “\(newName)”.")
+            return nil
+        } catch {
+            return "Couldn't rename — that name may already be taken."
+        }
+    }
+
+    /// Ask the leadership for a promotion — lands in the clan chat where the
+    /// owner (and everyone else) sees it.
+    private func askForPromotion() async -> Bool {
+        guard let clan = myClan else { return false }
+        do {
+            try await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "requested_promotion")
+            await refreshEvents()
+            flash("Asked! Your request is in the clan chat 📣")
+            return true
+        } catch {
+            flash("Couldn't ask — try again.")
+            return false
+        }
     }
 
     private func flash(_ message: String) {
@@ -993,6 +1185,229 @@ private struct ClanCreateSheet: View {
             self.error = "Couldn't create — that name or tag may already be taken."
         }
         working = false
+    }
+}
+
+// ===========================================================================
+// ClanSettingsSheet — role-aware clan settings, opened from the gear in the
+// My Clan toolbar.
+//   Members & officers: see their role, ask the leadership for a promotion
+//                       (lands in the clan chat), and leave the clan.
+//   The owner:          renames the clan (future personalization/preference
+//                       knobs slot into the same section) and can disband.
+// Mutations run through the parent's closures so ClansView stays the single
+// place that talks to SocialClient and refreshes clan state.
+// ===========================================================================
+private struct ClanSettingsSheet: View {
+    @Environment(\.dismiss) var dismiss
+
+    let clan: Clan
+    let role: String                                  // owner | officer | member
+    let alreadyAskedPromotion: Bool
+    let onRename:       (String) async -> String?     // → error text, nil = ok
+    let onAskPromotion: () async -> Bool
+    let onLeave:        () -> Void
+    let onDisband:      () -> Void
+
+    @State private var name        = ""
+    @State private var renameBusy  = false
+    @State private var renameError: String?
+    @State private var askBusy     = false
+    @State private var asked       = false
+    @State private var confirmLeave   = false
+    @State private var confirmDisband = false
+
+    private var isOwner:     Bool   { role == "owner" }
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSaveName: Bool   { trimmedName != clan.name && (2...32).contains(trimmedName.count) }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(white: 0.08).ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 26) {
+                        roleCard
+                        if isOwner { personalizationSection } else { promotionSection }
+                        membershipSection
+                    }
+                    .padding(20)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .navigationTitle("Clan settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.foregroundStyle(.white)
+                }
+            }
+            .onAppear { name = clan.name }
+        }
+    }
+
+    /// Who you are here — clan name + your role.
+    private var roleCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: isOwner ? "crown.fill" : "person.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(isOwner ? Color(red: 1.00, green: 0.81, blue: 0.30)
+                                         : Color(red: 0.55, green: 0.78, blue: 1.0))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(clan.name)
+                    .font(.system(.body, design: .rounded).weight(.bold))
+                    .foregroundStyle(.white)
+                Text(roleLine)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+    }
+
+    private var roleLine: String {
+        switch role {
+        case "owner":   return "You're the owner"
+        case "officer": return "You're an officer"
+        default:        return "You're a member"
+        }
+    }
+
+    // Owner: clan personalization — just the name today; description, tag,
+    // colors and other preferences will live in this same section.
+    private var personalizationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header("Personalization")
+            VStack(alignment: .leading, spacing: 7) {
+                Text("CLAN NAME")
+                    .font(.system(.caption2, design: .rounded).weight(.bold))
+                    .foregroundStyle(Color(white: 0.5)).tracking(0.5)
+                TextField("", text: $name, prompt: Text("Clan name"))
+                    .foregroundStyle(.white).autocorrectionDisabled()
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.14)))
+                    .onChange(of: name) { _, newValue in
+                        if newValue.count > 32 { name = String(newValue.prefix(32)) }
+                    }
+            }
+            Button { Task { await saveName() } } label: {
+                ZStack {
+                    Text("Save name").opacity(renameBusy ? 0 : 1)
+                    if renameBusy { ProgressView().tint(.white).scaleEffect(0.8) }
+                }
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                .background(Capsule().fill(canSaveName ? Color(red: 0.20, green: 0.50, blue: 0.96)
+                                                       : Color(white: 0.2)))
+            }
+            .disabled(!canSaveName || renameBusy).buttonStyle(.plain)
+            if let renameError {
+                Text(renameError)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
+            }
+            Text("Renaming is announced in the clan chat.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+        }
+    }
+
+    // Members & officers: ask the leadership to move you up.
+    private var promotionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header("Role")
+            if asked || alreadyAskedPromotion {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color(red: 0.30, green: 0.75, blue: 0.42))
+                    Text("Asked — your request is in the clan chat.")
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundStyle(Color(white: 0.7))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14).padding(.vertical, 13)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+            } else {
+                Button { Task { await ask() } } label: {
+                    ZStack {
+                        Text("Ask for a promotion 📣").opacity(askBusy ? 0 : 1)
+                        if askBusy { ProgressView().tint(.white).scaleEffect(0.8) }
+                    }
+                    .font(.system(.body, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                    .background(Capsule().fill(Color(red: 0.20, green: 0.50, blue: 0.96)))
+                }
+                .disabled(askBusy).buttonStyle(.plain)
+            }
+            Text("Drops a note in the clan chat so the owner sees you'd like to move up.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+        }
+    }
+
+    private var membershipSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header("Membership")
+            if isOwner {
+                Button { confirmDisband = true } label: {
+                    Text("Disband clan")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                        .background(Capsule().fill(Color(red: 0.90, green: 0.30, blue: 0.32)))
+                }
+                .buttonStyle(.plain)
+                .confirmationDialog("Disband this clan? It's removed for every member.",
+                                    isPresented: $confirmDisband, titleVisibility: .visible) {
+                    Button("Disband", role: .destructive) { dismiss(); onDisband() }
+                    Button("Cancel", role: .cancel) {}
+                }
+                Text("Disbanding removes the clan for everyone.")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
+            } else {
+                Button { confirmLeave = true } label: {
+                    Text("Leave clan")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                        .background(Capsule().fill(Color(white: 0.22)))
+                }
+                .buttonStyle(.plain)
+                .confirmationDialog("Leave this clan?", isPresented: $confirmLeave,
+                                    titleVisibility: .visible) {
+                    Button("Leave", role: .destructive) { dismiss(); onLeave() }
+                    Button("Cancel", role: .cancel) {}
+                }
+                Text("You can rejoin, or join another clan, anytime.")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
+            }
+        }
+    }
+
+    private func header(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(.caption, design: .rounded).weight(.bold))
+            .foregroundStyle(Color(white: 0.5)).tracking(0.5)
+    }
+
+    private func saveName() async {
+        renameBusy = true; renameError = nil
+        let err = await onRename(trimmedName)
+        renameBusy = false
+        if let err { renameError = err } else { dismiss() }
+    }
+
+    private func ask() async {
+        askBusy = true
+        if await onAskPromotion() { asked = true }
+        askBusy = false
     }
 }
 
