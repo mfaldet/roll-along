@@ -53,8 +53,11 @@ extension CosmeticItem {
 
     /// True when Sell Back can liquidate this item for coins — everything that
     /// isn't the starter look or a permanent Iconic special, including seasonal /
-    /// limited-time cosmetics.
-    var isSellable: Bool { !isIconic }
+    /// limited-time cosmetics.  `Self.starter` is excluded explicitly because a
+    /// starter needn't be `.starter` tier (TrailColor's is Graphite, tier .rare):
+    /// Sell Back re-grants every category's starter, so refunding it would mint
+    /// coins on every pass.
+    var isSellable: Bool { !isIconic && self != Self.starter }
 
     /// Player-facing rarity word: "Iconic" for un-sellable specials, otherwise
     /// the tier's rarity name (Standard / Rare / Epic / Legendary).
