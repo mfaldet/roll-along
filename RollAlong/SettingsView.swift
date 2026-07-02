@@ -26,6 +26,7 @@ struct SettingsView: View {
                     gameSection
                     notificationsSection
                     accountSection
+                    cosmeticsSection
                     purchasesSection
                     resetSection
                 }
@@ -435,13 +436,12 @@ struct SettingsView: View {
         showRestoreResult = true
     }
 
-    private var resetSection: some View {
+    // ── Cosmetics — beneficial: sell coin-bought cosmetics back for the coins
+    //    paid and tidy the locker.  Recoverable (re-buy anything anytime), so
+    //    it sits with the friendly sections, above Purchases.
+    private var cosmeticsSection: some View {
         let cosmetic = gameState.coinLiquidationPreview()
         return VStack(alignment: .leading, spacing: 12) {
-            // ── Cosmetics — beneficial: sell coin-bought cosmetics back for
-            //    the coins paid and tidy the locker.  Sits ABOVE the Danger Zone
-            //    because it's recoverable (re-buy anything anytime), so it gets
-            //    an inviting, non-alarming treatment.
             sectionHeader("Cosmetics")
             Button {
                 showCosmeticResetAlert = true
@@ -465,11 +465,14 @@ struct SettingsView: View {
                     .foregroundStyle(Color(red: 0.3, green: 0.8, blue: 0.45))
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
 
-            // ── Danger Zone — the one destructive, unrecoverable reset, gated
-            //    behind a typed "STARTOVER" confirmation. ──
+    // ── Danger Zone — the one destructive, unrecoverable reset, gated behind a
+    //    typed "STARTOVER" confirmation. ──
+    private var resetSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Danger Zone")
-                .padding(.top, 10)
             Button {
                 showResetConfirm = true
             } label: {
@@ -491,7 +494,7 @@ struct SettingsView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .font(.system(size: 22, weight: .semibold, design: .rounded))
             .kerning(1.5)
             .foregroundStyle(Color(white: 0.45))
     }

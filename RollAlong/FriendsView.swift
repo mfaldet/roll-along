@@ -170,10 +170,9 @@ struct FriendsView: View {
     private var inviteRow: some View {
         if let me = myId {
             let link = URL(string: "rollalong://player/\(me.uuidString)")!
-            let who  = gameState.playerName.isEmpty ? "me" : gameState.playerName
             ShareLink(item: link,
                       subject: Text("Add me on Roll Along"),
-                      message: Text("Add \(who) on Roll Along so we can send each other lives! Tap: \(link.absoluteString)")) {
+                      message: Text("Come on, Roll Along with me!")) {
                 HStack(spacing: 10) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 15, weight: .semibold))
