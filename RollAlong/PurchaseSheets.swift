@@ -1010,9 +1010,10 @@ private enum CoinPackArt {
 
 // MARK: - Shimmery-diamond bonus label
 
-/// The "×2 coins" subtitle on the top coin pack: a cool diamond gradient with a
-/// highlight that sweeps across the glyphs.  Shown instead of the plain green
-/// "+100% coins" bonus so the best-value pack reads as premium.
+/// The bonus subtitle on the top coin pack (+60% under the 2026-07 reprice):
+/// a cool diamond gradient with a highlight that sweeps across the glyphs.
+/// Shown instead of the plain green bonus text so the best-value pack reads
+/// as premium.
 private struct DiamondBonusLabel: View {
     let text: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

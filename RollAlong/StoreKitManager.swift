@@ -370,9 +370,10 @@ final class StoreKitManager: ObservableObject {
     /// Grant the complete Aurora collection — every item in the "aurora"
     /// cosmetic bundle (ball, goal, trail, floor, pit, music) — via
     /// `grantBundleFree`, which marks the items free-granted so Sell Back keeps
-    /// them but never refunds them.  That marking is load-bearing: the bundle
-    /// liquidates for 2,550 coins, so a plain grant would let a $1.99 pack
-    /// out-mint the $19.99 coin pack.  Players who already coin-bought part of
+    /// them but never refunds them.  That marking is load-bearing: the bundle's
+    /// items would sell back for 4,125 coins (half their 8,250 catalogue value
+    /// under the 2026-07 reprice), so a plain grant would hand a $1.99 pack
+    /// nearly the $4.99 coin pack's worth.  Players who already coin-bought part of
     /// the collection are refunded those items' full coinCost by
     /// `grantBundleFree` before the marking, so no paid Sell Back value is
     /// confiscated.  No-ops when the player already owns all six items (a

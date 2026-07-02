@@ -427,8 +427,9 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// The Starter Pack grants the Aurora bundle free-granted; Sell Back must
-    /// refund none of it.  The bundle liquidates for 2,550 coins, so a sellable
-    /// grant would let the $1.99 pack out-mint the $19.99 coin pack.
+    /// refund none of it.  The bundle's items would sell back for 4,125 coins
+    /// (half of 8,250 under the 2026-07 reprice), so a sellable grant would
+    /// let the $1.99 pack rival the $4.99 coin pack.
     func testAuroraBundleGrantedFree_isNotACoinFaucet() {
         let gs = makeCleanState()
         gs.coinBalance = 0
@@ -502,8 +503,8 @@ final class CosmeticsTests: XCTestCase {
     //
     // Sell Back used to refund every item's full coinCost even when it was
     // bought below cost (the Shop's featured-bundle discount, Ball Packs'
-    // 66% pricing) — buy a 2,550-coin bundle at 50% off for 1,275, liquidate
-    // for 2,550, pocket 1,275, repeat every rotation window.  `paidPrices`
+    // 66% pricing) — buy a bundle at 50% off, liquidate for its full price,
+    // pocket the difference, repeat every rotation window.  `paidPrices`
     // records the discounted price, and Sell Back pays `sellBackValue`:
     // half the CURRENT coinCost, capped at what was paid — so neither deep
     // discounts nor future price bumps can ever refund more than was spent.
