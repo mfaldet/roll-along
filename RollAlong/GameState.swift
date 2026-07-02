@@ -1338,9 +1338,9 @@ final class GameState: ObservableObject {
     /// day 7 the ladder repeats from the top, but `dailyStreak` keeps climbing
     /// so an unbroken streak still reads as a big number in the HUD.
     ///
-    /// ECONOMY: a perfect week pays 105 — about two standard-tier (50) skins,
-    /// half a premium (200).  Tuned down 2026-06-11 from [25,40,60,80,100,150,
-    /// 300] (= 755/week, several premium cosmetics for just signing in).
+    /// ECONOMY: a perfect week pays 105 — a top-up, not a wage: ~14% of a
+    /// Standard-tier (750) skin under the 2026-07 reprice.  Tuned down
+    /// 2026-06-11 from [25,40,60,80,100,150,300] (= 755/week).
     static let dailyRewardLadder: [Int] = [5, 8, 10, 12, 15, 20, 35]
 
     /// True when the player hasn't yet claimed today's reward.

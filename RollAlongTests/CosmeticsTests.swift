@@ -32,7 +32,7 @@ final class CosmeticsTests: XCTestCase {
 
     /// Bundle-exclusive skins are always top-tier (`.exclusive`).  They're kept
     /// out of the coin shop by CosmeticShopView's owned-or-hidden filter, NOT by
-    /// price — `coinCost` reads through to `tier.basePrice` (500), so asserting a
+    /// price — `coinCost` reads through to `tier.basePrice` (1,500), so asserting a
     /// price of 0 would be wrong.  This guards against an event skin being
     /// mis-tiered into a cheap, coin-buyable slot.
     func testBundleExclusiveSkins_areExclusiveTier() {
@@ -97,9 +97,24 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(CosmeticTier.starter.basePrice, 0)
     }
 
+    /// The approved 2026-07 reprice (07-decisions ruling 2, shipped in
+    /// 08-reprice): 750 / 1,000 / 1,250 / 1,500.  Every price must be EVEN
+    /// forever — Sell Back refunds exactly half the CURRENT cost as an
+    /// integer, so an odd price would truncate the refund.
+    func testCosmeticTier_basePricesMatchApprovedLadderAndAreEven() {
+        XCTAssertEqual(CosmeticTier.standard.basePrice,  750)
+        XCTAssertEqual(CosmeticTier.rare.basePrice,      1000)
+        XCTAssertEqual(CosmeticTier.premium.basePrice,   1250)
+        XCTAssertEqual(CosmeticTier.exclusive.basePrice, 1500)
+        for tier in [CosmeticTier.starter, .standard, .rare, .premium, .exclusive] {
+            XCTAssertEqual(tier.basePrice % 2, 0,
+                           "Tier \(tier) price must stay even so sell-back halves exactly")
+        }
+    }
+
     func testCosmeticTier_basePricesAreMonotonicallyIncreasing() {
         // Ordered from cheapest to most expensive
-        let tiers: [CosmeticTier] = [.starter, .standard, .premium, .exclusive]
+        let tiers: [CosmeticTier] = [.starter, .standard, .rare, .premium, .exclusive]
         var previous = -1
         for tier in tiers {
             XCTAssertGreaterThan(tier.basePrice, previous,
@@ -337,10 +352,10 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(preview.count, 1, "only the seasonal pumpkin is sellable")
         XCTAssertEqual(preview.coins, BallSkin.pumpkin.coinCost / 2)   // 50% refund
 
-        // Sell Back pays 50% of the CURRENT item cost: a 500-coin exclusive
-        // refunds exactly 250.
-        XCTAssertEqual(BallSkin.pumpkin.coinCost, 500, "pumpkin is a 500-coin exclusive")
-        XCTAssertEqual(preview.coins, 250, "a 500-coin exclusive refunds 250")
+        // Sell Back pays 50% of the CURRENT item cost: a 1,500-coin exclusive
+        // refunds exactly 750.
+        XCTAssertEqual(BallSkin.pumpkin.coinCost, 1500, "pumpkin is a 1,500-coin exclusive")
+        XCTAssertEqual(preview.coins, 750, "a 1,500-coin exclusive refunds 750")
 
         let r = gs.liquidateCoinCosmetics()
         XCTAssertEqual(r.coins, BallSkin.pumpkin.coinCost / 2)
