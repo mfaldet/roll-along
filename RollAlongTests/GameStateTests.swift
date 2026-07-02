@@ -753,3 +753,177 @@ final class ClimbRecordGateTests: XCTestCase {
                        "the daily gauntlet must never write climb records")
     }
 }
+
+// ---------------------------------------------------------------------------
+// MinigameAICalibrationTests — headless win-rate calibration harness.
+//
+// Runs the PRODUCTION Gold Rush simulation (GoldRushEngine.tick(), the exact
+// code GoldRushView drives every frame) against a scripted "median-skill"
+// player at each MinigameDifficulty, and reports simulated win rates next to
+// `MinigameDifficulty.targetWinRate` (0.80 / 0.45 / 0.22).
+//
+// WHAT IS REAL vs WHAT IS MODELED — read before trusting a number:
+//   • REAL: all rival AI (MinigameAI weave/hesitation, aiAccelScale,
+//     aiSpeedScale, bully charges), all physics, coins, spills, round timing.
+//     Zero divergence from the shipped game — it IS the shipped tick.
+//   • MODELED: the player. In the real game the player is a human tilting a
+//     phone; here it's `MedianPlayer` (reaction latency ~0.25 s, ~75% tilt,
+//     ±0.30 rad aim error, opportunistic-but-imperfect charge use).
+//
+// Consequence: ABSOLUTE win rates from this harness are only as honest as the
+// player model, so they must NOT be used alone to retune the aiAccelScale /
+// aiSpeedScale tables against targetWinRate — live telemetry
+// (minigame_result: game/difficulty/won) is the ground truth for absolutes.
+// What the harness IS good for:
+//   • the difficulty SPREAD (easy must beat hard by a wide margin),
+//   • knob sensitivity (re-run after touching the scale tables or engine
+//     tunables and compare deltas before shipping),
+//   • regression safety (a physics/AI change that flattens the spread fails
+//     the sanity assertion below).
+//
+// Gold Rush only: it is the one mode with the headless engine pattern.  The
+// other competitive modes (KotH, PaintBall, MarbleCup, Sumo) run their tick
+// inside SwiftUI @State and cannot be simulated without an engine extraction.
+// ---------------------------------------------------------------------------
+
+final class MinigameAICalibrationTests: XCTestCase {
+
+    /// Same fixed reference arena as PerformanceTests (iPhone-class portrait).
+    private let arena = CGSize(width: 390, height: 844)
+
+    /// Rounds simulated per difficulty.  At n=200 the standard error of a
+    /// mid-range rate is ~3.5 points — plenty for spread/sensitivity checks.
+    private let roundsPerCell = 200
+
+    // MARK: - Scripted median-skill player
+
+    /// A deliberately imperfect tilt player:
+    ///  • Decides only every `reactionTicks` (~0.25 s) — between decisions it
+    ///    holds the previous tilt, like a human committed to a lean.
+    ///  • Aims at the nearest grabbable coin with a fresh ±`aimError` rad
+    ///    mistake per decision, at ~`tiltMagnitude` of full tilt (full-strength
+    ///    player accel is 1_500 vs the rivals' 1_180 base, so 0.75 tilt puts
+    ///    the player at rival-comparable thrust — "median", not optimal).
+    ///  • Uses the charge mechanic opportunistically: when it's off cooldown
+    ///    and a coin-carrying rival is close, it re-aims and taps — but only
+    ///    half the time it notices (humans miss windows).
+    private struct MedianPlayer {
+        let reactionTicks = 15              // ~0.25 s @ 60 fps
+        let tiltMagnitude: CGFloat = 0.75
+        let aimError: CGFloat = 0.30        // radians, resampled per decision
+        let chargeRange: CGFloat = 140
+        private var input = CGVector.zero
+        private var nextDecision = 0
+
+        mutating func drive(_ engine: GoldRushEngine, tick: Int) {
+            defer { engine.playerInput = input }
+            guard tick >= nextDecision,
+                  let me = engine.racers.first(where: { $0.isPlayer }) else { return }
+            nextDecision = tick + reactionTicks
+
+            // Opportunistic charge: nearest rival worth ramming, in range.
+            if engine.playerChargeReady, Bool.random(),
+               let victim = engine.racers
+                    .filter({ !$0.isPlayer && $0.score >= 2 })
+                    .min(by: { dist($0.pos, me.pos) < dist($1.pos, me.pos) }),
+               dist(victim.pos, me.pos) < chargeRange {
+                input = aimed(from: me.pos, at: victim.pos)
+                engine.playerInput = input
+                engine.chargePlayer()
+                return
+            }
+
+            // Otherwise chase the nearest coin this player may actually grab
+            // (own just-spilled coins are briefly off-limits and a human
+            // wouldn't hover over them); drift to centre when the board's bare.
+            let coin = engine.coins
+                .filter { !($0.ignoreRacer == me.id && engine.localTick < $0.ignoreUntil) }
+                .min { dist($0.pos, me.pos) < dist($1.pos, me.pos) }
+            input = aimed(from: me.pos, at: coin?.pos ?? engine.center)
+        }
+
+        private func aimed(from: CGPoint, at target: CGPoint) -> CGVector {
+            let ang = atan2(target.y - from.y, target.x - from.x)
+                    + CGFloat.random(in: -aimError...aimError)
+            return CGVector(dx: cos(ang) * tiltMagnitude,
+                            dy: sin(ang) * tiltMagnitude)
+        }
+
+        private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+            hypot(a.x - b.x, a.y - b.y)
+        }
+    }
+
+    // MARK: - One headless round
+
+    /// Exactly what GoldRushView's per-frame driver does, minus rendering:
+    /// set the knobs from the difficulty, feed playerInput, tick to round end.
+    private func runRound(difficulty: MinigameDifficulty, map: Int) -> Bool {
+        let engine = GoldRushEngine(arena: arena)
+        engine.loadMap(index: map)
+        engine.aiAccelScale = difficulty.aiAccelScale
+        engine.aiSpeedScale = difficulty.aiSpeedScale
+        engine.difficulty   = difficulty
+        engine.startRound()
+
+        var player = MedianPlayer()
+        var tick = 0
+        while !engine.isOver {
+            player.drive(engine, tick: tick)
+            engine.tick()
+            tick += 1
+            if tick > 4_000 {                    // 60 s round = 3_600 ticks
+                XCTFail("round failed to end — engine round-clock regression")
+                return false
+            }
+        }
+        return engine.playerWon
+    }
+
+    // MARK: - The calibration report
+
+    /// Cells measured so far.  XCTest builds a fresh instance per test method,
+    /// so the three per-difficulty tests below share results through this
+    /// static; the hard cell (alphabetically last selector, so it runs last)
+    /// closes with the cross-difficulty spread check.  One test per difficulty
+    /// keeps each under ~25 s and isolates a simulator hiccup to one cell.
+    private static var measured: [MinigameDifficulty: Double] = [:]
+
+    private func measureCell(_ difficulty: MinigameDifficulty) {
+        var wins = 0
+        for round in 0..<roundsPerCell {
+            // Cycle the shipped maps so no single layout dominates.
+            if runRound(difficulty: difficulty,
+                        map: round % max(1, GoldRushMaps.maps.count)) {
+                wins += 1
+            }
+        }
+        let rate = Double(wins) / Double(roundsPerCell)
+        Self.measured[difficulty] = rate
+        // The report — read it from the test log; this is the harness output.
+        print(String(format: "[AI-CALIBRATION] goldrush %@ n=%d win-rate %.3f (target %.2f)",
+                     difficulty.rawValue, roundsPerCell, rate, difficulty.targetWinRate))
+    }
+
+    func testWinRate_1_easy()   { measureCell(.easy) }
+    func testWinRate_2_normal() { measureCell(.normal) }
+
+    func testWinRate_3_hard_thenSpread() {
+        measureCell(.hard)
+        // When invoked in isolation the other cells are absent — report only.
+        guard let easy = Self.measured[.easy],
+              let normal = Self.measured[.normal],
+              let hard = Self.measured[.hard] else { return }
+
+        // Deliberately WEAK assertions: the harness measures, telemetry judges.
+        // Only the difficulty ORDERING is load-bearing enough to gate on —
+        // if easy stops being meaningfully easier than hard, the knobs or the
+        // humanizer regressed.
+        XCTAssertGreaterThan(easy, normal - 0.02,
+            "easy should not simulate harder than normal — knob regression")
+        XCTAssertGreaterThan(normal, hard - 0.02,
+            "normal should not simulate harder than hard — knob regression")
+        XCTAssertGreaterThan(easy, hard + 0.10,
+            "difficulty spread collapsed: easy \(easy) vs hard \(hard)")
+    }
+}
