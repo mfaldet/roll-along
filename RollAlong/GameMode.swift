@@ -100,6 +100,18 @@ enum ProgressionKind: Equatable, Codable {
         if case .mainClimb = self { return true }
         return false
     }
+
+    /// Whether a goal-reached clear writes the climb's persistent per-level
+    /// records — stars, best time, first-clear bonus, and the unlock frontier
+    /// (`highestUnlocked`) — all keyed by `gameState.currentLevel`.  Only the
+    /// main climb may: every other progression plays maps that are NOT
+    /// `currentLevel`, so recording there would stamp a bogus best onto
+    /// whatever climb level the player happens to be parked on (and could
+    /// even unlock the next climb level without it ever being cleared).
+    var recordsClimbResult: Bool {
+        if case .mainClimb = self { return true }
+        return false
+    }
 }
 
 /// How the lives economy applies to a mode.

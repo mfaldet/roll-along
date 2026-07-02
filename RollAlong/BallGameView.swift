@@ -5616,7 +5616,37 @@ struct BallGameView: View {
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
+
+        // ── Daily Challenge (one-shot) fast-path ───────────────────────────
+        // The gauntlet plays generated maps that are NOT `currentLevel` — the
+        // player's parked climb level.  Falling through to the climb logic
+        // would stamp a bogus 3-star best + time onto that parked level
+        // (daily layouts carry sentinel 999 s targets), pay its first-clear
+        // bonus, and could bump `highestUnlocked` past the frontier.  A
+        // sub-level clear only surfaces gauntlet progress; the day's coin
+        // reward is banked once by `completeTodaysDailyChallenge()` when
+        // "Finish" is tapped on the last sub-level (see advanceFromLevelClear).
+        if case .oneShot = activeMode.progression {
+            lastClearedTime           = elapsed
+            lastClearedStars          = stars
+            lastClearedCoinIndices    = coinsPickedThisAttempt
+            lastClearedIsNewBestStars = false   // no persistent record; nothing to best
+            lastClearedCoinReward     = 0       // day reward pays on completion, not per level
+            AnalyticsClient.shared.track(
+                "daily_challenge_level_cleared",
+                properties: [
+                    "sub_level": .int(gameState.dailyChallengeIndex),
+                    "time":      .double(elapsed),
+                ]
+            )
+            withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
+            return
+        }
         // ── Main climb (original logic below) ──────────────────────────────
+        // Everything past this point writes persistent records against
+        // `gameState.currentLevel` — only the climb's progression may.
+        assert(activeMode.progression.recordsClimbResult,
+               "mode \(activeMode.id) fell through to climb record-keeping")
 
         let level     = gameState.currentLevel
         let prevStars = gameState.stars(for: level)
