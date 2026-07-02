@@ -13,7 +13,7 @@ import SwiftUI
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
 //   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
 //   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBoundaries,
-//   ra_ownedBundles, ra_ownedPacks, ra_freeGrantedItems,
+//   ra_ownedBundles, ra_ownedPacks, ra_freeGrantedItems, ra_paidPrices,
 //   ra_ownedMusic, ra_trackProgress, ra_completedTracks, ra_equippedGoal,
 //   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedBoundary,
 //   ra_equippedMusic, ra_equippedPack.
@@ -284,6 +284,16 @@ final class GameState: ObservableObject {
     /// refunds them — they're un-redeemable.  Persisted.
     @Published var freeGrantedItems: Set<String> {
         didSet { saveStringSet(freeGrantedItems, forKey: "ra_freeGrantedItems") }
+    }
+    /// Coins actually PAID for cosmetics bought below their full `coinCost`
+    /// (the Shop's featured-bundle discount, Ball Packs' 66% pricing).  Sell
+    /// Back refunds this recorded price instead of `coinCost` — otherwise a
+    /// discounted purchase + immediate Sell Back mints the difference, forever.
+    /// Keyed by `paidPriceKey` ("<Type>:<rawValue>" — bare rawValues collide
+    /// across categories, e.g. five different "aurora" items).  No entry means
+    /// full price was paid.  Persisted.
+    @Published var paidPrices: [String: Int] {
+        didSet { save(paidPrices, trackProgressKey: "ra_paidPrices") }
     }
     /// Owned Ball-Pack IDs.  Buying a Pack also adds its member skins to
     /// `ownedBallSkins` (so they're individually equippable); this set
@@ -564,6 +574,7 @@ final class GameState: ObservableObject {
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
         freeGrantedItems = Self.loadStringSet(forKey: "ra_freeGrantedItems", defaults)
+        paidPrices = Self.loadTrackProgress(key: "ra_paidPrices", defaults)
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         minigameWins   = Self.loadTrackProgress(key: "ra_minigameWins", defaults)
         minigameBests  = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
@@ -659,6 +670,19 @@ final class GameState: ObservableObject {
 
     // MARK: - Cosmetic liquidation ("Reset Cosmetics")
 
+    /// Namespaced `paidPrices` key — bare rawValues collide across cosmetic
+    /// categories (five different items are named "aurora").
+    static func paidPriceKey<Item: CosmeticItem>(_ item: Item) -> String {
+        "\(Item.self):\(item.rawValue)"
+    }
+
+    /// What Sell Back pays for `item`: the recorded price when it was bought
+    /// below cost (discounted featured bundle, Ball Pack), else the full
+    /// `coinCost`.  Never more than `coinCost`.
+    func sellBackValue<Item: CosmeticItem>(_ item: Item) -> Int {
+        min(item.coinCost, paidPrices[Self.paidPriceKey(item)] ?? item.coinCost)
+    }
+
     /// Dry run: how many owned cosmetics are sellable (coin-bought plus seasonal
     /// / limited-time specials), and the coins they'd refund.  Powers the
     /// Danger-Zone button label + confirm dialog.
@@ -666,7 +690,7 @@ final class GameState: ObservableObject {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
             for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
-                count += 1; coins += item.coinCost
+                count += 1; coins += sellBackValue(item)
             }
         }
         tally(ownedBallSkins, BallSkin.self); tally(ownedGoals, GoalSkin.self)
@@ -686,8 +710,10 @@ final class GameState: ObservableObject {
         var count = 0, coins = 0
         func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
             for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
-                count += 1; coins += item.coinCost
+                count += 1; coins += sellBackValue(item)
                 owned.remove(item.rawValue)
+                // Relocked — a future re-purchase pays its own price fresh.
+                paidPrices.removeValue(forKey: Self.paidPriceKey(item))
             }
             owned.insert(Item.starter.rawValue)   // the starter is always owned
         }
@@ -1476,7 +1502,50 @@ final class GameState: ObservableObject {
     func purchase<Item: CosmeticItem>(_ item: Item) -> Bool {
         if isOwned(item) { return false }
         guard spendCoins(item.coinCost) else { return false }
+        // Full price paid — clear any stale discounted-price record so Sell
+        // Back refunds the full cost.
+        paidPrices.removeValue(forKey: Self.paidPriceKey(item))
         grant(item)
+        return true
+    }
+
+    /// Record what was actually paid for each just-purchased item when the
+    /// total paid is below the items' combined `coinCost`.  The discount is
+    /// prorated across the items; each share is floored so the recorded sum
+    /// (= a later Sell Back refund) never exceeds what was paid.
+    private func recordPaidPrices<Item: CosmeticItem>(_ items: [Item], ratio: Double) {
+        for item in items where item.isSellable {
+            let key = Self.paidPriceKey(item)
+            if ratio < 1.0 {
+                paidPrices[key] = Int(Double(item.coinCost) * ratio)
+            } else {
+                paidPrices.removeValue(forKey: key)
+            }
+        }
+    }
+
+    /// Buy `bundle` for `price` coins (the Shop's discounted price or the
+    /// Catalog's prorated price).  Grants every yet-unowned item and records
+    /// the bundle owned.  When `price` is below the granted items' combined
+    /// `coinCost`, each item's paid share is recorded so Sell Back refunds
+    /// what was paid — otherwise the featured-bundle discount is a coin mint
+    /// (buy at 50% off, liquidate at 100%, repeat every rotation window).
+    @discardableResult
+    func purchaseBundle(_ bundle: CosmeticBundle, price: Int) -> Bool {
+        guard !ownedBundles.contains(bundle.id) else { return false }
+        let base = bundle.proratedPrice(in: self)   // BEFORE granting
+        guard spendCoins(price) else { return false }
+        if base > 0 {
+            let ratio = Double(price) / Double(base)
+            recordPaidPrices(bundle.balls.filter  { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.goals.filter  { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.trails.filter { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.floors.filter { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.pits.filter   { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.music.filter  { !isOwned($0) }, ratio: ratio)
+        }
+        bundle.grantContents(to: self)
+        ownedBundles.insert(bundle.id)
         return true
     }
 
@@ -1494,7 +1563,16 @@ final class GameState: ObservableObject {
     @discardableResult
     func purchasePack(_ pack: BallPack) -> Bool {
         if ownedPacks.contains(pack.id) { return false }
-        guard spendCoins(pack.price(in: self)) else { return false }
+        let price = pack.price(in: self)
+        // Packs charge 66% of the member-skin sum — record each granted
+        // skin's paid share so Sell Back refunds what was paid, not the
+        // full coinCost (the 34% gap was a repeatable coin mint).
+        let unowned = pack.skins.filter { !isOwned($0) }
+        let base = unowned.reduce(0) { $0 + $1.coinCost }
+        guard spendCoins(price) else { return false }
+        if base > 0 {
+            recordPaidPrices(unowned, ratio: Double(price) / Double(base))
+        }
         pack.grantContents(to: self)
         ownedPacks.insert(pack.id)
         return true

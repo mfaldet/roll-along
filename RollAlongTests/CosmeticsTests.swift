@@ -370,4 +370,105 @@ final class CosmeticsTests: XCTestCase {
         }
         XCTAssertEqual(gs.coinBalance, 0, "no coins handed out for the gift")
     }
+
+    // MARK: - Discounted purchases refund what was PAID (coin-mint fix)
+    //
+    // Sell Back used to refund every item's full coinCost even when it was
+    // bought below cost (the Shop's featured-bundle discount, Ball Packs'
+    // 66% pricing) — buy a 2,550-coin bundle at 50% off for 1,275, liquidate
+    // for 2,550, pocket 1,275, repeat every rotation window.  `paidPrices`
+    // now records the discounted price and Sell Back refunds that instead.
+
+    /// Buying the featured bundle at the deepest (50%) discount and selling
+    /// straight back must refund at most what was paid — never a profit.
+    func testBundle_discountedShopPurchase_sellBackRefundsPaidNotFull() {
+        let gs = makeCleanState()
+        let bundle = CosmeticBundle.catalogue[0]
+        let paid = bundle.shopPrice(in: gs, discount: .legendary)   // 50% off
+        gs.coinBalance = paid
+        XCTAssertTrue(gs.purchaseBundle(bundle, price: paid))
+        XCTAssertEqual(gs.coinBalance, 0)
+
+        let preview = gs.coinLiquidationPreview()
+        let r = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(preview.coins, r.coins, "preview and liquidation must agree")
+        XCTAssertGreaterThan(r.coins, 0, "a discounted purchase still refunds something")
+        XCTAssertLessThanOrEqual(r.coins, paid, "Sell Back must never refund more than was paid")
+        XCTAssertLessThanOrEqual(gs.coinBalance, paid, "buy-discounted → Sell Back must not mint coins")
+    }
+
+    /// The original exploit loop: buy at 50% off, liquidate, re-buy next
+    /// window.  Repeating must never grow the balance past its start.
+    func testBundle_discountBuySellLoop_neverProfits() {
+        let gs = makeCleanState()
+        let bundle = CosmeticBundle.catalogue[0]
+        let start = bundle.fullPrice()
+        gs.coinBalance = start
+        for pass in 1...3 {
+            let price = bundle.shopPrice(in: gs, discount: .legendary)
+            XCTAssertTrue(gs.purchaseBundle(bundle, price: price), "pass \(pass) purchase")
+            gs.liquidateCoinCosmetics()
+            XCTAssertLessThanOrEqual(gs.coinBalance, start,
+                                     "pass \(pass): buy-at-discount → Sell Back must never exceed the starting balance")
+        }
+    }
+
+    /// Ball Packs charge 66% of the member-skin sum — the same mint existed
+    /// there (buy pack, liquidate skins at full coinCost, +34% forever).
+    func testPack_purchase_sellBackRefundsPaidNotFull() {
+        let gs = makeCleanState()
+        guard let pack = BallPack.catalogue.first else { return XCTFail("expected a pack in the catalogue") }
+        let start = pack.skins.reduce(0) { $0 + $1.coinCost }
+        gs.coinBalance = start
+        let price = pack.price(in: gs)
+        XCTAssertTrue(gs.purchasePack(pack))
+        XCTAssertEqual(gs.coinBalance, start - price)
+
+        let r = gs.liquidateCoinCosmetics()
+        XCTAssertGreaterThan(r.coins, 0, "a pack purchase still refunds something")
+        XCTAssertLessThanOrEqual(r.coins, price, "pack Sell Back must refund at most the discounted price paid")
+        XCTAssertLessThanOrEqual(gs.coinBalance, start, "pack buy → Sell Back must not mint coins")
+    }
+
+    /// Full-price paths are untouched: an individual Shop purchase still
+    /// refunds its full coinCost, and a Catalog bundle bought at the full
+    /// prorated price refunds (up to) that price.
+    func testFullPricePurchases_stillRefundFullCost() {
+        let gs = makeCleanState()
+        gs.coinBalance = BallSkin.blue.coinCost
+        XCTAssertTrue(gs.purchase(BallSkin.blue))
+        let r = gs.liquidateCoinCosmetics()
+        XCTAssertEqual(r.coins, BallSkin.blue.coinCost, "full-price purchase refunds the full cost")
+    }
+
+    /// Re-buying an item at full price after a discounted purchase was sold
+    /// back must clear the stale discounted record.
+    func testRebuyAtFullPrice_clearsDiscountedRecord() {
+        let gs = makeCleanState()
+        gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = 1   // stale discount record
+        gs.coinBalance = BallSkin.blue.coinCost
+        XCTAssertTrue(gs.purchase(BallSkin.blue))
+        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost,
+                       "full-price re-purchase refunds full cost again")
+    }
+
+    /// `paidPrices` keys are category-qualified: five different cosmetics
+    /// share the rawValue "aurora", and a discounted record for one category
+    /// must not distort another's refund.
+    func testPaidPrices_keysAreCategoryQualified_noAuroraCollision() {
+        let gs = makeCleanState()
+        gs.paidPrices[GameState.paidPriceKey(BallSkin.aurora)] = 1
+        XCTAssertEqual(gs.sellBackValue(BallSkin.aurora), 1)
+        XCTAssertEqual(gs.sellBackValue(TrailColor.aurora), TrailColor.aurora.coinCost)
+        XCTAssertEqual(gs.sellBackValue(GoalSkin.aurora), GoalSkin.aurora.coinCost)
+        XCTAssertEqual(gs.sellBackValue(Floor.aurora), Floor.aurora.coinCost)
+    }
+
+    /// `sellBackValue` never exceeds coinCost even if a corrupt/legacy record
+    /// says otherwise.
+    func testSellBackValue_isCappedAtCoinCost() {
+        let gs = makeCleanState()
+        gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = BallSkin.blue.coinCost * 10
+        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost)
+    }
 }
