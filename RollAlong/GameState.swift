@@ -1013,13 +1013,26 @@ final class GameState: ObservableObject {
     /// up to 3 currency-coins on the floor → 0…3 coins per first clear
     /// from pickups alone.
     static let coinPerPickup: Int = 1
-    /// Flat coin award on EVERY climb clear — first time or replay.  The
+    /// Base flat coin award on EVERY climb clear — first time or replay.  The
     /// grind is blessed (2026-07-01 economy calibration): replaying a level
     /// pays this bonus again, exactly like the Challenge Tracks, whether the
     /// player pushes to level 10,000 or replays level 1 ten thousand times.
-    /// Stacks with pickups, so a perfect first clear yields `coinPerClear +
-    /// 3` coins; pickup coins stay sticky and pay only once per level.
+    /// Stacks with pickups, so a perfect first clear yields `clearCoins(for:)
+    /// + 3` coins; pickup coins stay sticky and pay only once per level.
+    /// The climb scales this by tier via `clearCoins(for:)` — this constant
+    /// is the easy-tier base (and the flat track-level bonus).
     static let coinPerClear:  Int = 2
+
+    /// Climb clear bonus scaled by the level's difficulty tier (the
+    /// last-digit rule — `DifficultyTier.tier(for:)`): easy 2 · hard 3 ·
+    /// veryHard 4.  Harder never pays less per clear.
+    static func clearCoins(for level: Int) -> Int {
+        switch DifficultyTier.tier(for: level) {
+        case .easy:     return 2
+        case .hard:     return 3
+        case .veryHard: return 4
+        }
+    }
 
     /// Maximum coins grantable in a single `addCoins` call.
     /// Highest legitimate single award is 10 000 (coins10000 IAP).

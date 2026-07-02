@@ -5611,25 +5611,26 @@ struct BallGameView: View {
 
         // Currency-coin reward.  Two stackable sources:
         //
-        //   1. Flat per-clear bonus (`coinPerClear`) — on EVERY clear,
-        //      first time or replay.  Replay farming is blessed
-        //      (2026-07-01 economy calibration): the climb pays exactly
-        //      like the Challenge Tracks, whether the player pushes to
-        //      level 10,000 or replays level 1 ten thousand times.
+        //   1. Flat per-clear bonus (`clearCoins(for:)` — 2/3/4 by the
+        //      level's difficulty tier) — on EVERY clear, first time or
+        //      replay.  Replay farming is blessed (2026-07-01 economy
+        //      calibration): the climb pays like the Challenge Tracks,
+        //      whether the player pushes to level 10,000 or replays
+        //      level 1 ten thousand times.
         //
         //   2. Per-pickup (`coinPerPickup`) for each currency-coin grabbed
         //      this run.  Banked coins can't be re-picked (the pickup gate
         //      skips them), so sticky pickups still pay only once ACROSS
         //      attempts — only the flat bonus repeats.
         //
-        // A perfect first clear awards coinPerClear + 3.  Replays award
-        // coinPerClear plus any never-before-banked pickups.
+        // A perfect first clear of an easy level awards 2 + 3.  Replays
+        // award the flat bonus plus any never-before-banked pickups.
         let newStars = max(0, stars - prevStars)
         // `coinReward` is the amount we add to the balance HERE.  The L1
         // tutorial may have already banked + credited the three coins at
         // the Phase-2→3 transition (`tutorialCoinBonus`); subtract that
         // portion so the player isn't paid twice in the same attempt.
-        let coinReward = GameState.coinPerClear
+        let coinReward = GameState.clearCoins(for: level)
                        + coinsPickedThisAttempt.count * GameState.coinPerPickup
                        - tutorialCoinBonus
         // `displayedCoinReward` is what the Level Clear screen shows
