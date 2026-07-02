@@ -706,10 +706,11 @@ final class GameState: ObservableObject {
 
     /// Relock every SELLABLE cosmetic and refund its `sellBackValue` (half the
     /// live price at sell time, never more than was paid) — coin-bought items
-    /// plus seasonal / limited-time specials — KEEPING the starter look and the
-    /// permanent Iconic specials (Trophy, Diamond, Money, Aurora).  Re-equips the
-    /// starter for any slot whose item was liquidated.  Returns what was
-    /// liquidated.  Level progress is untouched.
+    /// plus seasonal / limited-time specials — KEEPING the starter look, the
+    /// permanent Iconic specials (Trophy, Diamond, Money), and free-granted
+    /// gifts (the tutorial bundle, the Starter Pack's Aurora collection).
+    /// Re-equips the starter for any slot whose item was liquidated.  Returns
+    /// what was liquidated.  Level progress is untouched.
     @discardableResult
     func liquidateCoinCosmetics() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
@@ -736,7 +737,8 @@ final class GameState: ObservableObject {
         ownedBundles = []; ownedPacks = []; equippedPackID = nil
         // Reset the WHOLE equipped loadout to the default starters — red ball, no
         // trail, etc. — regardless of whether each item was liquidated. Kept
-        // exclusives (Diamond/Aurora/earned) stay owned and can be re-equipped.
+        // items (Iconic specials, free-granted gifts, earned exclusives) stay
+        // owned and can be re-equipped.
         activeSkin    = .starter
         equippedGoal  = .starter
         equippedTrail = .starter
@@ -1396,8 +1398,10 @@ final class GameState: ObservableObject {
 
     // The Starter Pack one-time IAP offer was retired — its auto-presented sheet
     // and 48-hour-window logic are gone.  `starterPackClaimed` is kept (persisted)
-    // only so StoreKitManager can re-grant the Aurora skin once to past buyers on
-    // restore.  Aurora is now an ownable coin ball + part of the Aurora bundle.
+    // so StoreKitManager delivers the pack's 500 coins exactly once; the pack's
+    // cosmetic grant is the complete Aurora collection (the "aurora" bundle,
+    // free-granted so Sell Back never refunds it), re-granted idempotently to
+    // past buyers on restore.  Aurora itself remains a coin-buyable bundle.
 
     // MARK: - Ratings prompt
 
@@ -1451,11 +1455,35 @@ final class GameState: ObservableObject {
         ownedBundles.insert(bundleID)
     }
 
-    /// Gift an entire bundle for free (the post-tutorial Standard-bundle reward).
-    /// Grants every item, marks them all as `freeGrantedItems` so Sell Back keeps
-    /// them and never refunds them (un-redeemable), and records the bundle as
-    /// owned.  Does NOT charge coins.
+    /// Gift an entire bundle for free (the post-tutorial Standard-bundle reward,
+    /// the Starter Pack's Aurora collection).  Grants every item, marks them all
+    /// as `freeGrantedItems` so Sell Back keeps them and never refunds them
+    /// (un-redeemable), and records the bundle as owned.  Does NOT charge coins.
+    ///
+    /// Items the player already coin-bought are compensated at `sellBackValue`
+    /// — exactly what Sell Back would have paid (half the current `coinCost`,
+    /// capped at the recorded paid price) — up front, then free-marked with the
+    /// rest: the gift must never confiscate Sell Back value the player paid
+    /// for, and must never pay MORE than Sell Back would (else gifting becomes
+    /// its own mint).  Refunding (rather than leaving paid items unmarked) is
+    /// deliberate: `freeGrantedItems` is keyed by rawValue and a bundle's items
+    /// can share one rawValue across categories (the five lowercase "aurora"
+    /// items, say), so a per-item carve-out would also unmark the same-named
+    /// gifted items and let Sell Back mint coins from them.
     func grantBundleFree(_ bundle: CosmeticBundle) {
+        var compensation = 0
+        func compensate<Item: CosmeticItem>(_ items: [Item]) {
+            for item in items
+            where isOwned(item) && item.isSellable && !freeGrantedItems.contains(item.rawValue) {
+                compensation += sellBackValue(item)
+                // Compensated + about to be free-marked — the item can never
+                // be sold again, so its paid-price record is done.
+                paidPrices.removeValue(forKey: Self.paidPriceKey(item))
+            }
+        }
+        compensate(bundle.balls); compensate(bundle.goals); compensate(bundle.trails)
+        compensate(bundle.floors); compensate(bundle.pits); compensate(bundle.music)
+        if compensation > 0 { addCoins(compensation) }
         bundle.grantContents(to: self)
         freeGrantedItems.formUnion(bundle.balls.map(\.rawValue))
         freeGrantedItems.formUnion(bundle.goals.map(\.rawValue))

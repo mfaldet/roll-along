@@ -145,7 +145,7 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color(red: 0.82, green: 0.60, blue: 0.08).opacity(0.60), lineWidth: 0.5))
 
-        // ── Starter Pack exclusive ──────────────────────────────────────
+        // ── Aurora (Legendary; anchors the Aurora bundle) ───────────────
         case .aurora:
             auroraCanvas
                 .clipShape(Circle())

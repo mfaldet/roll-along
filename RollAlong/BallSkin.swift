@@ -128,9 +128,10 @@ enum BallSkin: String, CaseIterable, Identifiable {
 
     // ── Aurora (Legendary, coin-buyable; anchors the Aurora bundle) ──────
     //   • aurora — deep midnight sphere with animated teal-green and violet
-    //     Northern Lights bands and twinkling stars.  Once the Starter Pack
-    //     IAP exclusive; that pack is retired, so Aurora is now a regular
-    //     coin-buyable Legendary ball and the centerpiece of the Aurora bundle.
+    //     Northern Lights bands and twinkling stars.  A regular coin-buyable
+    //     Legendary ball and the centerpiece of the Aurora bundle; the legacy
+    //     Starter Pack IAP grants the entire Aurora collection free-granted
+    //     (see StoreKitManager.grantAuroraCollection).
     case aurora = "Aurora"
 
     // ── Summer 2026 seasonal exclusive ──────────────────────────────────
@@ -714,7 +715,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.16, green: 0.10, blue: 0.01),
             ]
 
-        // ── Starter Pack exclusive ──
+        // ── Aurora (Legendary; anchors the Aurora bundle) ──
         case .aurora:
             // Northern Lights — icy highlight → vivid teal-green aurora →
             // deep violet sky → near-black midnight.  Fallback for any static
