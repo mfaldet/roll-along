@@ -123,6 +123,21 @@
       "type": "Consumable"
     },
     {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "11000009",
+      "localizations": [
+        {
+          "description": "One-time offer: 500 coins + the exclusive Aurora ball skin.",
+          "displayName": "Starter Pack",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.macfaldet.RollAlong.starterpack",
+      "referenceName": "Starter Pack (500 coins + Aurora skin) $1.99",
+      "type": "NonConsumable"
+    },
+    {
       "displayPrice": "49.99",
       "familyShareable": false,
       "internalID": "11000010",
