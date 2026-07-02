@@ -13,7 +13,7 @@ import SwiftUI
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
 //   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
 //   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBoundaries,
-//   ra_ownedBundles, ra_ownedPacks, ra_freeGrantedItems,
+//   ra_ownedBundles, ra_ownedPacks, ra_freeGrantedItems, ra_paidPrices,
 //   ra_ownedMusic, ra_trackProgress, ra_completedTracks, ra_equippedGoal,
 //   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedBoundary,
 //   ra_equippedMusic, ra_equippedPack.
@@ -284,6 +284,16 @@ final class GameState: ObservableObject {
     /// refunds them — they're un-redeemable.  Persisted.
     @Published var freeGrantedItems: Set<String> {
         didSet { saveStringSet(freeGrantedItems, forKey: "ra_freeGrantedItems") }
+    }
+    /// Coins actually PAID for cosmetics bought below their full `coinCost`
+    /// (the Shop's featured-bundle discount, Ball Packs' 66% pricing).  Sell
+    /// Back refunds this recorded price instead of `coinCost` — otherwise a
+    /// discounted purchase + immediate Sell Back mints the difference, forever.
+    /// Keyed by `paidPriceKey` ("<Type>:<rawValue>" — bare rawValues collide
+    /// across categories, e.g. five different "aurora" items).  No entry means
+    /// full price was paid.  Persisted.
+    @Published var paidPrices: [String: Int] {
+        didSet { save(paidPrices, trackProgressKey: "ra_paidPrices") }
     }
     /// Owned Ball-Pack IDs.  Buying a Pack also adds its member skins to
     /// `ownedBallSkins` (so they're individually equippable); this set
@@ -564,6 +574,7 @@ final class GameState: ObservableObject {
         ownedBundles   = loadedOwnedBundles
         ownedPacks     = loadedOwnedPacks
         freeGrantedItems = Self.loadStringSet(forKey: "ra_freeGrantedItems", defaults)
+        paidPrices = Self.loadTrackProgress(key: "ra_paidPrices", defaults)
         trackProgress  = Self.loadTrackProgress(key: "ra_trackProgress", defaults)
         minigameWins   = Self.loadTrackProgress(key: "ra_minigameWins", defaults)
         minigameBests  = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
@@ -659,14 +670,31 @@ final class GameState: ObservableObject {
 
     // MARK: - Cosmetic liquidation ("Reset Cosmetics")
 
+    /// Namespaced `paidPrices` key — bare rawValues collide across cosmetic
+    /// categories (five different items are named "aurora").
+    static func paidPriceKey<Item: CosmeticItem>(_ item: Item) -> String {
+        "\(Item.self):\(item.rawValue)"
+    }
+
+    /// What Sell Back pays for `item`: HALF its CURRENT `coinCost` (all tier
+    /// prices are even, so the halving is exact — and the refund deliberately
+    /// reads the live price, per Mac's calibration ruling), capped at the
+    /// recorded price when the item was bought below cost (discounted featured
+    /// bundle, Ball Pack).  The cap keeps discounts and future price bumps
+    /// from becoming a mint: a refund can never exceed what was paid.
+    func sellBackValue<Item: CosmeticItem>(_ item: Item) -> Int {
+        min(item.coinCost / 2, paidPrices[Self.paidPriceKey(item)] ?? item.coinCost)
+    }
+
     /// Dry run: how many owned cosmetics are sellable (coin-bought plus seasonal
-    /// / limited-time specials), and the coins they'd refund.  Powers the
-    /// Danger-Zone button label + confirm dialog.
+    /// / limited-time specials), and the coins they'd refund — `sellBackValue`
+    /// each: 50% of the CURRENT `coinCost`, capped at what was paid for
+    /// below-cost buys.  Powers the Danger-Zone button label + confirm dialog.
     func coinLiquidationPreview() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
             for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
-                count += 1; coins += item.coinCost
+                count += 1; coins += sellBackValue(item)
             }
         }
         tally(ownedBallSkins, BallSkin.self); tally(ownedGoals, GoalSkin.self)
@@ -676,7 +704,8 @@ final class GameState: ObservableObject {
         return (count, coins)
     }
 
-    /// Relock every SELLABLE cosmetic and refund its coins — coin-bought items
+    /// Relock every SELLABLE cosmetic and refund its `sellBackValue` (half the
+    /// live price at sell time, never more than was paid) — coin-bought items
     /// plus seasonal / limited-time specials — KEEPING the starter look, the
     /// permanent Iconic specials (Trophy, Diamond, Money), and free-granted
     /// gifts (the tutorial bundle, the Starter Pack's Aurora collection).
@@ -687,8 +716,10 @@ final class GameState: ObservableObject {
         var count = 0, coins = 0
         func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
             for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
-                count += 1; coins += item.coinCost
+                count += 1; coins += sellBackValue(item)
                 owned.remove(item.rawValue)
+                // Relocked — a future re-purchase pays its own price fresh.
+                paidPrices.removeValue(forKey: Self.paidPriceKey(item))
             }
             owned.insert(Item.starter.rawValue)   // the starter is always owned
         }
@@ -1013,10 +1044,26 @@ final class GameState: ObservableObject {
     /// up to 3 currency-coins on the floor → 0…3 coins per first clear
     /// from pickups alone.
     static let coinPerPickup: Int = 1
-    /// Flat coin award the first time a player clears a level.  Stacks
-    /// with pickups so a perfect first clear yields `coinPerClear + 3`
-    /// coins.  Subsequent clears award 0 (no farming).
+    /// Base flat coin award on EVERY climb clear — first time or replay.  The
+    /// grind is blessed (2026-07-01 economy calibration): replaying a level
+    /// pays this bonus again, exactly like the Challenge Tracks, whether the
+    /// player pushes to level 10,000 or replays level 1 ten thousand times.
+    /// Stacks with pickups, so a perfect first clear yields `clearCoins(for:)
+    /// + 3` coins; pickup coins stay sticky and pay only once per level.
+    /// The climb scales this by tier via `clearCoins(for:)` — this constant
+    /// is the easy-tier base (and the flat track-level bonus).
     static let coinPerClear:  Int = 2
+
+    /// Climb clear bonus scaled by the level's difficulty tier (the
+    /// last-digit rule — `DifficultyTier.tier(for:)`): easy 2 · hard 3 ·
+    /// veryHard 4.  Harder never pays less per clear.
+    static func clearCoins(for level: Int) -> Int {
+        switch DifficultyTier.tier(for: level) {
+        case .easy:     return 2
+        case .hard:     return 3
+        case .veryHard: return 4
+        }
+    }
 
     /// Maximum coins grantable in a single `addCoins` call.
     /// Highest legitimate single award is 10 000 (coins10000 IAP).
@@ -1185,12 +1232,15 @@ final class GameState: ObservableObject {
 
     // ── Gold Rush tickets ───────────────────────────────────────────────
     /// ECONOMY: one ticket per competitive-minigame win.  A Gold Rush round
-    /// is bought up front: each TIME ticket = 30 s of play, each COIN ticket
-    /// adds +1x to the coins dropped (1 → x2 … 9 → x10), at most
-    /// `goldRushMaxStake` tickets per round.  Quitting early refunds one
-    /// ticket per FULL un-played 30 s block (coin tickets never refund).
+    /// is bought up front on the stake overlay: each TIME ticket buys 30 s
+    /// on the clock, and you can stake as many as you hold (no per-round
+    /// cap).  The only in-round upsell is the ×2-coins boost — a flat
+    /// 2 tickets, once per round — which doubles the PAYOUT per catch
+    /// (and back-pays the haul caught so far), never the coin count /
+    /// drop density (scaling density tanked the frame rate).  Quitting
+    /// early refunds one TIME ticket per FULL un-played 30 s block;
+    /// boost tickets never refund.  See docs/gold-rush-economy.md.
     static let maxTicketBalance = 999
-    static let goldRushMaxStake = 10
     static let goldRushSecondsPerTicket: TimeInterval = 30
 
     /// Award tickets (competitive win; future promos).  Mirrors addCoins'
@@ -1407,19 +1457,25 @@ final class GameState: ObservableObject {
     /// as `freeGrantedItems` so Sell Back keeps them and never refunds them
     /// (un-redeemable), and records the bundle as owned.  Does NOT charge coins.
     ///
-    /// Items the player already coin-bought are compensated at full `coinCost`
-    /// up front, then free-marked with the rest — the gift must never confiscate
-    /// Sell Back value the player paid for.  Refunding (rather than leaving paid
-    /// items unmarked) is deliberate: `freeGrantedItems` is keyed by rawValue and
-    /// a bundle's items can share one rawValue across categories (the five
-    /// lowercase "aurora" items, say), so a per-item carve-out would also unmark
-    /// the same-named gifted items and let Sell Back mint coins from them.
+    /// Items the player already coin-bought are compensated at `sellBackValue`
+    /// — exactly what Sell Back would have paid (half the current `coinCost`,
+    /// capped at the recorded paid price) — up front, then free-marked with the
+    /// rest: the gift must never confiscate Sell Back value the player paid
+    /// for, and must never pay MORE than Sell Back would (else gifting becomes
+    /// its own mint).  Refunding (rather than leaving paid items unmarked) is
+    /// deliberate: `freeGrantedItems` is keyed by rawValue and a bundle's items
+    /// can share one rawValue across categories (the five lowercase "aurora"
+    /// items, say), so a per-item carve-out would also unmark the same-named
+    /// gifted items and let Sell Back mint coins from them.
     func grantBundleFree(_ bundle: CosmeticBundle) {
         var compensation = 0
         func compensate<Item: CosmeticItem>(_ items: [Item]) {
             for item in items
             where isOwned(item) && item.isSellable && !freeGrantedItems.contains(item.rawValue) {
-                compensation += item.coinCost
+                compensation += sellBackValue(item)
+                // Compensated + about to be free-marked — the item can never
+                // be sold again, so its paid-price record is done.
+                paidPrices.removeValue(forKey: Self.paidPriceKey(item))
             }
         }
         compensate(bundle.balls); compensate(bundle.goals); compensate(bundle.trails)
@@ -1498,7 +1554,50 @@ final class GameState: ObservableObject {
     func purchase<Item: CosmeticItem>(_ item: Item) -> Bool {
         if isOwned(item) { return false }
         guard spendCoins(item.coinCost) else { return false }
+        // Full price paid — clear any stale discounted-price record so Sell
+        // Back refunds the full cost.
+        paidPrices.removeValue(forKey: Self.paidPriceKey(item))
         grant(item)
+        return true
+    }
+
+    /// Record what was actually paid for each just-purchased item when the
+    /// total paid is below the items' combined `coinCost`.  The discount is
+    /// prorated across the items; each share is floored so the recorded sum
+    /// (= a later Sell Back refund) never exceeds what was paid.
+    private func recordPaidPrices<Item: CosmeticItem>(_ items: [Item], ratio: Double) {
+        for item in items where item.isSellable {
+            let key = Self.paidPriceKey(item)
+            if ratio < 1.0 {
+                paidPrices[key] = Int(Double(item.coinCost) * ratio)
+            } else {
+                paidPrices.removeValue(forKey: key)
+            }
+        }
+    }
+
+    /// Buy `bundle` for `price` coins (the Shop's discounted price or the
+    /// Catalog's prorated price).  Grants every yet-unowned item and records
+    /// the bundle owned.  When `price` is below the granted items' combined
+    /// `coinCost`, each item's paid share is recorded so Sell Back refunds
+    /// what was paid — otherwise the featured-bundle discount is a coin mint
+    /// (buy at 50% off, liquidate at 100%, repeat every rotation window).
+    @discardableResult
+    func purchaseBundle(_ bundle: CosmeticBundle, price: Int) -> Bool {
+        guard !ownedBundles.contains(bundle.id) else { return false }
+        let base = bundle.proratedPrice(in: self)   // BEFORE granting
+        guard spendCoins(price) else { return false }
+        if base > 0 {
+            let ratio = Double(price) / Double(base)
+            recordPaidPrices(bundle.balls.filter  { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.goals.filter  { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.trails.filter { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.floors.filter { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.pits.filter   { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.music.filter  { !isOwned($0) }, ratio: ratio)
+        }
+        bundle.grantContents(to: self)
+        ownedBundles.insert(bundle.id)
         return true
     }
 
@@ -1516,7 +1615,16 @@ final class GameState: ObservableObject {
     @discardableResult
     func purchasePack(_ pack: BallPack) -> Bool {
         if ownedPacks.contains(pack.id) { return false }
-        guard spendCoins(pack.price(in: self)) else { return false }
+        let price = pack.price(in: self)
+        // Packs charge 66% of the member-skin sum — record each granted
+        // skin's paid share so Sell Back refunds what was paid, not the
+        // full coinCost (the 34% gap was a repeatable coin mint).
+        let unowned = pack.skins.filter { !isOwned($0) }
+        let base = unowned.reduce(0) { $0 + $1.coinCost }
+        guard spendCoins(price) else { return false }
+        if base > 0 {
+            recordPaidPrices(unowned, ratio: Double(price) / Double(base))
+        }
         pack.grantContents(to: self)
         ownedPacks.insert(pack.id)
         return true
@@ -1702,23 +1810,24 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
     }
 
     /// Payout multiplier applied to a competitive minigame's coin winnings.
-    /// Higher difficulty = harder to win = bigger reward for the risk taken.
-    /// Spread: Easy 0.5× · Normal 1× · Hard 2× (today's payout == Normal).
-    /// Calibrate against `targetWinRate` from the tracked success rates so the
-    /// expected value per play stays fair — see docs/minigame-difficulty.md.
+    /// Compressed spread (2026-07-01 economy calibration, see
+    /// docs/economy/07-decisions.md): Easy 1× · Normal 1.5× · Hard 2×.
+    /// Easy no longer pays below par — combined with `targetWinRate`, Easy is
+    /// deliberately the EV-optimal per-attempt pick; Hard still pays the most
+    /// per WIN.  See docs/minigame-difficulty.md for the honest EV math.
     var payoutMultiplier: Double {
         switch self {
-        case .easy:   return 0.5
-        case .normal: return 1.0
+        case .easy:   return 1.0
+        case .normal: return 1.5
         case .hard:   return 2.0
         }
     }
 
-    /// Short payout descriptor for the pre-game picker (relative to Normal).
+    /// Short payout descriptor for the pre-game picker.
     var payoutLabel: String {
         switch self {
-        case .easy:   return "0.5× coins"
-        case .normal: return "1× coins"
+        case .easy:   return "1× coins"
+        case .normal: return "1.5× coins"
         case .hard:   return "2× coins"
         }
     }

@@ -49,8 +49,18 @@ struct MarbleCupView: View {
     private let ballRestitution:   CGFloat = 0.88
     private let roundSeconds       = 90
     private let celebrateTicks     = 75            // GOAL! freeze (~1.25s, clock paused)
-    private let coinsPerGoal       = 6
-    private let winBonus           = 15
+    private let coinsPerGoal       = 15
+    private let winBonus           = 30
+    /// Base-payout floor — a 90 s match can never pay 0, even a goalless loss.
+    private let lossFloor          = 15
+
+    /// Single source of truth for the match's base payout (pre-difficulty):
+    /// goals scored × `coinsPerGoal`, plus `winBonus` on a win, never below
+    /// `lossFloor`.  Used by both the award and the result-screen display so
+    /// they can't disagree.
+    private func matchBasePayout(goals: Int, won: Bool) -> Int {
+        max(lossFloor, goals * coinsPerGoal + (won ? winBonus : 0))
+    }
 
     // Tap-to-dash (speed burst) — mirrored from Smash and Grab, minus the
     // coin-spill: a tap overrides the player marble's velocity to `chargeSpeed`
@@ -515,7 +525,7 @@ struct MarbleCupView: View {
     }
 
     private var matchOverOverlay: some View {
-        let banked = gameState.minigamePayout(base: playerGoals * coinsPerGoal + (playerWon ? winBonus : 0),
+        let banked = gameState.minigamePayout(base: matchBasePayout(goals: playerGoals, won: playerWon),
                                               difficulty: gameState.minigameDifficulty)
         let title = playerWon ? "You Win!" : (playerGoals == aiGoals ? "Draw" : "You Lose")
         let titleColor: Color = playerWon ? Self.playerAccent
@@ -670,7 +680,7 @@ struct MarbleCupView: View {
         playerWon = playerGoals > aiGoals
         if !awarded {
             awarded = true
-            let base = playerGoals * coinsPerGoal + (playerWon ? winBonus : 0)
+            let base = matchBasePayout(goals: playerGoals, won: playerWon)
             gameState.recordCompetitiveScore("marblecup", playerGoals)   // leaderboard best (goals)
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(

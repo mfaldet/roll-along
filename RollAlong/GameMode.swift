@@ -88,6 +88,30 @@ enum ProgressionKind: Equatable, Codable {
     case oneShot
     /// No progression — Zen, Coin Pit, casual competitive play.
     case none
+
+    /// Whether pickup coins bank persistently against `gameState.currentLevel`.
+    /// Only the main climb does — its levels ARE `currentLevel`, and banking is
+    /// what keeps a collected coin from paying out again on replays.  Every
+    /// other progression plays maps that are NOT `currentLevel` (tracks and the
+    /// daily gauntlet generate their own layouts), so reading the climb's
+    /// banked indices there would mask coins the player never collected on the
+    /// map actually being played.
+    var banksPickupCoins: Bool {
+        if case .mainClimb = self { return true }
+        return false
+    }
+
+    /// Whether a goal-reached clear writes the climb's persistent per-level
+    /// records — stars, best time, first-clear bonus, and the unlock frontier
+    /// (`highestUnlocked`) — all keyed by `gameState.currentLevel`.  Only the
+    /// main climb may: every other progression plays maps that are NOT
+    /// `currentLevel`, so recording there would stamp a bogus best onto
+    /// whatever climb level the player happens to be parked on (and could
+    /// even unlock the next climb level without it ever being cleared).
+    var recordsClimbResult: Bool {
+        if case .mainClimb = self { return true }
+        return false
+    }
 }
 
 /// How the lives economy applies to a mode.

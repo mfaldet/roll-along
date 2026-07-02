@@ -87,16 +87,16 @@ final class GameStateTests: XCTestCase {
 
     func testMinigamePayout_scalesByDifficulty() {
         let gs = makeGameState()
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .easy),   50)
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .normal), 100)
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .easy),   100)
+        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .normal), 150)
         XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .hard),   200)
         // Rounds to the nearest coin.
-        XCTAssertEqual(gs.minigamePayout(base: 5, difficulty: .easy), 3)   // 2.5 -> 3
+        XCTAssertEqual(gs.minigamePayout(base: 5, difficulty: .normal), 8)   // 7.5 -> 8
     }
 
-    func testPayoutMultiplier_spreadIsHalfOneTwo() {
-        XCTAssertEqual(MinigameDifficulty.easy.payoutMultiplier,   0.5)
-        XCTAssertEqual(MinigameDifficulty.normal.payoutMultiplier, 1.0)
+    func testPayoutMultiplier_spreadIsOneOneHalfTwo() {
+        XCTAssertEqual(MinigameDifficulty.easy.payoutMultiplier,   1.0)
+        XCTAssertEqual(MinigameDifficulty.normal.payoutMultiplier, 1.5)
         XCTAssertEqual(MinigameDifficulty.hard.payoutMultiplier,   2.0)
     }
 
@@ -118,8 +118,8 @@ final class GameStateTests: XCTestCase {
         gs.coinBalance = 0
         let paid = gs.recordMinigameResult(modeID: "sumo", difficulty: .easy,
                                            won: true, score: 0, basePayout: 10)
-        XCTAssertEqual(paid, 5, "10 base × 0.5 (easy)")
-        XCTAssertEqual(gs.coinBalance, 5)
+        XCTAssertEqual(paid, 10, "10 base × 1.0 (easy)")
+        XCTAssertEqual(gs.coinBalance, 10)
         XCTAssertEqual(gs.minigameDifficultyPlays["sumo|easy"], 1)
         XCTAssertEqual(gs.minigameDifficultyWins["sumo|easy"], 1)
         XCTAssertEqual(gs.minigameWins["sumo"], 1, "win bumps the lifetime tally")
@@ -609,5 +609,134 @@ final class LevelOverridesTests: XCTestCase {
         XCTAssertEqual(LevelLayout.overrides[1]?.verified, true, "L1 should be verified")
         XCTAssertEqual(LevelLayout.overrides[10]?.verified, true, "L10 should be verified")
         XCTAssertEqual(LevelLayout.overrides[50]?.verified, false, "L50 should not be verified")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CoinBankingGateTests — which modes may consult the climb's banked-coin set.
+//
+// `gameState.currentLevel` is always the player's parked CLIMB level, even
+// while a Challenge Track or the Daily Challenge is being played.  BallGame's
+// coin masking (dim + skip-pickup of already-banked indices) must therefore
+// apply ONLY on the main climb — every other progression generates its own
+// maps, banks nothing, and masking against the parked level would hide coins
+// the player never collected there.  Regression: track levels silently lost
+// whichever coin indices happened to be banked on the parked climb level.
+// ---------------------------------------------------------------------------
+final class CoinBankingGateTests: XCTestCase {
+
+    /// Enum-level truth table: only `.mainClimb` banks pickup coins.
+    func testBanksPickupCoins_onlyMainClimb() {
+        XCTAssertTrue(ProgressionKind.mainClimb.banksPickupCoins)
+        XCTAssertFalse(ProgressionKind.challengeTrack("frozen-peaks").banksPickupCoins)
+        XCTAssertFalse(ProgressionKind.oneShot.banksPickupCoins)
+        XCTAssertFalse(ProgressionKind.none.banksPickupCoins)
+    }
+
+    /// Registry sweep: the climb is the ONLY registered mode that banks.
+    /// Guards against a future mode accidentally shipping `.mainClimb`
+    /// progression (which would let it mask/bank against the parked level).
+    func testRegistry_onlyTheClimbBanksPickupCoins() {
+        for (mode, _) in GameModeCatalogue.registry {
+            if mode.id == GameModeCatalogue.climb.id {
+                XCTAssertTrue(mode.progression.banksPickupCoins,
+                              "the climb must bank pickup coins")
+            } else {
+                XCTAssertFalse(mode.progression.banksPickupCoins,
+                               "\(mode.id) must NOT consult the climb's banked coins")
+            }
+        }
+    }
+
+    /// The concrete regression scenario: coins banked on the parked climb
+    /// level exist in GameState, but a track/daily mode's progression says
+    /// not to consult them — so track maps present their full coin set.
+    func testBankedClimbCoins_doNotLeakIntoNonClimbModes() {
+        let suite = "CoinBankingGateTests.isolated"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let gs = GameState(defaults: defaults)
+        gs.bankCoins(for: gs.currentLevel, indices: [0, 1, 2])
+        XCTAssertEqual(gs.coinsCollected(for: gs.currentLevel), [0, 1, 2])
+
+        guard let track = GameModeCatalogue.challengeTracks.first else {
+            return XCTFail("at least one Challenge Track should be registered")
+        }
+        XCTAssertFalse(track.progression.banksPickupCoins,
+                       "a track must ignore the parked climb level's banked coins")
+        XCTAssertFalse(DailyChallengeMode().progression.banksPickupCoins,
+                       "the daily gauntlet must ignore the parked climb level's banked coins")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClimbRecordGateTests — which modes may write the climb's per-level records.
+//
+// `gameState.currentLevel` is always the player's parked CLIMB level, even
+// while the Daily Challenge (or a Challenge Track) is being played.
+// handleLevelClear's record-keeping tail — recordResult (stars / best time /
+// unlock frontier), the first-clear coin bonus, and the "level_complete"
+// analytics event — must therefore run ONLY on the main climb.  Regression:
+// clearing a Daily Challenge sub-level fell through that tail and stamped a
+// 3-star best + bogus best-time onto the parked climb level (daily layouts
+// carry sentinel 999 s gold times, so any clear "beat gold"), paid its
+// first-clear bonus, and — when the player was parked on their frontier —
+// unlocked the next climb level without it ever being cleared.
+// ---------------------------------------------------------------------------
+final class ClimbRecordGateTests: XCTestCase {
+
+    /// Enum-level truth table: only `.mainClimb` records climb results.
+    func testRecordsClimbResult_onlyMainClimb() {
+        XCTAssertTrue(ProgressionKind.mainClimb.recordsClimbResult)
+        XCTAssertFalse(ProgressionKind.challengeTrack("frozen-peaks").recordsClimbResult)
+        XCTAssertFalse(ProgressionKind.oneShot.recordsClimbResult)
+        XCTAssertFalse(ProgressionKind.none.recordsClimbResult)
+    }
+
+    /// Registry sweep: the climb is the ONLY registered mode whose clears may
+    /// write climb records.  Guards against a future mode accidentally
+    /// shipping `.mainClimb` progression and silently polluting the parked
+    /// level's stars / times / unlock frontier.
+    func testRegistry_onlyTheClimbRecordsClimbResults() {
+        for (mode, _) in GameModeCatalogue.registry {
+            if mode.id == GameModeCatalogue.climb.id {
+                XCTAssertTrue(mode.progression.recordsClimbResult,
+                              "the climb must record climb results")
+            } else {
+                XCTAssertFalse(mode.progression.recordsClimbResult,
+                               "\(mode.id) must NOT write the parked climb level's records")
+            }
+        }
+    }
+
+    /// The concrete regression scenario: `recordResult` against the parked
+    /// frontier level is exactly the pollution a daily sub-level clear used
+    /// to cause — a fake 3-star best, a bogus best-time, and an unearned
+    /// unlock.  The daily's progression must say "hands off" so
+    /// handleLevelClear never makes that call for it.
+    func testDailyClear_mustNotRecordAgainstParkedClimbLevel() {
+        let suite = "ClimbRecordGateTests.isolated"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let gs = GameState(defaults: defaults)
+        let parked = gs.currentLevel
+        XCTAssertNil(gs.time(for: parked), "fresh save — the parked level has no best yet")
+        let frontierBefore = gs.highestUnlocked
+
+        // What the old fall-through did on a daily sub-level clear:
+        gs.recordResult(level: parked, stars: 3, time: 4.2, coinIndices: [])
+        XCTAssertEqual(gs.stars(for: parked), 3, "recordResult stamps a fake 3-star best")
+        XCTAssertEqual(gs.time(for: parked), 4.2, "recordResult stamps a bogus best-time")
+        XCTAssertGreaterThan(gs.highestUnlocked, frontierBefore,
+                             "recordResult on the frontier unlocks the next climb level")
+
+        // The gate that keeps handleLevelClear from ever making that call
+        // outside the climb:
+        XCTAssertFalse(DailyChallengeMode().progression.recordsClimbResult,
+                       "the daily gauntlet must never write climb records")
     }
 }

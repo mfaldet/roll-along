@@ -12,8 +12,8 @@ sees the reward before committing:
 
 | Difficulty | Rivals | Payout |
 |-----------|--------|--------|
-| Easy   | weakest AI | **0.5×** coins |
-| Normal | medium AI  | **1×** coins (today's payout) |
+| Easy   | weakest AI | **1×** coins |
+| Normal | medium AI  | **1.5×** coins |
 | Hard   | full-strength AI | **2×** coins |
 
 The choice is remembered (`GameState.minigameDifficulty`) and re-shown each time.
@@ -33,7 +33,9 @@ are the only things you edit to retune.**
   `Easy 0.55 · Normal 0.78 · Hard 1.0`. **Hard == the original pre-difficulty
   AI**; Easy/Normal handicap it. Each game multiplies its base rival
   acceleration (`aiAccelBase`) by `aiAccelScale`.
-- `payoutMultiplier`: scales the coin winnings. `Easy 0.5 · Normal 1.0 · Hard 2.0`.
+- `payoutMultiplier`: scales the coin winnings. `Easy 1.0 · Normal 1.5 · Hard 2.0`
+  (compressed from `0.5 / 1.0 / 2.0` in the 2026-07-01 economy calibration —
+  decision recorded in `docs/economy/07-decisions.md`).
 - `targetWinRate`: the win-rate each tier is *designed* to land near
   (`Easy 0.80 · Normal 0.45 · Hard 0.22`) — the calibration target, not used by
   runtime logic.
@@ -41,7 +43,7 @@ are the only things you edit to retune.**
 ## How payout is applied
 
 Each game computes a raw `basePayout` from its own formula (e.g. Sumo placement
-coins `[10,5,3,2]`; Comet Clash `power×3 + winBonus`; Smash and Grab = coins
+coins `[60,30,15,8]`; Comet Clash `power×3 + winBonus`; Smash and Grab = coins
 collected). The award and the on-screen "+N coins" both run through:
 
 - `GameState.minigamePayout(base:difficulty:)` — pure, for the result-screen and
@@ -67,19 +69,21 @@ server-side per game and per difficulty (the per-game events —
 
 ## Calibration loop (manual, data-driven)
 
-The fairness goal: **expected coins per play should not reward sitting on Easy or
-punish committing to Hard** — payout should compensate for the lower win odds.
+Honest math, post-compression: the win-bonus portion is **no longer
+EV-neutral**. Expected value per attempt = `payoutMultiplier × targetWinRate`:
 
-For the win-bonus portion this is roughly EV-neutral by construction —
-`payoutMultiplier × targetWinRate`:
-
-- Easy: `0.5 × 0.80 = 0.40`
-- Normal: `1.0 × 0.45 = 0.45`
+- Easy: `1.0 × 0.80 = 0.80`
+- Normal: `1.5 × 0.45 = 0.675`
 - Hard: `2.0 × 0.22 = 0.44`
 
-…all ≈ 0.4–0.45, i.e. about even. The accumulated portion (coins picked up
-regardless of winning) is a deliberate "harder pays more per unit" premium and
-is **not** auto-balanced — watch its total in the data.
+**Easy is the EV-optimal per-attempt pick — by design.** This is a deliberate
+2026-07-01 decision (see `docs/economy/07-decisions.md`): grinding is blessed,
+and a player who camps Easy earns coins fastest per attempt on the win bonus.
+Hard still pays the most per WIN, and the accumulated portion (coins picked up
+regardless of winning) still pays more on Hard — that "harder pays more per
+unit" premium is unchanged and **not** auto-balanced. Telemetry (the
+`minigame_result` event) will monitor how much Easy-camping actually happens;
+revisit only if the data shows it distorting the economy.
 
 **To retune, quarterly or after a balance patch:**
 
@@ -90,10 +94,11 @@ is **not** auto-balanced — watch its total in the data.
    when we target 22%), first move `aiAccelScale` for that tier to push the
    win-rate back toward target — that keeps the three tiers meaningfully
    different.
-3. **If win-rates are where we want them but the coin EV is skewed** across
-   tiers (compute mean `payout` per play per tier from the events), adjust
-   `payoutMultiplier` so the EVs line up. Smash and Grab is accumulation-heavy and may
-   need its own multiplier if its EV curve diverges — split it out then.
+3. **If the coin EV drifts from the intended shape** (Easy-leaning per attempt,
+   Hard-leaning per win — compute mean `payout` per play per tier from the
+   events), adjust `payoutMultiplier` toward that shape. Smash and Grab is
+   accumulation-heavy and may need its own multiplier if its EV curve
+   diverges — split it out then.
 4. Edit only the tables in `MinigameDifficulty`; ship; repeat.
 
 We deliberately do **not** auto-adjust payouts at runtime — it's exploitable

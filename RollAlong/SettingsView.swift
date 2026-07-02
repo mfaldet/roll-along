@@ -26,6 +26,7 @@ struct SettingsView: View {
                     gameSection
                     notificationsSection
                     accountSection
+                    cosmeticsSection
                     purchasesSection
                     resetSection
                 }
@@ -77,7 +78,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for a full coin refund, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
+            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for half their current coin value, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
         }
     }
 
@@ -435,13 +436,12 @@ struct SettingsView: View {
         showRestoreResult = true
     }
 
-    private var resetSection: some View {
+    // ── Cosmetics — beneficial: sell coin-bought cosmetics back for the coins
+    //    paid and tidy the locker.  Recoverable (re-buy anything anytime), so
+    //    it sits with the friendly sections, above Purchases.
+    private var cosmeticsSection: some View {
         let cosmetic = gameState.coinLiquidationPreview()
         return VStack(alignment: .leading, spacing: 12) {
-            // ── Cosmetics — beneficial: sell coin-bought cosmetics back for a
-            //    full refund and tidy the locker.  Sits ABOVE the Danger Zone
-            //    because it's recoverable (re-buy anything anytime), so it gets
-            //    an inviting, non-alarming treatment.
             sectionHeader("Cosmetics")
             Button {
                 showCosmeticResetAlert = true
@@ -456,7 +456,7 @@ struct SettingsView: View {
             .disabled(cosmetic.count == 0 && gameState.isLoadoutDefault)
             .opacity(cosmetic.count == 0 && gameState.isLoadoutDefault ? 0.5 : 1)
 
-            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, receive a full coin refund.")
+            Text("Tidy up your locker.\nRemove cosmetics you've bought with coin, sell them back for half their current value.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
             if let m = cosmeticResetMessage {
@@ -465,11 +465,14 @@ struct SettingsView: View {
                     .foregroundStyle(Color(red: 0.3, green: 0.8, blue: 0.45))
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
 
-            // ── Danger Zone — the one destructive, unrecoverable reset, gated
-            //    behind a typed "STARTOVER" confirmation. ──
+    // ── Danger Zone — the one destructive, unrecoverable reset, gated behind a
+    //    typed "STARTOVER" confirmation. ──
+    private var resetSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Danger Zone")
-                .padding(.top, 10)
             Button {
                 showResetConfirm = true
             } label: {
@@ -491,7 +494,7 @@ struct SettingsView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .font(.system(size: 22, weight: .semibold, design: .rounded))
             .kerning(1.5)
             .foregroundStyle(Color(white: 0.45))
     }

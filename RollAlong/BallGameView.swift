@@ -409,6 +409,18 @@ struct BallGameView: View {
         }
     }
 
+    /// Coin indices already banked for the level being played — CLIMB ONLY.
+    /// Challenge Tracks and the Daily Challenge bank nothing, and in those
+    /// modes `gameState.currentLevel` still points at the player's parked
+    /// climb level — reading it there would mask coins on a completely
+    /// different map (dimmed + uncollectible wherever the climb level's
+    /// banked indices happen to land).  Non-climb modes therefore always
+    /// present their full coin set.
+    private var bankedCoinIndices: Set<Int> {
+        guard activeMode.progression.banksPickupCoins else { return [] }
+        return gameState.coinsCollected(for: gameState.currentLevel)
+    }
+
     /// Equipped Floor and Pit — read from GameState so the view
     /// re-renders when either is swapped.  Replaces the old `theme`
     /// abstraction since Floor and Pit are now independent picks.
@@ -961,7 +973,7 @@ struct BallGameView: View {
     /// across past attempts render dimmed but visible (signal that this slot
     /// has already been collected).
     private func coinLayer(geo: GeometryProxy) -> some View {
-        let banked = gameState.coinsCollected(for: gameState.currentLevel)
+        let banked = bankedCoinIndices
         return ForEach(Array(effectiveLayout.coins.enumerated()), id: \.offset) { idx, norm in
             if !coinsPickedThisAttempt.contains(idx) {
                 coinView(banked: banked.contains(idx), index: idx)
@@ -5210,7 +5222,7 @@ struct BallGameView: View {
         // Multiple coins can be collected per run.  Driven by
         // effectiveLayout so the L1 tutorial doesn't allow pickups while
         // coins aren't yet "revealed".
-        let banked = gameState.coinsCollected(for: gameState.currentLevel)
+        let banked = bankedCoinIndices
         for (idx, c) in effectiveLayout.coins.enumerated() {
             if coinsPickedThisAttempt.contains(idx) { continue }
             if banked.contains(idx) { continue }
@@ -5371,6 +5383,11 @@ struct BallGameView: View {
         if gameState.currentLevel == 1 && tutorialPhase != .notTutorial {
             tutorialPhase = .notTutorial
             coinsPickedThisAttempt = []
+            // The mid-tour coin credit was already paid AND its coins are now
+            // banked (un-pickable on the respawn), so leaving the bonus set
+            // would subtract it from the eventual clear's payout — zero it so
+            // the clear pays its full tier bonus.
+            tutorialCoinBonus = 0
             levelStartTime = nil
             spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
             respawnAfterPitFall(in: geoSize)
@@ -5604,37 +5621,65 @@ struct BallGameView: View {
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
+
+        // ── Daily Challenge (one-shot) fast-path ───────────────────────────
+        // The gauntlet plays generated maps that are NOT `currentLevel` — the
+        // player's parked climb level.  Falling through to the climb logic
+        // would stamp a bogus 3-star best + time onto that parked level
+        // (daily layouts carry sentinel 999 s targets), pay its first-clear
+        // bonus, and could bump `highestUnlocked` past the frontier.  A
+        // sub-level clear only surfaces gauntlet progress; the day's coin
+        // reward is banked once by `completeTodaysDailyChallenge()` when
+        // "Finish" is tapped on the last sub-level (see advanceFromLevelClear).
+        if case .oneShot = activeMode.progression {
+            lastClearedTime           = elapsed
+            lastClearedStars          = stars
+            lastClearedCoinIndices    = coinsPickedThisAttempt
+            lastClearedIsNewBestStars = false   // no persistent record; nothing to best
+            lastClearedCoinReward     = 0       // day reward pays on completion, not per level
+            AnalyticsClient.shared.track(
+                "daily_challenge_level_cleared",
+                properties: [
+                    "sub_level": .int(gameState.dailyChallengeIndex),
+                    "time":      .double(elapsed),
+                ]
+            )
+            withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
+            return
+        }
         // ── Main climb (original logic below) ──────────────────────────────
+        // Everything past this point writes persistent records against
+        // `gameState.currentLevel` — only the climb's progression may.
+        assert(activeMode.progression.recordsClimbResult,
+               "mode \(activeMode.id) fell through to climb record-keeping")
 
         let level     = gameState.currentLevel
         let prevStars = gameState.stars(for: level)
 
         // Currency-coin reward.  Two stackable sources:
         //
-        //   1. Flat per-clear bonus (`coinPerClear`) — only on the FIRST
-        //      time the level is cleared.  We detect first clear by the
-        //      absence of a recorded best-time; `recordResult` (called
-        //      below) is what sets bestTime, so we can safely read it
-        //      here to decide.
+        //   1. Flat per-clear bonus (`clearCoins(for:)` — 2/3/4 by the
+        //      level's difficulty tier) — on EVERY clear, first time or
+        //      replay.  Replay farming is blessed (2026-07-01 economy
+        //      calibration): the climb pays like the Challenge Tracks,
+        //      whether the player pushes to level 10,000 or replays
+        //      level 1 ten thousand times.
         //
         //   2. Per-pickup (`coinPerPickup`) for each currency-coin grabbed
-        //      this run.  `coinsPickedThisAttempt` is already filtered
-        //      to first-time pickups at collection time.
+        //      this run.  Banked coins can't be re-picked (the pickup gate
+        //      skips them), so sticky pickups still pay only once ACROSS
+        //      attempts — only the flat bonus repeats.
         //
-        // A perfect first clear awards coinPerClear + 3.  Replays of an
-        // already-cleared level award only the value of any newly-banked
-        // pickup coins (typically 0 since they're sticky).
-        let newStars     = max(0, stars - prevStars)
-        let isFirstClear = gameState.time(for: level) == nil
-        // L1 tutorial may have already banked + paid out the three
-        // coins at the Phase-2→3 transition.  Filter those out so the
-        // player isn't rewarded twice for the same pickups.
-        let alreadyBanked = gameState.coinsCollected(for: level)
-        let newCoinsThisRun = coinsPickedThisAttempt.subtracting(alreadyBanked)
-        // `coinReward` is the amount we add to the balance HERE — the
-        // tutorial-bank moment already credited its own portion.
-        let coinReward = (isFirstClear ? GameState.coinPerClear : 0)
-                       + newCoinsThisRun.count * GameState.coinPerPickup
+        // A perfect first clear of an easy level awards 2 + 3.  Replays
+        // award the flat bonus plus any never-before-banked pickups.
+        let newStars = max(0, stars - prevStars)
+        // `coinReward` is the amount we add to the balance HERE.  The L1
+        // tutorial may have already banked + credited the three coins at
+        // the Phase-2→3 transition (`tutorialCoinBonus`); subtract that
+        // portion so the player isn't paid twice in the same attempt.
+        let coinReward = GameState.clearCoins(for: level)
+                       + coinsPickedThisAttempt.count * GameState.coinPerPickup
+                       - tutorialCoinBonus
         // `displayedCoinReward` is what the Level Clear screen shows
         // ("+N coins").  It surfaces the FULL haul from this attempt
         // — coinReward plus any tutorial bonus already paid out — so
