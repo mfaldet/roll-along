@@ -1634,10 +1634,22 @@ enum BundleRarity: String, CaseIterable {
     case standard, rare, legendary
 
     /// Cost thresholds (in coins).  `fullPrice < rareFloor` → Standard;
-    /// `< legendaryFloor` → Rare; otherwise Legendary.  Tuned to the live
-    /// catalogue (bundles run 450–1950) so the split is ~7 / 17 / 33.
-    static let rareFloor      = 700
-    static let legendaryFloor = 1100
+    /// `< legendaryFloor` → Rare; otherwise Legendary.
+    ///
+    /// Re-derived for the 2026-07 tier reprice (750/1,000/1,250/1,500) from
+    /// the ACTUAL catalogue distribution (test_bundleRarityDistribution dump:
+    /// 66 bundles, fullPrice 4,500–13,500).  Chosen so that:
+    ///   • the split stays a pyramid — 6 / 20 / 40 (9% / 30% / 61%),
+    ///     proportionally close to the old 7 / 17 / 42;
+    ///   • the PERMANENT (non-seasonal) Standard pool feeding the
+    ///     post-tutorial gift picker holds 4 bundles (diamond, nature,
+    ///     citrus, sketchbook) + 2 seasonal windows (backtoschool-2026,
+    ///     earthday-2027) — guarded by
+    ///     testTutorialGift_permanentStandardBundlePool_neverEmpty.
+    /// Six bundles sit at exactly 5,500, so the next round step up (5,750)
+    /// would balloon the permanent gift pool to 10 — keep 5,500.
+    static let rareFloor      = 5500
+    static let legendaryFloor = 6500
 
     var label: String {
         switch self {

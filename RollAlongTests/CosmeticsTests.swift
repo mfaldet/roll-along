@@ -307,7 +307,8 @@ final class CosmeticsTests: XCTestCase {
     func test_bundleRarityDistribution() {
         let sorted = CosmeticBundle.catalogue.sorted { $0.fullPrice() < $1.fullPrice() }
         for b in sorted {
-            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(b.fullPrice())  \(b.id)")
+            let perm = b.isLimitedTime ? "seasonal " : "PERMANENT"
+            print("RARITYDIST \(b.rarity.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(String(format: "%6d", b.fullPrice()))  \(perm)  \(b.id)")
         }
         let buckets = Dictionary(grouping: CosmeticBundle.catalogue, by: { $0.rarity })
         print("RARITYDIST counts:",
@@ -315,6 +316,22 @@ final class CosmeticsTests: XCTestCase {
         for r in BundleRarity.allCases {
             XCTAssertGreaterThan(buckets[r]?.count ?? 0, 0, "no bundles in rarity band \(r.label)")
         }
+    }
+
+    /// Regression guard for the post-tutorial gift (BallGameView filters
+    /// `rarity == .standard && isAvailable`): the PERMANENT (non-seasonal)
+    /// Standard-rarity pool must never be empty, or the gift picker
+    /// dead-ends the moment no seasonal window is open.  A future price or
+    /// floor change that empties this pool must fail here, not in prod.
+    func testTutorialGift_permanentStandardBundlePool_neverEmpty() {
+        let pool = CosmeticBundle.catalogue.filter { !$0.isLimitedTime && $0.rarity == .standard }
+        print("GIFTPOOL permanent Standard bundles:", pool.map { $0.id }.joined(separator: ", "))
+        XCTAssertFalse(pool.isEmpty,
+                       "The permanent Standard-rarity bundle pool is empty — the post-tutorial gift dead-ends")
+        // Every permanent Standard bundle is (trivially) always available, so
+        // the gift picker's `isAvailable` filter can never see fewer options
+        // than this pool.
+        for b in pool { XCTAssertTrue(b.isAvailable, "permanent bundle \(b.id) must always be available") }
     }
 
     /// Iconic = the un-sellable specials.  Starter look + earned/IAP exclusives
