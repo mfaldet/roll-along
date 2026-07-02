@@ -1759,9 +1759,9 @@ struct CosmeticShopView: View {
         }
         let discountPct = mode == .shop ? ShopRotation.featuredDiscount().percent : 0
         let beforeCompleted = gameState.completedBundleIDs
-        _ = gameState.spendCoins(cost)
-        bundle.grantContents(to: gameState)
-        gameState.ownedBundles.insert(bundle.id)
+        // Charges the coins, grants the items, and records what was paid so
+        // Sell Back refunds the discounted price rather than full coinCost.
+        guard gameState.purchaseBundle(bundle, price: cost) else { return }
         // Auto-equip the new set so the purchase shows up instantly — the buyer
         // sees their new look right away instead of equipping each piece by hand.
         if let b = bundle.balls.first  { gameState.equipBall(b) }
