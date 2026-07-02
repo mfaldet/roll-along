@@ -120,4 +120,131 @@ final class StoreKitManagerTests: XCTestCase {
             .skipRevoked
         )
     }
+
+    // MARK: - Launch-window race (update before bootstrap)
+
+    /// The launch race: a verified update (Ask to Buy approval, other-device
+    /// sync, unfinished replay) arriving before bootstrap binds gameState
+    /// must be DEFERRED — not delivered into the void and finished, which
+    /// permanently lost consumable purchases.
+    func testUpdateBeforeBootstrapDefersEveryProduct() {
+        for productID in StoreKitManager.ProductID.allCases {
+            XCTAssertEqual(
+                StoreKitManager.verifiedUpdateAction(productID: productID.rawValue,
+                                                     revocationDate: nil,
+                                                     hasGameState: false),
+                .deferUntilBootstrap,
+                "\(productID.rawValue) must wait for bootstrap, not vanish"
+            )
+        }
+    }
+
+    /// Revoked updates still finish pre-bootstrap — there is nothing to
+    /// deliver, and refreshEntitlements re-mirrors the unlimited flag during
+    /// bootstrap anyway.  Deferring would leave them unfinished forever.
+    func testRevokedUpdateBeforeBootstrapStillSkipsRevoked() {
+        XCTAssertEqual(
+            StoreKitManager.verifiedUpdateAction(
+                productID: StoreKitManager.ProductID.coins10000.rawValue,
+                revocationDate: Date(timeIntervalSince1970: 1_780_000_000),
+                hasGameState: false),
+            .skipRevoked
+        )
+    }
+
+    /// Unknown products also finish pre-bootstrap — nothing will ever be
+    /// deliverable for them, so there is no reason to hold them open.
+    func testUnknownProductBeforeBootstrapStillSkips() {
+        XCTAssertEqual(
+            StoreKitManager.verifiedUpdateAction(
+                productID: "com.macfaldet.RollAlong.retired.pack",
+                revocationDate: nil,
+                hasGameState: false),
+            .skipUnknownProduct
+        )
+    }
+
+    // MARK: - Crash-replay idempotency (delivered ledger)
+
+    /// The double-grant replay: a crash after deliverReward but before
+    /// finish() makes StoreKit replay the transaction at the next launch.
+    /// The ledger says it was already granted, so the replay must finish
+    /// WITHOUT delivering a second reward.
+    func testAlreadyDeliveredReplaySkipsDelivery() {
+        for productID in StoreKitManager.ProductID.allCases {
+            XCTAssertEqual(
+                StoreKitManager.verifiedUpdateAction(productID: productID.rawValue,
+                                                     revocationDate: nil,
+                                                     alreadyDelivered: true),
+                .skipAlreadyDelivered,
+                "\(productID.rawValue) must not double-grant on replay"
+            )
+        }
+    }
+
+    /// An already-delivered replay finishes even pre-bootstrap — nothing is
+    /// left to deliver, so it must not stack up behind the defer path.
+    func testAlreadyDeliveredBeatsDefer() {
+        XCTAssertEqual(
+            StoreKitManager.verifiedUpdateAction(
+                productID: StoreKitManager.ProductID.livesPack10.rawValue,
+                revocationDate: nil,
+                hasGameState: false,
+                alreadyDelivered: true),
+            .skipAlreadyDelivered
+        )
+    }
+
+    /// Revocation still wins over the ledger: a refunded transaction reports
+    /// .skipRevoked (firing the refund analytics + unlimited flip-off) even
+    /// if its reward was delivered earlier — which it always was.
+    func testRevokedBeatsAlreadyDelivered() {
+        XCTAssertEqual(
+            StoreKitManager.verifiedUpdateAction(
+                productID: StoreKitManager.ProductID.unlimited.rawValue,
+                revocationDate: Date(timeIntervalSince1970: 1_780_000_000),
+                hasGameState: true,
+                alreadyDelivered: true),
+            .skipRevoked
+        )
+    }
+
+    // MARK: - Delivered ledger (append / dedupe / trim)
+
+    func testLedgerAppendsNewID() {
+        XCTAssertEqual(
+            StoreKitManager.appendingDelivered("42", to: ["1", "2"]),
+            ["1", "2", "42"]
+        )
+    }
+
+    /// Recording the same transaction twice (listener + bootstrap replay
+    /// overlap) must not duplicate the entry.
+    func testLedgerDedupesExistingID() {
+        XCTAssertEqual(
+            StoreKitManager.appendingDelivered("2", to: ["1", "2"]),
+            ["1", "2"]
+        )
+    }
+
+    /// The ledger drops its OLDEST entries beyond the cap — recent IDs are
+    /// the ones StoreKit can still replay.
+    func testLedgerTrimsOldestBeyondCap() {
+        let full = (0..<5).map(String.init)          // ["0"..."4"]
+        XCTAssertEqual(
+            StoreKitManager.appendingDelivered("5", to: full, cap: 3),
+            ["3", "4", "5"]
+        )
+    }
+
+    /// The default cap holds the newest entries and stays at the documented
+    /// size once exceeded.
+    func testLedgerDefaultCapBounded() {
+        let cap  = StoreKitManager.deliveredLedgerCap
+        let full = (0..<cap).map(String.init)
+        let next = StoreKitManager.appendingDelivered("new", to: full)
+        XCTAssertEqual(next.count, cap)
+        XCTAssertEqual(next.last, "new")
+        XCTAssertFalse(next.contains("0"), "oldest entry should be trimmed")
+    }
 }

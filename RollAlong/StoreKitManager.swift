@@ -19,6 +19,11 @@ import StoreKit
 //     RawValue strings here are the source of truth.
 //   • For simulator testing, see Products.storekit (configured via the
 //     scheme's Run → Options → StoreKit Configuration setting).
+//   • Delivery discipline: a transaction is finished only AFTER its reward
+//     is granted and recorded in the persisted delivered-ledger.  Updates
+//     that arrive before bootstrap binds gameState are left unfinished and
+//     replayed by processUnfinishedTransactions(); replays of already-
+//     delivered transactions finish without granting again.
 // ---------------------------------------------------------------------------
 
 @MainActor
@@ -146,6 +151,45 @@ final class StoreKitManager: ObservableObject {
     /// passes its GameState reference at startup.
     weak var gameState: GameState?
 
+    // MARK: - Delivered-transaction ledger
+
+    /// IDs of transactions whose rewards have been granted, persisted so a
+    /// crash between deliverReward and transaction.finish() can't double-grant
+    /// consumables when StoreKit replays the update at the next launch.
+    /// GameState write-through-persists every granted reward in its didSet,
+    /// so recording here immediately after delivery keeps the two stores
+    /// consistent (worst case — crash between the two writes — the reward is
+    /// granted twice, never lost).
+    private var deliveredTransactionIDs: [String] =
+        UserDefaults.standard.stringArray(forKey: StoreKitManager.deliveredLedgerKey) ?? []
+
+    private static let deliveredLedgerKey = "ra_iapDeliveredTxnIDs"
+
+    /// Ledger size cap.  StoreKit only replays *unfinished* transactions,
+    /// which are always recent, so the ledger never needs deep history —
+    /// 200 is orders of magnitude more than can be in flight at once.
+    nonisolated static let deliveredLedgerCap = 200
+
+    /// Append a delivered transaction ID, dropping the oldest entries beyond
+    /// `cap`.  Pure so unit tests can pin the dedupe + trim behavior.
+    nonisolated static func appendingDelivered(
+        _ id: String,
+        to ledger: [String],
+        cap: Int = deliveredLedgerCap
+    ) -> [String] {
+        var next = ledger
+        if !next.contains(id) { next.append(id) }
+        if next.count > cap { next.removeFirst(next.count - cap) }
+        return next
+    }
+
+    private func recordDelivered(_ transactionID: UInt64) {
+        deliveredTransactionIDs = Self.appendingDelivered(String(transactionID),
+                                                          to: deliveredTransactionIDs)
+        UserDefaults.standard.set(deliveredTransactionIDs,
+                                  forKey: Self.deliveredLedgerKey)
+    }
+
     private init() {
         transactionListener = Task { [weak self] in
             await self?.listenForTransactions()
@@ -164,6 +208,12 @@ final class StoreKitManager: ObservableObject {
         self.gameState = gameState
         await loadProducts()
         await refreshEntitlements()
+        // Re-drive transactions still unfinished: updates the listener had to
+        // defer because they arrived before gameState was bound (Ask to Buy
+        // approvals, other-device syncs racing app launch), plus any left
+        // over from a crash between deliver and finish in a previous run
+        // (the delivered ledger turns those into a bare finish).
+        await processUnfinishedTransactions()
     }
 
     func loadProducts() async {
@@ -243,8 +293,14 @@ final class StoreKitManager: ObservableObject {
                 // Explicit switch — .unverified must NEVER grant a reward.
                 switch verification {
                 case .verified(let transaction):
-                    await deliverReward(for: productID)
-                    await transaction.finish()
+                    // Same idempotent path as the background listener: the
+                    // ledger stops a crash-replay double-grant, and finish
+                    // is skipped when delivery fails so StoreKit re-delivers
+                    // instead of the purchase being silently lost.
+                    guard await handleVerified(transaction) else {
+                        self.lastError = "Purchase couldn't be delivered yet — it will retry automatically."
+                        return false
+                    }
                     AnalyticsClient.shared.track(
                         "iap_purchased",
                         properties: [
@@ -318,8 +374,15 @@ final class StoreKitManager: ObservableObject {
 
     // MARK: - Reward delivery
 
-    private func deliverReward(for productID: ProductID) async {
-        guard let gameState else { return }
+    /// Grants the reward for a delivered purchase.  Returns false — having
+    /// granted nothing — when gameState isn't bound; the caller must NOT
+    /// finish the transaction in that case or the purchase is silently lost.
+    /// Deliberately synchronous: handleVerified relies on the ledger check,
+    /// this grant, and recordDelivered running without a suspension point so
+    /// concurrent MainActor tasks (listener vs. bootstrap replay) can't
+    /// interleave and double-deliver the same transaction.
+    private func deliverReward(for productID: ProductID) -> Bool {
+        guard let gameState else { return false }
         var grantedCosmetic: String? = nil
         switch productID.category {
         case .lifePack:
@@ -365,6 +428,7 @@ final class StoreKitManager: ObservableObject {
             grantedCosmeticName: grantedCosmetic
         )
         deliveryCount += 1
+        return true
     }
 
     /// Grant the complete Aurora collection — every item in the "aurora"
@@ -418,73 +482,146 @@ final class StoreKitManager: ObservableObject {
         /// Product retired from the catalogue — finish so it stops
         /// re-delivering; nothing to grant.
         case skipUnknownProduct
+        /// Reward already granted in a previous pass (crash between deliver
+        /// and finish, or the listener overlapping the bootstrap replay) —
+        /// finish WITHOUT delivering again.
+        case skipAlreadyDelivered
+        /// Verified update arrived before bootstrap(with:) bound gameState —
+        /// delivering now would silently drop the reward.  Leave the
+        /// transaction UNFINISHED; bootstrap's unfinished-transaction replay
+        /// (or StoreKit itself at the next launch) re-delivers it.
+        case deferUntilBootstrap
     }
 
     nonisolated static func verifiedUpdateAction(
         productID: String,
-        revocationDate: Date?
+        revocationDate: Date?,
+        hasGameState: Bool = true,
+        alreadyDelivered: Bool = false
     ) -> VerifiedUpdateAction {
         // Revocation wins over everything else: StoreKit delivers refunds and
         // Family Sharing revocations through Transaction.updates as *verified*
         // transactions with revocationDate set.  Delivering here would mint
         // the reward a second time on top of the money back (e.g., refund the
         // top coin pack → another 60,000 coins + a Money cosmetic, forever
-        // repeatable).
+        // repeatable).  Revoked and unknown-product updates finish even
+        // pre-bootstrap: there is nothing to deliver, so deferring would
+        // just leave them unfinished forever (a revoked unlimited unlock is
+        // re-mirrored off by refreshEntitlements during bootstrap anyway).
         if revocationDate != nil { return .skipRevoked }
         guard let productID = ProductID(rawValue: productID) else {
             return .skipUnknownProduct
         }
+        // An already-granted reward finishes quietly even if gameState isn't
+        // bound yet — nothing is left to deliver.
+        if alreadyDelivered { return .skipAlreadyDelivered }
+        guard hasGameState else { return .deferUntilBootstrap }
         return .deliver(productID)
     }
 
     private func listenForTransactions() async {
         for await update in Transaction.updates {
-            switch update {
-            case .verified(let transaction):
-                switch Self.verifiedUpdateAction(productID: transaction.productID,
-                                                 revocationDate: transaction.revocationDate) {
-                case .deliver(let productID):
-                    await deliverReward(for: productID)
-                case .skipRevoked:
-                    // A refunded unlimited unlock should stop granting free
-                    // lives right away, not at the next launch (where
-                    // refreshEntitlements re-mirrors the entitlement anyway).
-                    // Consumables aren't clawed back: coins/lives already
-                    // granted may be spent, and Apple owns the refund risk.
-                    if transaction.productID == ProductID.unlimited.rawValue {
-                        gameState?.unlimitedLives = false
-                    }
-                    let reason: String
-                    if let revocationReason = transaction.revocationReason {
-                        reason = revocationReason == .developerIssue ? "developer_issue" : "other"
-                    } else {
-                        reason = "unknown"
-                    }
-                    AnalyticsClient.shared.track(
-                        "iap_revoked",
-                        properties: [
-                            "product_id": .string(transaction.productID),
-                            "reason":     .string(reason),
-                        ]
-                    )
-                case .skipUnknownProduct:
-                    break
-                }
-                // Finish verified updates whether delivered or skipped, so
-                // StoreKit stops re-delivering them.
-                await transaction.finish()
-            case .unverified(_, let verificationError):
-                // Apple's JWS signature check failed.  Do NOT grant any
-                // reward and do NOT finish — let the transaction remain
-                // unfinished so StoreKit can retry verification.
-                AnalyticsClient.shared.track(
-                    "iap_verification_failed",
-                    properties: [
-                        "error":   .string(verificationError.localizedDescription),
-                        "context": .string("listener"),
-                    ]
-                )
+            await handle(update, context: "listener")
+        }
+    }
+
+    /// Called from bootstrap once gameState is bound.  Transactions stay in
+    /// Transaction.unfinished until finish() is called, so this picks up both
+    /// updates the listener deferred pre-bootstrap and any survivors of a
+    /// crash in a previous run.
+    private func processUnfinishedTransactions() async {
+        for await result in Transaction.unfinished {
+            await handle(result, context: "unfinished")
+        }
+    }
+
+    /// Shared per-update processing for the background listener and the
+    /// bootstrap unfinished-transaction replay.
+    private func handle(_ update: VerificationResult<Transaction>, context: String) async {
+        switch update {
+        case .verified(let transaction):
+            await handleVerified(transaction)
+        case .unverified(_, let verificationError):
+            // Apple's JWS signature check failed.  Do NOT grant any
+            // reward and do NOT finish — let the transaction remain
+            // unfinished so StoreKit can retry verification.
+            AnalyticsClient.shared.track(
+                "iap_verification_failed",
+                properties: [
+                    "error":   .string(verificationError.localizedDescription),
+                    "context": .string(context),
+                ]
+            )
+        }
+    }
+
+    /// Processes one *verified* transaction from any source (listener,
+    /// bootstrap replay, or the in-app purchase flow).  Returns true when the
+    /// player has the reward (delivered now, or found in the ledger) and the
+    /// transaction was finished.  A transaction is only ever finished AFTER
+    /// its delivery outcome is secured — deliver-then-record-then-finish —
+    /// so a crash at any point replays as either a ledger-guarded no-op or a
+    /// fresh delivery, never a lost purchase.
+    @discardableResult
+    private func handleVerified(_ transaction: Transaction) async -> Bool {
+        let action = Self.verifiedUpdateAction(
+            productID:        transaction.productID,
+            revocationDate:   transaction.revocationDate,
+            hasGameState:     gameState != nil,
+            alreadyDelivered: deliveredTransactionIDs.contains(String(transaction.id))
+        )
+        switch action {
+        case .deliver(let productID):
+            // No suspension point between the ledger check above and
+            // recordDelivered below — deliverReward is synchronous — so a
+            // concurrent MainActor task can't slip in and deliver the same
+            // transaction twice.
+            guard deliverReward(for: productID) else { return false }
+            recordDelivered(transaction.id)
+            await transaction.finish()
+            return true
+
+        case .skipAlreadyDelivered:
+            await transaction.finish()
+            return true
+
+        case .skipRevoked:
+            // A refunded unlimited unlock should stop granting free
+            // lives right away, not at the next launch (where
+            // refreshEntitlements re-mirrors the entitlement anyway).
+            // Consumables aren't clawed back: coins/lives already
+            // granted may be spent, and Apple owns the refund risk.
+            if transaction.productID == ProductID.unlimited.rawValue {
+                gameState?.unlimitedLives = false
             }
+            let reason: String
+            if let revocationReason = transaction.revocationReason {
+                reason = revocationReason == .developerIssue ? "developer_issue" : "other"
+            } else {
+                reason = "unknown"
+            }
+            AnalyticsClient.shared.track(
+                "iap_revoked",
+                properties: [
+                    "product_id": .string(transaction.productID),
+                    "reason":     .string(reason),
+                ]
+            )
+            await transaction.finish()
+            return false
+
+        case .skipUnknownProduct:
+            await transaction.finish()
+            return false
+
+        case .deferUntilBootstrap:
+            // Intentionally NOT finished — processUnfinishedTransactions
+            // re-drives it once bootstrap binds gameState.
+            AnalyticsClient.shared.track(
+                "iap_deferred_pre_bootstrap",
+                properties: ["product_id": .string(transaction.productID)]
+            )
+            return false
         }
     }
 }
