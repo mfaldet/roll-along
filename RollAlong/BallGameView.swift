@@ -1328,7 +1328,7 @@ struct BallGameView: View {
     private var discoFloorOverlay: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             Canvas { ctx, size in
-                let t = tl.date.timeIntervalSinceReferenceDate
+                let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let cellSize: CGFloat = 62
                 let cols = Int(ceil(size.width  / cellSize))
                 let rows = Int(ceil(size.height / cellSize))
@@ -3048,7 +3048,7 @@ struct BallGameView: View {
                         let rad = r * CGFloat(f)
                         let px = cx + CGFloat(cos(ang)) * rad
                         let py = cy + CGFloat(sin(ang)) * rad
-                        let sz = CGFloat(1.2 + 2.0 * (1 - f))
+                        let sz: CGFloat = 1.2 + 2.0 * (1 - CGFloat(f))
                         let hue: Double = 0.60 + 0.15 * sin(f * 6 + t)
                         g.fill(Path(ellipseIn: CGRect(x: px-sz, y: py-sz, width: sz*2, height: sz*2)),
                             with: .color(Color(hue: hue, saturation: 0.6, brightness: 1).opacity(0.8 * (1 - f) + 0.2)))
@@ -3529,7 +3529,7 @@ struct BallGameView: View {
         let style = gameState.equippedGoal.holeStyle
         return TimelineView(.animation) { timeline in
             Canvas { ctx, size in
-                let t    = timeline.date.timeIntervalSinceReferenceDate
+                let t    = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
                 let cx   = size.width  / 2
                 let cy   = size.height / 2
                 let maxR = (size.width / 2) * 0.90

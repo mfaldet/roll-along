@@ -2281,6 +2281,25 @@ struct BallSkinView: View {
                 ctx.stroke(Path(ellipseIn: CGRect(x: cx - outer, y: cy - outer, width: outer * 2, height: outer * 2)),
                            with: .color(gold), lineWidth: max(0.8, r * 0.05))
 
+                // 3b. Rim catch-light that rides the spin — a bright bead that
+                //     orbits the gold separator ring locked to the wheel's
+                //     rotation, so the rim glints faster while the wheel whips
+                //     round and eases to a stop as it settles.  This is the
+                //     spin-responding second layer (gone under Reduce Motion,
+                //     where spinA is pinned to 0).
+                if !reduceMotion {
+                    let ringA: Double = -(.pi / 3.0) + spinA
+                    let beadC = CGPoint(x: cx + CGFloat(cos(ringA)) * outer,
+                                        y: cy + CGFloat(sin(ringA)) * outer)
+                    let beadR: CGFloat = r * 0.11
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: beadC.x - beadR, y: beadC.y - beadR,
+                                               width: beadR * 2, height: beadR * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(0.80), .clear]),
+                            center: beadC, startRadius: 0, endRadius: beadR))
+                }
+
                 // 4. White centre pip with a gold ring.
                 let pipR = r * 0.16
                 ctx.fill(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
@@ -5301,9 +5320,17 @@ struct BallSkinView: View {
                 let cy = h / 2
                 let r  = min(w, h) / 2
 
-                // Specular drift — a slow small orbit; zero when static.
-                let specDX: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 0.55)) * r * 0.055
-                let specDY: CGFloat = reduceMotion ? 0.0 : CGFloat(cos(t * 0.55)) * r * 0.032
+                // Specular drift — a slow small orbit that is ALSO nudged by
+                // the leaf sway, so the wet-gloss catch-light shivers in
+                // response to the leaf rocking overhead (the two layers are
+                // coupled, not two independent solo clocks).  Zero when static.
+                let specDX: CGFloat = reduceMotion ? 0.0
+                    : CGFloat(sin(t * 0.55)) * r * 0.055 + CGFloat(sway) * r * 0.014
+                let specDY: CGFloat = reduceMotion ? 0.0
+                    : CGFloat(cos(t * 0.55)) * r * 0.032 - CGFloat(sway) * r * 0.010
+                // Gloss brightness breathes with the sway — brightest as the
+                // leaf swings back toward the light.
+                let specGlow: Double = reduceMotion ? 0.92 : 0.92 + 0.06 * sway
 
                 // ── 1. Rounded apple-red body (radial shading) ───────────────
                 ctx.fill(
@@ -5341,9 +5368,23 @@ struct BallSkinView: View {
                 // points ride the sway (tipDX/tipDY == 0 → original leaf).
                 let tipDX: CGFloat = CGFloat(sway) * r * 0.035
                 let tipDY: CGFloat = CGFloat(sway) * r * -0.022
-                var leaf = Path()
                 let lx = cx + r * 0.10
                 let ly = cy - r * 0.88
+                // Soft shadow the leaf casts onto the apple body — it slides
+                // as the leaf sways, so this layer is driven by the leaf's
+                // motion rather than a clock of its own.
+                if !reduceMotion {
+                    let shX = lx + r * 0.16 + tipDX * 1.3
+                    let shY = ly + r * 0.10 - tipDY * 0.6
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: shX - r * 0.20, y: shY - r * 0.09,
+                                               width: r * 0.40, height: r * 0.18)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.black.opacity(0.16), .clear]),
+                            center: CGPoint(x: shX, y: shY),
+                            startRadius: 0, endRadius: r * 0.22))
+                }
+                var leaf = Path()
                 leaf.move(to: CGPoint(x: lx, y: ly))
                 leaf.addQuadCurve(to: CGPoint(x: lx + r * 0.42 + tipDX, y: ly - r * 0.18 + tipDY),
                                   control: CGPoint(x: lx + r * 0.22 + tipDX * 0.5, y: ly - r * 0.34 + tipDY * 0.5))
@@ -5379,7 +5420,7 @@ struct BallSkinView: View {
                     Path(ellipseIn: CGRect(x: cx - r * 0.58 + specDX, y: cy - r * 0.62 + specDY,
                                            width: r * 0.50, height: r * 0.34)),
                     with: .radialGradient(
-                        Gradient(colors: [.white.opacity(0.92), .white.opacity(0.3), .clear]),
+                        Gradient(colors: [.white.opacity(specGlow), .white.opacity(0.3), .clear]),
                         center: CGPoint(x: cx - r * 0.38 + specDX, y: cy - r * 0.50 + specDY),
                         startRadius: 0, endRadius: r * 0.34))
             }

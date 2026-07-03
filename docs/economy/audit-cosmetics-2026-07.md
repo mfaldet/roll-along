@@ -491,3 +491,43 @@ Legendary hasAnimatedOverlay precedent line.
 companion standard committed as docs/economy/standards-cosmetics.md. Seven
 category graders + one bundle grader + one adversarial verifier, per the
 06-sprint-plan.md Workstream B procedure.*
+
+---
+
+## Gate — Legendary-fund re-grade (2026-07-03)
+
+Re-grade after the SHORT verdicts from the fund grader + typecheck probe
+were repaired on `claude/legendary-fund`.
+
+**Outcome: all PASS.** 4 SHORT verdicts repaired, 1 mandatory typecheck
+fix applied, 0 items regressed. Build SUCCEEDED; `CosmeticsTests` +
+`BallSkinSnapshotTests` green (44 tests, 0 failures).
+
+Repairs made:
+
+1. **discoFloorOverlay** (BallGameView.swift:1331) — added the missing
+   Reduce-Motion gate on the clock: `t = reduceMotion ? 0.0 : …`, matching
+   grass/moon/brass. Freezes hue/pulse to a static grid under RM.
+2. **rainbowHole** (BallGameView.swift:3532) — added the same RM gate on
+   `t`, matching neon/quasar. Halts orbits/breathing/hue/twinkle under RM.
+3. **highRoller** (BallSkinView.swift) — added a spin-responding second
+   layer: a rim catch-light bead that orbits the gold separator ring
+   locked to `spinA`, so a distinct element reacts *during* the spin (the
+   pip glint only fired at rest). RM-gated (spinA pinned to 0).
+4. **apple** (BallSkinView.swift) — coupled the two previously-independent
+   clocks: the wet-gloss specular now drifts and brightens off `sway`, and
+   a leaf-cast shadow slides on the apple body driven by the leaf tip.
+   Layers now interact instead of running as solo clocks. RM-gated.
+5. **Typecheck (mandatory)** — BallGameView.swift:3051 `sz` expression
+   (404ms, over the 400ms limit) re-typed as
+   `let sz: CGFloat = 1.2 + 2.0 * (1 - CGFloat(f))`, removing the
+   outer `CGFloat(...)` coercion over untyped literals. Re-probe with
+   `-warn-long-expression-type-checking=400` on a forced recompile of both
+   target files: zero over-limit expressions.
+
+Non-issues (correctly PASS, left unchanged): trails fire/ice/aurora/
+stardust (receive `t` already RM-gated upstream via `drawRichTrail`, no
+internal gate needed) and trailRainbow (indexical hue cycle, no
+time-driven lifecycle → no RM logic by design). eclipse floor/pit goals
+gate at their parent call sites (BallGameView.swift:531 / 1067), so their
+inline non-gated `t` is intentional.
