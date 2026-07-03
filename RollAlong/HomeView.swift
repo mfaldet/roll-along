@@ -113,7 +113,8 @@ final class Navigator: ObservableObject {
 struct HomeView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var ads:       AdManager
-    @ObservedObject private var auth = AppleAuthManager.shared   // greys out the social buttons when signed out
+    @ObservedObject private var auth  = AppleAuthManager.shared   // greys out the social buttons when signed out
+    @ObservedObject private var store = StoreKitManager.shared    // starter-pack offer waits for products to load
     @StateObject private var nav    = Navigator()
     @StateObject private var motion = BallMotion()   // same class used in BallGameView
     @StateObject private var clock  = PhysicsClock()
@@ -169,6 +170,10 @@ struct HomeView: View {
     // auto-pop so popping back from a sub-screen doesn't re-open it.
     @State private var showDailyRewardSheet: Bool = false
     @State private var autoPresentedDaily: Bool = false
+
+    // Starter Pack sheet — shown once automatically when coinBalance first
+    // reaches 50.  Also shown on re-launch while the 48-hour window is open.
+    @State private var showStarterPackSheet: Bool = false
 
     /// Drives the Play→game launch animation (the ball dives at the viewer).
     @State private var launching: Bool = false
@@ -391,12 +396,19 @@ struct HomeView: View {
             .onChange(of: nav.path) { _, path in
                 // Remember the last mode/game entered so the home Play button
                 // reflects it (and later, so the home aesthetic can theme off it).
-                guard let last = path.last else { return }
+                guard let last = path.last else {
+                    // Popped back to Home — the starter-pack offer may have
+                    // triggered mid-run (coins bank during gameplay) and been
+                    // deferred; present it now that Home is front-most.
+                    maybeAutoPresentStarterPack()
+                    return
+                }
                 if case .game = last { gameState.currentModeID = "climb" }
                 else if case .mode(let id) = last, id != "daily" { gameState.currentModeID = id }
             }
             .onAppear    {
                 motion.start(); clock.start(); maybeAutoPresentDailyReward()
+                maybeAutoPresentStarterPack()   // 48h-window re-present on launch
                 // A CotD run left unfinished at last launch (app killed mid-run)
                 // is forfeited — leaving a run forfeits the day.
                 gameState.forfeitDailyChallengeIfRunning()
@@ -510,6 +522,25 @@ struct HomeView: View {
             .sheet(isPresented: $showDailyRewardSheet) {
                 DailyRewardView()
                     .environmentObject(gameState)
+            }
+            .sheet(isPresented: $showStarterPackSheet) {
+                StarterPackSheet()
+                    .environmentObject(gameState)
+                    .environmentObject(StoreKitManager.shared)
+            }
+            // Auto-present the Starter Pack sheet the first time coinBalance
+            // reaches 50 (trigger fires once and is never re-armed).  The
+            // 48-hour-window re-present rides the same onAppear as the daily
+            // reward; this observer catches the mid-session first trigger.
+            .onChange(of: gameState.coinBalance) { _, _ in
+                maybeAutoPresentStarterPack()
+            }
+            // Products load asynchronously in bootstrap, usually AFTER Home's
+            // first onAppear — without this, the launch-time 48h-window
+            // re-present would silently lose the race and only fire on the
+            // next coin change.
+            .onChange(of: store.products.count) { _, _ in
+                maybeAutoPresentStarterPack()
             }
         }
         .environmentObject(nav)
@@ -1006,6 +1037,54 @@ struct HomeView: View {
         autoPresentedDaily = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if gameState.dailyRewardAvailable { showDailyRewardSheet = true }
+        }
+    }
+
+    /// Present the Starter Pack sheet when:
+    ///   (a) coinBalance just crossed 50 for the first time (trigger fires once), OR
+    ///   (b) the player re-opens the app while the 48-hour window is still live.
+    /// Called from onAppear (launch), the coinBalance observer (mid-session
+    /// trigger), the products observer (bootstrap races Home's first frame),
+    /// and the nav-path observer (pop back to Home after a mid-run trigger).
+    /// Guards: only when Home is front-most (empty nav path, no other sheet up
+    /// — coins bank during gameplay and this must never pop over a run or the
+    /// Buy Coins sheet), suppressed under --uitesting (SmokeTests query Home
+    /// the moment it appears), and skipped entirely while StoreKit has no
+    /// loaded product (e.g. it isn't live in App Store Connect) — an offer
+    /// whose buy button can't work must never auto-present.  The first-trigger
+    /// `shownAt` stamp shares the same guards, so the 48-hour countdown only
+    /// starts once the sheet can actually appear.
+    private func maybeAutoPresentStarterPack() {
+        guard !Self.isUITesting else { return }
+        guard gameState.seenOnboarding, !showStarterPackSheet else { return }
+        guard nav.path.isEmpty,
+              !showDailyRewardSheet, !showBuyCoinsSheet, !showBuyLivesSheet
+        else { return }
+        guard store.product(for: .starterPack) != nil else { return }
+
+        let trigger: String
+        if gameState.shouldTriggerStarterPack {
+            // First trigger: stamp shownAt so the countdown starts now.
+            gameState.starterPackShownAt = Date()
+            trigger = "first"
+        } else if gameState.starterPackOfferActive {
+            // Re-open within the 48-hour window.
+            trigger = "window_reopen"
+        } else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            // Re-check: the daily-reward sheet fires at +0.5s, a game could
+            // have been entered, or a second scheduled block could have won.
+            guard nav.path.isEmpty,
+                  !showDailyRewardSheet, !showBuyCoinsSheet, !showBuyLivesSheet,
+                  !showStarterPackSheet
+            else { return }
+            showStarterPackSheet = true
+            AnalyticsClient.shared.track(
+                "starter_pack_shown",
+                properties: ["trigger": .string(trigger)]
+            )
         }
     }
 

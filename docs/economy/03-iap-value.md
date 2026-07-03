@@ -15,8 +15,10 @@ Lower $/hr-saved = stronger perceived value.
 | coins3000 | $19.99 | 3,000 | 2.5 hr | **$8.00** | $48.00 | Planets ball pack (2,640) + change |
 | coins10000 | $49.99 | 10,000 | 8.3 hr | **$6.00** | $36.00 | ~19% of the catalogue **+ 1 random Money cosmetic** |
 
-(StoreKitManager.swift:78-82; Products.storekit price tiers. Retired: Starter
-Pack $1.99 → 500 + Aurora ball — was the best coin value ever sold; restore-only.)
+(StoreKitManager.swift `rewardCoins`; Products.storekit price tiers — the table
+amounts predate the 2026-07 reprice. Starter Pack $1.99 → 500 coins + the full
+Aurora collection, free-granted: un-retired 2026-07 as the one-time 48-hour
+welcome offer. Its 500-coin component was NOT repriced with the coin packs.)
 
 **Reading:**
 - **The small packs are anti-value**: $0.99 buys 5 minutes of play. Nobody

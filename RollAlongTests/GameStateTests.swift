@@ -575,6 +575,105 @@ final class GameStateTests: XCTestCase {
         XCTAssertEqual(UserDefaults.standard.integer(forKey: key), standardBefore,
                        "Mutating an isolated GameState must not write to UserDefaults.standard")
     }
+
+    // MARK: - Starter Pack offer window
+
+    /// The one-shot trigger: fires only at coinBalance >= 50 with the offer
+    /// never shown, never claimed, and the Aurora collection incomplete.
+    func testStarterPackTrigger_firesOnceAtFiftyCoins() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "no trigger before 50 coins")
+
+        gs.coinBalance = 49
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "49 is below the threshold")
+
+        gs.coinBalance = 50
+        XCTAssertTrue(gs.shouldTriggerStarterPack, "fires at exactly 50")
+
+        // Presenting the sheet stamps shownAt — the trigger never re-arms.
+        gs.starterPackShownAt = Date()
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "one-shot: shownAt disarms it")
+    }
+
+    func testStarterPackTrigger_suppressedWhenClaimedDismissedOrCollectionOwned() {
+        let gs = makeGameState()
+        gs.coinBalance = 100
+
+        gs.starterPackClaimed = true
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "delivered players never see it")
+        gs.starterPackClaimed = false
+        XCTAssertTrue(gs.shouldTriggerStarterPack)
+
+        gs.starterPackDismissed = true
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "\"No thanks\" is a permanent opt-out")
+        gs.starterPackDismissed = false
+        XCTAssertTrue(gs.shouldTriggerStarterPack)
+
+        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
+            return XCTFail("expected the \"aurora\" bundle in the catalogue")
+        }
+        aurora.grantContents(to: gs)
+        XCTAssertFalse(gs.shouldTriggerStarterPack,
+                       "owning the complete collection suppresses the offer")
+    }
+
+    /// The load-bearing split behind the Ask-to-Buy flow: "No thanks" sets
+    /// `dismissed` (offer UI opt-out) but must NOT set `claimed` (the coin
+    /// gate) — a pending purchase approved after a dismissal still delivers
+    /// its 500 coins.
+    func testStarterPackDismissal_doesNotBlockCoinDelivery() {
+        let gs = makeGameState()
+        gs.starterPackDismissed = true
+        XCTAssertFalse(gs.starterPackClaimed,
+                       "dismissal must leave the coin-delivery gate open")
+        XCTAssertFalse(gs.starterPackOfferActive)
+        XCTAssertFalse(gs.shouldTriggerStarterPack)
+    }
+
+    /// The 48-hour window: active right after first show, dead after 48h,
+    /// and `starterPackSecondsRemaining` counts down and clamps at 0.
+    func testStarterPackWindow_fortyEightHourCountdown() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.starterPackOfferActive, "inactive before first show")
+        XCTAssertEqual(gs.starterPackSecondsRemaining, 0, "no countdown before first show")
+
+        // Mid-window: shown 47 hours ago.
+        gs.starterPackShownAt = Date(timeIntervalSinceNow: -47 * 3_600)
+        XCTAssertTrue(gs.starterPackOfferActive, "window still open at 47h")
+        XCTAssertEqual(gs.starterPackSecondsRemaining, 3_600, accuracy: 5,
+                       "about one hour left at 47h")
+
+        // Expired: shown 49 hours ago.
+        gs.starterPackShownAt = Date(timeIntervalSinceNow: -49 * 3_600)
+        XCTAssertFalse(gs.starterPackOfferActive, "window closed after 48h")
+        XCTAssertEqual(gs.starterPackSecondsRemaining, 0, "remaining clamps at 0")
+    }
+
+    func testStarterPackWindow_closesOnClaimOrCollectionCompletion() {
+        let gs = makeGameState()
+        gs.starterPackShownAt = Date()   // window just opened
+        XCTAssertTrue(gs.starterPackOfferActive)
+
+        // Delivery closes the window …
+        gs.starterPackClaimed = true
+        XCTAssertFalse(gs.starterPackOfferActive, "claimed closes the window")
+        gs.starterPackClaimed = false
+        XCTAssertTrue(gs.starterPackOfferActive, "re-armed")
+
+        // … so does "No thanks" …
+        gs.starterPackDismissed = true
+        XCTAssertFalse(gs.starterPackOfferActive, "dismissed closes the window")
+        gs.starterPackDismissed = false
+        XCTAssertTrue(gs.starterPackOfferActive, "re-armed for the completion check")
+
+        // … and so does coin-completing the Aurora collection mid-window.
+        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
+            return XCTFail("expected the \"aurora\" bundle in the catalogue")
+        }
+        aurora.grantContents(to: gs)
+        XCTAssertFalse(gs.starterPackOfferActive,
+                       "mid-window collection completion suppresses the offer")
+    }
 }
 
 // ---------------------------------------------------------------------------

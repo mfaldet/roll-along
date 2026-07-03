@@ -5,6 +5,22 @@ Notable changes to Roll Along, newest first. Dates are when the work landed on
 
 ---
 
+## 2026-07 — Starter Pack returns
+
+### Starter Pack welcome offer (un-retired)
+
+- **The $1.99 Starter Pack is back on sale** as a one-time welcome offer:
+  500 coins + the complete Aurora collection (ball · goal · trail · floor ·
+  pit · music), free-granted so Sell Back keeps it but never refunds it.
+- **Auto-presented once** when the coin balance first reaches 50, then again
+  on re-launch while the 48-hour claim window is open; "No thanks" dismisses
+  it permanently. Suppressed for players who already own the whole collection,
+  under `--uitesting`, and whenever the App Store product isn't loaded.
+- **Past buyers unaffected**: restore still re-grants the collection (never
+  the coins), and the offer never re-shows once claimed or dismissed.
+
+---
+
 ## 2026-06 — Cosmetics, lives, launch & Gold Rush overhaul
 
 A large polish pass ahead of the full App Store release. See

@@ -104,7 +104,7 @@ final class StoreKitManager: ObservableObject {
             case .coins1300:   return 10000
             case .coins3000:   return 22500
             case .coins10000:  return 60000
-            case .starterPack: return 500   // retired product, historical grant
+            case .starterPack: return 500   // welcome-offer coins (pre-reprice amount)
             default:           return 0
             }
         }
@@ -263,11 +263,11 @@ final class StoreKitManager: ObservableObject {
         // Diamond ball when entitled — never revoke a cosmetic already owned.
         gameState?.unlimitedLives = unlimitedSeen
         if unlimitedSeen { gameState?.grant(BallSkin.diamond) }
-        // Legacy: the Starter Pack IAP is retired (no longer sold).  Past
-        // purchasers get the complete Aurora collection back on restore —
-        // including original buyers who only ever received the ball, who are
-        // upgraded to the full collection here — but NOT the 500 coins, which
-        // were a one-time consumable already spent.
+        // Starter Pack (one-time welcome offer): owners get the complete
+        // Aurora collection back on restore — including original buyers who
+        // only ever received the ball, who are upgraded to the full
+        // collection here — but NOT the 500 coins, which are a one-time
+        // consumable delivered only by the purchase path.
         if starterPackSeen, let gs = gameState {
             grantAuroraCollection(to: gs)
             gs.starterPackClaimed = true
