@@ -578,17 +578,19 @@ final class GameStateTests: XCTestCase {
 
     // MARK: - Starter Pack offer window
 
-    /// The one-shot trigger: fires only at coinBalance >= 50 with the offer
-    /// never shown, never claimed, and the Aurora collection incomplete.
-    func testStarterPackTrigger_firesOnceAtFiftyCoins() {
+    /// The one-shot trigger: fires only once coinBalance reaches the
+    /// threshold, with the offer never shown, never claimed, and the Aurora
+    /// collection incomplete.
+    func testStarterPackTrigger_firesOnceAtThreshold() {
+        let threshold = GameState.starterPackTriggerCoins
         let gs = makeGameState()
-        XCTAssertFalse(gs.shouldTriggerStarterPack, "no trigger before 50 coins")
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "no trigger at zero coins")
 
-        gs.coinBalance = 49
-        XCTAssertFalse(gs.shouldTriggerStarterPack, "49 is below the threshold")
+        gs.coinBalance = threshold - 1
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "one below the threshold does not fire")
 
-        gs.coinBalance = 50
-        XCTAssertTrue(gs.shouldTriggerStarterPack, "fires at exactly 50")
+        gs.coinBalance = threshold
+        XCTAssertTrue(gs.shouldTriggerStarterPack, "fires at exactly the threshold")
 
         // Presenting the sheet stamps shownAt — the trigger never re-arms.
         gs.starterPackShownAt = Date()
@@ -597,7 +599,7 @@ final class GameStateTests: XCTestCase {
 
     func testStarterPackTrigger_suppressedWhenClaimedDismissedOrCollectionOwned() {
         let gs = makeGameState()
-        gs.coinBalance = 100
+        gs.coinBalance = GameState.starterPackTriggerCoins
 
         gs.starterPackClaimed = true
         XCTAssertFalse(gs.shouldTriggerStarterPack, "delivered players never see it")
@@ -620,7 +622,7 @@ final class GameStateTests: XCTestCase {
     /// The load-bearing split behind the Ask-to-Buy flow: "No thanks" sets
     /// `dismissed` (offer UI opt-out) but must NOT set `claimed` (the coin
     /// gate) — a pending purchase approved after a dismissal still delivers
-    /// its 500 coins.
+    /// its coins.
     func testStarterPackDismissal_doesNotBlockCoinDelivery() {
         let gs = makeGameState()
         gs.starterPackDismissed = true

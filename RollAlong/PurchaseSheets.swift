@@ -1065,11 +1065,12 @@ private struct DiamondBonusLabel: View {
 
 // MARK: - Starter Pack Sheet
 
-/// One-time welcome offer: $1.99 → 500 coins + the complete Aurora collection
+/// One-time welcome offer: $1.99 → 3,750 coins + the complete Aurora collection
 /// (ball · goal · trail · floor · pit · music, free-granted so Sell Back keeps
 /// but never refunds it).  Presented automatically the first time the player's
-/// coin balance reaches 50, and again on re-launch while the 48-hour window is
-/// still open.  Purchase sets `starterPackClaimed` (via reward delivery);
+/// coin balance reaches `GameState.starterPackTriggerCoins`, and again on
+/// re-launch while the 48-hour window is open.  Purchase sets
+/// `starterPackClaimed` (via reward delivery);
 /// "No thanks" sets `starterPackDismissed`.  Either one closes the sheet and
 /// keeps it from ever showing again — but ONLY delivery sets `claimed`, so an
 /// Ask-to-Buy purchase approved after a dismissal still pays out in full.
@@ -1130,7 +1131,7 @@ struct StarterPackSheet: View {
                         VStack(spacing: 10) {
                             rewardRow(icon: "sparkles", label: "The Aurora collection",
                                       detail: "Ball · Goal · Trail · Floor · Pit · Music")
-                            rewardRow(icon: "circle.grid.cross.fill", label: "500 coins",
+                            rewardRow(icon: "circle.grid.cross.fill", label: "3,750 coins",
                                       detail: "Spend in the cosmetics shop")
                         }
                         .padding(.horizontal, 24)

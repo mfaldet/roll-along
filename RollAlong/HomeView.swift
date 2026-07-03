@@ -172,7 +172,8 @@ struct HomeView: View {
     @State private var autoPresentedDaily: Bool = false
 
     // Starter Pack sheet — shown once automatically when coinBalance first
-    // reaches 50.  Also shown on re-launch while the 48-hour window is open.
+    // reaches the trigger threshold.  Also shown on re-launch while the
+    // 48-hour window is open.
     @State private var showStarterPackSheet: Bool = false
 
     /// Drives the Play→game launch animation (the ball dives at the viewer).
@@ -529,7 +530,7 @@ struct HomeView: View {
                     .environmentObject(StoreKitManager.shared)
             }
             // Auto-present the Starter Pack sheet the first time coinBalance
-            // reaches 50 (trigger fires once and is never re-armed).  The
+            // reaches the trigger threshold (fires once, never re-armed).  The
             // 48-hour-window re-present rides the same onAppear as the daily
             // reward; this observer catches the mid-session first trigger.
             .onChange(of: gameState.coinBalance) { _, _ in
@@ -1041,7 +1042,8 @@ struct HomeView: View {
     }
 
     /// Present the Starter Pack sheet when:
-    ///   (a) coinBalance just crossed 50 for the first time (trigger fires once), OR
+    ///   (a) coinBalance just crossed the trigger threshold for the first time
+    ///       (fires once), OR
     ///   (b) the player re-opens the app while the 48-hour window is still live.
     /// Called from onAppear (launch), the coinBalance observer (mid-session
     /// trigger), the products observer (bootstrap races Home's first frame),

@@ -128,13 +128,13 @@
       "internalID": "11000009",
       "localizations": [
         {
-          "description": "One-time offer: 500 coins + the complete Aurora collection — ball, goal, trail, floor, pit, and music.",
+          "description": "One-time offer: 3,750 coins + the complete Aurora collection — ball, goal, trail, floor, pit, and music.",
           "displayName": "Starter Pack",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.starterpack",
-      "referenceName": "Starter Pack (500 coins + Aurora collection) $1.99",
+      "referenceName": "Starter Pack (3,750 coins + Aurora collection) $1.99",
       "type": "NonConsumable"
     },
     {

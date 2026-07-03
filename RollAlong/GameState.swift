@@ -169,10 +169,11 @@ final class GameState: ObservableObject {
     // ── Starter Pack one-time offer ─────────────────────────────────────────
     // starterPackShownAt   : timestamp when the offer sheet was first presented.
     //                        nil until the trigger fires (first time coinBalance
-    //                        reaches 50).  Drives the 48-hour countdown.
+    //                        reaches `starterPackTriggerCoins`).  Drives the
+    //                        48-hour countdown.
     // starterPackClaimed   : true once the pack's rewards have been DELIVERED
-    //                        (purchase or restore).  Gates the once-only 500
-    //                        coins in StoreKitManager — deliberately NOT set by
+    //                        (purchase or restore).  Gates the once-only coins
+    //                        in StoreKitManager — deliberately NOT set by
     //                        "No thanks", or an Ask-to-Buy purchase approved
     //                        after a dismissal would silently lose its coins.
     // starterPackDismissed : true after the player taps "No thanks" —
@@ -1408,7 +1409,7 @@ final class GameState: ObservableObject {
 
     // MARK: - Starter Pack offer
 
-    // The one-time $1.99 welcome offer: 500 coins + the complete Aurora
+    // The one-time $1.99 welcome offer: 3,750 coins + the complete Aurora
     // collection (the "aurora" bundle, free-granted so Sell Back keeps but
     // never refunds it).  `starterPackClaimed` = rewards delivered (gates the
     // once-only coins in StoreKitManager); `starterPackDismissed` = "No
@@ -1416,14 +1417,22 @@ final class GameState: ObservableObject {
     // collection (never the coins) on restore.  Aurora itself remains a
     // coin-buyable bundle.
 
-    /// Fires once: true the first time `coinBalance` reaches 50 AND the
-    /// player hasn't claimed or permanently dismissed the offer yet.
-    /// HomeView observes `coinBalance` and checks this to auto-present
-    /// the sheet.  Suppressed when the player already owns the complete
-    /// Aurora collection — the offer's headline item is already theirs.
+    /// Coin balance that first arms the welcome offer.  Set past the tutorial's
+    /// natural take (~30–50 coins from L1–10 clears) plus a chunk of free play
+    /// — a few minigame wins or ~45 min of climb at current earn rates — so the
+    /// offer lands once the player is invested and has glimpsed the shop, not in
+    /// the first thirty seconds.  Still reachable within a session, so the
+    /// 48-hour window stays meaningful.
+    static let starterPackTriggerCoins = 250
+
+    /// Fires once: true the first time `coinBalance` reaches
+    /// `starterPackTriggerCoins` AND the player hasn't claimed or permanently
+    /// dismissed the offer yet.  HomeView observes `coinBalance` and checks
+    /// this to auto-present the sheet.  Suppressed when the player already owns
+    /// the complete Aurora collection — the offer's headline item is theirs.
     var shouldTriggerStarterPack: Bool {
         !starterPackClaimed && !starterPackDismissed
-            && starterPackShownAt == nil && coinBalance >= 50
+            && starterPackShownAt == nil && coinBalance >= Self.starterPackTriggerCoins
             && !completedBundleIDs.contains("aurora")
     }
 
