@@ -60,6 +60,33 @@ final class TrophyEngine: ObservableObject {
     /// needed — unlike GameState's Int-keyed dict helpers).
     static let unlockDatesKey = "ra_trophyUnlockDates"
 
+    /// Set to `true` the first time `backfill(from:)` completes, so the
+    /// retro-evaluation never runs twice (idempotent across relaunches —
+    /// S0-T4 acceptance). It also gates the flag S2-T6 consumes for a
+    /// single coalesced "Trophy Room opens" reveal instead of a toast
+    /// storm (design.md §6 anti-spam batching): the reveal is owed exactly
+    /// when this key flips from unset to set with a non-empty grant.
+    static let backfillDoneKey = "ra_trophyBackfillDone"
+
+    /// The count of trophies the one-time backfill granted, persisted so
+    /// S2-T6 can render "you've already earned N" after the flag flips.
+    /// Absent/`0` when no backfill ran or it granted nothing.
+    static let backfillGrantCountKey = "ra_trophyBackfillGrantCount"
+
+    /// The single, fixed timestamp every grandfathered unlock carries — a
+    /// clearly-legacy marker, distinct from any real play instant, and
+    /// always in the past so it can never violate the never-in-the-future
+    /// invariant. It is 2000-01-01 UTC (`Date(timeIntervalSinceReferenceDate: 0)`):
+    /// well before Roll Along shipped, so a stamp equal to it unambiguously
+    /// reads "earned before trophies existed."
+    ///
+    /// Kept deliberately separable (D5 is still open — design.md §11 #12,
+    /// "Mac may veto"): if Mac vetoes grant-from-existing-stats in favour
+    /// of earn-fresh-from-zero, the ONLY change is not calling `backfill`
+    /// at wiring time (S1) — no latch, cascade, or persistence code depends
+    /// on this constant, and live unlocks never use it.
+    static let legacyUnlockDate = Date(timeIntervalSinceReferenceDate: 0)
+
     // MARK: - Dependencies
 
     /// The validated, immutable v1 catalog this engine evaluates against.
@@ -105,6 +132,16 @@ final class TrophyEngine: ObservableObject {
     /// First-unlock timestamps. First stamp wins, forever — a double fire
     /// can never restamp (S0-T3 acceptance: timestamp stable).
     private var unlockDates: [String: Date]
+
+    /// Whether the one-time first-launch backfill has already run. Loaded
+    /// from `backfillDoneKey`; `backfill(from:)` short-circuits when set,
+    /// so the retro-evaluation is idempotent across relaunches.
+    @Published private(set) var didBackfill: Bool
+
+    /// How many trophies the backfill granted (0 if it ran on a fresh
+    /// install or has not run). S2-T6 reads this for its one coalesced
+    /// reveal; nothing on the hot path touches it.
+    @Published private(set) var backfillGrantCount: Int
 
     // MARK: - Monotonic progress high-water (in-memory)
 
@@ -167,6 +204,9 @@ final class TrophyEngine: ObservableObject {
         let rawDates = defaults.dictionary(forKey: Self.unlockDatesKey) ?? [:]
         self.unlockDates = rawDates.compactMapValues { $0 as? Date }
         self.unlockedIDs = storedIDs.union(rawDates.keys)
+
+        self.didBackfill = defaults.bool(forKey: Self.backfillDoneKey)
+        self.backfillGrantCount = max(0, defaults.integer(forKey: Self.backfillGrantCountKey))
     }
 
     // MARK: - Reads
@@ -235,6 +275,78 @@ final class TrophyEngine: ObservableObject {
         return commit(newlyUnlocked)
     }
 
+    // MARK: - First-launch backfill / migration (S0-T4)
+
+    /// A snapshot of every trophy metric's CURRENT value, derived once at
+    /// first launch with trophies from a player's existing save. Only
+    /// metrics with a real historical source appear; metrics that begin
+    /// life at zero the day trophies ship (the NEW counters — daily-reward
+    /// claims, play-earned coins, no-fall streak — and the run/event
+    /// metrics — first-try aces, spotless runs, night-Zen sessions, social
+    /// latches, …) are deliberately ABSENT, so backfill can never
+    /// grandfather a deed the save carries no proof of.
+    ///
+    /// See `TrophyBackfill.snapshot(from:)` for the derivation from the
+    /// authoritative `GameState` decode.
+    typealias MetricSnapshot = [TrophyMetric: Double]
+
+    /// One-time retroactive grant (design.md §11 #12 default: "grant from
+    /// existing stats"; sprint-plan.md §2 S0-T4). Evaluates the full
+    /// catalog against `snapshot` and latches every satisfied trophy with
+    /// the `legacyUnlockDate` marker, then records that the backfill ran.
+    ///
+    /// Idempotent across relaunches: the first completed run sets
+    /// `backfillDoneKey`, and every later call short-circuits to `[]` — a
+    /// veteran's second launch re-grants nothing, and a fresh install whose
+    /// snapshot satisfied nothing still marks itself done (so the empty
+    /// grant is never re-attempted).
+    ///
+    /// The returned set is the newly-backfilled trophies (capstone included
+    /// if the grandfathered base completes it) — S2-T6's coalesced reveal
+    /// consumes `backfillGrantCount`; the return value is for callers/tests
+    /// that want the exact list. Live `record` unlocks are unaffected: they
+    /// keep stamping `now()`.
+    @discardableResult
+    func backfill(from snapshot: MetricSnapshot) -> [TrophyDefinition] {
+        guard !didBackfill else { return [] }
+
+        // Seed the progress high-water from the snapshot so post-backfill
+        // `progressFraction` is correct for a still-locked trophy on a
+        // metric the veteran already has history on (e.g. 30/40 balls).
+        for (metric, value) in snapshot { latchBestObserved(metric, value: value) }
+
+        // Collect every locked trophy the snapshot satisfies. Iterate the
+        // catalog (this is the one-time cold path — O(catalog) is fine and
+        // deterministic in catalog order), consulting only base-metric
+        // criteria; the capstone (ledger provenance) is left to `commit`'s
+        // cascade so a grandfathered base can complete it.
+        var granted: [TrophyDefinition] = []
+        for (metric, trophies) in trophiesByMetric {
+            guard let value = snapshot[metric] else { continue }
+            for trophy in trophies where !unlockedIDs.contains(trophy.id) {
+                if trophy.criteria.comparison.isSatisfied(
+                    value: value, threshold: trophy.criteria.threshold) {
+                    granted.append(trophy)
+                }
+            }
+        }
+
+        var all: [TrophyDefinition] = []
+        if !granted.isEmpty {
+            all = commit(granted, stamp: Self.legacyUnlockDate)
+        }
+
+        // Mark done exactly once, even on a nothing-to-grant fresh install,
+        // so the retro-evaluation never re-runs. Written last: a crash
+        // before this leaves the flag unset and the (already-persisted,
+        // idempotent) grants simply re-evaluate to the same set next launch.
+        didBackfill = true
+        backfillGrantCount = all.count
+        defaults.set(true, forKey: Self.backfillDoneKey)
+        defaults.set(all.count, forKey: Self.backfillGrantCountKey)
+        return all
+    }
+
     // MARK: - Progress (monotonic, for future UI)
 
     /// Fraction toward `trophyID`'s threshold, 0.0–1.0. Monotonic: an
@@ -275,7 +387,16 @@ final class TrophyEngine: ObservableObject {
     /// and persists synchronously — an unlock is durable the moment
     /// `record` returns (unlock-time durability; S1-T8 hardens the sync
     /// dirty flag on top of this).
-    private func commit(_ base: [TrophyDefinition]) -> [TrophyDefinition] {
+    ///
+    /// `stamp` is the first-unlock date to record. The live hot path passes
+    /// `now()` (its default); S0-T4's backfill passes the `legacyUnlockDate`
+    /// sentinel so grandfathered unlocks carry a clearly-legacy marker
+    /// instead of the update-install instant. Either way the stamp is
+    /// clamped to `<= now()` — no unlock timestamp may be in the future
+    /// (S0-T4 acceptance).
+    @discardableResult
+    private func commit(_ base: [TrophyDefinition],
+                        stamp rawStamp: Date? = nil) -> [TrophyDefinition] {
         var all = base
         var working = unlockedIDs
         for trophy in base { working.insert(trophy.id) }
@@ -299,7 +420,11 @@ final class TrophyEngine: ObservableObject {
         }
 
         // First stamp wins, forever — never restamp (timestamp stability).
-        let stamp = now()
+        // Never-in-the-future is invariant: clamp the requested stamp to
+        // now(). The legacy sentinel is already in the past, so backfill
+        // only ever stamps backwards; the clamp is defense for a pinned or
+        // skewed clock.
+        let stamp = min(rawStamp ?? now(), now())
         for trophy in all where unlockDates[trophy.id] == nil {
             unlockDates[trophy.id] = stamp
         }
@@ -352,5 +477,168 @@ final class TrophyEngine: ObservableObject {
                                       _ defaults: UserDefaults) -> Set<String> {
         guard let arr = defaults.array(forKey: key) as? [String] else { return [] }
         return Set(arr)
+    }
+}
+
+// MARK: - Backfill snapshot derivation (S0-T4)
+
+/// Derives the one-time backfill snapshot — every trophy metric's CURRENT
+/// value — from a player's existing save. The derivation reads GameState's
+/// AUTHORITATIVE decode (a `GameState(defaults:)` built from the real `ra_*`
+/// dump), never re-parsing raw plist/JSON blobs, so it can never drift from
+/// how the game itself interprets a save.
+///
+/// It maps ONLY metrics with a genuine historical source (design.md §11 #12
+/// "grant from existing stats"; trophy-catalog.md §6 item 2 "retro-evaluation
+/// of all *derivable* triggers"). A metric that begins at zero the day
+/// trophies ship is deliberately OMITTED — a missing key means "no proof in
+/// this save," so `backfill` never grandfathers it:
+///
+/// • NEW S0-T2 counters that start empty: `daily_reward_claims`,
+///   `coins_earned_from_play`, `no_fall_clear_streak_best`.
+/// • Run/event metrics with no historical record: `first_try_aces`,
+///   `spotless_runs`, `night_zen_sessions`, `level_one_falls`,
+///   `starter_loadout_flexes`, `coinpit_round_stake_best`, `daily_played`.
+/// • Social latches (all `socialAction` metrics) — no local pre-trophy state.
+/// • `pinball_roll_lane_sweeps` — the ROLL lanes don't exist yet (§7).
+/// • The capstone metric `base_trophies_unlocked` — engine-derived; the
+///   cascade in `commit` completes it if the grandfathered base qualifies.
+/// • Cosmetics-OWNERSHIP counts (`balls_owned`, `cosmetics_owned`,
+///   `evergreen_cosmetics_owned`, `full_nonstarter_loadouts`) — their
+///   IAP-secret exclusion constant and evergreen arithmetic are S1-T5's
+///   deliverable and do not exist yet. Omitting them here keeps S0-T4 from
+///   pre-empting/duplicating that logic; because `backfill` re-evaluates the
+///   full catalog against whatever snapshot it is handed and is idempotent,
+///   S1 can extend `snapshot(from:)` with those metrics (or grant them live
+///   on the next `grant`) without any change to this file's latch path.
+///   `bundles_completed` and `packs_owned` ARE included: both are
+///   exclusion-free (bundles are kept IAP-secret-free by guardrail;
+///   `ownedPacks` has no IAP-secret members).
+enum TrophyBackfill {
+
+    /// Build the metric snapshot from an already-loaded `GameState`. Reads
+    /// only public read accessors — no mutation, no persistence.
+    static func snapshot(from state: GameState) -> TrophyEngine.MetricSnapshot {
+        var snap: TrophyEngine.MetricSnapshot = [:]
+
+        // — Climb (existing stats) —
+        snap[.climbHighestUnlocked] = Double(state.highestUnlocked)
+        snap[.climbTotalStars]      = Double(state.totalStars)
+        snap[.climbPickupCoins]     = Double(state.totalCoins)
+        snap[.climbPerfectWorlds]   = Double(perfectWorldCount(bestStars: state.bestStars))
+
+        // — Challenge Tracks (existing) —
+        let bestTrack = state.trackProgress.values.max() ?? 0
+        snap[.trackBestProgress]      = Double(bestTrack)
+        snap[.tracksCompleted]        = Double(state.completedTracks.count)
+        if state.completedTracks.contains("golden-gauntlet") {
+            snap[.goldenGauntletCompleted] = 1
+        }
+
+        // — Daily Challenge & Streaks —
+        snap[.dailyClears]           = Double(state.dailyChallengeCompletions.count)
+        // Backfill proxy for the reward-streak high-water: the live streak
+        // the save carries (catalog §3.3 `daily_login_7/30` → EXISTING
+        // `dailyStreak`). S1-T2's own latch takes over for live play.
+        snap[.dailyRewardStreakBest] = Double(state.dailyStreak)
+        snap[.dailyClearStreakBest]  = Double(
+            TrophyStats.longestConsecutiveDailyClearRun(
+                in: state.dailyChallengeCompletions))
+
+        // — Minigames — arcade-wide —
+        let played = state.playedModeIDs
+        let minigamesPlayed = TrophyMetric.minigameModeIDs.filter { played.contains($0) }.count
+        snap[.minigamesPlayed] = Double(minigamesPlayed)
+
+        let wins = state.minigameWins
+        var competitiveWins = 0
+        var competitiveModesWon = 0
+        for id in TrophyMetric.competitiveModeIDs {
+            let w = wins[id, default: 0]
+            competitiveWins += w
+            if w >= 1 { competitiveModesWon += 1 }
+        }
+        snap[.competitiveWins]     = Double(competitiveWins)
+        snap[.competitiveModesWon] = Double(competitiveModesWon)
+
+        let hardWins = state.minigameDifficultyWins
+        var competitiveModesWonHard = 0
+        for id in TrophyMetric.competitiveModeIDs where hardWins["\(id)|hard", default: 0] >= 1 {
+            competitiveModesWonHard += 1
+        }
+        snap[.competitiveModesWonHard] = Double(competitiveModesWonHard)
+
+        // — Minigames — per game (existing wins/bests) —
+        snap[.snakeWins]     = Double(wins["snake", default: 0])
+        snap[.sumoWins]      = Double(wins["sumo", default: 0])
+        snap[.paintballWins] = Double(wins["paintball", default: 0])
+        snap[.goldrushWins]  = Double(wins["goldrush", default: 0])
+        snap[.marblecupWins] = Double(wins["marblecup", default: 0])
+        snap[.kothWins]      = Double(wins["koth", default: 0])
+
+        let bests = state.minigameBests
+        snap[.paintballBestCoverage] = Double(bests["paintball", default: 0])
+        snap[.kothBestHoldSeconds]   = Double(bests["koth", default: 0])
+        snap[.pinballBestScore]      = Double(state.pinballBest)
+        snap[.rolloutBestMaze]       = Double(bests["rollout", default: 0])
+        snap[.rollupBestHeight]      = Double(bests["rollup", default: 0])
+
+        // Disco crossings: best across all three difficulty keys (catalog
+        // §3.5 `disco_cross_25`); the hard-only variant reads discohard.
+        let discoBest = max(bests["discoeasy", default: 0],
+                            bests["disco", default: 0],
+                            bests["discohard", default: 0])
+        snap[.discoBestCrossings]     = Double(discoBest)
+        snap[.discoHardBestCrossings] = Double(bests["discohard", default: 0])
+
+        snap[.zenSeconds] = Double(state.zenSeconds)
+        if played.contains("coinpit") { snap[.coinpitPlayed] = 1 }
+        snap[.coinpitBestCatch]  = Double(state.goldrushBest)
+        snap[.coinpitCoinsTotal] = Double(state.goldrushCoinsTotal)
+
+        // — Cosmetics & Collection (exclusion-free subset only) —
+        snap[.bundlesCompleted] = Double(state.completedBundleIDs.count)
+        snap[.packsOwned]       = Double(state.ownedPacks.count)
+
+        // — Economy (existing high-water; play-earned/claim COUNTERS omitted) —
+        snap[.coinBalancePeak] = Double(state.coinBalance)
+
+        // — Skill & Style (existing star/time scans) —
+        snap[.veryhardAceLevels] = Double(veryHardAceCount(bestStars: state.bestStars))
+        // Fastest clear is the sole `lte` metric — only present when the
+        // save actually has a cleared level (an absent key means "no clear
+        // time yet," never a spurious 0-second grant).
+        if let fastest = state.bestTime.values.min() {
+            snap[.fastestClearSeconds] = fastest
+        }
+
+        return snap
+    }
+
+    /// Count of worlds whose every level (all 100 in `World.levelRange`)
+    /// holds 3 stars — keyed to the star dict + number ranges, never to
+    /// layouts (catalog §3.1 `climb_perfect_world`).
+    static func perfectWorldCount(bestStars: [Int: Int]) -> Int {
+        var count = 0
+        for world in World.all {
+            var allThree = true
+            for level in world.levelRange where bestStars[level, default: 0] < 3 {
+                allThree = false
+                break
+            }
+            if allThree { count += 1 }
+        }
+        return count
+    }
+
+    /// Count of veryHard levels (number ending in 0 or 5, above level 10)
+    /// aced at 3 stars — the digit rule is the stable difficulty vocabulary
+    /// (catalog §3.9 `skill_ace_veryhard`).
+    static func veryHardAceCount(bestStars: [Int: Int]) -> Int {
+        var count = 0
+        for (level, stars) in bestStars where level > 10 && level % 5 == 0 && stars >= 3 {
+            count += 1
+        }
+        return count
     }
 }
