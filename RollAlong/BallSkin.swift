@@ -32,8 +32,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case ruby   = "Ruby"
 
     // Exclusive / Legendary (1,500 coins) — animated / special-effect renderers
-    case galaxy    = "Galaxy"          // multi-colour gradient (kept here for parity)
-    case nebula    = "Nebula"          // multi-colour gradient
+    case galaxy    = "Galaxy"          // animated spiral canvas (Legendary since audit 2026-07)
+    case nebula    = "Nebula"          // animated nebula canvas (Legendary since audit 2026-07)
     case opal      = "Opal"            // multi-colour gradient
     case snowglobe = "Snowglobe"       // glass marble with swirling snow inside
     case golfBall  = "Golf Ball"       // white with dimples (Golf bundle)
