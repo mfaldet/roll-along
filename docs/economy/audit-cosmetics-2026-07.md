@@ -1,6 +1,16 @@
 # Cosmetics catalogue audit — July 2026 misfit worklist
 
-**Status: WORKLIST for Mac's approval. Nothing here has been re-tiered.**
+**Status: WORKLIST for Mac's approval — PARTIALLY RESOLVED.** Mac's ruling
+1(c) (2026-07-02) approved promoting the UNDER-priced items UP; those 11
+rows are marked **RESOLVED** below (re-tiered on branch
+`claude/retier-underpriced`): balls galaxy/nebula/lavaLamp → Legendary,
+trails ink/roseTrail → Legendary and ember → Rare, floors
+notebook/graph/parchment/sketch/origami → Rare (opening the floors Rare
+rung). Bundle knock-ons: diamond → Rare; bloom, backtoschool-2026,
+lava-lamp, valentines-2027, muertos-2026 → Legendary; the permanent
+Standard gift pool now holds exactly 4 (nature, citrus, sketchbook,
+midas) — the floor of the 4–8 band. Everything else (OVER-TIER /
+fund-program items, bundle copy flags, open rulings) is still pending.
 
 This is the output of the Workstream B census from
 [06-sprint-plan.md](06-sprint-plan.md): seven per-category graders applied
@@ -100,9 +110,9 @@ auto-qualifies", ruling #3) to balls, those four flip to MATCH.**
 
 | Item | Current | Graded | Evidence | Proposed action |
 |---|---|---|---|---|
-| galaxy ✓ | Epic (1,250) | Legendary (1,500) | TimelineView Canvas (BallSkinView.swift:1706-1738): rotating two-arm spiral of 55 stars (ang = f*5.5 + t*0.25, :1719) + per-star twinkle (:1726) + plusLighter core glow — bespoke + clock + layered = R4 | Promote to Legendary (free value upgrade for owners) or accept as flagship-value Epic |
-| nebula | Epic (1,250) | Legendary (1,500) | TimelineView Canvas (BallSkinView.swift:1740-1778): four drifting/breathing nebula blobs (:1758-1760) plus seven twinkling stars (:1769) under plusLighter — two animated effect systems = R4 | Promote to Legendary or accept as flagship-value Epic |
-| lavaLamp | Epic (1,250) | Legendary (1,500) | TimelineView + animated MeshGradient fluid (BallSkinView.swift:2320-2329) + rising, pulsing plusLighter wax blobs (:2346-2362) — the standards doc's own §2 R4 example (cited at 2298-2329) sitting at Epic | Promote to Legendary — the standard literally uses it as the R4 exemplar |
+| galaxy ✓ | Epic (1,250) | Legendary (1,500) | TimelineView Canvas (BallSkinView.swift:1706-1738): rotating two-arm spiral of 55 stars (ang = f*5.5 + t*0.25, :1719) + per-star twinkle (:1726) + plusLighter core glow — bespoke + clock + layered = R4 | **RESOLVED 2026-07-02** — re-tiered to Legendary per ruling 1(c) |
+| nebula | Epic (1,250) | Legendary (1,500) | TimelineView Canvas (BallSkinView.swift:1740-1778): four drifting/breathing nebula blobs (:1758-1760) plus seven twinkling stars (:1769) under plusLighter — two animated effect systems = R4 | **RESOLVED 2026-07-02** — re-tiered to Legendary per ruling 1(c) |
+| lavaLamp | Epic (1,250) | Legendary (1,500) | TimelineView + animated MeshGradient fluid (BallSkinView.swift:2320-2329) + rising, pulsing plusLighter wax blobs (:2346-2362) — the standards doc's own §2 R4 example (cited at 2298-2329) sitting at Epic | **RESOLVED 2026-07-02** — re-tiered to Legendary per ruling 1(c) |
 
 ### Balls — grader notes
 
@@ -189,9 +199,9 @@ clear the Legendary bar anyway). Ordered per §5: OVER-TIER first.
 |---|---|---|---|---|
 | smoke ✓ | Legendary (1,500) | Rare (Epic at best) | OVER-TIER: trailMist (Cosmetics.swift:3095 → 3563-3579) has no trailAge/times lifecycle — index-aged mono-grey puffs towed by the FIFO with only a slow t-driven lobe rotation — and smoke is absent from the doc's own Legendary precedent list (fire/ice/comet/stardust/air/aurora) | Re-tier (Rare per grade; Epic defensible) or add a real element lifecycle to hold Legendary |
 | rainbow | Legendary (1,500) | Epic (1,250) | OVER-TIER: trailRainbow (Cosmetics.swift:3098 → 3692-3708) is per-segment hue-cycle + glow with no element lifecycle — exactly the doc's Epic bar and its hue-cycle-vs-lifecycle tie-breaker; already named the Epic-rung anchor candidate in open ruling #4 | Ruling #4: demote to Epic as the trail-Epic anchor, or keep Legendary as historical flagship |
-| ink ✓ | Standard (750) | Legendary (min Rare) | UNDER-TIER: dispatch routes .ink to bespoke trailInk with a real-time, times-driven dwell/bleed mechanic (Cosmetics.swift:3094 → 3632-3691), grouped with the fire/ice/air "elemental lifecycle" trails in the drawRichTrail header — Standard bar requires stock trailTapered with no bespoke function | Promote (Legendary by the lifecycle bar; Rare minimum), or swap to stock trailTapered to stay 750 |
-| roseTrail ✓ | Rare (1,000) | Legendary (1,500) | UNDER-TIER: trailRose (Cosmetics.swift:3100 → 3378-3449) runs a full trailAge element lifecycle (petals pop in, settle/sway/turn, fade in place, lifetime 1.3s) and its own comment says "like the fire/ice trails" — the Legendary bar verbatim, not Rare's "still palette-static texture" | Promote to Legendary or simplify the renderer |
-| ember | Standard (750) | Rare (1,000) | UNDER-TIER: ember rides trailTapered's plusLighter glow path (glow: trail == .raybeam \|\| .gilded \|\| .ember, Cosmetics.swift:3104-3105), the exact treatment the Rare bar cites as raybeam/gilded precedent — Standard bar says "no glow" | Promote to Rare or drop the glow flag to stay 750 |
+| ink ✓ | Standard (750) | Legendary (min Rare) | UNDER-TIER: dispatch routes .ink to bespoke trailInk with a real-time, times-driven dwell/bleed mechanic (Cosmetics.swift:3094 → 3632-3691), grouped with the fire/ice/air "elemental lifecycle" trails in the drawRichTrail header — Standard bar requires stock trailTapered with no bespoke function | **RESOLVED 2026-07-02** — re-tiered to Legendary (the lifecycle bar) per ruling 1(c) |
+| roseTrail ✓ | Rare (1,000) | Legendary (1,500) | UNDER-TIER: trailRose (Cosmetics.swift:3100 → 3378-3449) runs a full trailAge element lifecycle (petals pop in, settle/sway/turn, fade in place, lifetime 1.3s) and its own comment says "like the fire/ice trails" — the Legendary bar verbatim, not Rare's "still palette-static texture" | **RESOLVED 2026-07-02** — re-tiered to Legendary per ruling 1(c) |
+| ember | Standard (750) | Rare (1,000) | UNDER-TIER: ember rides trailTapered's plusLighter glow path (glow: trail == .raybeam \|\| .gilded \|\| .ember, Cosmetics.swift:3104-3105), the exact treatment the Rare bar cites as raybeam/gilded precedent — Standard bar says "no glow" | **RESOLVED 2026-07-02** — re-tiered to Rare per ruling 1(c) |
 
 ### Trails — grader notes
 
@@ -231,11 +241,11 @@ static full-scene bill tiling, R2, BallGameView.swift:1206-1259).
 | grass ✓ | Legendary (1,500) | Rare (1,000) | OVER-TIER: static Canvas of seeded grass tufts, no TimelineView/clock — comment says "Static (no animation)" (BallGameView.swift:1012-1046) — R2 static texture = §3 floors Rare bar, not "animated overlay" | Re-tier to Rare, animate to hold Legendary, or adopt a floors doodle clause (ruling needed) |
 | moon | Legendary (1,500) | Rare (1,000) | OVER-TIER: static Canvas of seeded craters (SeededRNG, no animation clock), "Static (no animation)" (BallGameView.swift:1053-1090) — R2; the doc's Legendary precedent "moon craters + regolith" trusted the lying Cosmetics.swift:978 "animated floor overlays" comment | Same options as grass; also fix the lying comment + doc precedent line |
 | brass ✓ | Legendary (1,500) | Rare (1,000) | OVER-TIER: the doc's pre-flagged suspect confirmed — plain static Canvas (sheen gradient + plates + cog engravings + rivets), no TimelineView anywhere in 1266-1336 — rich R2 texture but fails the animation test the doc's grading note demands | Same options as grass |
-| notebook ✓ | Standard (750) | Rare (1,000) | UNDER-TIER: notebookRules draws ruled lines + red margin as a bespoke static texture overlay (BallGameView.swift:1929-1948) — meets the Rare bar ("static texture drawn once over the base") the doc marks "none yet" | Promote to Rare, or accept as deliberate paper-theme over-delivery at 750 |
-| graph | Standard (750) | Rare (1,000) | UNDER-TIER: graphGrid draws a full pale-green grid texture over the base (BallGameView.swift:1951-1972) — R2 static texture overlay, above "flat base color" | Same options as notebook |
-| parchment | Standard (750) | Rare (1,000) | UNDER-TIER: parchmentTexture draws a warm radial vignette + 60 seeded aged-ink specks (BallGameView.swift:1975-2003) — static grain overlay = Rare bar | Same options as notebook |
-| sketch | Standard (750) | Rare (1,000) | UNDER-TIER: sketchGrain draws 140 seeded cross-hatch pencil strokes (BallGameView.swift:2006-2027) — static texture overlay = Rare bar | Same options as notebook |
-| origami | Standard (750) | Rare (1,000) | UNDER-TIER: origamiFolds draws diagonal fold-shadow gradient stripes + fold lines (BallGameView.swift:2030-2056) — static texture overlay = Rare bar | Same options as notebook |
+| notebook ✓ | Standard (750) | Rare (1,000) | UNDER-TIER: notebookRules draws ruled lines + red margin as a bespoke static texture overlay (BallGameView.swift:1929-1948) — meets the Rare bar ("static texture drawn once over the base") the doc marks "none yet" | **RESOLVED 2026-07-02** — re-tiered to Rare per ruling 1(c); opens the floors Rare rung |
+| graph | Standard (750) | Rare (1,000) | UNDER-TIER: graphGrid draws a full pale-green grid texture over the base (BallGameView.swift:1951-1972) — R2 static texture overlay, above "flat base color" | **RESOLVED 2026-07-02** — re-tiered to Rare per ruling 1(c) |
+| parchment | Standard (750) | Rare (1,000) | UNDER-TIER: parchmentTexture draws a warm radial vignette + 60 seeded aged-ink specks (BallGameView.swift:1975-2003) — static grain overlay = Rare bar | **RESOLVED 2026-07-02** — re-tiered to Rare per ruling 1(c) |
+| sketch | Standard (750) | Rare (1,000) | UNDER-TIER: sketchGrain draws 140 seeded cross-hatch pencil strokes (BallGameView.swift:2006-2027) — static texture overlay = Rare bar | **RESOLVED 2026-07-02** — re-tiered to Rare per ruling 1(c) |
+| origami | Standard (750) | Rare (1,000) | UNDER-TIER: origamiFolds draws diagonal fold-shadow gradient stripes + fold lines (BallGameView.swift:2030-2056) — static texture overlay = Rare bar | **RESOLVED 2026-07-02** — re-tiered to Rare per ruling 1(c) |
 
 ### Floors — grader notes
 
