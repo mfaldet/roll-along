@@ -1289,7 +1289,10 @@ enum Boundary: String, CosmeticItem {
     case gold
     case ice
 
-    // Exclusive / Legendary (1,500 coins)
+    // Exclusive / Legendary (1,500 coins) — each has a bespoke animated
+    // border renderer in BallGameView (obsidian molten sheen + embers,
+    // candy scrolling stripes, circuit pulsing traces); `color` below is
+    // only their base coat / Reduce Motion fallback.
     case obsidian
     case candy
     case circuit
@@ -1329,6 +1332,11 @@ enum Boundary: String, CosmeticItem {
     }
 
     /// Base fill for the wall / platform / border.
+    ///
+    /// For the Legendary trio (obsidian / candy / circuit) this is the base
+    /// coat only: BallGameView layers a bespoke animated texture on the
+    /// screen border (see `legendaryBorderOverlay`), and this flat colour is
+    /// the static fallback under Reduce Motion and in non-animated contexts.
     var color: Color {
         switch self {
         case .classic:  return Color(white: 0.34)
@@ -3126,10 +3134,10 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .ice:             trailIce(ctx, pts, n, t, baseWidth, times)
     case .fire:            trailFire(ctx, pts, n, t, baseWidth, times)
     case .ink:             trailInk(ctx, pts, n, t, baseWidth, times)
-    case .smoke:           trailMist(ctx, pts, n, t, baseWidth, base: trail.color)
+    case .smoke:           trailMist(ctx, pts, n, t, baseWidth, base: trail.color, times)
     case .stardust:        trailStardust(ctx, pts, n, t, baseWidth)
     case .air:             trailAir(ctx, pts, n, t, baseWidth, times)
-    case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth)
+    case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth, times)
     case .graphite:        trailGraphite(ctx, pts, n, baseWidth)
     case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth, times)
     case .moneyRoll:       trailMoney(ctx, pts, n, t, baseWidth, times)
@@ -3593,19 +3601,46 @@ private func trailFire(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: 
     }
 }
 
-/// Mist / smoke — soft cloud puffs spreading in all directions.
-private func trailMist(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat, base: Color) {
+/// Mist / smoke — puffs born at the ball that live their own life where they
+/// were laid (trailAge-driven, like fire/rose): each puff pops in small and
+/// dense, then expands, thins, and curls IN PLACE as it ages — its two lobes
+/// slowly orbiting the birth spot while the whole puff lifts a touch — and its
+/// colour cools from the dense base grey toward a faint blue-grey fringe
+/// before it dissipates.  When `times` is nil (shop preview) the synthetic age
+/// spread still sells the expand-and-fade down the trail's length.
+private func trailMist(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
+                       base: Color, _ times: [Double]?) {
+    let lifetime: Double = 1.6
+    let cool = Color(red: 0.60, green: 0.68, blue: 0.80)     // the blue-grey a puff cools toward
     for i in 0..<n {
-        let age = Double(i) / Double(n - 1)
+        let age: Double = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let life: Double = age / lifetime
+        let rise: Double = min(1.0, age / 0.08)                             // quick puff-in when laid
+        let thin: Double = life < 0.40 ? 1.0 : 1.0 - (life - 0.40) / 0.60   // hold, then thin away
+        let env:  Double = rise * max(0.0, thin)
+        guard env > 0.02 else { continue }
         let p = pts[i]
-        for k in 0..<3 {
-            let ang = Double(k) * 2.1 + t * 0.5 + Double(i)
-            let spread = baseWidth * CGFloat(1.0 + 2.0 * (1 - age))
-            let ox = CGFloat(cos(ang)) * spread * 0.5, oy = CGFloat(sin(ang)) * spread * 0.5
-            let pr = baseWidth * CGFloat(1.0 + 1.5 * age)
-            ctx.fill(Path(ellipseIn: CGRect(x: p.x + ox - pr, y: p.y + oy - pr, width: pr * 2, height: pr * 2)),
-                with: .radialGradient(Gradient(colors: [base.opacity(0.08 * age + 0.04), .clear]),
-                    center: CGPoint(x: p.x + ox, y: p.y + oy), startRadius: 0, endRadius: pr))
+        let seed: Double = trailSeed(p)                      // stable per-spot curl phase
+        let expand: Double = 1.0 + 1.8 * life                // puff grows as it ages
+        let curl: Double = seed * 6.283 + age * 1.4          // lobes curl around the birth spot
+        let lift: CGFloat = CGFloat(life) * baseWidth * 0.7  // smoke rises a touch as it thins
+        // Colour over life: dense base-grey core young → faint cool fringe old.
+        let coreOp: Double = (0.06 + 0.12 * (1.0 - 0.55 * life)) * env
+        let coolOp: Double = 0.08 * life * env
+        for k in 0..<2 {
+            let kk: Double = Double(k)
+            let ang: Double = curl + kk * 3.1
+            let orbit: CGFloat = baseWidth * CGFloat(0.35 + 0.65 * life)
+            let pr: CGFloat = baseWidth * CGFloat((0.90 + 0.25 * kk) * expand)
+            let cx: CGFloat = p.x + CGFloat(cos(ang)) * orbit
+            let cy: CGFloat = p.y + CGFloat(sin(ang)) * orbit * 0.7 - lift
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - pr, y: cy - pr, width: pr * 2, height: pr * 2)),
+                with: .radialGradient(Gradient(stops: [
+                    .init(color: base.opacity(coreOp), location: 0.00),
+                    .init(color: cool.opacity(coolOp), location: 0.55),
+                    .init(color: cool.opacity(0.0),    location: 1.00)]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: pr))
         }
     }
 }
@@ -3722,20 +3757,64 @@ private func trailInk(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: D
     }
 }
 
-/// Rainbow — a glowing, hue-cycling streak (now a Legendary).
-private func trailRainbow(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+/// Rainbow — the glowing, hue-cycling streak (its identity), now with a real
+/// element lifecycle on top: each segment blooms bright where it was laid,
+/// holds, then dissolves — and as it dissolves it sheds tiny spectral sparkles
+/// that scatter outward and twinkle out IN PLACE (trailAge-driven, like
+/// fire/rose), so the spectrum is born and dies along the path instead of only
+/// rippling behind the ball.
+private func trailRainbow(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
+                          _ times: [Double]?) {
     var ctx = ctx
+    let lifetime: Double = 1.3
+    // 1) Hue-cycling ribbon — `t * 0.30` ripples the spectrum along the trail;
+    //    each segment blooms in fast, holds, then fades fully out by ~3/4 of
+    //    its life, handing the last stretch over to the sparkles below.
     for i in 1..<n {
-        let age = Double(i) / Double(n - 1)
-        // `t * 0.30` (was 0.15) ripples the spectrum along the trail twice as fast.
-        let hue = (Double(i) / Double(n) + t * 0.30).truncatingRemainder(dividingBy: 1)
+        let age: Double = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let life: Double = age / lifetime
+        let bloom: Double = min(1.0, age / 0.10)
+        let fade: Double = life < 0.30 ? 1.0 : 1.0 - (life - 0.30) / 0.45
+        let env: Double = bloom * max(0.0, fade)
+        guard env > 0.02 else { continue }
+        let hue: Double = (Double(i) / Double(n) + t * 0.30).truncatingRemainder(dividingBy: 1)
         let col = Color(hue: hue, saturation: 1, brightness: 1)
-        let w = baseWidth * CGFloat(0.4 + 0.8 * age)
+        let w: CGFloat = baseWidth * CGFloat(0.4 + 0.8 * env)
         var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
         ctx.blendMode = .plusLighter
-        ctx.stroke(p, with: .color(col.opacity(0.20 * age)), style: StrokeStyle(lineWidth: w * 2.2, lineCap: .round))
+        ctx.stroke(p, with: .color(col.opacity(0.20 * env)),
+                   style: StrokeStyle(lineWidth: w * 2.2, lineCap: .round))
         ctx.blendMode = .normal
-        ctx.stroke(p, with: .color(col.opacity(0.20 + 0.7 * age)), style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(col.opacity(0.90 * env)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+    // 2) Spectral sparkles — a dissolving segment sheds tiny stars in a stable
+    //    per-spot hue that drift outward, shrink, and twinkle out where the
+    //    ribbon died.  Shed spots are a stable function of position so the
+    //    scatter doesn't flicker as the FIFO shifts indices underneath it.
+    ctx.blendMode = .plusLighter
+    for i in 0..<n {
+        let p = pts[i]
+        let seed: Double = trailSeed(p)
+        let r1: Double = seed.truncatingRemainder(dividingBy: 1.0)
+        guard r1 < 0.40 else { continue }                    // stable thinning of shed spots
+        let age: Double = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let life: Double = age / lifetime
+        guard life > 0.35 else { continue }                  // only dissolving segments shed
+        let s: Double = (life - 0.35) / 0.65                 // 0 → 1 across the sparkle phase
+        let tw: Double = 0.55 + 0.45 * sin(t * 6.0 + seed * 6.283)
+        let op: Double = (1.0 - s) * tw * 0.9
+        guard op > 0.03 else { continue }
+        let hue: Double = (r1 * 2.5 + t * 0.10).truncatingRemainder(dividingBy: 1.0)
+        let ang: Double = seed * 6.283
+        let scatter: CGFloat = baseWidth * CGFloat(0.6 + 2.0 * s)
+        let sx: CGFloat = p.x + CGFloat(cos(ang)) * scatter
+        let sy: CGFloat = p.y + CGFloat(sin(ang)) * scatter
+        let sz: CGFloat = baseWidth * CGFloat(0.36 - 0.14 * s)
+        trailStar(ctx, CGPoint(x: sx, y: sy), sz,
+                  Color(hue: hue, saturation: 0.85, brightness: 1.0).opacity(op))
     }
 }
 

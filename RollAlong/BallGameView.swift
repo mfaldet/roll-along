@@ -503,19 +503,22 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
-                // Grass floor (Golf bundle) — static fairway turf with
-                // randomly-distributed grass tufts.  Subtle so it's
-                // not noisy; not animated so it stays under Reduce
-                // Motion as well.
+                // Grass floor (Golf bundle) — fairway turf with
+                // randomly-distributed grass tufts that sway in the
+                // breeze plus drifting seed/firefly motes.  Renders
+                // under Reduce Motion too: the clock freezes so the
+                // tufts hold still and the motes are skipped.
                 if floor == .grass {
                     grassFloorOverlay
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                 }
 
-                // Moon floor (Space Travel bundle) — static lunar
-                // regolith with scattered craters.  Like grass it's
-                // not animated, so it renders under Reduce Motion too.
+                // Moon floor (Space Travel bundle) — lunar regolith with
+                // scattered craters whose rim light slowly drifts, plus
+                // twinkling star-glint dust.  Renders under Reduce Motion
+                // too: the clock freezes to the classic static craters
+                // and the dust is skipped.
                 if floor == .moon {
                     moonFloorOverlay
                         .ignoresSafeArea()
@@ -542,8 +545,10 @@ struct BallGameView: View {
                 }
 
                 // Brass Works floor (Clockwork bundle) — riveted brass/
-                // bronze plating with engraved cog outlines.  Static, so
-                // it renders under Reduce Motion too.
+                // bronze plating whose engraved cogs slowly turn beneath
+                // a traveling sheen.  Renders under Reduce Motion too:
+                // the clock freezes (cogs at their original angle) and
+                // the sheen is skipped.
                 if floor == .brass {
                     brassFloorOverlay
                         .ignoresSafeArea()
@@ -883,11 +888,157 @@ struct BallGameView: View {
     private var screenBorder: some View {
         // RoundedRectangle with cornerRadius pulled from the actual device's
         // display corner radius, so the stroke traces the screen curve exactly.
+        ZStack {
+            RoundedRectangle(cornerRadius: screenCornerRadius, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: borderPhase == .normal ? 4 : 5)
+                .animation(.easeInOut(duration: 0.35), value: borderPhase)
+
+            // Legendary boundaries wear a bespoke animated texture on top of
+            // the base stroke.  It fades out whenever the border leaves the
+            // .normal phase so the semantic state colours (arming-bright,
+            // fell-red, won-green) always read unobstructed, then fades back
+            // in.  Reduce Motion keeps the plain static stroke above.
+            if !reduceMotion {
+                legendaryBorderOverlay
+                    .opacity(borderPhase == .normal ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 0.35), value: borderPhase)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Legendary boundary textures
+    //
+    // Bespoke animated strokes for the three Legendary boundaries
+    // (obsidian / candy / circuit).  Each layers TimelineView-driven motion
+    // onto the same screen-tracing RoundedRectangle geometry as the base
+    // stroke; Standard/Rare boundaries and Classic stay plain flat strokes.
+
+    @ViewBuilder
+    private var legendaryBorderOverlay: some View {
+        switch gameState.equippedBoundary {
+        case .obsidian: obsidianBorderOverlay
+        case .candy:    candyBorderOverlay
+        case .circuit:  circuitBorderOverlay
+        default:        EmptyView()
+        }
+    }
+
+    /// The border ring shape, inset so a centred `.stroke(lineWidth: 4)`
+    /// occupies the same pixels as the base `strokeBorder(lineWidth: 4)`.
+    private func borderRing() -> some InsettableShape {
         RoundedRectangle(cornerRadius: screenCornerRadius, style: .continuous)
-            .strokeBorder(borderColor, lineWidth: borderPhase == .normal ? 4 : 5)
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .animation(.easeInOut(duration: 0.35), value: borderPhase)
+            .inset(by: 2)
+    }
+
+    /// A glowing segment of the border ring at perimeter position
+    /// `position` (0…1, wraps) spanning `length` of the perimeter.
+    /// Drawn as two trims so segments crossing the trim origin still render.
+    private func borderTrimSegment(at position: Double,
+                                   length: Double,
+                                   color: Color,
+                                   lineWidth: CGFloat,
+                                   blur: CGFloat) -> some View {
+        let raw: Double = position.truncatingRemainder(dividingBy: 1.0)
+        let start: Double = raw < 0 ? raw + 1.0 : raw
+        let end: Double = start + length
+        let firstEnd: Double = min(1.0, end)
+        let wrapEnd: Double = max(0.0, end - 1.0)
+        return ZStack {
+            borderRing()
+                .trim(from: CGFloat(start), to: CGFloat(firstEnd))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            borderRing()
+                .trim(from: 0, to: CGFloat(wrapEnd))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+        }
+        .blur(radius: blur)
+    }
+
+    /// Obsidian — molten glass: the dark base stroke carries a slow-drifting
+    /// purple-tinted sheen (plus a fainter trailing echo) and an occasional
+    /// ember-glow pulse that creeps along the rim.
+    private var obsidianBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let sheenPos: Double = (t * 0.040).truncatingRemainder(dividingBy: 1.0)
+            let echoPos: Double = sheenPos + 0.47
+            let emberPos: Double = (t * 0.012 + 0.31).truncatingRemainder(dividingBy: 1.0)
+            let emberGate: Double = max(0.0, sin(t * 0.55))
+            let emberGlow: Double = pow(emberGate, 5.0)          // brief, occasional
+            let sheen: Color = Color(red: 0.58, green: 0.42, blue: 0.92)
+            let echo: Color = Color(red: 0.44, green: 0.33, blue: 0.78)
+            let ember: Color = Color(red: 1.00, green: 0.46, blue: 0.16)
+            ZStack {
+                borderTrimSegment(at: sheenPos, length: 0.16,
+                                  color: sheen.opacity(0.55), lineWidth: 4, blur: 1.5)
+                borderTrimSegment(at: echoPos, length: 0.10,
+                                  color: echo.opacity(0.38), lineWidth: 4, blur: 2.2)
+                borderTrimSegment(at: emberPos, length: 0.05,
+                                  color: ember.opacity(0.80 * emberGlow), lineWidth: 5, blur: 3.0)
+            }
+        }
+    }
+
+    /// Candy — candy-cane stripes scrolling along the rim: white + deep-red
+    /// dashes phase-shifted over the pink base stroke, plus a soft drifting
+    /// sugar-glint highlight.
+    private var candyBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let scroll: CGFloat = CGFloat((t * 16.0).truncatingRemainder(dividingBy: 28.0))
+            let glintPos: Double = (t * 0.055).truncatingRemainder(dividingBy: 1.0)
+            let glintPulse: Double = 0.55 + 0.45 * sin(t * 2.1)
+            let stripeRed: Color = Color(red: 0.85, green: 0.16, blue: 0.34)
+            ZStack {
+                borderRing()
+                    .stroke(Color.white.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 4, dash: [8, 20], dashPhase: scroll))
+                borderRing()
+                    .stroke(stripeRed.opacity(0.80),
+                            style: StrokeStyle(lineWidth: 4, dash: [8, 20], dashPhase: scroll - 14.0))
+                borderTrimSegment(at: glintPos, length: 0.06,
+                                  color: Color.white.opacity(0.50 * glintPulse),
+                                  lineWidth: 5, blur: 2.0)
+            }
+        }
+    }
+
+    /// Circuit — dark teal board with brighter trace-segments travelling
+    /// around the ring like signals, plus three fixed nodes that blink
+    /// intermittently.
+    private var circuitBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let tracePhase: CGFloat = CGFloat((-t * 26.0).truncatingRemainder(dividingBy: 46.0))
+            let signalPos: Double = (t * 0.09).truncatingRemainder(dividingBy: 1.0)
+            let blinkA: Double = pow(max(0.0, sin(t * 2.3)), 6.0)
+            let blinkB: Double = pow(max(0.0, sin(t * 1.7 + 2.1)), 6.0)
+            let blinkC: Double = pow(max(0.0, sin(t * 2.9 + 4.4)), 6.0)
+            let board: Color = Color(red: 0.05, green: 0.20, blue: 0.18)
+            let trace: Color = Color(red: 0.35, green: 1.00, blue: 0.78)
+            let node: Color = Color(red: 0.80, green: 1.00, blue: 0.92)
+            ZStack {
+                // Dark teal board laid over the base stroke.
+                borderRing()
+                    .stroke(board.opacity(0.85), lineWidth: 4)
+                // Etched traces drifting like clocked signals.
+                borderRing()
+                    .stroke(trace.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 2, dash: [16, 30], dashPhase: tracePhase))
+                // One bright packet racing the ring.
+                borderTrimSegment(at: signalPos, length: 0.03,
+                                  color: trace.opacity(0.95), lineWidth: 3, blur: 1.5)
+                // Fixed solder nodes, blinking out of phase.
+                borderTrimSegment(at: 0.12, length: 0.012,
+                                  color: node.opacity(0.90 * blinkA), lineWidth: 5, blur: 1.0)
+                borderTrimSegment(at: 0.55, length: 0.012,
+                                  color: node.opacity(0.90 * blinkB), lineWidth: 5, blur: 1.0)
+                borderTrimSegment(at: 0.82, length: 0.012,
+                                  color: node.opacity(0.90 * blinkC), lineWidth: 5, blur: 1.0)
+            }
+        }
     }
 
     // MARK: - Layout helpers
@@ -1005,40 +1156,84 @@ struct BallGameView: View {
     }
 
     /// Grass floor overlay (Golf bundle) — scatter of small grass
-    /// blade tufts on top of the base fairway green.  Static (no
-    /// animation), so Reduce Motion users still get the texture.
-    /// Tuft positions come from a deterministic seeded "random" so
-    /// they don't shift between frames.
+    /// blade tufts on top of the base fairway green, with a gentle
+    /// breeze sway on the blade tips and the occasional drifting
+    /// seed/firefly mote.  Under Reduce Motion the sway amplitude is
+    /// zero and the motes are skipped, so the frozen frame is exactly
+    /// the old static tuft texture.  Tuft positions come from a
+    /// deterministic seeded "random" so they don't shift between
+    /// frames; sway phase derives from position so the RNG call
+    /// sequence (and thus the layout) is unchanged.
     private var grassFloorOverlay: some View {
-        Canvas { ctx, size in
-            // Deterministic pseudo-random so tufts stay put across
-            // frames.  A small linear-congruential generator state.
-            var state: UInt64 = 0x9E3779B97F4A7C15
-            func rand() -> Double {
-                state = state &* 6364136223846793005 &+ 1442695040888963407
-                return Double(state >> 11) / Double(1 << 53)
-            }
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Zero amplitude under Reduce Motion — static fallback.
+                let swayAmp: CGFloat = reduceMotion ? 0.0 : 1.4
 
-            let tuftCount = Int(size.width * size.height / 800)  // ~one per 800 sqpt
-            let blade = Color(red: 0.18, green: 0.40, blue: 0.12)
-            let bladeBright = Color(red: 0.55, green: 0.78, blue: 0.32)
+                // Deterministic pseudo-random so tufts stay put across
+                // frames.  A small linear-congruential generator state.
+                var state: UInt64 = 0x9E3779B97F4A7C15
+                func rand() -> Double {
+                    state = state &* 6364136223846793005 &+ 1442695040888963407
+                    return Double(state >> 11) / Double(1 << 53)
+                }
 
-            for _ in 0..<tuftCount {
-                let cx = CGFloat(rand()) * size.width
-                let cy = CGFloat(rand()) * size.height
-                // A tuft = 2-3 thin upward slashes.
-                let blades = 2 + Int(rand() * 2)
-                for b in 0..<blades {
-                    let offsetX = CGFloat(rand() - 0.5) * 6
-                    let tilt = CGFloat(rand() - 0.5) * 4
-                    var path = Path()
-                    path.move(to: CGPoint(x: cx + offsetX, y: cy + 3))
-                    path.addLine(to: CGPoint(x: cx + offsetX + tilt, y: cy - 6 + CGFloat(rand()) * 4))
-                    ctx.stroke(
-                        path,
-                        with: .color(b == 0 ? bladeBright : blade),
-                        lineWidth: 1.0
-                    )
+                let tuftCount = Int(size.width * size.height / 800)  // ~one per 800 sqpt
+                let blade = Color(red: 0.18, green: 0.40, blue: 0.12)
+                let bladeBright = Color(red: 0.55, green: 0.78, blue: 0.32)
+
+                for _ in 0..<tuftCount {
+                    let cx = CGFloat(rand()) * size.width
+                    let cy = CGFloat(rand()) * size.height
+                    // Breeze phase from position (not rand()) so the RNG
+                    // sequence stays identical to the static layout.
+                    let phase: Double = Double(cx) * 0.13 + Double(cy) * 0.07
+                    let sway: CGFloat = swayAmp * CGFloat(sin(t * 1.1 + phase))
+                    // A tuft = 2-3 thin upward slashes.
+                    let blades = 2 + Int(rand() * 2)
+                    for b in 0..<blades {
+                        let offsetX = CGFloat(rand() - 0.5) * 6
+                        let tilt = CGFloat(rand() - 0.5) * 4
+                        var path = Path()
+                        path.move(to: CGPoint(x: cx + offsetX, y: cy + 3))
+                        path.addLine(to: CGPoint(x: cx + offsetX + tilt + sway, y: cy - 6 + CGFloat(rand()) * 4))
+                        ctx.stroke(
+                            path,
+                            with: .color(b == 0 ? bladeBright : blade),
+                            lineWidth: 1.0
+                        )
+                    }
+                }
+
+                // Drifting seed / firefly motes — sparse glowing specks
+                // that ride the breeze diagonally and fade in/out.
+                // Motion-only, so skipped entirely under Reduce Motion.
+                if !reduceMotion {
+                    var mote = ctx
+                    mote.blendMode = .plusLighter
+                    var mrng = SeededRNG(seed: 0x6F1E_F1E5)
+                    let moteCount = 7
+                    for i in 0..<moteCount {
+                        let lane: CGFloat = CGFloat(mrng.nextUnit())
+                        let speed: Double = 0.030 + mrng.nextUnit() * 0.035
+                        let mPhase: Double = mrng.nextUnit()
+                        // 0→1 loop, drifting left-to-right with a bobbing y.
+                        let prog: Double = (t * speed + mPhase).truncatingRemainder(dividingBy: 1.0)
+                        let mx: CGFloat = CGFloat(prog) * (size.width + 40) - 20
+                        let bob: CGFloat = CGFloat(sin(t * 0.8 + Double(i) * 1.9)) * size.height * 0.04
+                        let my: CGFloat = lane * size.height + bob
+                        let fade: Double = sin(prog * .pi)   // dim at both ends
+                        // Alternate warm firefly / pale seed.
+                        let warm: Bool = i % 2 == 0
+                        let moteColor: Color = warm
+                            ? Color(red: 0.95, green: 0.90, blue: 0.45)
+                            : Color(red: 0.90, green: 0.95, blue: 0.80)
+                        let mr: CGFloat = warm ? 1.6 : 1.1
+                        mote.fill(
+                            Path(ellipseIn: CGRect(x: mx - mr, y: my - mr, width: mr * 2, height: mr * 2)),
+                            with: .color(moteColor.opacity(0.55 * fade)))
+                    }
                 }
             }
         }
@@ -1048,42 +1243,78 @@ struct BallGameView: View {
     /// Moon floor overlay (Space Travel bundle) — scatter of craters on
     /// the pale-grey regolith base.  Each crater is a darker disc with a
     /// lighter lower-rim crescent so it reads as a shallow bowl lit from
-    /// the upper-left.  Deterministic seeded placement so craters don't
-    /// shift between frames.  Static (no animation).
+    /// the upper-left.  The rim light now drifts very slowly around each
+    /// bowl (a sun-angle parallax feel) and a thin veil of star-glint
+    /// dust twinkles across the regolith.  Under Reduce Motion the drift
+    /// amplitude is zero and the dust is skipped — the frozen frame is
+    /// exactly the old static crater field.  Deterministic seeded
+    /// placement so craters don't shift between frames.
     private var moonFloorOverlay: some View {
-        Canvas { ctx, size in
-            var rng = SeededRNG(seed: 0x5EED_0C24)
-            // ~one crater per 5500 sqpt — sparse so it reads as terrain.
-            let craterCount = max(8, Int(size.width * size.height / 5500))
-            let floorBase = Color(red: 0.62, green: 0.62, blue: 0.66)
-            for _ in 0..<craterCount {
-                let cx = CGFloat(rng.nextUnit()) * size.width
-                let cy = CGFloat(rng.nextUnit()) * size.height
-                let r  = 6 + CGFloat(rng.nextUnit()) * 22
-                // Crater bowl — slightly darker than the regolith.
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
-                    with: .radialGradient(
-                        Gradient(colors: [
-                            floorBase.opacity(0.0),
-                            Color(red: 0.42, green: 0.42, blue: 0.46).opacity(0.55),
-                        ]),
-                        center: CGPoint(x: cx, y: cy),
-                        startRadius: r * 0.30,
-                        endRadius:   r
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                var rng = SeededRNG(seed: 0x5EED_0C24)
+                // ~one crater per 5500 sqpt — sparse so it reads as terrain.
+                let craterCount = max(8, Int(size.width * size.height / 5500))
+                let floorBase = Color(red: 0.62, green: 0.62, blue: 0.66)
+                for _ in 0..<craterCount {
+                    let cx = CGFloat(rng.nextUnit()) * size.width
+                    let cy = CGFloat(rng.nextUnit()) * size.height
+                    let r  = 6 + CGFloat(rng.nextUnit()) * 22
+                    // Slow shadow drift — phase from position (not rand())
+                    // so the RNG sequence, and thus the crater layout,
+                    // matches the old static render exactly.  Zero at t=0.
+                    let dPhase: Double = Double(cx) * 0.05 + Double(cy) * 0.03
+                    let drift: Double = reduceMotion ? 0.0 : sin(t * 0.12 + dPhase) * 14.0
+                    let shadeDX: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 0.12 + dPhase)) * r * 0.06
+                    // Crater bowl — slightly darker than the regolith.
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [
+                                floorBase.opacity(0.0),
+                                Color(red: 0.42, green: 0.42, blue: 0.46).opacity(0.55),
+                            ]),
+                            center: CGPoint(x: cx + shadeDX, y: cy),
+                            startRadius: r * 0.30,
+                            endRadius:   r
+                        )
                     )
-                )
-                // Dark inner shadow (upper-left, where the wall faces away).
-                ctx.stroke(
-                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
-                    with: .color(Color(red: 0.30, green: 0.30, blue: 0.34).opacity(0.40)),
-                    lineWidth: 1.2
-                )
-                // Bright lower-right rim crescent (sunlit far wall).
-                var rim = Path()
-                rim.addArc(center: CGPoint(x: cx, y: cy), radius: r * 0.96,
-                           startAngle: .degrees(20), endAngle: .degrees(150), clockwise: false)
-                ctx.stroke(rim, with: .color(Color.white.opacity(0.30)), lineWidth: 1.0)
+                    // Dark inner shadow (upper-left, where the wall faces away).
+                    ctx.stroke(
+                        Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                        with: .color(Color(red: 0.30, green: 0.30, blue: 0.34).opacity(0.40)),
+                        lineWidth: 1.2
+                    )
+                    // Bright lower-right rim crescent (sunlit far wall) —
+                    // its arc swings gently with the drifting sun angle.
+                    var rim = Path()
+                    rim.addArc(center: CGPoint(x: cx, y: cy), radius: r * 0.96,
+                               startAngle: .degrees(20 + drift), endAngle: .degrees(150 + drift), clockwise: false)
+                    ctx.stroke(rim, with: .color(Color.white.opacity(0.30)), lineWidth: 1.0)
+                }
+
+                // Star-glint dust — tiny bright specks in the regolith that
+                // catch the light and twinkle, drifting almost imperceptibly.
+                // Motion-only, so skipped under Reduce Motion.
+                if !reduceMotion {
+                    var dust = ctx
+                    dust.blendMode = .plusLighter
+                    var drng = SeededRNG(seed: 0xD057_FADE)
+                    let dustCount = 16
+                    for i in 0..<dustCount {
+                        let gx0: CGFloat = CGFloat(drng.nextUnit()) * size.width
+                        let gy0: CGFloat = CGFloat(drng.nextUnit()) * size.height
+                        let gPhase: Double = drng.nextUnit() * 6.28
+                        let gx: CGFloat = gx0 + CGFloat(sin(t * 0.05 + gPhase)) * 6
+                        let gy: CGFloat = gy0 + CGFloat(cos(t * 0.04 + gPhase)) * 4
+                        let twinkle: Double = 0.5 + 0.5 * sin(t * 1.8 + Double(i) * 2.3)
+                        let gr: CGFloat = 0.7 + CGFloat(drng.nextUnit()) * 0.9
+                        dust.fill(
+                            Path(ellipseIn: CGRect(x: gx - gr, y: gy - gr, width: gr * 2, height: gr * 2)),
+                            with: .color(Color.white.opacity(0.10 + 0.30 * twinkle)))
+                    }
+                }
             }
         }
         .allowsHitTesting(false)
@@ -1097,7 +1328,7 @@ struct BallGameView: View {
     private var discoFloorOverlay: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             Canvas { ctx, size in
-                let t = tl.date.timeIntervalSinceReferenceDate
+                let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let cellSize: CGFloat = 62
                 let cols = Int(ceil(size.width  / cellSize))
                 let rows = Int(ceil(size.height / cellSize))
@@ -1261,74 +1492,114 @@ struct BallGameView: View {
     /// Brass Works floor overlay (Clockwork bundle) — riveted brass/bronze
     /// plating laid out as a seamed grid of plates, each with a rivet at its
     /// corners and a faint engraved cog outline, over a warm metallic sheen.
+    /// The engraved cogs now slowly ROTATE — alternating direction like a
+    /// meshed gear train — and a bright highlight band travels diagonally
+    /// across the plating.  Under Reduce Motion the clock freezes at t=0
+    /// (cogs at their original angle) and the traveling sheen is skipped,
+    /// so the frozen frame is exactly the old static plating.
     /// Deterministic seeded placement so it doesn't shift between frames.
-    /// Static (renders under Reduce Motion too).
     private var brassFloorOverlay: some View {
-        Canvas { ctx, size in
-            let w = size.width, h = size.height
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
 
-            // Warm metallic sheen — a soft diagonal highlight band.
-            ctx.fill(
-                Path(CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .linearGradient(
-                    Gradient(colors: [
-                        Color(red: 0.62, green: 0.45, blue: 0.20).opacity(0.0),
-                        Color(red: 0.92, green: 0.74, blue: 0.40).opacity(0.30),
-                        Color(red: 0.40, green: 0.27, blue: 0.10).opacity(0.30),
-                    ]),
-                    startPoint: CGPoint(x: 0, y: 0),
-                    endPoint:   CGPoint(x: w, y: h)))
+                // Warm metallic sheen — a soft diagonal highlight band.
+                ctx.fill(
+                    Path(CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .linearGradient(
+                        Gradient(colors: [
+                            Color(red: 0.62, green: 0.45, blue: 0.20).opacity(0.0),
+                            Color(red: 0.92, green: 0.74, blue: 0.40).opacity(0.30),
+                            Color(red: 0.40, green: 0.27, blue: 0.10).opacity(0.30),
+                        ]),
+                        startPoint: CGPoint(x: 0, y: 0),
+                        endPoint:   CGPoint(x: w, y: h)))
 
-            // Seamed plates.
-            let plate: CGFloat = 96
-            let seam   = Color(red: 0.22, green: 0.14, blue: 0.05).opacity(0.55)
-            let groove = Color(red: 0.98, green: 0.84, blue: 0.50).opacity(0.30)
-            let rivet  = Color(red: 0.98, green: 0.86, blue: 0.52)
-            let rivetD = Color(red: 0.40, green: 0.26, blue: 0.10)
-            let cog    = Color(red: 0.30, green: 0.20, blue: 0.08).opacity(0.28)
+                // Seamed plates.
+                let plate: CGFloat = 96
+                let seam   = Color(red: 0.22, green: 0.14, blue: 0.05).opacity(0.55)
+                let groove = Color(red: 0.98, green: 0.84, blue: 0.50).opacity(0.30)
+                let rivet  = Color(red: 0.98, green: 0.86, blue: 0.52)
+                let rivetD = Color(red: 0.40, green: 0.26, blue: 0.10)
+                let cog    = Color(red: 0.30, green: 0.20, blue: 0.08).opacity(0.28)
 
-            let cols = Int(ceil(w / plate))
-            let rows = Int(ceil(h / plate))
-            var rng = SeededRNG(seed: 0xB8A5_5C06)
-            for row in 0..<rows {
-                for col in 0..<cols {
-                    let x = CGFloat(col) * plate
-                    let y = CGFloat(row) * plate
-                    let rect = CGRect(x: x, y: y, width: plate, height: plate)
-                    // Plate seam (dark groove + bright highlight just inside).
-                    ctx.stroke(Path(rect), with: .color(seam), lineWidth: 2.0)
-                    ctx.stroke(Path(rect.insetBy(dx: 1.5, dy: 1.5)), with: .color(groove), lineWidth: 0.8)
+                let cols = Int(ceil(w / plate))
+                let rows = Int(ceil(h / plate))
+                var rng = SeededRNG(seed: 0xB8A5_5C06)
+                for row in 0..<rows {
+                    for col in 0..<cols {
+                        let x = CGFloat(col) * plate
+                        let y = CGFloat(row) * plate
+                        let rect = CGRect(x: x, y: y, width: plate, height: plate)
+                        // Plate seam (dark groove + bright highlight just inside).
+                        ctx.stroke(Path(rect), with: .color(seam), lineWidth: 2.0)
+                        ctx.stroke(Path(rect.insetBy(dx: 1.5, dy: 1.5)), with: .color(groove), lineWidth: 0.8)
 
-                    // Faint engraved cog outline in the plate centre on some plates.
-                    if rng.nextUnit() < 0.55 {
-                        let ccx = x + plate / 2
-                        let ccy = y + plate / 2
-                        let cr  = plate * 0.26
-                        let teeth = 10
-                        var p = Path()
-                        let n = teeth * 2
-                        for k in 0..<n {
-                            let a = Double(k) / Double(n) * 2 * .pi
-                            let rad = (k % 2 == 0) ? cr : cr * 0.78
-                            let pt = CGPoint(x: ccx + CGFloat(cos(a)) * rad, y: ccy + CGFloat(sin(a)) * rad)
-                            if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                        // Faint engraved cog outline in the plate centre on
+                        // some plates — slowly turning, alternating direction
+                        // checkerboard-fashion like a meshed gear train.  The
+                        // spin term is 0 at t=0, so Reduce Motion shows the
+                        // cogs at their original engraved angle.
+                        if rng.nextUnit() < 0.55 {
+                            let ccx = x + plate / 2
+                            let ccy = y + plate / 2
+                            let cr  = plate * 0.26
+                            let dir: Double = ((row + col) % 2 == 0) ? 1.0 : -1.0
+                            let spin: Double = t * 0.22 * dir
+                            let teeth = 10
+                            var p = Path()
+                            let n = teeth * 2
+                            for k in 0..<n {
+                                let a: Double = Double(k) / Double(n) * 2 * .pi + spin
+                                let rad = (k % 2 == 0) ? cr : cr * 0.78
+                                let pt = CGPoint(x: ccx + CGFloat(cos(a)) * rad, y: ccy + CGFloat(sin(a)) * rad)
+                                if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                            }
+                            p.closeSubpath()
+                            ctx.stroke(p, with: .color(cog), lineWidth: 1.2)
+                            let hr = cr * 0.30
+                            ctx.stroke(Path(ellipseIn: CGRect(x: ccx - hr, y: ccy - hr, width: hr * 2, height: hr * 2)),
+                                       with: .color(cog), lineWidth: 1.0)
                         }
-                        p.closeSubpath()
-                        ctx.stroke(p, with: .color(cog), lineWidth: 1.2)
-                        let hr = cr * 0.30
-                        ctx.stroke(Path(ellipseIn: CGRect(x: ccx - hr, y: ccy - hr, width: hr * 2, height: hr * 2)),
-                                   with: .color(cog), lineWidth: 1.0)
-                    }
 
-                    // Rivets at the four plate corners.
-                    let rr: CGFloat = 3.0
-                    for (rx, ry) in [(x + 7, y + 7), (x + plate - 7, y + 7),
-                                     (x + 7, y + plate - 7), (x + plate - 7, y + plate - 7)] {
-                        ctx.fill(Path(ellipseIn: CGRect(x: rx - rr, y: ry - rr, width: rr * 2, height: rr * 2)),
-                            with: .radialGradient(Gradient(colors: [rivet, rivetD]),
-                                center: CGPoint(x: rx - rr * 0.3, y: ry - rr * 0.3),
-                                startRadius: 0, endRadius: rr))
+                        // Rivets at the four plate corners.
+                        let rr: CGFloat = 3.0
+                        for (rx, ry) in [(x + 7, y + 7), (x + plate - 7, y + 7),
+                                         (x + 7, y + plate - 7), (x + plate - 7, y + plate - 7)] {
+                            ctx.fill(Path(ellipseIn: CGRect(x: rx - rr, y: ry - rr, width: rr * 2, height: rr * 2)),
+                                with: .radialGradient(Gradient(colors: [rivet, rivetD]),
+                                    center: CGPoint(x: rx - rr * 0.3, y: ry - rr * 0.3),
+                                    startRadius: 0, endRadius: rr))
+                        }
                     }
+                }
+
+                // Traveling sheen — a soft diagonal light band that sweeps
+                // across the plating, like lamplight gliding over polished
+                // brass.  Motion-only, so skipped under Reduce Motion.
+                if !reduceMotion {
+                    var shine = ctx
+                    shine.blendMode = .plusLighter
+                    // Band position cycles along the w+h diagonal span.
+                    let span: CGFloat = w + h
+                    let prog: Double = (t * 0.055).truncatingRemainder(dividingBy: 1.0)
+                    let bandC: CGFloat = CGFloat(prog) * (span + 320) - 160
+                    let bandHalf: CGFloat = 90
+                    var band = Path()
+                    band.move(to:    CGPoint(x: bandC - bandHalf, y: 0))
+                    band.addLine(to: CGPoint(x: bandC + bandHalf, y: 0))
+                    band.addLine(to: CGPoint(x: bandC + bandHalf - h, y: h))
+                    band.addLine(to: CGPoint(x: bandC - bandHalf - h, y: h))
+                    band.closeSubpath()
+                    shine.fill(band, with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.0, green: 0.88, blue: 0.55).opacity(0.0),  location: 0.0),
+                            .init(color: Color(red: 1.0, green: 0.88, blue: 0.55).opacity(0.14), location: 0.5),
+                            .init(color: Color(red: 1.0, green: 0.88, blue: 0.55).opacity(0.0),  location: 1.0),
+                        ]),
+                        startPoint: CGPoint(x: bandC - bandHalf, y: 0),
+                        endPoint:   CGPoint(x: bandC + bandHalf, y: 0)))
                 }
             }
         }
@@ -1705,7 +1976,11 @@ struct BallGameView: View {
     }
 
     /// Eclipse pit (Eclipse bundle) — a mini eclipse in the death zone: a dark
-    /// core ringed by a pulsing golden corona over a near-black void.
+    /// core ringed by a pulsing golden corona over a near-black void.  A second
+    /// effect system layers over the pulse: slow counter-rotating corona
+    /// filaments licking outward from the ring, plus an occasional bright
+    /// flare arc that erupts along the rim and dies away.  (This overlay is
+    /// already suppressed entirely under Reduce Motion at the call site.)
     private var eclipsePitOverlay: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             Canvas { ctx, size in
@@ -1725,6 +2000,56 @@ struct BallGameView: View {
                     ]),
                     center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glowR))
                 let ringR = r * 1.1
+
+                // ── Corona filaments — thin plasma tongues rooted on the ring,
+                // slowly rotating as a body, each flexing on its own beat.
+                var fil = ctx
+                fil.blendMode = .plusLighter
+                let filaments = 12
+                for i in 0..<filaments {
+                    let base: Double = Double(i) / Double(filaments) * 2 * .pi
+                    let a: Double = base + t * 0.20
+                    // Each filament breathes: length swells and shrinks.
+                    let flex: Double = 0.55 + 0.45 * sin(t * 1.1 + Double(i) * 2.1)
+                    let len: CGFloat = r * (0.28 + 0.42 * CGFloat(flex))
+                    let x0: CGFloat = cx + CGFloat(cos(a)) * ringR
+                    let y0: CGFloat = cy + CGFloat(sin(a)) * ringR
+                    let x1: CGFloat = cx + CGFloat(cos(a)) * (ringR + len)
+                    let y1: CGFloat = cy + CGFloat(sin(a)) * (ringR + len)
+                    var p = Path()
+                    p.move(to: CGPoint(x: x0, y: y0))
+                    p.addLine(to: CGPoint(x: x1, y: y1))
+                    fil.stroke(p, with: .linearGradient(
+                        Gradient(colors: [
+                            Color(red: 1.0, green: 0.84, blue: 0.40).opacity(0.55 * flex),
+                            Color(red: 1.0, green: 0.62, blue: 0.16).opacity(0.0),
+                        ]),
+                        startPoint: CGPoint(x: x0, y: y0),
+                        endPoint:   CGPoint(x: x1, y: y1)),
+                        style: StrokeStyle(lineWidth: max(1.0, r * 0.05), lineCap: .round))
+                }
+
+                // ── Occasional flare arc — every few seconds a bright arc
+                // erupts along the rim, swells, and fades.  Eruption angle
+                // hops per cycle so it never repeats in place.
+                let flarePeriod: Double = 6.5
+                let cycle: Double = (t / flarePeriod).rounded(.down)
+                let prog: Double = (t - cycle * flarePeriod) / flarePeriod
+                if prog < 0.22 {
+                    let flare: Double = sin(prog / 0.22 * .pi)   // 0→1→0
+                    let seed: Double = cycle * 2.399963           // golden-angle hop
+                    let a0: Double = seed.truncatingRemainder(dividingBy: 2 * .pi)
+                    let sweep: Double = 0.9 + 0.5 * flare
+                    var arc = Path()
+                    arc.addArc(center: CGPoint(x: cx, y: cy),
+                               radius: ringR + r * 0.10 * CGFloat(flare),
+                               startAngle: .radians(a0), endAngle: .radians(a0 + sweep),
+                               clockwise: false)
+                    fil.stroke(arc,
+                               with: .color(Color(red: 1.0, green: 0.92, blue: 0.60).opacity(0.85 * flare)),
+                               style: StrokeStyle(lineWidth: max(1.5, r * 0.07), lineCap: .round))
+                }
+
                 ctx.stroke(Path(ellipseIn: CGRect(x: cx - ringR, y: cy - ringR, width: ringR * 2, height: ringR * 2)),
                            with: .color(Color(red: 1.0, green: 0.86, blue: 0.42).opacity(0.9)),
                            lineWidth: max(1.5, r * 0.12))
@@ -2723,7 +3048,7 @@ struct BallGameView: View {
                         let rad = r * CGFloat(f)
                         let px = cx + CGFloat(cos(ang)) * rad
                         let py = cy + CGFloat(sin(ang)) * rad
-                        let sz = CGFloat(1.2 + 2.0 * (1 - f))
+                        let sz: CGFloat = 1.2 + 2.0 * (1 - CGFloat(f))
                         let hue: Double = 0.60 + 0.15 * sin(f * 6 + t)
                         g.fill(Path(ellipseIn: CGRect(x: px-sz, y: py-sz, width: sz*2, height: sz*2)),
                             with: .color(Color(hue: hue, saturation: 0.6, brightness: 1).opacity(0.8 * (1 - f) + 0.2)))
@@ -2933,7 +3258,12 @@ struct BallGameView: View {
         .clipShape(Circle())
     }
 
-    /// Neon — concentric glowing neon tubes flickering in magenta + cyan.
+    /// Neon — concentric glowing neon tubes flickering while their hues cycle
+    /// through the full spectrum (each tube offset so the set always spans
+    /// several colours), plus a bright highlight that orbits each tube like
+    /// current racing round the glass.  At t=0 (Reduce Motion) the hues sit
+    /// on the classic magenta/cyan pair and the orbiting highlight is
+    /// skipped, so the frozen frame matches the original two-hue sign.
     private var neonGoal: some View {
         TimelineView(.animation) { tl in
             Canvas { ctx, size in
@@ -2945,11 +3275,29 @@ struct BallGameView: View {
                 for i in 0..<4 {
                     let rr = r * CGFloat(0.30 + 0.20 * Double(i))
                     let flick = 0.7 + 0.3 * sin(t * 8 + Double(i) * 2)
-                    let col = i % 2 == 0 ? Color(red:1.0,green:0.15,blue:0.7) : Color(red:0.2,green:0.9,blue:1.0)
+                    // Full-spectrum hue cycle, seeded on the classic pair
+                    // (magenta ~0.88 / cyan ~0.52) so t=0 keeps the old look;
+                    // per-tube offset keeps several hues on screen at once.
+                    let hueBase: Double = (i % 2 == 0) ? 0.88 : 0.52
+                    let hue: Double = (hueBase + t * 0.07 + Double(i) * 0.04).truncatingRemainder(dividingBy: 1.0)
+                    let col = Color(hue: hue, saturation: 0.92, brightness: 1.0)
                     g.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
                              with: .color(col.opacity(0.25 * flick)), lineWidth: r * 0.16)
                     g.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
                              with: .color(col.opacity(0.9 * flick)), lineWidth: r * 0.04)
+
+                    // Traveling highlight — a short white-hot arc racing round
+                    // the tube, alternating direction per ring.  Motion-only.
+                    if !reduceMotion {
+                        let dir: Double = (i % 2 == 0) ? 1.0 : -1.0
+                        let a0: Double = t * 1.4 * dir + Double(i) * 1.7
+                        var hi = Path()
+                        hi.addArc(center: CGPoint(x: cx, y: cy), radius: rr,
+                                  startAngle: .radians(a0), endAngle: .radians(a0 + 0.55),
+                                  clockwise: false)
+                        g.stroke(hi, with: .color(Color.white.opacity(0.75 * flick)),
+                                 style: StrokeStyle(lineWidth: r * 0.05, lineCap: .round))
+                    }
                 }
             }
         }
@@ -3107,7 +3455,11 @@ struct BallGameView: View {
         .clipShape(Circle())
     }
 
-    /// Quasar — a white-hot core firing two counter-rotating energy jets.
+    /// Quasar — a white-hot core firing two counter-rotating energy jets,
+    /// now with hot sparks streaming outward along each jet and an accretion
+    /// disc that shimmers segment-by-segment as it slowly turns.  The sparks
+    /// and shimmer are motion-only; at t=0 (Reduce Motion) the frozen frame
+    /// is the original core + jets + plain ring.
     private var quasarGoal: some View {
         TimelineView(.animation) { tl in
             Canvas { ctx, size in
@@ -3123,10 +3475,45 @@ struct BallGameView: View {
                     var jet = Path(); jet.move(to: CGPoint(x: cx, y: cy)); jet.addLine(to: CGPoint(x: ax, y: ay))
                     g.stroke(jet, with: .linearGradient(Gradient(colors: [Color(red:1.0,green:0.2,blue:0.9), Color(red:0.2,green:0.95,blue:1.0).opacity(0.0)]),
                         startPoint: CGPoint(x: cx, y: cy), endPoint: CGPoint(x: ax, y: ay)), style: StrokeStyle(lineWidth: r * 0.12, lineCap: .round))
+
+                    // Jet sparks — hot flecks flung outward along the beam,
+                    // fading as they outrun it.  Motion-only.
+                    if !reduceMotion {
+                        for s in 0..<5 {
+                            let sPhase: Double = Double(s) * 0.2
+                            let prog: Double = (t * 0.45 + sPhase).truncatingRemainder(dividingBy: 1.0)
+                            let f: CGFloat = CGFloat(prog)
+                            // Perpendicular scatter off the beam centreline.
+                            let jog: Double = sin(t * 6.0 + Double(s) * 2.6) * 0.05
+                            let px: CGFloat = cx + (ax - cx) * f + CGFloat(cos(ang + .pi / 2) * jog) * r * dir
+                            let py: CGFloat = cy + (ay - cy) * f + CGFloat(sin(ang + .pi / 2) * jog) * r * dir
+                            let fade: Double = sin(prog * .pi)
+                            let sr: CGFloat = 1.2 + 1.2 * (1 - f)
+                            g.fill(Path(ellipseIn: CGRect(x: px - sr, y: py - sr, width: sr * 2, height: sr * 2)),
+                                   with: .color(Color(red: 0.75, green: 0.95, blue: 1.0).opacity(0.8 * fade)))
+                        }
+                    }
                 }
                 let rr = r * 0.45
                 g.stroke(Path(ellipseIn: CGRect(x: cx-rr, y: cy-rr, width: rr*2, height: rr*2)),
                          with: .color(Color(red:0.2,green:0.9,blue:1.0).opacity(0.5)), lineWidth: r * 0.05)
+
+                // Accretion shimmer — short arc segments riding the disc,
+                // slowly orbiting while each glints on its own beat.
+                if !reduceMotion {
+                    let segs = 8
+                    for k in 0..<segs {
+                        let a0: Double = Double(k) / Double(segs) * 2 * .pi + t * 0.35
+                        let glint: Double = 0.5 + 0.5 * sin(t * 2.6 + Double(k) * 1.3)
+                        var seg = Path()
+                        seg.addArc(center: CGPoint(x: cx, y: cy), radius: rr,
+                                   startAngle: .radians(a0), endAngle: .radians(a0 + 0.34),
+                                   clockwise: false)
+                        g.stroke(seg,
+                                 with: .color(Color(red: 0.85, green: 0.98, blue: 1.0).opacity(0.15 + 0.45 * glint)),
+                                 style: StrokeStyle(lineWidth: r * 0.06, lineCap: .round))
+                    }
+                }
                 let cr = r * 0.22
                 g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
                     with: .radialGradient(Gradient(colors: [Color.white, Color(red:1.0,green:0.4,blue:0.9).opacity(0.4), .clear]),
@@ -3142,7 +3529,7 @@ struct BallGameView: View {
         let style = gameState.equippedGoal.holeStyle
         return TimelineView(.animation) { timeline in
             Canvas { ctx, size in
-                let t    = timeline.date.timeIntervalSinceReferenceDate
+                let t    = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
                 let cx   = size.width  / 2
                 let cy   = size.height / 2
                 let maxR = (size.width / 2) * 0.90
