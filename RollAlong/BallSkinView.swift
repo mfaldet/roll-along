@@ -693,52 +693,94 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Aquarium
-    // Translucent aqua glass sphere with a cluster of static bubbles.
+    // MARK: - Aquarium  (Legendary)
+    // Translucent aqua glass sphere with a cluster of bubbles.  Animated: each
+    // bubble rises on its own loop with a gentle side-to-side sway, and a
+    // small fish silhouette swims across the tank behind them on a slow
+    // bobbing circuit.  Under Reduce Motion the bubbles hold their original
+    // positions and the fish is gone — exactly the original static tank.
+    // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var aquariumCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width
-            let h = size.height
-            let r = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.80, green: 0.98, blue: 0.98), location: 0.00),
-                        .init(color: Color(red: 0.36, green: 0.84, blue: 0.92), location: 0.45),
-                        .init(color: Color(red: 0.10, green: 0.55, blue: 0.72), location: 0.82),
-                        .init(color: Color(red: 0.03, green: 0.26, blue: 0.40), location: 1.00),
-                    ]),
-                    center: CGPoint(x: w * 0.34, y: h * 0.32),
-                    startRadius: 0, endRadius: r * 1.25))
+                let w = size.width
+                let h = size.height
+                let r = min(w, h) / 2
 
-            let bubbles: [(x: CGFloat, y: CGFloat, rad: CGFloat)] = [
-                (0.36, 0.62, 0.15), (0.58, 0.46, 0.10),
-                (0.50, 0.76, 0.07), (0.70, 0.66, 0.06), (0.30, 0.40, 0.055),
-            ]
-            for b in bubbles {
-                let c    = CGPoint(x: w * b.x, y: h * b.y)
-                let br   = r * b.rad
-                let rect = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
-                ctx.fill(Path(ellipseIn: rect), with: .color(.white.opacity(0.12)))
-                ctx.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(0.75)),
-                           lineWidth: max(1, br * 0.18))
-                let hr = br * 0.30
-                ctx.fill(Path(ellipseIn: CGRect(x: c.x - br * 0.40 - hr,
-                                                y: c.y - br * 0.40 - hr,
-                                                width: hr * 2, height: hr * 2)),
-                         with: .color(.white.opacity(0.85)))
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.80, green: 0.98, blue: 0.98), location: 0.00),
+                            .init(color: Color(red: 0.36, green: 0.84, blue: 0.92), location: 0.45),
+                            .init(color: Color(red: 0.10, green: 0.55, blue: 0.72), location: 0.82),
+                            .init(color: Color(red: 0.03, green: 0.26, blue: 0.40), location: 1.00),
+                        ]),
+                        center: CGPoint(x: w * 0.34, y: h * 0.32),
+                        startRadius: 0, endRadius: r * 1.25))
+
+                // ── Fish silhouette — swims left → right, wraps, gentle bob ──
+                //    (drawn behind the bubbles; gone under Reduce Motion)
+                if !reduceMotion {
+                    let lap: Double = (t * 0.11).truncatingRemainder(dividingBy: 1.0)
+                    let fx: CGFloat = w * (-0.25 + CGFloat(lap) * 1.5)
+                    let fy: CGFloat = h * 0.56 + CGFloat(sin(t * 1.3)) * h * 0.035
+                    let fl: CGFloat = r * 0.26            // body length
+                    let fh: CGFloat = r * 0.11            // body half-height
+                    let fishInk = Color(red: 0.02, green: 0.20, blue: 0.30).opacity(0.55)
+
+                    var fish = Path()
+                    fish.addEllipse(in: CGRect(x: fx - fl / 2, y: fy - fh,
+                                               width: fl, height: fh * 2))
+                    // Tail — a triangle trailing the body (fish swims +x).
+                    let tailX: CGFloat = fx - fl * 0.42
+                    fish.move(to:    CGPoint(x: tailX, y: fy))
+                    fish.addLine(to: CGPoint(x: tailX - fl * 0.38, y: fy - fh * 1.05))
+                    fish.addLine(to: CGPoint(x: tailX - fl * 0.38, y: fy + fh * 1.05))
+                    fish.closeSubpath()
+                    ctx.fill(fish, with: .color(fishInk))
+                }
+
+                // ── Bubbles — the original cluster; each rises on its own
+                //    loop.  Phase-anchored so t = 0 reproduces the static
+                //    layout exactly (which is also the Reduce Motion pose).
+                let bubbles: [(x: CGFloat, y: CGFloat, rad: CGFloat)] = [
+                    (0.36, 0.62, 0.15), (0.58, 0.46, 0.10),
+                    (0.50, 0.76, 0.07), (0.70, 0.66, 0.06), (0.30, 0.40, 0.055),
+                ]
+                for (i, b) in bubbles.enumerated() {
+                    var bx: CGFloat = b.x
+                    var by: CGFloat = b.y
+                    if !reduceMotion {
+                        let speed: Double = 0.030 + 0.014 * Double(i)
+                        let travel: Double = (Double(b.y) - 0.10) - (t * speed).truncatingRemainder(dividingBy: 0.72)
+                        by = 0.10 + CGFloat(travel < 0 ? travel + 0.72 : travel)
+                        bx = b.x + CGFloat(sin(t * 1.1 + Double(i) * 1.9)) * 0.022
+                    }
+                    let c    = CGPoint(x: w * bx, y: h * by)
+                    let br   = r * b.rad
+                    let rect = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
+                    ctx.fill(Path(ellipseIn: rect), with: .color(.white.opacity(0.12)))
+                    ctx.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(0.75)),
+                               lineWidth: max(1, br * 0.18))
+                    let hr = br * 0.30
+                    ctx.fill(Path(ellipseIn: CGRect(x: c.x - br * 0.40 - hr,
+                                                    y: c.y - br * 0.40 - hr,
+                                                    width: hr * 2, height: hr * 2)),
+                             with: .color(.white.opacity(0.85)))
+                }
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.08,
+                                           width: w * 0.34, height: h * 0.24)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: w * 0.26, y: h * 0.18),
+                        startRadius: 0, endRadius: r * 0.42))
             }
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.08,
-                                       width: w * 0.34, height: h * 0.24)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: w * 0.26, y: h * 0.18),
-                    startRadius: 0, endRadius: r * 0.42))
         }
     }
 
@@ -2171,65 +2213,110 @@ struct BallSkinView: View {
     // MARK: - High Roller  (High Roller bundle · Legendary)
     // A casino roulette wheel / chip: alternating deep-red and black wedges
     // radiating from the centre, ringed by a polished gold rim, with a crisp
-    // white centre pip and a glossy top-left specular.  Static.  Clipped to a
-    // circle by the body switch caller.
+    // white centre pip and a glossy top-left specular.  Animated: the wedge
+    // wheel whips around and eases to a stop each lap (spin-and-settle, like
+    // a real roulette throw), then a bright glint sweeps across the pip once
+    // it rests.  The lighting (rim, shading, specular) stays put.  Under
+    // Reduce Motion the wheel holds the original pose and the glint is gone —
+    // exactly the original static chip.  Clipped to a circle by the body
+    // switch caller.
     // =========================================================================
     private var highRollerCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width, h = size.height
-            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
-            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Spin-and-settle: a cubic ease-out over the first 62% of each
+                // 7 s lap, then rest.  Total travel is a whole number of
+                // red+black pattern periods (pi/4 each), so the resting pose
+                // IS the starting pose and the loop wraps seamlessly.
+                let lap: Double = (t / 7.0).truncatingRemainder(dividingBy: 1.0)
+                let ramp: Double = min(lap / 0.62, 1.0)
+                let ease: Double = 1.0 - pow(1.0 - ramp, 3.0)
+                let spinA: Double = reduceMotion ? 0.0 : (.pi / 4.0) * 14.0 * ease
+                // Pip glint — sweeps the pip just after the wheel settles.
+                let glintU: Double = (lap - 0.70) / 0.16
+                let glint: Double = (!reduceMotion && glintU >= 0.0 && glintU <= 1.0) ? sin(glintU * .pi) : 0.0
 
-            let red   = Color(red: 0.74, green: 0.07, blue: 0.10)
-            let black = Color(red: 0.07, green: 0.05, blue: 0.06)
-            let gold  = Color(red: 0.92, green: 0.74, blue: 0.30)
-            let goldD = Color(red: 0.58, green: 0.42, blue: 0.10)
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
 
-            // 1. Gold rim base (fills the whole disc; wedges sit inside it).
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                Gradient(colors: [gold, goldD]),
-                center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.26), startRadius: 0, endRadius: r * 1.25))
+                let red   = Color(red: 0.74, green: 0.07, blue: 0.10)
+                let black = Color(red: 0.07, green: 0.05, blue: 0.06)
+                let gold  = Color(red: 0.92, green: 0.74, blue: 0.30)
+                let goldD = Color(red: 0.58, green: 0.42, blue: 0.10)
 
-            // 2. Alternating red/black wedges inside the rim.
-            let wedges = 16
-            let inner  = r * 0.10
-            let outer  = r * 0.86          // leaves a gold rim band
-            for k in 0..<wedges {
-                let a0 = Double(k)     / Double(wedges) * 2 * .pi - .pi / 2
-                let a1 = Double(k + 1) / Double(wedges) * 2 * .pi - .pi / 2
-                var wedge = Path()
-                wedge.move(to: CGPoint(x: cx + CGFloat(cos(a0)) * inner, y: cy + CGFloat(sin(a0)) * inner))
-                wedge.addLine(to: CGPoint(x: cx + CGFloat(cos(a0)) * outer, y: cy + CGFloat(sin(a0)) * outer))
-                wedge.addArc(center: CGPoint(x: cx, y: cy), radius: outer,
-                             startAngle: .radians(a0), endAngle: .radians(a1), clockwise: false)
-                wedge.addLine(to: CGPoint(x: cx + CGFloat(cos(a1)) * inner, y: cy + CGFloat(sin(a1)) * inner))
-                wedge.addArc(center: CGPoint(x: cx, y: cy), radius: inner,
-                             startAngle: .radians(a1), endAngle: .radians(a0), clockwise: true)
-                wedge.closeSubpath()
-                ctx.fill(wedge, with: .color(k % 2 == 0 ? red : black))
-                ctx.stroke(wedge, with: .color(gold.opacity(0.55)), lineWidth: max(0.4, r * 0.012))
+                // 1. Gold rim base (fills the whole disc; wedges sit inside it).
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [gold, goldD]),
+                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.26), startRadius: 0, endRadius: r * 1.25))
+
+                // 2. Alternating red/black wedges inside the rim — rotated by
+                //    the spin-and-settle angle.
+                let wedges = 16
+                let inner  = r * 0.10
+                let outer  = r * 0.86          // leaves a gold rim band
+                for k in 0..<wedges {
+                    let a0 = Double(k)     / Double(wedges) * 2 * .pi - .pi / 2 + spinA
+                    let a1 = Double(k + 1) / Double(wedges) * 2 * .pi - .pi / 2 + spinA
+                    var wedge = Path()
+                    wedge.move(to: CGPoint(x: cx + CGFloat(cos(a0)) * inner, y: cy + CGFloat(sin(a0)) * inner))
+                    wedge.addLine(to: CGPoint(x: cx + CGFloat(cos(a0)) * outer, y: cy + CGFloat(sin(a0)) * outer))
+                    wedge.addArc(center: CGPoint(x: cx, y: cy), radius: outer,
+                                 startAngle: .radians(a0), endAngle: .radians(a1), clockwise: false)
+                    wedge.addLine(to: CGPoint(x: cx + CGFloat(cos(a1)) * inner, y: cy + CGFloat(sin(a1)) * inner))
+                    wedge.addArc(center: CGPoint(x: cx, y: cy), radius: inner,
+                                 startAngle: .radians(a1), endAngle: .radians(a0), clockwise: true)
+                    wedge.closeSubpath()
+                    ctx.fill(wedge, with: .color(k % 2 == 0 ? red : black))
+                    ctx.stroke(wedge, with: .color(gold.opacity(0.55)), lineWidth: max(0.4, r * 0.012))
+                }
+
+                // 3. Gold separator ring between wedges and rim.
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - outer, y: cy - outer, width: outer * 2, height: outer * 2)),
+                           with: .color(gold), lineWidth: max(0.8, r * 0.05))
+
+                // 4. White centre pip with a gold ring.
+                let pipR = r * 0.16
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
+                         with: .radialGradient(Gradient(colors: [.white, Color(red: 0.86, green: 0.86, blue: 0.88)]),
+                            center: CGPoint(x: cx - pipR * 0.3, y: cy - pipR * 0.3), startRadius: 0, endRadius: pipR * 1.2))
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
+                           with: .color(gold), lineWidth: max(0.6, r * 0.03))
+
+                // 5. Roundness (limb darkening) + glossy top-left specular.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(stops: [
+                    .init(color: .clear, location: 0.55),
+                    .init(color: .black.opacity(0.45), location: 1.0)]),
+                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.80, width: r * 0.50, height: r * 0.30)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.38))
+
+                // 6. Pip glint — a narrow bright streak sweeping left → right
+                //    across the pip while the wheel rests (gone under Reduce
+                //    Motion).  Sized to stay inside the pip disc.
+                if glint > 0.001 {
+                    let sweepX: CGFloat = cx - pipR * 0.7 + CGFloat(glintU) * pipR * 1.4
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: sweepX - pipR * 0.24, y: cy - pipR * 0.72,
+                                               width: pipR * 0.48, height: pipR * 1.44)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(0.85 * glint), .clear]),
+                            center: CGPoint(x: sweepX, y: cy),
+                            startRadius: 0, endRadius: pipR * 0.72))
+                    // Matching micro-sparkle on the gold rim at 4 o'clock.
+                    let sparkA: Double = .pi * 0.28
+                    let sparkC = CGPoint(x: cx + CGFloat(cos(sparkA)) * r * 0.93,
+                                         y: cy + CGFloat(sin(sparkA)) * r * 0.93)
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: sparkC.x - r * 0.07, y: sparkC.y - r * 0.07,
+                                               width: r * 0.14, height: r * 0.14)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(0.75 * glint), .clear]),
+                            center: sparkC, startRadius: 0, endRadius: r * 0.07))
+                }
             }
-
-            // 3. Gold separator ring between wedges and rim.
-            ctx.stroke(Path(ellipseIn: CGRect(x: cx - outer, y: cy - outer, width: outer * 2, height: outer * 2)),
-                       with: .color(gold), lineWidth: max(0.8, r * 0.05))
-
-            // 4. White centre pip with a gold ring.
-            let pipR = r * 0.16
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
-                     with: .radialGradient(Gradient(colors: [.white, Color(red: 0.86, green: 0.86, blue: 0.88)]),
-                        center: CGPoint(x: cx - pipR * 0.3, y: cy - pipR * 0.3), startRadius: 0, endRadius: pipR * 1.2))
-            ctx.stroke(Path(ellipseIn: CGRect(x: cx - pipR, y: cy - pipR, width: pipR * 2, height: pipR * 2)),
-                       with: .color(gold), lineWidth: max(0.6, r * 0.03))
-
-            // 5. Roundness (limb darkening) + glossy top-left specular.
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(Gradient(stops: [
-                .init(color: .clear, location: 0.55),
-                .init(color: .black.opacity(0.45), location: 1.0)]),
-                center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.80, width: r * 0.50, height: r * 0.30)),
-                with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.62), startRadius: 0, endRadius: r * 0.38))
         }
     }
 
@@ -2996,85 +3083,112 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Beach Ball  (Summer 2026 seasonal exclusive)
+    // MARK: - Beach Ball  (Summer 2026 seasonal exclusive · Legendary)
     // Classic glossy inflatable beach ball with 6 alternating wedge panels:
     // red · yellow · blue · red · yellow · blue, radiating from the centre.
     // A radial edge-darkening overlay + upper-left specular highlight sell
-    // the inflated 3-D read.  Clipped to a circle by the body switch caller.
+    // the inflated 3-D read.  Animated: the panels drift around in a lazy
+    // poolside spin while the lighting stays put, and a soft sun-glare band
+    // sweeps across the face every few seconds.  Under Reduce Motion the
+    // panels hold the original pose and the glare is gone — exactly the
+    // original static ball.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var beachBallCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Lazy spin — zero under Reduce Motion → original panel pose.
+                let spin: CGFloat = reduceMotion ? 0.0 : CGFloat(t.truncatingRemainder(dividingBy: 2.0 * .pi / 0.22) * 0.22)
 
-            // ── 1. Base white fill ──────────────────────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .color(.white))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Six coloured wedge panels ────────────────────────────
-            // Each wedge spans 60°.  The oversized radius (r * 1.05) lets
-            // them fill the circle cleanly; clipShape(Circle()) trims any
-            // overflow.
-            let wedgeColors: [Color] = [
-                Color(red: 0.90, green: 0.18, blue: 0.22),  // red
-                Color(red: 0.96, green: 0.84, blue: 0.10),  // yellow
-                Color(red: 0.22, green: 0.54, blue: 0.92),  // blue
-                Color(red: 0.90, green: 0.18, blue: 0.22),  // red
-                Color(red: 0.96, green: 0.84, blue: 0.10),  // yellow
-                Color(red: 0.22, green: 0.54, blue: 0.92),  // blue
-            ]
-            let wedgeAngle = CGFloat.pi * 2 / CGFloat(wedgeColors.count)
-            for (i, color) in wedgeColors.enumerated() {
-                let startAngle = CGFloat(i) * wedgeAngle - .pi / 2
-                let endAngle   = startAngle + wedgeAngle
-                var wedge = Path()
-                wedge.move(to: CGPoint(x: cx, y: cy))
-                wedge.addArc(center: CGPoint(x: cx, y: cy),
-                             radius: r * 1.05,
-                             startAngle: .radians(Double(startAngle)),
-                             endAngle:   .radians(Double(endAngle)),
-                             clockwise:  false)
-                wedge.closeSubpath()
-                ctx.fill(wedge, with: .color(color))
+                // ── 1. Base white fill ──────────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .color(.white))
+
+                // ── 2. Six coloured wedge panels — rotated by the spin ──────
+                // Each wedge spans 60°.  The oversized radius (r * 1.05) lets
+                // them fill the circle cleanly; clipShape(Circle()) trims any
+                // overflow.
+                let wedgeColors: [Color] = [
+                    Color(red: 0.90, green: 0.18, blue: 0.22),  // red
+                    Color(red: 0.96, green: 0.84, blue: 0.10),  // yellow
+                    Color(red: 0.22, green: 0.54, blue: 0.92),  // blue
+                    Color(red: 0.90, green: 0.18, blue: 0.22),  // red
+                    Color(red: 0.96, green: 0.84, blue: 0.10),  // yellow
+                    Color(red: 0.22, green: 0.54, blue: 0.92),  // blue
+                ]
+                let wedgeAngle = CGFloat.pi * 2 / CGFloat(wedgeColors.count)
+                for (i, color) in wedgeColors.enumerated() {
+                    let startAngle = CGFloat(i) * wedgeAngle - .pi / 2 + spin
+                    let endAngle   = startAngle + wedgeAngle
+                    var wedge = Path()
+                    wedge.move(to: CGPoint(x: cx, y: cy))
+                    wedge.addArc(center: CGPoint(x: cx, y: cy),
+                                 radius: r * 1.05,
+                                 startAngle: .radians(Double(startAngle)),
+                                 endAngle:   .radians(Double(endAngle)),
+                                 clockwise:  false)
+                    wedge.closeSubpath()
+                    ctx.fill(wedge, with: .color(color))
+                }
+
+                // ── 3. Thin white seam lines between panels ─────────────────
+                for i in 0..<6 {
+                    let angle = CGFloat(i) * wedgeAngle - .pi / 2 + spin
+                    var seam = Path()
+                    seam.move(to: CGPoint(x: cx, y: cy))
+                    seam.addLine(to: CGPoint(x: cx + cos(angle) * r * 1.05,
+                                             y: cy + sin(angle) * r * 1.05))
+                    ctx.stroke(seam,
+                               with: .color(Color.white.opacity(0.72)),
+                               style: StrokeStyle(lineWidth: max(1, r * 0.035),
+                                                  lineCap: .round))
+                }
+
+                // ── 4. Spherical shading — edge-darkening inflated look ──────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.00), location: 0.00),
+                            .init(color: .white.opacity(0.00), location: 0.50),
+                            .init(color: .black.opacity(0.28), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx, y: cy),
+                        startRadius: 0, endRadius: r * 1.05))
+
+                // ── 5. Sun-glare sweep — a soft vertical band of light that
+                //    crosses the upper face left → right every ~6 s, fading
+                //    in and out at the ends (gone under Reduce Motion).
+                if !reduceMotion {
+                    let sweepU: Double = (t * 0.16).truncatingRemainder(dividingBy: 1.0)
+                    let fade: Double = sin(sweepU * .pi)
+                    let gx: CGFloat = w * (-0.15 + CGFloat(sweepU) * 1.3)
+                    let gy: CGFloat = h * (0.40 - CGFloat(sweepU) * 0.22)
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: gx - r * 0.30, y: gy - r * 0.55,
+                                               width: r * 0.60, height: r * 1.10)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(0.34 * fade), .clear]),
+                            center: CGPoint(x: gx, y: gy),
+                            startRadius: 0, endRadius: r * 0.55))
+                }
+
+                // ── 6. Specular highlight — upper-left gloss crescent ────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.10, y: h * 0.08,
+                                           width: w * 0.32, height: h * 0.24)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.70), .clear]),
+                        center: CGPoint(x: w * 0.22, y: h * 0.16),
+                        startRadius: 0, endRadius: r * 0.40))
             }
-
-            // ── 3. Thin white seam lines between panels ─────────────────
-            for i in 0..<6 {
-                let angle = CGFloat(i) * wedgeAngle - .pi / 2
-                var seam = Path()
-                seam.move(to: CGPoint(x: cx, y: cy))
-                seam.addLine(to: CGPoint(x: cx + cos(angle) * r * 1.05,
-                                         y: cy + sin(angle) * r * 1.05))
-                ctx.stroke(seam,
-                           with: .color(Color.white.opacity(0.72)),
-                           style: StrokeStyle(lineWidth: max(1, r * 0.035),
-                                              lineCap: .round))
-            }
-
-            // ── 4. Spherical shading — edge-darkening inflated look ──────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.00), location: 0.00),
-                        .init(color: .white.opacity(0.00), location: 0.50),
-                        .init(color: .black.opacity(0.28), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx, y: cy),
-                    startRadius: 0, endRadius: r * 1.05))
-
-            // ── 5. Specular highlight — upper-left gloss crescent ────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.10, y: h * 0.08,
-                                       width: w * 0.32, height: h * 0.24)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.70), .clear]),
-                    center: CGPoint(x: w * 0.22, y: h * 0.16),
-                    startRadius: 0, endRadius: r * 0.40))
         }
     }
 
@@ -3664,99 +3778,126 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Confetti  (New Year's 2027 seasonal exclusive)
+    // MARK: - Confetti  (New Year's 2027 seasonal exclusive · Legendary)
     // Champagne-gold sphere scattered with 18 deterministic multicolor
     // confetti rectangles, each individually rotated via a manual 2-D
-    // rotation matrix (SwiftUI Canvas has no transform API).
-    // Clipped to a circle by the body switch caller.
+    // rotation matrix (SwiftUI Canvas has no transform API).  Animated: the
+    // pieces fall in a perpetual settle cycle — each drifts down at its own
+    // speed with a gentle side-to-side flutter and a slow tumble, wrapping
+    // back to the top as it leaves the sphere.  Under Reduce Motion every
+    // piece holds its original position and angle — exactly the original
+    // static scatter.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var confettiCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            // ── 1. Champagne-gold radial gradient sphere ─────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.96, blue: 0.80), location: 0.00),
-                        .init(color: Color(red: 0.94, green: 0.78, blue: 0.32), location: 0.40),
-                        .init(color: Color(red: 0.70, green: 0.52, blue: 0.14), location: 0.78),
-                        .init(color: Color(red: 0.36, green: 0.24, blue: 0.04), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
-                    startRadius: 0, endRadius: r * 1.28))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. 18 deterministic rotated confetti rectangles ──────────
-            let pieceW = max(2.0, r * 0.075)
-            let pieceH = max(1.5, r * 0.045)
-            let confettiColors: [Color] = [
-                Color(red: 0.92, green: 0.12, blue: 0.18),   // red
-                Color(red: 0.18, green: 0.42, blue: 0.92),   // cobalt
-                Color(red: 0.12, green: 0.76, blue: 0.30),   // emerald
-                Color(red: 0.96, green: 0.22, blue: 0.80),   // magenta
-                Color(red: 0.56, green: 0.16, blue: 0.94),   // violet
-                Color(red: 1.00, green: 1.00, blue: 1.00),   // white
-            ]
-            // (normX, normY, angleDeg, colorIdx) — positions in [0,1] space
-            let pieces: [(CGFloat, CGFloat, CGFloat, Int)] = [
-                (0.32, 0.18,  25, 0), (0.55, 0.22, -35, 1), (0.44, 0.32,  55, 2),
-                (0.68, 0.30, -20, 3), (0.25, 0.42,  45, 4), (0.58, 0.42,  70, 5),
-                (0.38, 0.55, -50, 0), (0.72, 0.50,  15, 1), (0.28, 0.60,  60, 2),
-                (0.50, 0.62, -40, 3), (0.70, 0.68,  30, 4), (0.22, 0.28, -60, 5),
-                (0.42, 0.72,  45, 0), (0.62, 0.78, -25, 1), (0.35, 0.78,  65, 2),
-                (0.74, 0.38, -45, 3), (0.18, 0.52,  20, 4), (0.56, 0.14, -55, 5),
-            ]
+                // ── 1. Champagne-gold radial gradient sphere ─────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.96, blue: 0.80), location: 0.00),
+                            .init(color: Color(red: 0.94, green: 0.78, blue: 0.32), location: 0.40),
+                            .init(color: Color(red: 0.70, green: 0.52, blue: 0.14), location: 0.78),
+                            .init(color: Color(red: 0.36, green: 0.24, blue: 0.04), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
+                        startRadius: 0, endRadius: r * 1.28))
 
-            for (nx, ny, angleDeg, colorIdx) in pieces {
-                let px = cx - r + nx * r * 2
-                let py = cy - r + ny * r * 2
-                let dx = px - cx
-                let dy = py - cy
-                // Skip pieces that fall outside the sphere silhouette
-                if sqrt(dx * dx + dy * dy) > r * 0.86 { continue }
+                // ── 2. 18 deterministic rotated confetti rectangles ──────────
+                let pieceW = max(2.0, r * 0.075)
+                let pieceH = max(1.5, r * 0.045)
+                let confettiColors: [Color] = [
+                    Color(red: 0.92, green: 0.12, blue: 0.18),   // red
+                    Color(red: 0.18, green: 0.42, blue: 0.92),   // cobalt
+                    Color(red: 0.12, green: 0.76, blue: 0.30),   // emerald
+                    Color(red: 0.96, green: 0.22, blue: 0.80),   // magenta
+                    Color(red: 0.56, green: 0.16, blue: 0.94),   // violet
+                    Color(red: 1.00, green: 1.00, blue: 1.00),   // white
+                ]
+                // (normX, normY, angleDeg, colorIdx) — positions in [0,1] space
+                let pieces: [(CGFloat, CGFloat, CGFloat, Int)] = [
+                    (0.32, 0.18,  25, 0), (0.55, 0.22, -35, 1), (0.44, 0.32,  55, 2),
+                    (0.68, 0.30, -20, 3), (0.25, 0.42,  45, 4), (0.58, 0.42,  70, 5),
+                    (0.38, 0.55, -50, 0), (0.72, 0.50,  15, 1), (0.28, 0.60,  60, 2),
+                    (0.50, 0.62, -40, 3), (0.70, 0.68,  30, 4), (0.22, 0.28, -60, 5),
+                    (0.42, 0.72,  45, 0), (0.62, 0.78, -25, 1), (0.35, 0.78,  65, 2),
+                    (0.74, 0.38, -45, 3), (0.18, 0.52,  20, 4), (0.56, 0.14, -55, 5),
+                ]
 
-                // Manual 2-D rotation matrix: avoids the unavailable ctx.transform
-                let angleRad = angleDeg * CGFloat.pi / 180
-                let cosA     = cos(angleRad)
-                let sinA     = sin(angleRad)
+                for (idx, item) in pieces.enumerated() {
+                    let (nx, ny, angleDeg, colorIdx) = item
 
-                // Half-extents of the rectangle in local space
-                let lx = pieceW / 2
-                let ly = pieceH / 2
+                    // Falling-and-settling cycle — phase-anchored so t = 0
+                    // reproduces the static scatter exactly (also the Reduce
+                    // Motion pose).  Each piece gets its own fall speed,
+                    // flutter phase, and tumble direction from its index.
+                    var nxA: CGFloat = nx
+                    var nyA: CGFloat = ny
+                    var angA: CGFloat = angleDeg
+                    if !reduceMotion {
+                        let fallSpeed: Double = 0.045 + 0.020 * Double((idx * 5) % 4)
+                        let drop: Double = (Double(ny) - 0.10 + t * fallSpeed).truncatingRemainder(dividingBy: 0.80)
+                        nyA = 0.10 + CGFloat(drop)
+                        nxA = nx + CGFloat(sin(t * 0.9 + Double(idx) * 1.3)) * 0.03
+                        let spinDir: Double = (idx % 2 == 0) ? 1.0 : -1.0
+                        angA = angleDeg + CGFloat((t * 40.0 * spinDir).truncatingRemainder(dividingBy: 360.0))
+                    }
 
-                // Rotate all four corners around (px, py)
-                func rotate(_ lx: CGFloat, _ ly: CGFloat) -> CGPoint {
-                    CGPoint(x: px + lx * cosA - ly * sinA,
-                            y: py + lx * sinA + ly * cosA)
+                    let px = cx - r + nxA * r * 2
+                    let py = cy - r + nyA * r * 2
+                    let dx = px - cx
+                    let dy = py - cy
+                    // Skip pieces that fall outside the sphere silhouette —
+                    // animated pieces naturally pop in/out at the rim.
+                    if sqrt(dx * dx + dy * dy) > r * 0.86 { continue }
+
+                    // Manual 2-D rotation matrix: avoids the unavailable ctx.transform
+                    let angleRad = angA * CGFloat.pi / 180
+                    let cosA     = cos(angleRad)
+                    let sinA     = sin(angleRad)
+
+                    // Half-extents of the rectangle in local space
+                    let lx = pieceW / 2
+                    let ly = pieceH / 2
+
+                    // Rotate all four corners around (px, py)
+                    func rotate(_ lx: CGFloat, _ ly: CGFloat) -> CGPoint {
+                        CGPoint(x: px + lx * cosA - ly * sinA,
+                                y: py + lx * sinA + ly * cosA)
+                    }
+
+                    var piece = Path()
+                    piece.move(to:    rotate(-lx, -ly))
+                    piece.addLine(to: rotate( lx, -ly))
+                    piece.addLine(to: rotate( lx,  ly))
+                    piece.addLine(to: rotate(-lx,  ly))
+                    piece.closeSubpath()
+
+                    ctx.fill(piece, with: .color(confettiColors[colorIdx]))
                 }
 
-                var piece = Path()
-                piece.move(to:    rotate(-lx, -ly))
-                piece.addLine(to: rotate( lx, -ly))
-                piece.addLine(to: rotate( lx,  ly))
-                piece.addLine(to: rotate(-lx,  ly))
-                piece.closeSubpath()
-
-                ctx.fill(piece, with: .color(confettiColors[colorIdx]))
+                // ── 3. Bright specular highlight (upper-left) ────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.72,
+                                           width: r * 0.48, height: r * 0.32)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.80), location: 0.00),
+                            .init(color: .white.opacity(0.42), location: 0.40),
+                            .init(color: .clear,               location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.60),
+                        startRadius: 0, endRadius: r * 0.36))
             }
-
-            // ── 3. Bright specular highlight (upper-left) ────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.72,
-                                       width: r * 0.48, height: r * 0.32)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.80), location: 0.00),
-                        .init(color: .white.opacity(0.42), location: 0.40),
-                        .init(color: .clear,               location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.60),
-                    startRadius: 0, endRadius: r * 0.36))
         }
     }
 
