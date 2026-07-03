@@ -542,7 +542,7 @@ triaged false positives on 74/92/93/94).
 | **37** | top shelf [0.4,0.4,0.18,0.07] → **[0.4,0.4,0.12,0.07]** (entrance 0.02 → 0.08); goal (0.5,0.5) → **(0.5,0.55)** (doc coordinates). Corridor 0.020 → 0.080. |
 | **55** | center gaps 0.04 → 0.08: rows → **[0.12,0.35,0.34,0.1] + [0.54,0.35,0.34,0.1]** and **[0.2,0.55,0.26,0.1] + [0.54,0.55,0.26,0.1]** (doc coordinates). Corridor 0.040 → 0.080. |
 | **39** | rows 1/3 slots 0.04 → 0.08: **[0.12,0.3,0.34,0.1] + [0.54,0.3,0.34,0.1]**, same at y=0.7 (doc coordinates); coins stay x=0.5. Corridor 0.040 → 0.080. |
-| **19** | hardened (tier is digit-derived, layout was 3–6× too open): added shelves **[0.12,0.55,0.2,0.07]** and **[0.68,0.4,0.2,0.07]** (doc's suggestion) → serpentine with 0.12 gaps, corridor 0.284 → 0.120, TIER flag gone, zero flags total. *Deviation:* coin#2 (0.75,0.45) sat inside the new right shelf, so it drops to **(0.75,0.53)** (0.06 below the shelf). |
+| **19** | hardened (tier is digit-derived, layout was 3–6× too open): added shelves **[0.12,0.55,0.2,0.07]** and **[0.68,0.4,0.2,0.07]** (doc's suggestion) → serpentine with 0.12 gaps, checker corridor 0.160 → 0.120 (the review's full-clearance inflation test had measured 0.284 pre-fix), TIER flag gone, zero flags total. *Deviation:* coin#2 (0.75,0.45) sat inside the new right shelf, so it drops to **(0.75,0.53)** (0.06 below the shelf). |
 
 ### Coin placement (visual/sunk/bait)
 
