@@ -72,12 +72,13 @@ final class StoreKitManager: ObservableObject {
             }
         }
 
-        /// Lives granted by this purchase.  Zero for non-life products.
+        /// Lives granted by this purchase (into the reserve queue).  Zero
+        /// for non-life products.
         var rewardLives: Int {
             switch self {
-            case .livesPack1:  return 10    // 1 full reload (10-life cap)
-            case .livesPack5:  return 60    // 6 reloads
-            case .livesPack10: return 130   // 13 reloads
+            case .livesPack1:  return 10
+            case .livesPack5:  return 60
+            case .livesPack10: return 130
             default:           return 0
             }
         }
@@ -386,15 +387,10 @@ final class StoreKitManager: ObservableObject {
         var grantedCosmetic: String? = nil
         switch productID.category {
         case .lifePack:
-            // Lives from purchases stockpile unbounded.  $9.99 = 130 lives
-            // promised in the App Store Connect product description; the
-            // player gets exactly that.  Earlier code clamped to 24 — that
-            // was a bug, fixed here.
-            gameState.lives += productID.rewardLives
-            // Clearing lastLifeLostAt stops the regen timer; the stockpile
-            // doesn't need regen and the timer would just churn confusingly.
-            gameState.lastLifeLostAt = nil
-            gameState.reconcileLivesNotification()   // now full → cancel any pending alert
+            // Purchased lives land in the reserve queue — they never touch
+            // the 10-life regen bar, so the free-regen timer keeps ticking
+            // and the player gets every life promised on the store page.
+            gameState.addLives(productID.rewardLives)
 
         case .coinPack:
             gameState.addCoins(productID.rewardCoins)
