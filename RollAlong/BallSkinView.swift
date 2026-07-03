@@ -745,261 +745,422 @@ struct BallSkinView: View {
     // =========================================================================
     // MARK: - Glass Marble (Realistic Marble skin)
     // Clear glass sphere with an internal cobalt cat's-eye vane — three
-    // curved blades meeting at the centre.
+    // curved blades meeting at the centre.  Animated: the vane rotates slowly
+    // inside the glass while a refracted caustic orbits behind it, giving the
+    // sphere real internal depth.  Under Reduce Motion the vane rests in its
+    // original pose — exactly the original static marble.
     // =========================================================================
     private var glassMarbleCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Cat's-eye rotation — zero under Reduce Motion → original pose.
+                let spin: CGFloat = reduceMotion ? 0.0 : CGFloat(t.truncatingRemainder(dividingBy: 2.0 * .pi / 0.26) * 0.26)
 
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.97, green: 0.99, blue: 1.00), location: 0.00),
-                        .init(color: Color(red: 0.86, green: 0.91, blue: 0.97), location: 0.50),
-                        .init(color: Color(red: 0.62, green: 0.70, blue: 0.82), location: 0.88),
-                        .init(color: Color(red: 0.30, green: 0.38, blue: 0.52), location: 1.00),
-                    ]),
-                    center: CGPoint(x: w * 0.34, y: h * 0.32),
-                    startRadius: 0, endRadius: r * 1.25))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            func blade(angle a: CGFloat, length len: CGFloat, width wd: CGFloat) -> Path {
-                var p    = Path()
-                let tip  = CGPoint(x: cx + len * cos(a), y: cy + len * sin(a))
-                let perp = a + .pi / 2
-                let mid  = CGPoint(x: cx + len * 0.5 * cos(a), y: cy + len * 0.5 * sin(a))
-                let b1   = CGPoint(x: mid.x + wd * cos(perp), y: mid.y + wd * sin(perp))
-                let b2   = CGPoint(x: mid.x - wd * cos(perp), y: mid.y - wd * sin(perp))
-                p.move(to: CGPoint(x: cx, y: cy))
-                p.addQuadCurve(to: tip, control: b1)
-                p.addQuadCurve(to: CGPoint(x: cx, y: cy), control: b2)
-                p.closeSubpath()
-                return p
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.97, green: 0.99, blue: 1.00), location: 0.00),
+                            .init(color: Color(red: 0.86, green: 0.91, blue: 0.97), location: 0.50),
+                            .init(color: Color(red: 0.62, green: 0.70, blue: 0.82), location: 0.88),
+                            .init(color: Color(red: 0.30, green: 0.38, blue: 0.52), location: 1.00),
+                        ]),
+                        center: CGPoint(x: w * 0.34, y: h * 0.32),
+                        startRadius: 0, endRadius: r * 1.25))
+
+                // Inner glass depth — a refracted cobalt caustic that orbits
+                // slowly BEHIND the vane, so the sphere reads as solid glass.
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    let orbA: CGFloat = -spin * 0.6 + 2.4
+                    let orbC = CGPoint(x: cx + cos(orbA) * r * 0.34,
+                                       y: cy + sin(orbA) * r * 0.34)
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: orbC.x - r * 0.40, y: orbC.y - r * 0.40,
+                                               width: r * 0.80, height: r * 0.80)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color(red: 0.30, green: 0.55, blue: 0.95).opacity(0.16), .clear]),
+                            center: orbC, startRadius: 0, endRadius: r * 0.40))
+                }
+
+                func blade(angle a: CGFloat, length len: CGFloat, width wd: CGFloat) -> Path {
+                    var p    = Path()
+                    let tip  = CGPoint(x: cx + len * cos(a), y: cy + len * sin(a))
+                    let perp = a + .pi / 2
+                    let mid  = CGPoint(x: cx + len * 0.5 * cos(a), y: cy + len * 0.5 * sin(a))
+                    let b1   = CGPoint(x: mid.x + wd * cos(perp), y: mid.y + wd * sin(perp))
+                    let b2   = CGPoint(x: mid.x - wd * cos(perp), y: mid.y - wd * sin(perp))
+                    p.move(to: CGPoint(x: cx, y: cy))
+                    p.addQuadCurve(to: tip, control: b1)
+                    p.addQuadCurve(to: CGPoint(x: cx, y: cy), control: b2)
+                    p.closeSubpath()
+                    return p
+                }
+
+                let cobalt = Color(red: 0.12, green: 0.34, blue: 0.86)
+                let azure  = Color(red: 0.45, green: 0.72, blue: 1.00)
+                for i in 0..<3 {
+                    let a: CGFloat = -.pi / 2 + spin + CGFloat(i) * (2 * .pi / 3)
+                    ctx.fill(blade(angle: a, length: r * 0.78, width: r * 0.26),
+                             with: .color(cobalt.opacity(0.92)))
+                }
+                for i in 0..<3 {
+                    let a: CGFloat = -.pi / 2 + spin + CGFloat(i) * (2 * .pi / 3)
+                    ctx.fill(blade(angle: a, length: r * 0.48, width: r * 0.16),
+                             with: .color(azure.opacity(0.95)))
+                }
+
+                let ctrR = r * 0.10
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - ctrR, y: cy - ctrR,
+                                                width: ctrR * 2, height: ctrR * 2)),
+                         with: .color(.white.opacity(0.85)))
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .clear, location: 0.00),
+                            .init(color: .clear, location: 0.82),
+                            .init(color: Color(red: 0.10, green: 0.16, blue: 0.30).opacity(0.55),
+                                  location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx, y: cy),
+                        startRadius: 0, endRadius: r))
+
+                // Glassy micro-glint — a second, small refraction highlight
+                // that circles the lower hemisphere (additive; absent under
+                // Reduce Motion).
+                if !reduceMotion {
+                    let glA: CGFloat = spin * 0.6 + 0.8
+                    let glC = CGPoint(x: cx + cos(glA) * r * 0.58,
+                                      y: cy + abs(sin(glA)) * r * 0.52)
+                    let glO: Double = 0.20 + 0.10 * sin(t * 1.7)
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: glC.x - r * 0.10, y: glC.y - r * 0.07,
+                                               width: r * 0.20, height: r * 0.14)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(glO), .clear]),
+                            center: glC, startRadius: 0, endRadius: r * 0.12))
+                }
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.14, y: h * 0.09,
+                                           width: w * 0.34, height: h * 0.24)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.75), .clear]),
+                        center: CGPoint(x: w * 0.27, y: h * 0.18),
+                        startRadius: 0, endRadius: r * 0.40))
             }
-
-            let cobalt = Color(red: 0.12, green: 0.34, blue: 0.86)
-            let azure  = Color(red: 0.45, green: 0.72, blue: 1.00)
-            for i in 0..<3 {
-                let a = -.pi / 2 + CGFloat(i) * (2 * .pi / 3)
-                ctx.fill(blade(angle: a, length: r * 0.78, width: r * 0.26),
-                         with: .color(cobalt.opacity(0.92)))
-            }
-            for i in 0..<3 {
-                let a = -.pi / 2 + CGFloat(i) * (2 * .pi / 3)
-                ctx.fill(blade(angle: a, length: r * 0.48, width: r * 0.16),
-                         with: .color(azure.opacity(0.95)))
-            }
-
-            let ctrR = r * 0.10
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - ctrR, y: cy - ctrR,
-                                            width: ctrR * 2, height: ctrR * 2)),
-                     with: .color(.white.opacity(0.85)))
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .clear, location: 0.00),
-                        .init(color: .clear, location: 0.82),
-                        .init(color: Color(red: 0.10, green: 0.16, blue: 0.30).opacity(0.55),
-                              location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx, y: cy),
-                    startRadius: 0, endRadius: r))
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.14, y: h * 0.09,
-                                       width: w * 0.34, height: h * 0.24)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.75), .clear]),
-                    center: CGPoint(x: w * 0.27, y: h * 0.18),
-                    startRadius: 0, endRadius: r * 0.40))
         }
     }
 
     // =========================================================================
     // MARK: - Ghost
-    // Luminous pale orb with hollow eyes and a wailing mouth.
+    // Luminous pale orb with hollow eyes and a wailing mouth.  Animated: the
+    // spirit hovers with a slow bob, pale wisps curl up around it, and the
+    // hollow eyes blink shut on a lazy clock.  Under Reduce Motion the haunt
+    // holds perfectly still — exactly the original static ghost.
     // =========================================================================
     private var ghostCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width
-            let h = size.height
-            let r = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.97, green: 0.98, blue: 1.00), location: 0.00),
-                        .init(color: Color(red: 0.82, green: 0.86, blue: 0.94), location: 0.55),
-                        .init(color: Color(red: 0.58, green: 0.64, blue: 0.76), location: 0.85),
-                        .init(color: Color(red: 0.34, green: 0.40, blue: 0.54), location: 1.00),
-                    ]),
-                    center: CGPoint(x: w * 0.40, y: h * 0.34),
-                    startRadius: 0, endRadius: r * 1.25))
+                let w = size.width
+                let h = size.height
+                let r = min(w, h) / 2
 
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.18, y: h * 0.18,
-                                       width: w * 0.50, height: h * 0.50)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: w * 0.42, y: h * 0.40),
-                    startRadius: 0, endRadius: r * 0.70))
+                // Hover bob — zero under Reduce Motion → original face position.
+                let bobPhase: Double = reduceMotion ? 0.0 : sin(t * 1.1)
+                let bob: CGFloat = CGFloat(bobPhase) * r * 0.05
 
-            let eyeColor = Color(red: 0.16, green: 0.18, blue: 0.26)
-            let eyeW = w * 0.16
-            let eyeH = h * 0.22
-            for ex in [w * 0.36, w * 0.60] {
-                ctx.fill(Path(ellipseIn: CGRect(x: ex - eyeW / 2, y: h * 0.36,
-                                                width: eyeW, height: eyeH)),
-                         with: .color(eyeColor))
+                // Blink — the eyes squash shut for a beat every ~3.8 s.
+                // 1.0 (fully open) reproduces the original static eyes.
+                let blinkCycle: Double = (t * 0.26).truncatingRemainder(dividingBy: 1.0)
+                let blinkP: Double = blinkCycle / 0.08
+                let blinkRaw: Double = blinkCycle < 0.08 ? abs(blinkP * 2.0 - 1.0) : 1.0
+                let eyeOpen: Double = reduceMotion ? 1.0 : max(0.12, blinkRaw)
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.97, green: 0.98, blue: 1.00), location: 0.00),
+                            .init(color: Color(red: 0.82, green: 0.86, blue: 0.94), location: 0.55),
+                            .init(color: Color(red: 0.58, green: 0.64, blue: 0.76), location: 0.85),
+                            .init(color: Color(red: 0.34, green: 0.40, blue: 0.54), location: 1.00),
+                        ]),
+                        center: CGPoint(x: w * 0.40, y: h * 0.34),
+                        startRadius: 0, endRadius: r * 1.25))
+
+                // Inner luminous glow — rides the hover bob with the face.
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.18, y: h * 0.18 + bob,
+                                           width: w * 0.50, height: h * 0.50)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: w * 0.42, y: h * 0.40 + bob),
+                        startRadius: 0, endRadius: r * 0.70))
+
+                // Rising wisps — pale curls drifting up the flanks.
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    for i in 0..<4 {
+                        let seed: Double  = Double(i) * 0.73 + 0.21
+                        let speed: Double = 0.10 + 0.04 * Double(i % 2)
+                        let cycle: Double = (t * speed + seed).truncatingRemainder(dividingBy: 1.0)
+                        let sway: Double  = sin(t * 0.9 + seed * 7.0)
+                        let sideSign: CGFloat = i % 2 == 0 ? -1.0 : 1.0
+                        let px: CGFloat = w / 2 + sideSign * r * 0.62 + CGFloat(sway) * r * 0.10
+                        let py: CGFloat = h * 0.92 - CGFloat(cycle) * h * 0.80
+                        let fade: Double = 0.30 * (1.0 - cycle) * min(1.0, cycle * 5.0)
+                        let ws: CGFloat = r * (0.10 + 0.05 * CGFloat(i % 2))
+                        ctx.fill(
+                            Path(ellipseIn: CGRect(x: px - ws, y: py - ws * 0.7,
+                                                   width: ws * 2, height: ws * 1.4)),
+                            with: .radialGradient(
+                                Gradient(colors: [Color.white.opacity(fade), .clear]),
+                                center: CGPoint(x: px, y: py),
+                                startRadius: 0, endRadius: ws))
+                    }
+                }
+
+                let eyeColor = Color(red: 0.16, green: 0.18, blue: 0.26)
+                let eyeW = w * 0.16
+                let eyeH = h * 0.22
+                // Blink squashes the eye about its centre; at eyeOpen == 1.0
+                // and bob == 0 the rect is exactly the original.
+                let eyeDrawH: CGFloat = eyeH * CGFloat(eyeOpen)
+                let eyeMidY: CGFloat = h * 0.36 + eyeH / 2 + bob
+                for ex in [w * 0.36, w * 0.60] {
+                    ctx.fill(Path(ellipseIn: CGRect(x: ex - eyeW / 2, y: eyeMidY - eyeDrawH / 2,
+                                                    width: eyeW, height: eyeDrawH)),
+                             with: .color(eyeColor))
+                    // Faint spirit-shimmer inside each open eye (additive;
+                    // invisible under Reduce Motion).
+                    if !reduceMotion && eyeOpen > 0.5 {
+                        let glint: Double = 0.22 + 0.16 * sin(t * 2.3 + Double(ex))
+                        ctx.fill(Path(ellipseIn: CGRect(x: ex - eyeW * 0.18, y: eyeMidY - eyeDrawH * 0.22,
+                                                        width: eyeW * 0.36, height: eyeDrawH * 0.36)),
+                                 with: .radialGradient(
+                                     Gradient(colors: [Color(red: 0.70, green: 0.85, blue: 1.00).opacity(glint), .clear]),
+                                     center: CGPoint(x: ex, y: eyeMidY),
+                                     startRadius: 0, endRadius: eyeW * 0.40))
+                    }
+                }
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.50 - w * 0.10, y: h * 0.62 + bob,
+                                           width: w * 0.20, height: h * 0.20)),
+                    with: .color(eyeColor))
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.16, y: h * 0.08,
+                                           width: w * 0.30, height: h * 0.22)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.65), .clear]),
+                        center: CGPoint(x: w * 0.28, y: h * 0.16),
+                        startRadius: 0, endRadius: r * 0.36))
             }
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.50 - w * 0.10, y: h * 0.62,
-                                       width: w * 0.20, height: h * 0.20)),
-                with: .color(eyeColor))
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.16, y: h * 0.08,
-                                       width: w * 0.30, height: h * 0.22)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.65), .clear]),
-                    center: CGPoint(x: w * 0.28, y: h * 0.16),
-                    startRadius: 0, endRadius: r * 0.36))
         }
     }
 
     // =========================================================================
     // MARK: - Candy
-    // Glossy peppermint sphere with a white pinwheel swirl.
+    // Glossy peppermint sphere with a white pinwheel swirl.  Animated: the
+    // pinwheel turns like a slowly licked lollipop and tiny sugar-crystal
+    // glints twinkle on the red lacquer.  Under Reduce Motion the swirl rests
+    // in its original pose — exactly the original static candy.
     // =========================================================================
     private var candyCanvas: some View {
-        Canvas { ctx, size in
-            let w      = size.width
-            let h      = size.height
-            let r      = min(w, h) / 2
-            let center = CGPoint(x: w / 2, y: h / 2)
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Pinwheel spin — zero under Reduce Motion → original swirl pose.
+                let spin: CGFloat = reduceMotion ? 0.0 : CGFloat(t.truncatingRemainder(dividingBy: 2.0 * .pi / 0.30) * 0.30)
 
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.62, blue: 0.66), location: 0.00),
-                        .init(color: Color(red: 0.92, green: 0.20, blue: 0.28), location: 0.50),
-                        .init(color: Color(red: 0.74, green: 0.08, blue: 0.18), location: 0.85),
-                        .init(color: Color(red: 0.46, green: 0.03, blue: 0.10), location: 1.00),
-                    ]),
-                    center: CGPoint(x: w * 0.36, y: h * 0.32),
-                    startRadius: 0, endRadius: r * 1.25))
+                let w      = size.width
+                let h      = size.height
+                let r      = min(w, h) / 2
+                let center = CGPoint(x: w / 2, y: h / 2)
 
-            let arms      = 6
-            let reach     = r * 1.05
-            let twist: CGFloat   = 0.55
-            let armWidth: CGFloat = (.pi * 2 / CGFloat(arms)) * 0.5
-            let white     = Color(red: 0.99, green: 0.97, blue: 0.98)
-            for i in 0..<arms {
-                let base  = CGFloat(i) / CGFloat(arms) * .pi * 2
-                let aLead = base + twist
-                var arm   = Path()
-                arm.move(to: center)
-                arm.addQuadCurve(
-                    to: CGPoint(x: center.x + cos(aLead) * reach,
-                                y: center.y + sin(aLead) * reach),
-                    control: CGPoint(x: center.x + cos(base + twist * 0.4) * reach * 0.55,
-                                     y: center.y + sin(base + twist * 0.4) * reach * 0.55))
-                arm.addArc(center: center, radius: reach,
-                           startAngle: .radians(Double(aLead)),
-                           endAngle:   .radians(Double(aLead + armWidth)), clockwise: false)
-                arm.addQuadCurve(
-                    to: center,
-                    control: CGPoint(
-                        x: center.x + cos(base + armWidth + twist * 0.4) * reach * 0.55,
-                        y: center.y + sin(base + armWidth + twist * 0.4) * reach * 0.55))
-                arm.closeSubpath()
-                ctx.fill(arm, with: .color(white))
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.62, blue: 0.66), location: 0.00),
+                            .init(color: Color(red: 0.92, green: 0.20, blue: 0.28), location: 0.50),
+                            .init(color: Color(red: 0.74, green: 0.08, blue: 0.18), location: 0.85),
+                            .init(color: Color(red: 0.46, green: 0.03, blue: 0.10), location: 1.00),
+                        ]),
+                        center: CGPoint(x: w * 0.36, y: h * 0.32),
+                        startRadius: 0, endRadius: r * 1.25))
+
+                let arms      = 6
+                let reach     = r * 1.05
+                let twist: CGFloat   = 0.55
+                let armWidth: CGFloat = (.pi * 2 / CGFloat(arms)) * 0.5
+                let white     = Color(red: 0.99, green: 0.97, blue: 0.98)
+                for i in 0..<arms {
+                    let base: CGFloat = spin + CGFloat(i) / CGFloat(arms) * .pi * 2
+                    let aLead = base + twist
+                    var arm   = Path()
+                    arm.move(to: center)
+                    arm.addQuadCurve(
+                        to: CGPoint(x: center.x + cos(aLead) * reach,
+                                    y: center.y + sin(aLead) * reach),
+                        control: CGPoint(x: center.x + cos(base + twist * 0.4) * reach * 0.55,
+                                         y: center.y + sin(base + twist * 0.4) * reach * 0.55))
+                    arm.addArc(center: center, radius: reach,
+                               startAngle: .radians(Double(aLead)),
+                               endAngle:   .radians(Double(aLead + armWidth)), clockwise: false)
+                    arm.addQuadCurve(
+                        to: center,
+                        control: CGPoint(
+                            x: center.x + cos(base + armWidth + twist * 0.4) * reach * 0.55,
+                            y: center.y + sin(base + armWidth + twist * 0.4) * reach * 0.55))
+                    arm.closeSubpath()
+                    ctx.fill(arm, with: .color(white))
+                }
+
+                let capR = r * 0.16
+                ctx.fill(Path(ellipseIn: CGRect(x: center.x - capR, y: center.y - capR,
+                                                width: capR * 2, height: capR * 2)),
+                         with: .color(white))
+
+                // Sugar-crystal glints — tiny sparkles riding the lacquer,
+                // each twinkling on its own clock.
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    for i in 0..<8 {
+                        let seed: Double = Double(i) * 0.79 + 0.13
+                        let ang: CGFloat = spin + CGFloat(seed) * .pi * 2
+                        let rad: CGFloat = r * (0.42 + 0.38 * CGFloat(seed.truncatingRemainder(dividingBy: 0.5)))
+                        let px: CGFloat = center.x + cos(ang) * rad
+                        let py: CGFloat = center.y + sin(ang) * rad
+                        let tw: Double = max(0.0, sin(t * 2.6 + seed * 9.0))
+                        let glint: Double = 0.65 * tw * tw
+                        let gs: CGFloat = r * (0.028 + 0.012 * CGFloat(i % 2))
+                        ctx.fill(Path(ellipseIn: CGRect(x: px - gs, y: py - gs,
+                                                        width: gs * 2, height: gs * 2)),
+                                 with: .color(.white.opacity(glint)))
+                    }
+                }
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.14, y: h * 0.08,
+                                           width: w * 0.34, height: h * 0.26)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: w * 0.28, y: h * 0.18),
+                        startRadius: 0, endRadius: r * 0.42))
             }
-
-            let capR = r * 0.16
-            ctx.fill(Path(ellipseIn: CGRect(x: center.x - capR, y: center.y - capR,
-                                            width: capR * 2, height: capR * 2)),
-                     with: .color(white))
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.14, y: h * 0.08,
-                                       width: w * 0.34, height: h * 0.26)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: w * 0.28, y: h * 0.18),
-                    startRadius: 0, endRadius: r * 0.42))
         }
     }
 
     // =========================================================================
     // MARK: - Storm
-    // Dark storm-cloud sphere with billowing puffs and a jagged lightning bolt.
+    // Dark storm-cloud sphere with billowing puffs and a jagged lightning
+    // bolt.  Animated: the cloud puffs drift and churn slowly while the bolt
+    // strikes in irregular flashes that light the whole cell.  Under Reduce
+    // Motion the storm freezes mid-strike — exactly the original static art.
     // =========================================================================
     private var stormCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width
-            let h = size.height
-            let r = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.66, green: 0.70, blue: 0.78), location: 0.00),
-                        .init(color: Color(red: 0.36, green: 0.42, blue: 0.52), location: 0.45),
-                        .init(color: Color(red: 0.16, green: 0.20, blue: 0.30), location: 0.82),
-                        .init(color: Color(red: 0.05, green: 0.07, blue: 0.14), location: 1.00),
-                    ]),
-                    center: CGPoint(x: w * 0.32, y: h * 0.30),
-                    startRadius: 0, endRadius: r * 1.30))
+                // Lightning strike — two offset strike clocks so the rhythm
+                // reads irregular.  1.0 under Reduce Motion → the original
+                // fully-lit bolt.
+                let cyc1: Double = (t * 0.31).truncatingRemainder(dividingBy: 1.0)
+                let cyc2: Double = (t * 0.13 + 0.47).truncatingRemainder(dividingBy: 1.0)
+                let spike1: Double = cyc1 < 0.10 ? 1.0 - cyc1 / 0.10 : 0.0
+                let spike2: Double = cyc2 < 0.07 ? 1.0 - cyc2 / 0.07 : 0.0
+                let spike: Double = max(spike1, spike2 * 0.8)
+                let flash: Double = reduceMotion ? 1.0 : 0.55 + 0.45 * spike
 
-            let puffs: [(x: CGFloat, y: CGFloat, rad: CGFloat)] = [
-                (0.34, 0.40, 0.30), (0.60, 0.34, 0.24),
-                (0.50, 0.54, 0.26), (0.70, 0.52, 0.20),
-            ]
-            for p in puffs {
-                let c  = CGPoint(x: w * p.x, y: h * p.y)
-                let pr = r * p.rad
+                let w = size.width
+                let h = size.height
+                let r = min(w, h) / 2
+
                 ctx.fill(
-                    Path(ellipseIn: CGRect(x: c.x - pr, y: c.y - pr,
-                                           width: pr * 2, height: pr * 2)),
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
                     with: .radialGradient(
-                        Gradient(colors: [Color(red: 0.80, green: 0.83, blue: 0.90).opacity(0.42), .clear]),
-                        center: c, startRadius: 0, endRadius: pr))
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.66, green: 0.70, blue: 0.78), location: 0.00),
+                            .init(color: Color(red: 0.36, green: 0.42, blue: 0.52), location: 0.45),
+                            .init(color: Color(red: 0.16, green: 0.20, blue: 0.30), location: 0.82),
+                            .init(color: Color(red: 0.05, green: 0.07, blue: 0.14), location: 1.00),
+                        ]),
+                        center: CGPoint(x: w * 0.32, y: h * 0.30),
+                        startRadius: 0, endRadius: r * 1.30))
+
+                // Cloud puffs — each drifts on its own slow clock; the strike
+                // brightens them from within.  Drift is zero under Reduce
+                // Motion → original positions, original 0.42 opacity.
+                let puffGlow: Double = reduceMotion ? 0.42 : 0.42 + 0.20 * spike
+                let puffs: [(x: CGFloat, y: CGFloat, rad: CGFloat)] = [
+                    (0.34, 0.40, 0.30), (0.60, 0.34, 0.24),
+                    (0.50, 0.54, 0.26), (0.70, 0.52, 0.20),
+                ]
+                for (i, p) in puffs.enumerated() {
+                    let seed: Double = Double(i) * 1.7 + 0.4
+                    let driftX: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 0.34 + seed)) * r * 0.055
+                    let driftY: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 0.22 + seed * 2.1)) * r * 0.030
+                    let c  = CGPoint(x: w * p.x + driftX, y: h * p.y + driftY)
+                    let pr = r * p.rad
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: c.x - pr, y: c.y - pr,
+                                               width: pr * 2, height: pr * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color(red: 0.80, green: 0.83, blue: 0.90).opacity(puffGlow), .clear]),
+                            center: c, startRadius: 0, endRadius: pr))
+                }
+
+                var bolt = Path()
+                let pts  = [
+                    CGPoint(x: w * 0.54, y: h * 0.18),
+                    CGPoint(x: w * 0.44, y: h * 0.46),
+                    CGPoint(x: w * 0.56, y: h * 0.48),
+                    CGPoint(x: w * 0.42, y: h * 0.82),
+                ]
+                bolt.move(to: pts[0])
+                for pt in pts.dropFirst() { bolt.addLine(to: pt) }
+                ctx.stroke(bolt,
+                           with: .color(Color(red: 1.00, green: 0.92, blue: 0.45).opacity(0.35 * flash)),
+                           style: StrokeStyle(lineWidth: r * 0.22, lineCap: .round, lineJoin: .round))
+                ctx.stroke(bolt,
+                           with: .color(Color(red: 1.00, green: 0.98, blue: 0.78).opacity(flash)),
+                           style: StrokeStyle(lineWidth: r * 0.08, lineCap: .round, lineJoin: .round))
+
+                // Sheet-lightning wash — the whole cell lights up at the
+                // instant of a strike (additive; absent under Reduce Motion).
+                if !reduceMotion && spike > 0.01 {
+                    let washO: Double = 0.20 * spike
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color(red: 0.95, green: 0.95, blue: 1.00).opacity(washO), .clear]),
+                            center: CGPoint(x: w * 0.50, y: h * 0.42),
+                            startRadius: 0, endRadius: r * 1.15))
+                }
+
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.08,
+                                           width: w * 0.32, height: h * 0.24)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.40), .clear]),
+                        center: CGPoint(x: w * 0.26, y: h * 0.18),
+                        startRadius: 0, endRadius: r * 0.40))
             }
-
-            var bolt = Path()
-            let pts  = [
-                CGPoint(x: w * 0.54, y: h * 0.18),
-                CGPoint(x: w * 0.44, y: h * 0.46),
-                CGPoint(x: w * 0.56, y: h * 0.48),
-                CGPoint(x: w * 0.42, y: h * 0.82),
-            ]
-            bolt.move(to: pts[0])
-            for pt in pts.dropFirst() { bolt.addLine(to: pt) }
-            ctx.stroke(bolt,
-                       with: .color(Color(red: 1.00, green: 0.92, blue: 0.45).opacity(0.35)),
-                       style: StrokeStyle(lineWidth: r * 0.22, lineCap: .round, lineJoin: .round))
-            ctx.stroke(bolt,
-                       with: .color(Color(red: 1.00, green: 0.98, blue: 0.78)),
-                       style: StrokeStyle(lineWidth: r * 0.08, lineCap: .round, lineJoin: .round))
-
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.08,
-                                       width: w * 0.32, height: h * 0.24)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.40), .clear]),
-                    center: CGPoint(x: w * 0.26, y: h * 0.18),
-                    startRadius: 0, endRadius: r * 0.40))
         }
     }
 
@@ -4561,54 +4722,85 @@ struct BallSkinView: View {
     // MARK: - Spectrum  (Spectrum seasonal · Legendary)
     // A bold, glossy six-colour rainbow sphere — vivid red/orange/yellow/green/
     // blue/violet bands running top→bottom, shaded into a sphere by a radial
-    // overlay, with a bright specular highlight for a wet-gloss finish.  Static.
+    // overlay, with a bright specular highlight for a wet-gloss finish.
+    // Animated: the bands flow continuously upward so every point on the
+    // sphere cycles through the full spectrum, and a soft light sheen sweeps
+    // across the gloss.  Under Reduce Motion the bands hold their original
+    // top→bottom layout — exactly the original static spectrum.
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var spectrumCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Band flow — fraction of one full six-band cycle scrolled so
+                // far.  Zero under Reduce Motion → original band positions.
+                let phase: Double = reduceMotion ? 0.0 : (t * 0.09).truncatingRemainder(dividingBy: 1.0)
 
-            // ── 1. Six vivid rainbow bands (top → bottom) ────────────────
-            let bands: [Color] = [
-                Color(red: 0.93, green: 0.16, blue: 0.16),   // red
-                Color(red: 0.97, green: 0.55, blue: 0.10),   // orange
-                Color(red: 0.99, green: 0.84, blue: 0.10),   // yellow
-                Color(red: 0.18, green: 0.72, blue: 0.28),   // green
-                Color(red: 0.13, green: 0.42, blue: 0.92),   // blue
-                Color(red: 0.52, green: 0.16, blue: 0.78),   // violet
-            ]
-            let bandH = h / CGFloat(bands.count)
-            for (i, col) in bands.enumerated() {
-                let y = CGFloat(i) * bandH
-                ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: bandH + 1)),
-                         with: .color(col))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
+
+                // ── 1. Six vivid rainbow bands, flowing upward ───────────────
+                // Twelve tiles (two spectra) scroll by `offsetY`; at phase 0
+                // tiles 0–5 sit exactly where the static bands did.
+                let bands: [Color] = [
+                    Color(red: 0.93, green: 0.16, blue: 0.16),   // red
+                    Color(red: 0.97, green: 0.55, blue: 0.10),   // orange
+                    Color(red: 0.99, green: 0.84, blue: 0.10),   // yellow
+                    Color(red: 0.18, green: 0.72, blue: 0.28),   // green
+                    Color(red: 0.13, green: 0.42, blue: 0.92),   // blue
+                    Color(red: 0.52, green: 0.16, blue: 0.78),   // violet
+                ]
+                let bandH: CGFloat = h / CGFloat(bands.count)
+                let offsetY: CGFloat = CGFloat(phase) * h
+                for i in 0..<12 {
+                    let yy: CGFloat = CGFloat(i) * bandH - offsetY
+                    if yy > h || yy + bandH + 1 < 0 { continue }
+                    let col: Color = bands[i % 6]
+                    ctx.fill(Path(CGRect(x: 0, y: yy, width: w, height: bandH + 1)),
+                             with: .color(col))
+                }
+
+                // ── 2. Sphere-shade overlay (lit upper-left, dark rim) ───────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.34),  location: 0.00),
+                            .init(color: .clear,                location: 0.42),
+                            .init(color: .black.opacity(0.18),  location: 0.80),
+                            .init(color: .black.opacity(0.52),  location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.28),
+                        startRadius: 0, endRadius: r * 1.24))
+
+                // ── 2b. Sweeping light sheen across the gloss ────────────────
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    let sweep: Double = sin(t * 0.55)
+                    let shX: CGFloat = cx + CGFloat(sweep) * r * 0.60
+                    let shO: Double = 0.14 + 0.06 * sin(t * 0.55 * 2.0)
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: shX - r * 0.34, y: cy - r * 0.95,
+                                               width: r * 0.68, height: r * 1.90)),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(shO), .clear]),
+                            center: CGPoint(x: shX, y: cy - r * 0.10),
+                            startRadius: 0, endRadius: r * 0.75))
+                }
+
+                // ── 3. Bright wet-gloss specular highlight (upper-left) ───────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.78,
+                                           width: r * 0.46, height: r * 0.30)),
+                    with: .radialGradient(
+                        Gradient(colors: [.white.opacity(0.9), .white.opacity(0.25), .clear]),
+                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.66),
+                        startRadius: 0, endRadius: r * 0.32))
             }
-
-            // ── 2. Sphere-shade overlay (lit upper-left, dark rim) ───────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.34),  location: 0.00),
-                        .init(color: .clear,                location: 0.42),
-                        .init(color: .black.opacity(0.18),  location: 0.80),
-                        .init(color: .black.opacity(0.52),  location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.28),
-                    startRadius: 0, endRadius: r * 1.24))
-
-            // ── 3. Bright wet-gloss specular highlight (upper-left) ───────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.78,
-                                       width: r * 0.46, height: r * 0.30)),
-                with: .radialGradient(
-                    Gradient(colors: [.white.opacity(0.9), .white.opacity(0.25), .clear]),
-                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.66),
-                    startRadius: 0, endRadius: r * 0.32))
         }
     }
 
