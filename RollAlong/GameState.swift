@@ -528,9 +528,39 @@ final class GameState: ObservableObject {
     /// changes or re-render gameplay views.
     let trophyStats: TrophyStats
 
-    init(defaults: UserDefaults = .standard) {
+    /// The latched trophy engine (S0-T3), owned here so S1 trigger funnels
+    /// can drive `record(_:value:)` from real gameplay hooks (S1-T1 is the
+    /// first task to establish this wiring point).  Deliberately its OWN
+    /// `ObservableObject` on a plain `let` — NOT `@Published` on GameState —
+    /// so gameplay views observing GameState never re-render on a trophy
+    /// write (S0-T3 rationale; §5 regression table).  Persists to the same
+    /// injected `defaults` as everything else.
+    ///
+    /// The one-time first-launch backfill (S0-T4) is NOT run in `init` — a
+    /// bare `GameState(defaults:)` must never touch the trophy ledger (the
+    /// migration tests build one and expect it inert).  Production calls
+    /// `activateTrophies()` once at launch; the harness's `backfill:` flag
+    /// does the same in tests.
+    let trophyEngine: TrophyEngine
+
+    /// Test-injectable clock so live-unlock timestamps are deterministic
+    /// (mirrors the engine's `now`).  Production uses the real wall clock.
+    private let now: () -> Date
+
+    init(defaults: UserDefaults = .standard,
+         now: @escaping () -> Date = Date.init) {
         self.defaults = defaults
+        self.now = now
         trophyStats = TrophyStats(defaults: defaults)
+        // Load the bundled 89-trophy catalog.  A decode/validation failure is
+        // a build-breaking AUTHORING error, never a runtime condition to
+        // recover from (TrophyCatalog house rules) — but GameState.init must
+        // never trap, so fall back to an empty catalog whose engine simply
+        // has nothing to evaluate.  In every shipping build and test host the
+        // bundled resource loads, so the fallback is unreachable in practice.
+        let catalog = (try? TrophyCatalog.load(bundle: .main))
+            ?? TrophyCatalog.empty
+        trophyEngine = TrophyEngine(catalog: catalog, defaults: defaults, now: now)
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -660,6 +690,25 @@ final class GameState: ObservableObject {
         equippedPackID = savedPack.flatMap { loadedOwnedPacks.contains($0) ? $0 : nil }
     }
 
+    // MARK: - Trophy activation (first-launch backfill)
+
+    /// Run the one-time first-launch trophy backfill (S0-T4): evaluate the
+    /// full catalog against this save's existing stats and grant every
+    /// derivable trophy with a legacy timestamp.  Idempotent across
+    /// relaunches — the engine short-circuits once its backfill-done flag is
+    /// set, so calling this on every launch is safe (and cheap after the
+    /// first).  Call once at app startup, BEFORE live play, so a veteran's
+    /// history is grandfathered rather than live-unlocked one clear at a time.
+    ///
+    /// Deliberately NOT called from `init` — a bare `GameState(defaults:)`
+    /// must leave the trophy ledger untouched (the migration/engine unit
+    /// tests build one and assert inertness).  Returns the trophies newly
+    /// granted by this call (empty after the first run).
+    @discardableResult
+    func activateTrophies() -> [TrophyDefinition] {
+        trophyEngine.backfill(from: TrophyBackfill.snapshot(from: self))
+    }
+
     /// Returns `item` if the player actually owns it (starter tier or
     /// present in the owned-set), otherwise the category's starter.
     /// Used at init time to recover from tier shuffles that would
@@ -681,6 +730,14 @@ final class GameState: ObservableObject {
             highestUnlocked = currentLevel
         }
         syncSocialProgress()
+        // Climb level trophies key on `highestUnlocked` (S1-T1;
+        // climb_first_clear … climb_summit).  Mode-gated: only the main
+        // climb advances its unlock ladder — CotD and tracks never reach
+        // this funnel (advanceFromLevelClear routes them away), and the
+        // guard is defense-in-depth against a future mode that does.
+        if currentMode.progression.recordsClimbResult {
+            trophyEngine.record(.climbHighestUnlocked, value: highestUnlocked)
+        }
     }
 
     /// Push the player's headline progression to the social backend, if and
@@ -838,7 +895,37 @@ final class GameState: ObservableObject {
         // ever reaching this funnel; tracks never call it).
         if currentMode.progression.recordsClimbResult {
             trophyStats.recordNoFallClimbClear()
+            recordClimbTrophies()
         }
+    }
+
+    /// Push every climb-category trophy metric's CURRENT value into the
+    /// trophy engine (S1-T1).  Callers gate on
+    /// `currentMode.progression.recordsClimbResult` so CotD / Roll Out /
+    /// Roll Up / track results never pollute the climb ladder — climb
+    /// trophies are keyed to lifetime stats and level NUMBERS, never to a
+    /// specific level layout (levels are swappable `LevelOverrides.json`
+    /// content).  Cheap on the hot path: each `record` is one index lookup +
+    /// O(interested trophies) and writes nothing unless a trophy latches.
+    private func recordClimbTrophies() {
+        // Level ladder — climb_first_clear (≥2) … climb_summit (≥5001).
+        trophyEngine.record(.climbHighestUnlocked, value: highestUnlocked)
+        // Total climb stars — climb_stars_25 / climb_stars_150 (latched
+        // ratchet: resetProgress can shrink the live sum, never the unlock).
+        trophyEngine.record(.climbTotalStars, value: totalStars)
+        // Lifetime banked pickup coins — climb_pickups_100 (NOT the coin
+        // balance; `totalCoins` counts pickups found).
+        trophyEngine.record(.climbPickupCoins, value: totalCoins)
+        // Perfect-world scan — climb_perfect_world (3 stars on all 100
+        // levels of some world; keyed to the star dict + world number
+        // ranges, never to layouts).
+        trophyEngine.record(.climbPerfectWorlds,
+                            value: TrophyBackfill.perfectWorldCount(bestStars: bestStars))
+        // No-fall clear streak ratchet — skill_clean_sheet_10 / _25.  The
+        // working streak was just grown by `recordNoFallClimbClear()`; its
+        // monotonic best is what the trophy reads.
+        trophyEngine.record(.noFallClearStreakBest,
+                            value: trophyStats.bestNoFallClearStreak)
     }
 
     // MARK: - Queries

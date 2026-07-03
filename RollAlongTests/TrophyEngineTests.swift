@@ -984,13 +984,19 @@ final class TrophyTestHarness {
 
         let clock = HarnessClock()
         self.clock = clock
-        // The authoritative decode + engine, both over the same suite.
-        self.gameState = TrophyTestHarness.makeGameState(defaults: defaults)
-        self.engine = TrophyEngine(catalog: try! TrophyCatalog.load(bundle: .main),
-                                   defaults: defaults,
-                                   now: { clock.current })
+        // The authoritative decode, with the injected clock so live-unlock
+        // timestamps are deterministic.  Since S1-T1, GameState OWNS its
+        // trophy engine and drives it from real gameplay funnels, so the
+        // harness observes `gameState.trophyEngine` directly — the same
+        // engine the live funnels write.  (Pre-S1-T1 the harness built a
+        // separate engine and stood in for the wiring via `sync()`; that
+        // stand-in is now the real thing for wired metrics, and `sync()`
+        // still covers not-yet-wired metrics idempotently.)
+        self.gameState = TrophyTestHarness.makeGameState(defaults: defaults,
+                                                         now: { clock.current })
+        self.engine = gameState.trophyEngine
         if backfill {
-            engine.backfill(from: TrophyBackfill.snapshot(from: gameState))
+            gameState.activateTrophies()
         }
     }
 
@@ -1000,8 +1006,10 @@ final class TrophyTestHarness {
     /// GameState backed by a caller-supplied throwaway suite, never the real
     /// "standard" save (GameStateTests pattern). Exposed statically so any
     /// test file can build a bare GameState on its own suite without a harness.
-    static func makeGameState(defaults: UserDefaults) -> GameState {
-        GameState(defaults: defaults)
+    /// `now` pins the trophy engine's clock for deterministic timestamps.
+    static func makeGameState(defaults: UserDefaults,
+                              now: @escaping () -> Date = Date.init) -> GameState {
+        GameState(defaults: defaults, now: now)
     }
 
     // MARK: The core move — re-derive + record
@@ -1179,9 +1187,10 @@ final class TrophyTestHarnessTests: XCTestCase {
     // MARK: The demo — bump a stat through public API → assert unlock
 
     /// S0-T5 acceptance: end-to-end proof. Nine 3-star climb clears through
-    /// the PUBLIC `recordResult` API push totalStars past 25; a `sync()`
-    /// re-derives and latches `climb_stars_25` and reports it as newly
-    /// unlocked on that sync — no engine internals touched.
+    /// the PUBLIC `recordResult` API push totalStars past 25 and latch
+    /// `climb_stars_25` — since S1-T1 the LIVE climb funnel drives the engine
+    /// directly, so the unlock lands during `recordResult` itself (a
+    /// following `sync()` is idempotent). No engine internals touched.
     func testHarnessDemo_publicAPIStatBumpUnlocksTrophy() {
         let h = TrophyTestHarness()
         h.assertLocked("climb_stars_25")
@@ -1193,10 +1202,10 @@ final class TrophyTestHarnessTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(h.gameState.totalStars, 25, "fixture must clear the bar")
 
-        // Re-derive + record, assert on the unlock SET.
-        let unlocked = h.sync()
-        h.assertUnlocked("climb_stars_25", in: unlocked)   // fired on THIS sync
-        h.assertUnlocked("climb_stars_25")                 // latched overall
+        // The live funnel already latched it; a re-sync grants nothing new.
+        h.assertUnlocked("climb_stars_25")                 // latched via live funnel
+        XCTAssertFalse(h.sync().contains { $0.id == "climb_stars_25" },
+                       "already latched — re-sync is a no-op for the target")
         h.assertLocked("climb_stars_150")                  // next rung untouched
     }
 
@@ -1204,9 +1213,9 @@ final class TrophyTestHarnessTests: XCTestCase {
 
     /// The threshold−1 / threshold / threshold+1 + idempotency shape S1
     /// trigger tests follow, exercised through the harness to prove it
-    /// supports them. (Boundary tests assert on the TARGET trophy's presence
-    /// in the sync batch, not on the whole batch — a climb clear legitimately
-    /// also moves `highestUnlocked`, so incidental sibling unlocks are fine.)
+    /// supports them.  Since S1-T1 the LIVE climb funnel drives the engine,
+    /// so the target latches during the threshold `recordResult` itself; the
+    /// following `sync()` is idempotent and a double-fire never restamps.
     func testHarnessSupportsBoundaryAndDoubleFire() {
         let h = TrophyTestHarness()
 
@@ -1214,14 +1223,13 @@ final class TrophyTestHarnessTests: XCTestCase {
         h.gameState.currentModeID = "climb"
         for level in 1...8 { h.gameState.recordResult(level: level, stars: 3, time: 30, coinIndices: []) }
         XCTAssertEqual(h.gameState.totalStars, 24)
+        h.assertLocked("climb_stars_25")
         XCTAssertFalse(h.sync().contains { $0.id == "climb_stars_25" },
                        "no star unlock below threshold")
-        h.assertLocked("climb_stars_25")
 
-        // threshold: the 25th star fires, on this sync.
+        // threshold: the 25th star latches via the live funnel.
         h.gameState.recordResult(level: 9, stars: 3, time: 30, coinIndices: [])
-        let batch = h.sync()
-        h.assertUnlocked("climb_stars_25", in: batch)
+        h.assertUnlocked("climb_stars_25")
         let stamp = h.engine.unlockDate(for: "climb_stars_25")
 
         // threshold+1 / double-fire: more stars, later clock — the target
