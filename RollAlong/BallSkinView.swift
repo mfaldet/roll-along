@@ -17,7 +17,10 @@ import SwiftUI
 //   • Bespoke (clipped)→ Canvas clipped to Circle + rim stroke overlay.
 //   • Bespoke (free)   → Canvas only (Saturn rings / UFO saucer exceed the
 //                        inscribed circle and must not be clipped).
-//   • Animated         → TimelineView wraps the Canvas (Snowglobe, UFO).
+//   • Animated         → TimelineView wraps the Canvas.  Every Legendary
+//                        bespoke skin is animated (2026-07 Legendary fund);
+//                        each freezes to its original static art under
+//                        Reduce Motion.
 // ---------------------------------------------------------------------------
 
 struct BallSkinView: View {
@@ -41,7 +44,9 @@ struct BallSkinView: View {
         case .ufo:
             ufoCanvas   // NOT clipped — saucer fills the square frame
 
-        // ── Static bespoke (Canvas) ─────────────────────────────────────
+        // ── Bespoke Canvas skins ────────────────────────────────────────
+        // golfBall/soccer/saturn/pluto are static (Epic bar / silhouette
+        // clause); aquarium…ghost are animated Legendaries (2026-07 fund).
         case .golfBall:
             golfBallCanvas
                 .clipShape(Circle())
