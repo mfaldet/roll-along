@@ -70,10 +70,48 @@ Guarded by the new regression test
 `testTutorialGift_permanentStandardBundlePool_neverEmpty` — a future price
 or bundle change that empties the pool fails CI, not prod.
 
-Known follow-up (unchanged from the memo): with a near-flat 1:2 tier ladder,
+~~Known follow-up (unchanged from the memo): with a near-flat 1:2 tier ladder,
 bundle `fullPrice` mostly measures *item count*, not tier mix. Deriving
 BundleRarity from member tiers instead of total price is queued as a design
-decision before the next seasonal drop.
+decision before the next seasonal drop.~~ **Done (2026-07)** — see the next
+section; everything above this line is a historical record of the interim
+price floors, which no longer exist in code.
+
+## Follow-up closed: bundle rarity now derives from member tiers
+
+`BundleRarity` is now computed from the bundle's **member tier mix**
+(`CosmeticBundle.tierCounts()`); prices appear nowhere in the rule, so future
+reprices cannot reshuffle the bands:
+
+> **≥ 2 legendary members → Legendary; ≥ 2 epic-or-legendary members →
+> Rare; otherwise Standard.**
+
+Player-explainable in one sentence: *a Legendary bundle is packed with
+legendary items, a Rare bundle carries a couple of high-tier showpieces, and
+a Standard bundle is (almost) all standard fare.*
+
+Candidate rules were evaluated on the live-catalogue tier-mix dump
+(`test_bundleRarityDistribution` now prints each bundle's
+std/rare/epic/legendary member counts alongside its rarity):
+
+| Rule | Split S/R/L | Perm. Standard pool | Verdict |
+|---|---|---:|---|
+| ≥2 leg → L; ≥1 leg or ≥2 epic → R | 3 / 25 / 38 | 3 | pool below the 4–8 band |
+| Majority member tier (ties promote) | 31 / 6 / 29 | 24 | pyramid inverted |
+| Value-weighted mean tier (≤1.6 / ≤2.3) | 5 / 19 / 42 | 4 | works, but magic decimal thresholds — price-per-item in disguise |
+| **≥2 leg → L; ≥2 (epic+leg) → R — chosen** | **7 / 21 / 38** | **6** | pyramid next to the floors' 6/20/40, pool in band, count-based and explainable |
+
+Reclassifications vs the price floors (9 bundles, each with a clean content
+story): champion and high-roller carry 2 legendary members → promoted to
+Legendary; realistic-marble, muertos-2026, lunar-2027 and lava-lamp hold only
+1 → demoted to Rare; bloom and midas (one showpiece each) join Standard;
+earthday-2027 (epic + legendary member) moves to Rare.
+
+**Permanent Standard pool is now 6**: diamond, nature, citrus, sketchbook,
+bloom, midas (+ seasonal window backtoschool-2026). The regression test
+`testTutorialGift_permanentStandardBundlePool_neverEmpty` now also pins the
+pool to the specified 4–8 band, and
+`test_bundleRarity_isDerivedFromMemberTiers` pins the rule itself.
 
 ## IAP coin packs — re-anchored
 

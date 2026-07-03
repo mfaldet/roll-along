@@ -1135,13 +1135,18 @@ struct HomeView: View {
     }
 
     /// Floating lives pill in the top-LEFT corner — a mirror of the coin
-    /// pill on the right: one red marble + the live count + a chevron.
-    /// Unlimited-lives subscribers see one diamond marble + an ∞ glyph.
+    /// pill on the right: one red marble + the TOTAL life count (regen bar
+    /// + purchased reserve) + a chevron.  The count is colour-coded (white →
+    /// yellow when running on reserve → orange at ≤3 → red at 0) and the
+    /// next-free-life countdown sits right of it whenever the regen bar
+    /// isn't full.  Unlimited-lives subscribers see one diamond marble + ∞.
     /// Tapping it opens BuyLivesSheet (which doubles as the "lives status
     /// + explanation + purchase" screen, including the regen countdown).
     private var livesMarblePill: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
             let unlimited = gameState.unlimitedLives
+            let regen     = gameState.displayedLives
+            let total     = gameState.totalLives
 
             VStack {
                 HStack {
@@ -1157,10 +1162,21 @@ struct HomeView: View {
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(Self.diamondLifeGradient)
                             } else {
-                                Text("\(gameState.displayedLives)")
+                                Text("\(total)")
                                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Self.livesCountColor(regen: regen, total: total))
                                     .monospacedDigit()
+
+                                if let secs = gameState.timeToNextLife() {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "clock")
+                                            .font(.system(size: 10, weight: .semibold))
+                                        Text(Self.formatCountdown(secs))
+                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                            .monospacedDigit()
+                                    }
+                                    .foregroundStyle(Color(white: 0.62))
+                                }
                             }
 
                             Image(systemName: "chevron.right")
@@ -1246,17 +1262,27 @@ struct HomeView: View {
         if gameState.unlimitedLives {
             return "Unlimited lives."
         }
-        let display    = gameState.displayedLives
-        let filled     = min(display, GameState.livesMax)
-        let stockpile  = max(0, display - GameState.livesMax)
-        var label = "\(filled) of \(GameState.livesMax) lives."
-        if stockpile > 0 {
-            label += " Plus \(stockpile) stockpiled."
+        let regen   = gameState.displayedLives
+        let reserve = gameState.purchasedLives
+        var label = "\(regen) of \(GameState.livesMax) lives."
+        if reserve > 0 {
+            label += " Plus \(reserve) in reserve."
         }
         if let next = gameState.timeToNextLife() {
             label += " Next life in \(Self.formatCountdown(next))."
         }
         return label
+    }
+
+    /// Count colour for the lives pill (matches BallGameView.livesCountColor
+    /// so the two pills read identically): red at 0 total, orange at ≤3
+    /// total, yellow while running on the purchased reserve (regen bar dry),
+    /// white while regenerative lives remain.
+    private static func livesCountColor(regen: Int, total: Int) -> Color {
+        if total <= 0 { return Color(red: 0.95, green: 0.36, blue: 0.36) }
+        if total <= 3 { return Color(red: 0.99, green: 0.63, blue: 0.20) }
+        if regen <= 0 { return Color(red: 1.00, green: 0.83, blue: 0.25) }
+        return .white
     }
 
     private static let redLifeGradient = LinearGradient(

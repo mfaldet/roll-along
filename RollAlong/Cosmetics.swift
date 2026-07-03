@@ -229,15 +229,17 @@ extension BallSkin: CosmeticItem {
         case .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon,
              .gold, .silver, .copper, .jade, .ruby:
             return .standard   //  750 coins — all mono-shaded
-        case .galaxy, .nebula, .opal,
+        case .opal,
              .pastel, .neon, .dune, .paper,
              .basketball, .soccer, .baseball, .eightBall, .golfBall,
              .geode,           // Geode bundle — Epic (banded agate + druzy core)
-             .lavaLamp,        // Lava Lamp bundle — Epic (animated wax blobs)
              .cathedral:       // Cathedral bundle — Epic (stained-glass rosette)
             return .premium    // 1,250 coins (Epic) — colour blends + sports/paper balls
         case .snowglobe, .pluto, .ufo, .aquarium, .marble,
              .storm, .candy, .ghost, .lava, .trench, .disco,
+             .galaxy,          // audit 2026-07 ruling 1(c): R4 animated spiral — Legendary
+             .nebula,          // audit 2026-07 ruling 1(c): R4 animated blobs+stars — Legendary
+             .lavaLamp,        // audit 2026-07 ruling 1(c): R4 MeshGradient+wax blobs — Legendary
              .highRoller,      // High Roller bundle — coin/bundle purchasable
              .quicksilver,     // Quicksilver bundle — coin/bundle purchasable
              .oracle,          // Oracle bundle — coin/bundle purchasable
@@ -900,11 +902,14 @@ enum TrailColor: String, CosmeticItem {
         switch self {
         case .none:
             return .starter
-        case .ink, .ember, .sky, .forest, .bubblegum:
+        case .sky, .forest, .bubblegum:
             return .standard   //  750 coins — solid mono colour
-        case .snake, .raybeam, .gilded, .graphite, .roseTrail:
+        case .snake, .raybeam, .gilded, .graphite,
+             .ember:           // audit 2026-07 ruling 1(c): rides the plusLighter glow path — Rare
             return .rare       // 1,000 coins — distinctive textured trails
         case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air, .aurora,
+             .ink,             // audit 2026-07 ruling 1(c): bespoke dwell/bleed lifecycle — Legendary
+             .roseTrail,       // audit 2026-07 ruling 1(c): full trailAge petal lifecycle — Legendary
              .moneyRoll:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
             return .exclusive  // 1,500 coins — animated / special-effect
         }
@@ -1035,12 +1040,17 @@ enum Floor: String, CosmeticItem {
         switch self {
         case .classic:
             return .starter
-        case .inverted, .twilight, .ember, .notebook, .graph,
+        case .inverted, .twilight, .ember,
              .blueprint, .dusk, .meadow,
-             .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .desert, .stormcloud, .sugar, .fog,
+             .velvet, .midnight, .sunset,
+             .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt:
             return .standard   //  750 coins
+        case .notebook, .graph, .parchment, .sketch, .origami:
+            // audit 2026-07 ruling 1(c): bespoke static texture overlays
+            // (ruled lines / grid / vignette+specks / cross-hatch / fold
+            // shadows) — exactly the Rare bar; opens the floors Rare rung.
+            return .rare       // 1,000 coins — static texture overlay
         case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass,
              .moneyFull:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
             return .exclusive  // 1,500 coins — animated / textured overlay
@@ -1630,28 +1640,36 @@ enum ShopRotation {
     }
 }
 
-/// A bundle's overall rarity, derived from its total coin value.  Three bands so
+/// A bundle's overall rarity, derived from its MEMBER TIERS.  Three bands so
 /// the shop reads at a glance and the post-tutorial gift can filter to Standard.
 enum BundleRarity: String, CaseIterable {
     case standard, rare, legendary
 
-    /// Cost thresholds (in coins).  `fullPrice < rareFloor` → Standard;
-    /// `< legendaryFloor` → Rare; otherwise Legendary.
+    /// Member-count thresholds.  ≥ `legendaryMembersFloor` legendary
+    /// (`.exclusive`) items → Legendary; ≥ `highTierMembersFloor` epic-or-
+    /// legendary (`.premium`/`.exclusive`) items → Rare; otherwise Standard.
+    /// In one sentence: a Legendary bundle is packed with legendary items, a
+    /// Rare bundle carries a couple of high-tier showpieces, and a Standard
+    /// bundle is (almost) all standard fare.
     ///
-    /// Re-derived for the 2026-07 tier reprice (750/1,000/1,250/1,500) from
-    /// the ACTUAL catalogue distribution (test_bundleRarityDistribution dump:
-    /// 66 bundles, fullPrice 4,500–13,500).  Chosen so that:
-    ///   • the split stays a pyramid — 6 / 20 / 40 (9% / 30% / 61%),
-    ///     proportionally close to the old 7 / 17 / 42;
+    /// Replaces the old `fullPrice()` coin floors (5,500 / 6,500): under the
+    /// near-flat 2026-07 tier ladder (750/1,000/1,250/1,500) total price
+    /// mostly measured ITEM COUNT, not content quality.  Deriving from member
+    /// tiers keeps rarity price-free — future reprices can't silently reshuffle
+    /// the bands.  Validated against the ACTUAL catalogue
+    /// (test_bundleRarityDistribution dump, 66 bundles, after the 2026-07
+    /// audit ruling-1c under-tier promotions):
+    ///   • the split stays a pyramid — 4 / 19 / 43 (6% / 29% / 65%), from
+    ///     7 / 21 / 38 pre-ruling (diamond → Rare; bloom, backtoschool-2026,
+    ///     lava-lamp, valentines-2027, muertos-2026 → Legendary);
     ///   • the PERMANENT (non-seasonal) Standard pool feeding the
-    ///     post-tutorial gift picker holds 4 bundles (diamond, nature,
-    ///     citrus, sketchbook) + 2 seasonal windows (backtoschool-2026,
-    ///     earthday-2027) — guarded by
-    ///     testTutorialGift_permanentStandardBundlePool_neverEmpty.
-    /// Six bundles sit at exactly 5,500, so the next round step up (5,750)
-    /// would balloon the permanent gift pool to 10 — keep 5,500.
-    static let rareFloor      = 5500
-    static let legendaryFloor = 6500
+    ///     post-tutorial gift picker holds 4 bundles (nature, citrus,
+    ///     sketchbook, midas) — at the FLOOR of the required 4–8 band, guarded
+    ///     by testTutorialGift_permanentStandardBundlePool_neverEmpty; any
+    ///     further promotion out of this pool needs a replacement Standard
+    ///     bundle first.
+    static let legendaryMembersFloor = 2
+    static let highTierMembersFloor  = 2
 
     var label: String {
         switch self {
@@ -1778,16 +1796,32 @@ struct CosmeticBundle: Identifiable {
         return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
     }
 
-    /// Bundle rarity — derived from the bundle's TOTAL coin value (`fullPrice`),
-    /// since price already encodes per-item rarity.  Thresholds tuned to the live
-    /// catalogue so a healthy number of cheaper bundles land in Standard (those
-    /// are the ones offered as the post-tutorial gift).
+    /// Count of contained items per cosmetic tier (starter items included —
+    /// they're free and don't affect rarity).  Feeds `rarity` and the
+    /// distribution dump in CosmeticsTests.
+    func tierCounts() -> [CosmeticTier: Int] {
+        var counts: [CosmeticTier: Int] = [:]
+        for b in balls  { counts[b.tier, default: 0] += 1 }
+        for g in goals  { counts[g.tier, default: 0] += 1 }
+        for t in trails { counts[t.tier, default: 0] += 1 }
+        for f in floors { counts[f.tier, default: 0] += 1 }
+        for p in pits   { counts[p.tier, default: 0] += 1 }
+        for m in music  { counts[m.tier, default: 0] += 1 }
+        return counts
+    }
+
+    /// Bundle rarity — derived from the bundle's MEMBER TIERS, not its price:
+    /// two or more legendary items → Legendary; two or more epic-or-legendary
+    /// items → Rare; otherwise Standard.  Price never appears in the rule, so
+    /// reprices can't reshuffle the bands (see `BundleRarity` for the full
+    /// derivation).  Standard bundles are the post-tutorial gift pool.
     var rarity: BundleRarity {
-        switch fullPrice() {
-        case ..<BundleRarity.rareFloor:       return .standard
-        case ..<BundleRarity.legendaryFloor:  return .rare
-        default:                              return .legendary
-        }
+        let counts = tierCounts()
+        let legendaryMembers = counts[.exclusive] ?? 0
+        let highTierMembers  = legendaryMembers + (counts[.premium] ?? 0)
+        if legendaryMembers >= BundleRarity.legendaryMembersFloor { return .legendary }
+        if highTierMembers  >= BundleRarity.highTierMembersFloor  { return .rare }
+        return .standard
     }
 
     /// The prorated price — the sum of only the items the player does NOT

@@ -49,7 +49,7 @@ struct SettingsView: View {
                         highestUnlocked: gameState.highestUnlocked,
                         totalStars:      gameState.totalStars,
                         coinsCollected:  gameState.totalCoins,
-                        lives:           gameState.lives
+                        lives:           gameState.totalLives
                     )
                 }
             }

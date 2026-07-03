@@ -5,7 +5,7 @@ Notable changes to Roll Along, newest first. Dates are when the work landed on
 
 ---
 
-## 2026-07 — Starter Pack returns
+## 2026-07 — Starter Pack returns; lives become a reserve queue
 
 ### Starter Pack welcome offer (un-retired)
 
@@ -21,6 +21,24 @@ Notable changes to Roll Along, newest first. Dates are when the work landed on
   under `--uitesting`, and whenever the App Store product isn't loaded.
 - **Past buyers unaffected**: restore still re-grants the collection (never
   the coins), and the offer never re-shows once claimed or dismissed.
+
+### Lives
+- **Purchased lives now live in a separate reserve queue** (`purchasedLives`)
+  instead of stockpiling inside the 10-life regen bar. Regenerative lives are
+  spent first; the reserve drains only when the bar is dry, and the 6-minute
+  regen timer keeps ticking regardless of reserve size. Rewarded-ad and
+  friend-gift lives also land in the reserve. Existing stockpiles above 10
+  migrate into the reserve on first launch.
+- **The lives pill shows the total** (regen + reserve) and colour-codes it:
+  white while regenerative lives remain, yellow when running on reserve,
+  orange at ≤3 total, red at 0. Unlimited owners keep the diamond ∞.
+- **The next-life countdown is always visible** beside the pill count (home +
+  in-game HUD) unless the regen bar is full or lives are unlimited (was:
+  in-game only, below 6 lives).
+- **"Reload" terminology retired.** Lives packs are now just "10/60/130
+  Lives", described as reserve lives (Get Lives sheet + Products.storekit).
+  Also fixed the Out of Lives overlay claiming refills every 10 minutes —
+  it's 6.
 
 ---
 

@@ -8,13 +8,13 @@
       "internalID": "11000001",
       "localizations": [
         {
-          "description": "10 lives instantly delivered.",
-          "displayName": "1 full reload",
+          "description": "10 lives added to your reserve.",
+          "displayName": "10 Lives",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.lives.pack1",
-      "referenceName": "1 Full Reload (10 lives) $0.99",
+      "referenceName": "10 Lives $0.99",
       "type": "Consumable"
     },
     {
@@ -23,13 +23,13 @@
       "internalID": "11000002",
       "localizations": [
         {
-          "description": "60 lives — best value for casual play.",
-          "displayName": "6 full reloads",
+          "description": "60 reserve lives — 20% more per dollar.",
+          "displayName": "60 Lives",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.lives.pack5",
-      "referenceName": "6 Full Reloads (60 lives) $4.99",
+      "referenceName": "60 Lives $4.99",
       "type": "Consumable"
     },
     {
@@ -38,13 +38,13 @@
       "internalID": "11000003",
       "localizations": [
         {
-          "description": "130 lives — for serious chasers.",
-          "displayName": "13 full reloads",
+          "description": "130 reserve lives — our best value.",
+          "displayName": "130 Lives",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.lives.pack10",
-      "referenceName": "13 Full Reloads (130 lives) $9.99",
+      "referenceName": "130 Lives $9.99",
       "type": "Consumable"
     },
     {
@@ -53,7 +53,7 @@
       "internalID": "11000004",
       "localizations": [
         {
-          "description": "Never run out of lives again. Unlocks the gold marble HUD + exclusive cosmetic packs as we release them.",
+          "description": "Never run out of lives again. Unlocks the Diamond ball skin + exclusive cosmetic packs as we release them.",
           "displayName": "Unlimited Lives",
           "locale": "en_US"
         }

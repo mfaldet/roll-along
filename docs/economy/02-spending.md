@@ -61,10 +61,13 @@ actually uses (below).
 - **Bundles are not a discount**: `proratedPrice` charges the sum of *unowned*
   items only (Cosmetics.swift:1770-1778) — identical to buying singles. Their
   value is curation + the auto-equip UX.
-- **Bundle rarity** derives from `fullPrice()`: rare ≥700, legendary ≥1,100
-  (Cosmetics.swift:1627-1628). Corrected examples: Hellfire 1,650 (legendary),
-  Golf 2,250 (legendary), Champion 1,250 (legendary), Bloom/Pastel ~650
-  (standard).
+- **Bundle rarity** derives from the **member tier mix**, not price
+  (`CosmeticBundle.rarity` via `tierCounts()`): ≥2 legendary members →
+  Legendary; ≥2 epic-or-legendary members → Rare; else Standard. Prices
+  appear nowhere in the rule, so reprices can't reshuffle the bands — see
+  [08-reprice](08-reprice.md) "Follow-up closed". Examples: Hellfire (3
+  legendary members) and Champion (2) are Legendary; Pastel (2 epic) is
+  Rare; Bloom (1 legendary showpiece, rest standard) is Standard.
 - **The only true discounts**:
   - **Featured-shop rotation** — hourly, one of 10/15/25/50% off at weights
     50/30/15/5 → expected ~15.75% (Cosmetics.swift:1441-1496), floored to ×5.
