@@ -2918,137 +2918,193 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Pumpkin  (Halloween 2026 seasonal exclusive)
+    // MARK: - Pumpkin  (Halloween 2026 seasonal exclusive · Legendary)
     // Orange Jack-o'-lantern with five vertical rib lines, a warm amber
     // inner glow, triangular eyes, a jagged three-toothed grin, and a
-    // small curved stem.  Clipped to a circle by the body switch caller.
+    // small curved stem.  Animated: the inner candle flickers on two
+    // incommensurate clocks, the carved eyes and grin breathe with it, and a
+    // few embers drift up past the face.  Under Reduce Motion the candle
+    // holds steady and the embers are gone — exactly the original static
+    // carving.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var pumpkinCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Candle flicker — 1.0 means "original steady glow", so the
+                // Reduce Motion fallback reproduces the static skin exactly.
+                let flick: Double = reduceMotion ? 1.0 : 0.84 + 0.11 * sin(t * 6.8) + 0.05 * sin(t * 11.3 + 1.7)
+                // Carve-glow strength for the eyes/grin (additive layer only).
+                let carve: Double = reduceMotion ? 0.0 : 0.22 + 0.55 * (flick - 0.68)
 
-            // ── 1. Orange radial gradient sphere base ───────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.72, blue: 0.22), location: 0.00),
-                        .init(color: Color(red: 0.95, green: 0.44, blue: 0.08), location: 0.48),
-                        .init(color: Color(red: 0.62, green: 0.22, blue: 0.04), location: 0.82),
-                        .init(color: Color(red: 0.32, green: 0.10, blue: 0.01), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
-                    startRadius: 0, endRadius: r * 1.28))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Warm amber inner glow — lit-from-inside effect ────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.22,
-                                       width: r * 1.16, height: r * 0.88)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.88, blue: 0.28).opacity(0.52), location: 0.00),
-                        .init(color: Color(red: 1.00, green: 0.68, blue: 0.08).opacity(0.22), location: 0.55),
-                        .init(color: .clear, location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx, y: cy + r * 0.18),
-                    startRadius: 0, endRadius: r * 0.72))
+                // ── 1. Orange radial gradient sphere base ───────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.72, blue: 0.22), location: 0.00),
+                            .init(color: Color(red: 0.95, green: 0.44, blue: 0.08), location: 0.48),
+                            .init(color: Color(red: 0.62, green: 0.22, blue: 0.04), location: 0.82),
+                            .init(color: Color(red: 0.32, green: 0.10, blue: 0.01), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.18, y: cy - r * 0.22),
+                        startRadius: 0, endRadius: r * 1.28))
 
-            // ── 3. Five rib lines — fan from north pole to south pole ────
-            let ribColor = Color(red: 0.24, green: 0.09, blue: 0.01)
-            let ribW     = max(1, r * 0.052)
-            let ribStyle = StrokeStyle(lineWidth: ribW, lineCap: .round)
+                // ── 2. Warm amber inner glow — flickering candle inside ──────
+                // Opacity and reach ride the flicker; at flick == 1.0 the
+                // numbers match the original static glow (0.52 / 0.22 / 0.72r).
+                let glowReach: CGFloat = r * (0.56 + 0.16 * CGFloat(flick))
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.22,
+                                           width: r * 1.16, height: r * 0.88)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.88, blue: 0.28).opacity(0.52 * flick), location: 0.00),
+                            .init(color: Color(red: 1.00, green: 0.68, blue: 0.08).opacity(0.22 * flick), location: 0.55),
+                            .init(color: .clear, location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx, y: cy + r * 0.18),
+                        startRadius: 0, endRadius: glowReach))
 
-            // Centre rib — straight vertical
-            var centre = Path()
-            centre.move(to: CGPoint(x: cx, y: cy - r * 0.88))
-            centre.addLine(to: CGPoint(x: cx, y: cy + r * 0.88))
-            ctx.stroke(centre, with: .color(ribColor.opacity(0.68)), style: ribStyle)
+                // ── 3. Five rib lines — fan from north pole to south pole ────
+                let ribColor = Color(red: 0.24, green: 0.09, blue: 0.01)
+                let ribW     = max(1, r * 0.052)
+                let ribStyle = StrokeStyle(lineWidth: ribW, lineCap: .round)
 
-            // Inner pair — bow ±r*0.44 outward
-            for sign in [-1, 1] as [CGFloat] {
-                var rib = Path()
-                rib.move(to: CGPoint(x: cx, y: cy - r * 0.86))
-                rib.addQuadCurve(to: CGPoint(x: cx, y: cy + r * 0.86),
-                                 control: CGPoint(x: cx + sign * r * 0.44, y: cy))
-                ctx.stroke(rib, with: .color(ribColor.opacity(0.62)), style: ribStyle)
+                // Centre rib — straight vertical
+                var centre = Path()
+                centre.move(to: CGPoint(x: cx, y: cy - r * 0.88))
+                centre.addLine(to: CGPoint(x: cx, y: cy + r * 0.88))
+                ctx.stroke(centre, with: .color(ribColor.opacity(0.68)), style: ribStyle)
+
+                // Inner pair — bow ±r*0.44 outward
+                for sign in [-1, 1] as [CGFloat] {
+                    var rib = Path()
+                    rib.move(to: CGPoint(x: cx, y: cy - r * 0.86))
+                    rib.addQuadCurve(to: CGPoint(x: cx, y: cy + r * 0.86),
+                                     control: CGPoint(x: cx + sign * r * 0.44, y: cy))
+                    ctx.stroke(rib, with: .color(ribColor.opacity(0.62)), style: ribStyle)
+                }
+
+                // Outer pair — bow ±r*0.82 outward
+                for sign in [-1, 1] as [CGFloat] {
+                    var rib = Path()
+                    rib.move(to: CGPoint(x: cx, y: cy - r * 0.78))
+                    rib.addQuadCurve(to: CGPoint(x: cx, y: cy + r * 0.78),
+                                     control: CGPoint(x: cx + sign * r * 0.82, y: cy))
+                    ctx.stroke(rib, with: .color(ribColor.opacity(0.50)), style: ribStyle)
+                }
+
+                // ── 4. Stem — small curved stalk at north pole ───────────────
+                var stemPath = Path()
+                stemPath.move(to: CGPoint(x: cx + r * 0.04, y: cy - r * 0.82))
+                stemPath.addQuadCurve(
+                    to:      CGPoint(x: cx + r * 0.14, y: cy - r * 0.96),
+                    control: CGPoint(x: cx + r * 0.16, y: cy - r * 0.86))
+                ctx.stroke(stemPath,
+                           with: .color(Color(red: 0.16, green: 0.34, blue: 0.10)),
+                           style: StrokeStyle(lineWidth: max(1.5, r * 0.10), lineCap: .round))
+
+                // ── 5. Two triangular eyes — downward-pointing ───────────────
+                // The dark cutout stays; a candle-glow gradient breathes over
+                // it in step 5b so the carve looks lit from within.
+                let candle = Color(red: 1.00, green: 0.78, blue: 0.20)
+                let faceColor = Color(red: 0.08, green: 0.03, blue: 0.00)
+                let eyeW  = r * 0.22
+                let eyeH  = r * 0.26
+                let eyeTop = cy - r * 0.30
+
+                for ex in [cx - r * 0.30, cx + r * 0.30] as [CGFloat] {
+                    var eye = Path()
+                    eye.move(to: CGPoint(x: ex - eyeW / 2, y: eyeTop))
+                    eye.addLine(to: CGPoint(x: ex + eyeW / 2, y: eyeTop))
+                    eye.addLine(to: CGPoint(x: ex,            y: eyeTop + eyeH))
+                    eye.closeSubpath()
+                    ctx.fill(eye, with: .color(faceColor))
+                    // 5b. Flickering candlelight inside the socket (additive;
+                    //     zero-opacity — i.e. invisible — under Reduce Motion).
+                    if carve > 0 {
+                        ctx.fill(eye, with: .radialGradient(
+                            Gradient(colors: [candle.opacity(carve), .clear]),
+                            center: CGPoint(x: ex, y: eyeTop + eyeH * 0.55),
+                            startRadius: 0, endRadius: eyeH * 1.1))
+                    }
+                }
+
+                // ── 6. Jagged grin — 3 orange teeth visible at bottom ────────
+                // The dark filled grin shape has three triangular notches cut
+                // from its lower edge, exposing the orange sphere beneath them.
+                // This creates 3 orange triangular teeth rising from the bottom
+                // of the grin opening — the classic carved Jack-o'-lantern look.
+                let mouthL    = cx - r * 0.44
+                let mouthR    = cx + r * 0.44
+                let mouthT    = cy + r * 0.08
+                let mouthB    = cy + r * 0.38
+                let mH2       = mouthB - mouthT
+                let seg       = (mouthR - mouthL) / 7.0
+                let toothTopY = mouthT + mH2 * 0.30  // tips of orange notches
+
+                var grin = Path()
+                grin.move(to: CGPoint(x: mouthL, y: mouthT))
+                grin.addLine(to: CGPoint(x: mouthR,              y: mouthT))
+                grin.addLine(to: CGPoint(x: mouthR,              y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 6,    y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 5.5,  y: toothTopY))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 5,    y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 4,    y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 3.5,  y: toothTopY))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 3,    y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 2,    y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 1.5,  y: toothTopY))
+                grin.addLine(to: CGPoint(x: mouthL + seg * 1,    y: mouthB))
+                grin.addLine(to: CGPoint(x: mouthL,              y: mouthB))
+                grin.closeSubpath()
+                ctx.fill(grin, with: .color(faceColor))
+                // 6b. Candlelight spilling through the grin (additive layer).
+                if carve > 0 {
+                    let grinGlowR: CGFloat = (mouthR - mouthL) * 0.55
+                    ctx.fill(grin, with: .radialGradient(
+                        Gradient(colors: [candle.opacity(carve), .clear]),
+                        center: CGPoint(x: cx, y: (mouthT + mouthB) / 2),
+                        startRadius: 0, endRadius: grinGlowR))
+                }
+
+                // ── 7. Drifting embers — a few sparks rise past the face ─────
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    let ember = Color(red: 1.00, green: 0.62, blue: 0.10)
+                    for i in 0..<6 {
+                        let seed: Double  = Double(i) * 0.61 + 0.17
+                        let speed: Double = 0.16 + 0.05 * Double(i % 3)
+                        let cycle: Double = (t * speed + seed).truncatingRemainder(dividingBy: 1.0)
+                        let sway: Double  = sin(t * 1.4 + seed * 6.0)
+                        let drift: CGFloat = CGFloat(seed.truncatingRemainder(dividingBy: 0.5) - 0.25)
+                        let px: CGFloat = cx + drift * r * 1.4 + CGFloat(sway) * r * 0.07
+                        let py: CGFloat = cy + r * 0.42 - CGFloat(cycle) * r * 1.15
+                        // Fade in just off the grin, fade out toward the crown.
+                        let fade: Double = 0.75 * (1.0 - cycle) * min(1.0, cycle * 6.0)
+                        let es: CGFloat = r * (0.028 + 0.014 * CGFloat(i % 2))
+                        ctx.fill(Path(ellipseIn: CGRect(x: px - es, y: py - es,
+                                                        width: es * 2, height: es * 2)),
+                                 with: .color(ember.opacity(fade)))
+                    }
+                }
+
+                // ── 8. Specular highlight ────────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.54, y: cy - r * 0.66,
+                                           width: r * 0.36, height: r * 0.24)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.48), .clear]),
+                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.56),
+                        startRadius: 0, endRadius: r * 0.28))
             }
-
-            // Outer pair — bow ±r*0.82 outward
-            for sign in [-1, 1] as [CGFloat] {
-                var rib = Path()
-                rib.move(to: CGPoint(x: cx, y: cy - r * 0.78))
-                rib.addQuadCurve(to: CGPoint(x: cx, y: cy + r * 0.78),
-                                 control: CGPoint(x: cx + sign * r * 0.82, y: cy))
-                ctx.stroke(rib, with: .color(ribColor.opacity(0.50)), style: ribStyle)
-            }
-
-            // ── 4. Stem — small curved stalk at north pole ───────────────
-            var stemPath = Path()
-            stemPath.move(to: CGPoint(x: cx + r * 0.04, y: cy - r * 0.82))
-            stemPath.addQuadCurve(
-                to:      CGPoint(x: cx + r * 0.14, y: cy - r * 0.96),
-                control: CGPoint(x: cx + r * 0.16, y: cy - r * 0.86))
-            ctx.stroke(stemPath,
-                       with: .color(Color(red: 0.16, green: 0.34, blue: 0.10)),
-                       style: StrokeStyle(lineWidth: max(1.5, r * 0.10), lineCap: .round))
-
-            // ── 5. Two triangular eyes — downward-pointing ───────────────
-            let faceColor = Color(red: 0.08, green: 0.03, blue: 0.00)
-            let eyeW  = r * 0.22
-            let eyeH  = r * 0.26
-            let eyeTop = cy - r * 0.30
-
-            for ex in [cx - r * 0.30, cx + r * 0.30] as [CGFloat] {
-                var eye = Path()
-                eye.move(to: CGPoint(x: ex - eyeW / 2, y: eyeTop))
-                eye.addLine(to: CGPoint(x: ex + eyeW / 2, y: eyeTop))
-                eye.addLine(to: CGPoint(x: ex,            y: eyeTop + eyeH))
-                eye.closeSubpath()
-                ctx.fill(eye, with: .color(faceColor))
-            }
-
-            // ── 6. Jagged grin — 3 orange teeth visible at bottom ────────
-            // The dark filled grin shape has three triangular notches cut
-            // from its lower edge, exposing the orange sphere beneath them.
-            // This creates 3 orange triangular teeth rising from the bottom
-            // of the grin opening — the classic carved Jack-o'-lantern look.
-            let mouthL    = cx - r * 0.44
-            let mouthR    = cx + r * 0.44
-            let mouthT    = cy + r * 0.08
-            let mouthB    = cy + r * 0.38
-            let mH2       = mouthB - mouthT
-            let seg       = (mouthR - mouthL) / 7.0
-            let toothTopY = mouthT + mH2 * 0.30  // tips of orange notches
-
-            var grin = Path()
-            grin.move(to: CGPoint(x: mouthL, y: mouthT))
-            grin.addLine(to: CGPoint(x: mouthR,              y: mouthT))
-            grin.addLine(to: CGPoint(x: mouthR,              y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 6,    y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 5.5,  y: toothTopY))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 5,    y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 4,    y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 3.5,  y: toothTopY))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 3,    y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 2,    y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 1.5,  y: toothTopY))
-            grin.addLine(to: CGPoint(x: mouthL + seg * 1,    y: mouthB))
-            grin.addLine(to: CGPoint(x: mouthL,              y: mouthB))
-            grin.closeSubpath()
-            ctx.fill(grin, with: .color(faceColor))
-
-            // ── 7. Specular highlight ────────────────────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.54, y: cy - r * 0.66,
-                                       width: r * 0.36, height: r * 0.24)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.48), .clear]),
-                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.56),
-                    startRadius: 0, endRadius: r * 0.28))
         }
     }
 
@@ -3976,122 +4032,165 @@ struct BallSkinView: View {
     // An ornate white calavera: a bone-white sphere with two large round eye
     // sockets ringed by marigold-orange petals, a small inverted-heart nose, a
     // stitched smile across the lower face, and a rose-and-marigold floral
-    // motif on the forehead.  Bright and festive.  Static.
-    // Clipped to a circle by the body switch caller.
+    // motif on the forehead.  Bright and festive.  Animated: the marigold
+    // sparks in the eye sockets pulse like votive candles (each on its own
+    // phase) and a handful of tiny marigold/rose sparks drift up around the
+    // face.  Under Reduce Motion both are gone — exactly the original static
+    // calavera.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var sugarSkullCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            let marigold = Color(red: 1.00, green: 0.60, blue: 0.12)
-            let rose     = Color(red: 0.92, green: 0.24, blue: 0.46)
-            let outline  = Color(red: 0.30, green: 0.20, blue: 0.16)
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 1. Bone-white sphere ─────────────────────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 1.00, blue: 0.99), location: 0.00),
-                        .init(color: Color(red: 0.96, green: 0.95, blue: 0.90), location: 0.45),
-                        .init(color: Color(red: 0.80, green: 0.76, blue: 0.68), location: 0.82),
-                        .init(color: Color(red: 0.48, green: 0.42, blue: 0.36), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.26),
-                    startRadius: 0, endRadius: r * 1.22))
+                let marigold = Color(red: 1.00, green: 0.60, blue: 0.12)
+                let rose     = Color(red: 0.92, green: 0.24, blue: 0.46)
+                let outline  = Color(red: 0.30, green: 0.20, blue: 0.16)
 
-            // ── 2. Forehead floral motif (rose + marigold petals) ────────
-            let fcx = cx
-            let fcy = cy - r * 0.46
-            // Marigold petal ring.
-            for k in 0..<8 {
-                let a  = Double(k) / 8.0 * 2 * .pi
-                let pr = r * 0.085
-                let px = fcx + CGFloat(cos(a)) * r * 0.13
-                let py = fcy + CGFloat(sin(a)) * r * 0.13
-                ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr, width: pr * 2, height: pr * 2)),
-                         with: .color(marigold.opacity(0.92)))
-            }
-            // Rose centre.
-            let roseR = r * 0.10
-            ctx.fill(Path(ellipseIn: CGRect(x: fcx - roseR, y: fcy - roseR, width: roseR * 2, height: roseR * 2)),
-                     with: .color(rose))
-            let roseR2 = r * 0.045
-            ctx.fill(Path(ellipseIn: CGRect(x: fcx - roseR2, y: fcy - roseR2, width: roseR2 * 2, height: roseR2 * 2)),
-                     with: .color(.white.opacity(0.85)))
+                // ── 1. Bone-white sphere ─────────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 1.00, blue: 0.99), location: 0.00),
+                            .init(color: Color(red: 0.96, green: 0.95, blue: 0.90), location: 0.45),
+                            .init(color: Color(red: 0.80, green: 0.76, blue: 0.68), location: 0.82),
+                            .init(color: Color(red: 0.48, green: 0.42, blue: 0.36), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.26),
+                        startRadius: 0, endRadius: r * 1.22))
 
-            // ── 3. Eye sockets with marigold petal rings ─────────────────
-            let eyeDX = r * 0.34
-            let eyeY  = cy - r * 0.02
-            let eyeR  = r * 0.20
-            for sgn in [CGFloat(-1), 1] {
-                let ecx = cx + sgn * eyeDX
-                // Marigold petals around the socket.
-                for k in 0..<10 {
-                    let a  = Double(k) / 10.0 * 2 * .pi
-                    let pr = r * 0.045
-                    let px = ecx + CGFloat(cos(a)) * eyeR * 1.05
-                    let py = eyeY + CGFloat(sin(a)) * eyeR * 1.05
+                // ── 2. Forehead floral motif (rose + marigold petals) ────────
+                let fcx = cx
+                let fcy = cy - r * 0.46
+                // Marigold petal ring.
+                for k in 0..<8 {
+                    let a  = Double(k) / 8.0 * 2 * .pi
+                    let pr = r * 0.085
+                    let px = fcx + CGFloat(cos(a)) * r * 0.13
+                    let py = fcy + CGFloat(sin(a)) * r * 0.13
                     ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr, width: pr * 2, height: pr * 2)),
-                             with: .color((k % 2 == 0 ? marigold : rose).opacity(0.85)))
+                             with: .color(marigold.opacity(0.92)))
                 }
-                // Dark socket.
-                ctx.fill(Path(ellipseIn: CGRect(x: ecx - eyeR, y: eyeY - eyeR, width: eyeR * 2, height: eyeR * 2)),
-                         with: .color(outline))
-                // Small bright spark glint in each socket.
-                let gr = eyeR * 0.34
-                ctx.fill(Path(ellipseIn: CGRect(x: ecx - gr, y: eyeY - gr, width: gr * 2, height: gr * 2)),
-                         with: .color(marigold.opacity(0.55)))
+                // Rose centre.
+                let roseR = r * 0.10
+                ctx.fill(Path(ellipseIn: CGRect(x: fcx - roseR, y: fcy - roseR, width: roseR * 2, height: roseR * 2)),
+                         with: .color(rose))
+                let roseR2 = r * 0.045
+                ctx.fill(Path(ellipseIn: CGRect(x: fcx - roseR2, y: fcy - roseR2, width: roseR2 * 2, height: roseR2 * 2)),
+                         with: .color(.white.opacity(0.85)))
+
+                // ── 3. Eye sockets with marigold petal rings ─────────────────
+                let eyeDX = r * 0.34
+                let eyeY  = cy - r * 0.02
+                let eyeR  = r * 0.20
+                for sgn in [CGFloat(-1), 1] {
+                    let ecx = cx + sgn * eyeDX
+                    // Marigold petals around the socket.
+                    for k in 0..<10 {
+                        let a  = Double(k) / 10.0 * 2 * .pi
+                        let pr = r * 0.045
+                        let px = ecx + CGFloat(cos(a)) * eyeR * 1.05
+                        let py = eyeY + CGFloat(sin(a)) * eyeR * 1.05
+                        ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr, width: pr * 2, height: pr * 2)),
+                                 with: .color((k % 2 == 0 ? marigold : rose).opacity(0.85)))
+                    }
+                    // Dark socket.
+                    ctx.fill(Path(ellipseIn: CGRect(x: ecx - eyeR, y: eyeY - eyeR, width: eyeR * 2, height: eyeR * 2)),
+                             with: .color(outline))
+                    // Small bright spark glint in each socket (static base).
+                    let gr = eyeR * 0.34
+                    ctx.fill(Path(ellipseIn: CGRect(x: ecx - gr, y: eyeY - gr, width: gr * 2, height: gr * 2)),
+                             with: .color(marigold.opacity(0.55)))
+                    // 3b. Votive-candle pulse — a marigold halo breathing over
+                    //     the socket and its petal ring, each eye on its own
+                    //     phase.  Additive; invisible under Reduce Motion.
+                    if !reduceMotion {
+                        let phase: Double = sgn > 0 ? 0.0 : 1.9
+                        let pulse: Double = 0.14 + 0.22 * (0.5 + 0.5 * sin(t * 1.7 + phase))
+                        let hr: CGFloat = eyeR * 1.55
+                        ctx.fill(Path(ellipseIn: CGRect(x: ecx - hr, y: eyeY - hr,
+                                                        width: hr * 2, height: hr * 2)),
+                                 with: .radialGradient(
+                                    Gradient(colors: [marigold.opacity(pulse), .clear]),
+                                    center: CGPoint(x: ecx, y: eyeY),
+                                    startRadius: 0, endRadius: hr))
+                    }
+                }
+
+                // ── 4. Inverted-heart nose ───────────────────────────────────
+                let nCx = cx
+                let nCy = cy + r * 0.22
+                let nS  = r * 0.10
+                var nose = Path()
+                nose.move(to: CGPoint(x: nCx, y: nCy + nS))                                  // bottom tip
+                nose.addQuadCurve(to: CGPoint(x: nCx - nS, y: nCy - nS * 0.4),
+                                  control: CGPoint(x: nCx - nS * 1.1, y: nCy + nS * 0.4))
+                nose.addArc(center: CGPoint(x: nCx - nS * 0.5, y: nCy - nS * 0.4),
+                            radius: nS * 0.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                nose.addArc(center: CGPoint(x: nCx + nS * 0.5, y: nCy - nS * 0.4),
+                            radius: nS * 0.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                nose.addQuadCurve(to: CGPoint(x: nCx, y: nCy + nS),
+                                  control: CGPoint(x: nCx + nS * 1.1, y: nCy + nS * 0.4))
+                nose.closeSubpath()
+                ctx.fill(nose, with: .color(outline))
+
+                // ── 5. Stitched smile ────────────────────────────────────────
+                let smileY = cy + r * 0.50
+                var smile = Path()
+                smile.move(to: CGPoint(x: cx - r * 0.42, y: smileY))
+                smile.addQuadCurve(to: CGPoint(x: cx + r * 0.42, y: smileY),
+                                   control: CGPoint(x: cx, y: smileY + r * 0.12))
+                ctx.stroke(smile, with: .color(outline),
+                           style: StrokeStyle(lineWidth: max(1.0, r * 0.03), lineCap: .round))
+                // Vertical stitch ticks crossing the smile.
+                for f in stride(from: CGFloat(-0.34), through: 0.34, by: 0.115) {
+                    let sx = cx + f * r
+                    let droop = (1 - (f / 0.42) * (f / 0.42)) * r * 0.10
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: sx, y: smileY + droop - r * 0.05))
+                    tick.addLine(to: CGPoint(x: sx, y: smileY + droop + r * 0.05))
+                    ctx.stroke(tick, with: .color(outline),
+                               style: StrokeStyle(lineWidth: max(0.8, r * 0.018), lineCap: .round))
+                }
+
+                // ── 6. Drifting marigold sparks — tiny petals of light rising
+                //     around the face, twinkling on individual clocks.
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    for i in 0..<8 {
+                        let seed: Double  = Double(i) * 0.57 + 0.11
+                        let speed: Double = 0.10 + 0.04 * Double(i % 3)
+                        let cycle: Double = (t * speed + seed).truncatingRemainder(dividingBy: 1.0)
+                        let ang: Double   = seed * 6.283 + t * 0.25
+                        let orbit: CGFloat = r * (0.55 + 0.8 * CGFloat(seed.truncatingRemainder(dividingBy: 0.4)))
+                        let px: CGFloat = cx + CGFloat(cos(ang)) * orbit
+                        let py: CGFloat = cy + r * 0.90 - CGFloat(cycle) * r * 1.80
+                        let tw: Double   = 0.30 + 0.45 * (0.5 + 0.5 * sin(t * 2.3 + seed * 7.0))
+                        let fade: Double = tw * min(1.0, cycle * 5.0) * min(1.0, (1.0 - cycle) * 5.0)
+                        let ss: CGFloat = r * (0.020 + 0.012 * CGFloat(i % 2))
+                        let col = (i % 3 == 0) ? rose : marigold
+                        ctx.fill(Path(ellipseIn: CGRect(x: px - ss, y: py - ss,
+                                                        width: ss * 2, height: ss * 2)),
+                                 with: .color(col.opacity(fade)))
+                    }
+                }
+
+                // ── 7. Specular highlight (upper-left) ───────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.78,
+                                           width: r * 0.40, height: r * 0.26)),
+                    with: .radialGradient(
+                        Gradient(colors: [.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: cx - r * 0.40, y: cy - r * 0.66),
+                        startRadius: 0, endRadius: r * 0.28))
             }
-
-            // ── 4. Inverted-heart nose ───────────────────────────────────
-            let nCx = cx
-            let nCy = cy + r * 0.22
-            let nS  = r * 0.10
-            var nose = Path()
-            nose.move(to: CGPoint(x: nCx, y: nCy + nS))                                  // bottom tip
-            nose.addQuadCurve(to: CGPoint(x: nCx - nS, y: nCy - nS * 0.4),
-                              control: CGPoint(x: nCx - nS * 1.1, y: nCy + nS * 0.4))
-            nose.addArc(center: CGPoint(x: nCx - nS * 0.5, y: nCy - nS * 0.4),
-                        radius: nS * 0.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
-            nose.addArc(center: CGPoint(x: nCx + nS * 0.5, y: nCy - nS * 0.4),
-                        radius: nS * 0.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
-            nose.addQuadCurve(to: CGPoint(x: nCx, y: nCy + nS),
-                              control: CGPoint(x: nCx + nS * 1.1, y: nCy + nS * 0.4))
-            nose.closeSubpath()
-            ctx.fill(nose, with: .color(outline))
-
-            // ── 5. Stitched smile ────────────────────────────────────────
-            let smileY = cy + r * 0.50
-            var smile = Path()
-            smile.move(to: CGPoint(x: cx - r * 0.42, y: smileY))
-            smile.addQuadCurve(to: CGPoint(x: cx + r * 0.42, y: smileY),
-                               control: CGPoint(x: cx, y: smileY + r * 0.12))
-            ctx.stroke(smile, with: .color(outline),
-                       style: StrokeStyle(lineWidth: max(1.0, r * 0.03), lineCap: .round))
-            // Vertical stitch ticks crossing the smile.
-            for f in stride(from: CGFloat(-0.34), through: 0.34, by: 0.115) {
-                let sx = cx + f * r
-                let droop = (1 - (f / 0.42) * (f / 0.42)) * r * 0.10
-                var tick = Path()
-                tick.move(to: CGPoint(x: sx, y: smileY + droop - r * 0.05))
-                tick.addLine(to: CGPoint(x: sx, y: smileY + droop + r * 0.05))
-                ctx.stroke(tick, with: .color(outline),
-                           style: StrokeStyle(lineWidth: max(0.8, r * 0.018), lineCap: .round))
-            }
-
-            // ── 6. Specular highlight (upper-left) ───────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.78,
-                                       width: r * 0.40, height: r * 0.26)),
-                with: .radialGradient(
-                    Gradient(colors: [.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: cx - r * 0.40, y: cy - r * 0.66),
-                    startRadius: 0, endRadius: r * 0.28))
         }
     }
 
@@ -4100,84 +4199,131 @@ struct BallSkinView: View {
     // A warm amber-to-maple gradient sphere with a subtle autumn-leaf motif:
     // a few translucent maple-leaf silhouettes drifting across the lit face
     // in deeper russet, plus soft mottled "moon" patches.  Cozy fall tones.
-    // Static.  Clipped to a circle by the body switch caller.
+    // Animated: the resident leaves sway gently on individual clocks, a warm
+    // amber harvest-light leans slowly side to side, and a few small leaves
+    // tumble down the face.  Under Reduce Motion all motion stops at the
+    // original static pose.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var harvestCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Per-leaf sway (zero under Reduce Motion → original pose).
+                let sway1: Double = reduceMotion ? 0.0 : 0.16 * sin(t * 0.70)
+                let sway2: Double = reduceMotion ? 0.0 : 0.16 * sin(t * 0.60 + 2.1)
+                let sway3: Double = reduceMotion ? 0.0 : 0.16 * sin(t * 0.80 + 4.2)
 
-            // ── 1. Warm amber → maple gradient sphere ────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.90, blue: 0.62), location: 0.00),
-                        .init(color: Color(red: 0.94, green: 0.66, blue: 0.28), location: 0.42),
-                        .init(color: Color(red: 0.74, green: 0.40, blue: 0.14), location: 0.80),
-                        .init(color: Color(red: 0.38, green: 0.18, blue: 0.06), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
-                    startRadius: 0, endRadius: r * 1.24))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Soft mottled "moon" patches (deeper maria) ────────────
-            let maria = Color(red: 0.64, green: 0.34, blue: 0.12).opacity(0.32)
-            for (fx, fy, fr) in [(0.40, 0.36, 0.20), (0.66, 0.58, 0.16),
-                                 (0.30, 0.62, 0.13), (0.58, 0.30, 0.11)] {
-                let bx = cx - r + CGFloat(fx) * r * 2
-                let by = cy - r + CGFloat(fy) * r * 2
-                let br = CGFloat(fr) * r
-                ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
-                         with: .radialGradient(Gradient(colors: [maria, .clear]),
-                                               center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
-            }
+                // ── 1. Warm amber → maple gradient sphere ────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.90, blue: 0.62), location: 0.00),
+                            .init(color: Color(red: 0.94, green: 0.66, blue: 0.28), location: 0.42),
+                            .init(color: Color(red: 0.74, green: 0.40, blue: 0.14), location: 0.80),
+                            .init(color: Color(red: 0.38, green: 0.18, blue: 0.06), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
+                        startRadius: 0, endRadius: r * 1.24))
 
-            // ── 3. Autumn-leaf motif — a few maple silhouettes ───────────
-            // A 7-point star-ish maple leaf built from radial spokes.
-            func leaf(at center: CGPoint, scale: CGFloat, rot: Double, color: Color) {
-                let lobes = 7
-                var path = Path()
-                for i in 0...(lobes * 2) {
-                    let frac = Double(i) / Double(lobes * 2)
-                    let a    = frac * 2 * .pi + rot
-                    // Alternate long tip / short valley to suggest serrated lobes.
-                    let rad  = (i % 2 == 0 ? scale : scale * 0.46)
-                    let px   = center.x + CGFloat(cos(a)) * rad
-                    let py   = center.y + CGFloat(sin(a)) * rad
-                    if i == 0 { path.move(to: CGPoint(x: px, y: py)) }
-                    else      { path.addLine(to: CGPoint(x: px, y: py)) }
+                // ── 2. Soft mottled "moon" patches (deeper maria) ────────────
+                let maria = Color(red: 0.64, green: 0.34, blue: 0.12).opacity(0.32)
+                for (fx, fy, fr) in [(0.40, 0.36, 0.20), (0.66, 0.58, 0.16),
+                                     (0.30, 0.62, 0.13), (0.58, 0.30, 0.11)] {
+                    let bx = cx - r + CGFloat(fx) * r * 2
+                    let by = cy - r + CGFloat(fy) * r * 2
+                    let br = CGFloat(fr) * r
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                             with: .radialGradient(Gradient(colors: [maria, .clear]),
+                                                   center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: br))
                 }
-                path.closeSubpath()
-                ctx.fill(path, with: .color(color))
-                // Short stem.
-                var stem = Path()
-                stem.move(to: center)
-                stem.addLine(to: CGPoint(x: center.x - CGFloat(cos(rot)) * scale * 1.3,
-                                         y: center.y - CGFloat(sin(rot)) * scale * 1.3))
-                ctx.stroke(stem, with: .color(color),
-                           style: StrokeStyle(lineWidth: max(0.8, scale * 0.10), lineCap: .round))
-            }
-            let russet = Color(red: 0.60, green: 0.26, blue: 0.08).opacity(0.55)
-            let amber  = Color(red: 0.86, green: 0.50, blue: 0.16).opacity(0.50)
-            leaf(at: CGPoint(x: cx - r * 0.34, y: cy + r * 0.18), scale: r * 0.20, rot: 0.4,  color: russet)
-            leaf(at: CGPoint(x: cx + r * 0.30, y: cy - r * 0.10), scale: r * 0.16, rot: 2.1,  color: amber)
-            leaf(at: CGPoint(x: cx + r * 0.06, y: cy + r * 0.40), scale: r * 0.14, rot: -0.8, color: russet)
 
-            // ── 4. Warm specular highlight (upper-left) ──────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
-                                       width: r * 0.44, height: r * 0.30)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.55), location: 0.00),
-                        .init(color: Color(red: 1.0, green: 0.92, blue: 0.66).opacity(0.30), location: 0.45),
-                        .init(color: .clear,               location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.64),
-                    startRadius: 0, endRadius: r * 0.34))
+                // ── 2b. Swaying amber harvest-light — a warm glow that leans
+                //     slowly side to side across the lit face.  Additive;
+                //     skipped under Reduce Motion → static fallback.
+                if !reduceMotion {
+                    let warmX: CGFloat = cx + CGFloat(sin(t * 0.5)) * r * 0.24
+                    let warm: Double = 0.14 + 0.06 * sin(t * 0.6 + 1.0)
+                    let warmR: CGFloat = r * 0.80
+                    ctx.fill(Path(ellipseIn: CGRect(x: warmX - warmR, y: cy - r * 0.10 - warmR,
+                                                    width: warmR * 2, height: warmR * 2)),
+                             with: .radialGradient(
+                                Gradient(colors: [Color(red: 1.00, green: 0.82, blue: 0.42).opacity(warm), .clear]),
+                                center: CGPoint(x: warmX, y: cy - r * 0.10),
+                                startRadius: 0, endRadius: warmR))
+                }
+
+                // ── 3. Autumn-leaf motif — a few maple silhouettes ───────────
+                // A 7-point star-ish maple leaf built from radial spokes.
+                func leaf(at center: CGPoint, scale: CGFloat, rot: Double, color: Color) {
+                    let lobes = 7
+                    var path = Path()
+                    for i in 0...(lobes * 2) {
+                        let frac = Double(i) / Double(lobes * 2)
+                        let a    = frac * 2 * .pi + rot
+                        // Alternate long tip / short valley to suggest serrated lobes.
+                        let rad  = (i % 2 == 0 ? scale : scale * 0.46)
+                        let px   = center.x + CGFloat(cos(a)) * rad
+                        let py   = center.y + CGFloat(sin(a)) * rad
+                        if i == 0 { path.move(to: CGPoint(x: px, y: py)) }
+                        else      { path.addLine(to: CGPoint(x: px, y: py)) }
+                    }
+                    path.closeSubpath()
+                    ctx.fill(path, with: .color(color))
+                    // Short stem.
+                    var stem = Path()
+                    stem.move(to: center)
+                    stem.addLine(to: CGPoint(x: center.x - CGFloat(cos(rot)) * scale * 1.3,
+                                             y: center.y - CGFloat(sin(rot)) * scale * 1.3))
+                    ctx.stroke(stem, with: .color(color),
+                               style: StrokeStyle(lineWidth: max(0.8, scale * 0.10), lineCap: .round))
+                }
+                let russet = Color(red: 0.60, green: 0.26, blue: 0.08).opacity(0.55)
+                let amber  = Color(red: 0.86, green: 0.50, blue: 0.16).opacity(0.50)
+                leaf(at: CGPoint(x: cx - r * 0.34, y: cy + r * 0.18), scale: r * 0.20, rot: 0.4 + sway1,  color: russet)
+                leaf(at: CGPoint(x: cx + r * 0.30, y: cy - r * 0.10), scale: r * 0.16, rot: 2.1 + sway2,  color: amber)
+                leaf(at: CGPoint(x: cx + r * 0.06, y: cy + r * 0.40), scale: r * 0.14, rot: -0.8 + sway3, color: russet)
+
+                // ── 3b. Falling leaves — small maples tumbling down the face,
+                //     fading in near the crown and out near the base.
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    let fallBase = Color(red: 0.72, green: 0.34, blue: 0.10)
+                    for i in 0..<4 {
+                        let seed: Double  = Double(i) * 0.77 + 0.21
+                        let speed: Double = 0.09 + 0.03 * Double(i % 2)
+                        let cycle: Double = (t * speed + seed).truncatingRemainder(dividingBy: 1.0)
+                        let flutter: Double = sin(t * 0.9 + seed * 6.0)
+                        let drift: CGFloat = CGFloat(seed.truncatingRemainder(dividingBy: 0.6) - 0.3)
+                        let px: CGFloat = cx + drift * r * 1.9 + CGFloat(flutter) * r * 0.10
+                        let py: CGFloat = cy - r * 0.95 + CGFloat(cycle) * r * 1.90
+                        let rot: Double = seed * 3.0 + t * (0.5 + 0.2 * Double(i % 2))
+                        let fade: Double = min(1.0, cycle * 8.0) * min(1.0, (1.0 - cycle) * 8.0)
+                        let sc: CGFloat = r * (0.070 + 0.020 * CGFloat(i % 2))
+                        leaf(at: CGPoint(x: px, y: py), scale: sc, rot: rot,
+                             color: fallBase.opacity(0.50 * fade))
+                    }
+                }
+
+                // ── 4. Warm specular highlight (upper-left) ──────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
+                                           width: r * 0.44, height: r * 0.30)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.55), location: 0.00),
+                            .init(color: Color(red: 1.0, green: 0.92, blue: 0.66).opacity(0.30), location: 0.45),
+                            .init(color: .clear,               location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.64),
+                        startRadius: 0, endRadius: r * 0.34))
+            }
         }
     }
 
@@ -4304,83 +4450,110 @@ struct BallSkinView: View {
     // gold, with a jeweled bead-like sheen.  A Canvas tiles a diagonal diamond
     // lattice (clipped to the sphere by the body switch caller), tints it with a
     // radial sphere-shade so it reads 3-D, scatters a few bright bead glints,
-    // and adds a specular highlight.  Static.
+    // and adds a specular highlight.  Animated: the gold lattice shimmers on a
+    // slow clock, a parade-float glint band sweeps across the sphere, and each
+    // bead glint twinkles on its own phase.  Under Reduce Motion everything
+    // holds at the original static look.
     // =========================================================================
     private var mardiGrasCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Lattice shimmer — 0.45 is the original static stroke opacity.
+                let latticeGlow: Double = reduceMotion ? 0.45 : 0.36 + 0.16 * (0.5 + 0.5 * sin(t * 1.2))
 
-            let purple = Color(red: 0.42, green: 0.12, blue: 0.62)
-            let green  = Color(red: 0.06, green: 0.52, blue: 0.24)
-            let gold   = Color(red: 0.92, green: 0.74, blue: 0.20)
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 1. Harlequin diamond lattice ─────────────────────────────
-            // Rotated 45° grid of diamonds; colour cycles purple→green→gold
-            // by (row+col) so adjacent diamonds always differ.
-            let d = r * 0.42                       // diamond half-diagonal
-            let cols = Int(w / d) + 3
-            let rows = Int(h / d) + 3
-            for rr in -1..<rows {
-                for cc in -1..<cols {
-                    let dcx = CGFloat(cc) * d - (rr % 2 == 0 ? 0 : d / 2)
-                    let dcy = CGFloat(rr) * (d * 0.7)
-                    // Cull to sphere.
-                    let dx = dcx - cx
-                    let dy = dcy - cy
-                    if dx * dx + dy * dy > (r * 1.05) * (r * 1.05) { continue }
-                    var dia = Path()
-                    dia.move(to: CGPoint(x: dcx,         y: dcy - d * 0.7))
-                    dia.addLine(to: CGPoint(x: dcx + d * 0.5, y: dcy))
-                    dia.addLine(to: CGPoint(x: dcx,         y: dcy + d * 0.7))
-                    dia.addLine(to: CGPoint(x: dcx - d * 0.5, y: dcy))
-                    dia.closeSubpath()
-                    let hue = (rr + cc) % 3
-                    let col = (hue == 0 ? purple : (hue == 1 ? green : gold))
-                    ctx.fill(dia, with: .color(col))
-                    ctx.stroke(dia, with: .color(gold.opacity(0.45)),
-                               lineWidth: max(0.5, r * 0.012))
+                let purple = Color(red: 0.42, green: 0.12, blue: 0.62)
+                let green  = Color(red: 0.06, green: 0.52, blue: 0.24)
+                let gold   = Color(red: 0.92, green: 0.74, blue: 0.20)
+
+                // ── 1. Harlequin diamond lattice ─────────────────────────────
+                // Rotated 45° grid of diamonds; colour cycles purple→green→gold
+                // by (row+col) so adjacent diamonds always differ.
+                let d = r * 0.42                       // diamond half-diagonal
+                let cols = Int(w / d) + 3
+                let rows = Int(h / d) + 3
+                for rr in -1..<rows {
+                    for cc in -1..<cols {
+                        let dcx = CGFloat(cc) * d - (rr % 2 == 0 ? 0 : d / 2)
+                        let dcy = CGFloat(rr) * (d * 0.7)
+                        // Cull to sphere.
+                        let dx = dcx - cx
+                        let dy = dcy - cy
+                        if dx * dx + dy * dy > (r * 1.05) * (r * 1.05) { continue }
+                        var dia = Path()
+                        dia.move(to: CGPoint(x: dcx,         y: dcy - d * 0.7))
+                        dia.addLine(to: CGPoint(x: dcx + d * 0.5, y: dcy))
+                        dia.addLine(to: CGPoint(x: dcx,         y: dcy + d * 0.7))
+                        dia.addLine(to: CGPoint(x: dcx - d * 0.5, y: dcy))
+                        dia.closeSubpath()
+                        let hue = (rr + cc) % 3
+                        let col = (hue == 0 ? purple : (hue == 1 ? green : gold))
+                        ctx.fill(dia, with: .color(col))
+                        ctx.stroke(dia, with: .color(gold.opacity(latticeGlow)),
+                                   lineWidth: max(0.5, r * 0.012))
+                    }
                 }
+
+                // ── 2. Radial sphere-shade so the lattice reads 3-D ──────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.30),       location: 0.00),
+                            .init(color: .clear,                     location: 0.46),
+                            .init(color: .black.opacity(0.22),       location: 0.82),
+                            .init(color: .black.opacity(0.55),       location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.28),
+                        startRadius: 0, endRadius: r * 1.24))
+
+                // ── 2b. Bead-glint sweep — a soft light band gliding across
+                //     the sphere like passing parade lights.  Skipped under
+                //     Reduce Motion → static fallback.
+                if !reduceMotion {
+                    let sweepCycle: Double = (t * 0.30).truncatingRemainder(dividingBy: 1.6)
+                    let bandX: CGFloat = cx - r * 1.5 + CGFloat(sweepCycle) * r * 2.2
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: bandX - r * 0.26, y: cy - r * 1.1,
+                                               width: r * 0.52, height: r * 2.2)),
+                        with: .linearGradient(
+                            Gradient(colors: [.clear, .white.opacity(0.22), .clear]),
+                            startPoint: CGPoint(x: bandX - r * 0.26, y: cy),
+                            endPoint:   CGPoint(x: bandX + r * 0.26, y: cy)))
+                }
+
+                // ── 3. Jeweled bead glints — each twinkling on its own phase
+                //     (steady at the original brightness under Reduce Motion).
+                let spots: [(Double, Double, Double)] = [
+                    (0.30, 0.32, 0.06), (0.66, 0.40, 0.05), (0.46, 0.62, 0.055),
+                    (0.72, 0.66, 0.04), (0.24, 0.58, 0.04)]
+                for (idx, spot) in spots.enumerated() {
+                    let tw: Double = reduceMotion ? 1.0 : 0.55 + 0.45 * (0.5 + 0.5 * sin(t * 2.6 + Double(idx) * 1.9))
+                    let bx = cx - r + CGFloat(spot.0) * r * 2
+                    let by = cy - r + CGFloat(spot.1) * r * 2
+                    let br = CGFloat(spot.2) * r
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                             with: .radialGradient(
+                                Gradient(colors: [.white.opacity(0.85 * tw), gold.opacity(0.4 * tw), .clear]),
+                                center: CGPoint(x: bx - br * 0.3, y: by - br * 0.3),
+                                startRadius: 0, endRadius: br))
+                }
+
+                // ── 4. Specular highlight (upper-left) ───────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
+                                           width: r * 0.42, height: r * 0.28)),
+                    with: .radialGradient(
+                        Gradient(colors: [.white.opacity(0.55), .clear]),
+                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.64),
+                        startRadius: 0, endRadius: r * 0.30))
             }
-
-            // ── 2. Radial sphere-shade so the lattice reads 3-D ──────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.30),       location: 0.00),
-                        .init(color: .clear,                     location: 0.46),
-                        .init(color: .black.opacity(0.22),       location: 0.82),
-                        .init(color: .black.opacity(0.55),       location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.28),
-                    startRadius: 0, endRadius: r * 1.24))
-
-            // ── 3. Jeweled bead glints scattered over the surface ────────
-            for (fx, fy, fr) in [(0.30, 0.32, 0.06), (0.66, 0.40, 0.05),
-                                 (0.46, 0.62, 0.055), (0.72, 0.66, 0.04),
-                                 (0.24, 0.58, 0.04)] {
-                let bx = cx - r + CGFloat(fx) * r * 2
-                let by = cy - r + CGFloat(fy) * r * 2
-                let br = CGFloat(fr) * r
-                ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
-                         with: .radialGradient(
-                            Gradient(colors: [.white.opacity(0.85), gold.opacity(0.4), .clear]),
-                            center: CGPoint(x: bx - br * 0.3, y: by - br * 0.3),
-                            startRadius: 0, endRadius: br))
-            }
-
-            // ── 4. Specular highlight (upper-left) ───────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
-                                       width: r * 0.42, height: r * 0.28)),
-                with: .radialGradient(
-                    Gradient(colors: [.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.64),
-                    startRadius: 0, endRadius: r * 0.30))
         }
     }
 
@@ -4443,90 +4616,138 @@ struct BallSkinView: View {
     // MARK: - Oktoberfest
     // Bavarian blue-and-white diamond (lozenge) pattern with warm pretzel-gold
     // accent lines and a creamy foam-like highlight along the top.  Festive
-    // beer-hall feel.  Static.
+    // beer-hall feel.  Animated: the gold lattice shimmers under a slow gloss
+    // sweep, the foam cap bobs gently, and a few beer bubbles rise up into it.
+    // Under Reduce Motion the stein settles — exactly the original static
+    // pattern.
     // =========================================================================
     private var oktoberfestCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Lozenge-grid shimmer — 0.55 is the original static opacity.
+                let gridGlow: Double = reduceMotion ? 0.55 : 0.45 + 0.20 * (0.5 + 0.5 * sin(t * 1.1))
+                // Foam bob — zero under Reduce Motion → original foam position.
+                let bobPhase: Double = reduceMotion ? 0.0 : sin(t * 0.8)
 
-            // ── 1. Creamy white base ─────────────────────────────────────
-            ctx.fill(Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                     with: .color(Color(red: 0.98, green: 0.97, blue: 0.92)))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
+                let bob: CGFloat = CGFloat(bobPhase) * r * 0.045
 
-            // ── 2. Bavarian blue lozenge (diamond) lattice ───────────────
-            let blue  = Color(red: 0.13, green: 0.42, blue: 0.82)
-            let gold  = Color(red: 0.80, green: 0.58, blue: 0.18)
-            let cell  = w / 4.0                  // diamond half-pitch
-            // Tile diamonds so that alternating cells are filled blue.
-            var row = -1
-            var y = -cell
-            while y < h + cell {
-                var col = 0
-                var x = -cell
-                while x < w + cell {
-                    if (row + col) % 2 == 0 {
-                        var dia = Path()
-                        dia.move(to:    CGPoint(x: x,             y: y - cell))
-                        dia.addLine(to: CGPoint(x: x + cell,      y: y))
-                        dia.addLine(to: CGPoint(x: x,             y: y + cell))
-                        dia.addLine(to: CGPoint(x: x - cell,      y: y))
-                        dia.closeSubpath()
-                        ctx.fill(dia, with: .color(blue))
+                // ── 1. Creamy white base ─────────────────────────────────────
+                ctx.fill(Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                         with: .color(Color(red: 0.98, green: 0.97, blue: 0.92)))
+
+                // ── 2. Bavarian blue lozenge (diamond) lattice ───────────────
+                let blue  = Color(red: 0.13, green: 0.42, blue: 0.82)
+                let gold  = Color(red: 0.80, green: 0.58, blue: 0.18)
+                let cell  = w / 4.0                  // diamond half-pitch
+                // Tile diamonds so that alternating cells are filled blue.
+                var row = -1
+                var y = -cell
+                while y < h + cell {
+                    var col = 0
+                    var x = -cell
+                    while x < w + cell {
+                        if (row + col) % 2 == 0 {
+                            var dia = Path()
+                            dia.move(to:    CGPoint(x: x,             y: y - cell))
+                            dia.addLine(to: CGPoint(x: x + cell,      y: y))
+                            dia.addLine(to: CGPoint(x: x,             y: y + cell))
+                            dia.addLine(to: CGPoint(x: x - cell,      y: y))
+                            dia.closeSubpath()
+                            ctx.fill(dia, with: .color(blue))
+                        }
+                        x += cell
+                        col += 1
                     }
-                    x += cell
-                    col += 1
+                    y += cell
+                    row += 1
                 }
-                y += cell
-                row += 1
+
+                // ── 3. Warm pretzel-gold accent lines along the diamond grid ─
+                var grid = Path()
+                var gx = -cell
+                while gx < w + cell {
+                    grid.move(to:    CGPoint(x: gx,            y: 0))
+                    grid.addLine(to: CGPoint(x: gx + h,       y: h))   // ╲ diagonal
+                    grid.move(to:    CGPoint(x: gx,            y: h))
+                    grid.addLine(to: CGPoint(x: gx + h,       y: 0))   // ╱ diagonal
+                    gx += cell
+                }
+                ctx.stroke(grid, with: .color(gold.opacity(gridGlow)), lineWidth: 1.0)
+
+                // ── 3b. Lozenge shimmer sweep — a soft gloss band gliding
+                //     across the lattice.  Skipped under Reduce Motion.
+                if !reduceMotion {
+                    let sweepCycle: Double = (t * 0.24).truncatingRemainder(dividingBy: 1.5)
+                    let bandX: CGFloat = cx - r * 1.4 + CGFloat(sweepCycle) * r * 2.2
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: bandX - r * 0.24, y: cy - r * 1.1,
+                                               width: r * 0.48, height: r * 2.2)),
+                        with: .linearGradient(
+                            Gradient(colors: [.clear, .white.opacity(0.18), .clear]),
+                            startPoint: CGPoint(x: bandX - r * 0.24, y: cy),
+                            endPoint:   CGPoint(x: bandX + r * 0.24, y: cy)))
+                }
+
+                // ── 3c. Rising beer bubbles — small cream rings drifting up
+                //     from the base and vanishing into the foam cap.
+                //     (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    let cream = Color(red: 1.00, green: 0.99, blue: 0.94)
+                    for i in 0..<7 {
+                        let seed: Double  = Double(i) * 0.83 + 0.29
+                        let speed: Double = 0.12 + 0.05 * Double(i % 3)
+                        let cycle: Double = (t * speed + seed).truncatingRemainder(dividingBy: 1.0)
+                        let sway: Double  = sin(t * 1.1 + seed * 5.0)
+                        let drift: CGFloat = CGFloat(seed.truncatingRemainder(dividingBy: 0.7) - 0.35)
+                        let px: CGFloat = cx + drift * r * 2.0 + CGFloat(sway) * r * 0.05
+                        let py: CGFloat = cy + r * 0.85 - CGFloat(cycle) * r * 1.55
+                        let fade: Double = 0.55 * min(1.0, cycle * 6.0) * min(1.0, (1.0 - cycle) * 3.0)
+                        let bs: CGFloat = r * (0.030 + 0.016 * CGFloat(i % 3))
+                        ctx.stroke(Path(ellipseIn: CGRect(x: px - bs, y: py - bs,
+                                                          width: bs * 2, height: bs * 2)),
+                                   with: .color(cream.opacity(fade)),
+                                   lineWidth: max(0.6, r * 0.02))
+                    }
+                }
+
+                // ── 4. Creamy foam highlight along the top (bobbing gently) ──
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.80, y: cy - r * 1.02 + bob,
+                                           width: r * 1.60, height: r * 0.70)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color(red: 1.0, green: 0.99, blue: 0.95).opacity(0.85),
+                                          .white.opacity(0.25), .clear]),
+                        center: CGPoint(x: cx, y: cy - r * 0.66 + bob),
+                        startRadius: 0, endRadius: r * 0.92))
+
+                // ── 5. Sphere-shade overlay (lit upper-left, dark rim) ───────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.30),  location: 0.00),
+                            .init(color: .clear,                location: 0.44),
+                            .init(color: .black.opacity(0.18),  location: 0.82),
+                            .init(color: .black.opacity(0.50),  location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.30),
+                        startRadius: 0, endRadius: r * 1.22))
+
+                // ── 6. Bright wet-gloss specular highlight (upper-left) ──────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
+                                           width: r * 0.44, height: r * 0.28)),
+                    with: .radialGradient(
+                        Gradient(colors: [.white.opacity(0.85), .white.opacity(0.2), .clear]),
+                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.64),
+                        startRadius: 0, endRadius: r * 0.30))
             }
-
-            // ── 3. Warm pretzel-gold accent lines along the diamond grid ─
-            var grid = Path()
-            var gx = -cell
-            while gx < w + cell {
-                grid.move(to:    CGPoint(x: gx,            y: 0))
-                grid.addLine(to: CGPoint(x: gx + h,       y: h))   // ╲ diagonal
-                grid.move(to:    CGPoint(x: gx,            y: h))
-                grid.addLine(to: CGPoint(x: gx + h,       y: 0))   // ╱ diagonal
-                gx += cell
-            }
-            ctx.stroke(grid, with: .color(gold.opacity(0.55)), lineWidth: 1.0)
-
-            // ── 4. Creamy foam highlight along the top ───────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.80, y: cy - r * 1.02,
-                                       width: r * 1.60, height: r * 0.70)),
-                with: .radialGradient(
-                    Gradient(colors: [Color(red: 1.0, green: 0.99, blue: 0.95).opacity(0.85),
-                                      .white.opacity(0.25), .clear]),
-                    center: CGPoint(x: cx, y: cy - r * 0.66),
-                    startRadius: 0, endRadius: r * 0.92))
-
-            // ── 5. Sphere-shade overlay (lit upper-left, dark rim) ───────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.30),  location: 0.00),
-                        .init(color: .clear,                location: 0.44),
-                        .init(color: .black.opacity(0.18),  location: 0.82),
-                        .init(color: .black.opacity(0.50),  location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.24, y: cy - r * 0.30),
-                    startRadius: 0, endRadius: r * 1.22))
-
-            // ── 6. Bright wet-gloss specular highlight (upper-left) ──────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76,
-                                       width: r * 0.44, height: r * 0.28)),
-                with: .radialGradient(
-                    Gradient(colors: [.white.opacity(0.85), .white.opacity(0.2), .clear]),
-                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.64),
-                    startRadius: 0, endRadius: r * 0.30))
         }
     }
 
