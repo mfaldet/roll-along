@@ -510,3 +510,68 @@ played and verified.
 *Audit date: 2026-07-02. Checker: `scripts/verify-levels.mjs` (no dependencies, plain Node).
 Re-run after every level overwrite — a level overwrite is a content-only file swap of
 `RollAlong/LevelOverrides.json`, so the checker is the only automated gate.*
+
+---
+
+## Fixes applied — 2026-07-02 (branch `claude/level-fixes-batch1`)
+
+All 21 confirmed-worklist levels fixed directly in `RollAlong/LevelOverrides.json`
+(content-only swap; 2-space formatting preserved byte-for-byte outside the edits;
+`verified` flags untouched — L1–L10 remain `true`, everything else `false`; exactly
+3 coins per level throughout). Guardrail `RollAlongTests/LevelOverridesTests`: green.
+
+Checker after fixes: **0 BROKEN on every touched level** (baseline 29 BROKEN → 7,
+all seven remaining on levels 78/83/89/92/97 — the depth-0.000/accepted-depth false
+positives triaged above, outside the worklist and deliberately left alone). Fully
+clean levels 30 → 35. L19's TIER flag cleared (5 → 4; the remaining four are the
+triaged false positives on 74/92/93/94).
+
+### Economy-breakers
+
+| Level | Change |
+|---|---|
+| **90** | coin#3 (0.5,0.8) → **(0.5,0.88)** — out of the center hole, into the gap between the flanking bottom holes (doc coordinates). |
+| **98** | center hole [0.4,0.44,0.2,0.1] → **[0.42,0.44,0.16,0.1]** (both middle-row openings 0.03 → 0.05); coin#2 (0.5,0.5) → **(0.5,0.415)** in the open band (doc coordinates). |
+| **99** | coin#2 (0.5,0.5) → **(0.61,0.5)**, coin#3 (0.5,0.2) → **(0.61,0.2)** — centered in the vertical lane between hole columns, 0.05 clearance each side (doc coordinates). Both coins now fully clean. |
+
+### Chokepoints + tier
+
+| Level | Change |
+|---|---|
+| **68** | hole#5 [0.4,0.36,0.32,0.06] → **[0.4,0.36,0.24,0.06]** — goal-chamber entrance 0.02 → 0.10 (doc's primary option). The goal-path TIGHT flag clears entirely. |
+| **37** | top shelf [0.4,0.4,0.18,0.07] → **[0.4,0.4,0.12,0.07]** (entrance 0.02 → 0.08); goal (0.5,0.5) → **(0.5,0.55)** (doc coordinates). Corridor 0.020 → 0.080. |
+| **55** | center gaps 0.04 → 0.08: rows → **[0.12,0.35,0.34,0.1] + [0.54,0.35,0.34,0.1]** and **[0.2,0.55,0.26,0.1] + [0.54,0.55,0.26,0.1]** (doc coordinates). Corridor 0.040 → 0.080. |
+| **39** | rows 1/3 slots 0.04 → 0.08: **[0.12,0.3,0.34,0.1] + [0.54,0.3,0.34,0.1]**, same at y=0.7 (doc coordinates); coins stay x=0.5. Corridor 0.040 → 0.080. |
+| **19** | hardened (tier is digit-derived, layout was 3–6× too open): added shelves **[0.12,0.55,0.2,0.07]** and **[0.68,0.4,0.2,0.07]** (doc's suggestion) → serpentine with 0.12 gaps, checker corridor 0.160 → 0.120 (the review's full-clearance inflation test had measured 0.284 pre-fix), TIER flag gone, zero flags total. *Deviation:* coin#2 (0.75,0.45) sat inside the new right shelf, so it drops to **(0.75,0.53)** (0.06 below the shelf). |
+
+### Coin placement (visual/sunk/bait)
+
+| Level | Change |
+|---|---|
+| **10** | coin#2 (0.5,0.43) → **(0.5,0.49)** (doc). Still `verified: true` — re-play per the note above. |
+| **28** | coin#2 (0.5,0.42) → **(0.55,0.38)** (doc). |
+| **34** | coins → **(0.5,0.39) / (0.5,0.68) / (0.66,0.82)** (doc). *Addition:* row-2/row-4 flanking holes w 0.16 → **0.10** ([0.22/0.68,y,0.1,0.08]) — the old staggered corners left only 0.072–0.089 diagonal pinches, so the doc's centerline pockets had no full-clearance route on the beginner tier; at w=0.10 every pinch ≥ 0.117 and the level is fully clean. |
+| **40** | coins → **(0.49,0.31) / (0.49,0.59) / (0.62,0.86)**. *Deviation:* doc said x=0.5, but 0.49 is the true center of the row-2/4 gap (columns .3–.44/.54–.68) and clears the last proximity flags; coin#3 per doc. |
+| **45** | coin#2 → **(0.5,0.5)**, coin#3 → **(0.2,0.36)** (doc). |
+| **48** | coin#1 → **(0.48,0.32)** (doc) + optional polish coin#2 → **(0.54,0.57)** (doc), now fully clear. |
+| **50** | coins → **(0.5,0.27) / (0.5,0.55) / (0.5,0.82)** (doc). Stays `verified: false`. |
+| **62** | coins → **(0.49,0.78) / (0.67,0.2) / (0.31,0.3)** (doc). Level fully clean. |
+| **66** | coin#2 → **(0.5,0.495)** (doc). |
+| **70** | coins → **(0.5,0.27) / (0.5,0.55) / (0.5,0.84)** (doc). |
+| **73** | coin#2 → **(0.78,0.55)**, coin#3 → **(0.2,0.38)**. *Deviation:* doc said 0.545/0.375; +0.005 gives 0.05 bar clearance (the flanking bars don't reach these x positions, so band-centering was unnecessary) and the level is fully clean. |
+| **82** | coin#2 (0.5,0.5) → **(0.06,0.5)**. *Deviation:* doc's (0.56,0.5) is the min-x edge of hole [0.56,0.42,0.18,0.12] (`CGRect.contains` includes minX — an engine-fatal center point), which the doc's fix missed; the middle lane is only 0.04 wide so no fair mid-grid spot exists on easy. The coin moves to the open left lane at mid-height, mirroring coin#1's right-lane placement. Level fully clean. |
+| **93** | coin#1 → **(0.78,0.91)**, coin#2 → **(0.06,0.48)**. *Deviation:* doc's (0.78,0.89)/(0.2,0.48) still sat 0.03/0.02 from bars with no full-clearance route on easy; both coins moved to the nearest fully clear on-path spots (bottom band / left lane). Only the triaged-false-positive TIER flag remains. |
+
+### Residual advisory flags on touched levels (accepted)
+
+- Hard/veryHard TIGHT corridors now all ≥ 0.04 (house idiom; L98's true 0.05 gaps
+  read as 0.040 through the checker's 0.01-grid quantization).
+- Doc-endorsed band-center coins on 40/45/48/50/66/70/90/98 keep RISKY flags at
+  0.02–0.045 — the square-aspect/pickup-reach false-positive classes documented
+  above (real y clearances ≈ 2×).
+- Untouched pre-existing false positives left in place: L37 coin#3 (0.030), L39
+  coin RISKYs (improved 0.028 → 0.045), L48 coin#3, L66 coin#3, L90 coin#2, L98
+  coin#1, L99 coin#1 + start, L93 TIER.
+
+Next step per the audit: play-test and grant `verified` in Marble Mapper — the 21
+fixed levels plus re-play of L10.
