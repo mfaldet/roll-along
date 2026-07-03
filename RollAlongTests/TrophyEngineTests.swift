@@ -882,3 +882,432 @@ final class TrophyEngineTests: XCTestCase {
         XCTAssertTrue(persisted.ids.contains("snake_first_win"))
     }
 }
+
+// MARK: - TrophyTestHarness (S0-T5 — shared QA scaffolding)
+//
+// ┌──────────────────────────────────────────────────────────────────────┐
+// │  THE trophy test harness. Copy this pattern in every S1 trigger test.  │
+// └──────────────────────────────────────────────────────────────────────┘
+//
+// WHY THIS EXISTS
+// ---------------
+// S1 wires each catalog trophy to a real GameState/social funnel. Those
+// trigger tests must prove a trophy unlocks *through the public API* — never
+// by reaching into TrophyEngine internals or hand-poking `ra_trophyUnlocks`.
+// This harness is the sanctioned way to do that: it owns an isolated
+// UserDefaults suite, a real `GameState`, and a real `TrophyEngine` over the
+// bundled 89-trophy catalog, and it drives them exactly the way the shipping
+// app will.
+//
+// THE ONE MOVE THE HARNESS MAKES: re-derive-and-record
+// ----------------------------------------------------
+// Trophy metrics are cumulative/latched values, not deltas. A player action
+// mutates GameState; the engine then wants each affected metric's CURRENT
+// value. `TrophyBackfill.snapshot(from:)` is the single authority that derives
+// every metric from a GameState decode (it is also what S0-T4 backfill uses),
+// so the harness's `sync()` is precisely: snapshot the GameState, `record`
+// each metric at its current value, return everything that newly unlocked.
+// `record` is a monotonic ratchet and silently ignores the ledger metric, so
+// re-syncing after every mutation is always safe and idempotent — which is
+// exactly the contract S1's live funnels will honour. (When S1 makes GameState
+// funnels call the engine directly, tests can drop the explicit `sync()` and
+// assert on the funnel's return; until then `sync()` stands in for that wiring
+// and the assertions do not change.)
+//
+// HOW TO USE IT (the copy-paste shape for S1-T*)
+// ----------------------------------------------
+//     func testSomeTrophyFiresAtThreshold() {
+//         let h = TrophyTestHarness()               // fresh isolated suite
+//         // 1. drive the PUBLIC GameState API up to the boundary
+//         h.gameState.currentModeID = "climb"
+//         for level in 1...9 { h.gameState.recordResult(level: level, stars: 3,
+//                                                        time: 30, coinIndices: []) }
+//         // 2. re-derive + record, then assert on the unlock SET
+//         let unlocked = h.sync()
+//         h.assertUnlocked("climb_stars_25", in: unlocked)   // newly this sync
+//         h.assertUnlocked("climb_stars_25")                 // latched overall
+//         h.assertLocked("climb_stars_150")
+//     }
+//
+// Boundary tests: sync at threshold−1 (assert locked), push to threshold
+// (assert it appears in the sync's newly-unlocked set), push past (assert the
+// double-fire is a no-op — `h.sync()` returns []). Canned saves: start from a
+// mid/veteran dump with `TrophyTestHarness(save:)` to prove backfill + live
+// interplay. Everything is on a throwaway suite wiped on `deinit`, so tests
+// never touch the real save (the GameStateTests injected-UserDefaults rule).
+//
+// SCOPE: unit-level only. XCUITest is explicitly out of scope for trigger
+// logic (sprint-plan.md §4g) — put trigger/migration/queue behaviour here.
+//
+final class TrophyTestHarness {
+
+    /// The isolated suite everything is injected with — never "standard".
+    let defaults: UserDefaults
+    /// A real GameState decode over `defaults` — driven by its PUBLIC API.
+    let gameState: GameState
+    /// A real engine over the bundled 89-trophy catalog and the same suite.
+    let engine: TrophyEngine
+
+    private let suiteName: String
+    private let clock: HarnessClock
+
+    /// A mutable injected clock so live-unlock timestamps are deterministic
+    /// (backfilled grants still carry `TrophyEngine.legacyUnlockDate`).
+    final class HarnessClock {
+        var current = Date(timeIntervalSince1970: 1_750_000_000)
+        func advance(_ seconds: TimeInterval) { current = current.addingTimeInterval(seconds) }
+    }
+
+    /// A canned pre-trophy save shape to seed before the GameState decode —
+    /// the same dumps the S0-T4 migration fixtures exercise, so trigger tests
+    /// can start from a believable veteran/mid save instead of only zero.
+    enum CannedSave {
+        case fresh          // no `ra_*` keys — a brand-new install
+        case midProgress    // ~climb 40, a scatter of stars, one arcade win
+        case veteran        // past every derivable catalog threshold
+    }
+
+    // MARK: Construction
+
+    /// Fresh isolated suite (optionally seeded from a canned save), the
+    /// injected-defaults `makeGameState`/engine pattern from GameStateTests.
+    /// Each instance gets a unique suite so parallel tests never collide.
+    init(save: CannedSave = .fresh,
+         backfill: Bool = false,
+         file: StaticString = #fileID,
+         line: UInt = #line) {
+        self.suiteName = "TrophyTestHarness.\(file).\(line).\(UUID().uuidString)"
+        self.defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        Self.seed(save, into: defaults)
+
+        let clock = HarnessClock()
+        self.clock = clock
+        // The authoritative decode + engine, both over the same suite.
+        self.gameState = TrophyTestHarness.makeGameState(defaults: defaults)
+        self.engine = TrophyEngine(catalog: try! TrophyCatalog.load(bundle: .main),
+                                   defaults: defaults,
+                                   now: { clock.current })
+        if backfill {
+            engine.backfill(from: TrophyBackfill.snapshot(from: gameState))
+        }
+    }
+
+    deinit { defaults.removePersistentDomain(forName: suiteName) }
+
+    /// The canonical injected-defaults constructor named by S0-T5 — a
+    /// GameState backed by a caller-supplied throwaway suite, never the real
+    /// "standard" save (GameStateTests pattern). Exposed statically so any
+    /// test file can build a bare GameState on its own suite without a harness.
+    static func makeGameState(defaults: UserDefaults) -> GameState {
+        GameState(defaults: defaults)
+    }
+
+    // MARK: The core move — re-derive + record
+
+    /// Re-derive every metric from the current GameState and push it into the
+    /// engine, returning trophies that unlocked ON THIS sync (cascaded
+    /// capstone included). Idempotent: an unchanged GameState syncs to [].
+    @discardableResult
+    func sync() -> [TrophyDefinition] {
+        let snapshot = TrophyBackfill.snapshot(from: gameState)
+        var unlocked: [TrophyDefinition] = []
+        // Deterministic order so a multi-metric bump reads reproducibly.
+        for metric in TrophyMetric.allCases {
+            guard let value = snapshot[metric] else { continue }
+            unlocked.append(contentsOf: engine.record(metric, value: value))
+        }
+        return unlocked
+    }
+
+    /// Drive a single metric directly (for a metric with no GameState funnel
+    /// yet, e.g. a social latch or a run-event flag S1 will wire). Returns
+    /// what unlocked on this bump.
+    @discardableResult
+    func record(_ metric: TrophyMetric, value: Double) -> [TrophyDefinition] {
+        engine.record(metric, value: value)
+    }
+
+    /// Advance the injected clock — new live unlocks stamp the advanced time,
+    /// so a test can prove timestamp stability across a double-fire.
+    func advanceClock(_ seconds: TimeInterval) { clock.advance(seconds) }
+    var now: Date { clock.current }
+
+    // MARK: Unlock-set assertions (public engine API only)
+
+    /// The full latched unlock set — the engine's public view, never the raw
+    /// UserDefaults key.
+    var unlockedIDs: Set<String> { engine.unlockedIDs }
+
+    func assertUnlocked(_ id: String,
+                        file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(engine.isUnlocked(id), "expected \(id) unlocked", file: file, line: line)
+    }
+
+    func assertLocked(_ id: String,
+                      file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertFalse(engine.isUnlocked(id), "expected \(id) still locked", file: file, line: line)
+    }
+
+    /// Assert `id` is among a specific sync/record call's newly-unlocked set
+    /// — the "fired on THIS action" boundary check.
+    func assertUnlocked(_ id: String, in batch: [TrophyDefinition],
+                        file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(batch.contains { $0.id == id },
+                      "expected \(id) in this batch, got \(batch.map(\.id))",
+                      file: file, line: line)
+    }
+
+    /// Assert the exact set of ids that unlocked on a sync/record call.
+    func assertNewlyUnlocked(_ ids: Set<String>, in batch: [TrophyDefinition],
+                             file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(Set(batch.map(\.id)), ids, file: file, line: line)
+    }
+
+    // MARK: Canned-save seeding (reuses S0-T4's real `ra_*` dump shapes)
+
+    /// Seed a suite with a pre-trophy `ra_*` dump in the exact on-disk format
+    /// GameState persists — mirrors the S0-T4 migration fixtures so trigger
+    /// tests and migration tests exercise the same believable saves.
+    private static func seed(_ save: CannedSave, into defaults: UserDefaults) {
+        switch save {
+        case .fresh:
+            break                                   // no keys — a clean install
+
+        case .midProgress:
+            defaults.set(41, forKey: "ra_highestUnlocked")      // cleared through ~40
+            var stars: [Int: Int] = [:]
+            for level in 1...12 { stars[level] = 3 }             // 36 stars
+            writeIntDict(stars, key: "ra_bestStars", defaults)
+            var pickups: [Int: Set<Int>] = [:]
+            for level in 1...20 { pickups[level] = [0, 1, 2] }   // 60 pickups
+            writeSetDict(pickups, key: "ra_collectedCoins", defaults)
+            writeDoubleDict([3: 8.5, 7: 22.0], key: "ra_bestTime", defaults)   // sub-10s clear
+            writeStringDict(["snake": 1], key: "ra_minigameWins", defaults)
+            writeStringSet(["snake", "zen"], key: "ra_playedModeIDs", defaults)
+            defaults.set(3600, forKey: "ra_zenSeconds")         // exactly 1 hour
+            writeStringSet(["standard"], key: "ra_ownedBundles", defaults)
+            defaults.set(400, forKey: "ra_coinBalance")
+
+        case .veteran:
+            defaults.set(5001, forKey: "ra_highestUnlocked")
+            var stars: [Int: Int] = [:]
+            for level in 1...100 { stars[level] = 3 }            // world 1 perfect + huge sum
+            writeIntDict(stars, key: "ra_bestStars", defaults)
+            var pickups: [Int: Set<Int>] = [:]
+            for level in 1...60 { pickups[level] = [0, 1, 2] }   // 180 pickups
+            writeSetDict(pickups, key: "ra_collectedCoins", defaults)
+            writeDoubleDict([2: 6.5, 40: 30.0], key: "ra_bestTime", defaults)
+            let allTracks: Set<String> = ["adventure", "expert", "gauntlet", "nightmare",
+                                          "speed", "precision", "endurance", "golden-gauntlet"]
+            writeStringSet(allTracks, key: "ra_completedTracks", defaults)
+            writeStringDict(["adventure": 100, "golden-gauntlet": 100],
+                            key: "ra_trackProgress", defaults)
+            writeStringSet(consecutiveDailyKeys(count: 60), key: "ra_dailyChallengeDone", defaults)
+            defaults.set(45, forKey: "ra_dailyStreak")
+            writeStringSet(Set(TrophyMetric.minigameModeIDs), key: "ra_playedModeIDs", defaults)
+            writeStringDict(["snake": 20, "sumo": 20, "paintball": 20,
+                             "goldrush": 20, "marblecup": 20, "koth": 20],
+                            key: "ra_minigameWins", defaults)
+            var hard: [String: Int] = [:]
+            for id in TrophyMetric.competitiveModeIDs { hard["\(id)|hard"] = 3 }
+            writeStringDict(hard, key: "ra_minigameDiffWins", defaults)
+            writeStringDict(["paintball": 80, "koth": 55, "rollout": 15,
+                             "rollup": 700, "discohard": 15, "discoeasy": 40],
+                            key: "ra_minigameBests", defaults)
+            defaults.set(200_000, forKey: "ra_pinballBest")
+            defaults.set(40_000, forKey: "ra_zenSeconds")
+            defaults.set(120, forKey: "ra_goldrushBest")
+            defaults.set(5_000, forKey: "ra_goldrushCoinsTotal")
+            writeStringSet(Set(CosmeticBundle.catalogue.prefix(6).map(\.id)),
+                           key: "ra_ownedBundles", defaults)
+            writeStringSet(["planets"], key: "ra_ownedPacks", defaults)
+            defaults.set(5_000, forKey: "ra_coinBalance")
+        }
+    }
+
+    // Fixture writers — the real `ra_*` on-disk formats (S0-T4 shapes).
+    private static func writeIntDict(_ dict: [Int: Int], key: String, _ d: UserDefaults) {
+        let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), $0.value) })
+        d.set(try! JSONEncoder().encode(stringKeyed), forKey: key)
+    }
+    private static func writeDoubleDict(_ dict: [Int: Double], key: String, _ d: UserDefaults) {
+        let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), $0.value) })
+        d.set(try! JSONEncoder().encode(stringKeyed), forKey: key)
+    }
+    private static func writeSetDict(_ dict: [Int: Set<Int>], key: String, _ d: UserDefaults) {
+        let stringKeyed = Dictionary(uniqueKeysWithValues: dict.map { (String($0.key), Array($0.value)) })
+        d.set(try! JSONEncoder().encode(stringKeyed), forKey: key)
+    }
+    private static func writeStringDict(_ dict: [String: Int], key: String, _ d: UserDefaults) {
+        d.set(try! JSONEncoder().encode(dict), forKey: key)
+    }
+    private static func writeStringSet(_ set: Set<String>, key: String, _ d: UserDefaults) {
+        d.set(Array(set), forKey: key)
+    }
+
+    /// `count` consecutive "YYYY-MM-DD" keys ending today (UTC) — the
+    /// `DailyChallenge.key()` format the completions set stores.
+    private static func consecutiveDailyKeys(count: Int) -> Set<String> {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let fmt = DateFormatter()
+        fmt.calendar = cal
+        fmt.timeZone = cal.timeZone
+        fmt.dateFormat = "yyyy-MM-dd"
+        var keys = Set<String>()
+        let today = cal.startOfDay(for: Date())
+        for offset in 0..<count {
+            if let day = cal.date(byAdding: .day, value: -offset, to: today) {
+                keys.insert(fmt.string(from: day))
+            }
+        }
+        return keys
+    }
+}
+
+// MARK: - TrophyTestHarnessTests (S0-T5 acceptance)
+
+/// Proves the shared harness works end-to-end BEFORE S1 leans on it: the
+/// harness compiles, the demo drives the PUBLIC GameState API and asserts an
+/// unlock (the S0-T5 acceptance criterion), and the canned saves + assertion
+/// helpers behave. If any of these break, every S1 trigger test built on the
+/// pattern is suspect — so this is the guardrail for the scaffolding itself.
+final class TrophyTestHarnessTests: XCTestCase {
+
+    // MARK: The demo — bump a stat through public API → assert unlock
+
+    /// S0-T5 acceptance: end-to-end proof. Nine 3-star climb clears through
+    /// the PUBLIC `recordResult` API push totalStars past 25; a `sync()`
+    /// re-derives and latches `climb_stars_25` and reports it as newly
+    /// unlocked on that sync — no engine internals touched.
+    func testHarnessDemo_publicAPIStatBumpUnlocksTrophy() {
+        let h = TrophyTestHarness()
+        h.assertLocked("climb_stars_25")
+
+        // Drive only the public GameState API.
+        h.gameState.currentModeID = "climb"
+        for level in 1...9 {
+            h.gameState.recordResult(level: level, stars: 3, time: 30, coinIndices: [])
+        }
+        XCTAssertGreaterThanOrEqual(h.gameState.totalStars, 25, "fixture must clear the bar")
+
+        // Re-derive + record, assert on the unlock SET.
+        let unlocked = h.sync()
+        h.assertUnlocked("climb_stars_25", in: unlocked)   // fired on THIS sync
+        h.assertUnlocked("climb_stars_25")                 // latched overall
+        h.assertLocked("climb_stars_150")                  // next rung untouched
+    }
+
+    // MARK: Boundary + double-fire, the S1 copy-paste shape
+
+    /// The threshold−1 / threshold / threshold+1 + idempotency shape S1
+    /// trigger tests follow, exercised through the harness to prove it
+    /// supports them. (Boundary tests assert on the TARGET trophy's presence
+    /// in the sync batch, not on the whole batch — a climb clear legitimately
+    /// also moves `highestUnlocked`, so incidental sibling unlocks are fine.)
+    func testHarnessSupportsBoundaryAndDoubleFire() {
+        let h = TrophyTestHarness()
+
+        // threshold−1: eight 3-star clears = 24 stars, below 25.
+        h.gameState.currentModeID = "climb"
+        for level in 1...8 { h.gameState.recordResult(level: level, stars: 3, time: 30, coinIndices: []) }
+        XCTAssertEqual(h.gameState.totalStars, 24)
+        XCTAssertFalse(h.sync().contains { $0.id == "climb_stars_25" },
+                       "no star unlock below threshold")
+        h.assertLocked("climb_stars_25")
+
+        // threshold: the 25th star fires, on this sync.
+        h.gameState.recordResult(level: 9, stars: 3, time: 30, coinIndices: [])
+        let batch = h.sync()
+        h.assertUnlocked("climb_stars_25", in: batch)
+        let stamp = h.engine.unlockDate(for: "climb_stars_25")
+
+        // threshold+1 / double-fire: more stars, later clock — the target
+        // never re-unlocks and its timestamp is stable.
+        h.advanceClock(3_600)
+        h.gameState.recordResult(level: 10, stars: 3, time: 30, coinIndices: [])
+        XCTAssertFalse(h.sync().contains { $0.id == "climb_stars_25" },
+                       "double fire must not re-unlock the target")
+        XCTAssertEqual(h.engine.unlockDate(for: "climb_stars_25"), stamp,
+                       "timestamp must be stable across the double-fire")
+    }
+
+    // MARK: Direct-metric driving (for funnels S1 hasn't wired yet)
+
+    /// A metric with no GameState funnel yet (a social latch) can be driven
+    /// directly — the escape hatch S1-T6/S1-T7 tests use before the funnel
+    /// exists.
+    func testHarnessDrivesMetricsWithoutAGameStateFunnel() {
+        let h = TrophyTestHarness()
+        h.assertLocked("social_sign_in")
+        let batch = h.record(.signedIn, value: 1)
+        h.assertUnlocked("social_sign_in", in: batch)
+        h.assertUnlocked("social_sign_in")
+    }
+
+    // MARK: Canned saves
+
+    /// A fresh save syncs to nothing (a live install starts at zero unlocks).
+    func testCannedFreshSaveIsEmpty() {
+        let h = TrophyTestHarness(save: .fresh)
+        XCTAssertTrue(h.sync().isEmpty)
+        XCTAssertTrue(h.unlockedIDs.isEmpty)
+    }
+
+    /// The veteran canned save carries real history: a `sync()` over it
+    /// latches the derivable milestones (backfill-equivalent through the
+    /// live path), proving trigger tests can start from a believable maxed
+    /// save rather than only zero.
+    func testCannedVeteranSaveSyncsDerivableMilestones() {
+        let h = TrophyTestHarness(save: .veteran)
+        h.sync()
+        for id in ["climb_first_clear", "climb_summit", "track_all_eight",
+                   "snake_wins_10", "pinball_score_150k", "zen_10_hours"] {
+            h.assertUnlocked(id)
+        }
+        // A non-derivable, live-only trophy stays locked even on a maxed save.
+        h.assertLocked("social_sign_in")
+        h.assertLocked("capstone_all")     // 12 base trophies need live play
+    }
+
+    /// `backfill: true` runs the S0-T4 retro-grant path at construction, so a
+    /// harness can start already-grandfathered (the state S1 sees post-update)
+    /// and grants carry the legacy marker, not the live clock.
+    func testCannedSaveWithBackfillGrantsLegacyStamped() {
+        let h = TrophyTestHarness(save: .veteran, backfill: true)
+        h.assertUnlocked("climb_first_clear")
+        XCTAssertTrue(h.engine.didBackfill)
+        XCTAssertEqual(h.engine.unlockDate(for: "climb_first_clear"),
+                       TrophyEngine.legacyUnlockDate,
+                       "backfilled grants carry the legacy marker, not now()")
+    }
+
+    // MARK: Isolation
+
+    /// Two harnesses never share a suite: an unlock in one is invisible in
+    /// the other (the parallel-safe isolation S1's suite needs).
+    func testHarnessesAreIsolated() {
+        let a = TrophyTestHarness()
+        let b = TrophyTestHarness()
+        a.record(.signedIn, value: 1)
+        a.assertUnlocked("social_sign_in")
+        b.assertLocked("social_sign_in")
+    }
+
+    /// The named injected-defaults helper builds a GameState on a supplied
+    /// suite and never touches the real save.
+    func testMakeGameStateUsesInjectedDefaults() {
+        let suite = "TrophyTestHarnessTests.makeGameState.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let gs = TrophyTestHarness.makeGameState(defaults: defaults)
+        gs.coinBalance = 4_242
+        // The value round-trips through the injected suite, not "standard".
+        let reloaded = TrophyTestHarness.makeGameState(defaults: defaults)
+        XCTAssertEqual(reloaded.coinBalance, 4_242)
+    }
+}

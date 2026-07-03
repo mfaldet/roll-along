@@ -524,4 +524,47 @@ final class TrophyStatsTests: XCTestCase {
         _ = gs.liquidateCoinCosmetics(); assertRatchets("liquidateCoinCosmetics")
         gs.completeTodaysDailyChallenge(); assertRatchets("completeTodaysDailyChallenge")
     }
+
+    // MARK: - S0-T5 harness usage over a stats-backed trophy
+
+    /// The S0-T5 `TrophyTestHarness` (defined in TrophyEngineTests.swift) is
+    /// shared scaffolding usable from every trophy test file — here it drives
+    /// a COUNTER-backed trophy end-to-end. `econ_punch_card` unlocks at 30
+    /// lifetime daily-reward claims (`TrophyStats.dailyRewardClaims`, §6 item
+    /// 5).
+    ///
+    /// Important boundary this test also documents: the NEW `ra_trophy*`
+    /// counters (claims, play-earned coins, no-fall streak) are deliberately
+    /// ABSENT from `TrophyBackfill.snapshot` — backfill must not grandfather a
+    /// counter that starts at zero the day trophies ship — so `harness.sync()`
+    /// (the existing-stats path) never fires a counter-backed trophy. The
+    /// live path drives the metric from its counter directly, which is exactly
+    /// what S1-T2's `claimDailyReward` funnel will do internally. This is the
+    /// copy-paste shape for S1-T2's `econ_punch_card` trigger test.
+    func testHarnessDrivesACounterBackedTrophy() {
+        let h = TrophyTestHarness()
+        h.assertLocked("econ_punch_card")
+
+        // 29 claims across broken streaks — the counter is claims, not streak.
+        for offset in stride(from: 58, through: 2, by: -2) {
+            h.gameState.lastDailyClaim = Calendar.current.date(
+                byAdding: .day, value: -offset, to: .now)
+            XCTAssertNotNil(h.gameState.claimDailyReward())
+        }
+        XCTAssertEqual(h.gameState.trophyStats.dailyRewardClaims, 29)
+        // Drive the live counter value into the engine (the S1-T2 funnel move).
+        XCTAssertTrue(h.record(.dailyRewardClaims,
+                               value: Double(h.gameState.trophyStats.dailyRewardClaims)).isEmpty,
+                      "29 claims is below the 30 bar")
+        h.assertLocked("econ_punch_card")
+
+        // The 30th claim crosses the threshold; the record latches it once.
+        h.gameState.lastDailyClaim = Calendar.current.date(byAdding: .day, value: -1, to: .now)
+        XCTAssertNotNil(h.gameState.claimDailyReward())
+        XCTAssertEqual(h.gameState.trophyStats.dailyRewardClaims, 30)
+        h.assertUnlocked("econ_punch_card",
+                         in: h.record(.dailyRewardClaims,
+                                      value: Double(h.gameState.trophyStats.dailyRewardClaims)))
+        h.assertUnlocked("econ_punch_card")
+    }
 }
