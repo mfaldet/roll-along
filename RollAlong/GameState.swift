@@ -19,6 +19,12 @@ import SwiftUI
 //   ra_equippedTrail, ra_equippedFloor, ra_equippedPit, ra_equippedBoundary,
 //   ra_equippedMusic, ra_equippedPack.
 //
+// TrophyStats adds (bumped only from GameState funnels — S0-T2):
+//   ra_trophyCoinsEarnedFromPlay, ra_trophyDailyRewardClaims,
+//   ra_trophyNoFallClearStreak, ra_trophyNoFallClearStreakBest.
+//   Latched trophy counters — monotonic ratchets, untouched by
+//   resetProgress() / liquidateCoinCosmetics().
+//
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
 //
@@ -510,8 +516,16 @@ final class GameState: ObservableObject {
     /// throwaway suite so they never read or scribble on the real save.
     private let defaults: UserDefaults
 
+    /// Latched trophy stat counters (S0-T2) — bumped ONLY from this class's
+    /// funnels (`addCoins`, `claimDailyReward`, `recordResult`,
+    /// `consumeLife`), persisted on the same injected defaults.  A plain
+    /// `let` on purpose: trophy stat writes must never publish GameState
+    /// changes or re-render gameplay views.
+    let trophyStats: TrophyStats
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        trophyStats = TrophyStats(defaults: defaults)
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -774,7 +788,9 @@ final class GameState: ObservableObject {
         equippedPit   = .starter
         equippedBoundary = .starter
         equippedMusic = .starter
-        addCoins(coins)
+        // Refund, not income — Sell Back credits are recycled capital and
+        // never count toward the play-earned trophy counter (§6 item 4).
+        addCoins(coins, source: .refund)
         return (count, coins)
     }
 
@@ -808,6 +824,15 @@ final class GameState: ObservableObject {
         }
         if level >= highestUnlocked {
             highestUnlocked = level + 1
+        }
+        // Consecutive no-fall clear streak (§6 item 6): a goal-reached run
+        // in this game either cleared or fell, so every recorded clear is a
+        // fall-free run — the fall side already reset the streak at
+        // `consumeLife`.  Mode-gated defense-in-depth: only the main climb
+        // may grow the streak (the CotD `.oneShot` fast-path returns before
+        // ever reaching this funnel; tracks never call it).
+        if currentMode.progression.recordsClimbResult {
+            trophyStats.recordNoFallClimbClear()
         }
     }
 
@@ -1007,6 +1032,16 @@ final class GameState: ObservableObject {
     /// 6-minute timer immediately, so reserve lives stretch further.
     @discardableResult
     func consumeLife() -> Bool {
+        // A climb fall breaks the no-fall clear streak (§6 item 6) — gated
+        // on the shipped mode vocabulary so Roll Out / Roll Up / track life
+        // consumption never resets it (S1-T1 acceptance).  BEFORE the
+        // unlimited-lives early-out: a subscriber's fall is still a fall,
+        // or unlimited lives would farm `skill_clean_sheet_*`.  Tutorial
+        // falls (L1–10) never reach consumeLife — their reset rides
+        // S1-T7's direct fall funnel.
+        if currentMode.progression.recordsClimbResult {
+            trophyStats.resetNoFallClearStreak()
+        }
         if unlimitedLives { return true }
         commitRegen()
         if lives > 0 {
@@ -1116,7 +1151,17 @@ final class GameState: ObservableObject {
     ///   programming error (use `spendCoins(_:)` for deductions).
     /// - Clamps `amount` to `[0, maxSingleAward]`; excess is logged.
     /// - Clamps the resulting balance to `[0, maxCoinBalance]`.
-    func addCoins(_ amount: Int) {
+    ///
+    /// `source` tags the award for the lifetime play-earned trophy counter
+    /// (trophy-catalog.md §6 item 4).  The default is `.play` — only the
+    /// non-play call sites tag themselves, and the exclusions are
+    /// load-bearing: IAP grants (StoreKitManager → `.iap`), Sell Back
+    /// refunds (`liquidateCoinCosmetics` → `.refund`), and bundle-gift
+    /// compensation (`grantBundleFree` → `.giftCompensation`) must never
+    /// count as play income.  The counter records the actually-granted
+    /// (post-`maxSingleAward`-clamp) award; the balance cap is a wallet
+    /// limit, not an earn limit, so a full wallet still earns.
+    func addCoins(_ amount: Int, source: TrophyStats.CoinSource = .play) {
         assert(amount >= 0, "addCoins: negative amount — use spendCoins(_:) for deductions")
         guard amount > 0 else { return }
         let clamped: Int
@@ -1129,6 +1174,7 @@ final class GameState: ObservableObject {
             clamped = amount
         }
         coinBalance = min(coinBalance + clamped, Self.maxCoinBalance)
+        trophyStats.recordCoins(clamped, source: source)
     }
 
     // MARK: - Minigame results (leaderboards + rewards)
@@ -1423,7 +1469,11 @@ final class GameState: ObservableObject {
         let amount = Self.dailyRewardLadder[(newStreak - 1) % Self.dailyRewardLadder.count]
         dailyStreak = newStreak
         lastDailyClaim = Date()
-        addCoins(amount)
+        // `.daily` counts toward play-earned coins (§6 item 4 excludes only
+        // IAP / refund / gift-compensation); the claim itself feeds the
+        // lifetime claim counter (§6 item 5 → `econ_punch_card`).
+        addCoins(amount, source: .daily)
+        trophyStats.recordDailyRewardClaim()
         return amount
     }
 
@@ -1553,7 +1603,9 @@ final class GameState: ObservableObject {
         }
         compensate(bundle.balls); compensate(bundle.goals); compensate(bundle.trails)
         compensate(bundle.floors); compensate(bundle.pits); compensate(bundle.music)
-        if compensation > 0 { addCoins(compensation) }
+        // Refund-shaped credit (PR #114), not income — gift compensation
+        // never counts toward the play-earned trophy counter (§6 item 4).
+        if compensation > 0 { addCoins(compensation, source: .giftCompensation) }
         bundle.grantContents(to: self)
         freeGrantedItems.formUnion(bundle.balls.map(\.rawValue))
         freeGrantedItems.formUnion(bundle.goals.map(\.rawValue))

@@ -393,7 +393,9 @@ final class StoreKitManager: ObservableObject {
             gameState.addLives(productID.rewardLives)
 
         case .coinPack:
-            gameState.addCoins(productID.rewardCoins)
+            // IAP grant — purchased, not earned: never counts toward the
+            // play-earned trophy counter (trophy-catalog.md §6 item 4).
+            gameState.addCoins(productID.rewardCoins, source: .iap)
             // The top coin pack (the historical coins.10000 product, now a
             // 60,000-coin grant) also drops ONE random not-yet-owned "Money"
             // cosmetic — up to three unlock across repeat purchases.
@@ -411,7 +413,8 @@ final class StoreKitManager: ObservableObject {
             // re-deliveries idempotent); the collection grant is set-insertion,
             // so it safely tops up a ball-only legacy buyer too.
             if !gameState.starterPackClaimed {
-                gameState.addCoins(productID.rewardCoins)
+                // IAP grant — excluded from play-earned coins (§6 item 4).
+                gameState.addCoins(productID.rewardCoins, source: .iap)
             }
             grantedCosmetic = grantAuroraCollection(to: gameState)
             gameState.starterPackClaimed = true
