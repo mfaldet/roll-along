@@ -3270,251 +3270,396 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Ornament  (Winter 2026 seasonal exclusive)
+    // MARK: - Ornament  (Winter 2026 seasonal exclusive · Legendary)
     // Mirror-glossy deep crimson Christmas ornament.  The very large specular
     // highlight is the signature element — it's substantially bigger and
     // brighter than other skins to sell the mirror-glass quality.  Gold
     // metallic cap at north pole, thin equatorial gold stripe, small caustic
-    // secondary reflection at lower-right.
+    // secondary reflection at lower-right.  Animated: a soft window-pane
+    // reflection sweeps slowly across the mirror glass and the gold cap
+    // throws a periodic glint.  Under Reduce Motion both extras vanish —
+    // exactly the original static ornament.
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var ornamentCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            // ── 1. Deep crimson sphere — very high contrast ──────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.98, green: 0.58, blue: 0.58), location: 0.00),
-                        .init(color: Color(red: 0.88, green: 0.06, blue: 0.14), location: 0.30),
-                        .init(color: Color(red: 0.50, green: 0.02, blue: 0.08), location: 0.65),
-                        .init(color: Color(red: 0.10, green: 0.00, blue: 0.02), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
-                    startRadius: 0, endRadius: r * 1.05))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Thin gold equatorial stripe ───────────────────────────
-            let stripeRx   = r * 0.95
-            let stripeRy   = r * 0.13
-            let stripeRect = CGRect(x: cx - stripeRx, y: cy - stripeRy,
-                                     width: stripeRx * 2, height: stripeRy * 2)
-            ctx.stroke(
-                Path(ellipseIn: stripeRect),
-                with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.72, green: 0.56, blue: 0.18), location: 0.00),
-                        .init(color: Color(red: 1.00, green: 0.88, blue: 0.50), location: 0.40),
-                        .init(color: Color(red: 0.80, green: 0.62, blue: 0.22), location: 0.75),
-                        .init(color: Color(red: 0.48, green: 0.36, blue: 0.08), location: 1.00),
-                    ]),
-                    startPoint: CGPoint(x: cx - stripeRx, y: cy),
-                    endPoint:   CGPoint(x: cx + stripeRx, y: cy)),
-                lineWidth: max(1.5, r * 0.058))
+                // ── 1. Deep crimson sphere — very high contrast ──────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.98, green: 0.58, blue: 0.58), location: 0.00),
+                            .init(color: Color(red: 0.88, green: 0.06, blue: 0.14), location: 0.30),
+                            .init(color: Color(red: 0.50, green: 0.02, blue: 0.08), location: 0.65),
+                            .init(color: Color(red: 0.10, green: 0.00, blue: 0.02), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
+                        startRadius: 0, endRadius: r * 1.05))
 
-            // ── 3. Gold metallic cap at north pole ───────────────────────
-            let capRx   = r * 0.19
-            let capRy   = r * 0.11
-            let capCy   = cy - r * 0.82
-            let capRect = CGRect(x: cx - capRx, y: capCy - capRy,
-                                  width: capRx * 2, height: capRy * 2)
-            ctx.fill(
-                Path(ellipseIn: capRect),
-                with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.94, blue: 0.60), location: 0.00),
-                        .init(color: Color(red: 0.78, green: 0.60, blue: 0.20), location: 0.55),
-                        .init(color: Color(red: 0.44, green: 0.30, blue: 0.08), location: 1.00),
-                    ]),
-                    startPoint: CGPoint(x: cx, y: capCy - capRy),
-                    endPoint:   CGPoint(x: cx, y: capCy + capRy)))
-            ctx.stroke(
-                Path(ellipseIn: capRect),
-                with: .color(Color(red: 0.22, green: 0.14, blue: 0.03).opacity(0.75)),
-                lineWidth: max(0.5, r * 0.022))
+                // ── 2. Thin gold equatorial stripe ───────────────────────────
+                let stripeRx   = r * 0.95
+                let stripeRy   = r * 0.13
+                let stripeRect = CGRect(x: cx - stripeRx, y: cy - stripeRy,
+                                         width: stripeRx * 2, height: stripeRy * 2)
+                ctx.stroke(
+                    Path(ellipseIn: stripeRect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.72, green: 0.56, blue: 0.18), location: 0.00),
+                            .init(color: Color(red: 1.00, green: 0.88, blue: 0.50), location: 0.40),
+                            .init(color: Color(red: 0.80, green: 0.62, blue: 0.22), location: 0.75),
+                            .init(color: Color(red: 0.48, green: 0.36, blue: 0.08), location: 1.00),
+                        ]),
+                        startPoint: CGPoint(x: cx - stripeRx, y: cy),
+                        endPoint:   CGPoint(x: cx + stripeRx, y: cy)),
+                    lineWidth: max(1.5, r * 0.058))
 
-            // ── 4. Very large specular highlight — mirror-glass signature ─
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.64, y: cy - r * 0.76,
-                                       width: r * 0.72, height: r * 0.50)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.94), location: 0.00),
-                        .init(color: .white.opacity(0.62), location: 0.30),
-                        .init(color: .white.opacity(0.00), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.55),
-                    startRadius: 0, endRadius: r * 0.52))
+                // ── 3. Gold metallic cap at north pole ───────────────────────
+                let capRx   = r * 0.19
+                let capRy   = r * 0.11
+                let capCy   = cy - r * 0.82
+                let capRect = CGRect(x: cx - capRx, y: capCy - capRy,
+                                      width: capRx * 2, height: capRy * 2)
+                ctx.fill(
+                    Path(ellipseIn: capRect),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 1.00, green: 0.94, blue: 0.60), location: 0.00),
+                            .init(color: Color(red: 0.78, green: 0.60, blue: 0.20), location: 0.55),
+                            .init(color: Color(red: 0.44, green: 0.30, blue: 0.08), location: 1.00),
+                        ]),
+                        startPoint: CGPoint(x: cx, y: capCy - capRy),
+                        endPoint:   CGPoint(x: cx, y: capCy + capRy)))
+                ctx.stroke(
+                    Path(ellipseIn: capRect),
+                    with: .color(Color(red: 0.22, green: 0.14, blue: 0.03).opacity(0.75)),
+                    lineWidth: max(0.5, r * 0.022))
 
-            // ── 5. Small secondary caustic reflection — lower-right ───────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx + r * 0.26, y: cy + r * 0.30,
-                                       width: r * 0.22, height: r * 0.14)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.38), .clear]),
-                    center: CGPoint(x: cx + r * 0.36, y: cy + r * 0.36),
-                    startRadius: 0, endRadius: r * 0.14))
+                // ── 3b. Sweeping window-pane reflection — mirror glass ────────
+                //      A tall, softly-rotated pane of light travels across the
+                //      face every few seconds, like room light crossing a real
+                //      glass ball.  (Skipped under Reduce Motion.)
+                if !reduceMotion {
+                    let cycle: Double = (t * 0.20).truncatingRemainder(dividingBy: 1.0)
+                    // Fade in/out at the edges of the traverse.
+                    let paneFade: Double = 0.34 * sin(Double.pi * cycle)
+                    let paneNX: Double = -0.9 + 1.8 * cycle
+                    let paneX: CGFloat = cx + CGFloat(paneNX) * r * 0.85
+                    let tilt = CGAffineTransform(translationX: paneX, y: cy)
+                        .rotated(by: -0.32)
+                        .translatedBy(x: -paneX, y: -cy)
+
+                    // Wide pane + a thin trailing companion bar (window frame).
+                    let paneRect = CGRect(x: paneX - r * 0.16, y: cy - r * 0.95,
+                                          width: r * 0.32, height: r * 1.90)
+                    ctx.fill(
+                        Path(ellipseIn: paneRect).applying(tilt),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(paneFade), .clear]),
+                            center: CGPoint(x: paneX, y: cy),
+                            startRadius: 0, endRadius: r * 0.85))
+                    let barX: CGFloat = paneX + r * 0.30
+                    let barRect = CGRect(x: barX - r * 0.05, y: cy - r * 0.80,
+                                         width: r * 0.10, height: r * 1.60)
+                    ctx.fill(
+                        Path(ellipseIn: barRect).applying(tilt),
+                        with: .radialGradient(
+                            Gradient(colors: [Color.white.opacity(paneFade * 0.6), .clear]),
+                            center: CGPoint(x: barX, y: cy),
+                            startRadius: 0, endRadius: r * 0.70))
+                }
+
+                // ── 3c. Cap glint — periodic sparkle off the gold cap ─────────
+                //      (Skipped under Reduce Motion.)
+                if !reduceMotion {
+                    let glint: Double = pow(max(0.0, sin(t * 1.6 + 0.8)), 10.0)
+                    if glint > 0.02 {
+                        let gx: CGFloat = cx + capRx * 0.55
+                        let gy: CGFloat = capCy - capRy * 0.25
+                        let gs: CGFloat = r * (0.05 + 0.05 * CGFloat(glint))
+                        ctx.fill(
+                            Path(ellipseIn: CGRect(x: gx - gs, y: gy - gs,
+                                                   width: gs * 2, height: gs * 2)),
+                            with: .radialGradient(
+                                Gradient(colors: [Color.white.opacity(0.90 * glint), .clear]),
+                                center: CGPoint(x: gx, y: gy),
+                                startRadius: 0, endRadius: gs))
+                        // Tiny horizontal flare through the sparkle core.
+                        var flare = Path()
+                        flare.move(to:    CGPoint(x: gx - gs * 1.8, y: gy))
+                        flare.addLine(to: CGPoint(x: gx + gs * 1.8, y: gy))
+                        ctx.stroke(flare,
+                                   with: .color(Color.white.opacity(0.55 * glint)),
+                                   style: StrokeStyle(lineWidth: max(0.5, r * 0.014), lineCap: .round))
+                    }
+                }
+
+                // ── 4. Very large specular highlight — mirror-glass signature ─
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.64, y: cy - r * 0.76,
+                                           width: r * 0.72, height: r * 0.50)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.94), location: 0.00),
+                            .init(color: .white.opacity(0.62), location: 0.30),
+                            .init(color: .white.opacity(0.00), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.55),
+                        startRadius: 0, endRadius: r * 0.52))
+
+                // ── 5. Small secondary caustic reflection — lower-right ───────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx + r * 0.26, y: cy + r * 0.30,
+                                           width: r * 0.22, height: r * 0.14)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.38), .clear]),
+                        center: CGPoint(x: cx + r * 0.36, y: cy + r * 0.36),
+                        startRadius: 0, endRadius: r * 0.14))
+            }
         }
     }
 
     // =========================================================================
-    // MARK: - Heartstone  (Valentine's Day 2027 seasonal exclusive)
+    // MARK: - Heartstone  (Valentine's Day 2027 seasonal exclusive · Legendary)
     // Deep fuchsia sphere with a gold embossed heart inlaid at centre.
     // The heart is built from four cubic Bézier curves meeting at a bottom
     // tip point — the classic cardioid construction.  A large upper-left
-    // specular sells the spherical gloss.
-    // Clipped to a circle by the body switch caller.
+    // specular sells the spherical gloss.  Animated: the heart beats with a
+    // real lub-dub rhythm — it swells slightly on each thump while a warm
+    // rose glow blooms behind it and a gold shimmer washes over its face.
+    // Under Reduce Motion the pulse is zero — exactly the original static
+    // emboss.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var heartstoneCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Lub-dub heartbeat: two exponentially-decaying thumps per
+                // ~1.2 s cycle.  pulse == 0 reproduces the static skin.
+                let beat: Double = (t * 0.85).truncatingRemainder(dividingBy: 1.0)
+                let lub: Double = exp(-9.0 * beat)
+                let dub: Double = beat > 0.20 ? exp(-9.0 * (beat - 0.20)) : 0.0
+                let pulse: Double = reduceMotion ? 0.0 : min(1.0, lub + 0.55 * dub)
 
-            // ── 1. Deep fuchsia radial gradient sphere ───────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.98, green: 0.72, blue: 0.82), location: 0.00),
-                        .init(color: Color(red: 0.92, green: 0.22, blue: 0.56), location: 0.38),
-                        .init(color: Color(red: 0.62, green: 0.06, blue: 0.30), location: 0.75),
-                        .init(color: Color(red: 0.28, green: 0.02, blue: 0.12), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
-                    startRadius: 0, endRadius: r * 1.05))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Gold embossed heart — 4 cubic Bézier construction ─────
-            // Scale factor and centre of the heart motif.
-            let pS  = r * 0.28
-            let hCx = cx
-            let hCy = cy + r * 0.04
+                // ── 1. Deep fuchsia radial gradient sphere ───────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.98, green: 0.72, blue: 0.82), location: 0.00),
+                            .init(color: Color(red: 0.92, green: 0.22, blue: 0.56), location: 0.38),
+                            .init(color: Color(red: 0.62, green: 0.06, blue: 0.30), location: 0.75),
+                            .init(color: Color(red: 0.28, green: 0.02, blue: 0.12), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.28),
+                        startRadius: 0, endRadius: r * 1.05))
 
-            // Tip (bottom of heart) and the four quadrant points in
-            // normalised coordinates (multiplied by pS and offset by hCx/hCy).
-            func hp(_ nx: CGFloat, _ ny: CGFloat) -> CGPoint {
-                CGPoint(x: hCx + nx * pS, y: hCy + ny * pS)
+                // ── 2. Gold embossed heart — 4 cubic Bézier construction ─────
+                // Scale factor rides the heartbeat (pulse == 0 → original
+                // r * 0.28) and centre of the heart motif.
+                let pS: CGFloat  = r * 0.28 * CGFloat(1.0 + 0.06 * pulse)
+                let hCx = cx
+                let hCy = cy + r * 0.04
+
+                // Tip (bottom of heart) and the four quadrant points in
+                // normalised coordinates (multiplied by pS and offset by hCx/hCy).
+                func hp(_ nx: CGFloat, _ ny: CGFloat) -> CGPoint {
+                    CGPoint(x: hCx + nx * pS, y: hCy + ny * pS)
+                }
+
+                var heart = Path()
+                // Start at bottom tip
+                heart.move(to: hp(0.0,  0.90))
+                // Bottom-left lobe sweep
+                heart.addCurve(to:        hp(-1.00, -0.30),
+                               control1:  hp(-0.10,  1.00),
+                               control2:  hp(-1.20,  0.30))
+                // Top-left crossing to top-centre
+                heart.addCurve(to:        hp( 0.00, -0.80),
+                               control1:  hp(-1.20, -0.90),
+                               control2:  hp(-0.40, -1.10))
+                // Top-right to right lobe
+                heart.addCurve(to:        hp( 1.00, -0.30),
+                               control1:  hp( 0.40, -1.10),
+                               control2:  hp( 1.20, -0.90))
+                // Bottom-right lobe back to tip
+                heart.addCurve(to:        hp( 0.00,  0.90),
+                               control1:  hp( 1.20,  0.30),
+                               control2:  hp( 0.10,  1.00))
+                heart.closeSubpath()
+
+                // 2a. Rose glow blooming behind the heart on each thump
+                //     (invisible at pulse == 0 → static fallback intact).
+                if pulse > 0.01 {
+                    let glowR: CGFloat = r * (0.42 + 0.22 * CGFloat(pulse))
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: hCx - glowR, y: hCy - glowR,
+                                               width: glowR * 2, height: glowR * 2)),
+                        with: .radialGradient(
+                            Gradient(colors: [
+                                Color(red: 1.00, green: 0.44, blue: 0.62).opacity(0.42 * pulse),
+                                .clear,
+                            ]),
+                            center: CGPoint(x: hCx, y: hCy),
+                            startRadius: 0, endRadius: glowR))
+                }
+
+                ctx.fill(heart,
+                         with: .color(Color(red: 0.92, green: 0.76, blue: 0.28)))
+                ctx.stroke(heart,
+                           with: .color(Color(red: 0.55, green: 0.38, blue: 0.08)),
+                           lineWidth: max(0.8, r * 0.028))
+
+                // 2b. Gold shimmer washing over the heart face on each thump.
+                if pulse > 0.01 {
+                    ctx.fill(heart, with: .radialGradient(
+                        Gradient(colors: [
+                            Color(red: 1.00, green: 0.94, blue: 0.62).opacity(0.55 * pulse),
+                            .clear,
+                        ]),
+                        center: CGPoint(x: hCx - pS * 0.30, y: hCy - pS * 0.40),
+                        startRadius: 0, endRadius: pS * 1.5))
+                }
+
+                // ── 3. Large specular highlight crescent (upper-left) ────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.74,
+                                           width: r * 0.46, height: r * 0.30)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.68), .clear]),
+                        center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.62),
+                        startRadius: 0, endRadius: r * 0.32))
             }
-
-            var heart = Path()
-            // Start at bottom tip
-            heart.move(to: hp(0.0,  0.90))
-            // Bottom-left lobe sweep
-            heart.addCurve(to:        hp(-1.00, -0.30),
-                           control1:  hp(-0.10,  1.00),
-                           control2:  hp(-1.20,  0.30))
-            // Top-left crossing to top-centre
-            heart.addCurve(to:        hp( 0.00, -0.80),
-                           control1:  hp(-1.20, -0.90),
-                           control2:  hp(-0.40, -1.10))
-            // Top-right to right lobe
-            heart.addCurve(to:        hp( 1.00, -0.30),
-                           control1:  hp( 0.40, -1.10),
-                           control2:  hp( 1.20, -0.90))
-            // Bottom-right lobe back to tip
-            heart.addCurve(to:        hp( 0.00,  0.90),
-                           control1:  hp( 1.20,  0.30),
-                           control2:  hp( 0.10,  1.00))
-            heart.closeSubpath()
-
-            ctx.fill(heart,
-                     with: .color(Color(red: 0.92, green: 0.76, blue: 0.28)))
-            ctx.stroke(heart,
-                       with: .color(Color(red: 0.55, green: 0.38, blue: 0.08)),
-                       lineWidth: max(0.8, r * 0.028))
-
-            // ── 3. Large specular highlight crescent (upper-left) ────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.74,
-                                       width: r * 0.46, height: r * 0.30)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.68), .clear]),
-                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.62),
-                    startRadius: 0, endRadius: r * 0.32))
         }
     }
 
     // =========================================================================
-    // MARK: - Shamrock  (St. Patrick's Day 2027 seasonal exclusive)
+    // MARK: - Shamrock  (St. Patrick's Day 2027 seasonal exclusive · Legendary)
     // Vivid forest-green sphere with a white four-leaf clover — four
     // overlapping petal circles arranged at N/E/S/W with a small centre
     // circle unifying them.  Gold outline rings the petals.  A curved gold
-    // stem descends from the base of the clover.
+    // stem descends from the base of the clover.  Animated: the clover
+    // sways gently about its centre as if in a breeze while flecks of gold
+    // dust drift up past it.  Under Reduce Motion the sway angle is zero
+    // and the dust is gone — exactly the original static clover.
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var shamrockCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Breeze sway — petals rotate about the clover centre.
+                // theta == 0 reproduces the static cardinal layout exactly.
+                let theta: Double = reduceMotion ? 0.0 : 0.16 * sin(t * 0.9) + 0.05 * sin(t * 2.3 + 1.1)
+                let cosT: CGFloat = CGFloat(cos(theta))
+                let sinT: CGFloat = CGFloat(sin(theta))
 
-            // ── 1. Forest-green radial gradient sphere ───────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.72, green: 0.98, blue: 0.52), location: 0.00),
-                        .init(color: Color(red: 0.20, green: 0.72, blue: 0.22), location: 0.42),
-                        .init(color: Color(red: 0.06, green: 0.42, blue: 0.10), location: 0.80),
-                        .init(color: Color(red: 0.02, green: 0.18, blue: 0.04), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.26),
-                    startRadius: 0, endRadius: r * 1.30))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Four-leaf clover ──────────────────────────────────────
-            let cloverCX = cx
-            let cloverCY = cy - r * 0.06
-            let petalR   = r * 0.195
-            let petalD   = r * 0.155   // centre-to-petal-centre offset
-            let goldStroke = Color(red: 0.88, green: 0.74, blue: 0.24)
-            let strokeW    = max(0.6, r * 0.022)
+                // ── 1. Forest-green radial gradient sphere ───────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.72, green: 0.98, blue: 0.52), location: 0.00),
+                            .init(color: Color(red: 0.20, green: 0.72, blue: 0.22), location: 0.42),
+                            .init(color: Color(red: 0.06, green: 0.42, blue: 0.10), location: 0.80),
+                            .init(color: Color(red: 0.02, green: 0.18, blue: 0.04), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.26),
+                        startRadius: 0, endRadius: r * 1.30))
 
-            // Cardinal offsets: N, E, S, W
-            let offsets: [(CGFloat, CGFloat)] = [(0, -1), (1, 0), (0, 1), (-1, 0)]
-            for (dx, dy) in offsets {
-                let pcx = cloverCX + dx * petalD
-                let pcy = cloverCY + dy * petalD
-                let pRect = CGRect(x: pcx - petalR, y: pcy - petalR,
-                                   width: petalR * 2, height: petalR * 2)
-                ctx.fill(Path(ellipseIn: pRect), with: .color(.white))
-                ctx.stroke(Path(ellipseIn: pRect),
-                           with: .color(goldStroke), lineWidth: strokeW)
+                // ── 2. Four-leaf clover — swaying about its centre ───────────
+                let cloverCX = cx
+                let cloverCY = cy - r * 0.06
+                let petalR   = r * 0.195
+                let petalD   = r * 0.155   // centre-to-petal-centre offset
+                let goldStroke = Color(red: 0.88, green: 0.74, blue: 0.24)
+                let strokeW    = max(0.6, r * 0.022)
+
+                // Cardinal offsets: N, E, S, W — rotated by the sway angle.
+                let offsets: [(CGFloat, CGFloat)] = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+                for (dx, dy) in offsets {
+                    let rx: CGFloat = dx * cosT - dy * sinT
+                    let ry: CGFloat = dx * sinT + dy * cosT
+                    let pcx = cloverCX + rx * petalD
+                    let pcy = cloverCY + ry * petalD
+                    let pRect = CGRect(x: pcx - petalR, y: pcy - petalR,
+                                       width: petalR * 2, height: petalR * 2)
+                    ctx.fill(Path(ellipseIn: pRect), with: .color(.white))
+                    ctx.stroke(Path(ellipseIn: pRect),
+                               with: .color(goldStroke), lineWidth: strokeW)
+                }
+
+                // Small centre circle to unify the four petals
+                let ctrR = petalR * 0.35
+                ctx.fill(Path(ellipseIn: CGRect(x: cloverCX - ctrR, y: cloverCY - ctrR,
+                                                width: ctrR * 2, height: ctrR * 2)),
+                         with: .color(.white))
+
+                // ── 3. Gold curved stem — tip follows the sway slightly ──────
+                let stemDX: CGFloat = sinT * petalR * 0.5
+                let stemBase = cloverCY + petalD + petalR * 0.6
+                var stem = Path()
+                stem.move(to:    CGPoint(x: cloverCX + r * 0.02, y: stemBase))
+                stem.addQuadCurve(
+                    to:      CGPoint(x: cloverCX + r * 0.08 - stemDX, y: stemBase + petalR * 1.5),
+                    control: CGPoint(x: cloverCX - r * 0.02 - stemDX * 0.5, y: stemBase + petalR * 1.1))
+                ctx.stroke(stem,
+                           with: .color(Color(red: 0.88, green: 0.72, blue: 0.22)),
+                           style: StrokeStyle(lineWidth: max(1.5, r * 0.075), lineCap: .round))
+
+                // ── 3b. Gold-dust drift — lucky flecks rising past the clover ─
+                //      (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    let dust = Color(red: 1.00, green: 0.86, blue: 0.38)
+                    for i in 0..<7 {
+                        let seed: Double  = Double(i) * 0.53 + 0.11
+                        let speed: Double = 0.10 + 0.045 * Double(i % 3)
+                        let cycle: Double = (t * speed + seed).truncatingRemainder(dividingBy: 1.0)
+                        let sway: Double  = sin(t * 1.1 + seed * 7.0)
+                        let lane: CGFloat = CGFloat(seed.truncatingRemainder(dividingBy: 0.6) - 0.3)
+                        let px: CGFloat = cx + lane * r * 1.9 + CGFloat(sway) * r * 0.06
+                        let py: CGFloat = cy + r * 0.85 - CGFloat(cycle) * r * 1.70
+                        // Fade in near the bottom, fade out toward the crown.
+                        let fade: Double = 0.70 * (1.0 - cycle) * min(1.0, cycle * 5.0)
+                        let ds: CGFloat = r * (0.022 + 0.014 * CGFloat(i % 2))
+                        // Twinkle each fleck on its own phase.
+                        let tw: Double = 0.55 + 0.45 * sin(t * 3.0 + seed * 9.0)
+                        ctx.fill(Path(ellipseIn: CGRect(x: px - ds, y: py - ds,
+                                                        width: ds * 2, height: ds * 2)),
+                                 with: .color(dust.opacity(fade * tw)))
+                    }
+                }
+
+                // ── 4. Specular highlight crescent ───────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.70,
+                                           width: r * 0.38, height: r * 0.26)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.52), .clear]),
+                        center: CGPoint(x: cx - r * 0.35, y: cy - r * 0.60),
+                        startRadius: 0, endRadius: r * 0.28))
             }
-
-            // Small centre circle to unify the four petals
-            let ctrR = petalR * 0.35
-            ctx.fill(Path(ellipseIn: CGRect(x: cloverCX - ctrR, y: cloverCY - ctrR,
-                                            width: ctrR * 2, height: ctrR * 2)),
-                     with: .color(.white))
-
-            // ── 3. Gold curved stem ──────────────────────────────────────
-            let stemBase = cloverCY + petalD + petalR * 0.6
-            var stem = Path()
-            stem.move(to:    CGPoint(x: cloverCX + r * 0.02, y: stemBase))
-            stem.addQuadCurve(
-                to:      CGPoint(x: cloverCX + r * 0.08, y: stemBase + petalR * 1.5),
-                control: CGPoint(x: cloverCX - r * 0.02, y: stemBase + petalR * 1.1))
-            ctx.stroke(stem,
-                       with: .color(Color(red: 0.88, green: 0.72, blue: 0.22)),
-                       style: StrokeStyle(lineWidth: max(1.5, r * 0.075), lineCap: .round))
-
-            // ── 4. Specular highlight crescent ───────────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.70,
-                                       width: r * 0.38, height: r * 0.26)),
-                with: .radialGradient(
-                    Gradient(colors: [Color.white.opacity(0.52), .clear]),
-                    center: CGPoint(x: cx - r * 0.35, y: cy - r * 0.60),
-                    startRadius: 0, endRadius: r * 0.28))
         }
     }
 
@@ -3616,75 +3761,120 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Speckled Egg  (Spring 2027 seasonal exclusive)
+    // MARK: - Speckled Egg  (Spring 2027 seasonal exclusive · Legendary)
     // Robin's-egg blue sphere with 16 deterministic dark oval speckles
     // scattered across its face.  Each oval is slightly elongated (width >
     // height) and slightly random in size via a per-speckle sizeScale factor.
     // A bright white specular crescent at upper-left anchors the lighting.
+    // Animated: the speckle field wobbles very gently (a just-about-to-hatch
+    // tremble), each speckle's ink breathes on its own phase, and a few tiny
+    // white glints twinkle across the shell.  Under Reduce Motion the wobble
+    // is zero, speckles hold at the original 0.80 opacity, and the glints
+    // are gone — exactly the original static egg.
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var speckledEggCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
-            // ── 1. Robin's-egg blue radial gradient sphere ───────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.82, green: 0.96, blue: 0.98), location: 0.00),
-                        .init(color: Color(red: 0.46, green: 0.82, blue: 0.90), location: 0.42),
-                        .init(color: Color(red: 0.22, green: 0.60, blue: 0.76), location: 0.80),
-                        .init(color: Color(red: 0.08, green: 0.28, blue: 0.44), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.28),
-                    startRadius: 0, endRadius: r * 1.25))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. 16 deterministic dark oval speckles ───────────────────
-            let baseSpeckleR = r * 0.040
-            let speckleColor = Color(red: 0.10, green: 0.28, blue: 0.38).opacity(0.80)
+                // Hatch-tremble wobble — zero under Reduce Motion.
+                let wobX: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 0.8)) * r * 0.018
+                let wobY: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 1.15 + 0.7)) * r * 0.013
 
-            // (normX, normY, sizeScale) — positions in [0,1] space
-            let speckles: [(CGFloat, CGFloat, CGFloat)] = [
-                (0.42, 0.22, 0.90), (0.62, 0.20, 1.10), (0.36, 0.36, 0.75),
-                (0.58, 0.38, 0.95), (0.72, 0.34, 0.80), (0.28, 0.44, 1.00),
-                (0.50, 0.46, 0.70), (0.66, 0.52, 1.05), (0.36, 0.58, 0.85),
-                (0.52, 0.60, 0.90), (0.70, 0.62, 0.75), (0.30, 0.68, 0.95),
-                (0.48, 0.72, 0.80), (0.62, 0.74, 1.00), (0.38, 0.80, 0.70),
-                (0.56, 0.82, 0.85),
-            ]
+                // ── 1. Robin's-egg blue radial gradient sphere ───────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.82, green: 0.96, blue: 0.98), location: 0.00),
+                            .init(color: Color(red: 0.46, green: 0.82, blue: 0.90), location: 0.42),
+                            .init(color: Color(red: 0.22, green: 0.60, blue: 0.76), location: 0.80),
+                            .init(color: Color(red: 0.08, green: 0.28, blue: 0.44), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.28),
+                        startRadius: 0, endRadius: r * 1.25))
 
-            for (nx, ny, scale) in speckles {
-                let sx = cx - r + nx * r * 2
-                let sy = cy - r + ny * r * 2
-                let dx = sx - cx
-                let dy = sy - cy
-                // Skip speckles outside the sphere silhouette
-                if sqrt(dx * dx + dy * dy) > r * 0.88 { continue }
+                // ── 2. 16 deterministic dark oval speckles — twinkling ───────
+                let baseSpeckleR = r * 0.040
+                let speckleInk = Color(red: 0.10, green: 0.28, blue: 0.38)
 
-                let sr = baseSpeckleR * scale
-                // Slightly elongated oval (1.0 wide, 0.62 tall)
-                let sRect = CGRect(x: sx - sr, y: sy - sr * 0.62,
-                                   width: sr * 2, height: sr * 1.24)
-                ctx.fill(Path(ellipseIn: sRect), with: .color(speckleColor))
+                // (normX, normY, sizeScale) — positions in [0,1] space
+                let speckles: [(CGFloat, CGFloat, CGFloat)] = [
+                    (0.42, 0.22, 0.90), (0.62, 0.20, 1.10), (0.36, 0.36, 0.75),
+                    (0.58, 0.38, 0.95), (0.72, 0.34, 0.80), (0.28, 0.44, 1.00),
+                    (0.50, 0.46, 0.70), (0.66, 0.52, 1.05), (0.36, 0.58, 0.85),
+                    (0.52, 0.60, 0.90), (0.70, 0.62, 0.75), (0.30, 0.68, 0.95),
+                    (0.48, 0.72, 0.80), (0.62, 0.74, 1.00), (0.38, 0.80, 0.70),
+                    (0.56, 0.82, 0.85),
+                ]
+
+                for (idx, sp) in speckles.enumerated() {
+                    let sx = cx - r + sp.0 * r * 2
+                    let sy = cy - r + sp.1 * r * 2
+                    let dx = sx - cx
+                    let dy = sy - cy
+                    // Skip speckles outside the sphere silhouette (checked on
+                    // the base position so the set is wobble-stable).
+                    if sqrt(dx * dx + dy * dy) > r * 0.88 { continue }
+
+                    // Per-speckle ink breathing — exactly 0.80 when static.
+                    let phase: Double = Double(idx) * 1.9
+                    let breathe: Double = reduceMotion
+                        ? 0.80
+                        : 0.68 + 0.20 * (0.5 + 0.5 * sin(t * 1.6 + phase))
+
+                    let sr = baseSpeckleR * sp.2
+                    // Slightly elongated oval (1.0 wide, 0.62 tall)
+                    let sRect = CGRect(x: sx + wobX - sr, y: sy + wobY - sr * 0.62,
+                                       width: sr * 2, height: sr * 1.24)
+                    ctx.fill(Path(ellipseIn: sRect),
+                             with: .color(speckleInk.opacity(breathe)))
+                }
+
+                // ── 2b. Tiny white shell glints — twinkle on their own phases ─
+                //      (skipped entirely under Reduce Motion → static fallback)
+                if !reduceMotion {
+                    // (normX, normY, phase) — fixed spots on the shell
+                    let glints: [(CGFloat, CGFloat, Double)] = [
+                        (0.34, 0.28, 0.0), (0.64, 0.42, 2.1),
+                        (0.44, 0.64, 4.2), (0.68, 0.70, 1.3),
+                    ]
+                    for (gnx, gny, gPhase) in glints {
+                        let gx: CGFloat = cx - r + gnx * r * 2
+                        let gy: CGFloat = cy - r + gny * r * 2
+                        let spark: Double = pow(max(0.0, sin(t * 1.3 + gPhase)), 8.0)
+                        if spark < 0.03 { continue }
+                        let gs: CGFloat = r * 0.055
+                        ctx.fill(
+                            Path(ellipseIn: CGRect(x: gx - gs, y: gy - gs,
+                                                   width: gs * 2, height: gs * 2)),
+                            with: .radialGradient(
+                                Gradient(colors: [Color.white.opacity(0.70 * spark), .clear]),
+                                center: CGPoint(x: gx, y: gy),
+                                startRadius: 0, endRadius: gs))
+                    }
+                }
+
+                // ── 3. Bright white specular crescent (upper-left) ───────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.54, y: cy - r * 0.72,
+                                           width: r * 0.44, height: r * 0.30)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .white.opacity(0.72), location: 0.00),
+                            .init(color: .white.opacity(0.36), location: 0.45),
+                            .init(color: .clear,               location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.60),
+                        startRadius: 0, endRadius: r * 0.34))
             }
-
-            // ── 3. Bright white specular crescent (upper-left) ───────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.54, y: cy - r * 0.72,
-                                       width: r * 0.44, height: r * 0.30)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .white.opacity(0.72), location: 0.00),
-                        .init(color: .white.opacity(0.36), location: 0.45),
-                        .init(color: .clear,               location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.60),
-                    startRadius: 0, endRadius: r * 0.34))
         }
     }
 
@@ -4944,91 +5134,109 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Teacher's Apple
+    // MARK: - Teacher's Apple  (Legendary)
     // Glossy classic-red apple with a small green leaf and brown stem at the
-    // top and a bright specular highlight.  Clean and cheerful.  Static.
+    // top and a bright specular highlight.  Clean and cheerful.  Animated:
+    // the leaf sways gently on the stem and the wet-gloss specular drifts
+    // in a slow orbit, like the apple turning under a classroom light.
+    // Under Reduce Motion both motions are zero — exactly the original
+    // static apple.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var appleCanvas: some View {
-        Canvas { ctx, size in
-            let w  = size.width
-            let h  = size.height
-            let cx = w / 2
-            let cy = h / 2
-            let r  = min(w, h) / 2
+        TimelineView(.animation) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                // Leaf sway — zero reproduces the static leaf exactly.
+                let sway: Double = reduceMotion ? 0.0 : sin(t * 1.2) + 0.35 * sin(t * 2.9 + 0.8)
 
-            // ── 1. Rounded apple-red body (radial shading) ───────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 0.97, green: 0.32, blue: 0.28), location: 0.00),
-                        .init(color: Color(red: 0.88, green: 0.13, blue: 0.14), location: 0.46),
-                        .init(color: Color(red: 0.60, green: 0.05, blue: 0.09), location: 0.84),
-                        .init(color: Color(red: 0.34, green: 0.03, blue: 0.06), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.24),
-                    startRadius: 0, endRadius: r * 1.18))
+                let w  = size.width
+                let h  = size.height
+                let cx = w / 2
+                let cy = h / 2
+                let r  = min(w, h) / 2
 
-            // ── 2. Subtle dimple shading at the top (apple navel) ────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.30, y: cy - r * 0.92,
-                                       width: r * 0.60, height: r * 0.40)),
-                with: .radialGradient(
-                    Gradient(colors: [Color(red: 0.40, green: 0.03, blue: 0.06).opacity(0.55), .clear]),
-                    center: CGPoint(x: cx, y: cy - r * 0.74),
-                    startRadius: 0, endRadius: r * 0.36))
+                // Specular drift — a slow small orbit; zero when static.
+                let specDX: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 0.55)) * r * 0.055
+                let specDY: CGFloat = reduceMotion ? 0.0 : CGFloat(cos(t * 0.55)) * r * 0.032
 
-            // ── 3. Brown stem ───────────────────────────────────────────
-            var stem = Path()
-            stem.move(to:    CGPoint(x: cx - r * 0.05, y: cy - r * 0.72))
-            stem.addQuadCurve(to: CGPoint(x: cx + r * 0.08, y: cy - r * 1.02),
-                              control: CGPoint(x: cx - r * 0.02, y: cy - r * 0.92))
-            ctx.stroke(stem,
-                       with: .color(Color(red: 0.42, green: 0.26, blue: 0.10)),
-                       style: StrokeStyle(lineWidth: max(2, r * 0.10), lineCap: .round))
+                // ── 1. Rounded apple-red body (radial shading) ───────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(red: 0.97, green: 0.32, blue: 0.28), location: 0.00),
+                            .init(color: Color(red: 0.88, green: 0.13, blue: 0.14), location: 0.46),
+                            .init(color: Color(red: 0.60, green: 0.05, blue: 0.09), location: 0.84),
+                            .init(color: Color(red: 0.34, green: 0.03, blue: 0.06), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.24),
+                        startRadius: 0, endRadius: r * 1.18))
 
-            // ── 4. Small green leaf beside the stem ──────────────────────
-            var leaf = Path()
-            let lx = cx + r * 0.10
-            let ly = cy - r * 0.88
-            leaf.move(to: CGPoint(x: lx, y: ly))
-            leaf.addQuadCurve(to: CGPoint(x: lx + r * 0.42, y: ly - r * 0.18),
-                              control: CGPoint(x: lx + r * 0.22, y: ly - r * 0.34))
-            leaf.addQuadCurve(to: CGPoint(x: lx, y: ly),
-                              control: CGPoint(x: lx + r * 0.22, y: ly + r * 0.04))
-            ctx.fill(leaf, with: .linearGradient(
-                Gradient(colors: [Color(red: 0.36, green: 0.72, blue: 0.30),
-                                  Color(red: 0.18, green: 0.52, blue: 0.20)]),
-                startPoint: CGPoint(x: lx, y: ly - r * 0.2),
-                endPoint:   CGPoint(x: lx + r * 0.42, y: ly + r * 0.05)))
-            // leaf mid-vein
-            var vein = Path()
-            vein.move(to: CGPoint(x: lx + r * 0.02, y: ly - r * 0.02))
-            vein.addQuadCurve(to: CGPoint(x: lx + r * 0.38, y: ly - r * 0.16),
-                              control: CGPoint(x: lx + r * 0.22, y: ly - r * 0.16))
-            ctx.stroke(vein, with: .color(Color(red: 0.14, green: 0.40, blue: 0.16).opacity(0.7)),
-                       lineWidth: 0.8)
+                // ── 2. Subtle dimple shading at the top (apple navel) ────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.30, y: cy - r * 0.92,
+                                           width: r * 0.60, height: r * 0.40)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color(red: 0.40, green: 0.03, blue: 0.06).opacity(0.55), .clear]),
+                        center: CGPoint(x: cx, y: cy - r * 0.74),
+                        startRadius: 0, endRadius: r * 0.36))
 
-            // ── 5. Sphere-shade rim ─────────────────────────────────────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
-                with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: .clear,               location: 0.55),
-                        .init(color: .black.opacity(0.14), location: 0.84),
-                        .init(color: .black.opacity(0.46), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.24),
-                    startRadius: 0, endRadius: r * 1.18))
+                // ── 3. Brown stem ───────────────────────────────────────────
+                var stem = Path()
+                stem.move(to:    CGPoint(x: cx - r * 0.05, y: cy - r * 0.72))
+                stem.addQuadCurve(to: CGPoint(x: cx + r * 0.08, y: cy - r * 1.02),
+                                  control: CGPoint(x: cx - r * 0.02, y: cy - r * 0.92))
+                ctx.stroke(stem,
+                           with: .color(Color(red: 0.42, green: 0.26, blue: 0.10)),
+                           style: StrokeStyle(lineWidth: max(2, r * 0.10), lineCap: .round))
 
-            // ── 6. Bright wet-gloss specular highlight (upper-left) ──────
-            ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.62,
-                                       width: r * 0.50, height: r * 0.34)),
-                with: .radialGradient(
-                    Gradient(colors: [.white.opacity(0.92), .white.opacity(0.3), .clear]),
-                    center: CGPoint(x: cx - r * 0.38, y: cy - r * 0.50),
-                    startRadius: 0, endRadius: r * 0.34))
+                // ── 4. Small green leaf beside the stem — swaying ────────────
+                // The base stays anchored at the stem; the tip and control
+                // points ride the sway (tipDX/tipDY == 0 → original leaf).
+                let tipDX: CGFloat = CGFloat(sway) * r * 0.035
+                let tipDY: CGFloat = CGFloat(sway) * r * -0.022
+                var leaf = Path()
+                let lx = cx + r * 0.10
+                let ly = cy - r * 0.88
+                leaf.move(to: CGPoint(x: lx, y: ly))
+                leaf.addQuadCurve(to: CGPoint(x: lx + r * 0.42 + tipDX, y: ly - r * 0.18 + tipDY),
+                                  control: CGPoint(x: lx + r * 0.22 + tipDX * 0.5, y: ly - r * 0.34 + tipDY * 0.5))
+                leaf.addQuadCurve(to: CGPoint(x: lx, y: ly),
+                                  control: CGPoint(x: lx + r * 0.22 + tipDX * 0.5, y: ly + r * 0.04))
+                ctx.fill(leaf, with: .linearGradient(
+                    Gradient(colors: [Color(red: 0.36, green: 0.72, blue: 0.30),
+                                      Color(red: 0.18, green: 0.52, blue: 0.20)]),
+                    startPoint: CGPoint(x: lx, y: ly - r * 0.2),
+                    endPoint:   CGPoint(x: lx + r * 0.42, y: ly + r * 0.05)))
+                // leaf mid-vein — follows the tip
+                var vein = Path()
+                vein.move(to: CGPoint(x: lx + r * 0.02, y: ly - r * 0.02))
+                vein.addQuadCurve(to: CGPoint(x: lx + r * 0.38 + tipDX, y: ly - r * 0.16 + tipDY),
+                                  control: CGPoint(x: lx + r * 0.22 + tipDX * 0.5, y: ly - r * 0.16 + tipDY * 0.5))
+                ctx.stroke(vein, with: .color(Color(red: 0.14, green: 0.40, blue: 0.16).opacity(0.7)),
+                           lineWidth: 0.8)
+
+                // ── 5. Sphere-shade rim ─────────────────────────────────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: 0, y: 0, width: w, height: h)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: .clear,               location: 0.55),
+                            .init(color: .black.opacity(0.14), location: 0.84),
+                            .init(color: .black.opacity(0.46), location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx - r * 0.20, y: cy - r * 0.24),
+                        startRadius: 0, endRadius: r * 1.18))
+
+                // ── 6. Bright wet-gloss specular highlight — drifting ────────
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.58 + specDX, y: cy - r * 0.62 + specDY,
+                                           width: r * 0.50, height: r * 0.34)),
+                    with: .radialGradient(
+                        Gradient(colors: [.white.opacity(0.92), .white.opacity(0.3), .clear]),
+                        center: CGPoint(x: cx - r * 0.38 + specDX, y: cy - r * 0.50 + specDY),
+                        startRadius: 0, endRadius: r * 0.34))
+            }
         }
     }
 }
