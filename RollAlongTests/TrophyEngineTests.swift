@@ -13,6 +13,7 @@
 //
 
 import XCTest
+import Combine
 @testable import RollAlong
 
 final class TrophyCatalogTests: XCTestCase {
@@ -420,8 +421,464 @@ final class TrophyCatalogTests: XCTestCase {
     }
 }
 
-// MARK: - TrophyEngineTests (S0-T3+)
+// MARK: - TrophyEngineTests (S0-T3)
 
-/// Placeholder — the engine's evaluation/idempotency/ratchet tests land in
-/// S0-T3/S0-T4/S0-T5 (shared harness) and the full trigger sweep in S1-T9.
-final class TrophyEngineTests: XCTestCase {}
+/// UserDefaults spy: counts every object write to the suite. The engine
+/// persists exclusively through `set(_ value: Any?, forKey:)` (plist array
+/// + plist dict), so overriding that one funnel is sufficient to prove the
+/// hot-path write discipline. (Typed scalar overloads like `set(Int,...)`
+/// don't route through here — the engine never uses them.)
+private final class WriteCountingDefaults: UserDefaults {
+    private(set) var objectWriteCount = 0
+    private(set) var writtenKeys: [String] = []
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        objectWriteCount += 1
+        writtenKeys.append(defaultName)
+        super.set(value, forKey: defaultName)
+    }
+}
+
+/// S0-T3 acceptance tests for the TrophyEngine evaluation core:
+/// double-fire idempotency (unlock exactly once, timestamp stable);
+/// unlocks never revoked when the underlying stat regresses
+/// (resetProgress / liquidateCoinCosmetics fixtures); evaluation per bump
+/// is O(interested trophies) with zero hot-path persistence; latched
+/// ledger in ra_trophyUnlocks / ra_trophyUnlockDates; monotonic progress.
+///
+/// Pattern for later sessions (S0-T4/S0-T5/S1-T9): every test runs
+/// against a throwaway injected UserDefaults suite — the GameStateTests
+/// pattern — so nothing touches the real save.
+final class TrophyEngineTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private let suiteName = "TrophyEngineTests.isolated"
+    private var cancellables: Set<AnyCancellable> = []
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        cancellables = []
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        super.tearDown()
+    }
+
+    // MARK: Fixtures
+
+    /// Mutable injected clock — proves timestamp stability exactly.
+    private final class Clock {
+        var current = Date(timeIntervalSince1970: 1_750_000_000)
+        func advance(_ seconds: TimeInterval) { current = current.addingTimeInterval(seconds) }
+    }
+
+    /// Engine over the real bundled 89-trophy catalog and the isolated
+    /// suite (or a caller-supplied spy suite).
+    private func makeEngine(clock: Clock = Clock(),
+                            defaults: UserDefaults? = nil) throws -> TrophyEngine {
+        TrophyEngine(catalog: try TrophyCatalog.load(bundle: .main),
+                     defaults: defaults ?? self.defaults,
+                     now: { clock.current })
+    }
+
+    /// GameState on the same isolated suite (regression fixtures).
+    private func makeGameState() -> GameState {
+        GameState(defaults: defaults)
+    }
+
+    private func makeDefinition(id: String,
+                                tier: TrophyTier = .bronze,
+                                category: TrophyCategory = .climb,
+                                metric: TrophyMetric = .climbHighestUnlocked,
+                                threshold: Double = 1,
+                                requiredTrophyIDs: [String]? = nil) -> TrophyDefinition {
+        TrophyDefinition(id: id,
+                         title: "Title \(id)",
+                         tier: tier,
+                         category: category,
+                         lockedDescription: "Do the thing.",
+                         unlockedDescription: "You did the thing.",
+                         isSecret: false,
+                         criteria: TrophyCriteria(metric: metric,
+                                                  threshold: threshold,
+                                                  requiredTrophyIDs: requiredTrophyIDs),
+                         rewardID: nil,
+                         addedInVersion: TrophyCatalog.launchVersion)
+    }
+
+    /// A tiny valid catalog with two independently keyed base trophies and
+    /// a capstone requiring both — staged capstone-cascade testing.
+    private func makeMiniEngine(clock: Clock = Clock()) throws -> TrophyEngine {
+        let trophies = [
+            makeDefinition(id: "mini_climb", metric: .climbHighestUnlocked, threshold: 5),
+            makeDefinition(id: "mini_snake", metric: .snakeWins, threshold: 3),
+            makeDefinition(id: "mini_capstone",
+                           tier: .platinum,
+                           category: .capstone,
+                           metric: .baseTrophiesUnlocked,
+                           threshold: 2,
+                           requiredTrophyIDs: ["mini_climb", "mini_snake"]),
+        ]
+        let file = TrophyCatalog.CatalogFile(catalogVersion: 1, trophies: trophies)
+        let catalog = try TrophyCatalog.load(from: JSONEncoder().encode(file))
+        return TrophyEngine(catalog: catalog, defaults: defaults, now: { clock.current })
+    }
+
+    /// Snapshot of the two persisted ledger keys, for before/after compares.
+    private func persistedLedgerSnapshot() -> (ids: Set<String>, dates: [String: Date]) {
+        let ids = Set((defaults.array(forKey: TrophyEngine.unlocksKey) as? [String]) ?? [])
+        let dates = (defaults.dictionary(forKey: TrophyEngine.unlockDatesKey) ?? [:])
+            .compactMapValues { $0 as? Date }
+        return (ids, dates)
+    }
+
+    // MARK: Metric index — O(interested) evaluation shape
+
+    /// The index is built once from the catalog and is exact: every metric
+    /// maps to precisely the trophies whose criteria watch it, and the
+    /// ledger-provenance capstone is cascade-only (never in the index).
+    func testMetricIndexMatchesCatalogExactly() throws {
+        let engine = try makeEngine()
+        let catalog = engine.catalog
+        var indexedTotal = 0
+        for metric in TrophyMetric.allCases {
+            let expected = Set(catalog.trophies
+                .filter { $0.criteria.metric == metric && metric.provenance != .trophyLedger }
+                .map(\.id))
+            let interested = Set(engine.trophies(interestedIn: metric).map(\.id))
+            XCTAssertEqual(interested, expected, "index wrong for \(metric.rawValue)")
+            indexedTotal += interested.count
+        }
+        // Everything is reachable exactly once: 88 metric-indexed + the capstone.
+        XCTAssertEqual(indexedTotal, 88)
+        XCTAssertTrue(engine.trophies(interestedIn: .baseTrophiesUnlocked).isEmpty,
+                      "the capstone must be cascade-only, never bump-evaluated")
+    }
+
+    #if DEBUG
+    /// Acceptance: a stat bump evaluates ONLY interested trophies —
+    /// O(interested), never O(catalog). snake_wins has 2 trophies;
+    /// climb_highest_unlocked has the catalog's biggest fan-out (8);
+    /// the catalog is 89.
+    func testStatBumpEvaluatesOnlyInterestedTrophies() throws {
+        let engine = try makeEngine()
+        engine.record(.snakeWins, value: 0)
+        XCTAssertEqual(engine.debugLastRecordEvaluationCount, 2)
+        engine.record(.climbHighestUnlocked, value: 1)
+        XCTAssertEqual(engine.debugLastRecordEvaluationCount, 8)
+        engine.record(.signedIn, value: 0)
+        XCTAssertEqual(engine.debugLastRecordEvaluationCount, 1)
+        // Already-latched trophies still cost only the interested set.
+        engine.record(.snakeWins, value: 1_000)
+        engine.record(.snakeWins, value: 1_001)
+        XCTAssertEqual(engine.debugLastRecordEvaluationCount, 2)
+    }
+    #endif
+
+    /// Behavioral face of the same acceptance: a huge value on one metric
+    /// latches exactly that metric's trophies and nothing else.
+    func testBumpUnlocksOnlyInterestedTrophies() throws {
+        let engine = try makeEngine()
+        let unlocked = engine.record(.snakeWins, value: 1_000_000)
+        XCTAssertEqual(Set(unlocked.map(\.id)), ["snake_first_win", "snake_wins_10"])
+        XCTAssertEqual(engine.unlockedIDs, ["snake_first_win", "snake_wins_10"])
+    }
+
+    /// Acceptance: no hot-path persistence — a bump that unlocks nothing
+    /// performs ZERO UserDefaults writes and ZERO objectWillChange
+    /// emissions; an unlocking bump writes exactly the two ledger keys
+    /// (plist-native — no JSON Data blobs) and publishes exactly once.
+    func testNoWritesAndNoPublishOnNonUnlockingBumps() throws {
+        let spy = WriteCountingDefaults(suiteName: suiteName)!
+        let engine = try makeEngine(defaults: spy)
+        var publishes = 0
+        engine.objectWillChange.sink { _ in publishes += 1 }.store(in: &cancellables)
+
+        for i in 0..<200 {
+            engine.record(.climbTotalStars, value: Double(i % 24))   // threshold 25 never met
+        }
+        XCTAssertEqual(spy.objectWriteCount, 0, "hot path must never touch UserDefaults")
+        XCTAssertEqual(publishes, 0, "hot path must never re-render observers")
+
+        let unlocked = engine.record(.climbTotalStars, value: 25)    // climb_stars_25
+        XCTAssertEqual(unlocked.map(\.id), ["climb_stars_25"])
+        XCTAssertEqual(publishes, 1, "exactly one publish per unlocking bump")
+        XCTAssertEqual(spy.objectWriteCount, 2)
+        XCTAssertEqual(Set(spy.writtenKeys),
+                       [TrophyEngine.unlocksKey, TrophyEngine.unlockDatesKey])
+
+        // Plist-native shapes: a string array + a Date-valued dictionary,
+        // and neither key holds a JSON-encoded Data blob.
+        XCTAssertEqual(spy.array(forKey: TrophyEngine.unlocksKey) as? [String],
+                       ["climb_stars_25"])
+        let dates = try XCTUnwrap(spy.dictionary(forKey: TrophyEngine.unlockDatesKey))
+        XCTAssertTrue(dates["climb_stars_25"] is Date)
+        XCTAssertNil(spy.data(forKey: TrophyEngine.unlocksKey))
+        XCTAssertNil(spy.data(forKey: TrophyEngine.unlockDatesKey))
+    }
+
+    // MARK: Double-fire idempotency
+
+    /// Acceptance: unlock exactly once, timestamp stable. The second
+    /// satisfying bump returns nothing, changes nothing, restamps nothing
+    /// — in memory and on disk.
+    func testDoubleFireUnlocksExactlyOnceWithStableTimestamp() throws {
+        let clock = Clock()
+        let engine = try makeEngine(clock: clock)
+        let t1 = clock.current
+
+        XCTAssertEqual(engine.record(.climbTotalStars, value: 25).map(\.id), ["climb_stars_25"])
+        XCTAssertEqual(engine.unlockDate(for: "climb_stars_25"), t1)
+        let firstSnapshot = persistedLedgerSnapshot()
+
+        clock.advance(86_400)
+        XCTAssertTrue(engine.record(.climbTotalStars, value: 30).isEmpty, "double fire must be a no-op")
+        XCTAssertTrue(engine.record(.climbTotalStars, value: 25).isEmpty)
+        XCTAssertEqual(engine.unlockedIDs, ["climb_stars_25"])
+        XCTAssertEqual(engine.unlockDate(for: "climb_stars_25"), t1, "timestamp must be stable")
+
+        let secondSnapshot = persistedLedgerSnapshot()
+        XCTAssertEqual(secondSnapshot.ids, firstSnapshot.ids)
+        XCTAssertEqual(secondSnapshot.dates, firstSnapshot.dates)
+
+        // And across a relaunch: a fresh engine still reports t1.
+        let relaunched = try makeEngine(clock: clock)
+        XCTAssertTrue(relaunched.isUnlocked("climb_stars_25"))
+        XCTAssertEqual(relaunched.unlockDate(for: "climb_stars_25"), t1)
+        // Re-push a value that still clears climb_stars_25 (>=25) but stays
+        // below the next rung climb_stars_150 (150) — so a genuine re-latch,
+        // not a sibling first-unlock, is what this asserts against.
+        XCTAssertTrue(relaunched.record(.climbTotalStars, value: 30).isEmpty,
+                      "re-satisfying after relaunch must not re-unlock")
+    }
+
+    // MARK: Ratchet — regression fixtures
+
+    /// Acceptance: an unlock is NEVER revoked when the underlying stat
+    /// regresses. Fixture 1: `resetProgress()` zeroes `totalStars`, the
+    /// exact regressable stat behind climb_stars_25 (catalog: "latched —
+    /// resetProgress() can shrink the live sum").
+    func testUnlockSurvivesResetProgress() throws {
+        let gs = makeGameState()
+        for level in 1...9 {
+            gs.recordResult(level: level, stars: 3, time: 30, coinIndices: [])
+        }
+        XCTAssertGreaterThanOrEqual(gs.totalStars, 25)
+
+        let clock = Clock()
+        let engine = try makeEngine(clock: clock)
+        engine.record(.climbTotalStars, value: gs.totalStars)
+        XCTAssertTrue(engine.isUnlocked("climb_stars_25"))
+        let stamp = engine.unlockDate(for: "climb_stars_25")
+        let before = persistedLedgerSnapshot()
+
+        gs.resetProgress()
+        XCTAssertEqual(gs.totalStars, 0, "fixture must actually regress the stat")
+
+        // The reset itself must not touch the ledger keys...
+        let after = persistedLedgerSnapshot()
+        XCTAssertEqual(after.ids, before.ids)
+        XCTAssertEqual(after.dates, before.dates)
+
+        // ...and re-recording the regressed value must never revoke.
+        clock.advance(3_600)
+        XCTAssertTrue(engine.record(.climbTotalStars, value: gs.totalStars).isEmpty)
+        XCTAssertTrue(engine.isUnlocked("climb_stars_25"))
+        XCTAssertEqual(engine.unlockDate(for: "climb_stars_25"), stamp)
+
+        // A cold engine over the same save agrees.
+        let relaunched = try makeEngine(clock: clock)
+        XCTAssertTrue(relaunched.isUnlocked("climb_stars_25"))
+    }
+
+    /// Fixture 2: `liquidateCoinCosmetics()` (Sell Back) strips sellable
+    /// cosmetics — the regressable stat behind balls_own_10.
+    func testUnlockSurvivesLiquidateCoinCosmetics() throws {
+        let gs = makeGameState()
+        let sellable = BallSkin.allCases.filter(\.isSellable).prefix(10)
+        XCTAssertEqual(sellable.count, 10, "catalogue must offer 10 sellable skins")
+        for skin in sellable { gs.ownedBallSkins.insert(skin.rawValue) }
+        let ownedBefore = gs.ownedBallSkins.count
+        XCTAssertGreaterThanOrEqual(ownedBefore, 10)
+
+        let clock = Clock()
+        let engine = try makeEngine(clock: clock)
+        engine.record(.ballsOwned, value: ownedBefore)
+        XCTAssertTrue(engine.isUnlocked("balls_own_10"))
+        let stamp = engine.unlockDate(for: "balls_own_10")
+        let before = persistedLedgerSnapshot()
+
+        gs.liquidateCoinCosmetics()
+        XCTAssertLessThan(gs.ownedBallSkins.count, 10,
+                          "fixture must actually regress ownership")
+
+        let after = persistedLedgerSnapshot()
+        XCTAssertEqual(after.ids, before.ids)
+        XCTAssertEqual(after.dates, before.dates)
+
+        clock.advance(60)
+        XCTAssertTrue(engine.record(.ballsOwned, value: gs.ownedBallSkins.count).isEmpty)
+        XCTAssertTrue(engine.isUnlocked("balls_own_10"))
+        XCTAssertEqual(engine.unlockDate(for: "balls_own_10"), stamp)
+
+        let relaunched = try makeEngine(clock: clock)
+        XCTAssertTrue(relaunched.isUnlocked("balls_own_10"))
+    }
+
+    // MARK: Observable isolation
+
+    /// Acceptance: trophy state lives in its OWN ObservableObject —
+    /// engine unlocks must never emit through GameState.objectWillChange,
+    /// so gameplay views observing GameState never re-render on trophy
+    /// writes.
+    func testEngineUnlockNeverEmitsThroughGameState() throws {
+        let gs = makeGameState()
+        let engine = try makeEngine()
+
+        var gameStateEmissions = 0
+        gs.objectWillChange.sink { _ in gameStateEmissions += 1 }.store(in: &cancellables)
+        var engineEmissions = 0
+        engine.objectWillChange.sink { _ in engineEmissions += 1 }.store(in: &cancellables)
+
+        engine.record(.climbTotalStars, value: 10)          // no unlock
+        engine.record(.climbTotalStars, value: 1_000)       // unlocks both star trophies
+        XCTAssertEqual(engine.unlockedIDs.count, 2)
+        XCTAssertEqual(engineEmissions, 1)
+        XCTAssertEqual(gameStateEmissions, 0,
+                       "trophy writes must never re-render GameState observers")
+    }
+
+    // MARK: Capstone — ledger cascade, never external
+
+    /// The ledger metric is engine-derived: an external push can never
+    /// forge the capstone open.
+    func testLedgerMetricIgnoresExternalPush() throws {
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.record(.baseTrophiesUnlocked, value: 1_000).isEmpty)
+        XCTAssertFalse(engine.isUnlocked("capstone_all"))
+        XCTAssertTrue(engine.unlockedIDs.isEmpty)
+    }
+
+    /// The capstone latches by cascade the moment its required set
+    /// completes, stamped at the same commit — and never before.
+    func testCapstoneCascadesWhenRequiredSetCompletes() throws {
+        let clock = Clock()
+        let engine = try makeMiniEngine(clock: clock)
+
+        XCTAssertEqual(engine.record(.climbHighestUnlocked, value: 5).map(\.id), ["mini_climb"])
+        XCTAssertFalse(engine.isUnlocked("mini_capstone"))
+        XCTAssertEqual(engine.progressFraction(for: "mini_capstone"), 0.5)
+
+        clock.advance(120)
+        let completing = engine.record(.snakeWins, value: 3)
+        XCTAssertEqual(completing.map(\.id), ["mini_snake", "mini_capstone"],
+                       "the completing bump must return the cascaded capstone too")
+        XCTAssertTrue(engine.isUnlocked("mini_capstone"))
+        XCTAssertEqual(engine.unlockDate(for: "mini_capstone"), clock.current)
+        XCTAssertEqual(engine.progressFraction(for: "mini_capstone"), 1)
+
+        // Cascade is idempotent like everything else.
+        XCTAssertTrue(engine.record(.snakeWins, value: 50).isEmpty)
+    }
+
+    /// Real-catalog spot check: one capstone-path unlock moves the
+    /// capstone's ledger-derived progress to exactly 1/73.
+    func testCapstoneProgressDerivesFromLedgerOnRealCatalog() throws {
+        let engine = try makeEngine()
+        XCTAssertEqual(engine.progressFraction(for: "capstone_all"), 0)
+        engine.record(.climbTotalStars, value: 25)           // climb_stars_25 is on the path
+        XCTAssertEqual(engine.progressFraction(for: "capstone_all") ?? 0,
+                       1.0 / 73.0, accuracy: 0.000_001)
+        XCTAssertFalse(engine.isUnlocked("capstone_all"))
+    }
+
+    // MARK: Monotonic progress
+
+    /// Progress rides a high-water latch: regressed values never walk it
+    /// back, unlock pins it at 1.0 forever, unknown ids are nil.
+    func testProgressFractionIsMonotonic() throws {
+        let engine = try makeEngine()
+        XCTAssertEqual(engine.progressFraction(for: "climb_stars_25"), 0)
+
+        engine.record(.climbTotalStars, value: 5)
+        XCTAssertEqual(engine.progressFraction(for: "climb_stars_25") ?? 0, 0.2, accuracy: 0.000_001)
+
+        engine.record(.climbTotalStars, value: 3)            // regression
+        XCTAssertEqual(engine.progressFraction(for: "climb_stars_25") ?? 0, 0.2, accuracy: 0.000_001,
+                       "a regressed stat must never walk progress back")
+
+        engine.record(.climbTotalStars, value: 25)
+        XCTAssertEqual(engine.progressFraction(for: "climb_stars_25"), 1)
+
+        XCTAssertNil(engine.progressFraction(for: "no_such_trophy"))
+    }
+
+    /// The lte criterion (speed clear) is binary 0 → 1, min-latched:
+    /// slower times never satisfy, the first fast-enough clear latches.
+    func testLessOrEqualCriterionProgressAndUnlock() throws {
+        let engine = try makeEngine()
+        XCTAssertEqual(engine.progressFraction(for: "skill_speed_10s"), 0)
+
+        engine.record(.fastestClearSeconds, value: 12.0)
+        XCTAssertFalse(engine.isUnlocked("skill_speed_10s"))
+        XCTAssertEqual(engine.progressFraction(for: "skill_speed_10s"), 0)
+
+        XCTAssertEqual(engine.record(.fastestClearSeconds, value: 9.5).map(\.id),
+                       ["skill_speed_10s"])
+        XCTAssertEqual(engine.progressFraction(for: "skill_speed_10s"), 1)
+
+        // A later slower time can never revoke (ratchet).
+        XCTAssertTrue(engine.record(.fastestClearSeconds, value: 60).isEmpty)
+        XCTAssertTrue(engine.isUnlocked("skill_speed_10s"))
+    }
+
+    // MARK: Ledger loading — healing + unknown ids
+
+    /// A crash between the two ledger writes heals toward MORE unlocked
+    /// (the ratchet direction): ids present in either key survive.
+    func testPartialLedgerWritesHealToTheUnion() throws {
+        // ids-only (dates write lost).
+        defaults.set(["climb_stars_25"], forKey: TrophyEngine.unlocksKey)
+        var engine = try makeEngine()
+        XCTAssertTrue(engine.isUnlocked("climb_stars_25"))
+        XCTAssertNil(engine.unlockDate(for: "climb_stars_25"))
+        // >=25 re-satisfies the healed climb_stars_25 but stays under the
+        // next rung climb_stars_150 (150), so [] means "no re-latch", not
+        // "a higher sibling happened to unlock".
+        XCTAssertTrue(engine.record(.climbTotalStars, value: 30).isEmpty,
+                      "healed unlock must not re-latch")
+
+        // dates-only (ids write lost) + one corrupt non-Date entry.
+        defaults.removePersistentDomain(forName: suiteName)
+        let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+        defaults.set(["snake_first_win": stamp, "corrupt_entry": "not a date"],
+                     forKey: TrophyEngine.unlockDatesKey)
+        engine = try makeEngine()
+        XCTAssertTrue(engine.isUnlocked("snake_first_win"))
+        XCTAssertEqual(engine.unlockDate(for: "snake_first_win"), stamp)
+        // A corrupt-VALUED entry still counts as unlock evidence (ratchet
+        // direction) — only its bad date is dropped.
+        XCTAssertTrue(engine.isUnlocked("corrupt_entry"))
+        XCTAssertNil(engine.unlockDate(for: "corrupt_entry"),
+                     "a corrupt timestamp entry must not survive as a date")
+    }
+
+    /// Ledger ids not in this build's catalog (a save from a newer app
+    /// version) are kept and re-persisted, never dropped — the catalog is
+    /// additive-only, so they are somebody's real unlocks.
+    func testUnknownLedgerIDsAreNeverDropped() throws {
+        defaults.set(["trophy_from_the_future"], forKey: TrophyEngine.unlocksKey)
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.isUnlocked("trophy_from_the_future"))
+        XCTAssertNil(engine.progressFraction(for: "trophy_from_the_future"))
+
+        engine.record(.snakeWins, value: 1)                  // forces a re-persist
+        let persisted = persistedLedgerSnapshot()
+        XCTAssertTrue(persisted.ids.contains("trophy_from_the_future"))
+        XCTAssertTrue(persisted.ids.contains("snake_first_win"))
+    }
+}

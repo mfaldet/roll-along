@@ -25,6 +25,11 @@ import SwiftUI
 //   Latched trophy counters — monotonic ratchets, untouched by
 //   resetProgress() / liquidateCoinCosmetics().
 //
+// TrophyEngine adds (written only by the engine at unlock time — S0-T3):
+//   ra_trophyUnlocks, ra_trophyUnlockDates.
+//   The latched unlock ledger — a pure ratchet: never revoked, untouched
+//   by resetProgress() / liquidateCoinCosmetics().
+//
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
 //
