@@ -5,7 +5,22 @@ Notable changes to Roll Along, newest first. Dates are when the work landed on
 
 ---
 
-## 2026-07 — Purchased lives become a reserve queue
+## 2026-07 — Starter Pack returns; lives become a reserve queue
+
+### Starter Pack welcome offer (un-retired)
+
+- **The $1.99 Starter Pack is back on sale** as a one-time welcome offer:
+  3,750 coins + the complete Aurora collection (ball · goal · trail · floor ·
+  pit · music), free-granted so Sell Back keeps it but never refunds it. The
+  coin component is repriced 7.5× (from the pre-retirement 500) in line with
+  the coin-pack reprice, keeping it the best coin value ever sold.
+- **Auto-presented once** when the coin balance first reaches 250 — past the
+  tutorial and into free play, not in the first thirty seconds — then again
+  on re-launch while the 48-hour claim window is open; "No thanks" dismisses
+  it permanently. Suppressed for players who already own the whole collection,
+  under `--uitesting`, and whenever the App Store product isn't loaded.
+- **Past buyers unaffected**: restore still re-grants the collection (never
+  the coins), and the offer never re-shows once claimed or dismissed.
 
 ### Lives
 - **Purchased lives now live in a separate reserve queue** (`purchasedLives`)

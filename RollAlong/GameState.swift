@@ -11,6 +11,7 @@ import SwiftUI
 //   ra_bestStars, ra_bestTime, ra_collectedCoins, ra_highestUnlocked,
 //   ra_lives, ra_purchasedLives, ra_lastLifeLostAt, ra_unlimitedLives, ra_dailyStreak,
 //   ra_lastDailyClaim, ra_starterPackShownAt, ra_starterPackClaimed,
+//   ra_starterPackDismissed,
 //   ra_lastReviewPromptDate, ra_coinBalance, ra_tickets, ra_ownedBallSkins, ra_ownedGoals,
 //   ra_ownedTrails, ra_ownedFloors, ra_ownedPits, ra_ownedBoundaries,
 //   ra_ownedBundles, ra_ownedPacks, ra_freeGrantedItems, ra_paidPrices,
@@ -172,12 +173,18 @@ final class GameState: ObservableObject {
     }
 
     // ── Starter Pack one-time offer ─────────────────────────────────────────
-    // starterPackShownAt : timestamp when the offer sheet was first presented.
-    //                      nil until the trigger fires (first time coinBalance
-    //                      reaches 50).  Drives the 48-hour countdown.
-    // starterPackClaimed : true after the player purchases OR permanently
-    //                      dismisses the offer.  Once true the sheet never
-    //                      shows again.
+    // starterPackShownAt   : timestamp when the offer sheet was first presented.
+    //                        nil until the trigger fires (first time coinBalance
+    //                        reaches `starterPackTriggerCoins`).  Drives the
+    //                        48-hour countdown.
+    // starterPackClaimed   : true once the pack's rewards have been DELIVERED
+    //                        (purchase or restore).  Gates the once-only coins
+    //                        in StoreKitManager — deliberately NOT set by
+    //                        "No thanks", or an Ask-to-Buy purchase approved
+    //                        after a dismissal would silently lose its coins.
+    // starterPackDismissed : true after the player taps "No thanks" —
+    //                        permanent opt-out of the offer UI only; a pending
+    //                        or restored purchase still delivers in full.
     @Published var starterPackShownAt: Date? {
         didSet {
             if let d = starterPackShownAt {
@@ -189,6 +196,9 @@ final class GameState: ObservableObject {
     }
     @Published var starterPackClaimed: Bool {
         didSet { defaults.set(starterPackClaimed, forKey: "ra_starterPackClaimed") }
+    }
+    @Published var starterPackDismissed: Bool {
+        didSet { defaults.set(starterPackDismissed, forKey: "ra_starterPackDismissed") }
     }
 
     // ── Ratings prompt ────────────────────────────────────────────────────
@@ -549,8 +559,9 @@ final class GameState: ObservableObject {
         lastDailyClaim = defaults.object(forKey: "ra_lastDailyClaim") as? Date
 
         // Starter Pack offer state.
-        starterPackShownAt = defaults.object(forKey: "ra_starterPackShownAt") as? Date
-        starterPackClaimed = defaults.bool(forKey: "ra_starterPackClaimed")
+        starterPackShownAt   = defaults.object(forKey: "ra_starterPackShownAt") as? Date
+        starterPackClaimed   = defaults.bool(forKey: "ra_starterPackClaimed")
+        starterPackDismissed = defaults.bool(forKey: "ra_starterPackDismissed")
 
         // Ratings prompt.
         lastReviewPromptDate = defaults.object(forKey: "ra_lastReviewPromptDate") as? Date
@@ -1416,12 +1427,51 @@ final class GameState: ObservableObject {
         return amount
     }
 
-    // The Starter Pack one-time IAP offer was retired — its auto-presented sheet
-    // and 48-hour-window logic are gone.  `starterPackClaimed` is kept (persisted)
-    // so StoreKitManager delivers the pack's 500 coins exactly once; the pack's
-    // cosmetic grant is the complete Aurora collection (the "aurora" bundle,
-    // free-granted so Sell Back never refunds it), re-granted idempotently to
-    // past buyers on restore.  Aurora itself remains a coin-buyable bundle.
+    // MARK: - Starter Pack offer
+
+    // The one-time $1.99 welcome offer: 3,750 coins + the complete Aurora
+    // collection (the "aurora" bundle, free-granted so Sell Back keeps but
+    // never refunds it).  `starterPackClaimed` = rewards delivered (gates the
+    // once-only coins in StoreKitManager); `starterPackDismissed` = "No
+    // thanks" opt-out of the offer UI.  Past buyers are re-granted the
+    // collection (never the coins) on restore.  Aurora itself remains a
+    // coin-buyable bundle.
+
+    /// Coin balance that first arms the welcome offer.  Set past the tutorial's
+    /// natural take (~30–50 coins from L1–10 clears) plus a chunk of free play
+    /// — a few minigame wins or ~45 min of climb at current earn rates — so the
+    /// offer lands once the player is invested and has glimpsed the shop, not in
+    /// the first thirty seconds.  Still reachable within a session, so the
+    /// 48-hour window stays meaningful.
+    static let starterPackTriggerCoins = 250
+
+    /// Fires once: true the first time `coinBalance` reaches
+    /// `starterPackTriggerCoins` AND the player hasn't claimed or permanently
+    /// dismissed the offer yet.  HomeView observes `coinBalance` and checks
+    /// this to auto-present the sheet.  Suppressed when the player already owns
+    /// the complete Aurora collection — the offer's headline item is theirs.
+    var shouldTriggerStarterPack: Bool {
+        !starterPackClaimed && !starterPackDismissed
+            && starterPackShownAt == nil && coinBalance >= Self.starterPackTriggerCoins
+            && !completedBundleIDs.contains("aurora")
+    }
+
+    /// True while the 48-hour countdown is still ticking — the offer sheet
+    /// is still worth showing (e.g., player re-opens the app mid-window).
+    /// Goes false early if the player coin-completes the Aurora collection
+    /// mid-window.
+    var starterPackOfferActive: Bool {
+        guard !starterPackClaimed, !starterPackDismissed,
+              let shownAt = starterPackShownAt else { return false }
+        return Date().timeIntervalSince(shownAt) < 48 * 3_600
+            && !completedBundleIDs.contains("aurora")
+    }
+
+    /// Seconds remaining in the 48-hour offer window (0 when expired/unclaimed).
+    var starterPackSecondsRemaining: TimeInterval {
+        guard let shownAt = starterPackShownAt else { return 0 }
+        return max(0, 48 * 3_600 - Date().timeIntervalSince(shownAt))
+    }
 
     // MARK: - Ratings prompt
 

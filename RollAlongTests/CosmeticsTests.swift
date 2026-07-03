@@ -48,8 +48,8 @@ final class CosmeticsTests: XCTestCase {
     /// "Speckled Egg" carry a space.
     func testBundleExclusiveSkins_flagIsConsistent() {
         let expected: Set<String> = [
-            // Aurora is intentionally absent — the Starter Pack IAP was retired and
-            // Aurora is now a regular coin-buyable ball (no longer bundle-locked).
+            // Aurora is intentionally absent — it's a regular coin-buyable ball.
+            // The Starter Pack offer GIFTS the collection; it doesn't lock it.
             "Pluto", "Beach Ball", "Pumpkin", "Ornament",
             "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy",
             "Diamond",     // Diamond Balls IAP exclusive

@@ -129,9 +129,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
     // ── Aurora (Legendary, coin-buyable; anchors the Aurora bundle) ──────
     //   • aurora — deep midnight sphere with animated teal-green and violet
     //     Northern Lights bands and twinkling stars.  A regular coin-buyable
-    //     Legendary ball and the centerpiece of the Aurora bundle; the legacy
-    //     Starter Pack IAP grants the entire Aurora collection free-granted
-    //     (see StoreKitManager.grantAuroraCollection).
+    //     Legendary ball and the centerpiece of the Aurora bundle; the
+    //     Starter Pack welcome offer grants the entire Aurora collection
+    //     free-granted (see StoreKitManager.grantAuroraCollection).
     case aurora = "Aurora"
 
     // ── Summer 2026 seasonal exclusive ──────────────────────────────────
@@ -292,9 +292,9 @@ enum BallSkin: String, CaseIterable, Identifiable {
              .diamond,   // Diamond Balls IAP exclusive
              .moneyBall: // top-coin-pack ($49.99) IAP secret exclusive
             return true
-        // Aurora was the Starter Pack IAP exclusive; that pack is retired, so
-        // Aurora is now a regular coin-buyable Legendary ball (and the anchor of
-        // the Aurora bundle) — no longer bundle-locked.
+        // Aurora is NOT bundle-locked: it's a regular coin-buyable Legendary
+        // ball (and the anchor of the Aurora bundle).  The Starter Pack
+        // welcome offer gifts the whole collection — gifted, not locked.
         default:                          return false
         }
     }

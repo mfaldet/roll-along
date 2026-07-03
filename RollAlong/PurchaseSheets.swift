@@ -1070,6 +1070,222 @@ private struct DiamondBonusLabel: View {
     }
 }
 
+// MARK: - Starter Pack Sheet
+
+/// One-time welcome offer: $1.99 → 3,750 coins + the complete Aurora collection
+/// (ball · goal · trail · floor · pit · music, free-granted so Sell Back keeps
+/// but never refunds it).  Presented automatically the first time the player's
+/// coin balance reaches `GameState.starterPackTriggerCoins`, and again on
+/// re-launch while the 48-hour window is open.  Purchase sets
+/// `starterPackClaimed` (via reward delivery);
+/// "No thanks" sets `starterPackDismissed`.  Either one closes the sheet and
+/// keeps it from ever showing again — but ONLY delivery sets `claimed`, so an
+/// Ask-to-Buy purchase approved after a dismissal still pays out in full.
+struct StarterPackSheet: View {
+    @EnvironmentObject var gameState: GameState
+    @EnvironmentObject var store:     StoreKitManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var purchaseError: String? = nil
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Deep midnight gradient — echoes the Aurora ball's own palette.
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.04, green: 0.06, blue: 0.16),
+                        Color(red: 0.08, green: 0.04, blue: 0.18),
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: 28)
+
+                        // ── Header badge ────────────────────────────────────
+                        Text("✦  WELCOME GIFT  ✦")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .kerning(2.0)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.22, green: 0.95, blue: 0.65),
+                                        Color(red: 0.62, green: 0.45, blue: 0.98),
+                                    ],
+                                    startPoint: .leading, endPoint: .trailing
+                                )
+                            )
+                            .padding(.bottom, 24)
+
+                        // ── Aurora ball preview ─────────────────────────────
+                        BallSkinView(skin: .aurora, diameter: 100)
+                            .frame(width: 100, height: 100)
+                            .shadow(color: Color(red: 0.22, green: 0.95, blue: 0.65).opacity(0.55),
+                                    radius: 24, x: 0, y: 0)
+                            .padding(.bottom, 20)
+
+                        Text("Aurora")
+                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("The complete collection — all six cosmetics")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color(red: 0.62, green: 0.45, blue: 0.98))
+                            .padding(.bottom, 28)
+
+                        // ── What you get ────────────────────────────────────
+                        VStack(spacing: 10) {
+                            rewardRow(icon: "sparkles", label: "The Aurora collection",
+                                      detail: "Ball · Goal · Trail · Floor · Pit · Music")
+                            rewardRow(icon: "circle.grid.cross.fill", label: "3,750 coins",
+                                      detail: "Spend in the cosmetics shop")
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 28)
+
+                        // ── Countdown timer ─────────────────────────────────
+                        if gameState.starterPackOfferActive {
+                            countdownView
+                                .padding(.bottom, 24)
+                        }
+
+                        // ── Buy button ──────────────────────────────────────
+                        let pid: StoreKitManager.ProductID = .starterPack
+                        let inProgress = store.purchaseInProgress == pid
+
+                        Button {
+                            Task { await store.purchase(pid) }
+                        } label: {
+                            if inProgress {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 52)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.white)
+                                    )
+                            } else {
+                                HStack(spacing: 8) {
+                                    Text(store.displayPrice(for: pid, fallback: "$1.99"))
+                                        .font(.system(size: 18, weight: .black, design: .rounded))
+                                        .foregroundStyle(.black)
+                                    Text("— Claim Offer")
+                                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.black.opacity(0.72))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(red: 0.84, green: 1.00, blue: 0.90),
+                                                    Color(red: 0.72, green: 0.88, blue: 1.00),
+                                                ],
+                                                startPoint: .leading, endPoint: .trailing
+                                            )
+                                        )
+                                )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(inProgress || gameState.starterPackClaimed)
+                        .padding(.horizontal, 24)
+
+                        // ── Dismiss (permanent) ─────────────────────────────
+                        // Sets `dismissed`, NOT `claimed` — the claimed flag
+                        // gates the once-only coin delivery, and a pending
+                        // (Ask-to-Buy) purchase approved later must still
+                        // deliver its coins after a dismissal.
+                        Button {
+                            AnalyticsClient.shared.track("starter_pack_dismissed")
+                            gameState.starterPackDismissed = true
+                            dismiss()
+                        } label: {
+                            Text("No thanks")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color(white: 0.40))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 14)
+
+                        Spacer().frame(height: 32)
+                    }
+                }
+            }
+            .navigationBarHidden(true)
+            .onChange(of: gameState.starterPackClaimed) { _, claimed in
+                if claimed { dismiss() }   // rewards delivered (purchase/restore)
+            }
+            .onChange(of: gameState.starterPackDismissed) { _, dismissed in
+                if dismissed { dismiss() }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+        .onChange(of: store.lastError) { _, err in purchaseError = err }
+        .alert("Purchase Failed", isPresented: Binding(
+            get: { purchaseError != nil },
+            set: { _ in purchaseError = nil; store.clearLastError() }
+        ), actions: { Button("OK", role: .cancel) {} },
+        message: { Text(purchaseError ?? "") })
+    }
+
+    // ── Reward row helper ────────────────────────────────────────────────
+    private func rewardRow(icon: String, label: String, detail: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.22, green: 0.95, blue: 0.65),
+                            Color(red: 0.62, green: 0.45, blue: 0.98),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(white: 0.10))
+        )
+    }
+
+    // ── Countdown timer ──────────────────────────────────────────────────
+    private var countdownView: some View {
+        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+            let secs = Int(gameState.starterPackSecondsRemaining)
+            let h = secs / 3600
+            let m = (secs % 3600) / 60
+            let s = secs % 60
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(String(format: "%d:%02d:%02d remaining", h, m, s))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(Color(white: 0.55))
+        }
+    }
+}
+
 // MARK: - Purchase celebration (confetti + fanfare)
 
 /// Which sheet is celebrating — drives the reward badge's wording + icon.
