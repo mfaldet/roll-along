@@ -58,7 +58,7 @@ gates each sprint before the next begins.
 
 | # | Sprint | Exit criteria | Est. sessions | Status |
 |---|--------|---------------|---------------|--------|
-| 0 | Foundation | Engine + stats + migration all unit-tested; zero visible change; files pre-registered | 4–5 | 🟢 in progress — D1/D4/D10 RULED 2026-07-02; kicked off on `claude/trophies-s0` |
+| 0 | Foundation | Engine + stats + migration all unit-tested; zero visible change; files pre-registered | 4–5 | 🟢 done 2026-07-02 (gate green) |
 | 1 | Trigger wiring | Every catalog trophy trigger-tested (boundary + idempotency); unlocks durable | 7–9 | ⚪ not started |
 | 2 | Presentation | Toasts/room/profile/capstone/pinning on device; VoiceOver smoke; no mid-run toast | 5–7 | ⚪ not started |
 | 3 | Rarity backend | Sync replay + rarity correctness + delete/reinstall + showcase verified | 6–8 (+1 if D2=yes, +1 if D11=yes) | ⚪ not started |
