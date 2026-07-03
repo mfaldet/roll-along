@@ -68,6 +68,16 @@
 		QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0103000000000000AA00 /* CosmeticsTests.swift */; };
 		QE3B0104000000000000AA01 /* StoreKitManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3B0104000000000000AA00 /* StoreKitManagerTests.swift */; };
 		QE3C0101000000000000AA01 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QE3C0101000000000000AA00 /* SmokeTests.swift */; };
+		7A0F0001000000000000AA01 /* TrophyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0001000000000000AA00 /* TrophyCatalog.swift */; };
+		7A0F0002000000000000AA02 /* TrophyCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A0F0002000000000000AA00 /* TrophyCatalog.json */; };
+		7A0F0003000000000000AA01 /* TrophyEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0003000000000000AA00 /* TrophyEngine.swift */; };
+		7A0F0004000000000000AA01 /* TrophyStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0004000000000000AA00 /* TrophyStats.swift */; };
+		7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0005000000000000AA00 /* TrophyRoomView.swift */; };
+		7A0F0006000000000000AA01 /* TrophyToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0006000000000000AA00 /* TrophyToastView.swift */; };
+		7A0F0007000000000000AA01 /* TrophySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0007000000000000AA00 /* TrophySyncService.swift */; };
+		7A0F0101000000000000AA01 /* TrophyEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0101000000000000AA00 /* TrophyEngineTests.swift */; };
+		7A0F0102000000000000AA01 /* TrophyStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0102000000000000AA00 /* TrophyStatsTests.swift */; };
+		7A0F0103000000000000AA01 /* TrophyMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -151,6 +161,16 @@
 		QE3B0104000000000000AA00 /* StoreKitManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManagerTests.swift; sourceTree = "<group>"; };
 		QE3C0001000000000000AA00 /* RollAlongUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollAlongUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		QE3C0101000000000000AA00 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		7A0F0001000000000000AA00 /* TrophyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCatalog.swift; sourceTree = "<group>"; };
+		7A0F0002000000000000AA00 /* TrophyCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = TrophyCatalog.json; sourceTree = "<group>"; };
+		7A0F0003000000000000AA00 /* TrophyEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEngine.swift; sourceTree = "<group>"; };
+		7A0F0004000000000000AA00 /* TrophyStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyStats.swift; sourceTree = "<group>"; };
+		7A0F0005000000000000AA00 /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
+		7A0F0006000000000000AA00 /* TrophyToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastView.swift; sourceTree = "<group>"; };
+		7A0F0007000000000000AA00 /* TrophySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophySyncService.swift; sourceTree = "<group>"; };
+		7A0F0101000000000000AA00 /* TrophyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEngineTests.swift; sourceTree = "<group>"; };
+		7A0F0102000000000000AA00 /* TrophyStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyStatsTests.swift; sourceTree = "<group>"; };
+		7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyMigrationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -243,6 +263,13 @@
 				FA000007000000000000FA00 /* LockerView.swift */,
 				FA000004000000000000FA00 /* ChallengeTrackSelectView.swift */,
 				FA000005000000000000FA00 /* ChallengeTrackView.swift */,
+				7A0F0001000000000000AA00 /* TrophyCatalog.swift */,
+				7A0F0002000000000000AA00 /* TrophyCatalog.json */,
+				7A0F0003000000000000AA00 /* TrophyEngine.swift */,
+				7A0F0004000000000000AA00 /* TrophyStats.swift */,
+				7A0F0005000000000000AA00 /* TrophyRoomView.swift */,
+				7A0F0006000000000000AA00 /* TrophyToastView.swift */,
+				7A0F0007000000000000AA00 /* TrophySyncService.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 				AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */,
@@ -278,6 +305,9 @@
 				QE3B0104000000000000AA00 /* StoreKitManagerTests.swift */,
 				FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */,
 				FC000002000000000000FC00 /* PerformanceTests.swift */,
+				7A0F0101000000000000AA00 /* TrophyEngineTests.swift */,
+				7A0F0102000000000000AA00 /* TrophyStatsTests.swift */,
+				7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -394,6 +424,7 @@
 				AA00000B000000000000AA02 /* Assets.xcassets in Resources */,
 				AA00000D000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */,
 				D502FED62FD5024E00CA86BD /* LevelOverrides.json in Resources */,
+				7A0F0002000000000000AA02 /* TrophyCatalog.json in Resources */,
 				AA000016000000000000AA02 /* Products.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -452,6 +483,12 @@
 				FA000007000000000000FA01 /* LockerView.swift in Sources */,
 				FA000004000000000000FA01 /* ChallengeTrackSelectView.swift in Sources */,
 				FA000005000000000000FA01 /* ChallengeTrackView.swift in Sources */,
+				7A0F0001000000000000AA01 /* TrophyCatalog.swift in Sources */,
+				7A0F0003000000000000AA01 /* TrophyEngine.swift in Sources */,
+				7A0F0004000000000000AA01 /* TrophyStats.swift in Sources */,
+				7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */,
+				7A0F0006000000000000AA01 /* TrophyToastView.swift in Sources */,
+				7A0F0007000000000000AA01 /* TrophySyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -465,6 +502,9 @@
 				QE3B0104000000000000AA01 /* StoreKitManagerTests.swift in Sources */,
 				FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */,
 				FC000002000000000000FC01 /* PerformanceTests.swift in Sources */,
+				7A0F0101000000000000AA01 /* TrophyEngineTests.swift in Sources */,
+				7A0F0102000000000000AA01 /* TrophyStatsTests.swift in Sources */,
+				7A0F0103000000000000AA01 /* TrophyMigrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
