@@ -525,7 +525,9 @@ final class GameStateTests: XCTestCase {
         gs.lastLifeLostAt = nil
         gs.lives = 3
         gs.addLives(3)
-        XCTAssertEqual(gs.lives, 6)
+        // addLives feeds the purchased reserve queue (ad / gift / IAP lives),
+        // not the regen bar, so the spendable TOTAL is what grows.
+        XCTAssertEqual(gs.totalLives, 6)
     }
 
     // MARK: - Gold Rush tickets
