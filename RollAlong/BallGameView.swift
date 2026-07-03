@@ -883,11 +883,157 @@ struct BallGameView: View {
     private var screenBorder: some View {
         // RoundedRectangle with cornerRadius pulled from the actual device's
         // display corner radius, so the stroke traces the screen curve exactly.
+        ZStack {
+            RoundedRectangle(cornerRadius: screenCornerRadius, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: borderPhase == .normal ? 4 : 5)
+                .animation(.easeInOut(duration: 0.35), value: borderPhase)
+
+            // Legendary boundaries wear a bespoke animated texture on top of
+            // the base stroke.  It fades out whenever the border leaves the
+            // .normal phase so the semantic state colours (arming-bright,
+            // fell-red, won-green) always read unobstructed, then fades back
+            // in.  Reduce Motion keeps the plain static stroke above.
+            if !reduceMotion {
+                legendaryBorderOverlay
+                    .opacity(borderPhase == .normal ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 0.35), value: borderPhase)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Legendary boundary textures
+    //
+    // Bespoke animated strokes for the three Legendary boundaries
+    // (obsidian / candy / circuit).  Each layers TimelineView-driven motion
+    // onto the same screen-tracing RoundedRectangle geometry as the base
+    // stroke; Standard/Rare boundaries and Classic stay plain flat strokes.
+
+    @ViewBuilder
+    private var legendaryBorderOverlay: some View {
+        switch gameState.equippedBoundary {
+        case .obsidian: obsidianBorderOverlay
+        case .candy:    candyBorderOverlay
+        case .circuit:  circuitBorderOverlay
+        default:        EmptyView()
+        }
+    }
+
+    /// The border ring shape, inset so a centred `.stroke(lineWidth: 4)`
+    /// occupies the same pixels as the base `strokeBorder(lineWidth: 4)`.
+    private func borderRing() -> some InsettableShape {
         RoundedRectangle(cornerRadius: screenCornerRadius, style: .continuous)
-            .strokeBorder(borderColor, lineWidth: borderPhase == .normal ? 4 : 5)
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .animation(.easeInOut(duration: 0.35), value: borderPhase)
+            .inset(by: 2)
+    }
+
+    /// A glowing segment of the border ring at perimeter position
+    /// `position` (0…1, wraps) spanning `length` of the perimeter.
+    /// Drawn as two trims so segments crossing the trim origin still render.
+    private func borderTrimSegment(at position: Double,
+                                   length: Double,
+                                   color: Color,
+                                   lineWidth: CGFloat,
+                                   blur: CGFloat) -> some View {
+        let raw: Double = position.truncatingRemainder(dividingBy: 1.0)
+        let start: Double = raw < 0 ? raw + 1.0 : raw
+        let end: Double = start + length
+        let firstEnd: Double = min(1.0, end)
+        let wrapEnd: Double = max(0.0, end - 1.0)
+        return ZStack {
+            borderRing()
+                .trim(from: CGFloat(start), to: CGFloat(firstEnd))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            borderRing()
+                .trim(from: 0, to: CGFloat(wrapEnd))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+        }
+        .blur(radius: blur)
+    }
+
+    /// Obsidian — molten glass: the dark base stroke carries a slow-drifting
+    /// purple-tinted sheen (plus a fainter trailing echo) and an occasional
+    /// ember-glow pulse that creeps along the rim.
+    private var obsidianBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let sheenPos: Double = (t * 0.040).truncatingRemainder(dividingBy: 1.0)
+            let echoPos: Double = sheenPos + 0.47
+            let emberPos: Double = (t * 0.012 + 0.31).truncatingRemainder(dividingBy: 1.0)
+            let emberGate: Double = max(0.0, sin(t * 0.55))
+            let emberGlow: Double = pow(emberGate, 5.0)          // brief, occasional
+            let sheen: Color = Color(red: 0.58, green: 0.42, blue: 0.92)
+            let echo: Color = Color(red: 0.44, green: 0.33, blue: 0.78)
+            let ember: Color = Color(red: 1.00, green: 0.46, blue: 0.16)
+            ZStack {
+                borderTrimSegment(at: sheenPos, length: 0.16,
+                                  color: sheen.opacity(0.55), lineWidth: 4, blur: 1.5)
+                borderTrimSegment(at: echoPos, length: 0.10,
+                                  color: echo.opacity(0.38), lineWidth: 4, blur: 2.2)
+                borderTrimSegment(at: emberPos, length: 0.05,
+                                  color: ember.opacity(0.80 * emberGlow), lineWidth: 5, blur: 3.0)
+            }
+        }
+    }
+
+    /// Candy — candy-cane stripes scrolling along the rim: white + deep-red
+    /// dashes phase-shifted over the pink base stroke, plus a soft drifting
+    /// sugar-glint highlight.
+    private var candyBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let scroll: CGFloat = CGFloat((t * 16.0).truncatingRemainder(dividingBy: 28.0))
+            let glintPos: Double = (t * 0.055).truncatingRemainder(dividingBy: 1.0)
+            let glintPulse: Double = 0.55 + 0.45 * sin(t * 2.1)
+            let stripeRed: Color = Color(red: 0.85, green: 0.16, blue: 0.34)
+            ZStack {
+                borderRing()
+                    .stroke(Color.white.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 4, dash: [8, 20], dashPhase: scroll))
+                borderRing()
+                    .stroke(stripeRed.opacity(0.80),
+                            style: StrokeStyle(lineWidth: 4, dash: [8, 20], dashPhase: scroll - 14.0))
+                borderTrimSegment(at: glintPos, length: 0.06,
+                                  color: Color.white.opacity(0.50 * glintPulse),
+                                  lineWidth: 5, blur: 2.0)
+            }
+        }
+    }
+
+    /// Circuit — dark teal board with brighter trace-segments travelling
+    /// around the ring like signals, plus three fixed nodes that blink
+    /// intermittently.
+    private var circuitBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let tracePhase: CGFloat = CGFloat((-t * 26.0).truncatingRemainder(dividingBy: 46.0))
+            let signalPos: Double = (t * 0.09).truncatingRemainder(dividingBy: 1.0)
+            let blinkA: Double = pow(max(0.0, sin(t * 2.3)), 6.0)
+            let blinkB: Double = pow(max(0.0, sin(t * 1.7 + 2.1)), 6.0)
+            let blinkC: Double = pow(max(0.0, sin(t * 2.9 + 4.4)), 6.0)
+            let board: Color = Color(red: 0.05, green: 0.20, blue: 0.18)
+            let trace: Color = Color(red: 0.35, green: 1.00, blue: 0.78)
+            let node: Color = Color(red: 0.80, green: 1.00, blue: 0.92)
+            ZStack {
+                // Dark teal board laid over the base stroke.
+                borderRing()
+                    .stroke(board.opacity(0.85), lineWidth: 4)
+                // Etched traces drifting like clocked signals.
+                borderRing()
+                    .stroke(trace.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 2, dash: [16, 30], dashPhase: tracePhase))
+                // One bright packet racing the ring.
+                borderTrimSegment(at: signalPos, length: 0.03,
+                                  color: trace.opacity(0.95), lineWidth: 3, blur: 1.5)
+                // Fixed solder nodes, blinking out of phase.
+                borderTrimSegment(at: 0.12, length: 0.012,
+                                  color: node.opacity(0.90 * blinkA), lineWidth: 5, blur: 1.0)
+                borderTrimSegment(at: 0.55, length: 0.012,
+                                  color: node.opacity(0.90 * blinkB), lineWidth: 5, blur: 1.0)
+                borderTrimSegment(at: 0.82, length: 0.012,
+                                  color: node.opacity(0.90 * blinkC), lineWidth: 5, blur: 1.0)
+            }
+        }
     }
 
     // MARK: - Layout helpers

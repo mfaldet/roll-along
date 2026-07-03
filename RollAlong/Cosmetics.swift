@@ -1289,7 +1289,10 @@ enum Boundary: String, CosmeticItem {
     case gold
     case ice
 
-    // Exclusive / Legendary (1,500 coins)
+    // Exclusive / Legendary (1,500 coins) — each has a bespoke animated
+    // border renderer in BallGameView (obsidian molten sheen + embers,
+    // candy scrolling stripes, circuit pulsing traces); `color` below is
+    // only their base coat / Reduce Motion fallback.
     case obsidian
     case candy
     case circuit
@@ -1329,6 +1332,11 @@ enum Boundary: String, CosmeticItem {
     }
 
     /// Base fill for the wall / platform / border.
+    ///
+    /// For the Legendary trio (obsidian / candy / circuit) this is the base
+    /// coat only: BallGameView layers a bespoke animated texture on the
+    /// screen border (see `legendaryBorderOverlay`), and this flat colour is
+    /// the static fallback under Reduce Motion and in non-animated contexts.
     var color: Color {
         switch self {
         case .classic:  return Color(white: 0.34)
