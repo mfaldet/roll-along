@@ -944,7 +944,29 @@ final class GameState: ObservableObject {
 
     /// Call when the player completes a level.  Stars only ever increase,
     /// times only ever decrease, collected coins never un-collect.
-    func recordResult(level: Int, stars: Int, time: TimeInterval, coinIndices: Set<Int>) {
+    ///
+    /// The two S1-T7 run-lifecycle flags are facts only the run's owner
+    /// (BallGameView) can supply — a run either kept a clean first attempt
+    /// or picked up every coin, and neither survives into persisted state.
+    /// The TROPHY decision stays here (in the funnel, never the view): both
+    /// are climb-mode-gated below and combined with `noPriorClear`, which
+    /// this funnel captures BEFORE the `bestTime` stamp so "first attempt"
+    /// reads the pre-clear world (BallGameView no longer computes it post-#118).
+    ///  • `firstAttemptClean` — this was the level's very first attempt with
+    ///    no fall/restart before the goal (the view's transient armed flag).
+    ///  • `pickupsThisRun` — currency coins banked in THIS run (already-banked
+    ///    coins can't be re-picked, so this is the fresh-run pickup count).
+    /// Default false/0 so the many non-view callers (tests) are unaffected;
+    /// they simply never satisfy the run-flag trophies.
+    func recordResult(level: Int, stars: Int, time: TimeInterval,
+                      coinIndices: Set<Int>,
+                      firstAttemptClean: Bool = false,
+                      pickupsThisRun: Int = 0) {
+        // Capture "no prior clear" BEFORE the bestTime stamp below — this is
+        // the `time(for: level) == nil` derivation the catalog specifies for
+        // `skill_first_try` (§6 item 7).  Once stamped it would always read
+        // "cleared," so it must be read here first.
+        let noPriorClear = bestTime[level] == nil
         if stars > (bestStars[level] ?? 0) {
             bestStars[level] = stars
         }
@@ -970,7 +992,72 @@ final class GameState: ObservableObject {
         if currentMode.progression.recordsClimbResult {
             trophyStats.recordNoFallClimbClear()
             recordClimbTrophies()
+            recordRunLifecycleTrophies(stars: stars,
+                                       noPriorClear: noPriorClear,
+                                       firstAttemptClean: firstAttemptClean,
+                                       pickupsThisRun: pickupsThisRun)
         }
+    }
+
+    /// Push the S1-T7 run-lifecycle Skill trophies (`skill_first_try`,
+    /// `skill_spotless`) from a just-recorded climb clear.  Called ONLY inside
+    /// `recordResult`'s `recordsClimbResult` gate, so CotD / Roll Out / Roll Up
+    /// / track clears (which never reach this funnel) can't pollute them.  The
+    /// engine latches once and never revokes, so a transient `1` on the run
+    /// that qualifies is all that's needed — nothing is persisted here (no
+    /// falls/failure counter; `firstTryAces` / `spotlessRuns` deliberately
+    /// carry NO backfill source, so a live latch and a first-launch grandfather
+    /// trivially agree — the grandfather grants neither, §7 backfill omit-list).
+    private func recordRunLifecycleTrophies(stars: Int,
+                                            noPriorClear: Bool,
+                                            firstAttemptClean: Bool,
+                                            pickupsThisRun: Int) {
+        // skill_first_try — 3 stars on a level's very first attempt (no prior
+        // clear AND no fall/restart before the goal, §6 item 7).
+        if stars == 3, noPriorClear, firstAttemptClean {
+            trophyEngine.record(.firstTryAces, value: 1)
+        }
+        // skill_spotless — 3 stars AND all 3 pickup coins banked in this one
+        // run (§6 item 8).  Requires the full three: fewer-coin levels and
+        // partial hauls never qualify.
+        if stars == 3, pickupsThisRun >= 3 {
+            trophyEngine.record(.spotlessRuns, value: 1)
+        }
+    }
+
+    /// A climb pit-fall that never reaches `consumeLife` (S1-T7).  The view's
+    /// fall path (`fireFell`) funnels every climb fall here so the two effects
+    /// that `consumeLife` can't cover for tutorial levels (L1–10, which are
+    /// lives-exempt and so never call `consumeLife`) are handled:
+    ///  • `whimsy_gravity_check` — the one-shot latch for falling into the pit
+    ///    on climb level 1 (§6 item 9; costs nothing, tutorial-exempt).
+    ///  • the no-fall clear-streak reset — S1-T1 left the tutorial-fall reset
+    ///    for this funnel (tutorial falls skip `consumeLife`).  `resetNoFall…`
+    ///    is idempotent, so a non-tutorial fall (whose `consumeLife` already
+    ///    reset the streak) makes this a harmless no-op.
+    /// Mode-gated on `recordsClimbResult`: Roll Out / Roll Up / Coin Pit / Zen
+    /// / CotD falls never reset the climb streak or fire the whimsy latch.
+    func recordClimbFall(level: Int) {
+        guard currentMode.progression.recordsClimbResult else { return }
+        trophyStats.resetNoFallClearStreak()
+        // whimsy_gravity_check keys to climb LEVEL 1 (a number, never a
+        // layout) — level 1 is a fixed rung, not swappable content.
+        if level == 1 {
+            trophyEngine.record(.levelOneFalls, value: 1)
+        }
+    }
+
+    /// A Coin Pit round has just been staked (S1-T7).  `tickets` is the count
+    /// of time-tickets committed at round START — the view calls this only
+    /// after `spendTickets` succeeds, so it never fires on a mid-round refund
+    /// or an aborted stake.  `whimsy_high_roller` latches at ≥5 (§6 item 13).
+    /// The engine keeps the best observed, so a later smaller stake never
+    /// revokes.  Not mode-gated on `recordsClimbResult` (Coin Pit is a `.solo`
+    /// unlimited mode); the funnel simply never fires outside the Coin Pit
+    /// stake overlay that is its only caller.
+    func recordCoinPitRoundStaked(tickets: Int) {
+        guard tickets > 0 else { return }
+        trophyEngine.record(.coinpitRoundStakeBest, value: tickets)
     }
 
     /// Push every climb-category trophy metric's CURRENT value into the

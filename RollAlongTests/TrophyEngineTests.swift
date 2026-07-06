@@ -1491,6 +1491,117 @@ final class TrophyTrackDailyWiringTests: XCTestCase {
     }
 }
 
+// MARK: - S1-T7 — View-layer event trigger wiring
+
+/// End-to-end wiring for the four view-only event trophies: the two
+/// run-lifecycle Skill trophies driven through `recordResult`'s new run flags,
+/// and the two secret whimsies driven through the dedicated fall / Coin-Pit
+/// stake funnels. (`whimsy_roll_call` is deliberately absent — it is blocked
+/// on the unbuilt pinball ROLL lanes and carved out of S1-T7/S1-T9.)
+final class TrophyViewEventWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyViewEventWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    /// Fresh GameState on the isolated suite — default mode is the main climb
+    /// (`recordsClimbResult == true`), the gate every run-lifecycle / fall
+    /// trophy rides (the S1-T1 climb tests rely on the same default).
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Skill run-lifecycle (via recordResult)
+
+    /// `skill_first_try`: 3 stars, the level's first-ever attempt (no prior
+    /// clear — a fresh level has no `bestTime`), and a clean run (no fall/
+    /// restart before the goal). Only all three together qualify.
+    func testFirstTryAceWiresThroughRecordResult() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_first_try"))
+
+        // 3 stars but NOT flagged clean → no unlock.
+        gs.recordResult(level: 4, stars: 3, time: 20, coinIndices: [],
+                        firstAttemptClean: false, pickupsThisRun: 0)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_first_try"))
+
+        // 3 stars, first attempt, clean → unlock.
+        gs.recordResult(level: 7, stars: 3, time: 18, coinIndices: [],
+                        firstAttemptClean: true, pickupsThisRun: 0)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("skill_first_try"))
+    }
+
+    /// A clean first attempt at only 2 stars must NOT latch skill_first_try.
+    func testFirstTryAceRequiresThreeStars() {
+        let gs = makeGameState()
+        gs.recordResult(level: 3, stars: 2, time: 25, coinIndices: [],
+                        firstAttemptClean: true, pickupsThisRun: 0)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_first_try"))
+    }
+
+    /// `skill_spotless`: 3 stars AND all three pickup coins banked in one run;
+    /// a partial haul (2 of 3) never qualifies.
+    func testSpotlessRunWiresThroughRecordResult() {
+        let gs = makeGameState()
+
+        // 3 stars but only 2 of 3 coins → no unlock.
+        gs.recordResult(level: 5, stars: 3, time: 22, coinIndices: [0, 1],
+                        firstAttemptClean: false, pickupsThisRun: 2)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_spotless"))
+
+        // 3 stars + all 3 coins → unlock.
+        gs.recordResult(level: 6, stars: 3, time: 21, coinIndices: [0, 1, 2],
+                        firstAttemptClean: false, pickupsThisRun: 3)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("skill_spotless"))
+    }
+
+    // MARK: Secret whimsies (via dedicated funnels)
+
+    /// `whimsy_gravity_check` (secret): a pit-fall on climb LEVEL 1 latches it
+    /// through the dedicated fall funnel — and, per the acceptance criterion,
+    /// falling never consumes a life (tutorial L1 is lives-exempt; the funnel
+    /// touches no life state).
+    func testGravityCheckWiresThroughClimbFallWithoutConsumingALife() {
+        let gs = makeGameState()
+        let livesBefore = gs.lives
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_gravity_check"))
+
+        // A fall on level 2 is not the gravity-check level.
+        gs.recordClimbFall(level: 2)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_gravity_check"))
+
+        gs.recordClimbFall(level: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("whimsy_gravity_check"))
+        XCTAssertEqual(gs.lives, livesBefore, "the fall funnel must never consume a life")
+    }
+
+    /// `whimsy_high_roller` (secret): staking ≥5 time-tickets on a single Coin
+    /// Pit round latches it; a 4-ticket stake does not.
+    func testHighRollerWiresThroughCoinPitStake() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
+
+        gs.recordCoinPitRoundStaked(tickets: 4)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
+
+        gs.recordCoinPitRoundStaked(tickets: 5)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
+    }
+}
+
 // MARK: - TrophyMinigameWiringTests (S1-T3 acceptance)
 
 /// End-to-end wiring proof for the minigame trophy triggers (S1-T3): drive
