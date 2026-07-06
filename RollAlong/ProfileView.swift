@@ -39,7 +39,8 @@ struct ProfileView: View {
                 VStack(spacing: 16) {
                     heroCard
                     careerCard
-                    ProfileTrophyCard(engine: gameState.trophyEngine)
+                    ProfileTrophyCard(engine: gameState.trophyEngine,
+                                      pins: gameState.trophyPins)
                     loadoutCard
                     PlayerRanksCard(profile: gameState.localLeaderboardProfile,
                                     playerId: SocialClient.shared.currentUserId)
@@ -663,13 +664,25 @@ struct ProfileTrophyCard: View {
 
     @ObservedObject var engine: TrophyEngine
 
+    /// The pin store (S2-T7). Observed so pinning a trophy in the Trophy Room
+    /// floats it to the front of this card's showcase on return. Optional so
+    /// the card still renders in previews/tests without a store (empty pins).
+    @ObservedObject var pins: TrophyPinStore
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Recomputed each render from the current engine snapshot. Cheap: one
-    /// pass over the catalog of value types. Pins are the S2-T7 seam — passed
-    /// as `[]` until that task wires the `ra_trophyPins` UI, so today's
-    /// showcase is purely most-recently-earned.
-    private var model: TrophyShowcaseModel { TrophyShowcaseModel(engine: engine) }
+    init(engine: TrophyEngine, pins: TrophyPinStore = TrophyPinStore()) {
+        self.engine = engine
+        self.pins = pins
+    }
+
+    /// Recomputed each render from the current engine + pin snapshot. Cheap:
+    /// one pass over the catalog of value types. Pinned trophies (the S2-T7
+    /// `ra_trophyPins` order) float to the front of the showcase; the rest is
+    /// most-recently-earned.
+    private var model: TrophyShowcaseModel {
+        TrophyShowcaseModel(engine: engine, pinnedIDs: pins.pinnedIDs)
+    }
 
     var body: some View {
         NavigationLink(value: HomeRoute.trophies) {

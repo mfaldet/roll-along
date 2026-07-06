@@ -40,6 +40,9 @@ import SwiftUI
 //   retroactive-grant "you've already earned N" reveal to a once-ever event;
 //   set when the summary has been offered (or when a fresh install had nothing
 //   to reveal), survives relaunch so it never re-offers. No PII.
+//   ra_trophyPins (S2-T7) — an ordered plist string array of up to 3 pinned
+//   trophy ids driving the "what am I chasing?" chips; player-chosen, capped,
+//   survives relaunch. Display state only, no PII.
 //
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
@@ -668,6 +671,16 @@ final class GameState: ObservableObject {
     /// so a relaunch never re-offers it.  DISPLAY-ONLY (D1 never-mint).
     let trophyReveal: TrophyRevealModel
 
+    /// The player's pinned-trophy store (S2-T7).  Owned here on its OWN
+    /// `ObservableObject` (like `trophyToasts`) so a pin toggle never
+    /// re-renders a gameplay view observing GameState.  It holds an ordered,
+    /// de-duplicated list of up to 3 pinned trophy ids in `ra_trophyPins`;
+    /// the Trophy Room writes it (`toggle`), and the "what am I chasing?"
+    /// chase chips + the Profile showcase READ its `pinnedIDs`.  Structural
+    /// rules (cap / order / dedup / persistence) live entirely in the store,
+    /// so they are unit-testable without a View.  DISPLAY-ONLY (D1 never-mint).
+    let trophyPins: TrophyPinStore
+
     /// Test-injectable clock so live-unlock timestamps are deterministic
     /// (mirrors the engine's `now`).  Production uses the real wall clock.
     private let now: () -> Date
@@ -699,6 +712,11 @@ final class GameState: ObservableObject {
         // (S2-T6 latch).  It arms only once `activateTrophies()` runs the
         // backfill and finds it granted trophies.
         trophyReveal = TrophyRevealModel(defaults: defaults)
+        // The pin store loads its persisted `ra_trophyPins` list (sanitized
+        // to the cap + deduped); a bare GameState(defaults:) constructs it
+        // inert, reading only.  Completed/stale pins are pruned later, once
+        // `activateTrophies()` has run the ledger (see below).
+        trophyPins = TrophyPinStore(defaults: defaults)
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -859,6 +877,11 @@ final class GameState: ObservableObject {
         // even the ones where `backfill` short-circuited (didBackfill already
         // set): the reveal's own latch decides whether anything is owed.
         trophyReveal.revealIfOwed(engine: trophyEngine)
+        // Drop any pin that is now earned or no longer in the catalog (S2-T7):
+        // a backfill may have grandfathered a chased trophy, and the ledger is
+        // authoritative at launch.  Cheap and order-preserving; persists only
+        // on an actual change.
+        trophyPins.pruneCompleted(using: trophyEngine)
         return granted
     }
 
@@ -906,6 +929,11 @@ final class GameState: ObservableObject {
             // Latched twice over: only arms if the engine truly holds the
             // capstone AND the once-ever flag is unset.
             capstoneCelebration.celebrateIfEarned(engine: trophyEngine)
+        }
+        // A pinned trophy that just unlocked is no longer a chase — drop it so
+        // its chip retires (S2-T7).  No-op unless a pin was among the unlocks.
+        if unlocked.contains(where: { trophyPins.isPinned($0.id) }) {
+            trophyPins.pruneCompleted(using: trophyEngine)
         }
     }
 

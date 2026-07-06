@@ -60,6 +60,13 @@ struct GameMenuView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     header
 
+                    // S2-T7: the "what am I chasing?" chase chips — a compact,
+                    // horizontal strip of the player's pinned trophies, each
+                    // showing live progress read from the engine.  Renders
+                    // nothing when nothing is pinned (or every pin is earned).
+                    ChaseChipStrip(engine: gameState.trophyEngine,
+                                   pins: gameState.trophyPins)
+
                     rollAlongHero
                     levelsLink
                     challengeOfTheDay
@@ -690,5 +697,107 @@ private struct ChallengePackShowcase: View {
             }
             .padding(12)
         }
+    }
+}
+
+// ===========================================================================
+// ChaseChipStrip — the S2-T7 "what am I chasing?" surface on the game menu.
+// A compact, horizontal row of the player's PINNED trophies (up to 3), each a
+// chip showing the grade glyph, the trophy name, and LIVE progress read from
+// the TrophyEngine's `progressFraction` API.  It renders nothing when nothing
+// is pinned (or every pin is already earned), so it never takes space it hasn't
+// earned.  Tapping a chip deep-links into the Trophy Room, where pins are
+// managed.  Display-only (D1 never-mint): it reads the engine + pin store and
+// writes nothing.
+//
+// Accessible: each chip is one combined a11y element speaking name + grade +
+// percent (a scalable Dynamic-Type font, never color-only for the grade — the
+// glyph is the second cue).  A masked secret pin (if one is ever pinned) draws
+// a generic "Hidden trophy" chip and never leaks its objective or closeness.
+// ===========================================================================
+private struct ChaseChipStrip: View {
+
+    @ObservedObject var engine: TrophyEngine
+    @ObservedObject var pins: TrophyPinStore
+
+    /// Rebuilt each render from the current engine + pin snapshot — cheap: at
+    /// most `maxPins` (3) value-type chips.
+    private var model: ChaseChipModel {
+        ChaseChipModel(engine: engine, pinnedIDs: pins.pinnedIDs)
+    }
+
+    var body: some View {
+        let chips = model.chips
+        if !chips.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color(white: 0.7))
+                        .accessibilityHidden(true)
+                    Text("CHASING")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .tracking(2)
+                        .foregroundStyle(.white)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(chips) { chip in
+                            NavigationLink(value: HomeRoute.trophies) {
+                                chipCard(chip)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    /// One chase chip: grade glyph, trophy name, a progress bar + percent.
+    private func chipCard(_ chip: ChaseChip) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: chip.isMasked ? "questionmark.circle" : chip.gradeGlyph)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(chip.gradeAccent)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(chip.title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                HStack(spacing: 6) {
+                    // Progress bar only when progress is exposed (a masked
+                    // secret suppresses it so the bar can't leak closeness).
+                    if let progress = chip.progress {
+                        ProgressView(value: progress)
+                            .tint(chip.gradeAccent)
+                            .frame(width: 90)
+                            .accessibilityHidden(true)
+                    }
+                    Text(chip.progressCaption)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color(white: 0.75))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(white: 0.13))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(chip.gradeAccent.opacity(0.55), lineWidth: 1)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(chip.accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens the Trophy Room.")
     }
 }

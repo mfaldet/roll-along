@@ -498,7 +498,8 @@ struct HomeView: View {
                         .firstPlayTutorial("disco")
                 case .profile:          ProfileView()
                 case .challengeTracks:  ChallengeTrackSelectView()
-                case .trophies:         TrophyRoomView(engine: gameState.trophyEngine)
+                case .trophies:         TrophyRoomView(engine: gameState.trophyEngine,
+                                                       pins: gameState.trophyPins)
                 case .player(let p):    PublicProfileView(player: p)
                 case .clan(let c):      ClanDetailView(clan: c)
                 case .mode("daily"):

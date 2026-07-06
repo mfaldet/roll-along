@@ -119,6 +119,13 @@ struct TrophyRoomRow: Identifiable, Equatable {
     /// Player-facing grade name ("Bronze" … "Platinum").
     var gradeName: String { tier.displayName }
 
+    /// Whether this trophy can be PINNED as a chase target (S2-T7). Only a
+    /// still-locked, non-masked trophy is a chase: an unlocked trophy has
+    /// nothing left to chase, and a masked secret must never be surfaced as a
+    /// pinnable objective (it would leak that it exists as a goal). The
+    /// Trophy Room offers the pin control only when this is true.
+    var isPinnable: Bool { !isUnlocked && !isMasked }
+
     /// One-line VoiceOver label: name, grade, and state. Never speaks the
     /// hidden title of a masked trophy (it uses `displayTitle` = "???").
     var accessibilityLabel: String {
@@ -309,7 +316,18 @@ struct TrophyRoomView: View {
 
     @ObservedObject var engine: TrophyEngine
 
+    /// The pin store (S2-T7). Observed so the pin controls + the "N of 3
+    /// pinned" caption refresh the instant a pin toggles. Optional so the
+    /// screen still renders in previews/tests without a store — pin controls
+    /// simply don't appear.
+    @ObservedObject var pins: TrophyPinStore
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(engine: TrophyEngine, pins: TrophyPinStore = TrophyPinStore()) {
+        self.engine = engine
+        self.pins = pins
+    }
 
     /// Recomputed each render from the current engine snapshot. Cheap: one
     /// pass over 89 rows of value types.
@@ -322,10 +340,17 @@ struct TrophyRoomView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
+                pinCaption
+                    .padding(.horizontal, 16)
+
                 ForEach(model.sections) { section in
                     Section {
                         ForEach(section.rows) { row in
-                            TrophyRoomRowView(row: row)
+                            TrophyRoomRowView(
+                                row: row,
+                                isPinned: pins.isPinned(row.id),
+                                canPinMore: pins.canPinMore,
+                                onTogglePin: { pins.toggle(row.id) })
                                 .padding(.horizontal, 16)
                         }
                     } header: {
@@ -339,6 +364,30 @@ struct TrophyRoomView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+    }
+
+    /// A quiet caption stating how many chase pins are set, so the pin cap is
+    /// discoverable ("Pin up to 3 to track them on the game menu").
+    @ViewBuilder
+    private var pinCaption: some View {
+        let n = pins.pinnedIDs.count
+        HStack(spacing: 6) {
+            Image(systemName: "pin.fill")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text(n == 0
+                 ? "Pin up to \(TrophyPinStore.maxPins) trophies to track them on the game menu."
+                 : "\(n) of \(TrophyPinStore.maxPins) pinned — tracked on the game menu.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(n == 0
+            ? "Pin up to \(TrophyPinStore.maxPins) trophies to track your chase on the game menu."
+            : "\(n) of \(TrophyPinStore.maxPins) trophies pinned, tracked on the game menu.")
     }
 
     // MARK: Header (completion % + per-grade counts — NO points level)
@@ -453,6 +502,24 @@ struct TrophyRoomRowView: View {
 
     let row: TrophyRoomRow
 
+    /// Whether this row's trophy is currently pinned (S2-T7).
+    var isPinned: Bool = false
+    /// Whether another pin slot is free — governs whether an UNpinned,
+    /// pinnable row can still be pinned (the cap of 3).
+    var canPinMore: Bool = true
+    /// Toggle the pin. `nil` when no pin store is wired (previews/tests) —
+    /// the control then never appears.
+    var onTogglePin: (() -> Void)? = nil
+
+    /// Show the pin control iff a handler is wired AND the trophy is a valid
+    /// chase (locked + non-masked). An already-pinned row always shows the
+    /// control (so it can be unpinned); an unpinned pinnable row shows it too
+    /// but disables it when the cap is full.
+    private var showsPinControl: Bool {
+        onTogglePin != nil && row.isPinnable
+    }
+    private var pinDisabled: Bool { !isPinned && !canPinMore }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: row.isMasked ? "questionmark.circle" : row.gradeGlyph)
@@ -497,11 +564,45 @@ struct TrophyRoomRowView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            // Pin toggle for a chaseable trophy (S2-T7). Its own a11y element
+            // (the row itself ignores children), so VoiceOver reaches it.
+            if showsPinControl {
+                pinButton
+            }
         }
         .padding(.vertical, 10)
         .opacity(row.isUnlocked ? 1 : 0.78)
-        .accessibilityElement(children: .ignore)
+        // The row text is one combined a11y element; the pin button stays a
+        // separate, focusable control alongside it.
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(row.accessibilityLabel)
+    }
+
+    /// The pin/unpin control — a filled pin when pinned, an outline when not,
+    /// dimmed + disabled when the cap blocks a new pin.
+    @ViewBuilder
+    private var pinButton: some View {
+        Button {
+            onTogglePin?()
+        } label: {
+            Image(systemName: isPinned ? "pin.fill" : "pin")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(isPinned ? row.gradeAccent
+                                          : (pinDisabled ? Color.secondary.opacity(0.4)
+                                                         : Color.secondary))
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(pinDisabled)
+        .accessibilityLabel(isPinned
+            ? "Unpin \(row.displayTitle) from your chase"
+            : "Pin \(row.displayTitle) to your chase")
+        .accessibilityHint(pinDisabled
+            ? "Pin limit reached. Unpin a trophy first."
+            : (isPinned ? "Removes it from the game-menu chase chips."
+                        : "Tracks it on the game-menu chase chips."))
     }
 
     /// "Earned Jan 3, 2026" — or a legacy note for grandfathered unlocks
