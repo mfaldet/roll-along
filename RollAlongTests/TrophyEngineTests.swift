@@ -2824,3 +2824,148 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
                        Double(gs.trophyBallsOwnedCount))
     }
 }
+
+// MARK: - S1-T9 — Trigger coverage sweep + gate
+
+/// The Sprint-1 completeness gate. Two jobs:
+///  1. Fill the trigger-coverage gaps the per-task suites left (a handful of
+///     mid-ladder climb thresholds and per-game minigame wins that no earlier
+///     test asserted by id), each driven through the real GameState funnel.
+///  2. A DURABLE catalog-enumeration gate: every one of the 89 catalog
+///     trophies must have an explicit trigger test — the sole exception is
+///     `whimsy_roll_call`, blocked on the unbuilt pinball ROLL lanes. Adding a
+///     trophy without wiring+testing it makes `testEveryTrophyHasATriggerTest`
+///     fail, forcing coverage to keep pace with the catalog.
+final class TrophyTriggerCoverageTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyTriggerCoverageTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Gap-fill triggers
+
+    /// The mid-ladder climb thresholds (101 / 251 / 501) — one high clear
+    /// advances `highestUnlocked` past all three.
+    func testMidLadderClimbLevelsWireThroughRecordResult() {
+        let gs = makeGameState()
+        gs.recordResult(level: 500, stars: 3, time: 40, coinIndices: [])
+        XCTAssertEqual(gs.highestUnlocked, 501)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_100"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_250"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_500"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("climb_level_1000"))
+    }
+
+    /// Per-game win counts through the `recordCompetitiveWin` choke point:
+    /// paintball/marblecup first wins (≥1), and the 10-win bars for sumo and
+    /// marble cup.
+    func testPerGameWinTrophiesWireThroughCompetitiveWin() {
+        let gs = makeGameState()
+
+        gs.recordCompetitiveWin("paintball")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("paintball_first_win"))
+
+        gs.recordCompetitiveWin("marblecup")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("marblecup_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("marblecup_wins_10"))
+
+        for _ in 0..<9 { gs.recordCompetitiveWin("marblecup") }   // → 10
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("marblecup_wins_10"))
+
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("sumo_wins_10"))
+        for _ in 0..<10 { gs.recordCompetitiveWin("sumo") }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("sumo_wins_10"))
+    }
+
+    // MARK: The durable coverage gate
+
+    /// `whimsy_roll_call` is the sole trophy with no live trigger — its metric
+    /// `pinball_roll_lane_sweeps` is recorded nowhere (the pinball ROLL lanes
+    /// are an unbuilt roadmap item) and is watched by no other trophy.
+    func testRollCallIsTheSoleBlockedTrophy() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        let rollCall = try XCTUnwrap(catalog.trophies.first { $0.id == "whimsy_roll_call" })
+        XCTAssertEqual(rollCall.criteria.metric, .pinballRollLaneSweeps)
+        let sharers = catalog.trophies.filter { $0.criteria.metric == .pinballRollLaneSweeps }
+        XCTAssertEqual(sharers.map(\.id), ["whimsy_roll_call"],
+                       "the blocked metric must be unique to whimsy_roll_call")
+    }
+
+    /// DURABLE GATE: every catalog trophy except `whimsy_roll_call` has an
+    /// explicit trigger test somewhere in the trophy test suites. The covered
+    /// set below is the hand-maintained checklist; a new trophy added to the
+    /// catalog without being listed here (and wired + tested) fails this test.
+    func testEveryTrophyHasATriggerTest() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        let catalogIDs = Set(catalog.trophies.map(\.id))
+        XCTAssertEqual(catalogIDs.count, 89, "catalog is frozen at 89 v1 trophies")
+
+        // Ids with an explicit trigger test, grouped by the S1 task/suite that
+        // owns them. Keep in lockstep with the catalog.
+        let coveredByTriggerTests: Set<String> = [
+            // S1-T1 climb (+ mid-ladder gaps filled by S1-T9)
+            "climb_first_clear", "climb_level_10", "climb_level_50", "climb_level_100",
+            "climb_level_250", "climb_level_500", "climb_level_1000", "climb_summit",
+            "climb_stars_25", "climb_stars_150", "climb_perfect_world", "climb_pickups_100",
+            // S1-T2 challenge tracks
+            "track_first_level", "track_halfway", "track_first_complete", "track_triple",
+            "track_gauntlet", "track_all_eight",
+            // S1-T2 daily
+            "daily_first_start", "daily_first_clear", "daily_login_7", "daily_clears_10",
+            "daily_login_30", "daily_clears_50", "daily_week_streak",
+            // S1-T5 economy
+            "econ_nest_egg", "econ_punch_card", "econ_working_capital", "econ_pit_boss",
+            // S1-T3 arcade
+            "arcade_sampler", "arcade_grand_tour", "arcade_first_win", "arcade_all_six",
+            "arcade_hard_once", "arcade_wins_100", "arcade_hard_all",
+            // S1-T3 per-game (+ S1-T4 disco/rollout; + S1-T9 gap fills)
+            "snake_first_win", "snake_wins_10", "sumo_first_win", "sumo_wins_10",
+            "paintball_first_win", "paintball_coverage_60", "goldrush_first_win",
+            "goldrush_wins_10", "marblecup_first_win", "marblecup_wins_10", "koth_first_win",
+            "koth_hold_45", "pinball_score_10k", "pinball_score_50k", "pinball_score_150k",
+            "rollout_first_maze", "rollout_maze_10", "rollup_100m", "rollup_500m",
+            "disco_cross_25", "disco_hard_10", "zen_hour", "zen_10_hours",
+            "coinpit_first_round", "coinpit_catch_90",
+            // S1-T5 cosmetics & collection
+            "cosmetic_first_buy", "cosmetic_full_kit", "bundle_first", "balls_own_10",
+            "bundle_5", "items_own_50", "pack_first", "balls_own_40", "collection_complete",
+            // S1-T1 / S1-T7 skill & style
+            "skill_ace_veryhard", "skill_speed_10s", "skill_clean_sheet_10", "skill_first_try",
+            "skill_spotless", "skill_clean_sheet_25",
+            // S1-T6 social
+            "social_sign_in", "social_first_friend", "social_friends_5", "social_send_life",
+            "social_lives_sent_25", "clan_join", "clan_fulfill",
+            // S1-T7 / S1-T3 secret whimsies (whimsy_roll_call excluded — blocked)
+            "whimsy_gravity_check", "whimsy_night_bloom", "whimsy_high_roller",
+            "whimsy_back_to_basics",
+            // capstone cascade
+            "capstone_all",
+        ]
+
+        // The one and only uncovered trophy is the pinball-blocked whimsy.
+        let uncovered = catalogIDs.subtracting(coveredByTriggerTests)
+        XCTAssertEqual(uncovered, ["whimsy_roll_call"],
+                       "exactly whimsy_roll_call may lack a trigger test (blocked on the "
+                       + "unbuilt pinball ROLL lanes); all others must be wired + tested")
+        // No stale ids: everything claimed as covered is a real catalog trophy.
+        XCTAssertTrue(coveredByTriggerTests.isSubset(of: catalogIDs),
+                      "the covered checklist must not name a non-existent trophy")
+    }
+}
