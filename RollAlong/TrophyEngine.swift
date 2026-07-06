@@ -503,17 +503,16 @@ final class TrophyEngine: ObservableObject {
 /// • `pinball_roll_lane_sweeps` — the ROLL lanes don't exist yet (§7).
 /// • The capstone metric `base_trophies_unlocked` — engine-derived; the
 ///   cascade in `commit` completes it if the grandfathered base qualifies.
-/// • Cosmetics-OWNERSHIP counts (`balls_owned`, `cosmetics_owned`,
-///   `evergreen_cosmetics_owned`, `full_nonstarter_loadouts`) — their
-///   IAP-secret exclusion constant and evergreen arithmetic are S1-T5's
-///   deliverable and do not exist yet. Omitting them here keeps S0-T4 from
-///   pre-empting/duplicating that logic; because `backfill` re-evaluates the
-///   full catalog against whatever snapshot it is handed and is idempotent,
-///   S1 can extend `snapshot(from:)` with those metrics (or grant them live
-///   on the next `grant`) without any change to this file's latch path.
-///   `bundles_completed` and `packs_owned` ARE included: both are
-///   exclusion-free (bundles are kept IAP-secret-free by guardrail;
-///   `ownedPacks` has no IAP-secret members).
+///
+/// Cosmetics-OWNERSHIP counts (`balls_owned`, `cosmetics_owned`,
+/// `evergreen_cosmetics_owned`, `full_nonstarter_loadouts`) ARE included
+/// (added by S1-T5): they derive from the SAME `GameState` computed
+/// properties the live `grant`/equip funnels record, so a grandfather and a
+/// live grant can't drift. The IAP-secret exclusion constant and the
+/// 207-item evergreen arithmetic live in `TrophyCosmeticExclusions` + those
+/// GameState helpers. `bundles_completed` and `packs_owned` are likewise
+/// exclusion-free (bundles are kept IAP-secret-free by guardrail;
+/// `ownedPacks` has no IAP-secret members).
 enum TrophyBackfill {
 
     /// Build the metric snapshot from an already-loaded `GameState`. Reads
@@ -596,9 +595,21 @@ enum TrophyBackfill {
         snap[.coinpitBestCatch]  = Double(state.goldrushBest)
         snap[.coinpitCoinsTotal] = Double(state.goldrushCoinsTotal)
 
-        // — Cosmetics & Collection (exclusion-free subset only) —
-        snap[.bundlesCompleted] = Double(state.completedBundleIDs.count)
-        snap[.packsOwned]       = Double(state.ownedPacks.count)
+        // — Cosmetics & Collection —
+        // Ownership counts derive from the SAME GameState computed properties
+        // the live `grant` funnel records (S1-T5), so a first-launch
+        // grandfather and a live grant can never disagree. The IAP-secret
+        // exclusion and the 207-item evergreen arithmetic live in
+        // `TrophyCosmeticExclusions` + those GameState helpers — never
+        // re-implemented here.
+        snap[.bundlesCompleted]         = Double(state.completedBundleIDs.count)
+        snap[.packsOwned]               = Double(state.ownedPacks.count)
+        snap[.ballsOwned]               = Double(state.trophyBallsOwnedCount)
+        snap[.cosmeticsOwned]           = Double(state.trophyCosmeticsOwnedCount)
+        snap[.evergreenCosmeticsOwned]  = Double(state.trophyEvergreenCosmeticsOwnedCount)
+        // cosmetic_full_kit — whether the currently-equipped loadout is
+        // fully non-starter in the veteran save being grandfathered.
+        snap[.fullNonstarterLoadouts]   = state.trophyLoadoutIsFullyNonStarter ? 1 : 0
 
         // — Economy (existing high-water; play-earned/claim COUNTERS omitted) —
         snap[.coinBalancePeak] = Double(state.coinBalance)

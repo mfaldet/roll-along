@@ -698,34 +698,33 @@ final class TrophyEngineTests: XCTestCase {
     /// Fixture 2: `liquidateCoinCosmetics()` (Sell Back) strips sellable
     /// cosmetics — the regressable stat behind balls_own_10.
     func testUnlockSurvivesLiquidateCoinCosmetics() throws {
+        // Reconciled to the wired reality (S1-T5): `balls_own_10` is now
+        // recorded to GameState's OWN engine by the real `grant` funnel, and
+        // `liquidateCoinCosmetics()` regresses ownership (and refunds coins
+        // through `addCoins`, which also latches `econ_nest_egg`). The
+        // ratchet claim is unchanged: an unlock earned before liquidation
+        // survives it and a relaunch.
         let gs = makeGameState()
-        let sellable = BallSkin.allCases.filter(\.isSellable).prefix(10)
+        let sellable = Array(BallSkin.allCases.filter(\.isSellable).prefix(10))
         XCTAssertEqual(sellable.count, 10, "catalogue must offer 10 sellable skins")
-        for skin in sellable { gs.ownedBallSkins.insert(skin.rawValue) }
-        let ownedBefore = gs.ownedBallSkins.count
-        XCTAssertGreaterThanOrEqual(ownedBefore, 10)
+        for skin in sellable { gs.grant(skin) }   // the real ownership funnel
+        XCTAssertGreaterThanOrEqual(gs.ownedBallSkins.count, 10)
 
-        let clock = Clock()
-        let engine = try makeEngine(clock: clock)
-        engine.record(.ballsOwned, value: ownedBefore)
-        XCTAssertTrue(engine.isUnlocked("balls_own_10"))
+        let engine = gs.trophyEngine
+        XCTAssertTrue(engine.isUnlocked("balls_own_10"),
+                      "granting 10 balls latches balls_own_10 through the funnel")
         let stamp = engine.unlockDate(for: "balls_own_10")
-        let before = persistedLedgerSnapshot()
 
         gs.liquidateCoinCosmetics()
-        XCTAssertLessThan(gs.ownedBallSkins.count, 10,
+        XCTAssertLessThan(gs.trophyBallsOwnedCount, 10,
                           "fixture must actually regress ownership")
 
-        let after = persistedLedgerSnapshot()
-        XCTAssertEqual(after.ids, before.ids)
-        XCTAssertEqual(after.dates, before.dates)
-
-        clock.advance(60)
-        XCTAssertTrue(engine.record(.ballsOwned, value: gs.ownedBallSkins.count).isEmpty)
+        // The ratchet holds: the unlock and its timestamp are untouched by
+        // the regression, and a fresh engine over the same suite still sees it.
         XCTAssertTrue(engine.isUnlocked("balls_own_10"))
         XCTAssertEqual(engine.unlockDate(for: "balls_own_10"), stamp)
 
-        let relaunched = try makeEngine(clock: clock)
+        let relaunched = try makeEngine()
         XCTAssertTrue(relaunched.isUnlocked("balls_own_10"))
     }
 
@@ -2043,5 +2042,364 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
             XCTAssertTrue(engine.isUnlocked(id),
                           "backfill should also unlock \(id) — live and backfill must agree")
         }
+    }
+}
+
+// MARK: - TrophyCosmeticEconomyWiringTests (S1-T5 acceptance)
+
+/// End-to-end wiring proof for the cosmetic + economy trophy triggers
+/// (S1-T5): drive the PUBLIC GameState funnels — `grant`, `purchase`,
+/// `purchaseBundle`, `purchasePack`, `addCoins`, and the equip setters — and
+/// assert the right trophies latch on `gs.trophyEngine`.  The load-bearing
+/// claims: the 4 IAP secrets are excluded from every collection criterion;
+/// the earned Trophy ball / coin-buyable Aurora / free starters DO count;
+/// `collection_complete` uses the 207-item evergreen denominator; no trophy
+/// keys to a purchase/IAP count.
+final class TrophyCosmeticEconomyWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyCosmeticEconomyWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    /// Fresh GameState on the isolated suite. Its first-launch backfill runs
+    /// over an empty save (grants nothing, marks itself done), so every
+    /// unlock below comes from the live funnel, not the grandfather.
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: - Exclusion constant (the base pay-gate guard)
+
+    /// The dedicated trophy exclusion constant is EXACTLY the 4 IAP secrets —
+    /// {Diamond ball, Money Ball, Money Roll, Money Full} — by rawValue. This
+    /// is the single guard that keeps every collection criterion from becoming
+    /// a ~$150 pay-gate; pin it hard so no future edit widens or narrows it.
+    func testIAPSecretExclusionConstantIsExactlyTheFourSecrets() {
+        XCTAssertEqual(
+            TrophyCosmeticExclusions.iapSecretRawValues,
+            Set([BallSkin.diamond.rawValue, BallSkin.moneyBall.rawValue,
+                 TrailColor.moneyRoll.rawValue, Floor.moneyFull.rawValue]),
+            "the exclusion constant must be exactly the 4 IAP secrets")
+        XCTAssertEqual(TrophyCosmeticExclusions.iapSecretRawValues.count, 4)
+        // It must NOT be the iconic set (which also carries Trophy + starters).
+        XCTAssertFalse(TrophyCosmeticExclusions.iapSecretBalls.contains(.trophy),
+                       "Trophy ball is earned, not an IAP secret — must NOT be excluded")
+    }
+
+    /// The seasonal exclusion is exactly the 7 `isBundleExclusive` seasonal
+    /// balls — and NOT Pluto/Trophy (also `isBundleExclusive` but evergreen).
+    func testSeasonalExclusionConstantIsExactlyTheSevenSeasonalBalls() {
+        XCTAssertEqual(
+            TrophyCosmeticExclusions.seasonalExclusiveBalls,
+            Set([.beachBall, .pumpkin, .ornament, .heartstone,
+                 .shamrock, .confetti, .speckledEgg]))
+        XCTAssertEqual(TrophyCosmeticExclusions.seasonalExclusiveBalls.count, 7)
+        XCTAssertFalse(TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(.pluto),
+                       "Pluto is bundle-exclusive but evergreen — must NOT be excluded")
+        XCTAssertFalse(TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(.trophy))
+    }
+
+    // MARK: - cosmetic_first_buy (coin spend only)
+
+    /// `cosmetic_first_buy` fires on the first COIN purchase — and only a coin
+    /// spend, never a free `grant` (tutorial gift, track reward, IAP unlock).
+    func testCosmeticFirstBuyFiresOnCoinPurchaseNotFreeGrant() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+
+        // A free grant must NOT trip it.
+        gs.grant(BallSkin.blue)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_first_buy"),
+                       "free grant is not a coin spend")
+
+        // A real coin purchase does.
+        gs.coinBalance = 100_000
+        XCTAssertTrue(gs.purchase(BallSkin.green))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+    }
+
+    /// A pack purchase also latches `cosmetic_first_buy` (a coin spend) and
+    /// `pack_first` (owned pack count ≥ 1).
+    func testPackPurchaseLatchesFirstBuyAndPackFirst() {
+        let gs = makeGameState()
+        gs.coinBalance = 100_000
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pack_first"))
+
+        let pack = BallPack.catalogue.first!
+        XCTAssertTrue(gs.purchasePack(pack))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pack_first"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+    }
+
+    // MARK: - balls_own_* (IAP secrets excluded, seasonal + Trophy counted)
+
+    /// `balls_own_10` latches at 10 owned non-secret ball skins granted through
+    /// the choke point; owning the 2 IAP-secret balls neither helps nor hurts.
+    func testBallsOwn10ExcludesIAPSecretsAndCountsRegularGrants() {
+        let gs = makeGameState()
+
+        // Grant the 2 IAP secrets first — they must not count.
+        gs.grant(BallSkin.diamond)
+        gs.grant(BallSkin.moneyBall)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("balls_own_10"),
+                       "IAP secrets must not count toward balls_own")
+
+        // 9 regular coin/skill-reachable balls → still locked.
+        let regular: [BallSkin] = [.blue, .green, .purple, .rose, .coral,
+                                   .mint, .slate, .lemon, .gold]
+        regular.forEach { gs.grant($0) }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("balls_own_10"))
+
+        // The Trophy ball is earned-exclusive but DOES count → 10th ball.
+        gs.grant(BallSkin.trophy)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("balls_own_10"),
+                      "Trophy ball counts toward collection")
+    }
+
+    /// A seasonal ball (excluded only from `collection_complete`) DOES count
+    /// toward `balls_own_*` / `items_own_50` per catalog §3.6.
+    func testSeasonalBallCountsTowardBallsAndItemsOwn() {
+        let gs = makeGameState()
+        let before = gs.trophyBallsOwnedCount
+        gs.grant(BallSkin.pumpkin)
+        XCTAssertEqual(gs.trophyBallsOwnedCount, before + 1,
+                       "a seasonal ball counts toward balls_own")
+    }
+
+    // MARK: - items_own_50
+
+    /// `items_own_50` latches at 50 owned cosmetics across all 7 slots,
+    /// IAP secrets excluded; wired through `grant`.
+    func testItemsOwn50AcrossSlotsExcludesIAPSecrets() {
+        let gs = makeGameState()
+        // Grant the 4 IAP secrets — none may count.
+        gs.grant(BallSkin.diamond); gs.grant(BallSkin.moneyBall)
+        gs.grant(TrailColor.moneyRoll); gs.grant(Floor.moneyFull)
+
+        // Grant 50 non-secret, non-starter items spread across slots.
+        var granted = 0
+        func fill<Item: CosmeticItem>(_ cases: [Item], _ secrets: Set<String>) {
+            for item in cases where granted < 50
+                && item.tier != .starter
+                && item != Item.starter
+                && !secrets.contains(item.rawValue) {
+                gs.grant(item); granted += 1
+            }
+        }
+        fill(Array(BallSkin.allCases),
+             TrophyCosmeticExclusions.iapSecretRawValues)
+        fill(Array(GoalSkin.allCases), [])
+        fill(Array(TrailColor.allCases),
+             TrophyCosmeticExclusions.iapSecretRawValues)
+        fill(Array(Floor.allCases),
+             TrophyCosmeticExclusions.iapSecretRawValues)
+        fill(Array(Pit.allCases), [])
+        fill(Array(Boundary.allCases), [])
+        fill(Array(MusicTrack.allCases), [])
+
+        XCTAssertEqual(granted, 50, "test should grant exactly 50 non-secret items")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("items_own_50"))
+    }
+
+    // MARK: - collection_complete (207 evergreen denominator)
+
+    /// Grant EVERY evergreen cosmetic (the 207-item set) and prove
+    /// `collection_complete` latches — while owning Money/Diamond neither
+    /// helps nor is required, and the 7 seasonal balls are NOT required.
+    func testCollectionCompleteUsesEvergreenDenominatorAndExcludesSecretsAndSeasonal() {
+        let gs = makeGameState()
+
+        // Own the 4 IAP secrets + all 7 seasonal balls — none should be
+        // needed, and they must not push the count past 207 either.
+        gs.grant(BallSkin.diamond); gs.grant(BallSkin.moneyBall)
+        gs.grant(TrailColor.moneyRoll); gs.grant(Floor.moneyFull)
+        for b in TrophyCosmeticExclusions.seasonalExclusiveBalls { gs.grant(b) }
+
+        // Not yet complete: evergreen items still missing.
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("collection_complete"))
+
+        // Grant every EVERGREEN item (skip IAP secrets + seasonal balls;
+        // starters are already implicitly owned).
+        for b in BallSkin.allCases
+        where !TrophyCosmeticExclusions.iapSecretBalls.contains(b)
+            && !TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(b) {
+            gs.grant(b)
+        }
+        for g in GoalSkin.allCases { gs.grant(g) }
+        for t in TrailColor.allCases
+        where !TrophyCosmeticExclusions.iapSecretTrails.contains(t) { gs.grant(t) }
+        for f in Floor.allCases
+        where !TrophyCosmeticExclusions.iapSecretFloors.contains(f) { gs.grant(f) }
+        for p in Pit.allCases { gs.grant(p) }
+        for bnd in Boundary.allCases { gs.grant(bnd) }
+        for m in MusicTrack.allCases { gs.grant(m) }
+
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 207,
+                       "the evergreen denominator must be exactly 207")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("collection_complete"),
+                      "owning all 207 evergreen items completes the collection")
+    }
+
+    /// The evergreen count NEVER exceeds 207 even when every IAP secret and
+    /// seasonal ball is also owned — proving they can't help/pad the metric.
+    func testEvergreenCountCannotExceed207() {
+        let gs = makeGameState()
+        // Own literally everything the game defines.
+        for b in BallSkin.allCases  { gs.grant(b) }
+        for g in GoalSkin.allCases  { gs.grant(g) }
+        for t in TrailColor.allCases { gs.grant(t) }
+        for f in Floor.allCases     { gs.grant(f) }
+        for p in Pit.allCases       { gs.grant(p) }
+        for bnd in Boundary.allCases { gs.grant(bnd) }
+        for m in MusicTrack.allCases { gs.grant(m) }
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 207,
+                       "owning secrets + seasonal must not push evergreen past 207")
+    }
+
+    /// Coin-buyable Aurora counts toward evergreen (it is NOT iconic-excluded).
+    func testAuroraCountsTowardEvergreen() {
+        let gs = makeGameState()
+        let before = gs.trophyEvergreenCosmeticsOwnedCount
+        gs.grant(BallSkin.aurora)
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, before + 1,
+                       "Aurora is coin-reachable evergreen and must count")
+    }
+
+    // MARK: - bundle_first / bundle_5
+
+    /// `bundle_first` (≥1) and `bundle_5` (≥5) latch off `completedBundleIDs`
+    /// as bundles are bought as a unit through `purchaseBundle`.
+    func testBundleCompletionTrophiesFireOnCompletedBundleIDs() {
+        let gs = makeGameState()
+        gs.coinBalance = 10_000_000
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("bundle_first"))
+
+        let bundles = Array(CosmeticBundle.catalogue.prefix(5))
+        XCTAssertGreaterThanOrEqual(bundles.count, 5, "need ≥5 bundles for this test")
+
+        _ = gs.purchaseBundle(bundles[0], price: bundles[0].proratedPrice(in: gs))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("bundle_first"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("bundle_5"))
+
+        for b in bundles[1...4] {
+            gs.coinBalance = 10_000_000
+            _ = gs.purchaseBundle(b, price: b.proratedPrice(in: gs))
+        }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("bundle_5"))
+    }
+
+    // MARK: - cosmetic_full_kit (equip in all 7 slots)
+
+    /// `cosmetic_full_kit` latches only when a non-starter cosmetic is equipped
+    /// in all 7 slots simultaneously; wired through the equip setters.
+    func testFullKitLatchesWhenAllSevenSlotsNonStarter() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_full_kit"))
+
+        // Equip a non-starter in six slots — ball slot still starter.
+        gs.equippedGoal = GoalSkin.allCases.first { $0 != .target }!
+        gs.equippedTrail = TrailColor.allCases.first { $0 != .graphite && $0 != .moneyRoll }!
+        gs.equippedFloor = Floor.allCases.first { $0 != .classic && $0 != .moneyFull }!
+        gs.equippedPit = Pit.allCases.first { $0 != .classic }!
+        gs.equippedBoundary = Boundary.allCases.first { $0 != .classic }!
+        gs.equippedMusic = MusicTrack.allCases.first { $0 != .none }!
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_full_kit"),
+                       "ball slot still starter → not a full kit")
+
+        // Equip a non-starter ball → all 7 slots non-starter.
+        gs.equipBall(BallSkin.blue)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_full_kit"))
+    }
+
+    // MARK: - econ_working_capital / econ_nest_egg (source-tagged coins)
+
+    /// `econ_working_capital` (5,000 play-earned) counts .play and .daily
+    /// coins but NOT .iap / .refund / .giftCompensation; `econ_nest_egg`
+    /// latches off the balance high-water.
+    func testEconomyTrophiesRespectCoinSourceAndBalanceHighWater() {
+        let gs = makeGameState()
+
+        // Excluded sources must never advance econ_working_capital.
+        gs.addCoins(6_000, source: .iap)
+        gs.addCoins(6_000, source: .refund)
+        gs.addCoins(6_000, source: .giftCompensation)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_working_capital"),
+                       "IAP / refund / gift coins are not play income")
+        // …but they still count toward the coin BALANCE (nest egg).
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_nest_egg"),
+                      "any coins held ≥1,000 latch nest egg")
+
+        // Play income advances working capital.
+        gs.addCoins(4_000, source: .play)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_working_capital"))
+        gs.addCoins(1_000, source: .daily)   // 5,000 play-earned total
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_working_capital"))
+    }
+
+    // MARK: - No trophy keys to a purchase / IAP count
+
+    /// `cosmetic_first_buy` is a one-shot LATCH (threshold 1), not a
+    /// purchase-count trophy: a second, third… purchase changes nothing and no
+    /// higher-count purchase trophy exists.
+    func testCosmeticFirstBuyIsALatchNotAPurchaseCounter() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        // Only one trophy keys to cosmetic_coin_buys, and its threshold is 1.
+        let buyTrophies = catalog.trophies.filter {
+            $0.criteria.metric == .cosmeticCoinBuys
+        }
+        XCTAssertEqual(buyTrophies.map(\.id), ["cosmetic_first_buy"])
+        XCTAssertEqual(buyTrophies.first?.criteria.threshold, 1,
+                       "no purchase-COUNT trophy may exist — first-buy is a latch")
+    }
+
+    // MARK: - Live vs backfill agreement
+
+    /// The ownership metrics recorded live through `grant` produce the SAME
+    /// unlocks as a first-launch backfill over the same save — the exclusion
+    /// arithmetic lives in one place, so they cannot drift.
+    func testLiveAndBackfillAgreeOnCosmeticOwnership() throws {
+        let gs = makeGameState()
+        gs.coinBalance = 100_000
+
+        // Own 40 non-secret balls (past balls_own_40) + a few other slots.
+        var granted = 0
+        for b in BallSkin.allCases
+        where granted < 40
+            && b.tier != .starter
+            && !TrophyCosmeticExclusions.iapSecretBalls.contains(b) {
+            gs.grant(b); granted += 1
+        }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("balls_own_10"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("balls_own_40"))
+
+        // Backfill a fresh engine from the SAME stored save.
+        let backfilled = TrophyBackfill.snapshot(from: gs)
+        let engine = TrophyEngine(catalog: try TrophyCatalog.load(bundle: .main),
+                                  defaults: UserDefaults(suiteName: suiteName + ".backfill")!)
+        for metric in TrophyMetric.allCases {
+            if let value = backfilled[metric] { _ = engine.record(metric, value: value) }
+        }
+        for id in ["balls_own_10", "balls_own_40"] {
+            XCTAssertTrue(engine.isUnlocked(id),
+                          "backfill must also unlock \(id) — live and backfill must agree")
+        }
+        // The snapshot's evergreen/full-kit values match the live properties.
+        XCTAssertEqual(backfilled[.evergreenCosmeticsOwned],
+                       Double(gs.trophyEvergreenCosmeticsOwnedCount))
+        XCTAssertEqual(backfilled[.ballsOwned],
+                       Double(gs.trophyBallsOwnedCount))
     }
 }

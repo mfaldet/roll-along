@@ -37,6 +37,59 @@ import SwiftUI
 //   gameplay state or UI settings.  UserDefaults is the appropriate store.
 //   No iCloud KV sync in use.  Keychain migration: not required.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Trophy collection-criterion exclusions (S1-T5)
+//
+// The collection/ownership trophies (`balls_own_10/40`, `items_own_50`,
+// `collection_complete`) must never become a hidden pay-gate or a
+// time-limited (eventually-dead) criterion.  Two disjoint exclusion sets,
+// defined here as the SINGLE source of truth so live wiring and the
+// first-launch backfill agree and a unit test can pin them exactly:
+//
+//   • `iapSecret*` — the 4 secret-drop IAP cosmetics {Diamond ball, Money
+//     Ball, Money Roll, Money Full}.  Excluded from EVERY collection
+//     criterion (counting them would create a ~$150 pay-gated trophy and
+//     leak the secret).  These are NOT the `isIconic`/`iconicBalls` set —
+//     Iconic also contains the earned Trophy ball and starter looks, which
+//     DO count toward collection criteria.
+//   • `seasonalExclusiveBalls` — the 7 `isBundleExclusive` seasonal balls
+//     whose bundle windows are hard-coded one-shot 2026–27 ranges.  Excluded
+//     from `collection_complete` ONLY (scoping it to the 207-item evergreen
+//     set), so the trophy never becomes permanently unearnable once a window
+//     lapses.  (NOT excluded from `balls_own_*`/`items_own_50`, which count
+//     seasonal balls per catalog §3.6.)  BallSkin.isBundleExclusive is a
+//     SUPERSET of this (it also flags Pluto/Trophy/Diamond/Money) — so this
+//     list is enumerated explicitly, never derived from that flag.
+//
+// Note: `moneyRoll` is a TrailColor and `moneyFull` a Floor, so only two of
+// the four IAP secrets are balls.  See trophy-catalog.md §3.6 / open Q10.
+// ---------------------------------------------------------------------------
+enum TrophyCosmeticExclusions {
+    /// The two IAP-secret BALL skins (Diamond, Money Ball).
+    static let iapSecretBalls: Set<BallSkin> = [.diamond, .moneyBall]
+    /// The IAP-secret TRAIL (Money Roll).
+    static let iapSecretTrails: Set<TrailColor> = [.moneyRoll]
+    /// The IAP-secret FLOOR (Money Full).
+    static let iapSecretFloors: Set<Floor> = [.moneyFull]
+
+    /// Exactly the 4 IAP secrets as persisted rawValues, for the exclusion
+    /// unit test and rawValue-set membership checks against the owned sets.
+    static let iapSecretRawValues: Set<String> =
+        Set(iapSecretBalls.map { $0.rawValue })
+            .union(iapSecretTrails.map { $0.rawValue })
+            .union(iapSecretFloors.map { $0.rawValue })
+
+    /// The 7 seasonal `isBundleExclusive` balls (each in a one-shot 2026–27
+    /// window) — excluded from `collection_complete` only.
+    static let seasonalExclusiveBalls: Set<BallSkin> =
+        [.beachBall, .pumpkin, .ornament, .heartstone,
+         .shamrock, .confetti, .speckledEgg]
+
+    static let seasonalExclusiveBallRawValues: Set<String> =
+        Set(seasonalExclusiveBalls.map { $0.rawValue })
+}
+
 final class GameState: ObservableObject {
 
     // MARK: - Published state
@@ -471,24 +524,45 @@ final class GameState: ObservableObject {
     // Currently-equipped cosmetic per category.  Always defaults to the
     // starter on a fresh install.
     @Published var equippedGoal: GoalSkin {
-        didSet { defaults.set(equippedGoal.rawValue, forKey: "ra_equippedGoal") }
+        didSet {
+            defaults.set(equippedGoal.rawValue, forKey: "ra_equippedGoal")
+            recordFullKitTrophy()   // cosmetic_full_kit (S1-T5)
+        }
     }
     @Published var equippedTrail: TrailColor {
-        didSet { defaults.set(equippedTrail.rawValue, forKey: "ra_equippedTrail") }
+        didSet {
+            defaults.set(equippedTrail.rawValue, forKey: "ra_equippedTrail")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedFloor: Floor {
-        didSet { defaults.set(equippedFloor.rawValue, forKey: "ra_equippedFloor") }
+        didSet {
+            defaults.set(equippedFloor.rawValue, forKey: "ra_equippedFloor")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedPit: Pit {
-        didSet { defaults.set(equippedPit.rawValue, forKey: "ra_equippedPit") }
+        didSet {
+            defaults.set(equippedPit.rawValue, forKey: "ra_equippedPit")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedBoundary: Boundary {
-        didSet { defaults.set(equippedBoundary.rawValue, forKey: "ra_equippedBoundary") }
+        didSet {
+            defaults.set(equippedBoundary.rawValue, forKey: "ra_equippedBoundary")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedMusic: MusicTrack {
-        didSet { defaults.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
+        didSet {
+            defaults.set(equippedMusic.rawValue, forKey: "ra_equippedMusic")
+            recordFullKitTrophy()
+        }
     }
-    // equippedBall lives on `activeSkin` — already defined above.
+    // equippedBall lives on `activeSkin` — already defined above.  Its
+    // cosmetic_full_kit check rides `equipBall`/`equipPack` (real ball-slot
+    // equips), NOT the raw `activeSkin` didSet — `advancePackSkin` mutates
+    // `activeSkin` every attempt (shuffle), which must stay off the hot path.
 
     /// The currently-equipped Ball Pack, or nil when an individual ball
     /// skin is equipped.  When non-nil, `activeSkin` is driven by the
@@ -1100,6 +1174,150 @@ final class GameState: ObservableObject {
         trophyEngine.record(.rolloutBestMaze, value: minigameBests["rollout", default: 0])
     }
 
+    // MARK: - Cosmetic & economy trophy funnels (S1-T5)
+
+    /// Owned BALL skins, IAP secrets excluded — the `balls_own_10/40`
+    /// metric.  `ownedBallSkins` holds rawValues; the starter (`.red`) is
+    /// the free default and never counts toward "own N ball skins" (the
+    /// catalogue's 74-ball framing prices it out).  It is normally absent
+    /// from the set, but `liquidateCoinCosmetics` re-inserts every slot's
+    /// starter, so it's subtracted explicitly to keep the count stable
+    /// across a liquidation.  Seasonal balls DO count here (catalog §3.6) —
+    /// only the 2 IAP-secret balls and the starter are removed.
+    var trophyBallsOwnedCount: Int {
+        ownedBallSkins
+            .subtracting(TrophyCosmeticExclusions.iapSecretBalls.map { $0.rawValue })
+            .subtracting([BallSkin.starter.rawValue])
+            .count
+    }
+
+    /// Total owned cosmetics across all 7 slots, IAP secrets + starters
+    /// excluded — the `items_own_50` metric.  Sums the owned rawValue sets;
+    /// each slot's free starter is subtracted (normally absent, but
+    /// re-inserted by `liquidateCoinCosmetics`) and the 4 IAP secrets are
+    /// removed from their slots.  Seasonal balls count (catalog §3.6).
+    var trophyCosmeticsOwnedCount: Int {
+        // Slots with no IAP-secret members: subtract only the free starter.
+        func owned<Item: CosmeticItem>(_ set: Set<String>, _ type: Item.Type) -> Int {
+            set.subtracting([Item.starter.rawValue]).count
+        }
+        let balls = ownedBallSkins
+            .subtracting(TrophyCosmeticExclusions.iapSecretBalls.map { $0.rawValue })
+            .subtracting([BallSkin.starter.rawValue]).count
+        let trails = ownedTrails
+            .subtracting(TrophyCosmeticExclusions.iapSecretTrails.map { $0.rawValue })
+            .subtracting([TrailColor.starter.rawValue]).count
+        let floors = ownedFloors
+            .subtracting(TrophyCosmeticExclusions.iapSecretFloors.map { $0.rawValue })
+            .subtracting([Floor.starter.rawValue]).count
+        // Goals / Pits / Boundaries / Music have no IAP-secret members.
+        return balls + trails + floors
+            + owned(ownedGoals, GoalSkin.self)
+            + owned(ownedPits, Pit.self)
+            + owned(ownedBoundaries, Boundary.self)
+            + owned(ownedMusic, MusicTrack.self)
+    }
+
+    /// Count of owned EVERGREEN cosmetics — the `collection_complete`
+    /// metric, capped at the 207-item evergreen set (218 total − 4 IAP
+    /// secrets − 7 seasonal balls).  Iterates every case per slot, keeps the
+    /// evergreen ones (not an IAP secret, not a seasonal-exclusive ball —
+    /// starters ARE evergreen and always owned), and counts those `isOwned`.
+    /// Reaches exactly 207 iff every evergreen cosmetic is owned; owning a
+    /// seasonal or IAP-secret item can never push it past 207.
+    var trophyEvergreenCosmeticsOwnedCount: Int {
+        var count = 0
+        for b in BallSkin.allCases
+        where !TrophyCosmeticExclusions.iapSecretBalls.contains(b)
+            && !TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(b)
+            && isOwned(b) { count += 1 }
+        for g in GoalSkin.allCases where isOwned(g) { count += 1 }
+        for t in TrailColor.allCases
+        where !TrophyCosmeticExclusions.iapSecretTrails.contains(t)
+            && isOwned(t) { count += 1 }
+        for f in Floor.allCases
+        where !TrophyCosmeticExclusions.iapSecretFloors.contains(f)
+            && isOwned(f) { count += 1 }
+        for p in Pit.allCases where isOwned(p) { count += 1 }
+        for bnd in Boundary.allCases where isOwned(bnd) { count += 1 }
+        for m in MusicTrack.allCases where isOwned(m) { count += 1 }
+        return count
+    }
+
+    /// True when a non-starter cosmetic is equipped in ALL 7 loadout slots
+    /// (Ball/Goal/Trail/Floor/Pit/Boundary/Music) at once — the
+    /// `cosmetic_full_kit` metric.  The Ball slot counts as non-starter when
+    /// either a non-starter individual skin OR any equipped Pack is worn.
+    /// Exact inverse of `isLoadoutDefault`, per slot.
+    var trophyLoadoutIsFullyNonStarter: Bool {
+        let ballNonStarter = equippedPackID != nil || activeSkin != .starter
+        return ballNonStarter
+            && equippedGoal    != GoalSkin.starter
+            && equippedTrail   != TrailColor.starter
+            && equippedFloor   != Floor.starter
+            && equippedPit     != Pit.starter
+            && equippedBoundary != Boundary.starter
+            && equippedMusic   != MusicTrack.starter
+    }
+
+    /// Push the ownership-based cosmetic trophy metrics (S1-T5).  Called
+    /// from `grant` — the single choke point every acquisition (coin buy,
+    /// bundle, pack, tutorial gift, track reward, IAP unlock) routes
+    /// through — plus `purchasePack` for the pack-count metric (a Pack is
+    /// only ever bought, never free-granted, so `ownedPacks` isn't touched
+    /// by `grant`).  Every derivation mirrors `TrophyBackfill.snapshot`
+    /// exactly so a live grant and a first-launch grandfather agree.  The
+    /// engine latches, so a later Sell Back / liquidation that shrinks a
+    /// count never revokes an earned trophy.
+    private func recordCosmeticOwnershipTrophies() {
+        // balls_own_10 / balls_own_40 — owned balls minus the 2 IAP secrets.
+        trophyEngine.record(.ballsOwned, value: trophyBallsOwnedCount)
+        // items_own_50 — total owned across 7 slots minus the 4 IAP secrets.
+        trophyEngine.record(.cosmeticsOwned, value: trophyCosmeticsOwnedCount)
+        // collection_complete — owned evergreen items toward the 207 set.
+        trophyEngine.record(.evergreenCosmeticsOwned,
+                            value: trophyEvergreenCosmeticsOwnedCount)
+        // bundle_first / bundle_5 — completed bundles (IAP-secret-free by
+        // guardrail).
+        trophyEngine.record(.bundlesCompleted, value: completedBundleIDs.count)
+        // pack_first — owned Ball Packs.
+        trophyEngine.record(.packsOwned, value: ownedPacks.count)
+    }
+
+    /// Push the "cosmetic equipped in all 7 slots" metric (S1-T5).  Called
+    /// from every equipped-slot mutation (the six `equipped*` setters, the
+    /// ball equip funnels, and Pack equip) so `cosmetic_full_kit` latches
+    /// the instant a full non-starter loadout is worn.  A monotonic latch:
+    /// value is 1 only while fully non-starter, but the engine never revokes
+    /// once unlocked.
+    func recordFullKitTrophy() {
+        trophyEngine.record(.fullNonstarterLoadouts,
+                            value: trophyLoadoutIsFullyNonStarter ? 1 : 0)
+    }
+
+    /// Push the first-coin-purchase latch (S1-T5) — `cosmetic_first_buy`.
+    /// Called only from the three COIN-spend funnels (`purchase`,
+    /// `purchaseBundle`, `purchasePack`) on success, so free grants
+    /// (tutorial gift, track rewards, IAP unlocks) never trip it.  A pure
+    /// latch: any successful coin spend records value 1 (threshold 1).
+    private func recordCosmeticFirstBuyTrophy() {
+        trophyEngine.record(.cosmeticCoinBuys, value: 1)
+    }
+
+    /// Push the lifetime play-earned coins metric (S1-T5) —
+    /// `econ_working_capital`.  Called from `addCoins` after the S0-T2
+    /// source-tagged counter (`coinsEarnedFromPlay`, which already excludes
+    /// IAP grants, Sell Back refunds, and grantBundleFree compensation) is
+    /// bumped; also latches `econ_nest_egg` off the current balance
+    /// high-water (the engine keeps the best, so spending later never
+    /// revokes).
+    private func recordEconomyTrophies() {
+        // econ_working_capital — 5,000 lifetime coins earned from play.
+        trophyEngine.record(.coinsEarnedFromPlay, value: trophyStats.coinsEarnedFromPlay)
+        // econ_nest_egg — hold 1,000 coins at once (latched high-water).
+        trophyEngine.record(.coinBalancePeak, value: coinBalance)
+    }
+
     // MARK: - Queries
 
     func stars(for level: Int) -> Int           { bestStars[level] ?? 0 }
@@ -1451,6 +1669,10 @@ final class GameState: ObservableObject {
         }
         coinBalance = min(coinBalance + clamped, Self.maxCoinBalance)
         trophyStats.recordCoins(clamped, source: source)
+        // Economy trophies (S1-T5): econ_working_capital reads the just-bumped
+        // play-earned counter (source-filtered), econ_nest_egg the balance
+        // high-water.  The engine latches, so a later spend never revokes.
+        recordEconomyTrophies()
     }
 
     // MARK: - Minigame results (leaderboards + rewards)
@@ -2022,6 +2244,11 @@ final class GameState: ObservableObject {
         case let m as MusicTrack:  ownedMusic.insert(m.rawValue)
         default: break
         }
+        // The single "cosmetic acquired" choke point — every ownership
+        // trophy (balls/items/collection/bundle counts) fires here (S1-T5).
+        // Bundle/Pack grants route each member through here too, so a bundle
+        // completing (or its final member landing) re-evaluates counts.
+        recordCosmeticOwnershipTrophies()
     }
 
     /// Attempt to purchase a cosmetic with coins.  Returns true on
@@ -2033,7 +2260,9 @@ final class GameState: ObservableObject {
         // Full price paid — clear any stale discounted-price record so Sell
         // Back refunds the full cost.
         paidPrices.removeValue(forKey: Self.paidPriceKey(item))
-        grant(item)
+        grant(item)   // records ownership-count trophies
+        // First coin spend on a cosmetic — cosmetic_first_buy (S1-T5).
+        recordCosmeticFirstBuyTrophy()
         return true
     }
 
@@ -2072,8 +2301,14 @@ final class GameState: ObservableObject {
             recordPaidPrices(bundle.pits.filter   { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.music.filter  { !isOwned($0) }, ratio: ratio)
         }
-        bundle.grantContents(to: self)
+        bundle.grantContents(to: self)   // each member's grant records ownership
         ownedBundles.insert(bundle.id)
+        // `ownedBundles` just changed → re-evaluate bundle-completion counts
+        // (a bought-as-a-unit bundle is complete the instant it's owned, and
+        // its members may not all pass through `grant` if already owned).
+        recordCosmeticOwnershipTrophies()
+        // First coin spend on a cosmetic — cosmetic_first_buy (S1-T5).
+        recordCosmeticFirstBuyTrophy()
         return true
     }
 
@@ -2101,8 +2336,13 @@ final class GameState: ObservableObject {
         if base > 0 {
             recordPaidPrices(unowned, ratio: Double(price) / Double(base))
         }
-        pack.grantContents(to: self)
+        pack.grantContents(to: self)   // each member's grant records ownership
         ownedPacks.insert(pack.id)
+        // `ownedPacks` just changed → re-evaluate pack_first (grant() fired
+        // before the pack id was recorded, so re-run the ownership funnel).
+        recordCosmeticOwnershipTrophies()
+        // First coin spend on a cosmetic — cosmetic_first_buy (S1-T5).
+        recordCosmeticFirstBuyTrophy()
         return true
     }
 
@@ -2113,6 +2353,8 @@ final class GameState: ObservableObject {
         equippedPackID = pack.id
         packBag = []
         advancePackSkin()
+        // Ball-slot equip → re-check cosmetic_full_kit (S1-T5).
+        recordFullKitTrophy()
     }
 
     /// Equip an individual ball skin — clears any equipped Pack so the
@@ -2121,6 +2363,8 @@ final class GameState: ObservableObject {
         equippedPackID = nil
         packBag = []
         activeSkin = skin
+        // Ball-slot equip → re-check cosmetic_full_kit (S1-T5).
+        recordFullKitTrophy()
     }
 
     /// If a Pack is equipped, advance `activeSkin` to the next member via
