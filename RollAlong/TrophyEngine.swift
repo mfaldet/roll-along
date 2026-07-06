@@ -38,6 +38,18 @@
 //  Migration/backfill (first launch with trophies) is S0-T4 and lands in
 //  this file next; offline-sync dirty-flagging is S1-T8.
 //
+//  Offline-safe recording (S1-T8, sprint-plan.md §2 S1-T8; catalog §6 item
+//  17; internal-data-backend.md §7): unlock writes are already synchronous
+//  UserDefaults at unlock time (see `persistLedger`), and progress snapshots
+//  for UI are the monotonic `progressFraction(for:)` (S0-T3). The one piece
+//  S1-T8 adds is the `ra_trophySyncDirty` flag — armed durably on EVERY
+//  commit (live unlock AND backfill grant) and drained by S3-T3's
+//  `TrophySyncService` via a FULL-SNAPSHOT upsert of every unlocked id
+//  (internal-data-backend.md §7's self-healing pattern), NOT a fragile
+//  per-event outbox. This engine only arms + exposes read/clear; it never
+//  talks to the network and never routes through the memory-only
+//  AnalyticsClient buffer.
+//
 
 import Foundation
 
@@ -59,6 +71,18 @@ final class TrophyEngine: ObservableObject {
     /// (String-keyed Date dicts are plist-legal, so no JSON round-trip is
     /// needed — unlike GameState's Int-keyed dict helpers).
     static let unlockDatesKey = "ra_trophyUnlockDates"
+
+    /// Offline-safe sync flag (S1-T8). Set to `true` — synchronously,
+    /// alongside the ledger — on EVERY commit that latches new unlocks
+    /// (live `record` AND `backfill`), and cleared only by S3-T3's
+    /// `TrophySyncService` once a full-snapshot upsert of all unlocked ids
+    /// succeeds. Durable across relaunch so an offline unlock still drives a
+    /// sync on the next online launch/foreground/sign-in (the one-shot
+    /// "unlocked X" fact is thereby converted into a replayable snapshot —
+    /// internal-data-backend.md §7). Not on the hot path: only a real
+    /// unlock's `commit` touches it, so a no-unlock stat bump never writes
+    /// it (the S0-T3 zero-write contract holds).
+    static let syncDirtyKey = "ra_trophySyncDirty"
 
     /// Set to `true` the first time `backfill(from:)` completes, so the
     /// retro-evaluation never runs twice (idempotent across relaunches —
@@ -143,6 +167,22 @@ final class TrophyEngine: ObservableObject {
     /// reveal; nothing on the hot path touches it.
     @Published private(set) var backfillGrantCount: Int
 
+    /// Whether an unlock has landed since the last successful server sync
+    /// (S1-T8). Loaded from `syncDirtyKey`, armed in every `commit`, and
+    /// cleared by `clearSyncDirty()` (S3-T3's drain). A pre-existing dirty
+    /// flag from a prior offline session survives relaunch and is honored on
+    /// load.
+    ///
+    /// Deliberately NOT `@Published`: arming it inside `commit` must not add
+    /// a SECOND `objectWillChange` on top of the single one `unlockedIDs`
+    /// already emits (the S0-T3 "exactly one publish per unlocking bump"
+    /// contract — a double publish double-renders trophy UI). It is set just
+    /// before the `unlockedIDs` publish, so an observer reacting to that one
+    /// emission already sees the armed flag. `clearSyncDirty()` — the only
+    /// mutation OUTSIDE a commit — sends `objectWillChange` itself so a
+    /// drain still notifies observers.
+    private(set) var isSyncDirty: Bool
+
     // MARK: - Monotonic progress high-water (in-memory)
 
     /// Best value ever pushed per metric THIS process lifetime (max for
@@ -207,6 +247,9 @@ final class TrophyEngine: ObservableObject {
 
         self.didBackfill = defaults.bool(forKey: Self.backfillDoneKey)
         self.backfillGrantCount = max(0, defaults.integer(forKey: Self.backfillGrantCountKey))
+        // A dirty flag armed in a prior (offline) session survives relaunch
+        // so S3-T3 can still drain it online next launch (S1-T8 acceptance).
+        self.isSyncDirty = defaults.bool(forKey: Self.syncDirtyKey)
     }
 
     // MARK: - Reads
@@ -380,6 +423,28 @@ final class TrophyEngine: ObservableObject {
         }
     }
 
+    // MARK: - Offline-safe sync flag (S1-T8)
+
+    /// Clears the `ra_trophySyncDirty` flag — S3-T3's drain, called ONLY
+    /// after a full-snapshot upsert of every unlocked id has succeeded
+    /// (internal-data-backend.md §7). Idempotent and synchronous: a no-op
+    /// when already clean (no wasted publish), else clears in memory and on
+    /// disk in one write. Never clears on a partial/failed sync — the flag
+    /// stays armed so the next launch/foreground retries (the ratchet's
+    /// deliver-at-least-once guarantee).
+    ///
+    /// Emits `objectWillChange` explicitly (unlike arming, this mutation is
+    /// not accompanied by an `unlockedIDs` publish): `isSyncDirty` is not
+    /// `@Published`, so a sync-service observer would otherwise miss the
+    /// state transition. Sent exactly once, and only when the flag actually
+    /// changes.
+    func clearSyncDirty() {
+        guard isSyncDirty else { return }
+        objectWillChange.send()
+        isSyncDirty = false
+        defaults.set(false, forKey: Self.syncDirtyKey)
+    }
+
     // MARK: - Latching (private)
 
     /// Latches unlocks into the ledger: stamps first-unlock dates, runs
@@ -428,6 +493,15 @@ final class TrophyEngine: ObservableObject {
         for trophy in all where unlockDates[trophy.id] == nil {
             unlockDates[trophy.id] = stamp
         }
+        // Arm the offline-safe sync flag (S1-T8) BEFORE the published
+        // mutation: a new unlock just landed, so S3-T3 must push a full
+        // snapshot. `isSyncDirty` is not `@Published`, so setting it here
+        // adds no second emission — an observer reacting to the one
+        // `unlockedIDs` publish below already sees it armed. Persisted
+        // synchronously with the ledger, so it survives a kill after this
+        // commit. Only ever reached on a real unlock (commit runs nowhere
+        // else), so the no-unlock hot path never touches it.
+        isSyncDirty = true
         // Single @Published mutation per commit → exactly one
         // objectWillChange per unlocking bump, none otherwise.
         unlockedIDs = working
@@ -466,9 +540,18 @@ final class TrophyEngine: ObservableObject {
     /// healing: ids first, dates second — whichever key survives a crash,
     /// loading unions toward MORE unlocked (the ratchet direction).
     /// Both writes are plist-native; nothing is JSON-encoded.
+    ///
+    /// The `ra_trophySyncDirty` flag rides the SAME synchronous write (S1-T8)
+    /// so a kill right after an unlock still leaves the flag armed for
+    /// S3-T3 to drain on the next online launch. Written last: the unlock
+    /// ledger is the source of truth, so an armed-but-not-yet-persisted flag
+    /// (crash between the ledger writes and this one) merely re-arms on the
+    /// next unlock — it can never lose an unlock, only briefly under-report
+    /// dirtiness, which the very next commit repairs.
     private func persistLedger() {
         defaults.set(Array(unlockedIDs), forKey: Self.unlocksKey)
         defaults.set(unlockDates, forKey: Self.unlockDatesKey)
+        defaults.set(isSyncDirty, forKey: Self.syncDirtyKey)
     }
 
     /// GameState's `loadStringSet` pattern (find by symbol —

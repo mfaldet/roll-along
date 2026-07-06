@@ -29,6 +29,10 @@ import SwiftUI
 //   ra_trophyUnlocks, ra_trophyUnlockDates.
 //   The latched unlock ledger — a pure ratchet: never revoked, untouched
 //   by resetProgress() / liquidateCoinCosmetics().
+//   ra_trophySyncDirty (S1-T8) — a Bool armed synchronously on every
+//   unlock (live + backfill) and cleared by S3-T3's TrophySyncService once
+//   a full-snapshot upsert succeeds; survives relaunch so an offline unlock
+//   still syncs next online launch. No PII.
 //
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.

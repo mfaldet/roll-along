@@ -464,9 +464,15 @@ final class TrophyStatsTests: XCTestCase {
 
     /// Sweep the funnels end-to-end: spends and falls move NO counter
     /// upward (no coins-spent counter, no falls/failure counter), and the
-    /// only `ra_trophy*` keys ever written are the enumerated four.
-    /// (S0-T3's engine adds its separate `ra_trophyUnlocks` ledger keys —
-    /// that session extends this allowlist when it wires the engine in.)
+    /// only COUNTER `ra_trophy*` keys ever written are the enumerated ones.
+    /// The engine owns a separate, non-counter ledger — `ra_trophyUnlocks`
+    /// (array) / `ra_trophyUnlockDates` (dict), which the L1 clear unlocking
+    /// `climb_first_clear` writes here, plus S1-T8's `ra_trophySyncDirty`
+    /// (Bool). Those are not TrophyStats counters and are excluded before
+    /// the subset check: the array/dict keys never cast to Int (so
+    /// `persistedTrophyKeyValues` already drops them), and the Bool flag is
+    /// subtracted explicitly (Bool bridges to Int via NSNumber, so it would
+    /// otherwise slip through).
     func testFunnelSweep_writesOnlyEnumeratedKeys_spendsAndFallsCountNothing() {
         let gs = makeGameState()
         gs.currentModeID = "climb"
@@ -494,9 +500,13 @@ final class TrophyStatsTests: XCTestCase {
         gs.resetProgress()
         _ = gs.liquidateCoinCosmetics()
 
-        let written = Set(persistedTrophyKeyValues().keys)
+        // Exclude the engine's non-counter ledger keys (the L1 clear latched
+        // `climb_first_clear`, and S1-T8 arms the Bool sync flag): this test
+        // guards TrophyStats COUNTER keys, not the engine's ratchet.
+        let engineLedgerKeys: Set<String> = [TrophyEngine.syncDirtyKey]
+        let written = Set(persistedTrophyKeyValues().keys).subtracting(engineLedgerKeys)
         XCTAssertTrue(written.isSubset(of: TrophyStats.allPersistedKeys),
-                      "unexpected ra_trophy* keys written: " +
+                      "unexpected ra_trophy* counter keys written: " +
                       "\(written.subtracting(TrophyStats.allPersistedKeys).sorted())")
     }
 

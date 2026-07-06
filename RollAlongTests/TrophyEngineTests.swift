@@ -607,9 +607,15 @@ final class TrophyEngineTests: XCTestCase {
         let unlocked = engine.record(.climbTotalStars, value: 25)    // climb_stars_25
         XCTAssertEqual(unlocked.map(\.id), ["climb_stars_25"])
         XCTAssertEqual(publishes, 1, "exactly one publish per unlocking bump")
-        XCTAssertEqual(spy.objectWriteCount, 2)
+        // Three synchronous writes per unlocking commit: the id set, the
+        // timestamp dict, and the S1-T8 `ra_trophySyncDirty` flag — all ride
+        // the same `persistLedger` write so an offline unlock is durable AND
+        // flagged for S3-T3 to drain.
+        XCTAssertEqual(spy.objectWriteCount, 3)
         XCTAssertEqual(Set(spy.writtenKeys),
-                       [TrophyEngine.unlocksKey, TrophyEngine.unlockDatesKey])
+                       [TrophyEngine.unlocksKey,
+                        TrophyEngine.unlockDatesKey,
+                        TrophyEngine.syncDirtyKey])
 
         // Plist-native shapes: a string array + a Date-valued dictionary,
         // and neither key holds a JSON-encoded Data blob.
@@ -833,6 +839,122 @@ final class TrophyEngineTests: XCTestCase {
         // A later slower time can never revoke (ratchet).
         XCTAssertTrue(engine.record(.fastestClearSeconds, value: 60).isEmpty)
         XCTAssertTrue(engine.isUnlocked("skill_speed_10s"))
+    }
+
+    // MARK: Offline-safe sync flag (S1-T8)
+
+    /// Acceptance: an unlock arms `ra_trophySyncDirty` synchronously, and a
+    /// kill-the-app-after-unlock (a cold engine over the same suite) still
+    /// reports it dirty — so S3-T3 can drain it on the next online launch.
+    /// A fresh install with no unlocks is clean; a no-unlock bump never arms.
+    func testSyncDirtyArmsOnUnlockAndSurvivesRelaunch() throws {
+        let engine = try makeEngine()
+        XCTAssertFalse(engine.isSyncDirty, "a fresh engine with no unlocks is clean")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+
+        // A stat bump that unlocks nothing must never arm the flag (the
+        // S0-T3 zero-write hot-path contract extends to S1-T8).
+        XCTAssertTrue(engine.record(.climbTotalStars, value: 10).isEmpty)
+        XCTAssertFalse(engine.isSyncDirty, "a no-unlock bump must not arm the flag")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+
+        // A real unlock arms it — in memory AND durably on disk, right now.
+        XCTAssertEqual(engine.record(.climbTotalStars, value: 25).map(\.id),
+                       ["climb_stars_25"])
+        XCTAssertTrue(engine.isSyncDirty, "an unlock must arm the sync flag")
+        XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey),
+                      "the flag is persisted synchronously at unlock time")
+
+        // Kill the app after the unlock: a cold engine over the same save
+        // still sees the flag armed (it never got to sync).
+        let relaunched = try makeEngine()
+        XCTAssertTrue(relaunched.isSyncDirty,
+                      "an armed flag must survive relaunch so an offline unlock still syncs")
+        XCTAssertTrue(relaunched.isUnlocked("climb_stars_25"),
+                      "and the unlock itself survives (kill-the-app-after-unlock)")
+    }
+
+    /// `clearSyncDirty()` is S3-T3's drain: it clears the flag in memory and
+    /// on disk (surviving relaunch as clean), publishes exactly once, and is
+    /// an idempotent no-op when already clean. A later unlock re-arms it.
+    func testClearSyncDirtyIsIdempotentAndReArmsOnNextUnlock() throws {
+        let engine = try makeEngine()
+        var publishes = 0
+        engine.objectWillChange.sink { _ in publishes += 1 }.store(in: &cancellables)
+
+        // Clearing an already-clean flag is a pure no-op — no write, no publish.
+        engine.clearSyncDirty()
+        XCTAssertFalse(engine.isSyncDirty)
+        XCTAssertEqual(publishes, 0, "clearing an already-clean flag must not publish")
+
+        // Arm it, then drain it (the S3-T3 success path).
+        XCTAssertEqual(engine.record(.climbTotalStars, value: 25).map(\.id),
+                       ["climb_stars_25"])
+        XCTAssertTrue(engine.isSyncDirty)
+        let publishesAfterUnlock = publishes
+
+        engine.clearSyncDirty()
+        XCTAssertFalse(engine.isSyncDirty, "clear drops the flag in memory")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey),
+                       "clear drops the flag on disk")
+        XCTAssertEqual(publishes, publishesAfterUnlock + 1,
+                       "a clear that actually changes state publishes exactly once")
+
+        // The cleared state survives relaunch — a synced install stays clean.
+        let relaunched = try makeEngine()
+        XCTAssertFalse(relaunched.isSyncDirty, "a drained flag stays clear across relaunch")
+        XCTAssertTrue(relaunched.isUnlocked("climb_stars_25"),
+                      "clearing the sync flag never touches the unlock ledger")
+
+        // A brand-new unlock after a successful sync re-arms the flag.
+        XCTAssertEqual(relaunched.record(.climbTotalStars, value: 150).map(\.id),
+                       ["climb_stars_150"])
+        XCTAssertTrue(relaunched.isSyncDirty, "a later unlock re-arms the drained flag")
+        XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+    }
+
+    /// Backfill (S0-T4) grants are unlocks too, so a grandfathered veteran's
+    /// backfill must arm the sync flag — otherwise their already-earned
+    /// trophies would never reach the rarity rail. And it survives relaunch.
+    func testBackfillArmsSyncDirtyAndSurvivesRelaunch() throws {
+        let engine = try makeEngine()
+        XCTAssertFalse(engine.isSyncDirty)
+
+        // A snapshot that grandfathers at least one trophy.
+        let granted = engine.backfill(from: [.climbTotalStars: 25])
+        XCTAssertFalse(granted.isEmpty, "fixture must actually grandfather a trophy")
+        XCTAssertTrue(engine.isSyncDirty, "a backfill grant must arm the sync flag")
+        XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+
+        let relaunched = try makeEngine()
+        XCTAssertTrue(relaunched.isSyncDirty,
+                      "a backfilled dirty flag must survive relaunch for S3-T3 to drain")
+    }
+
+    /// A backfill that grants NOTHING (fresh install / empty snapshot) must
+    /// NOT arm the flag — there is nothing to sync, so a first launch never
+    /// spuriously schedules a server push.
+    func testEmptyBackfillDoesNotArmSyncDirty() throws {
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.backfill(from: [:]).isEmpty)
+        XCTAssertTrue(engine.didBackfill, "the empty backfill still marks itself done")
+        XCTAssertFalse(engine.isSyncDirty, "a zero-grant backfill has nothing to sync")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+    }
+
+    /// A dirty flag persisted by a prior offline session is honored on load
+    /// even before this session unlocks anything — the pending sync is not
+    /// forgotten just because the process restarted.
+    func testPreExistingDirtyFlagIsLoadedOnInit() throws {
+        defaults.set(true, forKey: TrophyEngine.syncDirtyKey)
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.isSyncDirty,
+                      "a flag armed in a prior session is honored on the next launch")
+
+        // And it can still be drained normally.
+        engine.clearSyncDirty()
+        XCTAssertFalse(engine.isSyncDirty)
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
     }
 
     // MARK: Ledger loading — healing + unknown ids
