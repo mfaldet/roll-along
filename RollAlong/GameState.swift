@@ -36,6 +36,10 @@ import SwiftUI
 //   ra_trophyCapstonePresented (S2-T5) — a Bool latching the Platinum
 //   capstone's full-screen celebration to a once-ever event; set when the
 //   blowout has played, survives relaunch so it never replays. No PII.
+//   ra_trophyRevealPresented (S2-T6) — a Bool latching the one-time
+//   retroactive-grant "you've already earned N" reveal to a once-ever event;
+//   set when the summary has been offered (or when a fresh install had nothing
+//   to reveal), survives relaunch so it never re-offers. No PII.
 //
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
@@ -652,6 +656,18 @@ final class GameState: ObservableObject {
     /// too: a grandfathered capstone never blows up — S2-T6's reveal owns it.
     let capstoneCelebration: CapstoneCelebrationModel
 
+    /// The one-time retroactive-grant reveal state (S2-T6).  Owned here on its
+    /// OWN `ObservableObject` (like `trophyToasts`/`capstoneCelebration`) so it
+    /// never re-renders a gameplay view.  A veteran opening the trophy update
+    /// qualifies for many trophies at once via the S0-T4 backfill; those
+    /// grandfathered unlocks bypass the small-toast feed entirely, and this
+    /// model owns the single coalesced "Trophy Room unlocked — you've already
+    /// earned N" moment they get instead (design.md §6 anti-spam batching).
+    /// Armed from `activateTrophies()` — the same launch call that runs the
+    /// backfill — and latched against a durable `ra_trophyRevealPresented` flag
+    /// so a relaunch never re-offers it.  DISPLAY-ONLY (D1 never-mint).
+    let trophyReveal: TrophyRevealModel
+
     /// Test-injectable clock so live-unlock timestamps are deterministic
     /// (mirrors the engine's `now`).  Production uses the real wall clock.
     private let now: () -> Date
@@ -678,6 +694,11 @@ final class GameState: ObservableObject {
         // The capstone moment starts from its persisted "already played" flag,
         // so a relaunch after the blowout never replays it (S2-T5 latch).
         capstoneCelebration = CapstoneCelebrationModel(defaults: defaults)
+        // The retro-grant reveal starts from its persisted "already offered"
+        // flag, so a relaunch after the veteran summary never re-offers it
+        // (S2-T6 latch).  It arms only once `activateTrophies()` runs the
+        // backfill and finds it granted trophies.
+        trophyReveal = TrophyRevealModel(defaults: defaults)
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -821,9 +842,24 @@ final class GameState: ObservableObject {
     /// must leave the trophy ledger untouched (the migration/engine unit
     /// tests build one and assert inertness).  Returns the trophies newly
     /// granted by this call (empty after the first run).
+    ///
+    /// After the backfill, arm the S2-T6 retro-grant reveal: if this save's
+    /// history grandfathered any trophies, the `TrophyRevealModel` offers ONE
+    /// coalesced "Trophy Room unlocked — you've already earned N" banner on the
+    /// Home surface — never a toast cascade (design.md §6).  The reveal is
+    /// latched once-ever against its own durable flag, so calling this on every
+    /// launch (as production does) re-checks harmlessly: after the first offer
+    /// it never re-arms, and a relaunch — where `didBackfill`/`backfillGrantCount`
+    /// still read true/N (the historical fact) — shows nothing.  The grandfathered
+    /// unlocks themselves never flow through `fireTrophy`, so they never toast.
     @discardableResult
     func activateTrophies() -> [TrophyDefinition] {
-        trophyEngine.backfill(from: TrophyBackfill.snapshot(from: self))
+        let granted = trophyEngine.backfill(from: TrophyBackfill.snapshot(from: self))
+        // Reads the engine's persisted backfill counters — safe on every launch,
+        // even the ones where `backfill` short-circuited (didBackfill already
+        // set): the reveal's own latch decides whether anything is owed.
+        trophyReveal.revealIfOwed(engine: trophyEngine)
+        return granted
     }
 
     // MARK: - Trophy toast feed + run lifecycle (S2-T2)

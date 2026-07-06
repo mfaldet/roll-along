@@ -84,6 +84,7 @@
 		7A0F0106000000000000AA01 /* TrophyRoomModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */; };
 		7A0F0107000000000000AA01 /* TrophyShowcaseModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */; };
 		7A0F0108000000000000AA01 /* CapstoneCelebrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0108000000000000AA00 /* CapstoneCelebrationTests.swift */; };
+		7A0F0109000000000000AA01 /* TrophyRevealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0109000000000000AA00 /* TrophyRevealTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -183,6 +184,7 @@
 		7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomModelTests.swift; sourceTree = "<group>"; };
 		7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyShowcaseModelTests.swift; sourceTree = "<group>"; };
 		7A0F0108000000000000AA00 /* CapstoneCelebrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapstoneCelebrationTests.swift; sourceTree = "<group>"; };
+		7A0F0109000000000000AA00 /* TrophyRevealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRevealTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -326,6 +328,7 @@
 				7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */,
 				7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */,
 				7A0F0108000000000000AA00 /* CapstoneCelebrationTests.swift */,
+				7A0F0109000000000000AA00 /* TrophyRevealTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -529,6 +532,7 @@
 				7A0F0106000000000000AA01 /* TrophyRoomModelTests.swift in Sources */,
 				7A0F0107000000000000AA01 /* TrophyShowcaseModelTests.swift in Sources */,
 				7A0F0108000000000000AA01 /* CapstoneCelebrationTests.swift in Sources */,
+				7A0F0109000000000000AA01 /* TrophyRevealTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

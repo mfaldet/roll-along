@@ -398,6 +398,18 @@ struct HomeView: View {
                     .transition(.opacity)
                     .zIndex(90)
                 }
+
+                // Retroactive-grant reveal (S2-T6): the ONE coalesced
+                // "Trophy Room unlocked — you've already earned N" banner a
+                // veteran gets on the first open after the trophy update.
+                // Armed by `activateTrophies()` at launch; latched once-ever.
+                // Sits below the sign-in prompt so a raised prompt covers it,
+                // and taps route into the Trophy Room.
+                TrophyRevealHost(
+                    model: gameState.trophyReveal,
+                    hapticsEnabled: gameState.hapticsEnabled,
+                    onOpenTrophyRoom: { nav.goToTrophies() })
+                    .zIndex(85)
             }
             // NOTE: no accessibilityIdentifier here — the "HomeView" anchor
             // lives on titleText.  An identifier on this root ZStack would

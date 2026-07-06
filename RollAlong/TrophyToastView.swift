@@ -808,3 +808,276 @@ struct CapstoneCelebrationHost: View {
         .allowsHitTesting(model.pending != nil)
     }
 }
+
+// MARK: - Retroactive-grant reveal (S2-T6)
+
+//  ---------------------------------------------------------------------------
+//  The one-time "Trophy Room unlocked — you've already earned N" reveal
+//  (sprint-plan.md §2 S2-T6; design.md §6 "Anti-spam batching: retroactive
+//  grants at launch get a SINGLE one-time summary — never a toast cascade").
+//
+//  A veteran opening the trophy update qualifies for many trophies instantly
+//  (the S0-T4 backfill grants them all at once with a `legacyUnlockDate`
+//  stamp). Those grandfathered unlocks deliberately BYPASS the small-toast
+//  feed (`GameState.activateTrophies` never routes through `fireTrophy`), so
+//  they never storm the banner. This model owns the ONE coalesced moment they
+//  get instead: a single banner announcing how many were earned, offered on
+//  the first open after the update and NEVER again.
+//
+//  "Exactly once" is latched two ways, belt-and-suspenders (the capstone
+//  pattern):
+//    (1) it arms only when the engine's own `didBackfill` flag is set AND the
+//        backfill granted ≥ 1 trophy (`backfillGrantCount`); and
+//    (2) `TrophyRevealModel` latches the reveal against a durable
+//        `ra_trophyRevealPresented` flag, so a relaunch — where `didBackfill`
+//        and `backfillGrantCount` still read true/N forever (they are the
+//        historical fact, a ratchet) — never re-offers it.
+//
+//  NEVER-MINT (D1): the reveal is display-only. It reads the engine's backfill
+//  counters and grants nothing.
+//  ---------------------------------------------------------------------------
+
+/// The one-time, latched-forever state for the retroactive-grant reveal.
+///
+/// Deliberately a plain `ObservableObject` with NO View dependency, so its
+/// offer-exactly-once policy is unit-testable in isolation (S2-T6 acceptance).
+/// It mirrors `CapstoneCelebrationModel`: GameState owns it as a plain `let`
+/// and arms it from `activateTrophies()` (the same launch call that runs the
+/// backfill), so its `@Published` mutations land on main in practice without
+/// pinning it to the global actor.
+final class TrophyRevealModel: ObservableObject {
+
+    /// Durable "the retro-grant reveal has already been offered" flag. Survives
+    /// relaunch so the summary is a true once-ever event (S2-T6: "flag clears
+    /// after presentation"). Documented in the GameState.swift `ra_*` audit
+    /// header alongside the other trophy keys.
+    static let presentedKey = "ra_trophyRevealPresented"
+
+    /// The number of trophies the one-time backfill granted, or nil when no
+    /// reveal is pending. A non-nil value is the single signal the host view
+    /// renders the banner for. Cleared the instant `markPresented()` runs.
+    @Published private(set) var pendingCount: Int?
+
+    /// Whether the once-ever reveal has already been offered (loaded from
+    /// `presentedKey`; set permanently by `markPresented()`). Once true,
+    /// `revealIfOwed` can never arm the reveal again.
+    @Published private(set) var hasPresented: Bool
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.hasPresented = defaults.bool(forKey: Self.presentedKey)
+    }
+
+    /// Arm the reveal IFF the first-launch backfill has run, granted at least
+    /// one trophy, AND the reveal has never been offered. Idempotent and
+    /// latched: a second call (a relaunch, a re-check) with the flag already
+    /// set — or while a reveal is already armed — is a no-op, so the summary is
+    /// offered exactly once ever (S2-T6 acceptance).
+    ///
+    /// A fresh install (backfill ran but granted 0) never arms — there is
+    /// nothing to reveal, so the reveal is silently retired the same way
+    /// (`markPresented` on the empty path keeps the flag honest without a
+    /// banner). Reads the engine's public backfill counters only; it never
+    /// mutates the ledger or the economy (D1 never-mint).
+    ///
+    /// Returns true iff this call armed the reveal (for the caller/test).
+    @discardableResult
+    func revealIfOwed(engine: TrophyEngine) -> Bool {
+        guard !hasPresented else { return false }
+        // The backfill hasn't run yet (activateTrophies not called): don't
+        // decide anything — a later call after backfill will.
+        guard engine.didBackfill else { return false }
+        // Backfill ran but granted nothing (a fresh install / a save already
+        // at zero derivable trophies): there is nothing to reveal. Retire the
+        // reveal permanently so it never considers this save again, and show
+        // no banner.
+        guard engine.backfillGrantCount > 0 else {
+            markPresented()
+            return false
+        }
+        // Already armed and waiting to show — don't re-arm (idempotent).
+        guard pendingCount == nil else { return false }
+        pendingCount = engine.backfillGrantCount
+        return true
+    }
+
+    /// Mark the reveal as offered, forever. Persists the flag synchronously and
+    /// clears the pending signal so the host dismisses. After this, no code
+    /// path can re-arm the reveal (a ratchet on the presentation itself, on top
+    /// of the backfill flag's own once-ever guarantee).
+    func markPresented() {
+        pendingCount = nil
+        guard !hasPresented else { return }
+        hasPresented = true
+        defaults.set(true, forKey: Self.presentedKey)
+    }
+
+    // MARK: Test-only introspection
+
+    #if DEBUG
+    /// Whether a reveal is currently armed (test assertions).
+    var isArmed: Bool { pendingCount != nil }
+    #endif
+}
+
+/// The single coalesced retro-grant banner. Reads the granted count and
+/// renders a one-line "Trophy Room unlocked — you've already earned N" card in
+/// the toast grammar, tappable to open the Trophy Room. Accessible: a
+/// VoiceOver announcement + `accessibilityLabel`, Dynamic-Type scalable fonts,
+/// and `@Environment(\.accessibilityReduceMotion)` honored. Display-only.
+struct TrophyRevealBanner: View {
+
+    /// How many trophies the backfill granted (the "N").
+    let grantedCount: Int
+    /// Honored from GameState by the host; defaulted so the view previews.
+    var hapticsEnabled: Bool = true
+    /// Tapping the banner deep-links into the Trophy Room. Optional so the
+    /// banner renders standalone in tests/previews.
+    var onOpen: (() -> Void)? = nil
+    /// Dismiss without opening the room (the close affordance).
+    var onDismiss: (() -> Void)? = nil
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The reveal wears the gold medal mark — a celebratory, grade-neutral
+    /// summary glyph (NOT a specific rung's, and NEVER the Diamond-ball gem —
+    /// §2 R2). One source of truth for the accent: the gold grade style.
+    private var accent: Color { TrophyGradeStyle.forTier(.gold).accent }
+
+    /// "…you've already earned 12" / "…you've already earned 1 trophy" — the
+    /// count-correct headline (design.md §6 summary copy).
+    private var headline: String { "Trophy Room unlocked" }
+    private var subline: String {
+        let noun = grantedCount == 1 ? "trophy" : "trophies"
+        return "You've already earned \(grantedCount) \(noun) — tap to see them."
+    }
+
+    var announcement: String {
+        let noun = grantedCount == 1 ? "trophy" : "trophies"
+        return "Trophy Room unlocked. You've already earned \(grantedCount) \(noun). Tap to open the Trophy Room."
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "trophy.fill")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(accent)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(headline)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(subline)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+
+            Button {
+                onDismiss?()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(accent.opacity(0.85), lineWidth: 2)
+        )
+        .overlay(alignment: .leading) {
+            // Accent rail — the trophy glyph above is the second, non-color
+            // cue, so the moment is never conveyed by color alone.
+            RoundedRectangle(cornerRadius: 2)
+                .fill(accent)
+                .frame(width: 4)
+                .padding(.vertical, 8)
+                .padding(.leading, 2)
+                .accessibilityHidden(true)
+        }
+        .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+        .contentShape(Rectangle())
+        .onTapGesture { onOpen?() }
+        // One a11y element for the tappable card (the close button stays its
+        // own element). Speaks the summary; opens the room on activation.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(announcement)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens the Trophy Room.")
+        .transition(reduceMotion
+                    ? .opacity
+                    : .move(edge: .top).combined(with: .opacity))
+        .onAppear {
+            postAnnouncement(announcement)
+            fireFeedback()
+        }
+    }
+
+    /// Posts the VoiceOver announcement (design.md §6). No-op off-UIKit.
+    private func postAnnouncement(_ text: String) {
+        #if canImport(UIKit)
+        UIAccessibility.post(notification: .announcement, argument: text)
+        #endif
+    }
+
+    /// A single soft haptic when the summary appears — respects the player's
+    /// haptics setting. NEVER grants anything (feedback only).
+    private func fireFeedback() {
+        #if canImport(UIKit)
+        if hapticsEnabled {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+        #endif
+    }
+}
+
+/// Drops the retro-grant reveal over the Home surface. Observes the model,
+/// renders the single banner while `pendingCount` is non-nil, and calls
+/// `markPresented()` on open OR dismiss so it never shows again. Surface
+/// wiring (Home adopts this) rides `activateTrophies()` at launch.
+struct TrophyRevealHost: View {
+
+    @ObservedObject var model: TrophyRevealModel
+    var hapticsEnabled: Bool = true
+    /// Called when the player taps the banner to open the Trophy Room. The
+    /// host marks the reveal presented, then routes.
+    var onOpenTrophyRoom: (() -> Void)? = nil
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack {
+            if let count = model.pendingCount {
+                TrophyRevealBanner(
+                    grantedCount: count,
+                    hapticsEnabled: hapticsEnabled,
+                    onOpen: {
+                        model.markPresented()
+                        onOpenTrophyRoom?()
+                    },
+                    onDismiss: { model.markPresented() })
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+            }
+            Spacer(minLength: 0)
+        }
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
+                   value: model.pendingCount)
+        .allowsHitTesting(model.pendingCount != nil)
+    }
+}
