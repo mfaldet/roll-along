@@ -603,6 +603,11 @@ struct FriendsView: View {
         do {
             try await SocialClient.shared.acceptFriendRequest(id: edge.id)
             await load()
+            // social_first_friend / social_friends_5 (S1-T6): the reload above
+            // refreshed `edges`, so `friends.count` is the current accepted-
+            // friend high-water. The engine latches the best — removing a
+            // friend later never revokes.
+            gameState.recordFriendAccepted(peak: friends.count)
             flash("You're now friends!")
         } catch {
             flash("Couldn't accept — try again.")
@@ -637,6 +642,8 @@ struct FriendsView: View {
         defer { busyIds.remove(id) }
         do {
             try await SocialClient.shared.sendLife(to: id, amount: 1)
+            // social_send_life / social_lives_sent_25 (S1-T6): friend gift.
+            gameState.recordLifeSent()
             sentLifeIds.insert(id)
             flash("Life sent ♥")
         } catch {

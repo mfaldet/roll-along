@@ -1602,6 +1602,194 @@ final class TrophyViewEventWiringTests: XCTestCase {
     }
 }
 
+// MARK: - TrophySocialWiringTests (S1-T6 acceptance)
+
+/// End-to-end wiring proof for the 7 Social trophy triggers (S1-T6). Drives
+/// the PUBLIC GameState social funnels — `recordSocialSignIn`,
+/// `recordFriendAccepted(peak:)`, `recordLifeSent`, `recordClanJoined`,
+/// `recordClanRequestFulfilled` — directly on a fresh test GameState (a live
+/// `SocialClient` is deliberately NOT needed: the funnels ARE the decision
+/// point, the views only call them on a successful `SocialClient` return).
+///
+/// Each GameState is fresh on an isolated UserDefaults suite; its first-launch
+/// backfill runs over an empty save and grandfathers NOTHING social (all
+/// `socialAction` metrics are omitted from `TrophyBackfill.snapshot`), so
+/// every unlock below is proof the LIVE funnel fired.
+final class TrophySocialWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophySocialWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Sign-in
+
+    /// `social_sign_in`: a pure latch on the first active Apple session.
+    func testSignInWiresThroughFunnel() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_sign_in"))
+
+        gs.recordSocialSignIn()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_sign_in"))
+    }
+
+    // MARK: Friends — accepted-friend high-water
+
+    /// `social_first_friend` (≥1) then `social_friends_5` (≥5) latch as the
+    /// accepted-friend count climbs through the funnel.
+    func testFriendMilestonesWireThroughAcceptedPeak() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_first_friend"))
+
+        gs.recordFriendAccepted(peak: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_first_friend"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_friends_5"))
+
+        gs.recordFriendAccepted(peak: 4)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_friends_5"))
+
+        gs.recordFriendAccepted(peak: 5)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"))
+    }
+
+    /// The accepted-friend high-water LATCHES: once 5 is observed, dropping
+    /// back to 3 (a friend removed) must never revoke `social_friends_5`, and
+    /// a later smaller value must never lower what's unlocked.
+    func testFriendsPeakLatchesAndNeverRevokes() {
+        let gs = makeGameState()
+
+        gs.recordFriendAccepted(peak: 5)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_first_friend"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"))
+
+        // Two friends removed → live count 3, but the ratchet holds.
+        gs.recordFriendAccepted(peak: 3)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"),
+                      "high-water latch must never revoke on a regression")
+
+        // Even a drop to zero keeps both unlocked.
+        gs.recordFriendAccepted(peak: 0)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_first_friend"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"))
+    }
+
+    // MARK: Lives sent (friend gifts + clan fulfillments)
+
+    /// `social_send_life` (≥1) latches on the first gift; `social_lives_sent_25`
+    /// (≥25) latches on the 25th. The counter is lifetime and persisted.
+    func testLivesSentMilestonesWireThroughRepeatedSends() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_send_life"))
+
+        gs.recordLifeSent()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_send_life"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_lives_sent_25"))
+        XCTAssertEqual(gs.trophyStats.livesSent, 1)
+
+        for _ in 2...24 { gs.recordLifeSent() }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_lives_sent_25"))
+        XCTAssertEqual(gs.trophyStats.livesSent, 24)
+
+        gs.recordLifeSent()   // 25th
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_lives_sent_25"))
+        XCTAssertEqual(gs.trophyStats.livesSent, 25)
+    }
+
+    /// The lives-sent counter persists across a relaunch (a fresh GameState on
+    /// the same defaults reloads it), so the 25-gift trophy can accrue over
+    /// many sessions.
+    func testLivesSentCounterPersistsAcrossRelaunch() {
+        let gs = makeGameState()
+        for _ in 1...24 { gs.recordLifeSent() }
+        XCTAssertEqual(gs.trophyStats.livesSent, 24)
+
+        let relaunched = makeGameState()
+        XCTAssertEqual(relaunched.trophyStats.livesSent, 24, "counter must survive relaunch")
+        relaunched.recordLifeSent()   // 25th, across the session boundary
+        XCTAssertTrue(relaunched.trophyEngine.isUnlocked("social_lives_sent_25"))
+    }
+
+    // MARK: Clans
+
+    /// `clan_join`: a pure latch on joining OR creating a clan.
+    func testClanJoinWiresThroughFunnel() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("clan_join"))
+
+        gs.recordClanJoined()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("clan_join"))
+    }
+
+    /// `clan_fulfill`: a single fulfilled clan life-request latches it.
+    func testClanFulfillWiresThroughFunnel() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("clan_fulfill"))
+
+        gs.recordClanRequestFulfilled()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("clan_fulfill"))
+        XCTAssertEqual(gs.trophyStats.clanRequestsFulfilled, 1)
+    }
+
+    /// A clan fulfillment is BOTH a life sent and a request fulfilled: the view
+    /// calls `recordLifeSent()` on every clan gift and `recordClanRequestFulfilled()`
+    /// additionally when the recipient was asking. This mirrors that call
+    /// ordering and proves the two counters advance independently — the
+    /// `social_lives_sent_25` counter includes clan fulfillments (per catalog).
+    func testClanFulfillmentAlsoCountsTowardLivesSent() {
+        let gs = makeGameState()
+
+        // A gift to a NON-asking clanmate: life sent, no fulfillment.
+        gs.recordLifeSent()
+        XCTAssertEqual(gs.trophyStats.livesSent, 1)
+        XCTAssertEqual(gs.trophyStats.clanRequestsFulfilled, 0)
+
+        // A gift to an ASKING clanmate: both funnels fire (the view's order).
+        gs.recordLifeSent()
+        gs.recordClanRequestFulfilled()
+        XCTAssertEqual(gs.trophyStats.livesSent, 2, "clan fulfillments count toward lives sent")
+        XCTAssertEqual(gs.trophyStats.clanRequestsFulfilled, 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("clan_fulfill"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_send_life"))
+    }
+
+    // MARK: No population dependence
+
+    /// No social trophy requires more than a single friend/clan action — one
+    /// accept, one gift, one join, one fulfillment each unlock their bronze/
+    /// first-tier trophy with no other player having to exist. (The higher
+    /// tiers, 5 friends / 25 lives, are volume of the SAME single action, not
+    /// a dependence on a populated graph.)
+    func testFirstTierTrophiesNeedOnlyOneAction() {
+        let gs = makeGameState()
+        gs.recordSocialSignIn()
+        gs.recordFriendAccepted(peak: 1)
+        gs.recordLifeSent()
+        gs.recordClanJoined()
+        gs.recordClanRequestFulfilled()
+
+        for id in ["social_sign_in", "social_first_friend", "social_send_life",
+                   "clan_join", "clan_fulfill"] {
+            XCTAssertTrue(gs.trophyEngine.isUnlocked(id), "\(id) should latch on one action")
+        }
+    }
+}
+
 // MARK: - TrophyMinigameWiringTests (S1-T3 acceptance)
 
 /// End-to-end wiring proof for the minigame trophy triggers (S1-T3): drive

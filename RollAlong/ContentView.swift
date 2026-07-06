@@ -49,7 +49,18 @@ struct ContentView: View {
             }
         }
         // No intro to wait on (the default) — consider the nudge once home is up.
-        .onAppear { if !showIntro { maybeOfferSignIn() } }
+        .onAppear {
+            if !showIntro { maybeOfferSignIn() }
+            // social_sign_in: a session restored at launch also proves the
+            // player has signed in (onChange won't fire if it's already true).
+            if auth.isSignedIn { gameState.recordSocialSignIn() }
+        }
+        // social_sign_in (S1-T6): funnel on every transition into a signed-in
+        // session (fresh sign-in OR a restored session that lands after this
+        // view appears). A pure latch — the engine unlocks once, forever.
+        .onChange(of: auth.isSignedIn) { _, signedIn in
+            if signedIn { gameState.recordSocialSignIn() }
+        }
     }
 
     /// Offer Sign in with Apple once per launch if the player isn't signed in.

@@ -1405,6 +1405,59 @@ final class GameState: ObservableObject {
         trophyEngine.record(.coinBalancePeak, value: coinBalance)
     }
 
+    // MARK: - Social trophy funnels (S1-T6)
+    //
+    // The trophy DECISION lives here (never in a view), driven by the SwiftUI
+    // Friends/Clans/sign-in views AFTER a `SocialClient` call SUCCEEDS —
+    // SocialClient is a stateless singleton with no reference to GameState or
+    // the engine, so the established view→funnel pattern (S1-T7) is the only
+    // route. Signed-out players never reach these funnels, so their social
+    // trophies simply stay locked — no error paths. All five social metrics
+    // are go-forward (absent from `TrophyBackfill.snapshot`); no social trophy
+    // requires another player to exist beyond one friend/clan action.
+
+    /// `social_sign_in` — latched the first time a Sign-in-with-Apple session
+    /// becomes active (fresh sign-in OR a restored session — either proves the
+    /// player has signed in). Called from ContentView's `auth.isSignedIn`
+    /// change hook. A pure value-1 latch; the engine unlocks once, forever.
+    func recordSocialSignIn() {
+        trophyEngine.record(.signedIn, value: 1)
+    }
+
+    /// `social_first_friend` (≥1) / `social_friends_5` (≥5) — the accepted-
+    /// friend high-water. Called from FriendsView after an accept succeeds and
+    /// the friend list reloads; `peak` is the CURRENT accepted-friend count.
+    /// The engine keeps the best observed, so removing a friend later never
+    /// revokes (latched high-water — sprint-plan.md §4 addenda).
+    func recordFriendAccepted(peak: Int) {
+        trophyEngine.record(.friendsAcceptedPeak, value: peak)
+    }
+
+    /// `social_send_life` (≥1) / `social_lives_sent_25` (≥25) — lifetime lives
+    /// gifted (friend gifts AND clan fulfillments both count, per the catalog).
+    /// Called from Friends/Clans views after `SocialClient.sendLife` succeeds;
+    /// bumps the persisted go-forward counter, then records its current value.
+    func recordLifeSent() {
+        trophyStats.recordLifeSent()
+        trophyEngine.record(.livesSent, value: trophyStats.livesSent)
+    }
+
+    /// `clan_join` — latched on joining OR creating a clan. Called from
+    /// ClansView after `SocialClient.joinClan`/`createClan` succeeds. A pure
+    /// value-1 latch.
+    func recordClanJoined() {
+        trophyEngine.record(.clanJoined, value: 1)
+    }
+
+    /// `clan_fulfill` (≥1) — a life sent to a clanmate who was asking for one.
+    /// Called from ClansView IN ADDITION to `recordLifeSent()` (a fulfillment
+    /// is also a life sent) when the send target had an outstanding request.
+    /// Bumps its own persisted go-forward counter, then records its value.
+    func recordClanRequestFulfilled() {
+        trophyStats.recordClanRequestFulfilled()
+        trophyEngine.record(.clanRequestsFulfilled, value: trophyStats.clanRequestsFulfilled)
+    }
+
     // MARK: - Queries
 
     func stars(for level: Int) -> Int           { bestStars[level] ?? 0 }

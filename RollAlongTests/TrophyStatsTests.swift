@@ -437,11 +437,15 @@ final class TrophyStatsTests: XCTestCase {
                 (item: 6, feeds: .noFallClearStreakBest),      // working value
             TrophyStats.noFallClearStreakBestKey:
                 (item: 6, feeds: .noFallClearStreakBest),      // the ratchet
+            TrophyStats.livesSentKey:
+                (item: 14, feeds: .livesSent),                 // social_send_life / _25
+            TrophyStats.clanRequestsFulfilledKey:
+                (item: 14, feeds: .clanRequestsFulfilled),     // clan_fulfill
         ]
         XCTAssertEqual(TrophyStats.allPersistedKeys, Set(documentedInventory.keys),
                        "counter inventory drifted from the §6 mapping")
-        XCTAssertEqual(Set(documentedInventory.values.map { $0.item }), [4, 5, 6],
-                       "S0-T2 owns exactly the GameState-funnel items 4–6")
+        XCTAssertEqual(Set(documentedInventory.values.map { $0.item }), [4, 5, 6, 14],
+                       "S0-T2 owns items 4–6; S1-T6 adds the two item-14 social counters")
         // Item 15 (daily_clear_streak_best) is derivation-only — its metric
         // exists in the vocabulary but no key backs it.
         XCTAssertFalse(TrophyStats.allPersistedKeys.contains {
