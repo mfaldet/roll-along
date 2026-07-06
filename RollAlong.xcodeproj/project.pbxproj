@@ -78,6 +78,7 @@
 		7A0F0101000000000000AA01 /* TrophyEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0101000000000000AA00 /* TrophyEngineTests.swift */; };
 		7A0F0102000000000000AA01 /* TrophyStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0102000000000000AA00 /* TrophyStatsTests.swift */; };
 		7A0F0103000000000000AA01 /* TrophyMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */; };
+		7A0F0104000000000000AA01 /* TrophyToastQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0104000000000000AA00 /* TrophyToastQueueTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,6 +172,7 @@
 		7A0F0101000000000000AA00 /* TrophyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEngineTests.swift; sourceTree = "<group>"; };
 		7A0F0102000000000000AA00 /* TrophyStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyStatsTests.swift; sourceTree = "<group>"; };
 		7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyMigrationTests.swift; sourceTree = "<group>"; };
+		7A0F0104000000000000AA00 /* TrophyToastQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastQueueTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -308,6 +310,7 @@
 				7A0F0101000000000000AA00 /* TrophyEngineTests.swift */,
 				7A0F0102000000000000AA00 /* TrophyStatsTests.swift */,
 				7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */,
+				7A0F0104000000000000AA00 /* TrophyToastQueueTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -505,6 +508,7 @@
 				7A0F0101000000000000AA01 /* TrophyEngineTests.swift in Sources */,
 				7A0F0102000000000000AA01 /* TrophyStatsTests.swift in Sources */,
 				7A0F0103000000000000AA01 /* TrophyMigrationTests.swift in Sources */,
+				7A0F0104000000000000AA01 /* TrophyToastQueueTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
