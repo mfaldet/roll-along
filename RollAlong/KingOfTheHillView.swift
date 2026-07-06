@@ -164,6 +164,12 @@ struct KingOfTheHillView: View {
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
             if showMapName && started { mapNameLabel }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-match; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -427,6 +433,10 @@ struct KingOfTheHillView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: match ended — drain this match's trophies into one coalesced
+        // banner at the result screen (design.md §6).  Overlay-appearance
+        // trigger, never during play.
+        .onAppear { gameState.endTrophyRun() }
     }
 
     // MARK: - Lifecycle
@@ -442,6 +452,10 @@ struct KingOfTheHillView: View {
 
     private func reset() {
         guard field.width > 0 else { return }
+        // S2-T2: a fresh match — arm the toast queue so any trophy earned
+        // this match is held + coalesced, surfaced only at the game-over
+        // overlay (design.md §6 "never mid-run").
+        gameState.beginTrophyRun()
         started = false
         isOver = false
         playerWon = false

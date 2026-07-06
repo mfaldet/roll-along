@@ -621,6 +621,23 @@ final class GameState: ObservableObject {
     /// does the same in tests.
     let trophyEngine: TrophyEngine
 
+    /// The run-aware trophy-toast presentation queue (S2-T1), owned here so
+    /// the S1 trigger funnels can feed newly-unlocked trophies into it via
+    /// `fireTrophy(_:value:)` and the run-end result surfaces (S2-T2) can
+    /// drain it.  Deliberately a plain `let` on its OWN `ObservableObject`
+    /// (like `trophyEngine`) so a trophy unlock never re-renders a gameplay
+    /// view observing GameState.
+    ///
+    /// Presentation policy lives entirely in the queue: unlocks recorded
+    /// while a run is active only accumulate and coalesce; they surface as
+    /// one batched banner the moment a result overlay calls `runDidEnd()`
+    /// (design.md §6 "coalesced at run end · never mid-run").  DISPLAY-ONLY:
+    /// nothing here grants coins (D1 never-mint).  The one-time retroactive
+    /// backfill (`activateTrophies` → `trophyEngine.backfill`) deliberately
+    /// does NOT flow through `fireTrophy`, so grandfathered unlocks never
+    /// toast — S2-T6 owns that single coalesced "Trophy Room opens" reveal.
+    let trophyToasts: TrophyToastQueue
+
     /// Test-injectable clock so live-unlock timestamps are deterministic
     /// (mirrors the engine's `now`).  Production uses the real wall clock.
     private let now: () -> Date
@@ -639,6 +656,11 @@ final class GameState: ObservableObject {
         let catalog = (try? TrophyCatalog.load(bundle: .main))
             ?? TrophyCatalog.empty
         trophyEngine = TrophyEngine(catalog: catalog, defaults: defaults, now: now)
+        // The toast queue starts idle (no run active); the first `spawnBall`
+        // arms it via `beginTrophyRun()`.  A plain `TrophyToastQueue()` does
+        // no main-actor work in its initialiser, so constructing it here is
+        // safe from GameState's initialiser.
+        trophyToasts = TrophyToastQueue()
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -787,6 +809,51 @@ final class GameState: ObservableObject {
         trophyEngine.backfill(from: TrophyBackfill.snapshot(from: self))
     }
 
+    // MARK: - Trophy toast feed + run lifecycle (S2-T2)
+
+    /// The single funnel every LIVE trophy trigger routes through: records
+    /// `metric`'s current value on the engine and hands any newly-unlocked
+    /// trophies to the toast queue.  The queue itself decides WHEN they
+    /// surface — held + coalesced while a run is active, presented at run end
+    /// (design.md §6).  A no-unlock bump (the overwhelmingly common path)
+    /// adds only an empty-array guard over the bare `record` call.
+    ///
+    /// NEVER-MINT (D1): this only reads the ledger and enqueues a banner; it
+    /// grants nothing.  Backfill (`activateTrophies`) bypasses this on
+    /// purpose so grandfathered unlocks don't toast (S2-T6 owns their
+    /// reveal).
+    @discardableResult
+    private func fireTrophy(_ metric: TrophyMetric, value: Int) -> [TrophyDefinition] {
+        let unlocked = trophyEngine.record(metric, value: value)
+        if !unlocked.isEmpty { trophyToasts.enqueue(unlocked) }
+        return unlocked
+    }
+
+    /// Double overload — a handful of metrics record fractional bests.
+    @discardableResult
+    private func fireTrophy(_ metric: TrophyMetric, value: Double) -> [TrophyDefinition] {
+        let unlocked = trophyEngine.record(metric, value: value)
+        if !unlocked.isEmpty { trophyToasts.enqueue(unlocked) }
+        return unlocked
+    }
+
+    /// Mark the start of a tilt run.  From here until `endTrophyRun()` the
+    /// toast queue only accumulates — it never presents mid-run (design.md
+    /// §6; a banner over a live tilt run is a death sentence, f2p §7.10).
+    /// Idempotent — a Replay/respawn re-arms without double-counting.
+    func beginTrophyRun() {
+        trophyToasts.runDidStart()
+    }
+
+    /// Mark the end of a tilt run.  Called from every terminal result
+    /// overlay's appearance (climb win / oops / out-of-lives, each minigame
+    /// game-over, the Coin Pit payout) and on GameMenuView return — it flushes
+    /// everything the run accumulated as ONE coalesced banner.  Safe to call
+    /// when no run was active (it simply presents anything already pending).
+    func endTrophyRun() {
+        trophyToasts.runDidEnd()
+    }
+
     /// Returns `item` if the player actually owns it (starter tier or
     /// present in the owned-set), otherwise the category's starter.
     /// Used at init time to recover from tier shuffles that would
@@ -814,7 +881,7 @@ final class GameState: ObservableObject {
         // this funnel (advanceFromLevelClear routes them away), and the
         // guard is defense-in-depth against a future mode that does.
         if currentMode.progression.recordsClimbResult {
-            trophyEngine.record(.climbHighestUnlocked, value: highestUnlocked)
+            fireTrophy(.climbHighestUnlocked, value: highestUnlocked)
         }
     }
 
@@ -1019,13 +1086,13 @@ final class GameState: ObservableObject {
         // skill_first_try — 3 stars on a level's very first attempt (no prior
         // clear AND no fall/restart before the goal, §6 item 7).
         if stars == 3, noPriorClear, firstAttemptClean {
-            trophyEngine.record(.firstTryAces, value: 1)
+            fireTrophy(.firstTryAces, value: 1)
         }
         // skill_spotless — 3 stars AND all 3 pickup coins banked in this one
         // run (§6 item 8).  Requires the full three: fewer-coin levels and
         // partial hauls never qualify.
         if stars == 3, pickupsThisRun >= 3 {
-            trophyEngine.record(.spotlessRuns, value: 1)
+            fireTrophy(.spotlessRuns, value: 1)
         }
     }
 
@@ -1047,7 +1114,7 @@ final class GameState: ObservableObject {
         // whimsy_gravity_check keys to climb LEVEL 1 (a number, never a
         // layout) — level 1 is a fixed rung, not swappable content.
         if level == 1 {
-            trophyEngine.record(.levelOneFalls, value: 1)
+            fireTrophy(.levelOneFalls, value: 1)
         }
     }
 
@@ -1061,7 +1128,7 @@ final class GameState: ObservableObject {
     /// stake overlay that is its only caller.
     func recordCoinPitRoundStaked(tickets: Int) {
         guard tickets > 0 else { return }
-        trophyEngine.record(.coinpitRoundStakeBest, value: tickets)
+        fireTrophy(.coinpitRoundStakeBest, value: tickets)
     }
 
     /// Push every climb-category trophy metric's CURRENT value into the
@@ -1074,22 +1141,22 @@ final class GameState: ObservableObject {
     /// O(interested trophies) and writes nothing unless a trophy latches.
     private func recordClimbTrophies() {
         // Level ladder — climb_first_clear (≥2) … climb_summit (≥5001).
-        trophyEngine.record(.climbHighestUnlocked, value: highestUnlocked)
+        fireTrophy(.climbHighestUnlocked, value: highestUnlocked)
         // Total climb stars — climb_stars_25 / climb_stars_150 (latched
         // ratchet: resetProgress can shrink the live sum, never the unlock).
-        trophyEngine.record(.climbTotalStars, value: totalStars)
+        fireTrophy(.climbTotalStars, value: totalStars)
         // Lifetime banked pickup coins — climb_pickups_100 (NOT the coin
         // balance; `totalCoins` counts pickups found).
-        trophyEngine.record(.climbPickupCoins, value: totalCoins)
+        fireTrophy(.climbPickupCoins, value: totalCoins)
         // Perfect-world scan — climb_perfect_world (3 stars on all 100
         // levels of some world; keyed to the star dict + world number
         // ranges, never to layouts).
-        trophyEngine.record(.climbPerfectWorlds,
+        fireTrophy(.climbPerfectWorlds,
                             value: TrophyBackfill.perfectWorldCount(bestStars: bestStars))
         // No-fall clear streak ratchet — skill_clean_sheet_10 / _25.  The
         // working streak was just grown by `recordNoFallClimbClear()`; its
         // monotonic best is what the trophy reads.
-        trophyEngine.record(.noFallClearStreakBest,
+        fireTrophy(.noFallClearStreakBest,
                             value: trophyStats.bestNoFallClearStreak)
     }
 
@@ -1102,13 +1169,13 @@ final class GameState: ObservableObject {
     private func recordTrackTrophies() {
         // Best progress reached on any single track — track_first_level (≥1)
         // / track_halfway (≥50).
-        trophyEngine.record(.trackBestProgress, value: trackProgress.values.max() ?? 0)
+        fireTrophy(.trackBestProgress, value: trackProgress.values.max() ?? 0)
         // Tracks fully completed — track_first_complete / track_triple /
         // track_all_eight.
-        trophyEngine.record(.tracksCompleted, value: completedTracks.count)
+        fireTrophy(.tracksCompleted, value: completedTracks.count)
         // The prestige Golden Gauntlet — track_gauntlet (1 once
         // "golden-gauntlet" ∈ completedTracks).
-        trophyEngine.record(.goldenGauntletCompleted,
+        fireTrophy(.goldenGauntletCompleted,
                             value: completedTracks.contains("golden-gauntlet") ? 1 : 0)
     }
 
@@ -1118,10 +1185,10 @@ final class GameState: ObservableObject {
     /// append-only date set (mirrors `TrophyBackfill.snapshot`).
     private func recordDailyChallengeTrophies() {
         // Lifetime CotD clears — daily_first_clear / daily_clears_10 / _50.
-        trophyEngine.record(.dailyClears, value: dailyChallengeCompletions.count)
+        fireTrophy(.dailyClears, value: dailyChallengeCompletions.count)
         // Longest consecutive-day clear run — daily_week_streak (≥7).  The
         // engine latches the best observed, so a broken run never revokes.
-        trophyEngine.record(.dailyClearStreakBest,
+        fireTrophy(.dailyClearStreakBest,
                             value: TrophyStats.longestConsecutiveDailyClearRun(
                                 in: dailyChallengeCompletions))
     }
@@ -1134,9 +1201,9 @@ final class GameState: ObservableObject {
     /// never revokes (this live latch supersedes the snapshot's proxy).
     private func recordDailyRewardTrophies() {
         // Lifetime claims — econ_punch_card (≥30).
-        trophyEngine.record(.dailyRewardClaims, value: trophyStats.dailyRewardClaims)
+        fireTrophy(.dailyRewardClaims, value: trophyStats.dailyRewardClaims)
         // Reward-streak high-water — daily_login_7 / daily_login_30.
-        trophyEngine.record(.dailyRewardStreakBest, value: dailyStreak)
+        fireTrophy(.dailyRewardStreakBest, value: dailyStreak)
     }
 
     // MARK: - Minigame trophy funnels (S1-T3)
@@ -1159,9 +1226,9 @@ final class GameState: ObservableObject {
             if w >= 1 { competitiveModesWon += 1 }
         }
         // arcade_first_win (≥1) / arcade_wins_100 (≥100).
-        trophyEngine.record(.competitiveWins, value: competitiveWins)
+        fireTrophy(.competitiveWins, value: competitiveWins)
         // arcade_all_six (all 6 modes have ≥1 win → count ≥6).
-        trophyEngine.record(.competitiveModesWon, value: competitiveModesWon)
+        fireTrophy(.competitiveModesWon, value: competitiveModesWon)
 
         // arcade_hard_once (≥1) / arcade_hard_all (≥6): count of the 6 modes
         // with a Hard win, from the per-difficulty dict.
@@ -1170,15 +1237,15 @@ final class GameState: ObservableObject {
         where minigameDifficultyWins["\(id)|hard", default: 0] >= 1 {
             competitiveModesWonHard += 1
         }
-        trophyEngine.record(.competitiveModesWonHard, value: competitiveModesWonHard)
+        fireTrophy(.competitiveModesWonHard, value: competitiveModesWonHard)
 
         // Per-game lifetime win tallies — <mode>_first_win / <mode>_wins_10.
-        trophyEngine.record(.snakeWins,     value: minigameWins["snake", default: 0])
-        trophyEngine.record(.sumoWins,      value: minigameWins["sumo", default: 0])
-        trophyEngine.record(.paintballWins, value: minigameWins["paintball", default: 0])
-        trophyEngine.record(.goldrushWins,  value: minigameWins["goldrush", default: 0])
-        trophyEngine.record(.marblecupWins, value: minigameWins["marblecup", default: 0])
-        trophyEngine.record(.kothWins,      value: minigameWins["koth", default: 0])
+        fireTrophy(.snakeWins,     value: minigameWins["snake", default: 0])
+        fireTrophy(.sumoWins,      value: minigameWins["sumo", default: 0])
+        fireTrophy(.paintballWins, value: minigameWins["paintball", default: 0])
+        fireTrophy(.goldrushWins,  value: minigameWins["goldrush", default: 0])
+        fireTrophy(.marblecupWins, value: minigameWins["marblecup", default: 0])
+        fireTrophy(.kothWins,      value: minigameWins["koth", default: 0])
     }
 
     /// Push the "minigames played" discovery trophy metrics (S1-T3).  Called
@@ -1190,9 +1257,9 @@ final class GameState: ObservableObject {
     private func recordMinigamePlayedTrophies() {
         // arcade_sampler (≥5) / arcade_grand_tour (all 12).
         let played = TrophyMetric.minigameModeIDs.filter { playedModeIDs.contains($0) }.count
-        trophyEngine.record(.minigamesPlayed, value: played)
+        fireTrophy(.minigamesPlayed, value: played)
         // coinpit_first_round (≥1 once "coinpit" has been played).
-        trophyEngine.record(.coinpitPlayed, value: playedModeIDs.contains("coinpit") ? 1 : 0)
+        fireTrophy(.coinpitPlayed, value: playedModeIDs.contains("coinpit") ? 1 : 0)
     }
 
     /// Push the per-game best-score trophy metrics reachable from a GameState
@@ -1207,16 +1274,16 @@ final class GameState: ObservableObject {
         switch metric {
         case .paintballBestCoverage:
             // paintball_coverage_60 (≥60).
-            trophyEngine.record(.paintballBestCoverage, value: minigameBests["paintball", default: 0])
+            fireTrophy(.paintballBestCoverage, value: minigameBests["paintball", default: 0])
         case .kothBestHoldSeconds:
             // koth_hold_45 (≥45 hold-seconds in one round).
-            trophyEngine.record(.kothBestHoldSeconds, value: minigameBests["koth", default: 0])
+            fireTrophy(.kothBestHoldSeconds, value: minigameBests["koth", default: 0])
         case .pinballBestScore:
             // pinball_score_10k / _50k / _150k.
-            trophyEngine.record(.pinballBestScore, value: pinballBest)
+            fireTrophy(.pinballBestScore, value: pinballBest)
         case .rollupBestHeight:
             // rollup_100m (≥100) / rollup_500m (≥500).
-            trophyEngine.record(.rollupBestHeight, value: minigameBests["rollup", default: 0])
+            fireTrophy(.rollupBestHeight, value: minigameBests["rollup", default: 0])
         default:
             break
         }
@@ -1226,7 +1293,7 @@ final class GameState: ObservableObject {
     /// after the cumulative tally grows.  zen_hour (≥3,600) / zen_10_hours
     /// (≥36,000); the AFK-farmable ceiling stays silver by catalog design.
     private func recordZenTrophies() {
-        trophyEngine.record(.zenSeconds, value: zenSeconds)
+        fireTrophy(.zenSeconds, value: zenSeconds)
     }
 
     /// Push the Coin Pit reward-run trophy metrics (S1-T3).  Called from
@@ -1236,9 +1303,9 @@ final class GameState: ObservableObject {
     /// Mirrors `TrophyBackfill.snapshot`.
     private func recordCoinPitTrophies() {
         // coinpit_catch_90 (≥90 caught in one round).
-        trophyEngine.record(.coinpitBestCatch, value: goldrushBest)
+        fireTrophy(.coinpitBestCatch, value: goldrushBest)
         // econ_pit_boss (≥2,500 lifetime Coin Pit coins).
-        trophyEngine.record(.coinpitCoinsTotal, value: goldrushCoinsTotal)
+        fireTrophy(.coinpitCoinsTotal, value: goldrushCoinsTotal)
     }
 
     /// Push the Disco Ball best-crossings trophy metrics (S1-T4).  Called from
@@ -1251,9 +1318,9 @@ final class GameState: ObservableObject {
         let discoBest = max(minigameBests["discoeasy", default: 0],
                             minigameBests["disco", default: 0],
                             minigameBests["discohard", default: 0])
-        trophyEngine.record(.discoBestCrossings, value: discoBest)
+        fireTrophy(.discoBestCrossings, value: discoBest)
         // disco_hard_10 (≥10 crossings in one Hard run).
-        trophyEngine.record(.discoHardBestCrossings,
+        fireTrophy(.discoHardBestCrossings,
                             value: minigameBests["discohard", default: 0])
     }
 
@@ -1262,7 +1329,7 @@ final class GameState: ObservableObject {
     /// Mirrors `TrophyBackfill.snapshot`: both `rollout_first_maze` (≥1) and
     /// `rollout_maze_10` (≥10) ride `minigameBests["rollout"]`.
     private func recordRollOutTrophies() {
-        trophyEngine.record(.rolloutBestMaze, value: minigameBests["rollout", default: 0])
+        fireTrophy(.rolloutBestMaze, value: minigameBests["rollout", default: 0])
     }
 
     // MARK: - Cosmetic & economy trophy funnels (S1-T5)
@@ -1362,17 +1429,17 @@ final class GameState: ObservableObject {
     /// count never revokes an earned trophy.
     private func recordCosmeticOwnershipTrophies() {
         // balls_own_10 / balls_own_40 — owned balls minus the 2 IAP secrets.
-        trophyEngine.record(.ballsOwned, value: trophyBallsOwnedCount)
+        fireTrophy(.ballsOwned, value: trophyBallsOwnedCount)
         // items_own_50 — total owned across 7 slots minus the 4 IAP secrets.
-        trophyEngine.record(.cosmeticsOwned, value: trophyCosmeticsOwnedCount)
+        fireTrophy(.cosmeticsOwned, value: trophyCosmeticsOwnedCount)
         // collection_complete — owned evergreen items toward the 207 set.
-        trophyEngine.record(.evergreenCosmeticsOwned,
+        fireTrophy(.evergreenCosmeticsOwned,
                             value: trophyEvergreenCosmeticsOwnedCount)
         // bundle_first / bundle_5 — completed bundles (IAP-secret-free by
         // guardrail).
-        trophyEngine.record(.bundlesCompleted, value: completedBundleIDs.count)
+        fireTrophy(.bundlesCompleted, value: completedBundleIDs.count)
         // pack_first — owned Ball Packs.
-        trophyEngine.record(.packsOwned, value: ownedPacks.count)
+        fireTrophy(.packsOwned, value: ownedPacks.count)
     }
 
     /// Push the "cosmetic equipped in all 7 slots" metric (S1-T5).  Called
@@ -1382,7 +1449,7 @@ final class GameState: ObservableObject {
     /// value is 1 only while fully non-starter, but the engine never revokes
     /// once unlocked.
     func recordFullKitTrophy() {
-        trophyEngine.record(.fullNonstarterLoadouts,
+        fireTrophy(.fullNonstarterLoadouts,
                             value: trophyLoadoutIsFullyNonStarter ? 1 : 0)
     }
 
@@ -1392,7 +1459,7 @@ final class GameState: ObservableObject {
     /// (tutorial gift, track rewards, IAP unlocks) never trip it.  A pure
     /// latch: any successful coin spend records value 1 (threshold 1).
     private func recordCosmeticFirstBuyTrophy() {
-        trophyEngine.record(.cosmeticCoinBuys, value: 1)
+        fireTrophy(.cosmeticCoinBuys, value: 1)
     }
 
     /// Push the lifetime play-earned coins metric (S1-T5) —
@@ -1404,9 +1471,9 @@ final class GameState: ObservableObject {
     /// revokes).
     private func recordEconomyTrophies() {
         // econ_working_capital — 5,000 lifetime coins earned from play.
-        trophyEngine.record(.coinsEarnedFromPlay, value: trophyStats.coinsEarnedFromPlay)
+        fireTrophy(.coinsEarnedFromPlay, value: trophyStats.coinsEarnedFromPlay)
         // econ_nest_egg — hold 1,000 coins at once (latched high-water).
-        trophyEngine.record(.coinBalancePeak, value: coinBalance)
+        fireTrophy(.coinBalancePeak, value: coinBalance)
     }
 
     // MARK: - Social trophy funnels (S1-T6)
@@ -1425,7 +1492,7 @@ final class GameState: ObservableObject {
     /// player has signed in). Called from ContentView's `auth.isSignedIn`
     /// change hook. A pure value-1 latch; the engine unlocks once, forever.
     func recordSocialSignIn() {
-        trophyEngine.record(.signedIn, value: 1)
+        fireTrophy(.signedIn, value: 1)
     }
 
     /// `social_first_friend` (≥1) / `social_friends_5` (≥5) — the accepted-
@@ -1434,7 +1501,7 @@ final class GameState: ObservableObject {
     /// The engine keeps the best observed, so removing a friend later never
     /// revokes (latched high-water — sprint-plan.md §4 addenda).
     func recordFriendAccepted(peak: Int) {
-        trophyEngine.record(.friendsAcceptedPeak, value: peak)
+        fireTrophy(.friendsAcceptedPeak, value: peak)
     }
 
     /// `social_send_life` (≥1) / `social_lives_sent_25` (≥25) — lifetime lives
@@ -1443,14 +1510,14 @@ final class GameState: ObservableObject {
     /// bumps the persisted go-forward counter, then records its current value.
     func recordLifeSent() {
         trophyStats.recordLifeSent()
-        trophyEngine.record(.livesSent, value: trophyStats.livesSent)
+        fireTrophy(.livesSent, value: trophyStats.livesSent)
     }
 
     /// `clan_join` — latched on joining OR creating a clan. Called from
     /// ClansView after `SocialClient.joinClan`/`createClan` succeeds. A pure
     /// value-1 latch.
     func recordClanJoined() {
-        trophyEngine.record(.clanJoined, value: 1)
+        fireTrophy(.clanJoined, value: 1)
     }
 
     /// `clan_fulfill` (≥1) — a life sent to a clanmate who was asking for one.
@@ -1459,7 +1526,7 @@ final class GameState: ObservableObject {
     /// Bumps its own persisted go-forward counter, then records its value.
     func recordClanRequestFulfilled() {
         trophyStats.recordClanRequestFulfilled()
-        trophyEngine.record(.clanRequestsFulfilled, value: trophyStats.clanRequestsFulfilled)
+        fireTrophy(.clanRequestsFulfilled, value: trophyStats.clanRequestsFulfilled)
     }
 
     // MARK: - Queries
@@ -1550,7 +1617,7 @@ final class GameState: ObservableObject {
         // backfilled, so it credits the first daily STARTED after trophies
         // ship, not a veteran's past runs.
         if !playedModeIDs.contains("daily") { playedModeIDs.insert("daily") }
-        trophyEngine.record(.dailyPlayed, value: 1)
+        fireTrophy(.dailyPlayed, value: 1)
     }
 
     /// Forfeit an in-progress Challenge-of-the-Day run.  Quitting mid-run — via

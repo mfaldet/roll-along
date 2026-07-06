@@ -190,6 +190,12 @@ struct SnakeGameView: View {
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
             if showMapName && started { mapNameLabel }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-match; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -423,6 +429,8 @@ struct SnakeGameView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: match ended — drain this match's trophies, coalesced (§6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private var mapNameLabel: some View {
@@ -447,6 +455,8 @@ struct SnakeGameView: View {
 
     private func reset() {
         guard arena.width > 0, arena.height > 0 else { return }
+        // S2-T2: fresh match — arm the toast queue (§6 coalesce-at-run-end).
+        gameState.beginTrophyRun()
         localTick = 0
         started = false
         isOver = false

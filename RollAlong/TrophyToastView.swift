@@ -226,7 +226,15 @@ struct TrophyToastBatch: Identifiable, Equatable {
 ///
 /// This is deliberately a plain model with no View dependency so its
 /// coalescing + gating are unit-testable in isolation (S2-T1 acceptance).
-@MainActor
+///
+/// NOT `@MainActor`: it mirrors `TrophyEngine`, this codebase's established
+/// pattern for a trophy `ObservableObject` — GameState owns it as a plain
+/// `let` and drives it (via `fireTrophy` / `beginTrophyRun` / `endTrophyRun`)
+/// from its gameplay funnels, which all run on the main thread already (the
+/// SwiftUI view event handlers + the `@MainActor` StoreKit/Ad managers).  Its
+/// `@Published` mutations therefore land on main in practice, exactly as the
+/// engine's do; keeping it off the global actor lets GameState's non-isolated
+/// funnels call it without an actor hop (S2-T2).
 final class TrophyToastQueue: ObservableObject {
 
     /// The batch currently on screen, or nil when nothing is showing.

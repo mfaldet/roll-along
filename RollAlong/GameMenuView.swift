@@ -83,6 +83,20 @@ struct GameMenuView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             }
+
+            // S2-T2: the game-menu return surface — a trophy-unlock banner
+            // host, drained on appearance below.  Covers any pending unlock a
+            // run left un-presented (e.g. the player popped Home straight from
+            // a result screen).  Inert when nothing is pending (§6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
+        }
+        .onAppear {
+            // Returning to the hub is a run-end surface (sprint-plan §2 S2-T2):
+            // flush anything a just-finished run accumulated as one coalesced
+            // banner.  Safe when idle — presents nothing if the buffer's empty.
+            gameState.endTrophyRun()
         }
         .navigationTitle("Games")
         .navigationBarTitleDisplayMode(.inline)
