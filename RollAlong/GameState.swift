@@ -974,6 +974,108 @@ final class GameState: ObservableObject {
         trophyEngine.record(.dailyRewardStreakBest, value: dailyStreak)
     }
 
+    // MARK: - Minigame trophy funnels (S1-T3)
+
+    /// Push the competitive-win trophy metrics (S1-T3).  Called from
+    /// `recordCompetitiveWin` — the single win choke point (it bumps
+    /// `minigameWins` and mints the ticket), so ticket-earn trophies fire
+    /// here and ONLY here.  When reached via `recordMinigameResult`, that
+    /// funnel has already bumped `minigameDifficultyWins[…|hard]` before
+    /// calling us, so the Hard high-waters read the freshly-updated dict.
+    /// Every derivation mirrors `TrophyBackfill.snapshot` exactly so a live
+    /// win and a first-launch grandfather agree.
+    private func recordCompetitiveWinTrophies() {
+        // Arcade-wide win totals over the 6 competitive modes.
+        var competitiveWins = 0
+        var competitiveModesWon = 0
+        for id in TrophyMetric.competitiveModeIDs {
+            let w = minigameWins[id, default: 0]
+            competitiveWins += w
+            if w >= 1 { competitiveModesWon += 1 }
+        }
+        // arcade_first_win (≥1) / arcade_wins_100 (≥100).
+        trophyEngine.record(.competitiveWins, value: competitiveWins)
+        // arcade_all_six (all 6 modes have ≥1 win → count ≥6).
+        trophyEngine.record(.competitiveModesWon, value: competitiveModesWon)
+
+        // arcade_hard_once (≥1) / arcade_hard_all (≥6): count of the 6 modes
+        // with a Hard win, from the per-difficulty dict.
+        var competitiveModesWonHard = 0
+        for id in TrophyMetric.competitiveModeIDs
+        where minigameDifficultyWins["\(id)|hard", default: 0] >= 1 {
+            competitiveModesWonHard += 1
+        }
+        trophyEngine.record(.competitiveModesWonHard, value: competitiveModesWonHard)
+
+        // Per-game lifetime win tallies — <mode>_first_win / <mode>_wins_10.
+        trophyEngine.record(.snakeWins,     value: minigameWins["snake", default: 0])
+        trophyEngine.record(.sumoWins,      value: minigameWins["sumo", default: 0])
+        trophyEngine.record(.paintballWins, value: minigameWins["paintball", default: 0])
+        trophyEngine.record(.goldrushWins,  value: minigameWins["goldrush", default: 0])
+        trophyEngine.record(.marblecupWins, value: minigameWins["marblecup", default: 0])
+        trophyEngine.record(.kothWins,      value: minigameWins["koth", default: 0])
+    }
+
+    /// Push the "minigames played" discovery trophy metrics (S1-T3).  Called
+    /// from `markModePlayed`, the funnel that grows `playedModeIDs`.  Mirrors
+    /// `TrophyBackfill.snapshot`: `minigames_played` counts the intersection
+    /// with the 12 minigame ids, and `coinpit_played` flips once "coinpit" is
+    /// in the set.  Recording unconditionally is safe — a non-minigame id
+    /// simply leaves both derivations unchanged.
+    private func recordMinigamePlayedTrophies() {
+        // arcade_sampler (≥5) / arcade_grand_tour (all 12).
+        let played = TrophyMetric.minigameModeIDs.filter { playedModeIDs.contains($0) }.count
+        trophyEngine.record(.minigamesPlayed, value: played)
+        // coinpit_first_round (≥1 once "coinpit" has been played).
+        trophyEngine.record(.coinpitPlayed, value: playedModeIDs.contains("coinpit") ? 1 : 0)
+    }
+
+    /// Push the per-game best-score trophy metrics reachable from a GameState
+    /// funnel (S1-T3).  Each reads the SAME stored unit `TrophyBackfill`
+    /// derives from — coverage % (`minigameBests["paintball"]`), hold-seconds
+    /// (`minigameBests["koth"]`), the raw pinball score (`pinballBest`), and
+    /// Roll Up height (`minigameBests["rollup"]`).  Roll Out and Disco bests
+    /// are written in-view and are rerouted in S1-T4, so their trophies are
+    /// deliberately NOT recorded here.  `metric` selects which one to push so
+    /// the funnel call sites stay minimal.
+    private func recordMinigameBestTrophy(_ metric: TrophyMetric) {
+        switch metric {
+        case .paintballBestCoverage:
+            // paintball_coverage_60 (≥60).
+            trophyEngine.record(.paintballBestCoverage, value: minigameBests["paintball", default: 0])
+        case .kothBestHoldSeconds:
+            // koth_hold_45 (≥45 hold-seconds in one round).
+            trophyEngine.record(.kothBestHoldSeconds, value: minigameBests["koth", default: 0])
+        case .pinballBestScore:
+            // pinball_score_10k / _50k / _150k.
+            trophyEngine.record(.pinballBestScore, value: pinballBest)
+        case .rollupBestHeight:
+            // rollup_100m (≥100) / rollup_500m (≥500).
+            trophyEngine.record(.rollupBestHeight, value: minigameBests["rollup", default: 0])
+        default:
+            break
+        }
+    }
+
+    /// Push the Zen-time trophy metric (S1-T3).  Called from `addZenSeconds`
+    /// after the cumulative tally grows.  zen_hour (≥3,600) / zen_10_hours
+    /// (≥36,000); the AFK-farmable ceiling stays silver by catalog design.
+    private func recordZenTrophies() {
+        trophyEngine.record(.zenSeconds, value: zenSeconds)
+    }
+
+    /// Push the Coin Pit reward-run trophy metrics (S1-T3).  Called from
+    /// `recordGoldRushCoins` — the naming trap (trophy-catalog.md §3.5):
+    /// `goldrushBest`/`goldrushCoinsTotal` are the ticket-staked COIN PIT
+    /// reward run, NOT the "goldrush" (Smash and Grab) competitive mode.
+    /// Mirrors `TrophyBackfill.snapshot`.
+    private func recordCoinPitTrophies() {
+        // coinpit_catch_90 (≥90 caught in one round).
+        trophyEngine.record(.coinpitBestCatch, value: goldrushBest)
+        // econ_pit_boss (≥2,500 lifetime Coin Pit coins).
+        trophyEngine.record(.coinpitCoinsTotal, value: goldrushCoinsTotal)
+    }
+
     // MARK: - Queries
 
     func stars(for level: Int) -> Int           { bestStars[level] ?? 0 }
@@ -1015,6 +1117,9 @@ final class GameState: ObservableObject {
     /// Record that a mode has been launched so its tutorial won't show again.
     func markModePlayed(_ id: String) {
         if !playedModeIDs.contains(id) { playedModeIDs.insert(id) }
+        // Discovery trophies (arcade_sampler / arcade_grand_tour /
+        // coinpit_first_round) ride the played-mode set (S1-T3).
+        recordMinigamePlayedTrophies()
     }
 
     /// The currently-selected GameMode (resolves `currentModeID`; climb fallback).
@@ -1394,6 +1499,16 @@ final class GameState: ObservableObject {
         let isBest = score > minigameBests[modeID, default: 0]
         if isBest { minigameBests[modeID] = score }
         syncMinigameStats()
+        // Two competitive bests carry a trophy — Paint Ball coverage % and
+        // King of the Hill hold-seconds (their score arg IS the stored best
+        // unit, matching TrophyBackfill).  Other modes' bests have no trophy
+        // (their trophies are win-count based) so recording is a no-op switch
+        // default (S1-T3).
+        switch modeID {
+        case "paintball": recordMinigameBestTrophy(.paintballBestCoverage)
+        case "koth":      recordMinigameBestTrophy(.kothBestHoldSeconds)
+        default: break
+        }
         return isBest
     }
 
@@ -1404,6 +1519,8 @@ final class GameState: ObservableObject {
         let isBest = s > pinballBest
         if isBest { pinballBest = s; addCoins(Self.minigameBestBonus) }
         syncMinigameStats()
+        // pinball_score_10k / _50k / _150k ride pinballBest (S1-T3).
+        recordMinigameBestTrophy(.pinballBestScore)
         return isBest
     }
 
@@ -1415,6 +1532,9 @@ final class GameState: ObservableObject {
         let isBest = c > goldrushBest
         if isBest { goldrushBest = c; addCoins(Self.minigameBestBonus) }
         syncMinigameStats()
+        // Naming trap: goldrushBest/goldrushCoinsTotal are the Coin Pit
+        // reward run — coinpit_catch_90 / econ_pit_boss ride them (S1-T3).
+        recordCoinPitTrophies()
         return isBest
     }
 
@@ -1435,6 +1555,8 @@ final class GameState: ObservableObject {
             rollupBestSeconds = max(0, seconds)   // same height, longer run → keep it
         }
         syncMinigameStats()
+        // rollup_100m / rollup_500m ride minigameBests["rollup"] (S1-T3).
+        recordMinigameBestTrophy(.rollupBestHeight)
         return isBest
     }
 
@@ -1446,6 +1568,8 @@ final class GameState: ObservableObject {
         let reward = min(s / 60, 15)   // ≤ 15 coins per session — recognition, not a grind
         if reward > 0 { addCoins(reward) }
         syncMinigameStats()
+        // zen_hour / zen_10_hours ride the cumulative zenSeconds tally (S1-T3).
+        recordZenTrophies()
     }
 
     /// Spend coins.  Returns false (no-op) if balance is insufficient.
@@ -1485,6 +1609,10 @@ final class GameState: ObservableObject {
         minigameWins[modeID, default: 0] += 1
         addTickets(1)
         syncMinigameStats()   // publish the bumped win tally to the leaderboard
+        // The single win choke point — arcade + per-game win trophies (and
+        // the Hard high-waters, which read the just-bumped per-difficulty
+        // dict when reached via recordMinigameResult) fire here only (S1-T3).
+        recordCompetitiveWinTrophies()
     }
 
     /// Difficulty-scaled coin payout for a competitive minigame (pure — no side

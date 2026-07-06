@@ -1491,3 +1491,311 @@ final class TrophyTrackDailyWiringTests: XCTestCase {
         XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_30"))
     }
 }
+
+// MARK: - TrophyMinigameWiringTests (S1-T3 acceptance)
+
+/// End-to-end wiring proof for the minigame trophy triggers (S1-T3): drive
+/// the PUBLIC GameState minigame funnels — `recordMinigameResult`,
+/// `recordCompetitiveWin`, `recordPinballScore`, `recordGoldRushCoins`,
+/// `recordRollUpRun`, `addZenSeconds`, `recordCompetitiveScore`,
+/// `markModePlayed` — and assert the right trophies latch in the engine.
+/// Each GameState is fresh on an isolated UserDefaults suite; its
+/// first-launch backfill runs over an empty save (grants nothing), so every
+/// unlock below is proof the LIVE funnel fired, not the grandfather.
+///
+/// Disco + Roll Out best-trophies (`rollout_first_maze`, `rollout_maze_10`,
+/// `disco_cross_25`, `disco_hard_10`) are deliberately NOT covered here —
+/// those two modes write `minigameBests` in-view and are rerouted through a
+/// GameState funnel in S1-T4, which owns their trigger tests.
+final class TrophyMinigameWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyMinigameWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    /// Win one competitive match through `recordMinigameResult` (the shipped
+    /// view path), at the given difficulty. Score doubles as the stored-best
+    /// unit for koth/paintball.
+    @discardableResult
+    private func win(_ gs: GameState,
+                     _ mode: String,
+                     difficulty: MinigameDifficulty = .normal,
+                     score: Int = 1) -> Int {
+        gs.recordMinigameResult(modeID: mode, difficulty: difficulty,
+                                won: true, score: score, basePayout: 0)
+    }
+
+    // MARK: Arcade-wide — wins
+
+    /// A single competitive win latches arcade_first_win and the per-mode
+    /// first-win trophy, both riding `recordCompetitiveWin` (the ticket-earn
+    /// choke point).
+    func testFirstCompetitiveWinWiresArcadeAndPerGame() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("snake_first_win"))
+
+        win(gs, "snake")
+
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_first_win"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("snake_first_win"))
+    }
+
+    /// `recordCompetitiveWin` called directly (no difficulty context) is still
+    /// the ticket-earn choke point: it must latch the win trophies too.
+    func testDirectRecordCompetitiveWinFiresTrophies() {
+        let gs = makeGameState()
+        gs.recordCompetitiveWin("sumo")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_first_win"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("sumo_first_win"))
+    }
+
+    /// 10 lifetime wins in one mode latches its <mode>_wins_10 trophy; 9 do
+    /// not (boundary).
+    func testPerGameTenWinsBoundary() {
+        let gs = makeGameState()
+        for _ in 0..<9 { win(gs, "goldrush") }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("goldrush_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("goldrush_wins_10"))
+
+        win(gs, "goldrush")   // 10th
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("goldrush_wins_10"))
+    }
+
+    /// arcade_all_six needs one win in EACH of the 6 competitive modes; five
+    /// modes must NOT satisfy it.
+    func testArcadeAllSixNeedsEveryMode() {
+        let gs = makeGameState()
+        let modes = ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"]
+        for m in modes.dropLast() { win(gs, m) }   // 5 of 6
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_all_six"))
+
+        win(gs, modes.last!)                        // the 6th
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_all_six"))
+    }
+
+    /// arcade_wins_100 latches at 100 lifetime competitive wins summed across
+    /// modes; 99 does not.
+    func testArcadeHundredWinsBoundary() {
+        let gs = makeGameState()
+        for _ in 0..<99 { win(gs, "snake") }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_wins_100"))
+        win(gs, "sumo")   // 100th, different mode
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_wins_100"))
+    }
+
+    // MARK: Arcade-wide — Hard difficulty
+
+    /// arcade_hard_once latches on the FIRST Hard win only; a Normal win of
+    /// the same mode must not trip it.
+    func testArcadeHardOnceRequiresHardDifficulty() {
+        let gs = makeGameState()
+        win(gs, "snake", difficulty: .normal)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_hard_once"),
+                       "a Normal win must not satisfy the Hard trophy")
+
+        win(gs, "snake", difficulty: .hard)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_hard_once"))
+    }
+
+    /// arcade_hard_all needs a Hard win in EACH of the 6 modes; five is not
+    /// enough. Verifies the per-difficulty dict is read at the win choke
+    /// point after `recordMinigameResult` bumps it.
+    func testArcadeHardAllNeedsHardWinEveryMode() {
+        let gs = makeGameState()
+        let modes = ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"]
+        for m in modes.dropLast() { win(gs, m, difficulty: .hard) }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_hard_once"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_hard_all"))
+
+        win(gs, modes.last!, difficulty: .hard)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_hard_all"))
+    }
+
+    // MARK: Per-game bests
+
+    /// paintball_coverage_60 rides `minigameBests["paintball"]` (coverage %),
+    /// written by `recordCompetitiveScore`. 59 % misses, 60 % latches.
+    func testPaintballCoverageBestBoundary() {
+        let gs = makeGameState()
+        _ = gs.recordCompetitiveScore("paintball", 59)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("paintball_coverage_60"))
+        _ = gs.recordCompetitiveScore("paintball", 60)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("paintball_coverage_60"))
+    }
+
+    /// koth_hold_45 rides `minigameBests["koth"]` (hold-seconds). 44 misses,
+    /// 45 latches. A losing round still records the best (skill without a win).
+    func testKothHoldBestBoundary() {
+        let gs = makeGameState()
+        _ = gs.recordCompetitiveScore("koth", 44)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("koth_hold_45"))
+        _ = gs.recordCompetitiveScore("koth", 45)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("koth_hold_45"))
+    }
+
+    /// The full koth win path (`recordMinigameResult` with score = holdSec)
+    /// does NOT itself write the best — the view calls `recordCompetitiveScore`
+    /// for that — so a bare win under 45 s must not latch koth_hold_45, only
+    /// koth_first_win.
+    func testKothWinAloneDoesNotGrantHoldTrophy() {
+        let gs = makeGameState()
+        win(gs, "koth", score: 10)   // a short winning round
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("koth_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("koth_hold_45"))
+    }
+
+    /// pinball_score_10k / _50k / _150k ride `pinballBest` through
+    /// `recordPinballScore`, at their exact thresholds.
+    func testPinballScoreTiers() {
+        let gs = makeGameState()
+        _ = gs.recordPinballScore(9_999)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_10k"))
+
+        _ = gs.recordPinballScore(10_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_10k"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_50k"))
+
+        _ = gs.recordPinballScore(50_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_50k"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_150k"))
+
+        _ = gs.recordPinballScore(150_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"))
+    }
+
+    /// A LATER lower pinball score never revokes a higher unlock (latched
+    /// ratchet) and the tier already earned stays lit.
+    func testPinballBestTrophyIsLatched() {
+        let gs = makeGameState()
+        _ = gs.recordPinballScore(150_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"))
+        _ = gs.recordPinballScore(1)   // a bad game later
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"),
+                      "a latched trophy must never revoke")
+    }
+
+    /// rollup_100m / rollup_500m ride `minigameBests["rollup"]` (height, m)
+    /// through `recordRollUpRun`, at their thresholds.
+    func testRollUpHeightTiers() {
+        let gs = makeGameState()
+        _ = gs.recordRollUpRun(height: 99, seconds: 30)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollup_100m"))
+
+        _ = gs.recordRollUpRun(height: 100, seconds: 40)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollup_100m"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollup_500m"))
+
+        _ = gs.recordRollUpRun(height: 500, seconds: 90)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollup_500m"))
+    }
+
+    // MARK: Zen
+
+    /// zen_hour (≥3,600 s) / zen_10_hours (≥36,000 s) accumulate through
+    /// `addZenSeconds`. Below an hour: nothing.
+    func testZenTimeTiers() {
+        let gs = makeGameState()
+        gs.addZenSeconds(3_599)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("zen_hour"))
+
+        gs.addZenSeconds(1)   // now 3,600
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("zen_hour"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("zen_10_hours"))
+
+        gs.addZenSeconds(36_000 - 3_600)   // now 36,000
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("zen_10_hours"))
+    }
+
+    // MARK: Coin Pit (goldrushBest / goldrushCoinsTotal — the naming trap)
+
+    /// coinpit_first_round rides the played-mode set through `markModePlayed`.
+    func testCoinPitFirstRoundWiresThroughMarkModePlayed() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("coinpit_first_round"))
+        gs.markModePlayed("coinpit")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_first_round"))
+    }
+
+    /// coinpit_catch_90 rides `goldrushBest` (best single Coin Pit haul) and
+    /// econ_pit_boss rides `goldrushCoinsTotal` (lifetime Coin Pit coins) —
+    /// both through `recordGoldRushCoins`, NOT the "goldrush" competitive mode.
+    func testCoinPitCatchAndLifetimeWireThroughGoldRushCoins() {
+        let gs = makeGameState()
+        _ = gs.recordGoldRushCoins(89)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
+
+        _ = gs.recordGoldRushCoins(90)     // a 90-coin round: best now 90
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
+
+        // Grind the lifetime total to 2,500 for econ_pit_boss (89+90 = 179
+        // so far; add 2,321 more across rounds).
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_pit_boss"))
+        _ = gs.recordGoldRushCoins(2_500 - 179)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_pit_boss"))
+    }
+
+    /// Coin Pit reward-run stats must NOT be confused with the "goldrush"
+    /// (Smash and Grab) competitive mode: winning goldrush grants goldrush
+    /// win trophies but never the Coin Pit best/lifetime trophies, and a Coin
+    /// Pit haul never grants goldrush win trophies.
+    func testCoinPitAndGoldrushModeAreDisjoint() {
+        let gs = makeGameState()
+        _ = gs.recordGoldRushCoins(120)               // a Coin Pit round
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("goldrush_first_win"),
+                       "a Coin Pit haul must not grant a Smash and Grab win trophy")
+
+        win(gs, "goldrush")                           // a Smash and Grab win
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("goldrush_first_win"))
+    }
+
+    // MARK: Discovery (played-mode set)
+
+    /// arcade_sampler (5 distinct minigames) / arcade_grand_tour (all 12)
+    /// accumulate through `markModePlayed`.
+    func testArcadeDiscoveryTiers() {
+        let gs = makeGameState()
+        let all = ["zen", "coinpit", "snake", "sumo", "paintball", "goldrush",
+                   "marblecup", "koth", "pinball", "rollout", "rollup", "disco"]
+        for m in all.prefix(4) { gs.markModePlayed(m) }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"))
+
+        gs.markModePlayed(all[4])   // 5th distinct minigame
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_sampler"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
+
+        for m in all.dropFirst(5) { gs.markModePlayed(m) }   // all 12
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
+    }
+
+    /// Playing a non-minigame mode id (or re-playing one already counted) does
+    /// not inflate `minigames_played` — the derivation intersects with the 12
+    /// minigame ids and the set dedupes.
+    func testNonMinigameAndRepeatPlaysDoNotInflateDiscovery() {
+        let gs = makeGameState()
+        gs.markModePlayed("climb")            // not a minigame id
+        gs.markModePlayed("snake")
+        gs.markModePlayed("snake")            // repeat
+        gs.markModePlayed("challenge.alpha")  // not one of the 12
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"),
+                       "only 1 distinct minigame played — must not reach 5")
+    }
+}
