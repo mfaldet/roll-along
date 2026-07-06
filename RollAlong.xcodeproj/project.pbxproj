@@ -75,12 +75,14 @@
 		7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0005000000000000AA00 /* TrophyRoomView.swift */; };
 		7A0F0006000000000000AA01 /* TrophyToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0006000000000000AA00 /* TrophyToastView.swift */; };
 		7A0F0007000000000000AA01 /* TrophySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0007000000000000AA00 /* TrophySyncService.swift */; };
+		7A0F0008000000000000AA01 /* TrophyShowcaseModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0008000000000000AA00 /* TrophyShowcaseModel.swift */; };
 		7A0F0101000000000000AA01 /* TrophyEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0101000000000000AA00 /* TrophyEngineTests.swift */; };
 		7A0F0102000000000000AA01 /* TrophyStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0102000000000000AA00 /* TrophyStatsTests.swift */; };
 		7A0F0103000000000000AA01 /* TrophyMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */; };
 		7A0F0104000000000000AA01 /* TrophyToastQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0104000000000000AA00 /* TrophyToastQueueTests.swift */; };
 		7A0F0105000000000000AA01 /* TrophyToastWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0105000000000000AA00 /* TrophyToastWiringTests.swift */; };
 		7A0F0106000000000000AA01 /* TrophyRoomModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */; };
+		7A0F0107000000000000AA01 /* TrophyShowcaseModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,12 +173,14 @@
 		7A0F0005000000000000AA00 /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
 		7A0F0006000000000000AA00 /* TrophyToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastView.swift; sourceTree = "<group>"; };
 		7A0F0007000000000000AA00 /* TrophySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophySyncService.swift; sourceTree = "<group>"; };
+		7A0F0008000000000000AA00 /* TrophyShowcaseModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyShowcaseModel.swift; sourceTree = "<group>"; };
 		7A0F0101000000000000AA00 /* TrophyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEngineTests.swift; sourceTree = "<group>"; };
 		7A0F0102000000000000AA00 /* TrophyStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyStatsTests.swift; sourceTree = "<group>"; };
 		7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyMigrationTests.swift; sourceTree = "<group>"; };
 		7A0F0104000000000000AA00 /* TrophyToastQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastQueueTests.swift; sourceTree = "<group>"; };
 		7A0F0105000000000000AA00 /* TrophyToastWiringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastWiringTests.swift; sourceTree = "<group>"; };
 		7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomModelTests.swift; sourceTree = "<group>"; };
+		7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyShowcaseModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -276,6 +280,7 @@
 				7A0F0005000000000000AA00 /* TrophyRoomView.swift */,
 				7A0F0006000000000000AA00 /* TrophyToastView.swift */,
 				7A0F0007000000000000AA00 /* TrophySyncService.swift */,
+				7A0F0008000000000000AA00 /* TrophyShowcaseModel.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 				AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */,
@@ -317,6 +322,7 @@
 				7A0F0104000000000000AA00 /* TrophyToastQueueTests.swift */,
 				7A0F0105000000000000AA00 /* TrophyToastWiringTests.swift */,
 				7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */,
+				7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -498,6 +504,7 @@
 				7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */,
 				7A0F0006000000000000AA01 /* TrophyToastView.swift in Sources */,
 				7A0F0007000000000000AA01 /* TrophySyncService.swift in Sources */,
+				7A0F0008000000000000AA01 /* TrophyShowcaseModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -517,6 +524,7 @@
 				7A0F0104000000000000AA01 /* TrophyToastQueueTests.swift in Sources */,
 				7A0F0105000000000000AA01 /* TrophyToastWiringTests.swift in Sources */,
 				7A0F0106000000000000AA01 /* TrophyRoomModelTests.swift in Sources */,
+				7A0F0107000000000000AA01 /* TrophyShowcaseModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

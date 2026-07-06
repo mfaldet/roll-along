@@ -7,6 +7,9 @@ import SwiftUI
 //      scrollable level-records table.
 // S14: badge wall (11 achievements, locked/unlocked), social rank line
 //      (loaded from the leaderboard when signed in), ShareLink card.
+// S2-T4 (trophies): the S14 badge wall is RETIRED — the card is now the
+//      engine-backed Trophy card (`ProfileTrophyCard`, below), reflecting the
+//      latched trophy ledger instead of live-derived, pay-gated "badges".
 //
 // Pushed from HomeView via HomeRoute.profile.
 // ---------------------------------------------------------------------------
@@ -36,7 +39,7 @@ struct ProfileView: View {
                 VStack(spacing: 16) {
                     heroCard
                     careerCard
-                    badgesCard
+                    ProfileTrophyCard(engine: gameState.trophyEngine)
                     loadoutCard
                     PlayerRanksCard(profile: gameState.localLeaderboardProfile,
                                     playerId: SocialClient.shared.currentUserId)
@@ -378,171 +381,15 @@ struct ProfileView: View {
     }
 
     // =========================================================================
-    // MARK: - Badges card  (S14)
-    // 11 achievements arranged in a horizontal scroll.  Earned badges show their
-    // full icon + colour; locked badges show a lock on a dim circle.
-    // Earned badges are listed first, then locked ones.
+    // MARK: - Trophy card  (S2-T4 — replaces the retired S14 badge wall)
+    //
+    // The old 11-badge wall (BadgeDef / allBadges) was removed here: it derived
+    // "badges" LIVE from regressable GameState stats and pay-gated one entry
+    // ("Unlimited Power" → the $-gated `unlimitedLives` IAP, dropped per
+    // internal-economy.md §4). The card is now `ProfileTrophyCard` (a top-level
+    // view further down this file), which reflects the LATCHED trophy ledger
+    // from `TrophyEngine` and links through to the full Trophy Room (S2-T3).
     // =========================================================================
-
-    // Badge definition — private to this view
-    private struct BadgeDef: Identifiable {
-        let id:       String
-        let icon:     String
-        let title:    String
-        let subtitle: String
-        let color:    Color
-        let check:    (GameState) -> Bool
-    }
-
-    private static let allBadges: [BadgeDef] = [
-        BadgeDef(id: "first_steps",
-                 icon:     "figure.walk",
-                 title:    "First Steps",
-                 subtitle: "Clear level 1",
-                 color:    Color(red: 0.28, green: 0.82, blue: 0.44),
-                 check:    { $0.highestUnlocked > 1 }),
-
-        BadgeDef(id: "hat_trick",
-                 icon:     "star.fill",
-                 title:    "Hat Trick",
-                 subtitle: "3-star any level",
-                 color:    Color(red: 1.0, green: 0.82, blue: 0.22),
-                 check:    { $0.bestStars.values.contains(3) }),
-
-        BadgeDef(id: "star_collector",
-                 icon:     "star.circle.fill",
-                 title:    "Star Collector",
-                 subtitle: "50 total stars",
-                 color:    Color(red: 1.0, green: 0.60, blue: 0.12),
-                 check:    { $0.totalStars >= 50 }),
-
-        BadgeDef(id: "stellar",
-                 icon:     "staroflife.fill",
-                 title:    "Stellar",
-                 subtitle: "150 total stars",
-                 color:    Color(red: 1.0, green: 0.38, blue: 0.10),
-                 check:    { $0.totalStars >= 150 }),
-
-        BadgeDef(id: "on_a_roll",
-                 icon:     "flame.fill",
-                 title:    "On a Roll",
-                 subtitle: "7-day streak",
-                 color:    Color(red: 1.0, green: 0.48, blue: 0.12),
-                 check:    { $0.dailyStreak >= 7 }),
-
-        BadgeDef(id: "dedicated",
-                 icon:     "calendar.badge.checkmark",
-                 title:    "Dedicated",
-                 subtitle: "30-day streak",
-                 color:    Color(red: 0.92, green: 0.22, blue: 0.22),
-                 check:    { $0.dailyStreak >= 30 }),
-
-        BadgeDef(id: "coin_hoarder",
-                 icon:     "dollarsign.circle.fill",
-                 title:    "Coin Hoarder",
-                 subtitle: "100 in-game coins",
-                 color:    Color(red: 0.95, green: 0.78, blue: 0.20),
-                 check:    { $0.totalCoins >= 100 }),
-
-        BadgeDef(id: "completionist",
-                 icon:     "checkmark.seal.fill",
-                 title:    "Completionist",
-                 subtitle: "Complete any bundle",
-                 color:    Color(red: 0.28, green: 0.60, blue: 0.96),
-                 check:    { !$0.completedBundleIDs.isEmpty }),
-
-        BadgeDef(id: "bundle_hunter",
-                 icon:     "gift.fill",
-                 title:    "Bundle Hunter",
-                 subtitle: "Complete 3 bundles",
-                 color:    Color(red: 0.55, green: 0.28, blue: 0.96),
-                 check:    { $0.completedBundleIDs.count >= 3 }),
-
-        BadgeDef(id: "unlimited",
-                 icon:     "infinity",
-                 title:    "Unlimited Power",
-                 subtitle: "Unlock Unlimited Lives",
-                 color:    Color(red: 0.93, green: 0.65, blue: 0.10),
-                 check:    { $0.unlimitedLives }),
-
-        BadgeDef(id: "legend",
-                 icon:     "crown.fill",
-                 title:    "Legend",
-                 subtitle: "Reach level 50",
-                 color:    Color(red: 0.95, green: 0.72, blue: 0.15),
-                 check:    { $0.highestUnlocked >= 50 }),
-    ]
-
-    private var badgesCard: some View {
-        let earned = Self.allBadges.filter {  $0.check(gameState) }
-        let locked = Self.allBadges.filter { !$0.check(gameState) }
-        return VStack(spacing: 16) {
-            HStack {
-                sectionLabel("Badges")
-                Spacer()
-                Text("\(earned.count) / \(Self.allBadges.count)")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.40))
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(earned) { badge in
-                        badgeCell(badge, isEarned: true)
-                    }
-                    ForEach(locked) { badge in
-                        badgeCell(badge, isEarned: false)
-                    }
-                }
-                .padding(.horizontal, 2)
-                .padding(.vertical, 4)
-            }
-        }
-        .padding(18)
-        .profileCard()
-    }
-
-    private func badgeCell(_ badge: BadgeDef, isEarned: Bool) -> some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(isEarned
-                          ? badge.color.opacity(0.18)
-                          : Color(white: 0.12))
-                    .frame(width: 52, height: 52)
-                    .overlay(
-                        Circle()
-                            .stroke(isEarned
-                                    ? badge.color.opacity(0.48)
-                                    : Color(white: 0.18),
-                                    lineWidth: 1.2)
-                    )
-
-                if isEarned {
-                    Image(systemName: badge.icon)
-                        .font(.system(size: 22))
-                        .foregroundStyle(badge.color)
-                } else {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color(white: 0.30))
-                }
-            }
-
-            Text(badge.title)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(isEarned ? .white : Color(white: 0.32))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-
-            Text(badge.subtitle)
-                .font(.system(size: 10, design: .rounded))
-                .foregroundStyle(Color(white: 0.32))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-        }
-        .frame(width: 78)
-    }
 
     // =========================================================================
     // MARK: - Helpers
@@ -788,6 +635,210 @@ struct PlayerRanksCard: View {
         case .marbleCup:  return Color(red: 0.30, green: 0.80, blue: 0.70)
         case .kingOfHill: return Color(red: 0.95, green: 0.72, blue: 0.15)
         }
+    }
+}
+
+// ===========================================================================
+// MARK: - ProfileTrophyCard  (S2-T4)
+//
+// The Profile card that replaced the retired 11-badge wall. It reflects the
+// LATCHED trophy ledger from `TrophyEngine` (never live-derived, regressable
+// GameState stats), showing:
+//   • a header with earned/total + overall completion %,
+//   • a per-grade strip (Bronze…Platinum, glyph + earned/total; NO points —
+//     design.md §2 ships grades + capstone only),
+//   • a showcase strip of the player's staged trophies (pinned-first once
+//     S2-T7 wires pins, else most-recently-earned),
+// and links through to the full Trophy Room (S2-T3) via `HomeRoute.trophies`.
+//
+// All display logic lives in `TrophyShowcaseModel` (pure, unit-tested); this
+// view only draws it. Observes the engine so a mid-session unlock refreshes
+// the card. Display-only — reads the engine, writes nothing (NEVER-MINT).
+//
+// Diamond rider (design.md §2 R2): grade glyph/accent come from the single
+// `TrophyGradeStyle` source via the model's entries — the Diamond GRADE never
+// borrows the Diamond-ball cosmetic gem.
+// ===========================================================================
+struct ProfileTrophyCard: View {
+
+    @ObservedObject var engine: TrophyEngine
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Recomputed each render from the current engine snapshot. Cheap: one
+    /// pass over the catalog of value types. Pins are the S2-T7 seam — passed
+    /// as `[]` until that task wires the `ra_trophyPins` UI, so today's
+    /// showcase is purely most-recently-earned.
+    private var model: TrophyShowcaseModel { TrophyShowcaseModel(engine: engine) }
+
+    var body: some View {
+        NavigationLink(value: HomeRoute.trophies) {
+            content(model)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .contain)
+        .accessibilityHint("Opens the Trophy Room")
+    }
+
+    @ViewBuilder
+    private func content(_ model: TrophyShowcaseModel) -> some View {
+        VStack(spacing: 16) {
+            header(model)
+            gradeStrip(model)
+
+            if model.isEmpty {
+                emptyState
+            } else {
+                showcaseStrip(model)
+            }
+        }
+        .padding(18)
+        .profileCard()
+        .contentShape(Rectangle())
+    }
+
+    // MARK: Header — title + earned/total + completion %
+
+    @ViewBuilder
+    private func header(_ model: TrophyShowcaseModel) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            HStack(spacing: 8) {
+                Text("Trophies")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                if model.capstoneUnlocked {
+                    Image(systemName: "rosette")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(TrophyGradeStyle.forTier(.platinum).accent)
+                        .accessibilityHidden(true)
+                }
+            }
+            Spacer(minLength: 8)
+            Text("\(model.earned) / \(model.total)")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Color(white: 0.40))
+            Text("· \(model.completionPercent)%")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Color(white: 0.55))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(headerAccessibilityLabel(model))
+    }
+
+    private func headerAccessibilityLabel(_ model: TrophyShowcaseModel) -> String {
+        var parts = ["Trophies",
+                     "\(model.earned) of \(model.total) earned",
+                     "\(model.completionPercent) percent complete"]
+        if model.capstoneUnlocked { parts.append("Platinum capstone earned") }
+        return parts.joined(separator: ", ")
+    }
+
+    // MARK: Per-grade strip (ladder order; NO points)
+
+    @ViewBuilder
+    private func gradeStrip(_ model: TrophyShowcaseModel) -> some View {
+        HStack(spacing: 8) {
+            ForEach(model.gradeCounts) { g in
+                gradeChip(g)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func gradeChip(_ g: TrophyShowcaseModel.GradeCount) -> some View {
+        let style = TrophyGradeStyle.forTier(g.tier)
+        VStack(spacing: 3) {
+            Image(systemName: style.glyph)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(g.earned > 0 ? style.accent : style.accent.opacity(0.35))
+            Text("\(g.earned)/\(g.total)")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(g.earned > 0 ? .white : Color(white: 0.40))
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(white: 0.14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(style.accent.opacity(g.earned > 0 ? 0.5 : 0.12), lineWidth: 1)
+                )
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(g.gradeName), \(g.earned) of \(g.total) earned")
+    }
+
+    // MARK: Showcase strip (earned trophies on stage)
+
+    @ViewBuilder
+    private func showcaseStrip(_ model: TrophyShowcaseModel) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(model.showcase) { entry in
+                    showcaseCell(entry)
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func showcaseCell(_ entry: TrophyShowcaseEntry) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(entry.gradeAccent.opacity(0.18))
+                    .frame(width: 52, height: 52)
+                    .overlay(
+                        Circle().stroke(entry.gradeAccent.opacity(0.48), lineWidth: 1.2)
+                    )
+                Image(systemName: entry.gradeGlyph)
+                    .font(.system(size: 22))
+                    .foregroundStyle(entry.gradeAccent)
+            }
+
+            Text(entry.title)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+
+            Text(entry.gradeName)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+        }
+        .frame(width: 78)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(entry.accessibilityLabel)
+    }
+
+    // MARK: Empty state (no trophies earned yet)
+
+    private var emptyState: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "trophy")
+                .font(.system(size: 20))
+                .foregroundStyle(Color(white: 0.45))
+                .accessibilityHidden(true)
+            Text("No trophies yet — play to earn your first.")
+                .font(.system(size: 13, design: .rounded))
+                .foregroundStyle(Color(white: 0.55))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No trophies yet. Play to earn your first.")
     }
 }
 
