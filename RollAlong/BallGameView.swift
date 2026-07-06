@@ -853,6 +853,21 @@ struct BallGameView: View {
                                 hapticsEnabled: gameState.hapticsEnabled,
                                 soundEnabled: gameState.soundEnabled)
 
+                // S2-T5: the Platinum-capstone full-screen blowout.  Rendered
+                // ONLY on a result surface (`phase != .playing`) so the
+                // once-ever moment never lands over a live tilt run — the
+                // capstone can only latch during play, but the moment waits for
+                // the run to end, exactly like the coalesced banner.  The model
+                // gates it to fire exactly once ever.
+                if phase != .playing {
+                    CapstoneCelebrationHost(
+                        model: gameState.capstoneCelebration,
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        hapticsEnabled: gameState.hapticsEnabled,
+                        soundEnabled: gameState.soundEnabled)
+                }
+
                 // Screen border — always on top, colour reacts to game state
                 screenBorder
             }
@@ -7116,6 +7131,20 @@ final class AudioManager {
     func playCoin(enabled: Bool) {
         guard enabled else { return }
         AudioServicesPlaySystemSound(1306)
+    }
+
+    /// The Platinum-capstone fanfare (S2-T5) — a UNIQUE, bigger flourish
+    /// distinct from the standard win chime that every grade banner reuses
+    /// (design.md §6 "unique fanfare distinct from the standard chime").
+    /// Layers the synthesised win arpeggio with a brighter system fanfare
+    /// (1025, "Fanfare") so the once-ever moment sounds unmistakably grander.
+    /// Respects the player's sound setting like every other cue here.
+    func playCapstoneFanfare(enabled: Bool) {
+        guard enabled else { return }
+        // The familiar celebratory arpeggio…
+        playWin(enabled: true)
+        // …plus a distinct, brighter fanfare on top (respects silent mode).
+        AudioServicesPlaySystemSound(1025)
     }
 
     // MARK: - Win sound synthesis

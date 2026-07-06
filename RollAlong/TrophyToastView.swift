@@ -479,3 +479,332 @@ struct TrophyToastHost: View {
         .allowsHitTesting(queue.presented != nil)
     }
 }
+
+// MARK: - Capstone celebration (S2-T5)
+
+//  ---------------------------------------------------------------------------
+//  The Platinum capstone (`capstone_all`, display name "Platinum") is the ONE
+//  trophy that escalates past the small banner: a full-screen, one-time moment
+//  with a unique fanfare + heavy haptics + a confetti burst, auto-offering a
+//  `ResultShareCard` share (design.md §6 "capstone blowout"; sprint-plan.md §2
+//  S2-T5). "Escalate exactly once — standard unlocks stay small" (PS research:
+//  single escalation) is enforced two ways, belt-and-suspenders:
+//
+//    (1) the capstone is SPLIT OFF the small-toast feed in GameState.fireTrophy
+//        so it never shows as a Diamond-style banner; and
+//    (2) `CapstoneCelebrationModel` latches the full-screen moment against BOTH
+//        the engine's unlock state AND a durable `ra_trophyCapstonePresented`
+//        flag, so the blowout fires exactly once ever and never again — a
+//        relaunch, a replay, or a stray re-record can't re-trigger it.
+//
+//  Reduce Motion is honored: the confetti/scale burst is swapped for a static
+//  crossfade treatment (design.md §6 accessibility; §11 acceptance).
+//
+//  NEVER-MINT (D1): the celebration is display-only. It reads the ledger + the
+//  equipped cosmetics and shares an image; it grants no coins and no cosmetics
+//  (the capstone's regalia reward is D8, unbuilt — `rewardID` is nil in v1).
+//  ---------------------------------------------------------------------------
+
+/// The one-time, latched-forever celebration state for the Platinum capstone.
+///
+/// Deliberately a plain `ObservableObject` with NO View dependency, so its
+/// fire-exactly-once policy is unit-testable in isolation (S2-T5 acceptance).
+/// It mirrors `TrophyToastQueue`: GameState owns it as a plain `let` and drives
+/// it from the same main-thread funnels, so its `@Published` mutations land on
+/// main in practice without pinning it to the global actor.
+final class CapstoneCelebrationModel: ObservableObject {
+
+    /// Durable "the full-screen moment has already played" flag. Survives
+    /// relaunch so the blowout is a true once-ever event (S2-T5: "fires exactly
+    /// once ever"). Documented in the GameState.swift `ra_*` audit header.
+    static let presentedKey = "ra_trophyCapstonePresented"
+
+    /// The capstone id is frozen forever (design.md §11 #14 / §2 ruling); the
+    /// display name is "Platinum" but the id is unchanged.
+    static let capstoneID = "capstone_all"
+
+    /// The capstone definition to celebrate, or nil when nothing is pending.
+    /// A non-nil value is the single signal the host view renders the
+    /// full-screen moment for. Cleared the instant `markPresented()` runs.
+    @Published private(set) var pending: TrophyDefinition?
+
+    /// Whether the once-ever moment has already played (loaded from
+    /// `presentedKey`; set permanently by `markPresented()`). Once true,
+    /// `celebrateIfEarned` can never arm the moment again.
+    @Published private(set) var hasPresented: Bool
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.hasPresented = defaults.bool(forKey: Self.presentedKey)
+    }
+
+    /// Arm the full-screen moment IFF the capstone is genuinely earned on the
+    /// engine AND the moment has never played. Idempotent and latched: a second
+    /// call (double-fire, replay, relaunch) with the flag already set is a
+    /// no-op, so the blowout escalates exactly once ever (S2-T5 acceptance).
+    ///
+    /// Pass the LIVE-unlocked ids of the current bump (from `TrophyEngine.record`)
+    /// so the moment only arms on the bump that actually latches the capstone —
+    /// but the engine unlock-state gate below is the real guard, so passing the
+    /// engine alone (e.g. on a launch re-check) also works and stays latched.
+    ///
+    /// Returns true iff this call armed the moment (for the caller/test).
+    @discardableResult
+    func celebrateIfEarned(engine: TrophyEngine) -> Bool {
+        guard !hasPresented else { return false }
+        guard engine.isUnlocked(Self.capstoneID) else { return false }
+        guard let def = engine.catalog.trophy(withID: Self.capstoneID) else { return false }
+        // Already armed and waiting to show — don't re-arm (idempotent).
+        guard pending == nil else { return false }
+        pending = def
+        return true
+    }
+
+    /// Mark the moment as played, forever. Persists the flag synchronously and
+    /// clears the pending signal so the host dismisses. After this, no code
+    /// path can re-arm the celebration (the ratchet on the presentation itself,
+    /// on top of the trophy ledger's own ratchet).
+    func markPresented() {
+        pending = nil
+        guard !hasPresented else { return }
+        hasPresented = true
+        defaults.set(true, forKey: Self.presentedKey)
+    }
+
+    // MARK: Test-only introspection
+
+    #if DEBUG
+    /// Whether a full-screen moment is currently armed (test assertions).
+    var isArmed: Bool { pending != nil }
+    #endif
+}
+
+/// The full-screen capstone blowout. Reads the pending capstone definition +
+/// the player's equipped cosmetics (for the share card) and renders the big
+/// trophy, a unique fanfare + heavy haptics, a confetti burst (Reduce Motion →
+/// static), and a `ResultShareCard`-based share. Auto-dismiss is a tap / the
+/// Done button — a once-ever moment does not time out under the player.
+struct CapstoneCelebrationView: View {
+
+    /// The capstone being celebrated (its title/description drive the copy).
+    let trophy: TrophyDefinition
+    /// The player's equipped ball skin — their identity on the share card.
+    let skin: BallSkin
+    /// The player's equipped trail.
+    let trail: TrailColor
+    var hapticsEnabled: Bool = true
+    var soundEnabled: Bool = true
+    /// Called when the player dismisses the moment (Done / tap-through). The
+    /// host uses this to `markPresented()` so it never shows again.
+    var onDismiss: (() -> Void)? = nil
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Drives the entrance scale/pop of the trophy (skipped under Reduce Motion).
+    @State private var appeared = false
+
+    /// The share payload — the capstone rendered on the existing share card
+    /// grammar. `won: true` tints it gold, matching the regalia framing.
+    private var shareResult: ShareableResult {
+        ShareableResult(mode: "Platinum",
+                        headline: trophy.title,
+                        subtitle: "Capstone earned",
+                        skin: skin,
+                        trail: trail,
+                        won: true)
+    }
+
+    var body: some View {
+        ZStack {
+            // Dimmed backdrop — the moment owns the whole screen.
+            Color.black.opacity(0.72)
+                .ignoresSafeArea()
+
+            // Confetti burst BEHIND the trophy card — swapped for a calm
+            // static shimmer under Reduce Motion (design.md §6 accessibility).
+            if reduceMotion {
+                CapstoneStaticTreatment()
+                    .ignoresSafeArea()
+                    .accessibilityHidden(true)
+            } else {
+                CapstoneConfettiBurst()
+                    .ignoresSafeArea()
+                    .accessibilityHidden(true)
+            }
+
+            VStack(spacing: 22) {
+                Text("PLATINUM")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .tracking(4)
+                    .foregroundStyle(.white.opacity(0.85))
+
+                // The trophy, rendered big. The capstone grade glyph — NOT the
+                // Diamond-ball cosmetic gem (design.md §2 R2): the rosette is
+                // the capstone's own mark.
+                Image(systemName: "rosette")
+                    .font(.system(size: 96, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(colors: [Color(hexRGB: "#EAF0FA") ?? .white,
+                                                Color(hexRGB: "#AFC0DA") ?? .gray],
+                                       startPoint: .top, endPoint: .bottom))
+                    .shadow(color: .black.opacity(0.4), radius: 16, y: 6)
+                    .scaleEffect(reduceMotion ? 1 : (appeared ? 1 : 0.6))
+                    .accessibilityHidden(true)
+
+                VStack(spacing: 6) {
+                    Text(trophy.title)
+                        .font(.system(size: 30, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(2)
+                    // Grade-side copy only — never "cosmetic" (§2 R2 copy rider).
+                    Text(trophy.unlockedDescription)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.82))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                        .padding(.horizontal, 8)
+                }
+
+                // Auto-offered share (design.md §6 "auto-composed share card").
+                ResultShareButton(result: shareResult)
+                    .frame(maxWidth: 320)
+
+                Button {
+                    onDismiss?()
+                } label: {
+                    Text("Done")
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(maxWidth: 320)
+                        .padding(.vertical, 12)
+                        .background(RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.25), lineWidth: 1))
+                }
+                .accessibilityLabel("Dismiss the Platinum capstone celebration")
+            }
+            .padding(28)
+        }
+        // One a11y grouping speaking the capstone win; grade named, never
+        // color-only (design.md §6). VoiceOver hears it as one announcement.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Platinum capstone unlocked: \(trophy.title).")
+        .transition(reduceMotion ? .opacity
+                    : .scale(scale: 0.9).combined(with: .opacity))
+        .onAppear {
+            fireFanfare()
+            if !reduceMotion {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                    appeared = true
+                }
+            }
+        }
+    }
+
+    /// The capstone's UNIQUE fanfare + heavy haptics — deliberately bigger than
+    /// the standard unlock chime (design.md §6 "unique fanfare distinct from the
+    /// standard chime"). Respects the player's sound/haptics settings.
+    private func fireFanfare() {
+        #if canImport(UIKit)
+        if hapticsEnabled {
+            // A success notification + a heavy impact — heavier than any
+            // standard-grade banner haptic (design.md §6).
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        }
+        #endif
+        // A distinct fanfare, layered so it reads as bigger than the standard
+        // win chime that every grade banner uses. Respects the sound setting.
+        AudioManager.shared.playCapstoneFanfare(enabled: soundEnabled)
+    }
+}
+
+/// The animated confetti burst behind the capstone trophy. A lightweight
+/// timeline of drifting rounded rectangles — the celebratory motion the
+/// Reduce-Motion branch replaces with `CapstoneStaticTreatment`.
+private struct CapstoneConfettiBurst: View {
+    private let pieces = 42
+    private let colors: [Color] = [
+        Color(hexRGB: "#E7B93B") ?? .yellow,
+        Color(hexRGB: "#8A5CF6") ?? .purple,
+        Color(hexRGB: "#4FC3F7") ?? .cyan,
+        Color(hexRGB: "#FF6B6B") ?? .red,
+        Color(hexRGB: "#EAF0FA") ?? .white
+    ]
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            GeometryReader { geo in
+                Canvas { ctx, size in
+                    for i in 0..<pieces {
+                        let seed = Double(i) * 0.6180339887
+                        let x = (seed.truncatingRemainder(dividingBy: 1)) * size.width
+                        // Fall loops every ~3.5s, offset per piece.
+                        let phase = (t / 3.5 + seed).truncatingRemainder(dividingBy: 1)
+                        let y = phase * (size.height + 40) - 40
+                        let sway = sin(t * 1.8 + seed * 6.28) * 14
+                        let rot = Angle(radians: t * 2 + seed * 6.28)
+                        let color = colors[i % colors.count]
+                        var rect = Path(roundedRect:
+                            CGRect(x: -4, y: -6, width: 8, height: 12),
+                            cornerRadius: 2)
+                        rect = rect.applying(
+                            CGAffineTransform(translationX: x + sway, y: y)
+                                .rotated(by: rot.radians))
+                        ctx.fill(rect, with: .color(color.opacity(0.9)))
+                    }
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
+}
+
+/// The Reduce-Motion-safe replacement for the confetti: a still, gentle
+/// radial glow with no animation (design.md §6 "swaps confetti for a static
+/// treatment"; S2-T5 acceptance requires this branch to exist in code).
+private struct CapstoneStaticTreatment: View {
+    var body: some View {
+        RadialGradient(
+            colors: [Color(hexRGB: "#8A5CF6")?.opacity(0.28) ?? .clear, .clear],
+            center: .center, startRadius: 20, endRadius: 420)
+        .ignoresSafeArea()
+    }
+}
+
+/// Drops the capstone full-screen moment over any surface. Observes the model,
+/// renders the moment while `pending` is non-nil, and calls `markPresented()`
+/// on dismiss so it never shows again. Surface wiring (which overlays adopt
+/// this) rides the same result surfaces the toast host does.
+struct CapstoneCelebrationHost: View {
+
+    @ObservedObject var model: CapstoneCelebrationModel
+    /// The player's equipped cosmetics for the share card.
+    let skin: BallSkin
+    let trail: TrailColor
+    var hapticsEnabled: Bool = true
+    var soundEnabled: Bool = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            if let trophy = model.pending {
+                CapstoneCelebrationView(
+                    trophy: trophy,
+                    skin: skin,
+                    trail: trail,
+                    hapticsEnabled: hapticsEnabled,
+                    soundEnabled: soundEnabled,
+                    onDismiss: { model.markPresented() })
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35),
+                   value: model.pending?.id)
+        .allowsHitTesting(model.pending != nil)
+    }
+}

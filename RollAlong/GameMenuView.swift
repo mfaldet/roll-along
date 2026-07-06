@@ -91,6 +91,17 @@ struct GameMenuView: View {
             TrophyToastHost(queue: gameState.trophyToasts,
                             hapticsEnabled: gameState.hapticsEnabled,
                             soundEnabled: gameState.soundEnabled)
+
+            // S2-T5: the hub is a run-end surface, so it also hosts the
+            // Platinum-capstone blowout — covers a capstone latched in a
+            // minigame the player exits straight to the menu.  The model gates
+            // it to fire exactly once ever; inert when nothing is armed.
+            CapstoneCelebrationHost(
+                model: gameState.capstoneCelebration,
+                skin: gameState.activeSkin,
+                trail: gameState.equippedTrail,
+                hapticsEnabled: gameState.hapticsEnabled,
+                soundEnabled: gameState.soundEnabled)
         }
         .onAppear {
             // Returning to the hub is a run-end surface (sprint-plan §2 S2-T2):

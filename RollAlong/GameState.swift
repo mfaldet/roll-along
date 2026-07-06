@@ -33,6 +33,9 @@ import SwiftUI
 //   unlock (live + backfill) and cleared by S3-T3's TrophySyncService once
 //   a full-snapshot upsert succeeds; survives relaunch so an offline unlock
 //   still syncs next online launch. No PII.
+//   ra_trophyCapstonePresented (S2-T5) — a Bool latching the Platinum
+//   capstone's full-screen celebration to a once-ever event; set when the
+//   blowout has played, survives relaunch so it never replays. No PII.
 //
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
@@ -638,6 +641,17 @@ final class GameState: ObservableObject {
     /// toast — S2-T6 owns that single coalesced "Trophy Room opens" reveal.
     let trophyToasts: TrophyToastQueue
 
+    /// The Platinum capstone's full-screen, one-time celebration state (S2-T5).
+    /// Owned here on its OWN `ObservableObject` (like `trophyToasts`) so it
+    /// never re-renders a gameplay view.  When a live bump latches the capstone
+    /// (`capstone_all`), `fireTrophy` SPLITS it off the small-toast feed and
+    /// arms this instead — the capstone escalates to a full-screen blowout
+    /// exactly once ever (latched against the engine's unlock state AND a
+    /// durable `ra_trophyCapstonePresented` flag), while standard unlocks stay
+    /// small (design.md §6; sprint-plan.md §2 S2-T5).  Backfill bypasses this
+    /// too: a grandfathered capstone never blows up — S2-T6's reveal owns it.
+    let capstoneCelebration: CapstoneCelebrationModel
+
     /// Test-injectable clock so live-unlock timestamps are deterministic
     /// (mirrors the engine's `now`).  Production uses the real wall clock.
     private let now: () -> Date
@@ -661,6 +675,9 @@ final class GameState: ObservableObject {
         // no main-actor work in its initialiser, so constructing it here is
         // safe from GameState's initialiser.
         trophyToasts = TrophyToastQueue()
+        // The capstone moment starts from its persisted "already played" flag,
+        // so a relaunch after the blowout never replays it (S2-T5 latch).
+        capstoneCelebration = CapstoneCelebrationModel(defaults: defaults)
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -825,7 +842,7 @@ final class GameState: ObservableObject {
     @discardableResult
     private func fireTrophy(_ metric: TrophyMetric, value: Int) -> [TrophyDefinition] {
         let unlocked = trophyEngine.record(metric, value: value)
-        if !unlocked.isEmpty { trophyToasts.enqueue(unlocked) }
+        routeUnlockedToPresentation(unlocked)
         return unlocked
     }
 
@@ -833,8 +850,27 @@ final class GameState: ObservableObject {
     @discardableResult
     private func fireTrophy(_ metric: TrophyMetric, value: Double) -> [TrophyDefinition] {
         let unlocked = trophyEngine.record(metric, value: value)
-        if !unlocked.isEmpty { trophyToasts.enqueue(unlocked) }
+        routeUnlockedToPresentation(unlocked)
         return unlocked
+    }
+
+    /// Route a bump's newly-unlocked trophies to the right presentation
+    /// surface: the Platinum capstone (`capstone_all`) escalates to its
+    /// full-screen ONE-TIME blowout (`capstoneCelebration`), every other grade
+    /// coalesces into the small run-end banner (`trophyToasts`).  "Escalate
+    /// exactly once — standard unlocks stay small" is enforced here by SPLITTING
+    /// the capstone out of the banner feed, and again in the model's latch
+    /// (S2-T5; design.md §6).  Display-only — grants nothing (D1 never-mint).
+    private func routeUnlockedToPresentation(_ unlocked: [TrophyDefinition]) {
+        guard !unlocked.isEmpty else { return }
+        let capstoneID = CapstoneCelebrationModel.capstoneID
+        let standard = unlocked.filter { $0.id != capstoneID }
+        if !standard.isEmpty { trophyToasts.enqueue(standard) }
+        if unlocked.contains(where: { $0.id == capstoneID }) {
+            // Latched twice over: only arms if the engine truly holds the
+            // capstone AND the once-ever flag is unset.
+            capstoneCelebration.celebrateIfEarned(engine: trophyEngine)
+        }
     }
 
     /// Mark the start of a tilt run.  From here until `endTrophyRun()` the
