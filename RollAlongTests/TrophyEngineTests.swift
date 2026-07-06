@@ -607,9 +607,15 @@ final class TrophyEngineTests: XCTestCase {
         let unlocked = engine.record(.climbTotalStars, value: 25)    // climb_stars_25
         XCTAssertEqual(unlocked.map(\.id), ["climb_stars_25"])
         XCTAssertEqual(publishes, 1, "exactly one publish per unlocking bump")
-        XCTAssertEqual(spy.objectWriteCount, 2)
+        // Three synchronous writes per unlocking commit: the id set, the
+        // timestamp dict, and the S1-T8 `ra_trophySyncDirty` flag — all ride
+        // the same `persistLedger` write so an offline unlock is durable AND
+        // flagged for S3-T3 to drain.
+        XCTAssertEqual(spy.objectWriteCount, 3)
         XCTAssertEqual(Set(spy.writtenKeys),
-                       [TrophyEngine.unlocksKey, TrophyEngine.unlockDatesKey])
+                       [TrophyEngine.unlocksKey,
+                        TrophyEngine.unlockDatesKey,
+                        TrophyEngine.syncDirtyKey])
 
         // Plist-native shapes: a string array + a Date-valued dictionary,
         // and neither key holds a JSON-encoded Data blob.
@@ -698,34 +704,33 @@ final class TrophyEngineTests: XCTestCase {
     /// Fixture 2: `liquidateCoinCosmetics()` (Sell Back) strips sellable
     /// cosmetics — the regressable stat behind balls_own_10.
     func testUnlockSurvivesLiquidateCoinCosmetics() throws {
+        // Reconciled to the wired reality (S1-T5): `balls_own_10` is now
+        // recorded to GameState's OWN engine by the real `grant` funnel, and
+        // `liquidateCoinCosmetics()` regresses ownership (and refunds coins
+        // through `addCoins`, which also latches `econ_nest_egg`). The
+        // ratchet claim is unchanged: an unlock earned before liquidation
+        // survives it and a relaunch.
         let gs = makeGameState()
-        let sellable = BallSkin.allCases.filter(\.isSellable).prefix(10)
+        let sellable = Array(BallSkin.allCases.filter(\.isSellable).prefix(10))
         XCTAssertEqual(sellable.count, 10, "catalogue must offer 10 sellable skins")
-        for skin in sellable { gs.ownedBallSkins.insert(skin.rawValue) }
-        let ownedBefore = gs.ownedBallSkins.count
-        XCTAssertGreaterThanOrEqual(ownedBefore, 10)
+        for skin in sellable { gs.grant(skin) }   // the real ownership funnel
+        XCTAssertGreaterThanOrEqual(gs.ownedBallSkins.count, 10)
 
-        let clock = Clock()
-        let engine = try makeEngine(clock: clock)
-        engine.record(.ballsOwned, value: ownedBefore)
-        XCTAssertTrue(engine.isUnlocked("balls_own_10"))
+        let engine = gs.trophyEngine
+        XCTAssertTrue(engine.isUnlocked("balls_own_10"),
+                      "granting 10 balls latches balls_own_10 through the funnel")
         let stamp = engine.unlockDate(for: "balls_own_10")
-        let before = persistedLedgerSnapshot()
 
         gs.liquidateCoinCosmetics()
-        XCTAssertLessThan(gs.ownedBallSkins.count, 10,
+        XCTAssertLessThan(gs.trophyBallsOwnedCount, 10,
                           "fixture must actually regress ownership")
 
-        let after = persistedLedgerSnapshot()
-        XCTAssertEqual(after.ids, before.ids)
-        XCTAssertEqual(after.dates, before.dates)
-
-        clock.advance(60)
-        XCTAssertTrue(engine.record(.ballsOwned, value: gs.ownedBallSkins.count).isEmpty)
+        // The ratchet holds: the unlock and its timestamp are untouched by
+        // the regression, and a fresh engine over the same suite still sees it.
         XCTAssertTrue(engine.isUnlocked("balls_own_10"))
         XCTAssertEqual(engine.unlockDate(for: "balls_own_10"), stamp)
 
-        let relaunched = try makeEngine(clock: clock)
+        let relaunched = try makeEngine()
         XCTAssertTrue(relaunched.isUnlocked("balls_own_10"))
     }
 
@@ -834,6 +839,122 @@ final class TrophyEngineTests: XCTestCase {
         // A later slower time can never revoke (ratchet).
         XCTAssertTrue(engine.record(.fastestClearSeconds, value: 60).isEmpty)
         XCTAssertTrue(engine.isUnlocked("skill_speed_10s"))
+    }
+
+    // MARK: Offline-safe sync flag (S1-T8)
+
+    /// Acceptance: an unlock arms `ra_trophySyncDirty` synchronously, and a
+    /// kill-the-app-after-unlock (a cold engine over the same suite) still
+    /// reports it dirty — so S3-T3 can drain it on the next online launch.
+    /// A fresh install with no unlocks is clean; a no-unlock bump never arms.
+    func testSyncDirtyArmsOnUnlockAndSurvivesRelaunch() throws {
+        let engine = try makeEngine()
+        XCTAssertFalse(engine.isSyncDirty, "a fresh engine with no unlocks is clean")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+
+        // A stat bump that unlocks nothing must never arm the flag (the
+        // S0-T3 zero-write hot-path contract extends to S1-T8).
+        XCTAssertTrue(engine.record(.climbTotalStars, value: 10).isEmpty)
+        XCTAssertFalse(engine.isSyncDirty, "a no-unlock bump must not arm the flag")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+
+        // A real unlock arms it — in memory AND durably on disk, right now.
+        XCTAssertEqual(engine.record(.climbTotalStars, value: 25).map(\.id),
+                       ["climb_stars_25"])
+        XCTAssertTrue(engine.isSyncDirty, "an unlock must arm the sync flag")
+        XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey),
+                      "the flag is persisted synchronously at unlock time")
+
+        // Kill the app after the unlock: a cold engine over the same save
+        // still sees the flag armed (it never got to sync).
+        let relaunched = try makeEngine()
+        XCTAssertTrue(relaunched.isSyncDirty,
+                      "an armed flag must survive relaunch so an offline unlock still syncs")
+        XCTAssertTrue(relaunched.isUnlocked("climb_stars_25"),
+                      "and the unlock itself survives (kill-the-app-after-unlock)")
+    }
+
+    /// `clearSyncDirty()` is S3-T3's drain: it clears the flag in memory and
+    /// on disk (surviving relaunch as clean), publishes exactly once, and is
+    /// an idempotent no-op when already clean. A later unlock re-arms it.
+    func testClearSyncDirtyIsIdempotentAndReArmsOnNextUnlock() throws {
+        let engine = try makeEngine()
+        var publishes = 0
+        engine.objectWillChange.sink { _ in publishes += 1 }.store(in: &cancellables)
+
+        // Clearing an already-clean flag is a pure no-op — no write, no publish.
+        engine.clearSyncDirty()
+        XCTAssertFalse(engine.isSyncDirty)
+        XCTAssertEqual(publishes, 0, "clearing an already-clean flag must not publish")
+
+        // Arm it, then drain it (the S3-T3 success path).
+        XCTAssertEqual(engine.record(.climbTotalStars, value: 25).map(\.id),
+                       ["climb_stars_25"])
+        XCTAssertTrue(engine.isSyncDirty)
+        let publishesAfterUnlock = publishes
+
+        engine.clearSyncDirty()
+        XCTAssertFalse(engine.isSyncDirty, "clear drops the flag in memory")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey),
+                       "clear drops the flag on disk")
+        XCTAssertEqual(publishes, publishesAfterUnlock + 1,
+                       "a clear that actually changes state publishes exactly once")
+
+        // The cleared state survives relaunch — a synced install stays clean.
+        let relaunched = try makeEngine()
+        XCTAssertFalse(relaunched.isSyncDirty, "a drained flag stays clear across relaunch")
+        XCTAssertTrue(relaunched.isUnlocked("climb_stars_25"),
+                      "clearing the sync flag never touches the unlock ledger")
+
+        // A brand-new unlock after a successful sync re-arms the flag.
+        XCTAssertEqual(relaunched.record(.climbTotalStars, value: 150).map(\.id),
+                       ["climb_stars_150"])
+        XCTAssertTrue(relaunched.isSyncDirty, "a later unlock re-arms the drained flag")
+        XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+    }
+
+    /// Backfill (S0-T4) grants are unlocks too, so a grandfathered veteran's
+    /// backfill must arm the sync flag — otherwise their already-earned
+    /// trophies would never reach the rarity rail. And it survives relaunch.
+    func testBackfillArmsSyncDirtyAndSurvivesRelaunch() throws {
+        let engine = try makeEngine()
+        XCTAssertFalse(engine.isSyncDirty)
+
+        // A snapshot that grandfathers at least one trophy.
+        let granted = engine.backfill(from: [.climbTotalStars: 25])
+        XCTAssertFalse(granted.isEmpty, "fixture must actually grandfather a trophy")
+        XCTAssertTrue(engine.isSyncDirty, "a backfill grant must arm the sync flag")
+        XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+
+        let relaunched = try makeEngine()
+        XCTAssertTrue(relaunched.isSyncDirty,
+                      "a backfilled dirty flag must survive relaunch for S3-T3 to drain")
+    }
+
+    /// A backfill that grants NOTHING (fresh install / empty snapshot) must
+    /// NOT arm the flag — there is nothing to sync, so a first launch never
+    /// spuriously schedules a server push.
+    func testEmptyBackfillDoesNotArmSyncDirty() throws {
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.backfill(from: [:]).isEmpty)
+        XCTAssertTrue(engine.didBackfill, "the empty backfill still marks itself done")
+        XCTAssertFalse(engine.isSyncDirty, "a zero-grant backfill has nothing to sync")
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
+    }
+
+    /// A dirty flag persisted by a prior offline session is honored on load
+    /// even before this session unlocks anything — the pending sync is not
+    /// forgotten just because the process restarted.
+    func testPreExistingDirtyFlagIsLoadedOnInit() throws {
+        defaults.set(true, forKey: TrophyEngine.syncDirtyKey)
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.isSyncDirty,
+                      "a flag armed in a prior session is honored on the next launch")
+
+        // And it can still be drained normally.
+        engine.clearSyncDirty()
+        XCTAssertFalse(engine.isSyncDirty)
+        XCTAssertFalse(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
     }
 
     // MARK: Ledger loading — healing + unknown ids
@@ -984,13 +1105,19 @@ final class TrophyTestHarness {
 
         let clock = HarnessClock()
         self.clock = clock
-        // The authoritative decode + engine, both over the same suite.
-        self.gameState = TrophyTestHarness.makeGameState(defaults: defaults)
-        self.engine = TrophyEngine(catalog: try! TrophyCatalog.load(bundle: .main),
-                                   defaults: defaults,
-                                   now: { clock.current })
+        // The authoritative decode, with the injected clock so live-unlock
+        // timestamps are deterministic.  Since S1-T1, GameState OWNS its
+        // trophy engine and drives it from real gameplay funnels, so the
+        // harness observes `gameState.trophyEngine` directly — the same
+        // engine the live funnels write.  (Pre-S1-T1 the harness built a
+        // separate engine and stood in for the wiring via `sync()`; that
+        // stand-in is now the real thing for wired metrics, and `sync()`
+        // still covers not-yet-wired metrics idempotently.)
+        self.gameState = TrophyTestHarness.makeGameState(defaults: defaults,
+                                                         now: { clock.current })
+        self.engine = gameState.trophyEngine
         if backfill {
-            engine.backfill(from: TrophyBackfill.snapshot(from: gameState))
+            gameState.activateTrophies()
         }
     }
 
@@ -1000,8 +1127,10 @@ final class TrophyTestHarness {
     /// GameState backed by a caller-supplied throwaway suite, never the real
     /// "standard" save (GameStateTests pattern). Exposed statically so any
     /// test file can build a bare GameState on its own suite without a harness.
-    static func makeGameState(defaults: UserDefaults) -> GameState {
-        GameState(defaults: defaults)
+    /// `now` pins the trophy engine's clock for deterministic timestamps.
+    static func makeGameState(defaults: UserDefaults,
+                              now: @escaping () -> Date = Date.init) -> GameState {
+        GameState(defaults: defaults, now: now)
     }
 
     // MARK: The core move — re-derive + record
@@ -1179,9 +1308,10 @@ final class TrophyTestHarnessTests: XCTestCase {
     // MARK: The demo — bump a stat through public API → assert unlock
 
     /// S0-T5 acceptance: end-to-end proof. Nine 3-star climb clears through
-    /// the PUBLIC `recordResult` API push totalStars past 25; a `sync()`
-    /// re-derives and latches `climb_stars_25` and reports it as newly
-    /// unlocked on that sync — no engine internals touched.
+    /// the PUBLIC `recordResult` API push totalStars past 25 and latch
+    /// `climb_stars_25` — since S1-T1 the LIVE climb funnel drives the engine
+    /// directly, so the unlock lands during `recordResult` itself (a
+    /// following `sync()` is idempotent). No engine internals touched.
     func testHarnessDemo_publicAPIStatBumpUnlocksTrophy() {
         let h = TrophyTestHarness()
         h.assertLocked("climb_stars_25")
@@ -1193,10 +1323,10 @@ final class TrophyTestHarnessTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(h.gameState.totalStars, 25, "fixture must clear the bar")
 
-        // Re-derive + record, assert on the unlock SET.
-        let unlocked = h.sync()
-        h.assertUnlocked("climb_stars_25", in: unlocked)   // fired on THIS sync
-        h.assertUnlocked("climb_stars_25")                 // latched overall
+        // The live funnel already latched it; a re-sync grants nothing new.
+        h.assertUnlocked("climb_stars_25")                 // latched via live funnel
+        XCTAssertFalse(h.sync().contains { $0.id == "climb_stars_25" },
+                       "already latched — re-sync is a no-op for the target")
         h.assertLocked("climb_stars_150")                  // next rung untouched
     }
 
@@ -1204,9 +1334,9 @@ final class TrophyTestHarnessTests: XCTestCase {
 
     /// The threshold−1 / threshold / threshold+1 + idempotency shape S1
     /// trigger tests follow, exercised through the harness to prove it
-    /// supports them. (Boundary tests assert on the TARGET trophy's presence
-    /// in the sync batch, not on the whole batch — a climb clear legitimately
-    /// also moves `highestUnlocked`, so incidental sibling unlocks are fine.)
+    /// supports them.  Since S1-T1 the LIVE climb funnel drives the engine,
+    /// so the target latches during the threshold `recordResult` itself; the
+    /// following `sync()` is idempotent and a double-fire never restamps.
     func testHarnessSupportsBoundaryAndDoubleFire() {
         let h = TrophyTestHarness()
 
@@ -1214,14 +1344,13 @@ final class TrophyTestHarnessTests: XCTestCase {
         h.gameState.currentModeID = "climb"
         for level in 1...8 { h.gameState.recordResult(level: level, stars: 3, time: 30, coinIndices: []) }
         XCTAssertEqual(h.gameState.totalStars, 24)
+        h.assertLocked("climb_stars_25")
         XCTAssertFalse(h.sync().contains { $0.id == "climb_stars_25" },
                        "no star unlock below threshold")
-        h.assertLocked("climb_stars_25")
 
-        // threshold: the 25th star fires, on this sync.
+        // threshold: the 25th star latches via the live funnel.
         h.gameState.recordResult(level: 9, stars: 3, time: 30, coinIndices: [])
-        let batch = h.sync()
-        h.assertUnlocked("climb_stars_25", in: batch)
+        h.assertUnlocked("climb_stars_25")
         let stamp = h.engine.unlockDate(for: "climb_stars_25")
 
         // threshold+1 / double-fire: more stars, later clock — the target
@@ -1309,5 +1438,1534 @@ final class TrophyTestHarnessTests: XCTestCase {
         // The value round-trips through the injected suite, not "standard".
         let reloaded = TrophyTestHarness.makeGameState(defaults: defaults)
         XCTAssertEqual(reloaded.coinBalance, 4_242)
+    }
+}
+
+// MARK: - S1-T2 — Track + Daily trigger wiring
+
+/// End-to-end wiring tests: drive the PUBLIC GameState funnels (never the
+/// engine directly) and assert the 14 Challenge-Track / Challenge-of-the-Day
+/// trophies latch through the funnel → `trophyEngine.record` path. Each test
+/// runs on its own throwaway UserDefaults suite; the GameState it builds owns
+/// the engine those funnels drive, so an unlock here proves the S1-T2 wiring,
+/// not just the S0 engine.
+final class TrophyTrackDailyWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyTrackDailyWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    /// Fresh GameState on the isolated suite. Its first-launch backfill runs
+    /// over an empty save (grants nothing, marks itself done), so every
+    /// unlock below comes from the live funnel call, not the grandfather.
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    /// `count` distinct "YYYY-MM-DD" completion keys, `strideDays` apart
+    /// (stride 1 = consecutive calendar dates; larger = deliberately
+    /// non-consecutive so a clears-COUNT test never trips the streak trophy).
+    /// Anchored in 2020 so no key can collide with `DailyChallenge.key()`
+    /// (today), which `completeTodaysDailyChallenge` inserts.
+    private func dateKeys(_ count: Int, strideDays: Int) -> Set<String> {
+        let cal = Calendar.current
+        let base = cal.date(from: DateComponents(year: 2020, month: 1, day: 1))!
+        return Set((0..<count).map { i in
+            DailyChallenge.key(cal.date(byAdding: .day, value: i * strideDays, to: base)!)
+        })
+    }
+
+    private func yesterday() -> Date {
+        Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+    }
+
+    // MARK: Challenge Tracks
+
+    /// `track_best_progress` climbs through `advanceTrackProgress`:
+    /// track_first_level (≥1) then track_halfway (≥50); a completion (100)
+    /// also latches track_first_complete via `tracks_completed`.
+    func testTrackProgressTrophiesWireThroughAdvance() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_first_level"))
+
+        gs.advanceTrackProgress(trackID: "alpha", to: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_first_level"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_halfway"))
+
+        gs.advanceTrackProgress(trackID: "alpha", to: 50)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_halfway"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_first_complete"))
+
+        gs.advanceTrackProgress(trackID: "alpha", to: 100)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_first_complete"))
+    }
+
+    /// `tracks_completed` count latches track_triple (3) and track_all_eight
+    /// (8) through distinct-track completions; the Golden Gauntlet completion
+    /// latches track_gauntlet via `golden_gauntlet_completed`.
+    func testTrackCompletionCountAndGauntletWireThroughAdvance() {
+        let gs = makeGameState()
+
+        for i in 1...3 { gs.advanceTrackProgress(trackID: "t\(i)", to: 100) }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_first_complete"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_triple"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_all_eight"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_gauntlet"))
+
+        for i in 4...8 { gs.advanceTrackProgress(trackID: "t\(i)", to: 100) }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_all_eight"))
+
+        gs.advanceTrackProgress(trackID: "golden-gauntlet", to: 100)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_gauntlet"))
+    }
+
+    // MARK: Challenge of the Day
+
+    /// `daily_first_start` is a NEW go-forward metric: starting a daily marks
+    /// the "daily" mode played (§6 item 18) and latches the trophy.
+    func testDailyFirstStartWiresThroughStartDailyChallenge() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.playedModeIDs.contains("daily"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_first_start"))
+
+        gs.startDailyChallenge()
+
+        XCTAssertTrue(gs.playedModeIDs.contains("daily"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_first_start"))
+    }
+
+    /// `daily_clears` count latches daily_first_clear (≥1), daily_clears_10
+    /// (≥10) and daily_clears_50 (≥50) through `completeTodaysDailyChallenge`.
+    /// The set is seeded with non-consecutive historical keys so the clears
+    /// COUNT is what fires — never the streak trophy.
+    func testDailyClearsWireThroughCompleteFunnel() {
+        let gs = makeGameState()
+
+        // 9 prior non-consecutive clears + today's = 10.
+        gs.dailyChallengeCompletions = dateKeys(9, strideDays: 10)
+        gs.completeTodaysDailyChallenge()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_first_clear"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_clears_10"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_clears_50"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_week_streak"),
+                       "non-consecutive keys must not trip the streak trophy")
+
+        // Reseed to 49 prior + today's = 50.
+        gs.dailyChallengeCompletions = dateKeys(49, strideDays: 10)
+        gs.completeTodaysDailyChallenge()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_clears_50"))
+    }
+
+    /// `daily_clear_streak_best` (the consecutive-date derivation) latches
+    /// daily_week_streak (≥7) through the same completion funnel: 7
+    /// consecutive historical clears, revealed on the next completion.
+    func testDailyWeekStreakWiresThroughCompleteFunnel() {
+        let gs = makeGameState()
+        gs.dailyChallengeCompletions = dateKeys(7, strideDays: 1)   // 7 consecutive
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_week_streak"))
+
+        gs.completeTodaysDailyChallenge()   // fires the derivation over the set
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_week_streak"))
+    }
+
+    // MARK: Daily login reward
+
+    /// The reward-streak high-water latches daily_login_7 (≥7) via
+    /// `claimDailyReward`: a streak of 6 claimed yesterday advances to 7.
+    func testDailyLogin7WiresThroughClaim() {
+        let gs = makeGameState()
+        gs.dailyStreak = 6
+        gs.lastDailyClaim = yesterday()      // streak intact, claim available
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_login_7"))
+
+        let granted = gs.claimDailyReward()
+        XCTAssertNotNil(granted, "the claim must actually land")
+        XCTAssertEqual(gs.dailyStreak, 7)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_7"))
+    }
+
+    /// Repeated claims drive both counter-based reward trophies through the
+    /// real funnel: 30 claims latch econ_punch_card (claims ≥30) and, since
+    /// the streak climbs in lockstep, daily_login_7 and daily_login_30.
+    func testRewardClaimCountAndLongStreakWireThroughRepeatedClaims() {
+        let gs = makeGameState()
+        for _ in 0..<30 {
+            gs.lastDailyClaim = yesterday()   // keep the streak alive + claim open
+            _ = gs.claimDailyReward()
+        }
+        XCTAssertEqual(gs.dailyStreak, 30)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_punch_card"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_7"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_30"))
+    }
+}
+
+// MARK: - S1-T7 — View-layer event trigger wiring
+
+/// End-to-end wiring for the four view-only event trophies: the two
+/// run-lifecycle Skill trophies driven through `recordResult`'s new run flags,
+/// and the two secret whimsies driven through the dedicated fall / Coin-Pit
+/// stake funnels. (`whimsy_roll_call` is deliberately absent — it is blocked
+/// on the unbuilt pinball ROLL lanes and carved out of S1-T7/S1-T9.)
+final class TrophyViewEventWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyViewEventWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    /// Fresh GameState on the isolated suite — default mode is the main climb
+    /// (`recordsClimbResult == true`), the gate every run-lifecycle / fall
+    /// trophy rides (the S1-T1 climb tests rely on the same default).
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Skill run-lifecycle (via recordResult)
+
+    /// `skill_first_try`: 3 stars, the level's first-ever attempt (no prior
+    /// clear — a fresh level has no `bestTime`), and a clean run (no fall/
+    /// restart before the goal). Only all three together qualify.
+    func testFirstTryAceWiresThroughRecordResult() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_first_try"))
+
+        // 3 stars but NOT flagged clean → no unlock.
+        gs.recordResult(level: 4, stars: 3, time: 20, coinIndices: [],
+                        firstAttemptClean: false, pickupsThisRun: 0)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_first_try"))
+
+        // 3 stars, first attempt, clean → unlock.
+        gs.recordResult(level: 7, stars: 3, time: 18, coinIndices: [],
+                        firstAttemptClean: true, pickupsThisRun: 0)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("skill_first_try"))
+    }
+
+    /// A clean first attempt at only 2 stars must NOT latch skill_first_try.
+    func testFirstTryAceRequiresThreeStars() {
+        let gs = makeGameState()
+        gs.recordResult(level: 3, stars: 2, time: 25, coinIndices: [],
+                        firstAttemptClean: true, pickupsThisRun: 0)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_first_try"))
+    }
+
+    /// `skill_spotless`: 3 stars AND all three pickup coins banked in one run;
+    /// a partial haul (2 of 3) never qualifies.
+    func testSpotlessRunWiresThroughRecordResult() {
+        let gs = makeGameState()
+
+        // 3 stars but only 2 of 3 coins → no unlock.
+        gs.recordResult(level: 5, stars: 3, time: 22, coinIndices: [0, 1],
+                        firstAttemptClean: false, pickupsThisRun: 2)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("skill_spotless"))
+
+        // 3 stars + all 3 coins → unlock.
+        gs.recordResult(level: 6, stars: 3, time: 21, coinIndices: [0, 1, 2],
+                        firstAttemptClean: false, pickupsThisRun: 3)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("skill_spotless"))
+    }
+
+    // MARK: Secret whimsies (via dedicated funnels)
+
+    /// `whimsy_gravity_check` (secret): a pit-fall on climb LEVEL 1 latches it
+    /// through the dedicated fall funnel — and, per the acceptance criterion,
+    /// falling never consumes a life (tutorial L1 is lives-exempt; the funnel
+    /// touches no life state).
+    func testGravityCheckWiresThroughClimbFallWithoutConsumingALife() {
+        let gs = makeGameState()
+        let livesBefore = gs.lives
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_gravity_check"))
+
+        // A fall on level 2 is not the gravity-check level.
+        gs.recordClimbFall(level: 2)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_gravity_check"))
+
+        gs.recordClimbFall(level: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("whimsy_gravity_check"))
+        XCTAssertEqual(gs.lives, livesBefore, "the fall funnel must never consume a life")
+    }
+
+    /// `whimsy_high_roller` (secret): staking ≥5 time-tickets on a single Coin
+    /// Pit round latches it; a 4-ticket stake does not.
+    func testHighRollerWiresThroughCoinPitStake() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
+
+        gs.recordCoinPitRoundStaked(tickets: 4)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
+
+        gs.recordCoinPitRoundStaked(tickets: 5)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
+    }
+}
+
+// MARK: - TrophySocialWiringTests (S1-T6 acceptance)
+
+/// End-to-end wiring proof for the 7 Social trophy triggers (S1-T6). Drives
+/// the PUBLIC GameState social funnels — `recordSocialSignIn`,
+/// `recordFriendAccepted(peak:)`, `recordLifeSent`, `recordClanJoined`,
+/// `recordClanRequestFulfilled` — directly on a fresh test GameState (a live
+/// `SocialClient` is deliberately NOT needed: the funnels ARE the decision
+/// point, the views only call them on a successful `SocialClient` return).
+///
+/// Each GameState is fresh on an isolated UserDefaults suite; its first-launch
+/// backfill runs over an empty save and grandfathers NOTHING social (all
+/// `socialAction` metrics are omitted from `TrophyBackfill.snapshot`), so
+/// every unlock below is proof the LIVE funnel fired.
+final class TrophySocialWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophySocialWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Sign-in
+
+    /// `social_sign_in`: a pure latch on the first active Apple session.
+    func testSignInWiresThroughFunnel() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_sign_in"))
+
+        gs.recordSocialSignIn()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_sign_in"))
+    }
+
+    // MARK: Friends — accepted-friend high-water
+
+    /// `social_first_friend` (≥1) then `social_friends_5` (≥5) latch as the
+    /// accepted-friend count climbs through the funnel.
+    func testFriendMilestonesWireThroughAcceptedPeak() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_first_friend"))
+
+        gs.recordFriendAccepted(peak: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_first_friend"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_friends_5"))
+
+        gs.recordFriendAccepted(peak: 4)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_friends_5"))
+
+        gs.recordFriendAccepted(peak: 5)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"))
+    }
+
+    /// The accepted-friend high-water LATCHES: once 5 is observed, dropping
+    /// back to 3 (a friend removed) must never revoke `social_friends_5`, and
+    /// a later smaller value must never lower what's unlocked.
+    func testFriendsPeakLatchesAndNeverRevokes() {
+        let gs = makeGameState()
+
+        gs.recordFriendAccepted(peak: 5)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_first_friend"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"))
+
+        // Two friends removed → live count 3, but the ratchet holds.
+        gs.recordFriendAccepted(peak: 3)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"),
+                      "high-water latch must never revoke on a regression")
+
+        // Even a drop to zero keeps both unlocked.
+        gs.recordFriendAccepted(peak: 0)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_first_friend"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_friends_5"))
+    }
+
+    // MARK: Lives sent (friend gifts + clan fulfillments)
+
+    /// `social_send_life` (≥1) latches on the first gift; `social_lives_sent_25`
+    /// (≥25) latches on the 25th. The counter is lifetime and persisted.
+    func testLivesSentMilestonesWireThroughRepeatedSends() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_send_life"))
+
+        gs.recordLifeSent()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_send_life"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_lives_sent_25"))
+        XCTAssertEqual(gs.trophyStats.livesSent, 1)
+
+        for _ in 2...24 { gs.recordLifeSent() }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("social_lives_sent_25"))
+        XCTAssertEqual(gs.trophyStats.livesSent, 24)
+
+        gs.recordLifeSent()   // 25th
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_lives_sent_25"))
+        XCTAssertEqual(gs.trophyStats.livesSent, 25)
+    }
+
+    /// The lives-sent counter persists across a relaunch (a fresh GameState on
+    /// the same defaults reloads it), so the 25-gift trophy can accrue over
+    /// many sessions.
+    func testLivesSentCounterPersistsAcrossRelaunch() {
+        let gs = makeGameState()
+        for _ in 1...24 { gs.recordLifeSent() }
+        XCTAssertEqual(gs.trophyStats.livesSent, 24)
+
+        let relaunched = makeGameState()
+        XCTAssertEqual(relaunched.trophyStats.livesSent, 24, "counter must survive relaunch")
+        relaunched.recordLifeSent()   // 25th, across the session boundary
+        XCTAssertTrue(relaunched.trophyEngine.isUnlocked("social_lives_sent_25"))
+    }
+
+    // MARK: Clans
+
+    /// `clan_join`: a pure latch on joining OR creating a clan.
+    func testClanJoinWiresThroughFunnel() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("clan_join"))
+
+        gs.recordClanJoined()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("clan_join"))
+    }
+
+    /// `clan_fulfill`: a single fulfilled clan life-request latches it.
+    func testClanFulfillWiresThroughFunnel() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("clan_fulfill"))
+
+        gs.recordClanRequestFulfilled()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("clan_fulfill"))
+        XCTAssertEqual(gs.trophyStats.clanRequestsFulfilled, 1)
+    }
+
+    /// A clan fulfillment is BOTH a life sent and a request fulfilled: the view
+    /// calls `recordLifeSent()` on every clan gift and `recordClanRequestFulfilled()`
+    /// additionally when the recipient was asking. This mirrors that call
+    /// ordering and proves the two counters advance independently — the
+    /// `social_lives_sent_25` counter includes clan fulfillments (per catalog).
+    func testClanFulfillmentAlsoCountsTowardLivesSent() {
+        let gs = makeGameState()
+
+        // A gift to a NON-asking clanmate: life sent, no fulfillment.
+        gs.recordLifeSent()
+        XCTAssertEqual(gs.trophyStats.livesSent, 1)
+        XCTAssertEqual(gs.trophyStats.clanRequestsFulfilled, 0)
+
+        // A gift to an ASKING clanmate: both funnels fire (the view's order).
+        gs.recordLifeSent()
+        gs.recordClanRequestFulfilled()
+        XCTAssertEqual(gs.trophyStats.livesSent, 2, "clan fulfillments count toward lives sent")
+        XCTAssertEqual(gs.trophyStats.clanRequestsFulfilled, 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("clan_fulfill"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("social_send_life"))
+    }
+
+    // MARK: No population dependence
+
+    /// No social trophy requires more than a single friend/clan action — one
+    /// accept, one gift, one join, one fulfillment each unlock their bronze/
+    /// first-tier trophy with no other player having to exist. (The higher
+    /// tiers, 5 friends / 25 lives, are volume of the SAME single action, not
+    /// a dependence on a populated graph.)
+    func testFirstTierTrophiesNeedOnlyOneAction() {
+        let gs = makeGameState()
+        gs.recordSocialSignIn()
+        gs.recordFriendAccepted(peak: 1)
+        gs.recordLifeSent()
+        gs.recordClanJoined()
+        gs.recordClanRequestFulfilled()
+
+        for id in ["social_sign_in", "social_first_friend", "social_send_life",
+                   "clan_join", "clan_fulfill"] {
+            XCTAssertTrue(gs.trophyEngine.isUnlocked(id), "\(id) should latch on one action")
+        }
+    }
+}
+
+// MARK: - TrophyMinigameWiringTests (S1-T3 acceptance)
+
+/// End-to-end wiring proof for the minigame trophy triggers (S1-T3): drive
+/// the PUBLIC GameState minigame funnels — `recordMinigameResult`,
+/// `recordCompetitiveWin`, `recordPinballScore`, `recordGoldRushCoins`,
+/// `recordRollUpRun`, `addZenSeconds`, `recordCompetitiveScore`,
+/// `markModePlayed` — and assert the right trophies latch in the engine.
+/// Each GameState is fresh on an isolated UserDefaults suite; its
+/// first-launch backfill runs over an empty save (grants nothing), so every
+/// unlock below is proof the LIVE funnel fired, not the grandfather.
+///
+/// Disco + Roll Out best-trophies (`rollout_first_maze`, `rollout_maze_10`,
+/// `disco_cross_25`, `disco_hard_10`) are deliberately NOT covered here —
+/// those two modes write `minigameBests` in-view and are rerouted through a
+/// GameState funnel in S1-T4, which owns their trigger tests.
+final class TrophyMinigameWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyMinigameWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    /// Win one competitive match through `recordMinigameResult` (the shipped
+    /// view path), at the given difficulty. Score doubles as the stored-best
+    /// unit for koth/paintball.
+    @discardableResult
+    private func win(_ gs: GameState,
+                     _ mode: String,
+                     difficulty: MinigameDifficulty = .normal,
+                     score: Int = 1) -> Int {
+        gs.recordMinigameResult(modeID: mode, difficulty: difficulty,
+                                won: true, score: score, basePayout: 0)
+    }
+
+    // MARK: Arcade-wide — wins
+
+    /// A single competitive win latches arcade_first_win and the per-mode
+    /// first-win trophy, both riding `recordCompetitiveWin` (the ticket-earn
+    /// choke point).
+    func testFirstCompetitiveWinWiresArcadeAndPerGame() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("snake_first_win"))
+
+        win(gs, "snake")
+
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_first_win"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("snake_first_win"))
+    }
+
+    /// `recordCompetitiveWin` called directly (no difficulty context) is still
+    /// the ticket-earn choke point: it must latch the win trophies too.
+    func testDirectRecordCompetitiveWinFiresTrophies() {
+        let gs = makeGameState()
+        gs.recordCompetitiveWin("sumo")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_first_win"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("sumo_first_win"))
+    }
+
+    /// 10 lifetime wins in one mode latches its <mode>_wins_10 trophy; 9 do
+    /// not (boundary).
+    func testPerGameTenWinsBoundary() {
+        let gs = makeGameState()
+        for _ in 0..<9 { win(gs, "goldrush") }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("goldrush_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("goldrush_wins_10"))
+
+        win(gs, "goldrush")   // 10th
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("goldrush_wins_10"))
+    }
+
+    /// arcade_all_six needs one win in EACH of the 6 competitive modes; five
+    /// modes must NOT satisfy it.
+    func testArcadeAllSixNeedsEveryMode() {
+        let gs = makeGameState()
+        let modes = ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"]
+        for m in modes.dropLast() { win(gs, m) }   // 5 of 6
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_all_six"))
+
+        win(gs, modes.last!)                        // the 6th
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_all_six"))
+    }
+
+    /// arcade_wins_100 latches at 100 lifetime competitive wins summed across
+    /// modes; 99 does not.
+    func testArcadeHundredWinsBoundary() {
+        let gs = makeGameState()
+        for _ in 0..<99 { win(gs, "snake") }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_wins_100"))
+        win(gs, "sumo")   // 100th, different mode
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_wins_100"))
+    }
+
+    // MARK: Arcade-wide — Hard difficulty
+
+    /// arcade_hard_once latches on the FIRST Hard win only; a Normal win of
+    /// the same mode must not trip it.
+    func testArcadeHardOnceRequiresHardDifficulty() {
+        let gs = makeGameState()
+        win(gs, "snake", difficulty: .normal)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_hard_once"),
+                       "a Normal win must not satisfy the Hard trophy")
+
+        win(gs, "snake", difficulty: .hard)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_hard_once"))
+    }
+
+    /// arcade_hard_all needs a Hard win in EACH of the 6 modes; five is not
+    /// enough. Verifies the per-difficulty dict is read at the win choke
+    /// point after `recordMinigameResult` bumps it.
+    func testArcadeHardAllNeedsHardWinEveryMode() {
+        let gs = makeGameState()
+        let modes = ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"]
+        for m in modes.dropLast() { win(gs, m, difficulty: .hard) }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_hard_once"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_hard_all"))
+
+        win(gs, modes.last!, difficulty: .hard)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_hard_all"))
+    }
+
+    // MARK: Per-game bests
+
+    /// paintball_coverage_60 rides `minigameBests["paintball"]` (coverage %),
+    /// written by `recordCompetitiveScore`. 59 % misses, 60 % latches.
+    func testPaintballCoverageBestBoundary() {
+        let gs = makeGameState()
+        _ = gs.recordCompetitiveScore("paintball", 59)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("paintball_coverage_60"))
+        _ = gs.recordCompetitiveScore("paintball", 60)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("paintball_coverage_60"))
+    }
+
+    /// koth_hold_45 rides `minigameBests["koth"]` (hold-seconds). 44 misses,
+    /// 45 latches. A losing round still records the best (skill without a win).
+    func testKothHoldBestBoundary() {
+        let gs = makeGameState()
+        _ = gs.recordCompetitiveScore("koth", 44)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("koth_hold_45"))
+        _ = gs.recordCompetitiveScore("koth", 45)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("koth_hold_45"))
+    }
+
+    /// The full koth win path (`recordMinigameResult` with score = holdSec)
+    /// does NOT itself write the best — the view calls `recordCompetitiveScore`
+    /// for that — so a bare win under 45 s must not latch koth_hold_45, only
+    /// koth_first_win.
+    func testKothWinAloneDoesNotGrantHoldTrophy() {
+        let gs = makeGameState()
+        win(gs, "koth", score: 10)   // a short winning round
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("koth_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("koth_hold_45"))
+    }
+
+    /// pinball_score_10k / _50k / _150k ride `pinballBest` through
+    /// `recordPinballScore`, at their exact thresholds.
+    func testPinballScoreTiers() {
+        let gs = makeGameState()
+        _ = gs.recordPinballScore(9_999)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_10k"))
+
+        _ = gs.recordPinballScore(10_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_10k"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_50k"))
+
+        _ = gs.recordPinballScore(50_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_50k"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_150k"))
+
+        _ = gs.recordPinballScore(150_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"))
+    }
+
+    /// A LATER lower pinball score never revokes a higher unlock (latched
+    /// ratchet) and the tier already earned stays lit.
+    func testPinballBestTrophyIsLatched() {
+        let gs = makeGameState()
+        _ = gs.recordPinballScore(150_000)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"))
+        _ = gs.recordPinballScore(1)   // a bad game later
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"),
+                      "a latched trophy must never revoke")
+    }
+
+    /// rollup_100m / rollup_500m ride `minigameBests["rollup"]` (height, m)
+    /// through `recordRollUpRun`, at their thresholds.
+    func testRollUpHeightTiers() {
+        let gs = makeGameState()
+        _ = gs.recordRollUpRun(height: 99, seconds: 30)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollup_100m"))
+
+        _ = gs.recordRollUpRun(height: 100, seconds: 40)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollup_100m"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollup_500m"))
+
+        _ = gs.recordRollUpRun(height: 500, seconds: 90)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollup_500m"))
+    }
+
+    // MARK: Zen
+
+    /// zen_hour (≥3,600 s) / zen_10_hours (≥36,000 s) accumulate through
+    /// `addZenSeconds`. Below an hour: nothing.
+    func testZenTimeTiers() {
+        let gs = makeGameState()
+        gs.addZenSeconds(3_599)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("zen_hour"))
+
+        gs.addZenSeconds(1)   // now 3,600
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("zen_hour"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("zen_10_hours"))
+
+        gs.addZenSeconds(36_000 - 3_600)   // now 36,000
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("zen_10_hours"))
+    }
+
+    // MARK: Coin Pit (goldrushBest / goldrushCoinsTotal — the naming trap)
+
+    /// coinpit_first_round rides the played-mode set through `markModePlayed`.
+    func testCoinPitFirstRoundWiresThroughMarkModePlayed() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("coinpit_first_round"))
+        gs.markModePlayed("coinpit")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_first_round"))
+    }
+
+    /// coinpit_catch_90 rides `goldrushBest` (best single Coin Pit haul) and
+    /// econ_pit_boss rides `goldrushCoinsTotal` (lifetime Coin Pit coins) —
+    /// both through `recordGoldRushCoins`, NOT the "goldrush" competitive mode.
+    func testCoinPitCatchAndLifetimeWireThroughGoldRushCoins() {
+        let gs = makeGameState()
+        _ = gs.recordGoldRushCoins(89)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
+
+        _ = gs.recordGoldRushCoins(90)     // a 90-coin round: best now 90
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
+
+        // Grind the lifetime total to 2,500 for econ_pit_boss (89+90 = 179
+        // so far; add 2,321 more across rounds).
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_pit_boss"))
+        _ = gs.recordGoldRushCoins(2_500 - 179)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_pit_boss"))
+    }
+
+    /// Coin Pit reward-run stats must NOT be confused with the "goldrush"
+    /// (Smash and Grab) competitive mode: winning goldrush grants goldrush
+    /// win trophies but never the Coin Pit best/lifetime trophies, and a Coin
+    /// Pit haul never grants goldrush win trophies.
+    func testCoinPitAndGoldrushModeAreDisjoint() {
+        let gs = makeGameState()
+        _ = gs.recordGoldRushCoins(120)               // a Coin Pit round
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("goldrush_first_win"),
+                       "a Coin Pit haul must not grant a Smash and Grab win trophy")
+
+        win(gs, "goldrush")                           // a Smash and Grab win
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("goldrush_first_win"))
+    }
+
+    // MARK: Discovery (played-mode set)
+
+    /// arcade_sampler (5 distinct minigames) / arcade_grand_tour (all 12)
+    /// accumulate through `markModePlayed`.
+    func testArcadeDiscoveryTiers() {
+        let gs = makeGameState()
+        let all = ["zen", "coinpit", "snake", "sumo", "paintball", "goldrush",
+                   "marblecup", "koth", "pinball", "rollout", "rollup", "disco"]
+        for m in all.prefix(4) { gs.markModePlayed(m) }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"))
+
+        gs.markModePlayed(all[4])   // 5th distinct minigame
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_sampler"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
+
+        for m in all.dropFirst(5) { gs.markModePlayed(m) }   // all 12
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
+    }
+
+    /// Playing a non-minigame mode id (or re-playing one already counted) does
+    /// not inflate `minigames_played` — the derivation intersects with the 12
+    /// minigame ids and the set dedupes.
+    func testNonMinigameAndRepeatPlaysDoNotInflateDiscovery() {
+        let gs = makeGameState()
+        gs.markModePlayed("climb")            // not a minigame id
+        gs.markModePlayed("snake")
+        gs.markModePlayed("snake")            // repeat
+        gs.markModePlayed("challenge.alpha")  // not one of the 12
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"),
+                       "only 1 distinct minigame played — must not reach 5")
+    }
+}
+
+// MARK: - TrophyDiscoRollOutWiringTests (S1-T4)
+//
+// Disco Ball and Roll Out formerly wrote `minigameBests` directly in-view.
+// S1-T4 reroutes both writes through GameState funnels (`recordDiscoResult` /
+// `recordRollOutResult`) so the record, the shared new-best bonus, and the
+// Disco/Roll Out trophies all live at one choke point.  These tests drive the
+// PUBLIC funnels and assert (1) bests + the new-best bonus behave identically
+// to the old in-view logic, (2) the Disco/Roll Out trophies fire from the
+// funnels, and (3) the live funnel and `TrophyBackfill.snapshot` agree.
+final class TrophyDiscoRollOutWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyDiscoRollOutWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Regression — bests behave identically pre/post reroute
+
+    /// A new Disco best writes the difficulty-scoped slot and pays exactly the
+    /// shared new-best bonus (matching the old in-view `wasBest` branch); the
+    /// funnel returns true.  A fresh GameState starts at 0 coins, so the only
+    /// coin movement the funnel owns is the 100-coin bonus (the per-crossing
+    /// payout stays in the view).
+    func testDiscoNewBestWritesSlotAndPaysBonus() {
+        let gs = makeGameState()
+        XCTAssertEqual(gs.coinBalance, 0)
+
+        let isBest = gs.recordDiscoResult(bestKey: "disco", crossings: 30)
+
+        XCTAssertTrue(isBest)
+        XCTAssertEqual(gs.minigameBests["disco", default: 0], 30)
+        XCTAssertEqual(gs.coinBalance, GameState.minigameBestBonus,
+                       "a new best pays exactly the shared bonus")
+    }
+
+    /// A later, lower Disco run is NOT a best: the slot is unchanged, no bonus
+    /// is paid, and the funnel returns false — identical to the old in-view
+    /// `crossings > best` guard.
+    func testDiscoLowerRunDoesNotRegressBestOrPayBonus() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 30)
+        let balanceAfterBest = gs.coinBalance
+
+        let isBest = gs.recordDiscoResult(bestKey: "disco", crossings: 12)
+
+        XCTAssertFalse(isBest)
+        XCTAssertEqual(gs.minigameBests["disco", default: 0], 30,
+                       "a worse run must never lower the stored best")
+        XCTAssertEqual(gs.coinBalance, balanceAfterBest,
+                       "no new best → no bonus")
+    }
+
+    /// Each Disco difficulty writes its OWN slot; the three keys are
+    /// independent (the view passes the difficulty-scoped bestKey).
+    func testDiscoDifficultySlotsAreIndependent() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 8)
+        _ = gs.recordDiscoResult(bestKey: "disco",     crossings: 15)
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 5)
+
+        XCTAssertEqual(gs.minigameBests["discoeasy", default: 0], 8)
+        XCTAssertEqual(gs.minigameBests["disco", default: 0], 15)
+        XCTAssertEqual(gs.minigameBests["discohard", default: 0], 5)
+    }
+
+    /// A zero-crossing Disco run records nothing and pays nothing (the old
+    /// in-view path only wrote/paid when `crossings > 0`).
+    func testDiscoZeroCrossingsIsNoOp() {
+        let gs = makeGameState()
+        let isBest = gs.recordDiscoResult(bestKey: "disco", crossings: 0)
+        XCTAssertFalse(isBest)
+        XCTAssertNil(gs.minigameBests["disco"])
+        XCTAssertEqual(gs.coinBalance, 0)
+    }
+
+    /// A new Roll Out best (furthest maze reached, 1-based) writes the
+    /// `"rollout"` slot and pays the shared new-best bonus; the funnel returns
+    /// true.
+    func testRollOutNewBestWritesSlotAndPaysBonus() {
+        let gs = makeGameState()
+        XCTAssertEqual(gs.coinBalance, 0)
+
+        let isBest = gs.recordRollOutResult(reached: 3)
+
+        XCTAssertTrue(isBest)
+        XCTAssertEqual(gs.minigameBests["rollout", default: 0], 3)
+        XCTAssertEqual(gs.coinBalance, GameState.minigameBestBonus)
+    }
+
+    /// A later, lower Roll Out clear is not a best: slot unchanged, no bonus,
+    /// returns false.
+    func testRollOutLowerClearDoesNotRegressBestOrPayBonus() {
+        let gs = makeGameState()
+        _ = gs.recordRollOutResult(reached: 6)
+        let balanceAfterBest = gs.coinBalance
+
+        let isBest = gs.recordRollOutResult(reached: 2)
+
+        XCTAssertFalse(isBest)
+        XCTAssertEqual(gs.minigameBests["rollout", default: 0], 6)
+        XCTAssertEqual(gs.coinBalance, balanceAfterBest)
+    }
+
+    // MARK: Disco trophies fire from the funnel
+
+    /// disco_cross_25 rides the MAX over the three difficulty keys: 24 misses,
+    /// 25 (on any difficulty) latches.
+    func testDiscoCross25Boundary() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 24)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_cross_25"))
+
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"))
+    }
+
+    /// disco_cross_25 is the MAX across difficulties: 25 crossings on EASY
+    /// satisfies it even though the Normal/Hard slots are lower (mirrors the
+    /// backfill's max derivation).
+    func testDiscoCross25TakesMaxAcrossDifficulties() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco",     crossings: 10)
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 4)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_cross_25"))
+
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 25)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"),
+                      "25 crossings on any single difficulty must satisfy the any-difficulty trophy")
+    }
+
+    /// disco_hard_10 rides the "discohard" slot ONLY: 25 crossings on Normal
+    /// must not trip it; 10 on Hard latches.
+    func testDiscoHard10IsHardSlotOnly() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)   // Normal, well past 10
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_hard_10"),
+                       "a Normal run must never satisfy the Hard-only trophy")
+
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 9)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_hard_10"))
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 10)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_hard_10"))
+    }
+
+    /// A latched Disco trophy is never revoked by a later, worse run.
+    func testDiscoTrophyIsLatched() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 12)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_hard_10"))
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 1)   // a bad run later
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_hard_10"),
+                      "a latched trophy must never revoke")
+    }
+
+    // MARK: Roll Out trophies fire from the funnel
+
+    /// rollout_first_maze (≥1) latches on the first cleared maze; rollout_maze_10
+    /// (≥10) at maze 10 and not maze 9.
+    func testRollOutMazeTiers() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+
+        _ = gs.recordRollOutResult(reached: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+
+        _ = gs.recordRollOutResult(reached: 9)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+        _ = gs.recordRollOutResult(reached: 10)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+    }
+
+    /// A latched Roll Out trophy is never revoked by a later, worse clear.
+    func testRollOutTrophyIsLatched() {
+        let gs = makeGameState()
+        _ = gs.recordRollOutResult(reached: 10)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+        _ = gs.recordRollOutResult(reached: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"),
+                      "a latched trophy must never revoke")
+    }
+
+    // MARK: Disco and Roll Out are disjoint
+
+    /// A Disco run never touches Roll Out trophies and vice versa.
+    func testDiscoAndRollOutAreDisjoint() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_first_maze"),
+                       "a Disco run must not grant a Roll Out trophy")
+
+        _ = gs.recordRollOutResult(reached: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+    }
+
+    // MARK: Live funnel ≡ backfill snapshot
+
+    /// The live funnels must derive the SAME metric values `TrophyBackfill`
+    /// derives from the stored bests, so a save built by playing agrees with a
+    /// save that is grandfathered in.  Drive the funnels, then backfill a fresh
+    /// engine from the same GameState and assert identical unlock sets for the
+    /// four S1-T4 trophies.
+    func testLiveFunnelAgreesWithBackfill() throws {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 25)   // disco_cross_25 via max
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 10)   // disco_hard_10
+        _ = gs.recordRollOutResult(reached: 10)                          // rollout_first_maze + _maze_10
+
+        let live = gs.trophyEngine.unlockedIDs
+        for id in ["disco_cross_25", "disco_hard_10",
+                   "rollout_first_maze", "rollout_maze_10"] {
+            XCTAssertTrue(live.contains(id), "live funnel should unlock \(id)")
+        }
+
+        // Backfill a fresh engine from the SAME stored bests.
+        let backfilled = TrophyBackfill.snapshot(from: gs)
+        let engine = TrophyEngine(catalog: try TrophyCatalog.load(bundle: .main),
+                                  defaults: UserDefaults(suiteName: suiteName + ".backfill")!)
+        for metric in TrophyMetric.allCases {
+            if let value = backfilled[metric] { _ = engine.record(metric, value: value) }
+        }
+        for id in ["disco_cross_25", "disco_hard_10",
+                   "rollout_first_maze", "rollout_maze_10"] {
+            XCTAssertTrue(engine.isUnlocked(id),
+                          "backfill should also unlock \(id) — live and backfill must agree")
+        }
+    }
+}
+
+// MARK: - TrophyCosmeticEconomyWiringTests (S1-T5 acceptance)
+
+/// End-to-end wiring proof for the cosmetic + economy trophy triggers
+/// (S1-T5): drive the PUBLIC GameState funnels — `grant`, `purchase`,
+/// `purchaseBundle`, `purchasePack`, `addCoins`, and the equip setters — and
+/// assert the right trophies latch on `gs.trophyEngine`.  The load-bearing
+/// claims: the 4 IAP secrets are excluded from every collection criterion;
+/// the earned Trophy ball / coin-buyable Aurora / free starters DO count;
+/// `collection_complete` uses the 207-item evergreen denominator; no trophy
+/// keys to a purchase/IAP count.
+final class TrophyCosmeticEconomyWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyCosmeticEconomyWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    /// Fresh GameState on the isolated suite. Its first-launch backfill runs
+    /// over an empty save (grants nothing, marks itself done), so every
+    /// unlock below comes from the live funnel, not the grandfather.
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: - Exclusion constant (the base pay-gate guard)
+
+    /// The dedicated trophy exclusion constant is EXACTLY the 4 IAP secrets —
+    /// {Diamond ball, Money Ball, Money Roll, Money Full} — by rawValue. This
+    /// is the single guard that keeps every collection criterion from becoming
+    /// a ~$150 pay-gate; pin it hard so no future edit widens or narrows it.
+    func testIAPSecretExclusionConstantIsExactlyTheFourSecrets() {
+        XCTAssertEqual(
+            TrophyCosmeticExclusions.iapSecretRawValues,
+            Set([BallSkin.diamond.rawValue, BallSkin.moneyBall.rawValue,
+                 TrailColor.moneyRoll.rawValue, Floor.moneyFull.rawValue]),
+            "the exclusion constant must be exactly the 4 IAP secrets")
+        XCTAssertEqual(TrophyCosmeticExclusions.iapSecretRawValues.count, 4)
+        // It must NOT be the iconic set (which also carries Trophy + starters).
+        XCTAssertFalse(TrophyCosmeticExclusions.iapSecretBalls.contains(.trophy),
+                       "Trophy ball is earned, not an IAP secret — must NOT be excluded")
+    }
+
+    /// The seasonal exclusion is exactly the 7 `isBundleExclusive` seasonal
+    /// balls — and NOT Pluto/Trophy (also `isBundleExclusive` but evergreen).
+    func testSeasonalExclusionConstantIsExactlyTheSevenSeasonalBalls() {
+        XCTAssertEqual(
+            TrophyCosmeticExclusions.seasonalExclusiveBalls,
+            Set([.beachBall, .pumpkin, .ornament, .heartstone,
+                 .shamrock, .confetti, .speckledEgg]))
+        XCTAssertEqual(TrophyCosmeticExclusions.seasonalExclusiveBalls.count, 7)
+        XCTAssertFalse(TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(.pluto),
+                       "Pluto is bundle-exclusive but evergreen — must NOT be excluded")
+        XCTAssertFalse(TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(.trophy))
+    }
+
+    // MARK: - cosmetic_first_buy (coin spend only)
+
+    /// `cosmetic_first_buy` fires on the first COIN purchase — and only a coin
+    /// spend, never a free `grant` (tutorial gift, track reward, IAP unlock).
+    func testCosmeticFirstBuyFiresOnCoinPurchaseNotFreeGrant() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+
+        // A free grant must NOT trip it.
+        gs.grant(BallSkin.blue)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_first_buy"),
+                       "free grant is not a coin spend")
+
+        // A real coin purchase does.
+        gs.coinBalance = 100_000
+        XCTAssertTrue(gs.purchase(BallSkin.green))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+    }
+
+    /// A pack purchase also latches `cosmetic_first_buy` (a coin spend) and
+    /// `pack_first` (owned pack count ≥ 1).
+    func testPackPurchaseLatchesFirstBuyAndPackFirst() {
+        let gs = makeGameState()
+        gs.coinBalance = 100_000
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("pack_first"))
+
+        let pack = BallPack.catalogue.first!
+        XCTAssertTrue(gs.purchasePack(pack))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("pack_first"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+    }
+
+    // MARK: - balls_own_* (IAP secrets excluded, seasonal + Trophy counted)
+
+    /// `balls_own_10` latches at 10 owned non-secret ball skins granted through
+    /// the choke point; owning the 2 IAP-secret balls neither helps nor hurts.
+    func testBallsOwn10ExcludesIAPSecretsAndCountsRegularGrants() {
+        let gs = makeGameState()
+
+        // Grant the 2 IAP secrets first — they must not count.
+        gs.grant(BallSkin.diamond)
+        gs.grant(BallSkin.moneyBall)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("balls_own_10"),
+                       "IAP secrets must not count toward balls_own")
+
+        // 9 regular coin/skill-reachable balls → still locked.
+        let regular: [BallSkin] = [.blue, .green, .purple, .rose, .coral,
+                                   .mint, .slate, .lemon, .gold]
+        regular.forEach { gs.grant($0) }
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("balls_own_10"))
+
+        // The Trophy ball is earned-exclusive but DOES count → 10th ball.
+        gs.grant(BallSkin.trophy)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("balls_own_10"),
+                      "Trophy ball counts toward collection")
+    }
+
+    /// A seasonal ball (excluded only from `collection_complete`) DOES count
+    /// toward `balls_own_*` / `items_own_50` per catalog §3.6.
+    func testSeasonalBallCountsTowardBallsAndItemsOwn() {
+        let gs = makeGameState()
+        let before = gs.trophyBallsOwnedCount
+        gs.grant(BallSkin.pumpkin)
+        XCTAssertEqual(gs.trophyBallsOwnedCount, before + 1,
+                       "a seasonal ball counts toward balls_own")
+    }
+
+    // MARK: - items_own_50
+
+    /// `items_own_50` latches at 50 owned cosmetics across all 7 slots,
+    /// IAP secrets excluded; wired through `grant`.
+    func testItemsOwn50AcrossSlotsExcludesIAPSecrets() {
+        let gs = makeGameState()
+        // Grant the 4 IAP secrets — none may count.
+        gs.grant(BallSkin.diamond); gs.grant(BallSkin.moneyBall)
+        gs.grant(TrailColor.moneyRoll); gs.grant(Floor.moneyFull)
+
+        // Grant 50 non-secret, non-starter items spread across slots.
+        var granted = 0
+        func fill<Item: CosmeticItem>(_ cases: [Item], _ secrets: Set<String>) {
+            for item in cases where granted < 50
+                && item.tier != .starter
+                && item != Item.starter
+                && !secrets.contains(item.rawValue) {
+                gs.grant(item); granted += 1
+            }
+        }
+        fill(Array(BallSkin.allCases),
+             TrophyCosmeticExclusions.iapSecretRawValues)
+        fill(Array(GoalSkin.allCases), [])
+        fill(Array(TrailColor.allCases),
+             TrophyCosmeticExclusions.iapSecretRawValues)
+        fill(Array(Floor.allCases),
+             TrophyCosmeticExclusions.iapSecretRawValues)
+        fill(Array(Pit.allCases), [])
+        fill(Array(Boundary.allCases), [])
+        fill(Array(MusicTrack.allCases), [])
+
+        XCTAssertEqual(granted, 50, "test should grant exactly 50 non-secret items")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("items_own_50"))
+    }
+
+    // MARK: - collection_complete (207 evergreen denominator)
+
+    /// Grant EVERY evergreen cosmetic (the 207-item set) and prove
+    /// `collection_complete` latches — while owning Money/Diamond neither
+    /// helps nor is required, and the 7 seasonal balls are NOT required.
+    func testCollectionCompleteUsesEvergreenDenominatorAndExcludesSecretsAndSeasonal() {
+        let gs = makeGameState()
+
+        // Own the 4 IAP secrets + all 7 seasonal balls — none should be
+        // needed, and they must not push the count past 207 either.
+        gs.grant(BallSkin.diamond); gs.grant(BallSkin.moneyBall)
+        gs.grant(TrailColor.moneyRoll); gs.grant(Floor.moneyFull)
+        for b in TrophyCosmeticExclusions.seasonalExclusiveBalls { gs.grant(b) }
+
+        // Not yet complete: evergreen items still missing.
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("collection_complete"))
+
+        // Grant every EVERGREEN item (skip IAP secrets + seasonal balls;
+        // starters are already implicitly owned).
+        for b in BallSkin.allCases
+        where !TrophyCosmeticExclusions.iapSecretBalls.contains(b)
+            && !TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(b) {
+            gs.grant(b)
+        }
+        for g in GoalSkin.allCases { gs.grant(g) }
+        for t in TrailColor.allCases
+        where !TrophyCosmeticExclusions.iapSecretTrails.contains(t) { gs.grant(t) }
+        for f in Floor.allCases
+        where !TrophyCosmeticExclusions.iapSecretFloors.contains(f) { gs.grant(f) }
+        for p in Pit.allCases { gs.grant(p) }
+        for bnd in Boundary.allCases { gs.grant(bnd) }
+        for m in MusicTrack.allCases { gs.grant(m) }
+
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 207,
+                       "the evergreen denominator must be exactly 207")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("collection_complete"),
+                      "owning all 207 evergreen items completes the collection")
+    }
+
+    /// The evergreen count NEVER exceeds 207 even when every IAP secret and
+    /// seasonal ball is also owned — proving they can't help/pad the metric.
+    func testEvergreenCountCannotExceed207() {
+        let gs = makeGameState()
+        // Own literally everything the game defines.
+        for b in BallSkin.allCases  { gs.grant(b) }
+        for g in GoalSkin.allCases  { gs.grant(g) }
+        for t in TrailColor.allCases { gs.grant(t) }
+        for f in Floor.allCases     { gs.grant(f) }
+        for p in Pit.allCases       { gs.grant(p) }
+        for bnd in Boundary.allCases { gs.grant(bnd) }
+        for m in MusicTrack.allCases { gs.grant(m) }
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 207,
+                       "owning secrets + seasonal must not push evergreen past 207")
+    }
+
+    /// Coin-buyable Aurora counts toward evergreen (it is NOT iconic-excluded).
+    func testAuroraCountsTowardEvergreen() {
+        let gs = makeGameState()
+        let before = gs.trophyEvergreenCosmeticsOwnedCount
+        gs.grant(BallSkin.aurora)
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, before + 1,
+                       "Aurora is coin-reachable evergreen and must count")
+    }
+
+    // MARK: - bundle_first / bundle_5
+
+    /// `bundle_first` (≥1) and `bundle_5` (≥5) latch off `completedBundleIDs`
+    /// as bundles are bought as a unit through `purchaseBundle`.
+    func testBundleCompletionTrophiesFireOnCompletedBundleIDs() {
+        let gs = makeGameState()
+        gs.coinBalance = 10_000_000
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("bundle_first"))
+
+        let bundles = Array(CosmeticBundle.catalogue.prefix(5))
+        XCTAssertGreaterThanOrEqual(bundles.count, 5, "need ≥5 bundles for this test")
+
+        _ = gs.purchaseBundle(bundles[0], price: bundles[0].proratedPrice(in: gs))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("bundle_first"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("bundle_5"))
+
+        for b in bundles[1...4] {
+            gs.coinBalance = 10_000_000
+            _ = gs.purchaseBundle(b, price: b.proratedPrice(in: gs))
+        }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("bundle_5"))
+    }
+
+    // MARK: - cosmetic_full_kit (equip in all 7 slots)
+
+    /// `cosmetic_full_kit` latches only when a non-starter cosmetic is equipped
+    /// in all 7 slots simultaneously; wired through the equip setters.
+    func testFullKitLatchesWhenAllSevenSlotsNonStarter() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_full_kit"))
+
+        // Equip a non-starter in six slots — ball slot still starter.
+        gs.equippedGoal = GoalSkin.allCases.first { $0 != .target }!
+        gs.equippedTrail = TrailColor.allCases.first { $0 != .graphite && $0 != .moneyRoll }!
+        gs.equippedFloor = Floor.allCases.first { $0 != .classic && $0 != .moneyFull }!
+        gs.equippedPit = Pit.allCases.first { $0 != .classic }!
+        gs.equippedBoundary = Boundary.allCases.first { $0 != .classic }!
+        gs.equippedMusic = MusicTrack.allCases.first { $0 != .none }!
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_full_kit"),
+                       "ball slot still starter → not a full kit")
+
+        // Equip a non-starter ball → all 7 slots non-starter.
+        gs.equipBall(BallSkin.blue)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_full_kit"))
+    }
+
+    // MARK: - econ_working_capital / econ_nest_egg (source-tagged coins)
+
+    /// `econ_working_capital` (5,000 play-earned) counts .play and .daily
+    /// coins but NOT .iap / .refund / .giftCompensation; `econ_nest_egg`
+    /// latches off the balance high-water.
+    func testEconomyTrophiesRespectCoinSourceAndBalanceHighWater() {
+        let gs = makeGameState()
+
+        // Excluded sources must never advance econ_working_capital.
+        gs.addCoins(6_000, source: .iap)
+        gs.addCoins(6_000, source: .refund)
+        gs.addCoins(6_000, source: .giftCompensation)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_working_capital"),
+                       "IAP / refund / gift coins are not play income")
+        // …but they still count toward the coin BALANCE (nest egg).
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_nest_egg"),
+                      "any coins held ≥1,000 latch nest egg")
+
+        // Play income advances working capital.
+        gs.addCoins(4_000, source: .play)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_working_capital"))
+        gs.addCoins(1_000, source: .daily)   // 5,000 play-earned total
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_working_capital"))
+    }
+
+    // MARK: - No trophy keys to a purchase / IAP count
+
+    /// `cosmetic_first_buy` is a one-shot LATCH (threshold 1), not a
+    /// purchase-count trophy: a second, third… purchase changes nothing and no
+    /// higher-count purchase trophy exists.
+    func testCosmeticFirstBuyIsALatchNotAPurchaseCounter() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        // Only one trophy keys to cosmetic_coin_buys, and its threshold is 1.
+        let buyTrophies = catalog.trophies.filter {
+            $0.criteria.metric == .cosmeticCoinBuys
+        }
+        XCTAssertEqual(buyTrophies.map(\.id), ["cosmetic_first_buy"])
+        XCTAssertEqual(buyTrophies.first?.criteria.threshold, 1,
+                       "no purchase-COUNT trophy may exist — first-buy is a latch")
+    }
+
+    // MARK: - Live vs backfill agreement
+
+    /// The ownership metrics recorded live through `grant` produce the SAME
+    /// unlocks as a first-launch backfill over the same save — the exclusion
+    /// arithmetic lives in one place, so they cannot drift.
+    func testLiveAndBackfillAgreeOnCosmeticOwnership() throws {
+        let gs = makeGameState()
+        gs.coinBalance = 100_000
+
+        // Own 40 non-secret balls (past balls_own_40) + a few other slots.
+        var granted = 0
+        for b in BallSkin.allCases
+        where granted < 40
+            && b.tier != .starter
+            && !TrophyCosmeticExclusions.iapSecretBalls.contains(b) {
+            gs.grant(b); granted += 1
+        }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("balls_own_10"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("balls_own_40"))
+
+        // Backfill a fresh engine from the SAME stored save.
+        let backfilled = TrophyBackfill.snapshot(from: gs)
+        let engine = TrophyEngine(catalog: try TrophyCatalog.load(bundle: .main),
+                                  defaults: UserDefaults(suiteName: suiteName + ".backfill")!)
+        for metric in TrophyMetric.allCases {
+            if let value = backfilled[metric] { _ = engine.record(metric, value: value) }
+        }
+        for id in ["balls_own_10", "balls_own_40"] {
+            XCTAssertTrue(engine.isUnlocked(id),
+                          "backfill must also unlock \(id) — live and backfill must agree")
+        }
+        // The snapshot's evergreen/full-kit values match the live properties.
+        XCTAssertEqual(backfilled[.evergreenCosmeticsOwned],
+                       Double(gs.trophyEvergreenCosmeticsOwnedCount))
+        XCTAssertEqual(backfilled[.ballsOwned],
+                       Double(gs.trophyBallsOwnedCount))
+    }
+}
+
+// MARK: - S1-T9 — Trigger coverage sweep + gate
+
+/// The Sprint-1 completeness gate. Two jobs:
+///  1. Fill the trigger-coverage gaps the per-task suites left (a handful of
+///     mid-ladder climb thresholds and per-game minigame wins that no earlier
+///     test asserted by id), each driven through the real GameState funnel.
+///  2. A DURABLE catalog-enumeration gate: every one of the 89 catalog
+///     trophies must have an explicit trigger test — the sole exception is
+///     `whimsy_roll_call`, blocked on the unbuilt pinball ROLL lanes. Adding a
+///     trophy without wiring+testing it makes `testEveryTrophyHasATriggerTest`
+///     fail, forcing coverage to keep pace with the catalog.
+final class TrophyTriggerCoverageTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyTriggerCoverageTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Gap-fill triggers
+
+    /// The mid-ladder climb thresholds (101 / 251 / 501) — one high clear
+    /// advances `highestUnlocked` past all three.
+    func testMidLadderClimbLevelsWireThroughRecordResult() {
+        let gs = makeGameState()
+        gs.recordResult(level: 500, stars: 3, time: 40, coinIndices: [])
+        XCTAssertEqual(gs.highestUnlocked, 501)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_100"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_250"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_500"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("climb_level_1000"))
+    }
+
+    /// Per-game win counts through the `recordCompetitiveWin` choke point:
+    /// paintball/marblecup first wins (≥1), and the 10-win bars for sumo and
+    /// marble cup.
+    func testPerGameWinTrophiesWireThroughCompetitiveWin() {
+        let gs = makeGameState()
+
+        gs.recordCompetitiveWin("paintball")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("paintball_first_win"))
+
+        gs.recordCompetitiveWin("marblecup")
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("marblecup_first_win"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("marblecup_wins_10"))
+
+        for _ in 0..<9 { gs.recordCompetitiveWin("marblecup") }   // → 10
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("marblecup_wins_10"))
+
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("sumo_wins_10"))
+        for _ in 0..<10 { gs.recordCompetitiveWin("sumo") }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("sumo_wins_10"))
+    }
+
+    // MARK: The durable coverage gate
+
+    /// `whimsy_roll_call` is the sole trophy with no live trigger — its metric
+    /// `pinball_roll_lane_sweeps` is recorded nowhere (the pinball ROLL lanes
+    /// are an unbuilt roadmap item) and is watched by no other trophy.
+    func testRollCallIsTheSoleBlockedTrophy() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        let rollCall = try XCTUnwrap(catalog.trophies.first { $0.id == "whimsy_roll_call" })
+        XCTAssertEqual(rollCall.criteria.metric, .pinballRollLaneSweeps)
+        let sharers = catalog.trophies.filter { $0.criteria.metric == .pinballRollLaneSweeps }
+        XCTAssertEqual(sharers.map(\.id), ["whimsy_roll_call"],
+                       "the blocked metric must be unique to whimsy_roll_call")
+    }
+
+    /// DURABLE GATE: every catalog trophy except `whimsy_roll_call` has an
+    /// explicit trigger test somewhere in the trophy test suites. The covered
+    /// set below is the hand-maintained checklist; a new trophy added to the
+    /// catalog without being listed here (and wired + tested) fails this test.
+    func testEveryTrophyHasATriggerTest() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        let catalogIDs = Set(catalog.trophies.map(\.id))
+        XCTAssertEqual(catalogIDs.count, 89, "catalog is frozen at 89 v1 trophies")
+
+        // Ids with an explicit trigger test, grouped by the S1 task/suite that
+        // owns them. Keep in lockstep with the catalog.
+        let coveredByTriggerTests: Set<String> = [
+            // S1-T1 climb (+ mid-ladder gaps filled by S1-T9)
+            "climb_first_clear", "climb_level_10", "climb_level_50", "climb_level_100",
+            "climb_level_250", "climb_level_500", "climb_level_1000", "climb_summit",
+            "climb_stars_25", "climb_stars_150", "climb_perfect_world", "climb_pickups_100",
+            // S1-T2 challenge tracks
+            "track_first_level", "track_halfway", "track_first_complete", "track_triple",
+            "track_gauntlet", "track_all_eight",
+            // S1-T2 daily
+            "daily_first_start", "daily_first_clear", "daily_login_7", "daily_clears_10",
+            "daily_login_30", "daily_clears_50", "daily_week_streak",
+            // S1-T5 economy
+            "econ_nest_egg", "econ_punch_card", "econ_working_capital", "econ_pit_boss",
+            // S1-T3 arcade
+            "arcade_sampler", "arcade_grand_tour", "arcade_first_win", "arcade_all_six",
+            "arcade_hard_once", "arcade_wins_100", "arcade_hard_all",
+            // S1-T3 per-game (+ S1-T4 disco/rollout; + S1-T9 gap fills)
+            "snake_first_win", "snake_wins_10", "sumo_first_win", "sumo_wins_10",
+            "paintball_first_win", "paintball_coverage_60", "goldrush_first_win",
+            "goldrush_wins_10", "marblecup_first_win", "marblecup_wins_10", "koth_first_win",
+            "koth_hold_45", "pinball_score_10k", "pinball_score_50k", "pinball_score_150k",
+            "rollout_first_maze", "rollout_maze_10", "rollup_100m", "rollup_500m",
+            "disco_cross_25", "disco_hard_10", "zen_hour", "zen_10_hours",
+            "coinpit_first_round", "coinpit_catch_90",
+            // S1-T5 cosmetics & collection
+            "cosmetic_first_buy", "cosmetic_full_kit", "bundle_first", "balls_own_10",
+            "bundle_5", "items_own_50", "pack_first", "balls_own_40", "collection_complete",
+            // S1-T1 / S1-T7 skill & style
+            "skill_ace_veryhard", "skill_speed_10s", "skill_clean_sheet_10", "skill_first_try",
+            "skill_spotless", "skill_clean_sheet_25",
+            // S1-T6 social
+            "social_sign_in", "social_first_friend", "social_friends_5", "social_send_life",
+            "social_lives_sent_25", "clan_join", "clan_fulfill",
+            // S1-T7 / S1-T3 secret whimsies (whimsy_roll_call excluded — blocked)
+            "whimsy_gravity_check", "whimsy_night_bloom", "whimsy_high_roller",
+            "whimsy_back_to_basics",
+            // capstone cascade
+            "capstone_all",
+        ]
+
+        // The one and only uncovered trophy is the pinball-blocked whimsy.
+        let uncovered = catalogIDs.subtracting(coveredByTriggerTests)
+        XCTAssertEqual(uncovered, ["whimsy_roll_call"],
+                       "exactly whimsy_roll_call may lack a trigger test (blocked on the "
+                       + "unbuilt pinball ROLL lanes); all others must be wired + tested")
+        // No stale ids: everything claimed as covered is a real catalog trophy.
+        XCTAssertTrue(coveredByTriggerTests.isSubset(of: catalogIDs),
+                      "the covered checklist must not name a non-existent trophy")
     }
 }

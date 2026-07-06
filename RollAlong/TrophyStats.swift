@@ -34,6 +34,20 @@
 //    derivation over the EXISTING `dailyChallengeCompletions` date set.
 //    Deliberately no storage (the date set is already on disk). Feeds
 //    `daily_week_streak` via the `daily_clear_streak_best` metric.
+//  • §6 item 14 → `livesSent` (`ra_trophyLivesSent`) + `clanRequestsFulfilled`
+//    (`ra_trophyClanRequestsFulfilled`) — the two lifetime go-forward social
+//    counters (S1-T6). `livesSent` counts every gifted life (friend gifts AND
+//    clan fulfillments) and feeds `social_send_life`/`social_lives_sent_25`;
+//    `clanRequestsFulfilled` counts only lives sent to a clanmate who was
+//    asking, and feeds `clan_fulfill`. Both are bumped from GameState social
+//    funnels driven by the SwiftUI Friends/Clans views on a SUCCESSFUL
+//    `SocialClient` call. The three other social latches (`signed_in`,
+//    `friends_accepted_peak`, `clan_joined`) need NO counter: sign-in and
+//    clan-join are one-shot value-1 latches, and the friend high-water is the
+//    live accepted-friend count the engine already latches — so no persisted
+//    key backs them. Social metrics are go-forward only (deliberately absent
+//    from `TrophyBackfill.snapshot` — no local pre-trophy state to
+//    grandfather; TrophyEngine.swift documents the omission).
 //
 //  DELIBERATELY ABSENT (trophy-catalog.md §6 "deliberately absent" list;
 //  sprint-plan.md S0-T2 prohibitions — all test-enforced):
@@ -115,12 +129,16 @@ final class TrophyStats {
         dailyRewardClaimsKey,
         noFallClearStreakKey,
         noFallClearStreakBestKey,
+        livesSentKey,
+        clanRequestsFulfilledKey,
     ]
 
-    static let coinsEarnedFromPlayKey   = "ra_trophyCoinsEarnedFromPlay"
-    static let dailyRewardClaimsKey     = "ra_trophyDailyRewardClaims"
-    static let noFallClearStreakKey     = "ra_trophyNoFallClearStreak"
-    static let noFallClearStreakBestKey = "ra_trophyNoFallClearStreakBest"
+    static let coinsEarnedFromPlayKey    = "ra_trophyCoinsEarnedFromPlay"
+    static let dailyRewardClaimsKey      = "ra_trophyDailyRewardClaims"
+    static let noFallClearStreakKey      = "ra_trophyNoFallClearStreak"
+    static let noFallClearStreakBestKey  = "ra_trophyNoFallClearStreakBest"
+    static let livesSentKey              = "ra_trophyLivesSent"
+    static let clanRequestsFulfilledKey  = "ra_trophyClanRequestsFulfilled"
 
     /// The persistence store. Production uses `.standard` (injected by
     /// GameState with its own defaults); tests inject a throwaway suite.
@@ -157,6 +175,23 @@ final class TrophyStats {
         didSet { defaults.set(bestNoFallClearStreak, forKey: Self.noFallClearStreakBestKey) }
     }
 
+    /// §6 item 14 — lifetime lives sent (monotonic): every gifted life,
+    /// whether a friend gift or a clan fulfillment. Feeds `social_send_life`
+    /// (≥1) and `social_lives_sent_25` (≥25). Go-forward only — never
+    /// grandfathered (no local pre-trophy record of lives given).
+    private(set) var livesSent: Int {
+        didSet { defaults.set(livesSent, forKey: Self.livesSentKey) }
+    }
+
+    /// §6 item 14 — lifetime clan life-requests fulfilled (monotonic): a life
+    /// sent to a clanmate who was asking for one. Feeds `clan_fulfill` (≥1).
+    /// A subset of `livesSent` (every fulfillment is also a life sent), but a
+    /// distinct counter — friend gifts and clan gifts to non-asking members
+    /// never bump it. Go-forward only.
+    private(set) var clanRequestsFulfilled: Int {
+        didSet { defaults.set(clanRequestsFulfilled, forKey: Self.clanRequestsFulfilledKey) }
+    }
+
     // MARK: - Init
 
     /// Defensive loads, GameState-style: missing keys read as 0; corrupt
@@ -170,6 +205,8 @@ final class TrophyStats {
         noFallClearStreak = streak
         bestNoFallClearStreak = max(
             streak, max(0, defaults.integer(forKey: Self.noFallClearStreakBestKey)))
+        livesSent             = max(0, defaults.integer(forKey: Self.livesSentKey))
+        clanRequestsFulfilled = max(0, defaults.integer(forKey: Self.clanRequestsFulfilledKey))
     }
 
     // MARK: - Record funnels (called from GameState only)
@@ -205,6 +242,21 @@ final class TrophyStats {
     func resetNoFallClearStreak() {
         guard noFallClearStreak != 0 else { return }
         noFallClearStreak = 0
+    }
+
+    /// §6 item 14 — record one gifted life (friend gift OR clan fulfillment).
+    /// Monotonic; called from GameState's `recordLifeSent()` funnel on a
+    /// successful `SocialClient.sendLife`. Never regresses.
+    func recordLifeSent() {
+        livesSent += 1
+    }
+
+    /// §6 item 14 — record one fulfilled clan life-request (a life sent to a
+    /// clanmate who was asking). Monotonic; called from GameState's
+    /// `recordClanRequestFulfilled()` funnel IN ADDITION to `recordLifeSent()`
+    /// (a fulfillment is also a life sent). Never regresses.
+    func recordClanRequestFulfilled() {
+        clanRequestsFulfilled += 1
     }
 
     // MARK: - Derivations (no storage — §6 item 15)

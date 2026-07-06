@@ -97,7 +97,11 @@ struct ClansView: View {
             }
         }
         .task { await load() }
-        .sheet(isPresented: $showCreate) { ClanCreateSheet { Task { await load() } } }
+        // clan_join (S1-T6): creating a clan counts, same as joining. `onCreated`
+        // fires only after `SocialClient.createClan` succeeds.
+        .sheet(isPresented: $showCreate) {
+            ClanCreateSheet { gameState.recordClanJoined(); Task { await load() } }
+        }
         .sheet(item: $settingsClan) { clan in
             ClanSettingsSheet(clan: clan,
                               role: membership?.role ?? "member",
@@ -813,9 +817,18 @@ struct ClansView: View {
     private func sendLife(to id: UUID) async {
         guard let clan = myClan else { return }
         busyIds.insert(id); defer { busyIds.remove(id) }
+        // Capture the fulfillment signal BEFORE the send (a successful send may
+        // later clear the recipient's ask): a life to a clanmate who was asking
+        // is a request FULFILLMENT (`clan_fulfill`), not just a gift.
+        let wasAsking = rosterProfiles[id]?.isAskingForLives ?? false
         do {
             try await SocialClient.shared.sendLife(to: id, amount: 1)
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "sent_life", target: id)
+            // social_send_life / social_lives_sent_25 (S1-T6): every clan gift
+            // counts toward lives sent, whether or not it fulfills a request.
+            gameState.recordLifeSent()
+            // clan_fulfill (S1-T6): additionally, a gift to an asking clanmate.
+            if wasAsking { gameState.recordClanRequestFulfilled() }
             sentLifeIds.insert(id); flash("Life sent ♥")
         } catch { flash("Couldn't send a life — try again.") }
     }
@@ -1092,6 +1105,8 @@ struct ClanDetailView: View {
             try await SocialClient.shared.joinClan(id: clan.id)
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "joined")
             await load()
+            // clan_join (S1-T6): latched on a successful join.
+            gameState.recordClanJoined()
             flash("Joined \(clan.name.nonEmpty ?? "the clan")!")
         } catch {
             flash("Couldn't join — you may already be in a clan.")

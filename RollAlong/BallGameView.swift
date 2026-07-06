@@ -116,6 +116,19 @@ struct BallGameView: View {
     @State private var levelStartTime:        Date?    = nil
     @State private var coinsPickedThisAttempt: Set<Int> = []    // coin indices 0…2 picked this attempt
 
+    /// S1-T7 `skill_first_try` run flag: true while the CURRENT run is the
+    /// player's very first attempt at an uncleared climb level with no fall
+    /// or restart yet.  Armed in `spawnBall` when a fresh, never-cleared climb
+    /// level is spawned for the first time; a fall (`fireFell`) or any
+    /// re-spawn of the same level (Replay/respawn) clears it.  Read once, at
+    /// the clear, and passed into `recordResult` — the trophy DECISION lives in
+    /// the GameState funnel, never here.
+    @State private var firstAttemptClean: Bool = false
+    /// The climb level `firstAttemptClean` is currently armed for — a second
+    /// spawn of the SAME level (a re-attempt) must disarm it, so `spawnBall`
+    /// only arms when spawning a level it hasn't armed for this session.
+    @State private var firstAttemptArmedLevel: Int? = nil
+
     /// Spawn-lock — when set, physics is paused and the player sees a
     /// "Tap to start" hint over the ball.  Cleared by tap-to-start OR
     /// when the time elapses naturally (whichever happens first).  Set
@@ -4967,6 +4980,12 @@ struct BallGameView: View {
         coinPitTimeTicketsStaked = time
         coinPitStakedMultiplier  = 1          // ×2 is an optional in-round buy
         coinPitStaked = true
+        // S1-T7 `whimsy_high_roller`: the ROUND-START stake count.  Fired only
+        // after `spendTickets` commits — never on a refund or an aborted
+        // stake — so a big single-round stake (≥5) latches the trophy.  The
+        // ×2 in-round buy is a separate ticket spend, not part of the round
+        // stake, so it's intentionally NOT funneled here.
+        gameState.recordCoinPitRoundStaked(tickets: time)
         AnalyticsClient.shared.track(
             "goldrush_round_staked",
             properties: ["time_tickets": .int(time)]
@@ -5453,6 +5472,22 @@ struct BallGameView: View {
             spawnLockUntil = usesSandTrail ? nil : .now.addingTimeInterval(spawnLockDuration)
             tutorialCoinBonus = 0
         }
+
+        // S1-T7 `skill_first_try` arming.  A run is a clean first attempt only
+        // when spawning a climb level the player has NEVER cleared, for the
+        // FIRST time this session: `firstAttemptArmedLevel != level` gates out
+        // the Replay/respawn re-spawn (same level spawned again → disarm).  A
+        // fall clears the flag directly (`fireFell`).  The trophy decision is
+        // GameState's; this only carries the run fact.
+        let clearLevel = gameState.currentLevel
+        if isClimb,
+           gameState.time(for: clearLevel) == nil,
+           firstAttemptArmedLevel != clearLevel {
+            firstAttemptArmedLevel = clearLevel
+            firstAttemptClean = true
+        } else {
+            firstAttemptClean = false
+        }
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
 
         // `level_attempt` is a climb-funnel event keyed to a climb level —
@@ -5896,6 +5931,19 @@ struct BallGameView: View {
            !gameState.isTutorialLevel(gameState.currentLevel) {
             gameState.consumeLife()
         }
+
+        // S1-T7 climb-fall funnel: every climb pit-fall (including the
+        // tutorial L1–10 falls that skip `consumeLife` entirely) funnels the
+        // fall event to GameState.  The funnel is mode-gated (`recordsClimbResult`),
+        // fires `whimsy_gravity_check` on a level-1 fall, and resets the
+        // no-fall clear streak for tutorial falls (S1-T1 left this reset to
+        // this funnel; it's idempotent, so non-tutorial falls whose
+        // `consumeLife` already reset the streak are a harmless no-op).
+        gameState.recordClimbFall(level: gameState.currentLevel)
+
+        // The current run is no longer a clean first attempt — a fall (or the
+        // Replay/respawn that follows it) disqualifies `skill_first_try`.
+        firstAttemptClean = false
     }
 
     private func fireCoinPickup() {
@@ -6095,11 +6143,20 @@ struct BallGameView: View {
         lastClearedIsNewBestStars = stars > prevStars
         lastClearedCoinReward     = displayedCoinReward
 
+        // S1-T7 run-lifecycle facts for the Skill trophies.  `pickupsThisRun`
+        // is the currency coins banked in THIS attempt (already-banked coins
+        // can't be re-picked, so a replay of a level whose coins are banked
+        // reports a partial haul, correctly disqualifying `skill_spotless`).
+        // `firstAttemptClean` is the transient armed flag (cleared by any fall
+        // or re-spawn).  The funnel derives "no prior clear" itself, before it
+        // stamps the best time, and owns both trophy decisions.
         gameState.recordResult(
             level: level,
             stars: stars,
             time:  elapsed,
-            coinIndices: coinsPickedThisAttempt
+            coinIndices: coinsPickedThisAttempt,
+            firstAttemptClean: firstAttemptClean,
+            pickupsThisRun: coinsPickedThisAttempt.count
         )
         if coinReward > 0 {
             gameState.addCoins(coinReward)

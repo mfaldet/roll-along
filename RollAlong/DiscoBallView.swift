@@ -688,10 +688,10 @@ struct DiscoBallView: View {
     }
 
     private func endGame() {
-        let wasBest = crossings > best
-        if wasBest { gameState.minigameBests[bestKey] = crossings }
+        // View owns only the per-crossing payout; the record, the new-best
+        // bonus, and the Disco trophies now funnel through GameState (S1-T4).
         if runCoins > 0 { gameState.addCoins(runCoins) }
-        if wasBest && crossings > 0 { gameState.addCoins(GameState.minigameBestBonus) }
+        gameState.recordDiscoResult(bestKey: bestKey, crossings: crossings)
         AnalyticsClient.shared.track(
             "disco_game_over",
             properties: ["crossings": .int(crossings),

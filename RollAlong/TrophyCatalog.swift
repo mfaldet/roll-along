@@ -528,6 +528,13 @@ struct TrophyCatalog {
     /// LevelOverrides pattern.
     static let bundledResource = "TrophyCatalog"
 
+    /// A valid, empty catalog — the last-resort fallback for a build where
+    /// the bundled resource somehow fails to load (unreachable in practice;
+    /// `load(bundle:)` succeeds in every shipping build and test host).  An
+    /// engine over it evaluates nothing and never unlocks, so a missing
+    /// resource degrades to "no trophies" rather than a crash.
+    static let empty = TrophyCatalog(catalogVersion: 0, trophies: [], byID: [:])
+
     var count: Int { trophies.count }
 
     /// The single capstone ("Platinum") definition.

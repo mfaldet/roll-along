@@ -41,6 +41,15 @@ struct RollAlongApp: App {
                     // across launches without re-authenticating.
                     await AppleAuthManager.shared.restoreSession()
                 }
+                .task {
+                    // First-launch-with-trophies backfill (S0-T4, wired at
+                    // S1-T1): grandfather every trophy the save's existing
+                    // stats already earn, once, BEFORE live play — so a
+                    // veteran's history isn't live-unlocked one clear at a
+                    // time.  Idempotent across relaunches (the engine
+                    // short-circuits after the first run).
+                    gameState.activateTrophies()
+                }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared
                     // initialises the persistent user_id + session_id on

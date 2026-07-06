@@ -29,6 +29,10 @@ import SwiftUI
 //   ra_trophyUnlocks, ra_trophyUnlockDates.
 //   The latched unlock ledger — a pure ratchet: never revoked, untouched
 //   by resetProgress() / liquidateCoinCosmetics().
+//   ra_trophySyncDirty (S1-T8) — a Bool armed synchronously on every
+//   unlock (live + backfill) and cleared by S3-T3's TrophySyncService once
+//   a full-snapshot upsert succeeds; survives relaunch so an offline unlock
+//   still syncs next online launch. No PII.
 //
 // AnalyticsClient adds: ra_analytics_user_id — anonymous per-install UUID,
 //   not linked to real-world identity, declared in PrivacyInfo.xcprivacy.
@@ -37,6 +41,59 @@ import SwiftUI
 //   gameplay state or UI settings.  UserDefaults is the appropriate store.
 //   No iCloud KV sync in use.  Keychain migration: not required.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Trophy collection-criterion exclusions (S1-T5)
+//
+// The collection/ownership trophies (`balls_own_10/40`, `items_own_50`,
+// `collection_complete`) must never become a hidden pay-gate or a
+// time-limited (eventually-dead) criterion.  Two disjoint exclusion sets,
+// defined here as the SINGLE source of truth so live wiring and the
+// first-launch backfill agree and a unit test can pin them exactly:
+//
+//   • `iapSecret*` — the 4 secret-drop IAP cosmetics {Diamond ball, Money
+//     Ball, Money Roll, Money Full}.  Excluded from EVERY collection
+//     criterion (counting them would create a ~$150 pay-gated trophy and
+//     leak the secret).  These are NOT the `isIconic`/`iconicBalls` set —
+//     Iconic also contains the earned Trophy ball and starter looks, which
+//     DO count toward collection criteria.
+//   • `seasonalExclusiveBalls` — the 7 `isBundleExclusive` seasonal balls
+//     whose bundle windows are hard-coded one-shot 2026–27 ranges.  Excluded
+//     from `collection_complete` ONLY (scoping it to the 207-item evergreen
+//     set), so the trophy never becomes permanently unearnable once a window
+//     lapses.  (NOT excluded from `balls_own_*`/`items_own_50`, which count
+//     seasonal balls per catalog §3.6.)  BallSkin.isBundleExclusive is a
+//     SUPERSET of this (it also flags Pluto/Trophy/Diamond/Money) — so this
+//     list is enumerated explicitly, never derived from that flag.
+//
+// Note: `moneyRoll` is a TrailColor and `moneyFull` a Floor, so only two of
+// the four IAP secrets are balls.  See trophy-catalog.md §3.6 / open Q10.
+// ---------------------------------------------------------------------------
+enum TrophyCosmeticExclusions {
+    /// The two IAP-secret BALL skins (Diamond, Money Ball).
+    static let iapSecretBalls: Set<BallSkin> = [.diamond, .moneyBall]
+    /// The IAP-secret TRAIL (Money Roll).
+    static let iapSecretTrails: Set<TrailColor> = [.moneyRoll]
+    /// The IAP-secret FLOOR (Money Full).
+    static let iapSecretFloors: Set<Floor> = [.moneyFull]
+
+    /// Exactly the 4 IAP secrets as persisted rawValues, for the exclusion
+    /// unit test and rawValue-set membership checks against the owned sets.
+    static let iapSecretRawValues: Set<String> =
+        Set(iapSecretBalls.map { $0.rawValue })
+            .union(iapSecretTrails.map { $0.rawValue })
+            .union(iapSecretFloors.map { $0.rawValue })
+
+    /// The 7 seasonal `isBundleExclusive` balls (each in a one-shot 2026–27
+    /// window) — excluded from `collection_complete` only.
+    static let seasonalExclusiveBalls: Set<BallSkin> =
+        [.beachBall, .pumpkin, .ornament, .heartstone,
+         .shamrock, .confetti, .speckledEgg]
+
+    static let seasonalExclusiveBallRawValues: Set<String> =
+        Set(seasonalExclusiveBalls.map { $0.rawValue })
+}
+
 final class GameState: ObservableObject {
 
     // MARK: - Published state
@@ -471,24 +528,45 @@ final class GameState: ObservableObject {
     // Currently-equipped cosmetic per category.  Always defaults to the
     // starter on a fresh install.
     @Published var equippedGoal: GoalSkin {
-        didSet { defaults.set(equippedGoal.rawValue, forKey: "ra_equippedGoal") }
+        didSet {
+            defaults.set(equippedGoal.rawValue, forKey: "ra_equippedGoal")
+            recordFullKitTrophy()   // cosmetic_full_kit (S1-T5)
+        }
     }
     @Published var equippedTrail: TrailColor {
-        didSet { defaults.set(equippedTrail.rawValue, forKey: "ra_equippedTrail") }
+        didSet {
+            defaults.set(equippedTrail.rawValue, forKey: "ra_equippedTrail")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedFloor: Floor {
-        didSet { defaults.set(equippedFloor.rawValue, forKey: "ra_equippedFloor") }
+        didSet {
+            defaults.set(equippedFloor.rawValue, forKey: "ra_equippedFloor")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedPit: Pit {
-        didSet { defaults.set(equippedPit.rawValue, forKey: "ra_equippedPit") }
+        didSet {
+            defaults.set(equippedPit.rawValue, forKey: "ra_equippedPit")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedBoundary: Boundary {
-        didSet { defaults.set(equippedBoundary.rawValue, forKey: "ra_equippedBoundary") }
+        didSet {
+            defaults.set(equippedBoundary.rawValue, forKey: "ra_equippedBoundary")
+            recordFullKitTrophy()
+        }
     }
     @Published var equippedMusic: MusicTrack {
-        didSet { defaults.set(equippedMusic.rawValue, forKey: "ra_equippedMusic") }
+        didSet {
+            defaults.set(equippedMusic.rawValue, forKey: "ra_equippedMusic")
+            recordFullKitTrophy()
+        }
     }
-    // equippedBall lives on `activeSkin` — already defined above.
+    // equippedBall lives on `activeSkin` — already defined above.  Its
+    // cosmetic_full_kit check rides `equipBall`/`equipPack` (real ball-slot
+    // equips), NOT the raw `activeSkin` didSet — `advancePackSkin` mutates
+    // `activeSkin` every attempt (shuffle), which must stay off the hot path.
 
     /// The currently-equipped Ball Pack, or nil when an individual ball
     /// skin is equipped.  When non-nil, `activeSkin` is driven by the
@@ -528,9 +606,39 @@ final class GameState: ObservableObject {
     /// changes or re-render gameplay views.
     let trophyStats: TrophyStats
 
-    init(defaults: UserDefaults = .standard) {
+    /// The latched trophy engine (S0-T3), owned here so S1 trigger funnels
+    /// can drive `record(_:value:)` from real gameplay hooks (S1-T1 is the
+    /// first task to establish this wiring point).  Deliberately its OWN
+    /// `ObservableObject` on a plain `let` — NOT `@Published` on GameState —
+    /// so gameplay views observing GameState never re-render on a trophy
+    /// write (S0-T3 rationale; §5 regression table).  Persists to the same
+    /// injected `defaults` as everything else.
+    ///
+    /// The one-time first-launch backfill (S0-T4) is NOT run in `init` — a
+    /// bare `GameState(defaults:)` must never touch the trophy ledger (the
+    /// migration tests build one and expect it inert).  Production calls
+    /// `activateTrophies()` once at launch; the harness's `backfill:` flag
+    /// does the same in tests.
+    let trophyEngine: TrophyEngine
+
+    /// Test-injectable clock so live-unlock timestamps are deterministic
+    /// (mirrors the engine's `now`).  Production uses the real wall clock.
+    private let now: () -> Date
+
+    init(defaults: UserDefaults = .standard,
+         now: @escaping () -> Date = Date.init) {
         self.defaults = defaults
+        self.now = now
         trophyStats = TrophyStats(defaults: defaults)
+        // Load the bundled 89-trophy catalog.  A decode/validation failure is
+        // a build-breaking AUTHORING error, never a runtime condition to
+        // recover from (TrophyCatalog house rules) — but GameState.init must
+        // never trap, so fall back to an empty catalog whose engine simply
+        // has nothing to evaluate.  In every shipping build and test host the
+        // bundled resource loads, so the fallback is unreachable in practice.
+        let catalog = (try? TrophyCatalog.load(bundle: .main))
+            ?? TrophyCatalog.empty
+        trophyEngine = TrophyEngine(catalog: catalog, defaults: defaults, now: now)
         let saved = defaults.integer(forKey: "ra_level")
         let level = max(1, saved)
         currentLevel = level
@@ -660,6 +768,25 @@ final class GameState: ObservableObject {
         equippedPackID = savedPack.flatMap { loadedOwnedPacks.contains($0) ? $0 : nil }
     }
 
+    // MARK: - Trophy activation (first-launch backfill)
+
+    /// Run the one-time first-launch trophy backfill (S0-T4): evaluate the
+    /// full catalog against this save's existing stats and grant every
+    /// derivable trophy with a legacy timestamp.  Idempotent across
+    /// relaunches — the engine short-circuits once its backfill-done flag is
+    /// set, so calling this on every launch is safe (and cheap after the
+    /// first).  Call once at app startup, BEFORE live play, so a veteran's
+    /// history is grandfathered rather than live-unlocked one clear at a time.
+    ///
+    /// Deliberately NOT called from `init` — a bare `GameState(defaults:)`
+    /// must leave the trophy ledger untouched (the migration/engine unit
+    /// tests build one and assert inertness).  Returns the trophies newly
+    /// granted by this call (empty after the first run).
+    @discardableResult
+    func activateTrophies() -> [TrophyDefinition] {
+        trophyEngine.backfill(from: TrophyBackfill.snapshot(from: self))
+    }
+
     /// Returns `item` if the player actually owns it (starter tier or
     /// present in the owned-set), otherwise the category's starter.
     /// Used at init time to recover from tier shuffles that would
@@ -681,6 +808,14 @@ final class GameState: ObservableObject {
             highestUnlocked = currentLevel
         }
         syncSocialProgress()
+        // Climb level trophies key on `highestUnlocked` (S1-T1;
+        // climb_first_clear … climb_summit).  Mode-gated: only the main
+        // climb advances its unlock ladder — CotD and tracks never reach
+        // this funnel (advanceFromLevelClear routes them away), and the
+        // guard is defense-in-depth against a future mode that does.
+        if currentMode.progression.recordsClimbResult {
+            trophyEngine.record(.climbHighestUnlocked, value: highestUnlocked)
+        }
     }
 
     /// Push the player's headline progression to the social backend, if and
@@ -813,7 +948,29 @@ final class GameState: ObservableObject {
 
     /// Call when the player completes a level.  Stars only ever increase,
     /// times only ever decrease, collected coins never un-collect.
-    func recordResult(level: Int, stars: Int, time: TimeInterval, coinIndices: Set<Int>) {
+    ///
+    /// The two S1-T7 run-lifecycle flags are facts only the run's owner
+    /// (BallGameView) can supply — a run either kept a clean first attempt
+    /// or picked up every coin, and neither survives into persisted state.
+    /// The TROPHY decision stays here (in the funnel, never the view): both
+    /// are climb-mode-gated below and combined with `noPriorClear`, which
+    /// this funnel captures BEFORE the `bestTime` stamp so "first attempt"
+    /// reads the pre-clear world (BallGameView no longer computes it post-#118).
+    ///  • `firstAttemptClean` — this was the level's very first attempt with
+    ///    no fall/restart before the goal (the view's transient armed flag).
+    ///  • `pickupsThisRun` — currency coins banked in THIS run (already-banked
+    ///    coins can't be re-picked, so this is the fresh-run pickup count).
+    /// Default false/0 so the many non-view callers (tests) are unaffected;
+    /// they simply never satisfy the run-flag trophies.
+    func recordResult(level: Int, stars: Int, time: TimeInterval,
+                      coinIndices: Set<Int>,
+                      firstAttemptClean: Bool = false,
+                      pickupsThisRun: Int = 0) {
+        // Capture "no prior clear" BEFORE the bestTime stamp below — this is
+        // the `time(for: level) == nil` derivation the catalog specifies for
+        // `skill_first_try` (§6 item 7).  Once stamped it would always read
+        // "cleared," so it must be read here first.
+        let noPriorClear = bestTime[level] == nil
         if stars > (bestStars[level] ?? 0) {
             bestStars[level] = stars
         }
@@ -838,7 +995,471 @@ final class GameState: ObservableObject {
         // ever reaching this funnel; tracks never call it).
         if currentMode.progression.recordsClimbResult {
             trophyStats.recordNoFallClimbClear()
+            recordClimbTrophies()
+            recordRunLifecycleTrophies(stars: stars,
+                                       noPriorClear: noPriorClear,
+                                       firstAttemptClean: firstAttemptClean,
+                                       pickupsThisRun: pickupsThisRun)
         }
+    }
+
+    /// Push the S1-T7 run-lifecycle Skill trophies (`skill_first_try`,
+    /// `skill_spotless`) from a just-recorded climb clear.  Called ONLY inside
+    /// `recordResult`'s `recordsClimbResult` gate, so CotD / Roll Out / Roll Up
+    /// / track clears (which never reach this funnel) can't pollute them.  The
+    /// engine latches once and never revokes, so a transient `1` on the run
+    /// that qualifies is all that's needed — nothing is persisted here (no
+    /// falls/failure counter; `firstTryAces` / `spotlessRuns` deliberately
+    /// carry NO backfill source, so a live latch and a first-launch grandfather
+    /// trivially agree — the grandfather grants neither, §7 backfill omit-list).
+    private func recordRunLifecycleTrophies(stars: Int,
+                                            noPriorClear: Bool,
+                                            firstAttemptClean: Bool,
+                                            pickupsThisRun: Int) {
+        // skill_first_try — 3 stars on a level's very first attempt (no prior
+        // clear AND no fall/restart before the goal, §6 item 7).
+        if stars == 3, noPriorClear, firstAttemptClean {
+            trophyEngine.record(.firstTryAces, value: 1)
+        }
+        // skill_spotless — 3 stars AND all 3 pickup coins banked in this one
+        // run (§6 item 8).  Requires the full three: fewer-coin levels and
+        // partial hauls never qualify.
+        if stars == 3, pickupsThisRun >= 3 {
+            trophyEngine.record(.spotlessRuns, value: 1)
+        }
+    }
+
+    /// A climb pit-fall that never reaches `consumeLife` (S1-T7).  The view's
+    /// fall path (`fireFell`) funnels every climb fall here so the two effects
+    /// that `consumeLife` can't cover for tutorial levels (L1–10, which are
+    /// lives-exempt and so never call `consumeLife`) are handled:
+    ///  • `whimsy_gravity_check` — the one-shot latch for falling into the pit
+    ///    on climb level 1 (§6 item 9; costs nothing, tutorial-exempt).
+    ///  • the no-fall clear-streak reset — S1-T1 left the tutorial-fall reset
+    ///    for this funnel (tutorial falls skip `consumeLife`).  `resetNoFall…`
+    ///    is idempotent, so a non-tutorial fall (whose `consumeLife` already
+    ///    reset the streak) makes this a harmless no-op.
+    /// Mode-gated on `recordsClimbResult`: Roll Out / Roll Up / Coin Pit / Zen
+    /// / CotD falls never reset the climb streak or fire the whimsy latch.
+    func recordClimbFall(level: Int) {
+        guard currentMode.progression.recordsClimbResult else { return }
+        trophyStats.resetNoFallClearStreak()
+        // whimsy_gravity_check keys to climb LEVEL 1 (a number, never a
+        // layout) — level 1 is a fixed rung, not swappable content.
+        if level == 1 {
+            trophyEngine.record(.levelOneFalls, value: 1)
+        }
+    }
+
+    /// A Coin Pit round has just been staked (S1-T7).  `tickets` is the count
+    /// of time-tickets committed at round START — the view calls this only
+    /// after `spendTickets` succeeds, so it never fires on a mid-round refund
+    /// or an aborted stake.  `whimsy_high_roller` latches at ≥5 (§6 item 13).
+    /// The engine keeps the best observed, so a later smaller stake never
+    /// revokes.  Not mode-gated on `recordsClimbResult` (Coin Pit is a `.solo`
+    /// unlimited mode); the funnel simply never fires outside the Coin Pit
+    /// stake overlay that is its only caller.
+    func recordCoinPitRoundStaked(tickets: Int) {
+        guard tickets > 0 else { return }
+        trophyEngine.record(.coinpitRoundStakeBest, value: tickets)
+    }
+
+    /// Push every climb-category trophy metric's CURRENT value into the
+    /// trophy engine (S1-T1).  Callers gate on
+    /// `currentMode.progression.recordsClimbResult` so CotD / Roll Out /
+    /// Roll Up / track results never pollute the climb ladder — climb
+    /// trophies are keyed to lifetime stats and level NUMBERS, never to a
+    /// specific level layout (levels are swappable `LevelOverrides.json`
+    /// content).  Cheap on the hot path: each `record` is one index lookup +
+    /// O(interested trophies) and writes nothing unless a trophy latches.
+    private func recordClimbTrophies() {
+        // Level ladder — climb_first_clear (≥2) … climb_summit (≥5001).
+        trophyEngine.record(.climbHighestUnlocked, value: highestUnlocked)
+        // Total climb stars — climb_stars_25 / climb_stars_150 (latched
+        // ratchet: resetProgress can shrink the live sum, never the unlock).
+        trophyEngine.record(.climbTotalStars, value: totalStars)
+        // Lifetime banked pickup coins — climb_pickups_100 (NOT the coin
+        // balance; `totalCoins` counts pickups found).
+        trophyEngine.record(.climbPickupCoins, value: totalCoins)
+        // Perfect-world scan — climb_perfect_world (3 stars on all 100
+        // levels of some world; keyed to the star dict + world number
+        // ranges, never to layouts).
+        trophyEngine.record(.climbPerfectWorlds,
+                            value: TrophyBackfill.perfectWorldCount(bestStars: bestStars))
+        // No-fall clear streak ratchet — skill_clean_sheet_10 / _25.  The
+        // working streak was just grown by `recordNoFallClimbClear()`; its
+        // monotonic best is what the trophy reads.
+        trophyEngine.record(.noFallClearStreakBest,
+                            value: trophyStats.bestNoFallClearStreak)
+    }
+
+    /// Push the Challenge-Track trophy metrics' current values (S1-T2).
+    /// Called from `advanceTrackProgress` — the single funnel that mutates
+    /// `trackProgress` / `completedTracks`.  Derivations mirror
+    /// `TrophyBackfill.snapshot` exactly so a live update and a first-launch
+    /// grandfather agree.  Keyed to progress NUMBERS and completion COUNTS,
+    /// never to a specific track's layout.
+    private func recordTrackTrophies() {
+        // Best progress reached on any single track — track_first_level (≥1)
+        // / track_halfway (≥50).
+        trophyEngine.record(.trackBestProgress, value: trackProgress.values.max() ?? 0)
+        // Tracks fully completed — track_first_complete / track_triple /
+        // track_all_eight.
+        trophyEngine.record(.tracksCompleted, value: completedTracks.count)
+        // The prestige Golden Gauntlet — track_gauntlet (1 once
+        // "golden-gauntlet" ∈ completedTracks).
+        trophyEngine.record(.goldenGauntletCompleted,
+                            value: completedTracks.contains("golden-gauntlet") ? 1 : 0)
+    }
+
+    /// Push the Challenge-of-the-Day clear trophy metrics (S1-T2).  Called
+    /// from `completeTodaysDailyChallenge`, the sole funnel that inserts
+    /// into `dailyChallengeCompletions`.  Both metrics derive from that
+    /// append-only date set (mirrors `TrophyBackfill.snapshot`).
+    private func recordDailyChallengeTrophies() {
+        // Lifetime CotD clears — daily_first_clear / daily_clears_10 / _50.
+        trophyEngine.record(.dailyClears, value: dailyChallengeCompletions.count)
+        // Longest consecutive-day clear run — daily_week_streak (≥7).  The
+        // engine latches the best observed, so a broken run never revokes.
+        trophyEngine.record(.dailyClearStreakBest,
+                            value: TrophyStats.longestConsecutiveDailyClearRun(
+                                in: dailyChallengeCompletions))
+    }
+
+    /// Push the daily login-reward trophy metrics (S1-T2).  Called from
+    /// `claimDailyReward` after the claim counter is bumped.  The claim
+    /// count is a monotonic counter; the reward streak can regress on a
+    /// missed day, but the engine latches the best observed — so recording
+    /// the CURRENT `dailyStreak` correctly unlocks daily_login_7/30 and
+    /// never revokes (this live latch supersedes the snapshot's proxy).
+    private func recordDailyRewardTrophies() {
+        // Lifetime claims — econ_punch_card (≥30).
+        trophyEngine.record(.dailyRewardClaims, value: trophyStats.dailyRewardClaims)
+        // Reward-streak high-water — daily_login_7 / daily_login_30.
+        trophyEngine.record(.dailyRewardStreakBest, value: dailyStreak)
+    }
+
+    // MARK: - Minigame trophy funnels (S1-T3)
+
+    /// Push the competitive-win trophy metrics (S1-T3).  Called from
+    /// `recordCompetitiveWin` — the single win choke point (it bumps
+    /// `minigameWins` and mints the ticket), so ticket-earn trophies fire
+    /// here and ONLY here.  When reached via `recordMinigameResult`, that
+    /// funnel has already bumped `minigameDifficultyWins[…|hard]` before
+    /// calling us, so the Hard high-waters read the freshly-updated dict.
+    /// Every derivation mirrors `TrophyBackfill.snapshot` exactly so a live
+    /// win and a first-launch grandfather agree.
+    private func recordCompetitiveWinTrophies() {
+        // Arcade-wide win totals over the 6 competitive modes.
+        var competitiveWins = 0
+        var competitiveModesWon = 0
+        for id in TrophyMetric.competitiveModeIDs {
+            let w = minigameWins[id, default: 0]
+            competitiveWins += w
+            if w >= 1 { competitiveModesWon += 1 }
+        }
+        // arcade_first_win (≥1) / arcade_wins_100 (≥100).
+        trophyEngine.record(.competitiveWins, value: competitiveWins)
+        // arcade_all_six (all 6 modes have ≥1 win → count ≥6).
+        trophyEngine.record(.competitiveModesWon, value: competitiveModesWon)
+
+        // arcade_hard_once (≥1) / arcade_hard_all (≥6): count of the 6 modes
+        // with a Hard win, from the per-difficulty dict.
+        var competitiveModesWonHard = 0
+        for id in TrophyMetric.competitiveModeIDs
+        where minigameDifficultyWins["\(id)|hard", default: 0] >= 1 {
+            competitiveModesWonHard += 1
+        }
+        trophyEngine.record(.competitiveModesWonHard, value: competitiveModesWonHard)
+
+        // Per-game lifetime win tallies — <mode>_first_win / <mode>_wins_10.
+        trophyEngine.record(.snakeWins,     value: minigameWins["snake", default: 0])
+        trophyEngine.record(.sumoWins,      value: minigameWins["sumo", default: 0])
+        trophyEngine.record(.paintballWins, value: minigameWins["paintball", default: 0])
+        trophyEngine.record(.goldrushWins,  value: minigameWins["goldrush", default: 0])
+        trophyEngine.record(.marblecupWins, value: minigameWins["marblecup", default: 0])
+        trophyEngine.record(.kothWins,      value: minigameWins["koth", default: 0])
+    }
+
+    /// Push the "minigames played" discovery trophy metrics (S1-T3).  Called
+    /// from `markModePlayed`, the funnel that grows `playedModeIDs`.  Mirrors
+    /// `TrophyBackfill.snapshot`: `minigames_played` counts the intersection
+    /// with the 12 minigame ids, and `coinpit_played` flips once "coinpit" is
+    /// in the set.  Recording unconditionally is safe — a non-minigame id
+    /// simply leaves both derivations unchanged.
+    private func recordMinigamePlayedTrophies() {
+        // arcade_sampler (≥5) / arcade_grand_tour (all 12).
+        let played = TrophyMetric.minigameModeIDs.filter { playedModeIDs.contains($0) }.count
+        trophyEngine.record(.minigamesPlayed, value: played)
+        // coinpit_first_round (≥1 once "coinpit" has been played).
+        trophyEngine.record(.coinpitPlayed, value: playedModeIDs.contains("coinpit") ? 1 : 0)
+    }
+
+    /// Push the per-game best-score trophy metrics reachable from a GameState
+    /// funnel (S1-T3).  Each reads the SAME stored unit `TrophyBackfill`
+    /// derives from — coverage % (`minigameBests["paintball"]`), hold-seconds
+    /// (`minigameBests["koth"]`), the raw pinball score (`pinballBest`), and
+    /// Roll Up height (`minigameBests["rollup"]`).  Roll Out and Disco bests
+    /// are written in-view and are rerouted in S1-T4, so their trophies are
+    /// deliberately NOT recorded here.  `metric` selects which one to push so
+    /// the funnel call sites stay minimal.
+    private func recordMinigameBestTrophy(_ metric: TrophyMetric) {
+        switch metric {
+        case .paintballBestCoverage:
+            // paintball_coverage_60 (≥60).
+            trophyEngine.record(.paintballBestCoverage, value: minigameBests["paintball", default: 0])
+        case .kothBestHoldSeconds:
+            // koth_hold_45 (≥45 hold-seconds in one round).
+            trophyEngine.record(.kothBestHoldSeconds, value: minigameBests["koth", default: 0])
+        case .pinballBestScore:
+            // pinball_score_10k / _50k / _150k.
+            trophyEngine.record(.pinballBestScore, value: pinballBest)
+        case .rollupBestHeight:
+            // rollup_100m (≥100) / rollup_500m (≥500).
+            trophyEngine.record(.rollupBestHeight, value: minigameBests["rollup", default: 0])
+        default:
+            break
+        }
+    }
+
+    /// Push the Zen-time trophy metric (S1-T3).  Called from `addZenSeconds`
+    /// after the cumulative tally grows.  zen_hour (≥3,600) / zen_10_hours
+    /// (≥36,000); the AFK-farmable ceiling stays silver by catalog design.
+    private func recordZenTrophies() {
+        trophyEngine.record(.zenSeconds, value: zenSeconds)
+    }
+
+    /// Push the Coin Pit reward-run trophy metrics (S1-T3).  Called from
+    /// `recordGoldRushCoins` — the naming trap (trophy-catalog.md §3.5):
+    /// `goldrushBest`/`goldrushCoinsTotal` are the ticket-staked COIN PIT
+    /// reward run, NOT the "goldrush" (Smash and Grab) competitive mode.
+    /// Mirrors `TrophyBackfill.snapshot`.
+    private func recordCoinPitTrophies() {
+        // coinpit_catch_90 (≥90 caught in one round).
+        trophyEngine.record(.coinpitBestCatch, value: goldrushBest)
+        // econ_pit_boss (≥2,500 lifetime Coin Pit coins).
+        trophyEngine.record(.coinpitCoinsTotal, value: goldrushCoinsTotal)
+    }
+
+    /// Push the Disco Ball best-crossings trophy metrics (S1-T4).  Called from
+    /// `recordDiscoResult` after the just-finished run's difficulty-scoped best
+    /// is written.  Mirrors `TrophyBackfill.snapshot` EXACTLY: `disco_cross_25`
+    /// rides the MAX over all three difficulty keys, `disco_hard_10` rides the
+    /// `"discohard"` slot only.
+    private func recordDiscoTrophies() {
+        // disco_cross_25 (≥25 crossings in one run, any difficulty).
+        let discoBest = max(minigameBests["discoeasy", default: 0],
+                            minigameBests["disco", default: 0],
+                            minigameBests["discohard", default: 0])
+        trophyEngine.record(.discoBestCrossings, value: discoBest)
+        // disco_hard_10 (≥10 crossings in one Hard run).
+        trophyEngine.record(.discoHardBestCrossings,
+                            value: minigameBests["discohard", default: 0])
+    }
+
+    /// Push the Roll Out furthest-maze trophy metric (S1-T4).  Called from
+    /// `recordRollOutResult` after the highest-maze-reached best is written.
+    /// Mirrors `TrophyBackfill.snapshot`: both `rollout_first_maze` (≥1) and
+    /// `rollout_maze_10` (≥10) ride `minigameBests["rollout"]`.
+    private func recordRollOutTrophies() {
+        trophyEngine.record(.rolloutBestMaze, value: minigameBests["rollout", default: 0])
+    }
+
+    // MARK: - Cosmetic & economy trophy funnels (S1-T5)
+
+    /// Owned BALL skins, IAP secrets excluded — the `balls_own_10/40`
+    /// metric.  `ownedBallSkins` holds rawValues; the starter (`.red`) is
+    /// the free default and never counts toward "own N ball skins" (the
+    /// catalogue's 74-ball framing prices it out).  It is normally absent
+    /// from the set, but `liquidateCoinCosmetics` re-inserts every slot's
+    /// starter, so it's subtracted explicitly to keep the count stable
+    /// across a liquidation.  Seasonal balls DO count here (catalog §3.6) —
+    /// only the 2 IAP-secret balls and the starter are removed.
+    var trophyBallsOwnedCount: Int {
+        ownedBallSkins
+            .subtracting(TrophyCosmeticExclusions.iapSecretBalls.map { $0.rawValue })
+            .subtracting([BallSkin.starter.rawValue])
+            .count
+    }
+
+    /// Total owned cosmetics across all 7 slots, IAP secrets + starters
+    /// excluded — the `items_own_50` metric.  Sums the owned rawValue sets;
+    /// each slot's free starter is subtracted (normally absent, but
+    /// re-inserted by `liquidateCoinCosmetics`) and the 4 IAP secrets are
+    /// removed from their slots.  Seasonal balls count (catalog §3.6).
+    var trophyCosmeticsOwnedCount: Int {
+        // Slots with no IAP-secret members: subtract only the free starter.
+        func owned<Item: CosmeticItem>(_ set: Set<String>, _ type: Item.Type) -> Int {
+            set.subtracting([Item.starter.rawValue]).count
+        }
+        let balls = ownedBallSkins
+            .subtracting(TrophyCosmeticExclusions.iapSecretBalls.map { $0.rawValue })
+            .subtracting([BallSkin.starter.rawValue]).count
+        let trails = ownedTrails
+            .subtracting(TrophyCosmeticExclusions.iapSecretTrails.map { $0.rawValue })
+            .subtracting([TrailColor.starter.rawValue]).count
+        let floors = ownedFloors
+            .subtracting(TrophyCosmeticExclusions.iapSecretFloors.map { $0.rawValue })
+            .subtracting([Floor.starter.rawValue]).count
+        // Goals / Pits / Boundaries / Music have no IAP-secret members.
+        return balls + trails + floors
+            + owned(ownedGoals, GoalSkin.self)
+            + owned(ownedPits, Pit.self)
+            + owned(ownedBoundaries, Boundary.self)
+            + owned(ownedMusic, MusicTrack.self)
+    }
+
+    /// Count of owned EVERGREEN cosmetics — the `collection_complete`
+    /// metric, capped at the 207-item evergreen set (218 total − 4 IAP
+    /// secrets − 7 seasonal balls).  Iterates every case per slot, keeps the
+    /// evergreen ones (not an IAP secret, not a seasonal-exclusive ball —
+    /// starters ARE evergreen and always owned), and counts those `isOwned`.
+    /// Reaches exactly 207 iff every evergreen cosmetic is owned; owning a
+    /// seasonal or IAP-secret item can never push it past 207.
+    var trophyEvergreenCosmeticsOwnedCount: Int {
+        var count = 0
+        for b in BallSkin.allCases
+        where !TrophyCosmeticExclusions.iapSecretBalls.contains(b)
+            && !TrophyCosmeticExclusions.seasonalExclusiveBalls.contains(b)
+            && isOwned(b) { count += 1 }
+        for g in GoalSkin.allCases where isOwned(g) { count += 1 }
+        for t in TrailColor.allCases
+        where !TrophyCosmeticExclusions.iapSecretTrails.contains(t)
+            && isOwned(t) { count += 1 }
+        for f in Floor.allCases
+        where !TrophyCosmeticExclusions.iapSecretFloors.contains(f)
+            && isOwned(f) { count += 1 }
+        for p in Pit.allCases where isOwned(p) { count += 1 }
+        for bnd in Boundary.allCases where isOwned(bnd) { count += 1 }
+        for m in MusicTrack.allCases where isOwned(m) { count += 1 }
+        return count
+    }
+
+    /// True when a non-starter cosmetic is equipped in ALL 7 loadout slots
+    /// (Ball/Goal/Trail/Floor/Pit/Boundary/Music) at once — the
+    /// `cosmetic_full_kit` metric.  The Ball slot counts as non-starter when
+    /// either a non-starter individual skin OR any equipped Pack is worn.
+    /// Exact inverse of `isLoadoutDefault`, per slot.
+    var trophyLoadoutIsFullyNonStarter: Bool {
+        let ballNonStarter = equippedPackID != nil || activeSkin != .starter
+        return ballNonStarter
+            && equippedGoal    != GoalSkin.starter
+            && equippedTrail   != TrailColor.starter
+            && equippedFloor   != Floor.starter
+            && equippedPit     != Pit.starter
+            && equippedBoundary != Boundary.starter
+            && equippedMusic   != MusicTrack.starter
+    }
+
+    /// Push the ownership-based cosmetic trophy metrics (S1-T5).  Called
+    /// from `grant` — the single choke point every acquisition (coin buy,
+    /// bundle, pack, tutorial gift, track reward, IAP unlock) routes
+    /// through — plus `purchasePack` for the pack-count metric (a Pack is
+    /// only ever bought, never free-granted, so `ownedPacks` isn't touched
+    /// by `grant`).  Every derivation mirrors `TrophyBackfill.snapshot`
+    /// exactly so a live grant and a first-launch grandfather agree.  The
+    /// engine latches, so a later Sell Back / liquidation that shrinks a
+    /// count never revokes an earned trophy.
+    private func recordCosmeticOwnershipTrophies() {
+        // balls_own_10 / balls_own_40 — owned balls minus the 2 IAP secrets.
+        trophyEngine.record(.ballsOwned, value: trophyBallsOwnedCount)
+        // items_own_50 — total owned across 7 slots minus the 4 IAP secrets.
+        trophyEngine.record(.cosmeticsOwned, value: trophyCosmeticsOwnedCount)
+        // collection_complete — owned evergreen items toward the 207 set.
+        trophyEngine.record(.evergreenCosmeticsOwned,
+                            value: trophyEvergreenCosmeticsOwnedCount)
+        // bundle_first / bundle_5 — completed bundles (IAP-secret-free by
+        // guardrail).
+        trophyEngine.record(.bundlesCompleted, value: completedBundleIDs.count)
+        // pack_first — owned Ball Packs.
+        trophyEngine.record(.packsOwned, value: ownedPacks.count)
+    }
+
+    /// Push the "cosmetic equipped in all 7 slots" metric (S1-T5).  Called
+    /// from every equipped-slot mutation (the six `equipped*` setters, the
+    /// ball equip funnels, and Pack equip) so `cosmetic_full_kit` latches
+    /// the instant a full non-starter loadout is worn.  A monotonic latch:
+    /// value is 1 only while fully non-starter, but the engine never revokes
+    /// once unlocked.
+    func recordFullKitTrophy() {
+        trophyEngine.record(.fullNonstarterLoadouts,
+                            value: trophyLoadoutIsFullyNonStarter ? 1 : 0)
+    }
+
+    /// Push the first-coin-purchase latch (S1-T5) — `cosmetic_first_buy`.
+    /// Called only from the three COIN-spend funnels (`purchase`,
+    /// `purchaseBundle`, `purchasePack`) on success, so free grants
+    /// (tutorial gift, track rewards, IAP unlocks) never trip it.  A pure
+    /// latch: any successful coin spend records value 1 (threshold 1).
+    private func recordCosmeticFirstBuyTrophy() {
+        trophyEngine.record(.cosmeticCoinBuys, value: 1)
+    }
+
+    /// Push the lifetime play-earned coins metric (S1-T5) —
+    /// `econ_working_capital`.  Called from `addCoins` after the S0-T2
+    /// source-tagged counter (`coinsEarnedFromPlay`, which already excludes
+    /// IAP grants, Sell Back refunds, and grantBundleFree compensation) is
+    /// bumped; also latches `econ_nest_egg` off the current balance
+    /// high-water (the engine keeps the best, so spending later never
+    /// revokes).
+    private func recordEconomyTrophies() {
+        // econ_working_capital — 5,000 lifetime coins earned from play.
+        trophyEngine.record(.coinsEarnedFromPlay, value: trophyStats.coinsEarnedFromPlay)
+        // econ_nest_egg — hold 1,000 coins at once (latched high-water).
+        trophyEngine.record(.coinBalancePeak, value: coinBalance)
+    }
+
+    // MARK: - Social trophy funnels (S1-T6)
+    //
+    // The trophy DECISION lives here (never in a view), driven by the SwiftUI
+    // Friends/Clans/sign-in views AFTER a `SocialClient` call SUCCEEDS —
+    // SocialClient is a stateless singleton with no reference to GameState or
+    // the engine, so the established view→funnel pattern (S1-T7) is the only
+    // route. Signed-out players never reach these funnels, so their social
+    // trophies simply stay locked — no error paths. All five social metrics
+    // are go-forward (absent from `TrophyBackfill.snapshot`); no social trophy
+    // requires another player to exist beyond one friend/clan action.
+
+    /// `social_sign_in` — latched the first time a Sign-in-with-Apple session
+    /// becomes active (fresh sign-in OR a restored session — either proves the
+    /// player has signed in). Called from ContentView's `auth.isSignedIn`
+    /// change hook. A pure value-1 latch; the engine unlocks once, forever.
+    func recordSocialSignIn() {
+        trophyEngine.record(.signedIn, value: 1)
+    }
+
+    /// `social_first_friend` (≥1) / `social_friends_5` (≥5) — the accepted-
+    /// friend high-water. Called from FriendsView after an accept succeeds and
+    /// the friend list reloads; `peak` is the CURRENT accepted-friend count.
+    /// The engine keeps the best observed, so removing a friend later never
+    /// revokes (latched high-water — sprint-plan.md §4 addenda).
+    func recordFriendAccepted(peak: Int) {
+        trophyEngine.record(.friendsAcceptedPeak, value: peak)
+    }
+
+    /// `social_send_life` (≥1) / `social_lives_sent_25` (≥25) — lifetime lives
+    /// gifted (friend gifts AND clan fulfillments both count, per the catalog).
+    /// Called from Friends/Clans views after `SocialClient.sendLife` succeeds;
+    /// bumps the persisted go-forward counter, then records its current value.
+    func recordLifeSent() {
+        trophyStats.recordLifeSent()
+        trophyEngine.record(.livesSent, value: trophyStats.livesSent)
+    }
+
+    /// `clan_join` — latched on joining OR creating a clan. Called from
+    /// ClansView after `SocialClient.joinClan`/`createClan` succeeds. A pure
+    /// value-1 latch.
+    func recordClanJoined() {
+        trophyEngine.record(.clanJoined, value: 1)
+    }
+
+    /// `clan_fulfill` (≥1) — a life sent to a clanmate who was asking for one.
+    /// Called from ClansView IN ADDITION to `recordLifeSent()` (a fulfillment
+    /// is also a life sent) when the send target had an outstanding request.
+    /// Bumps its own persisted go-forward counter, then records its value.
+    func recordClanRequestFulfilled() {
+        trophyStats.recordClanRequestFulfilled()
+        trophyEngine.record(.clanRequestsFulfilled, value: trophyStats.clanRequestsFulfilled)
     }
 
     // MARK: - Queries
@@ -882,6 +1503,9 @@ final class GameState: ObservableObject {
     /// Record that a mode has been launched so its tutorial won't show again.
     func markModePlayed(_ id: String) {
         if !playedModeIDs.contains(id) { playedModeIDs.insert(id) }
+        // Discovery trophies (arcade_sampler / arcade_grand_tour /
+        // coinpit_first_round) ride the played-mode set (S1-T3).
+        recordMinigamePlayedTrophies()
     }
 
     /// The currently-selected GameMode (resolves `currentModeID`; climb fallback).
@@ -921,6 +1545,12 @@ final class GameState: ObservableObject {
         dailyChallengeIndex = 0
         dailyChallengeAttemptsLeft = Self.dailyChallengeAttemptsPerLevel
         dailyChallengeRunStartedKey = DailyChallenge.key()
+        // Mark the "daily" mode played (§6 item 18 — nothing else writes it)
+        // and fire daily_first_start (S1-T2).  A NEW go-forward metric: not
+        // backfilled, so it credits the first daily STARTED after trophies
+        // ship, not a veteran's past runs.
+        if !playedModeIDs.contains("daily") { playedModeIDs.insert("daily") }
+        trophyEngine.record(.dailyPlayed, value: 1)
     }
 
     /// Forfeit an in-progress Challenge-of-the-Day run.  Quitting mid-run — via
@@ -965,6 +1595,9 @@ final class GameState: ObservableObject {
         guard !dailyChallengeCompletions.contains(key) else { return }
         dailyChallengeCompletions.insert(key)
         addCoins(todaysDailyChallenge.rewardCoins)
+        // A genuinely-new CotD clear just landed — fire the daily-clear
+        // trophy metrics (S1-T2; the guard above makes this once-per-day).
+        recordDailyChallengeTrophies()
     }
 
     /// Current regenerative life count (0…livesMax) including any regen that
@@ -1180,6 +1813,10 @@ final class GameState: ObservableObject {
         }
         coinBalance = min(coinBalance + clamped, Self.maxCoinBalance)
         trophyStats.recordCoins(clamped, source: source)
+        // Economy trophies (S1-T5): econ_working_capital reads the just-bumped
+        // play-earned counter (source-filtered), econ_nest_egg the balance
+        // high-water.  The engine latches, so a later spend never revokes.
+        recordEconomyTrophies()
     }
 
     // MARK: - Minigame results (leaderboards + rewards)
@@ -1252,6 +1889,16 @@ final class GameState: ObservableObject {
         let isBest = score > minigameBests[modeID, default: 0]
         if isBest { minigameBests[modeID] = score }
         syncMinigameStats()
+        // Two competitive bests carry a trophy — Paint Ball coverage % and
+        // King of the Hill hold-seconds (their score arg IS the stored best
+        // unit, matching TrophyBackfill).  Other modes' bests have no trophy
+        // (their trophies are win-count based) so recording is a no-op switch
+        // default (S1-T3).
+        switch modeID {
+        case "paintball": recordMinigameBestTrophy(.paintballBestCoverage)
+        case "koth":      recordMinigameBestTrophy(.kothBestHoldSeconds)
+        default: break
+        }
         return isBest
     }
 
@@ -1262,6 +1909,8 @@ final class GameState: ObservableObject {
         let isBest = s > pinballBest
         if isBest { pinballBest = s; addCoins(Self.minigameBestBonus) }
         syncMinigameStats()
+        // pinball_score_10k / _50k / _150k ride pinballBest (S1-T3).
+        recordMinigameBestTrophy(.pinballBestScore)
         return isBest
     }
 
@@ -1273,6 +1922,9 @@ final class GameState: ObservableObject {
         let isBest = c > goldrushBest
         if isBest { goldrushBest = c; addCoins(Self.minigameBestBonus) }
         syncMinigameStats()
+        // Naming trap: goldrushBest/goldrushCoinsTotal are the Coin Pit
+        // reward run — coinpit_catch_90 / econ_pit_boss ride them (S1-T3).
+        recordCoinPitTrophies()
         return isBest
     }
 
@@ -1293,6 +1945,53 @@ final class GameState: ObservableObject {
             rollupBestSeconds = max(0, seconds)   // same height, longer run → keep it
         }
         syncMinigameStats()
+        // rollup_100m / rollup_500m ride minigameBests["rollup"] (S1-T3).
+        recordMinigameBestTrophy(.rollupBestHeight)
+        return isBest
+    }
+
+    /// Record a finished Disco Ball run — keeps the per-difficulty crossings
+    /// best and pays a new-best bonus (S1-T4 reroute of DiscoBallView's former
+    /// in-view `minigameBests` write).  `bestKey` is the difficulty-scoped slot
+    /// the view already computes ("discoeasy" / "disco" / "discohard"); it is
+    /// the sole source of truth for which slot is written, exactly matching the
+    /// keys `TrophyBackfill.snapshot` derives from.  The view still owns the
+    /// per-crossing coin payout; this keeps the record, pays the new-best
+    /// bonus, publishes it, and fires the Disco trophies.  Returns whether this
+    /// run set a new best for its difficulty.
+    @discardableResult
+    func recordDiscoResult(bestKey: String, crossings: Int) -> Bool {
+        guard crossings > 0 else { return false }
+        let isBest = crossings > minigameBests[bestKey, default: 0]
+        if isBest {
+            minigameBests[bestKey] = crossings
+            addCoins(Self.minigameBestBonus)
+        }
+        syncMinigameStats()
+        // disco_cross_25 (max over all 3 difficulty keys) / disco_hard_10
+        // (discohard only) ride the just-written bests (S1-T4).
+        recordDiscoTrophies()
+        return isBest
+    }
+
+    /// Record a cleared Roll Out maze — keeps the furthest-maze-reached best
+    /// (1-based) and pays a new-best bonus (S1-T4 reroute of RollOutView's
+    /// former in-view `minigameBests["rollout"]` write).  The view still owns
+    /// the flat per-clear coin payout; this keeps the record, pays the new-best
+    /// bonus, publishes it, and fires the Roll Out trophies.  Returns whether
+    /// this clear set a new best.
+    @discardableResult
+    func recordRollOutResult(reached: Int) -> Bool {
+        guard reached > 0 else { return false }
+        let isBest = reached > minigameBests["rollout", default: 0]
+        if isBest {
+            minigameBests["rollout"] = reached
+            addCoins(Self.minigameBestBonus)
+        }
+        syncMinigameStats()
+        // rollout_first_maze (≥1) / rollout_maze_10 (≥10) ride
+        // minigameBests["rollout"] (S1-T4).
+        recordRollOutTrophies()
         return isBest
     }
 
@@ -1304,6 +2003,8 @@ final class GameState: ObservableObject {
         let reward = min(s / 60, 15)   // ≤ 15 coins per session — recognition, not a grind
         if reward > 0 { addCoins(reward) }
         syncMinigameStats()
+        // zen_hour / zen_10_hours ride the cumulative zenSeconds tally (S1-T3).
+        recordZenTrophies()
     }
 
     /// Spend coins.  Returns false (no-op) if balance is insufficient.
@@ -1343,6 +2044,10 @@ final class GameState: ObservableObject {
         minigameWins[modeID, default: 0] += 1
         addTickets(1)
         syncMinigameStats()   // publish the bumped win tally to the leaderboard
+        // The single win choke point — arcade + per-game win trophies (and
+        // the Hard high-waters, which read the just-bumped per-difficulty
+        // dict when reached via recordMinigameResult) fire here only (S1-T3).
+        recordCompetitiveWinTrophies()
     }
 
     /// Difficulty-scaled coin payout for a competitive minigame (pure — no side
@@ -1479,6 +2184,9 @@ final class GameState: ObservableObject {
         // lifetime claim counter (§6 item 5 → `econ_punch_card`).
         addCoins(amount, source: .daily)
         trophyStats.recordDailyRewardClaim()
+        // Fire the daily login-reward trophy metrics (S1-T2), after the
+        // claim counter and streak are both updated above.
+        recordDailyRewardTrophies()
         return amount
     }
 
@@ -1562,9 +2270,13 @@ final class GameState: ObservableObject {
         let previous = trackProgress[trackID] ?? 0
         guard level > previous else { return }
         trackProgress[trackID] = level
-        guard level >= 100, !completedTracks.contains(trackID) else { return }
-        completedTracks.insert(trackID)
-        deliverTrackReward(for: trackID)
+        if level >= 100, !completedTracks.contains(trackID) {
+            completedTracks.insert(trackID)
+            deliverTrackReward(for: trackID)
+        }
+        // A genuine progress advance (and possibly a completion just above) —
+        // fire the track trophy metrics once (S1-T2).
+        recordTrackTrophies()
     }
 
     /// Grant the cosmetic bundle paired with a completed Challenge Track.
@@ -1676,6 +2388,11 @@ final class GameState: ObservableObject {
         case let m as MusicTrack:  ownedMusic.insert(m.rawValue)
         default: break
         }
+        // The single "cosmetic acquired" choke point — every ownership
+        // trophy (balls/items/collection/bundle counts) fires here (S1-T5).
+        // Bundle/Pack grants route each member through here too, so a bundle
+        // completing (or its final member landing) re-evaluates counts.
+        recordCosmeticOwnershipTrophies()
     }
 
     /// Attempt to purchase a cosmetic with coins.  Returns true on
@@ -1687,7 +2404,9 @@ final class GameState: ObservableObject {
         // Full price paid — clear any stale discounted-price record so Sell
         // Back refunds the full cost.
         paidPrices.removeValue(forKey: Self.paidPriceKey(item))
-        grant(item)
+        grant(item)   // records ownership-count trophies
+        // First coin spend on a cosmetic — cosmetic_first_buy (S1-T5).
+        recordCosmeticFirstBuyTrophy()
         return true
     }
 
@@ -1726,8 +2445,14 @@ final class GameState: ObservableObject {
             recordPaidPrices(bundle.pits.filter   { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.music.filter  { !isOwned($0) }, ratio: ratio)
         }
-        bundle.grantContents(to: self)
+        bundle.grantContents(to: self)   // each member's grant records ownership
         ownedBundles.insert(bundle.id)
+        // `ownedBundles` just changed → re-evaluate bundle-completion counts
+        // (a bought-as-a-unit bundle is complete the instant it's owned, and
+        // its members may not all pass through `grant` if already owned).
+        recordCosmeticOwnershipTrophies()
+        // First coin spend on a cosmetic — cosmetic_first_buy (S1-T5).
+        recordCosmeticFirstBuyTrophy()
         return true
     }
 
@@ -1755,8 +2480,13 @@ final class GameState: ObservableObject {
         if base > 0 {
             recordPaidPrices(unowned, ratio: Double(price) / Double(base))
         }
-        pack.grantContents(to: self)
+        pack.grantContents(to: self)   // each member's grant records ownership
         ownedPacks.insert(pack.id)
+        // `ownedPacks` just changed → re-evaluate pack_first (grant() fired
+        // before the pack id was recorded, so re-run the ownership funnel).
+        recordCosmeticOwnershipTrophies()
+        // First coin spend on a cosmetic — cosmetic_first_buy (S1-T5).
+        recordCosmeticFirstBuyTrophy()
         return true
     }
 
@@ -1767,6 +2497,8 @@ final class GameState: ObservableObject {
         equippedPackID = pack.id
         packBag = []
         advancePackSkin()
+        // Ball-slot equip → re-check cosmetic_full_kit (S1-T5).
+        recordFullKitTrophy()
     }
 
     /// Equip an individual ball skin — clears any equipped Pack so the
@@ -1775,6 +2507,8 @@ final class GameState: ObservableObject {
         equippedPackID = nil
         packBag = []
         activeSkin = skin
+        // Ball-slot equip → re-check cosmetic_full_kit (S1-T5).
+        recordFullKitTrophy()
     }
 
     /// If a Pack is equipped, advance `activeSkin` to the next member via

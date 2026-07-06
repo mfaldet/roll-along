@@ -437,11 +437,15 @@ final class TrophyStatsTests: XCTestCase {
                 (item: 6, feeds: .noFallClearStreakBest),      // working value
             TrophyStats.noFallClearStreakBestKey:
                 (item: 6, feeds: .noFallClearStreakBest),      // the ratchet
+            TrophyStats.livesSentKey:
+                (item: 14, feeds: .livesSent),                 // social_send_life / _25
+            TrophyStats.clanRequestsFulfilledKey:
+                (item: 14, feeds: .clanRequestsFulfilled),     // clan_fulfill
         ]
         XCTAssertEqual(TrophyStats.allPersistedKeys, Set(documentedInventory.keys),
                        "counter inventory drifted from the §6 mapping")
-        XCTAssertEqual(Set(documentedInventory.values.map { $0.item }), [4, 5, 6],
-                       "S0-T2 owns exactly the GameState-funnel items 4–6")
+        XCTAssertEqual(Set(documentedInventory.values.map { $0.item }), [4, 5, 6, 14],
+                       "S0-T2 owns items 4–6; S1-T6 adds the two item-14 social counters")
         // Item 15 (daily_clear_streak_best) is derivation-only — its metric
         // exists in the vocabulary but no key backs it.
         XCTAssertFalse(TrophyStats.allPersistedKeys.contains {
@@ -460,9 +464,15 @@ final class TrophyStatsTests: XCTestCase {
 
     /// Sweep the funnels end-to-end: spends and falls move NO counter
     /// upward (no coins-spent counter, no falls/failure counter), and the
-    /// only `ra_trophy*` keys ever written are the enumerated four.
-    /// (S0-T3's engine adds its separate `ra_trophyUnlocks` ledger keys —
-    /// that session extends this allowlist when it wires the engine in.)
+    /// only COUNTER `ra_trophy*` keys ever written are the enumerated ones.
+    /// The engine owns a separate, non-counter ledger — `ra_trophyUnlocks`
+    /// (array) / `ra_trophyUnlockDates` (dict), which the L1 clear unlocking
+    /// `climb_first_clear` writes here, plus S1-T8's `ra_trophySyncDirty`
+    /// (Bool). Those are not TrophyStats counters and are excluded before
+    /// the subset check: the array/dict keys never cast to Int (so
+    /// `persistedTrophyKeyValues` already drops them), and the Bool flag is
+    /// subtracted explicitly (Bool bridges to Int via NSNumber, so it would
+    /// otherwise slip through).
     func testFunnelSweep_writesOnlyEnumeratedKeys_spendsAndFallsCountNothing() {
         let gs = makeGameState()
         gs.currentModeID = "climb"
@@ -490,9 +500,13 @@ final class TrophyStatsTests: XCTestCase {
         gs.resetProgress()
         _ = gs.liquidateCoinCosmetics()
 
-        let written = Set(persistedTrophyKeyValues().keys)
+        // Exclude the engine's non-counter ledger keys (the L1 clear latched
+        // `climb_first_clear`, and S1-T8 arms the Bool sync flag): this test
+        // guards TrophyStats COUNTER keys, not the engine's ratchet.
+        let engineLedgerKeys: Set<String> = [TrophyEngine.syncDirtyKey]
+        let written = Set(persistedTrophyKeyValues().keys).subtracting(engineLedgerKeys)
         XCTAssertTrue(written.isSubset(of: TrophyStats.allPersistedKeys),
-                      "unexpected ra_trophy* keys written: " +
+                      "unexpected ra_trophy* counter keys written: " +
                       "\(written.subtracting(TrophyStats.allPersistedKeys).sorted())")
     }
 
@@ -552,19 +566,25 @@ final class TrophyStatsTests: XCTestCase {
             XCTAssertNotNil(h.gameState.claimDailyReward())
         }
         XCTAssertEqual(h.gameState.trophyStats.dailyRewardClaims, 29)
-        // Drive the live counter value into the engine (the S1-T2 funnel move).
+        // S1-T2 is now wired: each `claimDailyReward` already drove the claim
+        // counter into the engine via `recordDailyRewardTrophies`. 29 is below
+        // the 30 bar, so econ_punch_card is still locked — and a redundant
+        // manual record of the same value is a no-op.
         XCTAssertTrue(h.record(.dailyRewardClaims,
                                value: Double(h.gameState.trophyStats.dailyRewardClaims)).isEmpty,
                       "29 claims is below the 30 bar")
         h.assertLocked("econ_punch_card")
 
-        // The 30th claim crosses the threshold; the record latches it once.
+        // The 30th claim crosses the threshold; the `claimDailyReward` funnel
+        // itself latches econ_punch_card (S1-T2) — no manual record needed.
         h.gameState.lastDailyClaim = Calendar.current.date(byAdding: .day, value: -1, to: .now)
         XCTAssertNotNil(h.gameState.claimDailyReward())
         XCTAssertEqual(h.gameState.trophyStats.dailyRewardClaims, 30)
-        h.assertUnlocked("econ_punch_card",
-                         in: h.record(.dailyRewardClaims,
-                                      value: Double(h.gameState.trophyStats.dailyRewardClaims)))
         h.assertUnlocked("econ_punch_card")
+        // Idempotent: re-recording the now-latched counter value never
+        // re-fires — the ratchet unlocks exactly once.
+        XCTAssertTrue(h.record(.dailyRewardClaims,
+                               value: Double(h.gameState.trophyStats.dailyRewardClaims)).isEmpty,
+                      "already latched by the 30th claim — a redundant record is a no-op")
     }
 }
