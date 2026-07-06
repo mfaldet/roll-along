@@ -1799,3 +1799,249 @@ final class TrophyMinigameWiringTests: XCTestCase {
                        "only 1 distinct minigame played — must not reach 5")
     }
 }
+
+// MARK: - TrophyDiscoRollOutWiringTests (S1-T4)
+//
+// Disco Ball and Roll Out formerly wrote `minigameBests` directly in-view.
+// S1-T4 reroutes both writes through GameState funnels (`recordDiscoResult` /
+// `recordRollOutResult`) so the record, the shared new-best bonus, and the
+// Disco/Roll Out trophies all live at one choke point.  These tests drive the
+// PUBLIC funnels and assert (1) bests + the new-best bonus behave identically
+// to the old in-view logic, (2) the Disco/Roll Out trophies fire from the
+// funnels, and (3) the live funnel and `TrophyBackfill.snapshot` agree.
+final class TrophyDiscoRollOutWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyDiscoRollOutWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    // MARK: Regression — bests behave identically pre/post reroute
+
+    /// A new Disco best writes the difficulty-scoped slot and pays exactly the
+    /// shared new-best bonus (matching the old in-view `wasBest` branch); the
+    /// funnel returns true.  A fresh GameState starts at 0 coins, so the only
+    /// coin movement the funnel owns is the 100-coin bonus (the per-crossing
+    /// payout stays in the view).
+    func testDiscoNewBestWritesSlotAndPaysBonus() {
+        let gs = makeGameState()
+        XCTAssertEqual(gs.coinBalance, 0)
+
+        let isBest = gs.recordDiscoResult(bestKey: "disco", crossings: 30)
+
+        XCTAssertTrue(isBest)
+        XCTAssertEqual(gs.minigameBests["disco", default: 0], 30)
+        XCTAssertEqual(gs.coinBalance, GameState.minigameBestBonus,
+                       "a new best pays exactly the shared bonus")
+    }
+
+    /// A later, lower Disco run is NOT a best: the slot is unchanged, no bonus
+    /// is paid, and the funnel returns false — identical to the old in-view
+    /// `crossings > best` guard.
+    func testDiscoLowerRunDoesNotRegressBestOrPayBonus() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 30)
+        let balanceAfterBest = gs.coinBalance
+
+        let isBest = gs.recordDiscoResult(bestKey: "disco", crossings: 12)
+
+        XCTAssertFalse(isBest)
+        XCTAssertEqual(gs.minigameBests["disco", default: 0], 30,
+                       "a worse run must never lower the stored best")
+        XCTAssertEqual(gs.coinBalance, balanceAfterBest,
+                       "no new best → no bonus")
+    }
+
+    /// Each Disco difficulty writes its OWN slot; the three keys are
+    /// independent (the view passes the difficulty-scoped bestKey).
+    func testDiscoDifficultySlotsAreIndependent() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 8)
+        _ = gs.recordDiscoResult(bestKey: "disco",     crossings: 15)
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 5)
+
+        XCTAssertEqual(gs.minigameBests["discoeasy", default: 0], 8)
+        XCTAssertEqual(gs.minigameBests["disco", default: 0], 15)
+        XCTAssertEqual(gs.minigameBests["discohard", default: 0], 5)
+    }
+
+    /// A zero-crossing Disco run records nothing and pays nothing (the old
+    /// in-view path only wrote/paid when `crossings > 0`).
+    func testDiscoZeroCrossingsIsNoOp() {
+        let gs = makeGameState()
+        let isBest = gs.recordDiscoResult(bestKey: "disco", crossings: 0)
+        XCTAssertFalse(isBest)
+        XCTAssertNil(gs.minigameBests["disco"])
+        XCTAssertEqual(gs.coinBalance, 0)
+    }
+
+    /// A new Roll Out best (furthest maze reached, 1-based) writes the
+    /// `"rollout"` slot and pays the shared new-best bonus; the funnel returns
+    /// true.
+    func testRollOutNewBestWritesSlotAndPaysBonus() {
+        let gs = makeGameState()
+        XCTAssertEqual(gs.coinBalance, 0)
+
+        let isBest = gs.recordRollOutResult(reached: 3)
+
+        XCTAssertTrue(isBest)
+        XCTAssertEqual(gs.minigameBests["rollout", default: 0], 3)
+        XCTAssertEqual(gs.coinBalance, GameState.minigameBestBonus)
+    }
+
+    /// A later, lower Roll Out clear is not a best: slot unchanged, no bonus,
+    /// returns false.
+    func testRollOutLowerClearDoesNotRegressBestOrPayBonus() {
+        let gs = makeGameState()
+        _ = gs.recordRollOutResult(reached: 6)
+        let balanceAfterBest = gs.coinBalance
+
+        let isBest = gs.recordRollOutResult(reached: 2)
+
+        XCTAssertFalse(isBest)
+        XCTAssertEqual(gs.minigameBests["rollout", default: 0], 6)
+        XCTAssertEqual(gs.coinBalance, balanceAfterBest)
+    }
+
+    // MARK: Disco trophies fire from the funnel
+
+    /// disco_cross_25 rides the MAX over the three difficulty keys: 24 misses,
+    /// 25 (on any difficulty) latches.
+    func testDiscoCross25Boundary() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 24)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_cross_25"))
+
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"))
+    }
+
+    /// disco_cross_25 is the MAX across difficulties: 25 crossings on EASY
+    /// satisfies it even though the Normal/Hard slots are lower (mirrors the
+    /// backfill's max derivation).
+    func testDiscoCross25TakesMaxAcrossDifficulties() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco",     crossings: 10)
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 4)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_cross_25"))
+
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 25)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"),
+                      "25 crossings on any single difficulty must satisfy the any-difficulty trophy")
+    }
+
+    /// disco_hard_10 rides the "discohard" slot ONLY: 25 crossings on Normal
+    /// must not trip it; 10 on Hard latches.
+    func testDiscoHard10IsHardSlotOnly() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)   // Normal, well past 10
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_hard_10"),
+                       "a Normal run must never satisfy the Hard-only trophy")
+
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 9)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_hard_10"))
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 10)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_hard_10"))
+    }
+
+    /// A latched Disco trophy is never revoked by a later, worse run.
+    func testDiscoTrophyIsLatched() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 12)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_hard_10"))
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 1)   // a bad run later
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_hard_10"),
+                      "a latched trophy must never revoke")
+    }
+
+    // MARK: Roll Out trophies fire from the funnel
+
+    /// rollout_first_maze (≥1) latches on the first cleared maze; rollout_maze_10
+    /// (≥10) at maze 10 and not maze 9.
+    func testRollOutMazeTiers() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+
+        _ = gs.recordRollOutResult(reached: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+
+        _ = gs.recordRollOutResult(reached: 9)
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+        _ = gs.recordRollOutResult(reached: 10)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+    }
+
+    /// A latched Roll Out trophy is never revoked by a later, worse clear.
+    func testRollOutTrophyIsLatched() {
+        let gs = makeGameState()
+        _ = gs.recordRollOutResult(reached: 10)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"))
+        _ = gs.recordRollOutResult(reached: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"),
+                      "a latched trophy must never revoke")
+    }
+
+    // MARK: Disco and Roll Out are disjoint
+
+    /// A Disco run never touches Roll Out trophies and vice versa.
+    func testDiscoAndRollOutAreDisjoint() {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_first_maze"),
+                       "a Disco run must not grant a Roll Out trophy")
+
+        _ = gs.recordRollOutResult(reached: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+    }
+
+    // MARK: Live funnel ≡ backfill snapshot
+
+    /// The live funnels must derive the SAME metric values `TrophyBackfill`
+    /// derives from the stored bests, so a save built by playing agrees with a
+    /// save that is grandfathered in.  Drive the funnels, then backfill a fresh
+    /// engine from the same GameState and assert identical unlock sets for the
+    /// four S1-T4 trophies.
+    func testLiveFunnelAgreesWithBackfill() throws {
+        let gs = makeGameState()
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 25)   // disco_cross_25 via max
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 10)   // disco_hard_10
+        _ = gs.recordRollOutResult(reached: 10)                          // rollout_first_maze + _maze_10
+
+        let live = gs.trophyEngine.unlockedIDs
+        for id in ["disco_cross_25", "disco_hard_10",
+                   "rollout_first_maze", "rollout_maze_10"] {
+            XCTAssertTrue(live.contains(id), "live funnel should unlock \(id)")
+        }
+
+        // Backfill a fresh engine from the SAME stored bests.
+        let backfilled = TrophyBackfill.snapshot(from: gs)
+        let engine = TrophyEngine(catalog: try TrophyCatalog.load(bundle: .main),
+                                  defaults: UserDefaults(suiteName: suiteName + ".backfill")!)
+        for metric in TrophyMetric.allCases {
+            if let value = backfilled[metric] { _ = engine.record(metric, value: value) }
+        }
+        for id in ["disco_cross_25", "disco_hard_10",
+                   "rollout_first_maze", "rollout_maze_10"] {
+            XCTAssertTrue(engine.isUnlocked(id),
+                          "backfill should also unlock \(id) — live and backfill must agree")
+        }
+    }
+}

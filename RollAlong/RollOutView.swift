@@ -585,14 +585,11 @@ struct RollOutView: View {
     private func clearMaze() {
         phase = .cleared
         gameState.addCoins(coinsPerClear)
-        // Best = furthest maze reached (1-based).  A new best pays the shared
-        // 100-coin bonus, matching the other solo modes (see DiscoBallView).
+        // Best = furthest maze reached (1-based).  The record, the shared
+        // 100-coin new-best bonus, and the Roll Out trophies now funnel
+        // through GameState (S1-T4); the view keeps only the per-clear payout.
         let reached = mazeIndex + 1
-        let wasBest = reached > gameState.minigameBests["rollout", default: 0]
-        if wasBest {
-            gameState.minigameBests["rollout"] = reached
-            gameState.addCoins(GameState.minigameBestBonus)
-        }
+        gameState.recordRollOutResult(reached: reached)
         if gameState.hapticsEnabled { Haptics.success() }
         AudioManager.shared.playWin(enabled: gameState.soundEnabled)
         AnalyticsClient.shared.track(

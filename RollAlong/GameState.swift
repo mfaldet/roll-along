@@ -1076,6 +1076,30 @@ final class GameState: ObservableObject {
         trophyEngine.record(.coinpitCoinsTotal, value: goldrushCoinsTotal)
     }
 
+    /// Push the Disco Ball best-crossings trophy metrics (S1-T4).  Called from
+    /// `recordDiscoResult` after the just-finished run's difficulty-scoped best
+    /// is written.  Mirrors `TrophyBackfill.snapshot` EXACTLY: `disco_cross_25`
+    /// rides the MAX over all three difficulty keys, `disco_hard_10` rides the
+    /// `"discohard"` slot only.
+    private func recordDiscoTrophies() {
+        // disco_cross_25 (≥25 crossings in one run, any difficulty).
+        let discoBest = max(minigameBests["discoeasy", default: 0],
+                            minigameBests["disco", default: 0],
+                            minigameBests["discohard", default: 0])
+        trophyEngine.record(.discoBestCrossings, value: discoBest)
+        // disco_hard_10 (≥10 crossings in one Hard run).
+        trophyEngine.record(.discoHardBestCrossings,
+                            value: minigameBests["discohard", default: 0])
+    }
+
+    /// Push the Roll Out furthest-maze trophy metric (S1-T4).  Called from
+    /// `recordRollOutResult` after the highest-maze-reached best is written.
+    /// Mirrors `TrophyBackfill.snapshot`: both `rollout_first_maze` (≥1) and
+    /// `rollout_maze_10` (≥10) ride `minigameBests["rollout"]`.
+    private func recordRollOutTrophies() {
+        trophyEngine.record(.rolloutBestMaze, value: minigameBests["rollout", default: 0])
+    }
+
     // MARK: - Queries
 
     func stars(for level: Int) -> Int           { bestStars[level] ?? 0 }
@@ -1557,6 +1581,51 @@ final class GameState: ObservableObject {
         syncMinigameStats()
         // rollup_100m / rollup_500m ride minigameBests["rollup"] (S1-T3).
         recordMinigameBestTrophy(.rollupBestHeight)
+        return isBest
+    }
+
+    /// Record a finished Disco Ball run — keeps the per-difficulty crossings
+    /// best and pays a new-best bonus (S1-T4 reroute of DiscoBallView's former
+    /// in-view `minigameBests` write).  `bestKey` is the difficulty-scoped slot
+    /// the view already computes ("discoeasy" / "disco" / "discohard"); it is
+    /// the sole source of truth for which slot is written, exactly matching the
+    /// keys `TrophyBackfill.snapshot` derives from.  The view still owns the
+    /// per-crossing coin payout; this keeps the record, pays the new-best
+    /// bonus, publishes it, and fires the Disco trophies.  Returns whether this
+    /// run set a new best for its difficulty.
+    @discardableResult
+    func recordDiscoResult(bestKey: String, crossings: Int) -> Bool {
+        guard crossings > 0 else { return false }
+        let isBest = crossings > minigameBests[bestKey, default: 0]
+        if isBest {
+            minigameBests[bestKey] = crossings
+            addCoins(Self.minigameBestBonus)
+        }
+        syncMinigameStats()
+        // disco_cross_25 (max over all 3 difficulty keys) / disco_hard_10
+        // (discohard only) ride the just-written bests (S1-T4).
+        recordDiscoTrophies()
+        return isBest
+    }
+
+    /// Record a cleared Roll Out maze — keeps the furthest-maze-reached best
+    /// (1-based) and pays a new-best bonus (S1-T4 reroute of RollOutView's
+    /// former in-view `minigameBests["rollout"]` write).  The view still owns
+    /// the flat per-clear coin payout; this keeps the record, pays the new-best
+    /// bonus, publishes it, and fires the Roll Out trophies.  Returns whether
+    /// this clear set a new best.
+    @discardableResult
+    func recordRollOutResult(reached: Int) -> Bool {
+        guard reached > 0 else { return false }
+        let isBest = reached > minigameBests["rollout", default: 0]
+        if isBest {
+            minigameBests["rollout"] = reached
+            addCoins(Self.minigameBestBonus)
+        }
+        syncMinigameStats()
+        // rollout_first_maze (≥1) / rollout_maze_10 (≥10) ride
+        // minigameBests["rollout"] (S1-T4).
+        recordRollOutTrophies()
         return isBest
     }
 
