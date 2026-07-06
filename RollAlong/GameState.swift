@@ -928,6 +928,52 @@ final class GameState: ObservableObject {
                             value: trophyStats.bestNoFallClearStreak)
     }
 
+    /// Push the Challenge-Track trophy metrics' current values (S1-T2).
+    /// Called from `advanceTrackProgress` — the single funnel that mutates
+    /// `trackProgress` / `completedTracks`.  Derivations mirror
+    /// `TrophyBackfill.snapshot` exactly so a live update and a first-launch
+    /// grandfather agree.  Keyed to progress NUMBERS and completion COUNTS,
+    /// never to a specific track's layout.
+    private func recordTrackTrophies() {
+        // Best progress reached on any single track — track_first_level (≥1)
+        // / track_halfway (≥50).
+        trophyEngine.record(.trackBestProgress, value: trackProgress.values.max() ?? 0)
+        // Tracks fully completed — track_first_complete / track_triple /
+        // track_all_eight.
+        trophyEngine.record(.tracksCompleted, value: completedTracks.count)
+        // The prestige Golden Gauntlet — track_gauntlet (1 once
+        // "golden-gauntlet" ∈ completedTracks).
+        trophyEngine.record(.goldenGauntletCompleted,
+                            value: completedTracks.contains("golden-gauntlet") ? 1 : 0)
+    }
+
+    /// Push the Challenge-of-the-Day clear trophy metrics (S1-T2).  Called
+    /// from `completeTodaysDailyChallenge`, the sole funnel that inserts
+    /// into `dailyChallengeCompletions`.  Both metrics derive from that
+    /// append-only date set (mirrors `TrophyBackfill.snapshot`).
+    private func recordDailyChallengeTrophies() {
+        // Lifetime CotD clears — daily_first_clear / daily_clears_10 / _50.
+        trophyEngine.record(.dailyClears, value: dailyChallengeCompletions.count)
+        // Longest consecutive-day clear run — daily_week_streak (≥7).  The
+        // engine latches the best observed, so a broken run never revokes.
+        trophyEngine.record(.dailyClearStreakBest,
+                            value: TrophyStats.longestConsecutiveDailyClearRun(
+                                in: dailyChallengeCompletions))
+    }
+
+    /// Push the daily login-reward trophy metrics (S1-T2).  Called from
+    /// `claimDailyReward` after the claim counter is bumped.  The claim
+    /// count is a monotonic counter; the reward streak can regress on a
+    /// missed day, but the engine latches the best observed — so recording
+    /// the CURRENT `dailyStreak` correctly unlocks daily_login_7/30 and
+    /// never revokes (this live latch supersedes the snapshot's proxy).
+    private func recordDailyRewardTrophies() {
+        // Lifetime claims — econ_punch_card (≥30).
+        trophyEngine.record(.dailyRewardClaims, value: trophyStats.dailyRewardClaims)
+        // Reward-streak high-water — daily_login_7 / daily_login_30.
+        trophyEngine.record(.dailyRewardStreakBest, value: dailyStreak)
+    }
+
     // MARK: - Queries
 
     func stars(for level: Int) -> Int           { bestStars[level] ?? 0 }
@@ -1008,6 +1054,12 @@ final class GameState: ObservableObject {
         dailyChallengeIndex = 0
         dailyChallengeAttemptsLeft = Self.dailyChallengeAttemptsPerLevel
         dailyChallengeRunStartedKey = DailyChallenge.key()
+        // Mark the "daily" mode played (§6 item 18 — nothing else writes it)
+        // and fire daily_first_start (S1-T2).  A NEW go-forward metric: not
+        // backfilled, so it credits the first daily STARTED after trophies
+        // ship, not a veteran's past runs.
+        if !playedModeIDs.contains("daily") { playedModeIDs.insert("daily") }
+        trophyEngine.record(.dailyPlayed, value: 1)
     }
 
     /// Forfeit an in-progress Challenge-of-the-Day run.  Quitting mid-run — via
@@ -1052,6 +1104,9 @@ final class GameState: ObservableObject {
         guard !dailyChallengeCompletions.contains(key) else { return }
         dailyChallengeCompletions.insert(key)
         addCoins(todaysDailyChallenge.rewardCoins)
+        // A genuinely-new CotD clear just landed — fire the daily-clear
+        // trophy metrics (S1-T2; the guard above makes this once-per-day).
+        recordDailyChallengeTrophies()
     }
 
     /// Current regenerative life count (0…livesMax) including any regen that
@@ -1566,6 +1621,9 @@ final class GameState: ObservableObject {
         // lifetime claim counter (§6 item 5 → `econ_punch_card`).
         addCoins(amount, source: .daily)
         trophyStats.recordDailyRewardClaim()
+        // Fire the daily login-reward trophy metrics (S1-T2), after the
+        // claim counter and streak are both updated above.
+        recordDailyRewardTrophies()
         return amount
     }
 
@@ -1649,9 +1707,13 @@ final class GameState: ObservableObject {
         let previous = trackProgress[trackID] ?? 0
         guard level > previous else { return }
         trackProgress[trackID] = level
-        guard level >= 100, !completedTracks.contains(trackID) else { return }
-        completedTracks.insert(trackID)
-        deliverTrackReward(for: trackID)
+        if level >= 100, !completedTracks.contains(trackID) {
+            completedTracks.insert(trackID)
+            deliverTrackReward(for: trackID)
+        }
+        // A genuine progress advance (and possibly a completion just above) —
+        // fire the track trophy metrics once (S1-T2).
+        recordTrackTrophies()
     }
 
     /// Grant the cosmetic bundle paired with a completed Challenge Track.

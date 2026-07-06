@@ -1319,3 +1319,175 @@ final class TrophyTestHarnessTests: XCTestCase {
         XCTAssertEqual(reloaded.coinBalance, 4_242)
     }
 }
+
+// MARK: - S1-T2 — Track + Daily trigger wiring
+
+/// End-to-end wiring tests: drive the PUBLIC GameState funnels (never the
+/// engine directly) and assert the 14 Challenge-Track / Challenge-of-the-Day
+/// trophies latch through the funnel → `trophyEngine.record` path. Each test
+/// runs on its own throwaway UserDefaults suite; the GameState it builds owns
+/// the engine those funnels drive, so an unlock here proves the S1-T2 wiring,
+/// not just the S0 engine.
+final class TrophyTrackDailyWiringTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "TrophyTrackDailyWiringTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    /// Fresh GameState on the isolated suite. Its first-launch backfill runs
+    /// over an empty save (grants nothing, marks itself done), so every
+    /// unlock below comes from the live funnel call, not the grandfather.
+    private func makeGameState() -> GameState {
+        TrophyTestHarness.makeGameState(defaults: defaults)
+    }
+
+    /// `count` distinct "YYYY-MM-DD" completion keys, `strideDays` apart
+    /// (stride 1 = consecutive calendar dates; larger = deliberately
+    /// non-consecutive so a clears-COUNT test never trips the streak trophy).
+    /// Anchored in 2020 so no key can collide with `DailyChallenge.key()`
+    /// (today), which `completeTodaysDailyChallenge` inserts.
+    private func dateKeys(_ count: Int, strideDays: Int) -> Set<String> {
+        let cal = Calendar.current
+        let base = cal.date(from: DateComponents(year: 2020, month: 1, day: 1))!
+        return Set((0..<count).map { i in
+            DailyChallenge.key(cal.date(byAdding: .day, value: i * strideDays, to: base)!)
+        })
+    }
+
+    private func yesterday() -> Date {
+        Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+    }
+
+    // MARK: Challenge Tracks
+
+    /// `track_best_progress` climbs through `advanceTrackProgress`:
+    /// track_first_level (≥1) then track_halfway (≥50); a completion (100)
+    /// also latches track_first_complete via `tracks_completed`.
+    func testTrackProgressTrophiesWireThroughAdvance() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_first_level"))
+
+        gs.advanceTrackProgress(trackID: "alpha", to: 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_first_level"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_halfway"))
+
+        gs.advanceTrackProgress(trackID: "alpha", to: 50)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_halfway"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_first_complete"))
+
+        gs.advanceTrackProgress(trackID: "alpha", to: 100)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_first_complete"))
+    }
+
+    /// `tracks_completed` count latches track_triple (3) and track_all_eight
+    /// (8) through distinct-track completions; the Golden Gauntlet completion
+    /// latches track_gauntlet via `golden_gauntlet_completed`.
+    func testTrackCompletionCountAndGauntletWireThroughAdvance() {
+        let gs = makeGameState()
+
+        for i in 1...3 { gs.advanceTrackProgress(trackID: "t\(i)", to: 100) }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_first_complete"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_triple"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_all_eight"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("track_gauntlet"))
+
+        for i in 4...8 { gs.advanceTrackProgress(trackID: "t\(i)", to: 100) }
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_all_eight"))
+
+        gs.advanceTrackProgress(trackID: "golden-gauntlet", to: 100)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("track_gauntlet"))
+    }
+
+    // MARK: Challenge of the Day
+
+    /// `daily_first_start` is a NEW go-forward metric: starting a daily marks
+    /// the "daily" mode played (§6 item 18) and latches the trophy.
+    func testDailyFirstStartWiresThroughStartDailyChallenge() {
+        let gs = makeGameState()
+        XCTAssertFalse(gs.playedModeIDs.contains("daily"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_first_start"))
+
+        gs.startDailyChallenge()
+
+        XCTAssertTrue(gs.playedModeIDs.contains("daily"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_first_start"))
+    }
+
+    /// `daily_clears` count latches daily_first_clear (≥1), daily_clears_10
+    /// (≥10) and daily_clears_50 (≥50) through `completeTodaysDailyChallenge`.
+    /// The set is seeded with non-consecutive historical keys so the clears
+    /// COUNT is what fires — never the streak trophy.
+    func testDailyClearsWireThroughCompleteFunnel() {
+        let gs = makeGameState()
+
+        // 9 prior non-consecutive clears + today's = 10.
+        gs.dailyChallengeCompletions = dateKeys(9, strideDays: 10)
+        gs.completeTodaysDailyChallenge()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_first_clear"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_clears_10"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_clears_50"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_week_streak"),
+                       "non-consecutive keys must not trip the streak trophy")
+
+        // Reseed to 49 prior + today's = 50.
+        gs.dailyChallengeCompletions = dateKeys(49, strideDays: 10)
+        gs.completeTodaysDailyChallenge()
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_clears_50"))
+    }
+
+    /// `daily_clear_streak_best` (the consecutive-date derivation) latches
+    /// daily_week_streak (≥7) through the same completion funnel: 7
+    /// consecutive historical clears, revealed on the next completion.
+    func testDailyWeekStreakWiresThroughCompleteFunnel() {
+        let gs = makeGameState()
+        gs.dailyChallengeCompletions = dateKeys(7, strideDays: 1)   // 7 consecutive
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_week_streak"))
+
+        gs.completeTodaysDailyChallenge()   // fires the derivation over the set
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_week_streak"))
+    }
+
+    // MARK: Daily login reward
+
+    /// The reward-streak high-water latches daily_login_7 (≥7) via
+    /// `claimDailyReward`: a streak of 6 claimed yesterday advances to 7.
+    func testDailyLogin7WiresThroughClaim() {
+        let gs = makeGameState()
+        gs.dailyStreak = 6
+        gs.lastDailyClaim = yesterday()      // streak intact, claim available
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("daily_login_7"))
+
+        let granted = gs.claimDailyReward()
+        XCTAssertNotNil(granted, "the claim must actually land")
+        XCTAssertEqual(gs.dailyStreak, 7)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_7"))
+    }
+
+    /// Repeated claims drive both counter-based reward trophies through the
+    /// real funnel: 30 claims latch econ_punch_card (claims ≥30) and, since
+    /// the streak climbs in lockstep, daily_login_7 and daily_login_30.
+    func testRewardClaimCountAndLongStreakWireThroughRepeatedClaims() {
+        let gs = makeGameState()
+        for _ in 0..<30 {
+            gs.lastDailyClaim = yesterday()   // keep the streak alive + claim open
+            _ = gs.claimDailyReward()
+        }
+        XCTAssertEqual(gs.dailyStreak, 30)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_punch_card"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_7"))
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("daily_login_30"))
+    }
+}

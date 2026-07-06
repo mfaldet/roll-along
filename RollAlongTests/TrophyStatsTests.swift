@@ -552,19 +552,25 @@ final class TrophyStatsTests: XCTestCase {
             XCTAssertNotNil(h.gameState.claimDailyReward())
         }
         XCTAssertEqual(h.gameState.trophyStats.dailyRewardClaims, 29)
-        // Drive the live counter value into the engine (the S1-T2 funnel move).
+        // S1-T2 is now wired: each `claimDailyReward` already drove the claim
+        // counter into the engine via `recordDailyRewardTrophies`. 29 is below
+        // the 30 bar, so econ_punch_card is still locked — and a redundant
+        // manual record of the same value is a no-op.
         XCTAssertTrue(h.record(.dailyRewardClaims,
                                value: Double(h.gameState.trophyStats.dailyRewardClaims)).isEmpty,
                       "29 claims is below the 30 bar")
         h.assertLocked("econ_punch_card")
 
-        // The 30th claim crosses the threshold; the record latches it once.
+        // The 30th claim crosses the threshold; the `claimDailyReward` funnel
+        // itself latches econ_punch_card (S1-T2) — no manual record needed.
         h.gameState.lastDailyClaim = Calendar.current.date(byAdding: .day, value: -1, to: .now)
         XCTAssertNotNil(h.gameState.claimDailyReward())
         XCTAssertEqual(h.gameState.trophyStats.dailyRewardClaims, 30)
-        h.assertUnlocked("econ_punch_card",
-                         in: h.record(.dailyRewardClaims,
-                                      value: Double(h.gameState.trophyStats.dailyRewardClaims)))
         h.assertUnlocked("econ_punch_card")
+        // Idempotent: re-recording the now-latched counter value never
+        // re-fires — the ratchet unlocks exactly once.
+        XCTAssertTrue(h.record(.dailyRewardClaims,
+                               value: Double(h.gameState.trophyStats.dailyRewardClaims)).isEmpty,
+                      "already latched by the 30th claim — a redundant record is a no-op")
     }
 }
