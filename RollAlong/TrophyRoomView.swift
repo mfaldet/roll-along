@@ -105,10 +105,22 @@ struct TrophyRoomRow: Identifiable, Equatable {
     /// First-unlock timestamp, or nil when locked / un-stamped.
     let unlockDate: Date?
 
-    /// Rarity label slot. Always `"—"` in S2 — S3-T4 feeds real bands.
-    /// A property (not a hardcoded View string) so the wiring seam is
-    /// visible and testable.
+    /// Rarity label slot AS DRAWN ON THE ROW: the PSN band label ("Common" …
+    /// "Ultra Rare") once S3-T4's stats feed lands and the cold-start gate is
+    /// open, otherwise the "—" placeholder. Suppressed to the placeholder
+    /// whenever rarity is cold-started or the trophy is paused (design.md
+    /// §3/§9). Text only — NEVER diamond iconography at any band (§2 R2).
     let rarityLabel: String
+
+    /// The resolved band, or nil when rarity is suppressed (cold-start /
+    /// paused / no stats row yet). The View draws `rarityLabel`; this is the
+    /// structured value tests and a future detail view read.
+    let rarityBand: TrophyRarityBand?
+
+    /// The raw percentage string for a DETAIL view only ("0.9%"), or nil when
+    /// suppressed. Deliberately NOT drawn on the list row — the label is the
+    /// row's rarity, the percentage is a detail garnish (design.md §3).
+    let rarityDetailPercent: String?
 
     /// Grade glyph (SF Symbol) — from the single `TrophyGradeStyle` source
     /// so the Diamond grade never borrows the cosmetic gem (design.md §2 R2).
@@ -136,6 +148,11 @@ struct TrophyRoomRow: Identifiable, Equatable {
             parts.append("\(Int((progress * 100).rounded())) percent complete")
         } else {
             parts.append("locked")
+        }
+        // Speak the rarity band when one is shown (suppressed → nothing to say,
+        // and never the raw percent — that's a detail-view garnish).
+        if let rarityBand {
+            parts.append("\(rarityBand.displayName) rarity")
         }
         return parts.joined(separator: ", ")
     }
@@ -204,8 +221,10 @@ struct TrophyRoomModel: Equatable {
     /// Header summary (completion % + per-grade counts).
     let summary: TrophyRoomSummary
 
-    /// The rarity slot's S2 placeholder — the label every row shows until
-    /// S3-T4 wires `trophy_stats`. Centralized so S3 flips one constant.
+    /// The rarity slot's placeholder — the label a row shows whenever rarity
+    /// is suppressed: before the stats feed lands, during cold-start, for a
+    /// paused trophy, or for a trophy with no stats row yet (design.md §3/§9).
+    /// Centralized so the suppression path is one constant.
     static let rarityPlaceholder = "—"
 
     /// The subtitle shown for a masked (locked secret) trophy — a generic
@@ -215,11 +234,16 @@ struct TrophyRoomModel: Equatable {
     /// The masked title shown in place of a secret trophy's real name.
     static let maskedTitle = "???"
 
-    /// Build the model from the engine. Reads ONLY the engine's public API
-    /// (`catalog`, `isUnlocked`, `unlockDate(for:)`, `progressFraction`) —
-    /// never GameState. Rows within a section keep catalog (authored) order;
-    /// sections sort by `roomSortOrder`.
-    init(engine: TrophyEngine) {
+    /// Build the model from the engine + the resolved rarity index. Reads ONLY
+    /// the engine's public API (`catalog`, `isUnlocked`, `unlockDate(for:)`,
+    /// `progressFraction`) — never GameState — and the already-GATED
+    /// `TrophyRarityIndex` (S3-T4), which owns all cold-start / is_paused
+    /// suppression so this model draws its verdict, never re-decides it.
+    /// `rarity` defaults to `.empty` (every row shows the placeholder) so a
+    /// caller with no stats feed — previews, tests, the room's first render —
+    /// keeps the pre-S3 behavior. Rows within a section keep catalog (authored)
+    /// order; sections sort by `roomSortOrder`.
+    init(engine: TrophyEngine, rarity: TrophyRarityIndex = .empty) {
         let catalog = engine.catalog
 
         // Resolve every trophy to a row, honoring the secret-masking policy.
@@ -260,6 +284,13 @@ struct TrophyRoomModel: Equatable {
                 progress = engine.progressFraction(for: trophy.id)
             }
 
+            // Rarity: the index has already applied the cold-start + is_paused
+            // gates (design.md §3/§9). A suppressed display (nil band) renders
+            // the placeholder — NEVER a fabricated 0 %/100 %. The band label
+            // rides the row; the raw percent rides the (future) detail view.
+            let rarityDisplay = rarity.display(for: trophy.id)
+            let rarityLabel = rarityDisplay.band?.displayName ?? Self.rarityPlaceholder
+
             let row = TrophyRoomRow(
                 id: trophy.id,
                 tier: trophy.tier,
@@ -270,7 +301,9 @@ struct TrophyRoomModel: Equatable {
                 displayDescription: description,
                 progress: progress,
                 unlockDate: isUnlocked ? engine.unlockDate(for: trophy.id) : nil,
-                rarityLabel: Self.rarityPlaceholder)
+                rarityLabel: rarityLabel,
+                rarityBand: rarityDisplay.band,
+                rarityDetailPercent: rarityDisplay.detailPercent)
 
             rowsByCategory[trophy.category, default: []].append(row)
 
@@ -322,16 +355,27 @@ struct TrophyRoomView: View {
     /// simply don't appear.
     @ObservedObject var pins: TrophyPinStore
 
+    /// The rarity feed (S3-T4). Owned by the view so a `trophy_stats` fetch
+    /// never re-renders gameplay; observed so real bands appear the instant the
+    /// fetch lands. A garnish — an empty index (fetch pending / failed) simply
+    /// shows the placeholder on every row.
+    @StateObject private var rarity: TrophyRarityProvider
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(engine: TrophyEngine, pins: TrophyPinStore = TrophyPinStore()) {
+    init(engine: TrophyEngine,
+         pins: TrophyPinStore = TrophyPinStore(),
+         rarityProvider: TrophyRarityProvider = TrophyRarityProvider()) {
         self.engine = engine
         self.pins = pins
+        _rarity = StateObject(wrappedValue: rarityProvider)
     }
 
-    /// Recomputed each render from the current engine snapshot. Cheap: one
-    /// pass over 89 rows of value types.
-    private var model: TrophyRoomModel { TrophyRoomModel(engine: engine) }
+    /// Recomputed each render from the current engine snapshot + the latest
+    /// rarity index. Cheap: one pass over 89 rows of value types.
+    private var model: TrophyRoomModel {
+        TrophyRoomModel(engine: engine, rarity: rarity.index)
+    }
 
     var body: some View {
         ScrollView {
@@ -364,6 +408,10 @@ struct TrophyRoomView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        // Fetch trophy_stats once when the room opens (idempotent — a re-open
+        // reuses the cache). Fire-and-forget: rarity is a garnish, so a failed
+        // or slow fetch just leaves the placeholders in place.
+        .task { await rarity.loadIfNeeded() }
     }
 
     /// A quiet caption stating how many chase pins are set, so the pin cap is
