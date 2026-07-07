@@ -95,6 +95,7 @@
 		7A0F010C000000000000AA01 /* TrophyRarityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010C000000000000AA00 /* TrophyRarityTests.swift */; };
 		7A0F010D000000000000AA01 /* TrophyCloudMirrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010D000000000000AA00 /* TrophyCloudMirrorTests.swift */; };
 		7A0F010E000000000000AA01 /* TrophyHydrateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010E000000000000AA00 /* TrophyHydrateTests.swift */; };
+		7A0F0110000000000000AA01 /* TrophyCohortRarityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0110000000000000AA00 /* TrophyCohortRarityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -205,6 +206,7 @@
 		7A0F010C000000000000AA00 /* TrophyRarityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRarityTests.swift; sourceTree = "<group>"; };
 		7A0F010D000000000000AA00 /* TrophyCloudMirrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCloudMirrorTests.swift; sourceTree = "<group>"; };
 		7A0F010E000000000000AA00 /* TrophyHydrateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyHydrateTests.swift; sourceTree = "<group>"; };
+		7A0F0110000000000000AA00 /* TrophyCohortRarityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCohortRarityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -359,6 +361,7 @@
 				7A0F010C000000000000AA00 /* TrophyRarityTests.swift */,
 				7A0F010D000000000000AA00 /* TrophyCloudMirrorTests.swift */,
 				7A0F010E000000000000AA00 /* TrophyHydrateTests.swift */,
+				7A0F0110000000000000AA00 /* TrophyCohortRarityTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -573,6 +576,7 @@
 				7A0F010C000000000000AA01 /* TrophyRarityTests.swift in Sources */,
 				7A0F010D000000000000AA01 /* TrophyCloudMirrorTests.swift in Sources */,
 				7A0F010E000000000000AA01 /* TrophyHydrateTests.swift in Sources */,
+				7A0F0110000000000000AA01 /* TrophyCohortRarityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
