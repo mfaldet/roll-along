@@ -53,8 +53,11 @@
 
         <!-- Gameplay events sent to Supabase: level_complete, level_fail,
              minigame round start/over, challenge track progress, att_response,
+             the trophy_unlocked beta-funnel event (trophy id + tier, no PII),
              and ad impression/rewarded/failed events.  Used for product
-             analytics and funnel analysis only. -->
+             analytics and funnel analysis only.  This entry is the NOT-LINKED
+             gameplay envelope: it also covers the anonymous trophy rarity rail
+             (trophy_unlocks — anon install-UUID, INSERT-only, no identity). -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeGameplayContent</string>
@@ -65,6 +68,34 @@
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+        <!-- IDENTITY-LINKED gameplay content on the SIGNED-IN trophy rail.
+             When a player signs in with Apple (Supabase Auth), their unlocked
+             trophies (player_trophies) and curated public showcase
+             (player_showcase: up to 3 trophy ids + per-grade earned counts)
+             are stored keyed to player_id = auth.uid() and rendered on the
+             public profile.  Because these rows are tied to the account, this
+             is LINKED gameplay content — distinct from the not-linked analytics
+             envelope above and from the anonymous trophy_unlocks rarity rail.
+             Purpose is App Functionality (cross-device restore + public
+             showcase), NOT analytics or tracking.  No new data TYPE beyond the
+             account's existing signed-in social data (the public display name
+             lives on the pre-existing players row, already identity-linked by
+             the Friends/Clans social system — not introduced here).  This rail
+             is never used for cross-app tracking and cascades away on account
+             deletion (ON DELETE CASCADE). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeGameplayContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
 
