@@ -144,6 +144,14 @@ final class GameState: ObservableObject {
     @Published var livesFullNotifEnabled: Bool {
         didSet { defaults.set(livesFullNotifEnabled, forKey: "ra_notifLivesFull") }
     }
+    /// Whether the signed-in player's CURATED public trophy showcase is shared
+    /// on their public profile (S3-T9; design.md §7 / decision #10, D6).
+    /// Defaults ON — the design ruling is "on for signed-in players" (sign-in is
+    /// already the opt-in gate for public profiles). Toggling it OFF in Settings
+    /// deletes the showcase server-side via `TrophySyncService.syncShowcase`.
+    @Published var trophyShowcaseEnabled: Bool {
+        didSet { defaults.set(trophyShowcaseEnabled, forKey: "ra_trophyShowcaseEnabled") }
+    }
     /// Plays the cinematic opening-credits intro on cold launch.  Defaults
     /// OFF — pre-launch feature flag, flipped on from Settings once vetted
     /// on-device.  See IntroView / ContentView.
@@ -729,6 +737,8 @@ final class GameState: ObservableObject {
         ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
         shopFreshNotifEnabled = defaults.object(forKey: "ra_notifShopFresh") as? Bool ?? false
         livesFullNotifEnabled = defaults.object(forKey: "ra_notifLivesFull") as? Bool ?? false
+        // Public trophy showcase — DEFAULT ON (design.md §7 / D6).
+        trophyShowcaseEnabled = defaults.object(forKey: "ra_trophyShowcaseEnabled") as? Bool ?? true
         minigameDifficulty = MinigameDifficulty(
             rawValue: defaults.string(forKey: "ra_minigameDifficulty") ?? "") ?? .normal
         seenOnboarding = defaults.bool(forKey: "ra_seenOnboarding")

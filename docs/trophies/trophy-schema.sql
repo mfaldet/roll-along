@@ -143,6 +143,67 @@ comment on table public.player_trophies is
 -- player_id column already covers (player_id) lookups, so no extra index needed.
 
 -- =============================================================================
+-- Table: public.player_showcase  — the CURATED public showcase (S3-T9).
+-- =============================================================================
+-- A small, curated PUBLIC projection of a signed-in player's trophies — NOT
+-- their raw unlock rows.  design.md §7 "Profile showcase" / decision #10 (D6,
+-- ruled 2026-07-07: on for signed-in, Settings toggle):
+--   • per-grade counts (bronze…platinum earned tallies) + overall earned/total,
+--   • up to 3 showcased trophy ids (player-chosen; client default = rarest
+--     earned), stored as a text[] so PublicProfileView renders the grade
+--     glyphs without a second query,
+--   • the capstone (Platinum) flag for the crown highlight.
+--
+-- WHY A SEPARATE TABLE (not columns on player_trophies, not player_trophies
+-- itself): player_trophies is the FULL unlock set — dozens of rows a viewer has
+-- no business enumerating on someone else''s profile.  The showcase is a single
+-- curated row: three ids + a handful of counts.  Keeping it separate lets the
+-- raw unlock rows stay a private-ish own/authenticated read while the showcase
+-- is the intentionally public face, and lets the Settings toggle turn the
+-- public projection OFF (DELETE this row) WITHOUT deleting the player''s unlock
+-- history on player_trophies (which the rarity/restore rails still need).
+--
+-- One row per player.  FK → players ON DELETE CASCADE, so account deletion
+-- removes the public showcase with the rest of the personal rows.  Own-row
+-- write; readable by BOTH anon and authenticated (a signed-out viewer opening a
+-- rollalong://player/<id> deep link still sees the showcase — S3-T9 acceptance).
+create table if not exists public.player_showcase (
+    player_id      uuid        primary key
+                   references public.players (id) on delete cascade,
+
+    -- Up to 3 curated trophy ids (client caps + orders them; default = rarest
+    -- earned).  text[] so the client fetches the strip in one row.
+    showcased_ids  text[]      not null default '{}',
+
+    -- Per-grade EARNED counts (the public grade strip).  Small non-negative ints.
+    bronze_count   integer     not null default 0,
+    silver_count   integer     not null default 0,
+    gold_count     integer     not null default 0,
+    diamond_count  integer     not null default 0,
+    platinum_count integer     not null default 0,
+
+    -- Overall earned / catalog total (header "N of M"), and the capstone crown.
+    earned_count   integer     not null default 0,
+    total_count    integer     not null default 0,
+    capstone       boolean     not null default false,
+
+    updated_at     timestamptz not null default now(),
+
+    -- At most 3 showcased ids, each a short GC-legal id.
+    constraint player_showcase_ids_cap check (cardinality(showcased_ids) <= 3),
+    constraint player_showcase_counts_nonneg check (
+        bronze_count >= 0 and silver_count >= 0 and gold_count >= 0
+        and diamond_count >= 0 and platinum_count >= 0
+        and earned_count >= 0 and total_count >= 0
+    )
+);
+
+comment on table public.player_showcase is
+    'CURATED public trophy showcase (S3-T9), one row per player. FK → players ON DELETE CASCADE. Own-row write; readable by anon AND authenticated (public-profile face). A small projection — per-grade counts + up to 3 showcased ids — NEVER the raw unlock rows (those live in player_trophies). Toggling the showcase off DELETEs this row without touching player_trophies.';
+comment on column public.player_showcase.showcased_ids is
+    'Up to 3 curated trophy ids (client default = rarest earned). text[] so PublicProfileView fetches the strip in one row.';
+
+-- =============================================================================
 -- Table: public.trophy_stats  — counts-only aggregate (anon-READABLE).
 -- =============================================================================
 -- The project's FIRST anon-readable object.  Written by the scheduled rollup
@@ -191,6 +252,7 @@ comment on column public.trophy_stats.is_paused is
 -- =============================================================================
 alter table public.trophy_unlocks  enable row level security;
 alter table public.player_trophies enable row level security;
+alter table public.player_showcase enable row level security;
 alter table public.trophy_stats    enable row level security;
 
 -- ---- trophy_unlocks : anonymous rail — INSERT-ONLY for clients ---------------
@@ -239,6 +301,36 @@ create policy "player_trophies delete own"
     on public.player_trophies for delete to authenticated
     using (player_id = auth.uid());
 
+-- ---- player_showcase : PUBLIC read (anon + authed), own-row write ------------
+-- The curated showcase is the PUBLIC face of a signed-in player''s trophies, so
+-- BOTH anon and authenticated may SELECT it (a signed-out viewer on a deep link
+-- still sees it — S3-T9 acceptance).  A player may insert/update/delete only
+-- their OWN row (player_id = auth.uid()), so toggling the showcase off (DELETE)
+-- or refreshing it (upsert) is scoped to self.  Unlike player_trophies, this is
+-- a single curated row — never a window into the raw unlock set.
+drop policy if exists "player_showcase readable by anon" on public.player_showcase;
+create policy "player_showcase readable by anon"
+    on public.player_showcase for select to anon using (true);
+
+drop policy if exists "player_showcase readable by authenticated" on public.player_showcase;
+create policy "player_showcase readable by authenticated"
+    on public.player_showcase for select to authenticated using (true);
+
+drop policy if exists "player_showcase insert own" on public.player_showcase;
+create policy "player_showcase insert own"
+    on public.player_showcase for insert to authenticated
+    with check (player_id = auth.uid());
+
+drop policy if exists "player_showcase update own" on public.player_showcase;
+create policy "player_showcase update own"
+    on public.player_showcase for update to authenticated
+    using (player_id = auth.uid()) with check (player_id = auth.uid());
+
+drop policy if exists "player_showcase delete own" on public.player_showcase;
+create policy "player_showcase delete own"
+    on public.player_showcase for delete to authenticated
+    using (player_id = auth.uid());
+
 -- ---- trophy_stats : anon-READABLE aggregate ---------------------------------
 -- The project's first anon-readable SELECT.  Aggregates only (the table holds
 -- no raw unlock rows).  Both anon and authenticated may read; NO client writes
@@ -269,6 +361,11 @@ grant insert on public.trophy_unlocks to authenticated;
 -- own rows for writes and all rows for reads.
 grant select, insert, update, delete on public.player_trophies to authenticated;
 
+-- player_showcase: PUBLIC read (anon + authed), signed-in write.  RLS scopes
+-- writes to own row and reads to all rows (the public showcase face).
+grant select on public.player_showcase to anon;
+grant select, insert, update, delete on public.player_showcase to authenticated;
+
 -- trophy_stats: read-only for both client roles (aggregates only).
 grant select on public.trophy_stats to anon;
 grant select on public.trophy_stats to authenticated;
@@ -295,6 +392,8 @@ grant select on public.trophy_stats to authenticated;
 -- player_trophies, trophy_unlocks, or trophy_stats.  Therefore:
 --   • player_trophies — removed automatically by THIS file's FK ON DELETE
 --     CASCADE when the parent players row goes.  ✓ personal trophy data gone.
+--   • player_showcase — same FK ON DELETE CASCADE (S3-T9) ⇒ the curated public
+--     showcase row is torn down with the player.  ✓ public showcase gone.
 --   • trophy_unlocks  — no FK to players ⇒ zero rows touched by the cascade.
 --     ✓ the anonymous rarity numerator survives (rarity persists post-delete).
 --   • trophy_stats    — an aggregate derived only from trophy_unlocks + events

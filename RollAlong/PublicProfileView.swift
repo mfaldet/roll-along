@@ -7,13 +7,17 @@ import SwiftUI
 // player name in Friends or a Clan roster, and from a rollalong://player/<id>
 // deep link.  Back pops to wherever you came from; Home clears the stack.
 //
-// S2-T4 SEAM: this profile shows OTHER players, so its trophy showcase needs
-// SERVER-synced data — a per-grade count + up to 3 showcased ids on the remote
-// row.  That sync is S3-T9 (needs the migration + `TrophySyncService`).  Until
-// then we render an honest placeholder (`trophySeamCard`), NOT the local
-// engine's ledger — showing the viewer's own trophies on someone else's
-// profile would be a fake.  S3-T9 replaces the placeholder body with the real
-// synced showcase.
+// S3-T9 (fills the S2-T4 seam): this profile shows OTHER players, so its trophy
+// showcase is driven by SERVER-synced data — the curated `player_showcase` row
+// (per-grade counts + up to 3 showcased ids), fetched via `TrophySyncService`.
+// We deliberately do NOT read the local `trophyEngine` LEDGER here (that would
+// paint the VIEWER'S own trophies onto someone else's profile).  We DO resolve
+// the showcased ids' display titles from the bundled `TrophyCatalog` (static
+// content, identical for every install — not the viewer's unlock state) and
+// the grade glyph/color from the single `TrophyGradeStyle` source (so the
+// Diamond grade never borrows the cosmetic gem — design.md §2 R2).  When the
+// player has no showcase (never set / toggled off / offline), we fall back to
+// the honest placeholder instead of a fake.
 // ===========================================================================
 struct PublicProfileView: View {
     @EnvironmentObject var gameState: GameState
@@ -27,6 +31,13 @@ struct PublicProfileView: View {
     @State private var busy      = false
     @State private var sentLife  = false
     @State private var banner:   String?
+
+    /// The fetched public trophy showcase for THIS profile (nil until loaded /
+    /// when the player has none). S3-T9 — server-synced, never the local ledger.
+    @State private var showcase: TrophyPublicShowcase?
+    /// True while the first showcase fetch is in flight (so we show a spinner
+    /// rather than the "coming soon" placeholder before we know).
+    @State private var showcaseLoading = true
 
     init(player: PlayerProfile) { _profile = State(initialValue: player) }
 
@@ -166,32 +177,137 @@ struct PublicProfileView: View {
         .ppCard()
     }
 
-    // MARK: - Trophy showcase seam (S2-T4 → filled by S3-T9)
+    // MARK: - Trophy showcase (S3-T9 — fills the S2-T4 seam)
     //
-    // Honest placeholder, NOT a fake: another player's trophies live on the
-    // server, and that sync (per-grade counts + up to 3 showcased ids) is
-    // S3-T9.  We deliberately do NOT read the local `trophyEngine` here — that
-    // would paint the VIEWER'S own trophies onto someone else's profile.  When
-    // S3-T9 lands, it replaces this card's body with the synced showcase.
-    private var trophySeamCard: some View {
-        VStack(spacing: 10) {
+    // Renders the SERVER-synced curated showcase (per-grade counts + up to 3
+    // showcased ids) fetched into `showcase`.  Never reads the viewer's own
+    // ledger; showcased-id TITLES come from the bundled catalog (static content)
+    // and grade glyph/color from `TrophyGradeStyle` (Diamond grade ≠ cosmetic
+    // gem, design.md §2 R2).  Falls back to an honest placeholder when the
+    // player has no showcase (never set / toggled off / offline).
+    @ViewBuilder private var trophySeamCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             sectionLabel("Trophies")
-            HStack(spacing: 10) {
-                Image(systemName: "trophy")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color(white: 0.45))
-                    .accessibilityHidden(true)
-                Text("Trophy showcases aren't shared yet — coming soon.")
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundStyle(Color(white: 0.55))
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
+            if let sc = showcase, !sc.isEmpty {
+                showcaseHeader(sc)
+                gradeStrip(sc)
+                if !sc.showcasedIDs.isEmpty { showcasedStrip(sc) }
+            } else if showcaseLoading {
+                HStack(spacing: 10) {
+                    ProgressView().tint(Color(white: 0.6))
+                    Text("Loading trophies…")
+                        .font(.system(size: 13, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                    Spacer(minLength: 0)
+                }
+            } else {
+                showcaseEmpty
             }
         }
         .padding(18)
         .ppCard()
+    }
+
+    private func showcaseHeader(_ sc: TrophyPublicShowcase) -> some View {
+        HStack(spacing: 8) {
+            Text("\(sc.earned) of \(sc.total)")
+                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(.white)
+            Text("· \(sc.completionPercent)% complete")
+                .font(.system(size: 13, design: .rounded))
+                .foregroundStyle(Color(white: 0.5))
+            Spacer(minLength: 0)
+            if sc.capstone {
+                Image(systemName: TrophyGradeStyle.forTier(.platinum).glyph)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(TrophyGradeStyle.forTier(.platinum).accent)
+                    .accessibilityLabel("Platinum capstone earned")
+            }
+        }
+    }
+
+    private func gradeStrip(_ sc: TrophyPublicShowcase) -> some View {
+        HStack(spacing: 8) {
+            ForEach(TrophyTier.allCases.sorted(), id: \.self) { tier in
+                gradeChip(tier: tier, count: sc.gradeCounts[tier] ?? 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func gradeChip(tier: TrophyTier, count: Int) -> some View {
+        let style = TrophyGradeStyle.forTier(tier)
+        return VStack(spacing: 3) {
+            Image(systemName: style.glyph)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(count > 0 ? style.accent : style.accent.opacity(0.35))
+            Text("\(count)")
+                .font(.system(size: 11, weight: .semibold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(count > 0 ? .white : Color(white: 0.40))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(white: 0.14))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(style.accent.opacity(count > 0 ? 0.5 : 0.12), lineWidth: 1))
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(tier.displayName), \(count) earned")
+    }
+
+    private func showcasedStrip(_ sc: TrophyPublicShowcase) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(sc.showcasedIDs, id: \.self) { id in
+                    showcasedCell(id)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    @ViewBuilder private func showcasedCell(_ id: String) -> some View {
+        // Resolve display metadata from the bundled catalog (static content, not
+        // the viewer's ledger). An id the local catalog doesn't know (a newer
+        // build authored it) still renders a neutral chip rather than vanishing.
+        let def = gameState.trophyEngine.catalog.trophy(withID: id)
+        let tier = def?.tier ?? .bronze
+        let style = TrophyGradeStyle.forTier(tier)
+        VStack(spacing: 8) {
+            ZStack {
+                Circle().fill(style.accent.opacity(0.18)).frame(width: 52, height: 52)
+                    .overlay(Circle().stroke(style.accent.opacity(0.48), lineWidth: 1.2))
+                Image(systemName: style.glyph)
+                    .font(.system(size: 22)).foregroundStyle(style.accent)
+            }
+            Text(def?.title ?? "Trophy")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white).multilineTextAlignment(.center).lineLimit(2)
+            Text(tier.displayName)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(Color(white: 0.45)).lineLimit(1)
+        }
+        .frame(width: 78)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(def?.title ?? "Trophy"), \(tier.displayName) grade")
+    }
+
+    private var showcaseEmpty: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "trophy")
+                .font(.system(size: 20))
+                .foregroundStyle(Color(white: 0.45))
+                .accessibilityHidden(true)
+            Text(isMe ? "Turn on “Show Trophies on Profile” in Settings to share yours."
+                      : "This roller hasn’t shared a trophy showcase.")
+                .font(.system(size: 13, design: .rounded))
+                .foregroundStyle(Color(white: 0.55))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Trophies. Trophy showcases aren't shared yet. Coming soon.")
     }
 
     // MARK: - Relationship
@@ -214,6 +330,10 @@ struct PublicProfileView: View {
     private func refresh() async {
         if let full = try? await SocialClient.shared.fetchProfile(id: profile.id) { profile = full }
         if SocialClient.shared.isSignedIn, let e = try? await SocialClient.shared.fetchFriendships() { edges = e }
+        // S3-T9: fetch this player's curated public showcase (nil = none / off /
+        // offline → placeholder). Never reads the viewer's local ledger.
+        showcase = await TrophySyncService.shared.fetchShowcase(for: profile.id)
+        showcaseLoading = false
     }
 
     private func addFriend() async {

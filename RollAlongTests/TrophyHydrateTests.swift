@@ -64,6 +64,12 @@ final class TrophyHydrateTests: XCTestCase {
             return ids
         }
 
+        // S3-T9 showcase surface — unused by the hydrate tests here; present so
+        // the mock conforms to the grown protocol.
+        func upsertShowcase(_ showcase: TrophyPublicShowcase, playerID: UUID) async throws {}
+        func deleteShowcase(playerID: UUID) async throws {}
+        func fetchShowcase(playerID: UUID) async throws -> TrophyPublicShowcase? { nil }
+
         // Synchronous mutators, so the lock is never held across an await
         // (matches the S3-T3 MockBackend pattern).
         private func recordAnon(_ id: UUID, _ ids: [String]) {
@@ -332,20 +338,21 @@ final class TrophyHydrateTests: XCTestCase {
     /// which would let a deletion decrement rarity — is caught in review against
     /// this stated contract.
     func testDeleteAccountLeavesAnonRailAndStatsDocumented() {
-        // No client code path in the app deletes trophy_unlocks or trophy_stats;
-        // the only trophy write paths are the two INSERT/UPSERT pushes and the
-        // read-only hydrate fetch — none can DELETE. This is asserted by the
-        // TrophyBackend protocol surface itself: it exposes exactly two writes
-        // (both idempotent upserts) and one read, and NO delete.
+        // No client code path deletes the UNLOCK rails (trophy_unlocks /
+        // player_trophies) or trophy_stats: those write paths are only the two
+        // idempotent INSERT/UPSERT pushes plus the read-only hydrate fetch — none
+        // can DELETE an unlock row, so no client action can decrement rarity.
         //
-        // Compile-time proof: the protocol has no delete method. If a delete
-        // were added, this test's documentation would need updating alongside.
-        let writeAndReadOnly: [String] = [
-            "upsertAnonUnlocks",     // INSERT-only anon rail
+        // S3-T9 added a delete, but it targets ONLY the curated `player_showcase`
+        // projection (the public face — the Settings toggle-off removes it),
+        // NEVER the unlock rows. `player_showcase` carries no rarity numerator and
+        // is FK-cascade-cleaned on account deletion, so this contract is intact.
+        let unlockRailWriteAndReadOnly: [String] = [
+            "upsertAnonUnlocks",     // INSERT-only anon rail (rarity numerator)
             "upsertPlayerTrophies",  // own-row UPSERT (FK-cascade cleans it up)
             "fetchPlayerTrophies"    // read-only hydrate
         ]
-        XCTAssertEqual(writeAndReadOnly.count, 3,
-                       "TrophyBackend is insert/upsert + read only — no client delete of trophy rows")
+        XCTAssertEqual(unlockRailWriteAndReadOnly.count, 3,
+                       "No client path DELETEs an unlock row — deleteShowcase only removes the curated player_showcase projection")
     }
 }

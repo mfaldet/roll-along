@@ -168,6 +168,32 @@ struct SettingsView: View {
                 .padding()
                 .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
 
+                // Public trophy showcase toggle (S3-T9; design.md §7 / D6 —
+                // default ON for signed-in players). Off = delete the showcase
+                // server-side; on = publish the curated projection.
+                Toggle(isOn: $gameState.trophyShowcaseEnabled) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Show Trophies on Profile")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.75))
+                            Text("Share your grade counts and top trophies on your public profile")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
+                    } icon: {
+                        Image(systemName: "trophy.fill")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
+                .padding()
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+                .onChange(of: gameState.trophyShowcaseEnabled) { _, on in
+                    let engine = gameState.trophyEngine
+                    Task { await TrophySyncService.shared.syncShowcase(engine: engine, enabled: on) }
+                }
+
                 // Account deletion — required by App Store Guideline 5.1.1(v)
                 // for any app that supports account creation.
                 Button(role: .destructive) {

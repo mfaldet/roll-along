@@ -54,6 +54,12 @@ final class TrophySyncServiceTests: XCTestCase {
         // exercised in TrophyHydrateTests. Present so the mock conforms.
         func fetchPlayerTrophies(playerID: UUID) async throws -> [String] { [] }
 
+        // S3-T9 showcase surface — unused by the push-path tests here; present so
+        // the mock conforms. Exercised in TrophyPublicShowcaseTests.
+        func upsertShowcase(_ showcase: TrophyPublicShowcase, playerID: UUID) async throws {}
+        func deleteShowcase(playerID: UUID) async throws {}
+        func fetchShowcase(playerID: UUID) async throws -> TrophyPublicShowcase? { nil }
+
         // Synchronous, so the lock is never held across an await.
         private func recordAnon(_ id: UUID, _ ids: [String]) {
             lock.lock(); anonPushes.append((id, ids)); lock.unlock()

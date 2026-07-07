@@ -70,6 +70,28 @@ protocol TrophyBackend: Sendable {
     /// (docs/trophies/trophy-schema.sql RLS). Throws on any non-2xx / transport
     /// error so the caller leaves the local ledger untouched and retries later.
     func fetchPlayerTrophies(playerID: UUID) async throws -> [String]
+
+    // --- S3-T9 curated public showcase (`player_showcase`) -----------------
+
+    /// Upsert `playerID`'s CURATED public showcase row (per-grade counts + up to
+    /// 3 ids). Own-row write; the projection is public-readable so it renders on
+    /// another viewer's PublicProfileView. Throws on any non-2xx / transport
+    /// error so the caller can retry. See docs/trophies/trophy-schema.sql
+    /// `public.player_showcase`.
+    func upsertShowcase(_ showcase: TrophyPublicShowcase, playerID: UUID) async throws
+
+    /// DELETE `playerID`'s public showcase row — the server-side effect of
+    /// toggling the showcase OFF (design.md §7 / D6). Removes ONLY the curated
+    /// projection; the player's raw `player_trophies` unlock rows are untouched
+    /// (rarity + restore still need them). Idempotent: deleting an absent row is
+    /// a no-op. Throws on any non-2xx / transport error.
+    func deleteShowcase(playerID: UUID) async throws
+
+    /// Fetch `playerID`'s public showcase row (viewer → render), or nil when the
+    /// player has no showcase (never set it, or toggled it off). Any client role
+    /// (anon or authenticated) may read it. Throws on any non-2xx / transport
+    /// error so the caller shows the placeholder rather than a stale strip.
+    func fetchShowcase(playerID: UUID) async throws -> TrophyPublicShowcase?
 }
 
 // ===========================================================================
@@ -243,6 +265,88 @@ final class TrophySyncService: @unchecked Sendable {
         return await MainActor.run { engine.mergeUnlocks(ids: Set(serverIDs)) }
     }
 
+    // MARK: - Public showcase (S3-T9 — the curated public projection)
+
+    /// The outcome of a showcase sync — surfaced for tests / callers; production
+    /// wiring ignores it (fire-and-forget).
+    enum ShowcaseSyncResult: Equatable {
+        /// Pushed a curated showcase to `player_showcase` (enabled + signed-in +
+        /// something earned).
+        case pushed(TrophyPublicShowcase)
+        /// Deleted the showcase server-side (toggle OFF, or enabled-but-empty).
+        case deleted
+        /// No network happened — signed out (no public profile to show on).
+        case skippedSignedOut
+        /// A network error; the caller may retry. The local toggle is unaffected.
+        case failed
+    }
+
+    /// Reconcile the signed-in player's CURATED public showcase with the server
+    /// (design.md §7 / decision #10, D6 ruled 2026-07-07: on for signed-in, with
+    /// a Settings toggle).
+    ///
+    /// - `enabled == true`  → upsert the curated showcase (per-grade counts + up
+    ///   to 3 rarest-earned ids by default, or the player's chosen order). An
+    ///   enabled-but-EMPTY ledger deletes any stale row (nothing to show).
+    /// - `enabled == false` → DELETE the showcase row server-side, so toggling
+    ///   off actually removes the public projection (NOT just a local hide —
+    ///   S3-T9 acceptance). The raw `player_trophies` unlock rows are untouched
+    ///   (rarity + restore still need them).
+    ///
+    /// Signed out → no-op, no network (there is no public profile to project
+    /// onto). Fire-and-forget from the caller: swallows network errors (returns
+    /// `.failed`) so a toggle flip never throws into the UI; the next call
+    /// retries. Invoke on the Settings toggle change AND after a `sync` so the
+    /// public counts track new unlocks.
+    @discardableResult
+    func syncShowcase(engine: TrophyEngine,
+                      enabled: Bool,
+                      chosenIDs: [String] = []) async -> ShowcaseSyncResult {
+        // No public profile without a signed-in player id.
+        guard let playerID = currentPlayerID() else { return .skippedSignedOut }
+
+        // Toggle OFF → remove the public projection server-side.
+        if !enabled {
+            do {
+                try await backend.deleteShowcase(playerID: playerID)
+                return .deleted
+            } catch {
+                return .failed
+            }
+        }
+
+        // Toggle ON → build the curated projection from the local ledger.
+        let showcase = TrophyPublicShowcase(engine: engine, chosenIDs: chosenIDs)
+
+        // Enabled but nothing earned yet → ensure no stale row lingers, but
+        // don't publish an empty showcase.
+        guard !showcase.isEmpty else {
+            do {
+                try await backend.deleteShowcase(playerID: playerID)
+                return .deleted
+            } catch {
+                return .failed
+            }
+        }
+
+        do {
+            try await backend.upsertShowcase(showcase, playerID: playerID)
+            return .pushed(showcase)
+        } catch {
+            return .failed
+        }
+    }
+
+    /// Fetch another player's public showcase for rendering (viewer side —
+    /// PublicProfileView). Reads the public `player_showcase` projection, never
+    /// the VIEWER's local ledger (that would paint the viewer's own trophies on
+    /// someone else's profile). Returns nil on any error OR when the player has
+    /// no showcase (never set / toggled off), so the caller shows the honest
+    /// placeholder. Never throws into the UI.
+    func fetchShowcase(for playerID: UUID) async -> TrophyPublicShowcase? {
+        try? await backend.fetchShowcase(playerID: playerID)
+    }
+
     /// Claims the single in-flight slot; false when a drain is already running.
     /// Synchronous (the lock is never held across an await).
     private func beginSyncing() -> Bool {
@@ -353,6 +457,49 @@ struct SocialTrophyBackend: TrophyBackend {
         return rows.map(\.trophy_id)
     }
 
+    // MARK: - S3-T9 curated public showcase (player_showcase table)
+
+    func upsertShowcase(_ showcase: TrophyPublicShowcase, playerID: UUID) async throws {
+        let token = try SocialClient.shared.trophyAccessToken()
+        // One row per player (PK player_id). merge-duplicates so a re-push
+        // OVERWRITES the counts/ids (unlike the ignore-duplicates unlock rails,
+        // the showcase is a mutable snapshot that must reflect the latest set).
+        try await postAuthed(
+            path: "player_showcase",
+            query: "on_conflict=player_id",
+            body: try encoder.encode([showcase.row(playerID: playerID)]),
+            token: token,
+            prefer: "resolution=merge-duplicates,return=minimal"
+        )
+    }
+
+    func deleteShowcase(playerID: UUID) async throws {
+        let token = try SocialClient.shared.trophyAccessToken()
+        // RLS also scopes delete to the caller's own row; the explicit filter
+        // keeps the request well-formed (PostgREST requires a filter to delete).
+        try await deleteAuthed(
+            path: "player_showcase",
+            query: "player_id=eq.\(playerID.uuidString)",
+            token: token
+        )
+    }
+
+    func fetchShowcase(playerID: UUID) async throws -> TrophyPublicShowcase? {
+        // Public read — but authenticate when we can (the app is usually signed
+        // in when viewing profiles). Falls back to the anon key for a signed-out
+        // viewer so a deep-link visitor still sees the showcase.
+        let query = "player_id=eq.\(playerID.uuidString)&limit=1"
+        let data: Data
+        if let token = try? SocialClient.shared.trophyAccessToken() {
+            data = try await getAuthed(path: "player_showcase", query: query, token: token)
+        } else {
+            data = try await getAnon(path: "player_showcase", query: query)
+        }
+        let rows = try JSONDecoder().decode([TrophyPublicShowcase.Row].self, from: data)
+        guard let row = rows.first else { return nil }
+        return TrophyPublicShowcase(row: row)
+    }
+
     // MARK: - REST core (mirrors SocialClient.send / AnalyticsClient.flush)
 
     private func postAnon(path: String, query: String, body: Data, prefer: String) async throws {
@@ -391,6 +538,45 @@ struct SocialTrophyBackend: TrophyBackend {
                                    body: String(data: data, encoding: .utf8) ?? "")
         }
         return data
+    }
+
+    /// Anonymous GET returning the response body (the signed-out showcase read).
+    /// Uses the anon key so a deep-link visitor with no session still renders a
+    /// public showcase (RLS grants anon SELECT on `player_showcase`).
+    private func getAnon(path: String, query: String) async throws -> Data {
+        let urlString = "\(Self.projectURL)/rest/v1/\(path)"
+            + (query.isEmpty ? "" : "?\(query)")
+        guard let url = URL(string: urlString) else { throw SocialError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(Self.anonKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw SocialError.http(status: -1, body: "no HTTP response")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw SocialError.http(status: http.statusCode,
+                                   body: String(data: data, encoding: .utf8) ?? "")
+        }
+        return data
+    }
+
+    /// Authenticated DELETE (the showcase toggle-off). Mirrors the authed shape:
+    /// anon apikey header + the player's Bearer token, a PostgREST filter in the
+    /// query. Throws on any non-2xx so the caller can retry.
+    private func deleteAuthed(path: String, query: String, token: String) async throws {
+        let urlString = "\(Self.projectURL)/rest/v1/\(path)"
+            + (query.isEmpty ? "" : "?\(query)")
+        guard let url = URL(string: urlString) else { throw SocialError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        try await run(req)
     }
 
     private func request(path: String, query: String, body: Data, prefer: String) throws -> URLRequest {
