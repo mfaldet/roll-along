@@ -69,6 +69,14 @@ protocol TrophyKeyValueStore: AnyObject {
     /// Best-effort flush to iCloud (the system store also syncs opportunistically
     /// on its own). A no-op when unavailable.
     func synchronize()
+
+    /// The object `NSUbiquitousKeyValueStore.didChangeExternallyNotification`
+    /// is posted from — the value the mirror scopes its external-change observer
+    /// to. `nil` when unavailable (no entitlement / signed out of iCloud) OR for
+    /// the in-memory test double, so `start(engine:onExternalChange:)` registers
+    /// nothing and is a pure no-op off-device. The real store returns the system
+    /// `NSUbiquitousKeyValueStore` it wraps.
+    var notificationObject: AnyObject? { get }
 }
 
 // ===========================================================================
@@ -87,6 +95,12 @@ final class TrophyCloudMirror {
     static let shared = TrophyCloudMirror()
 
     private let store: TrophyKeyValueStore
+
+    /// The live external-change observer token, retained so a repeat `start`
+    /// tears the old one down first (idempotent wiring — no duplicate reconciles
+    /// if the app re-registers). `nil` until `start` registers one, and stays
+    /// `nil` forever when iCloud KV is unavailable (graceful no-op).
+    private var externalChangeObserver: NSObjectProtocol?
 
     init(store: TrophyKeyValueStore) {
         self.store = store
@@ -177,6 +191,57 @@ final class TrophyCloudMirror {
         store.synchronize()
     }
 
+    // MARK: - Live external-change observer (cross-device convergence WHILE OPEN)
+
+    /// Register the `NSUbiquitousKeyValueStore.didChangeExternallyNotification`
+    /// observer so a unlock earned on ANOTHER device lands here while THIS app is
+    /// open — not just at the next launch/foreground reconcile (RollAlongApp's
+    /// existing lifecycle passes). On each external change we `reconcile(engine:)`
+    /// (pull the cloud's newer union in, push ours back) and then invoke
+    /// `onExternalChange` — the app hands us a closure that flushes the (now
+    /// possibly-larger, dirty-flagged) ledger to the Supabase rails, mirroring the
+    /// launch/foreground reconcile→sync ordering. The mirror deliberately owns no
+    /// `TrophySyncService` dependency; the sync is the caller's concern.
+    ///
+    /// Graceful degradation (S3-T8 acceptance): when iCloud KV is unavailable
+    /// (entitlement missing / signed out of iCloud) `store.notificationObject` is
+    /// `nil`, so NOTHING is registered and this is a pure no-op — the app behaves
+    /// exactly as today. Idempotent: a second `start` tears the prior observer
+    /// down first, so re-wiring never doubles reconciles.
+    ///
+    /// The callback runs on the notification-delivery queue (`.main`); `reconcile`
+    /// is `@MainActor`-free and touches only the engine ledger, so this is safe
+    /// off the render hot path exactly like the launch pass.
+    func start(engine: TrophyEngine, onExternalChange: @escaping () -> Void) {
+        // Idempotent: drop any prior observer before re-registering.
+        if let existing = externalChangeObserver {
+            NotificationCenter.default.removeObserver(existing)
+            externalChangeObserver = nil
+        }
+
+        // No entitlement / signed out of iCloud → nothing to observe. Pure no-op.
+        guard let object = store.notificationObject else { return }
+
+        // Pull the store into sync on registration so we don't miss a change that
+        // landed between the launch reconcile and now (best-effort; the system
+        // store also syncs opportunistically).
+        store.synchronize()
+
+        externalChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: object,
+            queue: .main
+        ) { [weak self, weak engine] _ in
+            guard let self, let engine else { return }
+            // Union the cloud's external change INTO the local ledger (and push
+            // ours back). Reconcile is a no-op when nothing new arrived.
+            _ = self.reconcile(engine: engine)
+            // Let the app flush the possibly-grown, dirty-flagged ledger to the
+            // backend rails (reconcile arms ra_trophySyncDirty on a new id).
+            onExternalChange()
+        }
+    }
+
     // MARK: - Epoch <-> Date (iCloud KV stores plist-native scalars)
 
     /// `NSUbiquitousKeyValueStore` persists numbers, not `Date`s — store each
@@ -223,6 +288,14 @@ final class UbiquitousTrophyKVStore: TrophyKeyValueStore {
 
     init(store: NSUbiquitousKeyValueStore = .default) {
         self.store = store
+    }
+
+    /// Observe `didChangeExternallyNotification` on the wrapped system store —
+    /// but only when iCloud KV is actually usable, so a build without the
+    /// entitlement never wires up an observer that can't fire. `nil` here makes
+    /// `TrophyCloudMirror.start` a graceful no-op.
+    var notificationObject: AnyObject? {
+        isAvailable ? store : nil
     }
 
     func unlockIDs() -> [String] {

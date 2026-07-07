@@ -62,7 +62,7 @@ gates each sprint before the next begins.
 | 1 | Trigger wiring | Every catalog trophy trigger-tested (boundary + idempotency); unlocks durable | 7–9 | 🟢 done 2026-07-06 (gate green; 88/89 wired, whimsy_roll_call blocked on pinball ROLL lanes; 310 tests, 0 failures) |
 | 2 | Presentation | Toasts/room/profile/capstone/pinning on device; VoiceOver smoke; no mid-run toast | 5–7 | 🟢 done 2026-07-06 (logic gate green; 405 tests 0 failures; device/visual/VoiceOver QA pending Mac — see PR) |
 | 3 | Rarity backend | Sync replay + rarity correctness + delete/reinstall + showcase verified | 6–8 (+1 if D2=yes, +1 if D11=yes) | 🟢 done 2026-07-07 (logic gate green; 494 tests 0 failures; GC mirror deferred; Mac deploy steps pending — see PR) |
-| 4 | Hardening & launch | Full matrix, perf budget, beta criteria, freeze + submission | 4–6 | ⚪ not started |
+| 4 | Hardening & launch | Full matrix, perf budget, beta criteria, freeze + submission | 4–6 | 🟡 buildable slice done 2026-07-07 (benchmarks + integration + launch runway; device QA / TestFlight / ASC / Supabase deploy + freeze sign-off remain Mac's) |
 
 Total ≈ **27–36 focused agent sessions**. The GameState serial lane (S0-T2 → S1-T7) is the critical path
 at ~9 sessions; everything else parallelizes around it.
