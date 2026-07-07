@@ -75,8 +75,11 @@
 		7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0005000000000000AA00 /* TrophyRoomView.swift */; };
 		7A0F0006000000000000AA01 /* TrophyToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0006000000000000AA00 /* TrophyToastView.swift */; };
 		7A0F0007000000000000AA01 /* TrophySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0007000000000000AA00 /* TrophySyncService.swift */; };
+		7A0F000B000000000000AA01 /* TrophyCloudMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000B000000000000AA00 /* TrophyCloudMirror.swift */; };
+		7A0F000A000000000000AA01 /* TrophyRarity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000A000000000000AA00 /* TrophyRarity.swift */; };
 		7A0F0008000000000000AA01 /* TrophyShowcaseModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0008000000000000AA00 /* TrophyShowcaseModel.swift */; };
 		7A0F0009000000000000AA01 /* TrophyPinModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0009000000000000AA00 /* TrophyPinModel.swift */; };
+		7A0F000C000000000000AA01 /* TrophyPublicShowcase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F000C000000000000AA00 /* TrophyPublicShowcase.swift */; };
 		7A0F0101000000000000AA01 /* TrophyEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0101000000000000AA00 /* TrophyEngineTests.swift */; };
 		7A0F0102000000000000AA01 /* TrophyStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0102000000000000AA00 /* TrophyStatsTests.swift */; };
 		7A0F0103000000000000AA01 /* TrophyMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */; };
@@ -84,9 +87,15 @@
 		7A0F0105000000000000AA01 /* TrophyToastWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0105000000000000AA00 /* TrophyToastWiringTests.swift */; };
 		7A0F0106000000000000AA01 /* TrophyRoomModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */; };
 		7A0F0107000000000000AA01 /* TrophyShowcaseModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */; };
+		7A0F010F000000000000AA01 /* TrophyPublicShowcaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010F000000000000AA00 /* TrophyPublicShowcaseTests.swift */; };
 		7A0F010A000000000000AA01 /* TrophyPinModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010A000000000000AA00 /* TrophyPinModelTests.swift */; };
 		7A0F0108000000000000AA01 /* CapstoneCelebrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0108000000000000AA00 /* CapstoneCelebrationTests.swift */; };
 		7A0F0109000000000000AA01 /* TrophyRevealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0109000000000000AA00 /* TrophyRevealTests.swift */; };
+		7A0F010B000000000000AA01 /* TrophySyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010B000000000000AA00 /* TrophySyncServiceTests.swift */; };
+		7A0F010C000000000000AA01 /* TrophyRarityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010C000000000000AA00 /* TrophyRarityTests.swift */; };
+		7A0F010D000000000000AA01 /* TrophyCloudMirrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010D000000000000AA00 /* TrophyCloudMirrorTests.swift */; };
+		7A0F010E000000000000AA01 /* TrophyHydrateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F010E000000000000AA00 /* TrophyHydrateTests.swift */; };
+		7A0F0110000000000000AA01 /* TrophyCohortRarityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0110000000000000AA00 /* TrophyCohortRarityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -177,8 +186,11 @@
 		7A0F0005000000000000AA00 /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
 		7A0F0006000000000000AA00 /* TrophyToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastView.swift; sourceTree = "<group>"; };
 		7A0F0007000000000000AA00 /* TrophySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophySyncService.swift; sourceTree = "<group>"; };
+		7A0F000B000000000000AA00 /* TrophyCloudMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCloudMirror.swift; sourceTree = "<group>"; };
+		7A0F000A000000000000AA00 /* TrophyRarity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRarity.swift; sourceTree = "<group>"; };
 		7A0F0008000000000000AA00 /* TrophyShowcaseModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyShowcaseModel.swift; sourceTree = "<group>"; };
 		7A0F0009000000000000AA00 /* TrophyPinModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyPinModel.swift; sourceTree = "<group>"; };
+		7A0F000C000000000000AA00 /* TrophyPublicShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyPublicShowcase.swift; sourceTree = "<group>"; };
 		7A0F0101000000000000AA00 /* TrophyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEngineTests.swift; sourceTree = "<group>"; };
 		7A0F0102000000000000AA00 /* TrophyStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyStatsTests.swift; sourceTree = "<group>"; };
 		7A0F0103000000000000AA00 /* TrophyMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyMigrationTests.swift; sourceTree = "<group>"; };
@@ -186,9 +198,15 @@
 		7A0F0105000000000000AA00 /* TrophyToastWiringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyToastWiringTests.swift; sourceTree = "<group>"; };
 		7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomModelTests.swift; sourceTree = "<group>"; };
 		7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyShowcaseModelTests.swift; sourceTree = "<group>"; };
+		7A0F010F000000000000AA00 /* TrophyPublicShowcaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyPublicShowcaseTests.swift; sourceTree = "<group>"; };
 		7A0F010A000000000000AA00 /* TrophyPinModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyPinModelTests.swift; sourceTree = "<group>"; };
 		7A0F0108000000000000AA00 /* CapstoneCelebrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapstoneCelebrationTests.swift; sourceTree = "<group>"; };
 		7A0F0109000000000000AA00 /* TrophyRevealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRevealTests.swift; sourceTree = "<group>"; };
+		7A0F010B000000000000AA00 /* TrophySyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophySyncServiceTests.swift; sourceTree = "<group>"; };
+		7A0F010C000000000000AA00 /* TrophyRarityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRarityTests.swift; sourceTree = "<group>"; };
+		7A0F010D000000000000AA00 /* TrophyCloudMirrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCloudMirrorTests.swift; sourceTree = "<group>"; };
+		7A0F010E000000000000AA00 /* TrophyHydrateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyHydrateTests.swift; sourceTree = "<group>"; };
+		7A0F0110000000000000AA00 /* TrophyCohortRarityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCohortRarityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -288,8 +306,11 @@
 				7A0F0005000000000000AA00 /* TrophyRoomView.swift */,
 				7A0F0006000000000000AA00 /* TrophyToastView.swift */,
 				7A0F0007000000000000AA00 /* TrophySyncService.swift */,
+				7A0F000B000000000000AA00 /* TrophyCloudMirror.swift */,
+				7A0F000A000000000000AA00 /* TrophyRarity.swift */,
 				7A0F0008000000000000AA00 /* TrophyShowcaseModel.swift */,
 				7A0F0009000000000000AA00 /* TrophyPinModel.swift */,
+				7A0F000C000000000000AA00 /* TrophyPublicShowcase.swift */,
 				AA00000B000000000000AA00 /* Assets.xcassets */,
 				AA000004000000000000AA00 /* Info.plist */,
 				AA00000D000000000000AA00 /* PrivacyInfo.xcprivacy */,
@@ -332,9 +353,15 @@
 				7A0F0105000000000000AA00 /* TrophyToastWiringTests.swift */,
 				7A0F0106000000000000AA00 /* TrophyRoomModelTests.swift */,
 				7A0F0107000000000000AA00 /* TrophyShowcaseModelTests.swift */,
+				7A0F010F000000000000AA00 /* TrophyPublicShowcaseTests.swift */,
 				7A0F010A000000000000AA00 /* TrophyPinModelTests.swift */,
 				7A0F0108000000000000AA00 /* CapstoneCelebrationTests.swift */,
 				7A0F0109000000000000AA00 /* TrophyRevealTests.swift */,
+				7A0F010B000000000000AA00 /* TrophySyncServiceTests.swift */,
+				7A0F010C000000000000AA00 /* TrophyRarityTests.swift */,
+				7A0F010D000000000000AA00 /* TrophyCloudMirrorTests.swift */,
+				7A0F010E000000000000AA00 /* TrophyHydrateTests.swift */,
+				7A0F0110000000000000AA00 /* TrophyCohortRarityTests.swift */,
 			);
 			path = RollAlongTests;
 			sourceTree = "<group>";
@@ -516,8 +543,11 @@
 				7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */,
 				7A0F0006000000000000AA01 /* TrophyToastView.swift in Sources */,
 				7A0F0007000000000000AA01 /* TrophySyncService.swift in Sources */,
+				7A0F000B000000000000AA01 /* TrophyCloudMirror.swift in Sources */,
+				7A0F000A000000000000AA01 /* TrophyRarity.swift in Sources */,
 				7A0F0008000000000000AA01 /* TrophyShowcaseModel.swift in Sources */,
 				7A0F0009000000000000AA01 /* TrophyPinModel.swift in Sources */,
+				7A0F000C000000000000AA01 /* TrophyPublicShowcase.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -538,9 +568,15 @@
 				7A0F0105000000000000AA01 /* TrophyToastWiringTests.swift in Sources */,
 				7A0F0106000000000000AA01 /* TrophyRoomModelTests.swift in Sources */,
 				7A0F0107000000000000AA01 /* TrophyShowcaseModelTests.swift in Sources */,
+				7A0F010F000000000000AA01 /* TrophyPublicShowcaseTests.swift in Sources */,
 				7A0F010A000000000000AA01 /* TrophyPinModelTests.swift in Sources */,
 				7A0F0108000000000000AA01 /* CapstoneCelebrationTests.swift in Sources */,
 				7A0F0109000000000000AA01 /* TrophyRevealTests.swift in Sources */,
+				7A0F010B000000000000AA01 /* TrophySyncServiceTests.swift in Sources */,
+				7A0F010C000000000000AA01 /* TrophyRarityTests.swift in Sources */,
+				7A0F010D000000000000AA01 /* TrophyCloudMirrorTests.swift in Sources */,
+				7A0F010E000000000000AA01 /* TrophyHydrateTests.swift in Sources */,
+				7A0F0110000000000000AA01 /* TrophyCohortRarityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

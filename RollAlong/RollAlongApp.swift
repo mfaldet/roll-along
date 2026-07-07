@@ -42,13 +42,25 @@ struct RollAlongApp: App {
                     await AppleAuthManager.shared.restoreSession()
                 }
                 .task {
-                    // First-launch-with-trophies backfill (S0-T4, wired at
-                    // S1-T1): grandfather every trophy the save's existing
-                    // stats already earn, once, BEFORE live play — so a
-                    // veteran's history isn't live-unlocked one clear at a
-                    // time.  Idempotent across relaunches (the engine
-                    // short-circuits after the first run).
+                    // Trophy bootstrap, in order, every launch:
+                    // 1. First-launch-with-trophies backfill (S0-T4, wired at
+                    //    S1-T1): grandfather every trophy the save's existing
+                    //    stats already earn, once, BEFORE live play.  Idempotent
+                    //    across relaunches (the engine short-circuits after the
+                    //    first run).
                     gameState.activateTrophies()
+                    // 2. Reconcile the iCloud key-value ratchet mirror (S3-T8):
+                    //    union-restores unlocks after a delete+reinstall and
+                    //    converges multiple devices.  A local-only no-op until
+                    //    the iCloud KV entitlement is added (graceful degrade).
+                    _ = TrophyCloudMirror.shared.reconcile(engine: gameState.trophyEngine)
+                    // 3. Push the unioned unlock set to the backend (S3-T3):
+                    //    the anonymous rarity rail (trophy_unlocks) for EVERY
+                    //    player — signed-in or not — plus player_trophies when
+                    //    signed in.  Anonymous sync is how rarity counts the
+                    //    ~100% of players who never sign in.  A no-op when the
+                    //    sync-dirty flag is clean.
+                    await TrophySyncService.shared.sync(engine: gameState.trophyEngine)
                 }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared
@@ -89,6 +101,13 @@ struct RollAlongApp: App {
                 // backgrounded (regen kept accruing; the alert may need to be
                 // rescheduled or cleared).
                 gameState.reconcileLivesNotification()
+                // Trophy catch-up on resume: pull any cross-device iCloud
+                // updates (S3-T8) and flush unlocks earned offline to the
+                // rarity rail (S3-T3).  Both no-op when nothing changed.
+                Task {
+                    _ = TrophyCloudMirror.shared.reconcile(engine: gameState.trophyEngine)
+                    await TrophySyncService.shared.sync(engine: gameState.trophyEngine)
+                }
             @unknown default:
                 break
             }

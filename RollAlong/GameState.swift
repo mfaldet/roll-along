@@ -144,6 +144,14 @@ final class GameState: ObservableObject {
     @Published var livesFullNotifEnabled: Bool {
         didSet { defaults.set(livesFullNotifEnabled, forKey: "ra_notifLivesFull") }
     }
+    /// Whether the signed-in player's CURATED public trophy showcase is shared
+    /// on their public profile (S3-T9; design.md §7 / decision #10, D6).
+    /// Defaults ON — the design ruling is "on for signed-in players" (sign-in is
+    /// already the opt-in gate for public profiles). Toggling it OFF in Settings
+    /// deletes the showcase server-side via `TrophySyncService.syncShowcase`.
+    @Published var trophyShowcaseEnabled: Bool {
+        didSet { defaults.set(trophyShowcaseEnabled, forKey: "ra_trophyShowcaseEnabled") }
+    }
     /// Plays the cinematic opening-credits intro on cold launch.  Defaults
     /// OFF — pre-launch feature flag, flipped on from Settings once vetted
     /// on-device.  See IntroView / ContentView.
@@ -729,6 +737,8 @@ final class GameState: ObservableObject {
         ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
         shopFreshNotifEnabled = defaults.object(forKey: "ra_notifShopFresh") as? Bool ?? false
         livesFullNotifEnabled = defaults.object(forKey: "ra_notifLivesFull") as? Bool ?? false
+        // Public trophy showcase — DEFAULT ON (design.md §7 / D6).
+        trophyShowcaseEnabled = defaults.object(forKey: "ra_trophyShowcaseEnabled") as? Bool ?? true
         minigameDifficulty = MinigameDifficulty(
             rawValue: defaults.string(forKey: "ra_minigameDifficulty") ?? "") ?? .normal
         seenOnboarding = defaults.bool(forKey: "ra_seenOnboarding")
@@ -1593,6 +1603,33 @@ final class GameState: ObservableObject {
     /// change hook. A pure value-1 latch; the engine unlocks once, forever.
     func recordSocialSignIn() {
         fireTrophy(.signedIn, value: 1)
+    }
+
+    /// Restore this player's trophies from the server on sign-in, then push the
+    /// unioned local snapshot back up (S3-T5; design.md §4 "Supabase restore for
+    /// signed-in players"). The app's FIRST server→local hydrate, safe ONLY
+    /// because the trophy ledger is a pure ratchet: `TrophySyncService`
+    /// hydrates via `TrophyEngine.mergeUnlocks` (server ∪ local, never
+    /// subtraction), so a restore can only ADD unlocks and can never clobber a
+    /// local unlock or any other save state.
+    ///
+    /// Fire-and-forget, off the main path: called from ContentView alongside
+    /// `recordSocialSignIn()` on every transition into a signed-in session
+    /// (fresh sign-in OR a restored launch session). Signed-out → the hydrate is
+    /// an internal no-op. The follow-up `sync` pushes the unioned set (server ∪
+    /// local, incl. any local-only unlocks the hydrate armed) to BOTH rails.
+    /// Newly-restored unlocks are NOT toasted — S2-T6's coalesced reveal already
+    /// owns the "you've already earned N" moment; a silent ratchet restore never
+    /// interrupts play (design.md §6). Grants nothing (D1 never-mint).
+    func hydrateTrophiesOnSignIn() {
+        Task {
+            await TrophySyncService.shared.hydrateOnSignIn(engine: trophyEngine)
+            // Push the unioned snapshot (server ∪ local) back up: the hydrate
+            // arms the dirty flag when it introduced a server-only id, and any
+            // local-only unlocks still need to reach player_trophies now that a
+            // session exists. A no-op when nothing changed (clean flag).
+            await TrophySyncService.shared.sync(engine: trophyEngine)
+        }
     }
 
     /// `social_first_friend` (≥1) / `social_friends_5` (≥5) — the accepted-

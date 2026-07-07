@@ -577,6 +577,16 @@ final class SocialClient: @unchecked Sendable {
         return session
     }
 
+    /// The signed-in player's bearer token, for the trophy showcase push
+    /// (S3-T3, `SocialTrophyBackend`). A thin accessor so `TrophySyncService`
+    /// can drive the `player_trophies` REST call through its own backend seam
+    /// (kept out of `SocialClient` to preserve its network-abstraction seam)
+    /// without exposing the private `Session`. Throws `.notSignedIn` when
+    /// signed out, so the signed-in push is a no-op until sign-in.
+    func trophyAccessToken() throws -> String {
+        try requireSession().token
+    }
+
     private func send(method: String,
                       path: String,
                       query: String = "",

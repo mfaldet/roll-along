@@ -266,6 +266,14 @@ final class TrophyEngine: ObservableObject {
         unlockDates[trophyID]
     }
 
+    /// A copy of the full `[trophyID: firstUnlockDate]` ledger — the payload
+    /// the iCloud KV mirror (S3-T8) pushes. Read-only snapshot; callers never
+    /// mutate engine state through it. Ids latched without a surviving stamp
+    /// (a healed partial write) are absent here but still in `unlockedIDs`.
+    var allUnlockDates: [String: Date] {
+        unlockDates
+    }
+
     /// The trophies a stat bump on `metric` would evaluate — the metric
     /// index, exposed for tests and S0-T4's backfill. Ledger-provenance
     /// metrics return [] by design (cascade-only).
@@ -445,6 +453,77 @@ final class TrophyEngine: ObservableObject {
         defaults.set(false, forKey: Self.syncDirtyKey)
     }
 
+    // MARK: - Ratchet restore (server / iCloud KV → local)
+
+    /// Unions an external set of unlocks INTO the local ledger — the ONLY
+    /// server/cloud → local restore path (S3-T8's iCloud KV mirror; S3-T5's
+    /// sign-in hydrate reuses it). A pure ratchet: it can only ADD ids, never
+    /// remove one, so a stale or partial external set can never un-earn a
+    /// local trophy. Merge rule (design.md §4 "union, max-merge on
+    /// timestamps"):
+    ///  • ids: local ∪ incoming — the union grows the ledger, never shrinks it.
+    ///  • timestamps: FIRST-unlock wins (the engine's timestamp-stability rule).
+    ///    An id already latched locally KEEPS its existing stamp; an id new to
+    ///    this device adopts the incoming stamp, clamped to `<= now()` (the
+    ///    never-in-the-future invariant — a skewed remote clock can't stamp the
+    ///    future). When both sides carry a stamp for the same brand-new id, the
+    ///    EARLIER instant wins (the true first unlock).
+    ///
+    /// Runs the capstone cascade so a restored required-set opens the capstone,
+    /// and arms `ra_trophySyncDirty` when it actually introduced a new id, so
+    /// the restored unlocks propagate to the server rails on the next sync
+    /// (restore is bidirectional: iCloud → local → Supabase). Returns the ids
+    /// that were newly latched by this merge ([] when the external set was a
+    /// subset — the idempotent, convergent case: re-merging is a no-op).
+    ///
+    /// Deliberately mirrors `commit`'s single-`@Published`-mutation discipline:
+    /// when nothing new lands it emits ZERO `objectWillChange` and writes
+    /// nothing; when something lands it publishes exactly once.
+    @discardableResult
+    func mergeUnlocks(ids incomingIDs: Set<String>,
+                      dates incomingDates: [String: Date] = [:]) -> [String] {
+        let capped = now()
+
+        // Fold incoming timestamps in FIRST, first-stamp-wins, so a genuinely
+        // earlier remote first-unlock can correct a later local stamp for an id
+        // this device already has (never restamps LATER — only earlier). Ids
+        // absent locally get their (clamped) incoming stamp. This is a pure
+        // date reconciliation; it does not by itself latch an id.
+        var mergedDatesChanged = false
+        for (id, rawDate) in incomingDates {
+            let clamped = min(rawDate, capped)
+            if let existing = unlockDates[id] {
+                if clamped < existing {
+                    unlockDates[id] = clamped
+                    mergedDatesChanged = true
+                }
+            } else {
+                unlockDates[id] = clamped
+                mergedDatesChanged = true
+            }
+        }
+
+        // Ids to latch: everything incoming (by id OR by carrying a stamp) that
+        // isn't already latched. commit() unions them in, runs the capstone
+        // cascade, arms the dirty flag, and publishes once.
+        let candidateIDs = incomingIDs.union(incomingDates.keys)
+        let newIDs = candidateIDs.subtracting(unlockedIDs)
+
+        guard !newIDs.isEmpty else {
+            // No new unlock. If only earlier timestamps changed, persist them
+            // (durable) but do NOT arm sync or publish — timestamps are not
+            // server-synced and no unlock-set observer needs to re-render.
+            if mergedDatesChanged { persistLedger() }
+            return []
+        }
+
+        // Latch the new ids via the id-only core (an incoming id may be absent
+        // from this build's catalog — the ratchet keeps it, so we can't route
+        // through the `TrophyDefinition`-typed `commit`). Dated ids already
+        // carry the folded-in remote stamp; a bare id gets `now()`.
+        return Array(commitIDs(newIDs))
+    }
+
     // MARK: - Latching (private)
 
     /// Latches unlocks into the ledger: stamps first-unlock dates, runs
@@ -462,9 +541,34 @@ final class TrophyEngine: ObservableObject {
     @discardableResult
     private func commit(_ base: [TrophyDefinition],
                         stamp rawStamp: Date? = nil) -> [TrophyDefinition] {
-        var all = base
+        // Delegate to the id-based core, then reconstruct the catalog
+        // definitions for the ids it actually latched (base + any cascaded
+        // ledger trophy — all catalog-known, so the lookup never misses).
+        let baseIDs = Set(base.map(\.id))
+        let latchedIDs = commitIDs(baseIDs, stamp: rawStamp)
+        var all = base.filter { latchedIDs.contains($0.id) }
+        for trophy in ledgerTrophies where latchedIDs.contains(trophy.id)
+            && !baseIDs.contains(trophy.id) {
+            all.append(trophy)
+        }
+        return all
+    }
+
+    /// The id-only latch core (shared by `commit` and `mergeUnlocks`). Unions
+    /// `newBaseIDs` into the ledger, runs the capstone cascade, stamps
+    /// first-unlock dates, arms the dirty flag, publishes ONCE, and persists —
+    /// but only when something new actually lands. Returns the FULL set of ids
+    /// newly latched (base ∪ cascaded), so `mergeUnlocks` can report restored
+    /// unknown-catalog ids too (no `TrophyDefinition` needed for those).
+    ///
+    /// `newBaseIDs` may include ids already latched or absent from this build's
+    /// catalog; both are handled — already-latched ids are filtered out (no
+    /// republish), unknown ids are kept (the ratchet's additive-only rule).
+    @discardableResult
+    private func commitIDs(_ newBaseIDs: Set<String>,
+                           stamp rawStamp: Date? = nil) -> Set<String> {
         var working = unlockedIDs
-        for trophy in base { working.insert(trophy.id) }
+        working.formUnion(newBaseIDs)
 
         // Ledger cascade: trophies keyed to the ledger itself (v1: the
         // capstone) latch the instant their required set completes — no
@@ -478,20 +582,26 @@ final class TrophyEngine: ObservableObject {
                 if trophy.criteria.comparison.isSatisfied(value: value,
                                                           threshold: trophy.criteria.threshold) {
                     working.insert(trophy.id)
-                    all.append(trophy)
                     changed = true
                 }
             }
         }
 
+        // No net change (every candidate was already latched) → no write, no
+        // publish, no dirty-arm. Keeps the merge/replay idempotent and honors
+        // the "zero objectWillChange when nothing lands" contract.
+        let latched = working.subtracting(unlockedIDs)
+        guard !latched.isEmpty else { return [] }
+
         // First stamp wins, forever — never restamp (timestamp stability).
         // Never-in-the-future is invariant: clamp the requested stamp to
         // now(). The legacy sentinel is already in the past, so backfill
         // only ever stamps backwards; the clamp is defense for a pinned or
-        // skewed clock.
+        // skewed clock. `mergeUnlocks` pre-folds incoming dates, so a merged id
+        // that carried a remote stamp already has one here and is skipped.
         let stamp = min(rawStamp ?? now(), now())
-        for trophy in all where unlockDates[trophy.id] == nil {
-            unlockDates[trophy.id] = stamp
+        for id in latched where unlockDates[id] == nil {
+            unlockDates[id] = stamp
         }
         // Arm the offline-safe sync flag (S1-T8) BEFORE the published
         // mutation: a new unlock just landed, so S3-T3 must push a full
@@ -506,7 +616,7 @@ final class TrophyEngine: ObservableObject {
         // objectWillChange per unlocking bump, none otherwise.
         unlockedIDs = working
         persistLedger()
-        return all
+        return latched
     }
 
     /// The capstone's derived metric value: how many of its required ids

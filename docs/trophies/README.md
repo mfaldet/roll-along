@@ -39,7 +39,21 @@ Research inputs: [internal-features.md](research/internal-features.md) (every ho
 3. **4th-grade name** — Legend (recommended) vs Summit vs Diamond → design.md §11 #2 (collision analysis in §2) — **RULED 2026-07-02: Diamond** (Mac overruled the Legend recommendation; §2 R2's disambiguation riders are now binding)
 4. **Reward policy** — prestige-only vs prestige + earned-only regalia (recommended) vs coins (rejected by the economy analysis) → design.md §11 #3 — **RULED 2026-07-02: P2** (prestige + earned-only regalia; trophies never mint coins — economy log updated same day)
 
-**Mid-S0:** retroactive backfill for existing players (#12) — proceeding per recommendation (grant from existing stats) — Mac may veto. **Before S3 (rarity backend):** architecture (#4), anonymous rail (#13), denominator (#5), cold-start (#6), rarity vocabulary (catalog Q8), iCloud KV mirror (#7), restore-on-sign-in (#8), showcase default (#10), privacy-manifest timing (design §4). **Before launch:** Game Center mirror phase (#9), threshold recalibration vs live prices/telemetry (catalog Q5 — unblocked now that the reprice shipped), beta-data isolation and beta acceptance band (sprint §5/S4-T4).
+**Mid-S0:** retroactive backfill for existing players (#12) — proceeding per recommendation (grant from existing stats) — Mac may veto.
+
+**Sprint 2 (Presentation) — DONE, merged via PR #136 (2026-07-07).** First user-visible sprint; device/visual/VoiceOver QA is Mac's (checklist in the PR).
+
+**S3-gating decisions — all RULED 2026-07-07 (as recommended):**
+- **Architecture (#4) = hybrid C**; **anonymous rail (#13) APPROVED** — `trophy_unlocks` (anon install-UUID, INSERT-only) + `trophy_stats` counts-only aggregate, inside the not-linked analytics envelope; **denominator (#5) = distinct install UUIDs**.
+- **Cold-start (#6) = suppress until 500 installs + 30 days** (tier labels only until then).
+- **Rarity vocabulary = PSN's 4 labels** (Common ≥50% / Rare <50% / Very Rare <15% / Ultra Rare <5%).
+- **iCloud KV reinstall mirror (#7) = YES.**
+- Proceeding on defaults: **restore-on-sign-in (#8) = yes**; **showcase default (#10) = on for signed-in**.
+- **Deferred: Game Center mirror (#9) = LATER, not S3** (IDs stay GC-legal).
+
+**Mac-owned S3 deploy steps (the sprint delivers code + SQL; Mac executes these):** apply the trophy Supabase migration to **prod** (prod migrations always need Mac's explicit OK); add the **iCloud KV entitlement** in Xcode signing; answer the **App Privacy label** for `player_trophies` + `trophy_stats`.
+
+**Before launch:** threshold recalibration vs live prices/telemetry (catalog Q5 — unblocked now that the reprice shipped), beta-data isolation and beta acceptance band (sprint §5/S4-T4), and the Game Center mirror phase (#9) when the catalog has settled.
 
 Full mapping: design.md §11 (14 numbered decisions — #1/#2/#3/#14 RULED 2026-07-02, the rest open) + trophy-catalog.md open questions (11 — Q1/Q2/Q4/Q7/Q11 ruled via the same rulings) + sprint-plan.md §7 (D-handles, external blockers).
 
