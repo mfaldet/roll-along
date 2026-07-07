@@ -302,17 +302,31 @@ grant select on public.trophy_stats to authenticated;
 --   from public.trophy_unlocks
 --   group by trophy_id;
 
--- Full rollup upsert (skeleton the S3-T2 job fills in — kept here so the schema
--- and its consumer stay legible together; cold-start suppression + beta-install
--- exclusion + rate-plausibility filtering are the job's concern, not the DDL):
---   with denom as (select count(distinct user_id) d from public.events),
+-- The full rollup job (S3-T2) — the daily aggregation that writes trophy_stats
+-- from trophy_unlocks over the distinct-install denominator, increment-only and
+-- cold-start-aware — is authored as a SIBLING FILE: docs/trophies/trophy-rollup.sql.
+-- Apply THIS schema file first, then trophy-rollup.sql.  It adds:
+--   • public.trophy_rollup_config (launch_at anchor + cold-start thresholds),
+--   • trophy_stats.rarity_ready (the cold-start gate the client reads),
+--   • public.rollup_trophy_stats() (the daily recompute function),
+--   • the pg_cron / edge-function scheduling notes (Mac's deploy step).
+-- The denominator is count(distinct user_id) from public.events WHERE
+-- event_name = 'app_launch' (the "booted the game" rail, per design.md §3);
+-- earned_count is count(distinct install_id) from trophy_unlocks (this table),
+-- NEVER from player_trophies.  is_paused is never overwritten by the rollup.
+-- Sketch of the core upsert (see trophy-rollup.sql for the authoritative,
+-- cold-start-guarded, race-clamped version):
+--   with denom as (
+--       select count(distinct user_id) d from public.events
+--        where event_name = 'app_launch'
+--   ),
 --   counts as (
 --       select trophy_id, count(distinct install_id) c
 --       from public.trophy_unlocks group by trophy_id
 --   )
 --   insert into public.trophy_stats (trophy_id, earned_count, denominator, pct, updated_at)
 --   select c.trophy_id, c.c, d.d,
---          case when d.d = 0 then 0 else c.c::double precision / d.d end, now()
+--          case when d.d = 0 then 0 else least(c.c::double precision / d.d, 1.0) end, now()
 --   from counts c cross join denom d
 --   on conflict (trophy_id) do update
 --       set earned_count = excluded.earned_count,
