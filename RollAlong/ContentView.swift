@@ -53,13 +53,22 @@ struct ContentView: View {
             if !showIntro { maybeOfferSignIn() }
             // social_sign_in: a session restored at launch also proves the
             // player has signed in (onChange won't fire if it's already true).
-            if auth.isSignedIn { gameState.recordSocialSignIn() }
+            if auth.isSignedIn {
+                gameState.recordSocialSignIn()
+                // S3-T5: restore this player's trophies server→local (union).
+                gameState.hydrateTrophiesOnSignIn()
+            }
         }
         // social_sign_in (S1-T6): funnel on every transition into a signed-in
         // session (fresh sign-in OR a restored session that lands after this
         // view appears). A pure latch — the engine unlocks once, forever.
         .onChange(of: auth.isSignedIn) { _, signedIn in
-            if signedIn { gameState.recordSocialSignIn() }
+            if signedIn {
+                gameState.recordSocialSignIn()
+                // S3-T5: restore this player's trophies server→local (union),
+                // then push the merged set back up. Idempotent + convergent.
+                gameState.hydrateTrophiesOnSignIn()
+            }
         }
     }
 

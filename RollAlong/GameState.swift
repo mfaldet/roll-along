@@ -1595,6 +1595,33 @@ final class GameState: ObservableObject {
         fireTrophy(.signedIn, value: 1)
     }
 
+    /// Restore this player's trophies from the server on sign-in, then push the
+    /// unioned local snapshot back up (S3-T5; design.md §4 "Supabase restore for
+    /// signed-in players"). The app's FIRST server→local hydrate, safe ONLY
+    /// because the trophy ledger is a pure ratchet: `TrophySyncService`
+    /// hydrates via `TrophyEngine.mergeUnlocks` (server ∪ local, never
+    /// subtraction), so a restore can only ADD unlocks and can never clobber a
+    /// local unlock or any other save state.
+    ///
+    /// Fire-and-forget, off the main path: called from ContentView alongside
+    /// `recordSocialSignIn()` on every transition into a signed-in session
+    /// (fresh sign-in OR a restored launch session). Signed-out → the hydrate is
+    /// an internal no-op. The follow-up `sync` pushes the unioned set (server ∪
+    /// local, incl. any local-only unlocks the hydrate armed) to BOTH rails.
+    /// Newly-restored unlocks are NOT toasted — S2-T6's coalesced reveal already
+    /// owns the "you've already earned N" moment; a silent ratchet restore never
+    /// interrupts play (design.md §6). Grants nothing (D1 never-mint).
+    func hydrateTrophiesOnSignIn() {
+        Task {
+            await TrophySyncService.shared.hydrateOnSignIn(engine: trophyEngine)
+            // Push the unioned snapshot (server ∪ local) back up: the hydrate
+            // arms the dirty flag when it introduced a server-only id, and any
+            // local-only unlocks still need to reach player_trophies now that a
+            // session exists. A no-op when nothing changed (clean flag).
+            await TrophySyncService.shared.sync(engine: trophyEngine)
+        }
+    }
+
     /// `social_first_friend` (≥1) / `social_friends_5` (≥5) — the accepted-
     /// friend high-water. Called from FriendsView after an accept succeeds and
     /// the friend list reloads; `peak` is the CURRENT accepted-friend count.

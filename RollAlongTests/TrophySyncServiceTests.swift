@@ -50,6 +50,10 @@ final class TrophySyncServiceTests: XCTestCase {
             recordPlayer(playerID, trophyIDs)
         }
 
+        // S3-T5 hydrate read — unused by the push-path tests here (returns []);
+        // exercised in TrophyHydrateTests. Present so the mock conforms.
+        func fetchPlayerTrophies(playerID: UUID) async throws -> [String] { [] }
+
         // Synchronous, so the lock is never held across an await.
         private func recordAnon(_ id: UUID, _ ids: [String]) {
             lock.lock(); anonPushes.append((id, ids)); lock.unlock()

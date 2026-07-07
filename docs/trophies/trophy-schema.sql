@@ -288,6 +288,26 @@ grant select on public.trophy_stats to authenticated;
 -- anonymous rarity counts survive, exactly like `events` rows.  This is the
 -- design (design.md §4 / §10): deletion removes personal data, not aggregate
 -- history.
+--
+-- S3-T5 VERIFICATION (2026-07-06 — no code change): the edge function's own
+-- body deletes ONLY the auth.users / players row (RollAlong/SocialClient.swift
+-- `deleteMyAccount` → POST /functions/v1/delete-account); it never names
+-- player_trophies, trophy_unlocks, or trophy_stats.  Therefore:
+--   • player_trophies — removed automatically by THIS file's FK ON DELETE
+--     CASCADE when the parent players row goes.  ✓ personal trophy data gone.
+--   • trophy_unlocks  — no FK to players ⇒ zero rows touched by the cascade.
+--     ✓ the anonymous rarity numerator survives (rarity persists post-delete).
+--   • trophy_stats    — an aggregate derived only from trophy_unlocks + events
+--     (see trophy-rollup.sql); with trophy_unlocks untouched, a re-run of
+--     rollup_trophy_stats() produces the SAME earned_count/denominator ⇒ a
+--     deletion cannot decrement any aggregate.  ✓
+-- Client-side restore is the sign-in HYDRATE (S3-T5): TrophySyncService
+-- `hydrateOnSignIn` fetches player_trophies and UNIONS it into the local ledger
+-- (TrophyEngine.mergeUnlocks — server ∪ local, never subtraction), so a
+-- reinstall + sign-in re-materialises the signed-in player's showcase rail
+-- locally.  Anonymous reinstallers are covered by the iCloud KV mirror (S3-T8,
+-- D11 = yes); an anon player with iCloud KV unavailable keeps today's
+-- loss-on-reinstall (design.md §4 "Net:" — accepted, shrunk to near-zero).
 
 -- =============================================================================
 -- Useful queries (run with service_role, or as the rollup job — S3-T2).

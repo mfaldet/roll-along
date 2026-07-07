@@ -60,6 +60,16 @@ protocol TrophyBackend: Sendable {
     /// Push the full unlock set to the signed-in `player_trophies` showcase
     /// rail for `playerID` (own-row write). Only called when signed in.
     func upsertPlayerTrophies(playerID: UUID, trophyIDs: [String]) async throws
+
+    /// Fetch every `player_trophies.trophy_id` for `playerID` — the ONLY
+    /// server→local read in the whole trophy system (S3-T5's hydrate-on-sign-in;
+    /// design.md §4 "Supabase restore for signed-in players"). Returns the raw
+    /// id set; the caller UNIONS it into the local ledger (never subtracts).
+    /// Reads the SIGNED-IN showcase rail (`player_trophies`), never the anonymous
+    /// `trophy_unlocks` rail — that one is INSERT-only and never client-readable
+    /// (docs/trophies/trophy-schema.sql RLS). Throws on any non-2xx / transport
+    /// error so the caller leaves the local ledger untouched and retries later.
+    func fetchPlayerTrophies(playerID: UUID) async throws -> [String]
 }
 
 // ===========================================================================
@@ -172,6 +182,67 @@ final class TrophySyncService: @unchecked Sendable {
         return true
     }
 
+    // MARK: - Hydrate on sign-in (server → local, the app's FIRST such path)
+
+    /// Restore a signed-in player's trophies from the server into the local
+    /// ledger — S3-T5 / design.md §4 "Supabase restore for signed-in players"
+    /// (design decision #8, ruled yes 2026-07-07). This is the app's FIRST
+    /// hydrate-from-server path, and it is deliberately trophies-only: the ledger
+    /// is a pure ratchet, so a UNION can only ADD unlocks and can never clobber
+    /// local state (unlike the general `players` save-restore problem, which is
+    /// why nothing else hydrates from the server yet).
+    ///
+    /// Contract (a pure max-merge UNION — NEVER subtraction or overwrite):
+    ///  • signed out → no-op, no network (nothing to restore for an anon rail
+    ///    that is INSERT-only and never client-readable).
+    ///  • fetch the player's `player_trophies` ids, then
+    ///    `engine.mergeUnlocks(ids:)`: server ∪ local. Server-only unlocks are
+    ///    ADDED locally; local-only unlocks are UNTOUCHED (and the merge arms the
+    ///    dirty flag so they push UP on the next `sync`, closing the loop).
+    ///  • a fetch failure is silent (like `sync`): the local ledger is left
+    ///    exactly as it was and the next sign-in / launch retries. A hydrate
+    ///    never removes a local unlock even when the server read fails.
+    ///
+    /// Idempotent and convergent: re-hydrating with a server set that is already
+    /// a subset of local latches nothing (`mergeUnlocks` returns []). Fire-and-
+    /// forget from the caller's view (invoke on sign-in / on a restored session);
+    /// returns the ids this hydrate newly latched locally — used by tests and any
+    /// caller that wants to react (e.g. a coalesced "welcome back" reveal),
+    /// ignored by plain wiring.
+    ///
+    /// NOTE: hydrate (server→local restore) and `sync` (local→server push) are
+    /// separate, complementary passes. A sign-in flow runs hydrate FIRST (so the
+    /// server's unlocks land locally and the union arms the flag), then `sync`
+    /// (so the unioned local snapshot — server ∪ local — pushes back up to both
+    /// rails). Order is not load-bearing for correctness (both are pure unions),
+    /// only for promptness.
+    @discardableResult
+    func hydrateOnSignIn(engine: TrophyEngine) async -> [String] {
+        // Signed out → nothing to restore. The anonymous rail is INSERT-only and
+        // never readable, so there is no server set to union in for an anon
+        // player; their reinstall coverage is iCloud KV (S3-T8), not this path.
+        guard let playerID = currentPlayerID() else { return [] }
+
+        let serverIDs: [String]
+        do {
+            serverIDs = try await backend.fetchPlayerTrophies(playerID: playerID)
+        } catch {
+            // Silent, like `sync`: a failed restore leaves the local ledger
+            // exactly as it was (never subtracts) and the next sign-in retries.
+            return []
+        }
+
+        // Empty server set → nothing to union; mergeUnlocks would no-op anyway,
+        // but skip the merge (and its potential main-actor hop) entirely.
+        guard !serverIDs.isEmpty else { return [] }
+
+        // The ONE union: server ∪ local. Runs on the main actor because
+        // `mergeUnlocks` mutates the engine's @Published `unlockedIDs` (and may
+        // arm the not-@Published dirty flag) — same discipline as `sync`'s
+        // `clearSyncDirty()`. A pure ratchet: never removes, never overwrites.
+        return await MainActor.run { engine.mergeUnlocks(ids: Set(serverIDs)) }
+    }
+
     /// Claims the single in-flight slot; false when a drain is already running.
     /// Synchronous (the lock is never held across an await).
     private func beginSyncing() -> Bool {
@@ -267,6 +338,21 @@ struct SocialTrophyBackend: TrophyBackend {
         )
     }
 
+    // MARK: - Hydrate: read own player_trophies (S3-T5 sign-in restore)
+
+    func fetchPlayerTrophies(playerID: UUID) async throws -> [String] {
+        let token = try SocialClient.shared.trophyAccessToken()
+        // GET only this player's rows, selecting just the id column — the
+        // server→local restore never needs timestamps (the engine keeps its own
+        // first-unlock stamp; a merged id adopts `now()`). Filtering to
+        // player_id=eq.<self> keeps the payload to the player's own set even
+        // though RLS lets authenticated read all rows (the showcase read path).
+        let query = "select=trophy_id&player_id=eq.\(playerID.uuidString)"
+        let data = try await getAuthed(path: "player_trophies", query: query, token: token)
+        let rows = try JSONDecoder().decode([PlayerTrophyIDRow].self, from: data)
+        return rows.map(\.trophy_id)
+    }
+
     // MARK: - REST core (mirrors SocialClient.send / AnalyticsClient.flush)
 
     private func postAnon(path: String, query: String, body: Data, prefer: String) async throws {
@@ -281,6 +367,30 @@ struct SocialTrophyBackend: TrophyBackend {
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         try await run(req)
+    }
+
+    /// Authenticated GET returning the response body (the hydrate read). Mirrors
+    /// SocialClient.send's GET shape: anon apikey header + the player's Bearer
+    /// token, no body/Prefer. Throws on any non-2xx so the caller leaves the
+    /// local ledger untouched.
+    private func getAuthed(path: String, query: String, token: String) async throws -> Data {
+        let urlString = "\(Self.projectURL)/rest/v1/\(path)"
+            + (query.isEmpty ? "" : "?\(query)")
+        guard let url = URL(string: urlString) else { throw SocialError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw SocialError.http(status: -1, body: "no HTTP response")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw SocialError.http(status: http.statusCode,
+                                   body: String(data: data, encoding: .utf8) ?? "")
+        }
+        return data
     }
 
     private func request(path: String, query: String, body: Data, prefer: String) throws -> URLRequest {
@@ -315,6 +425,11 @@ struct SocialTrophyBackend: TrophyBackend {
 
     private struct PlayerTrophyRow: Encodable {
         let player_id: String
+        let trophy_id: String
+    }
+
+    /// The hydrate read's row shape — just the id column (select=trophy_id).
+    private struct PlayerTrophyIDRow: Decodable {
         let trophy_id: String
     }
 }
