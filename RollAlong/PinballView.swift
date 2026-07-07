@@ -111,10 +111,21 @@ struct PinballView: View {
             }
 
             if model.isOver { gameOverOverlay }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-game; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { scene.scaleMode = .resizeFill; scene.model = model }
+        .onAppear {
+            scene.scaleMode = .resizeFill; scene.model = model
+            // S2-T2: a game begins — arm the toast queue so any trophy earned
+            // this game coalesces and surfaces only at the game-over overlay.
+            gameState.beginTrophyRun()
+        }
         .onChange(of: model.isOver) { _, over in if over { submitScore() } }
     }
 
@@ -140,6 +151,9 @@ struct PinballView: View {
                 }
             }
         }
+        // S2-T2: game ended — drain this game's trophies at the result screen,
+        // coalesced (design.md §6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private func submitScore() {
@@ -151,7 +165,7 @@ struct PinballView: View {
         if gameState.hapticsEnabled { Haptics.success() }
     }
 
-    private func playAgain() { didSubmit = false; scene.resetGame() }
+    private func playAgain() { didSubmit = false; scene.resetGame(); gameState.beginTrophyRun() }
 }
 
 // MARK: - Chipmunk-driven scene

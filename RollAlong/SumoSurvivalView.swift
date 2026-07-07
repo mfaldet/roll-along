@@ -205,6 +205,13 @@ struct SumoSurvivalView: View {
             if roundOver { roundResultOverlay }
             if matchOver { matchOverOverlay }
             if showMapName && started { mapNameLabel }
+
+            // S2-T2: trophy-unlock banner host — inert until the MATCH-over
+            // overlay drains the queue.  The per-round result is a mid-match
+            // transition, not a run end, so only the match end drains (§6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -502,6 +509,8 @@ struct SumoSurvivalView: View {
             }
             .padding(24)
         }
+        // S2-T2: match ended — drain the match's trophies, coalesced (§6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     /// One standings row: rank badge · colour dot · name · trailing value.
@@ -546,6 +555,10 @@ struct SumoSurvivalView: View {
     /// lay out round 1 (which waits for a tap to begin).
     private func reset() {
         guard baseRadius > 0 else { return }
+        // S2-T2: fresh match — arm the toast queue.  Trophies earned across
+        // the match's rounds coalesce and surface only at the match-over
+        // overlay (design.md §6 "never mid-run").
+        gameState.beginTrophyRun()
         started = false
         matchOver = false
         roundOver = false

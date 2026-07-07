@@ -113,6 +113,12 @@ struct RollUpView: View {
             if phase == .ready && !outOfLives { startPrompt }
             if phase == .over && !outOfLives { gameOverOverlay }
             if outOfLives { outOfLivesOverlay }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-run; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -316,6 +322,8 @@ struct RollUpView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: run ended — drain this run's trophies, coalesced (§6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private var outOfLivesOverlay: some View {
@@ -354,6 +362,10 @@ struct RollUpView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: a last-life run end suppresses the game-over overlay and
+        // shows this instead — drain the run's trophies here too so a trophy
+        // earned on the final life still surfaces (design.md §6 "out-of-lives").
+        .onAppear { gameState.endTrophyRun() }
     }
 
     // MARK: - Coordinate mapping
@@ -378,6 +390,8 @@ struct RollUpView: View {
     /// (`.ready`) so the start prompt shows over a settled board.
     private func startRun() {
         guard arena.width > 0 else { return }
+        // S2-T2: a fresh climb — arm the toast queue (§6 coalesce-at-run-end).
+        gameState.beginTrophyRun()
         camBottom = 0
         groundY = arena.height * 0.20            // ground sits ~80% down the screen
         platforms = [Platform(id: 0, worldX: arena.width / 2, worldY: groundY, width: arena.width)]

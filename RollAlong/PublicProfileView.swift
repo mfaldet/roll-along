@@ -6,6 +6,14 @@ import SwiftUI
 // loadout/badges, which aren't synced).  Pushed via HomeRoute.player from any
 // player name in Friends or a Clan roster, and from a rollalong://player/<id>
 // deep link.  Back pops to wherever you came from; Home clears the stack.
+//
+// S2-T4 SEAM: this profile shows OTHER players, so its trophy showcase needs
+// SERVER-synced data — a per-grade count + up to 3 showcased ids on the remote
+// row.  That sync is S3-T9 (needs the migration + `TrophySyncService`).  Until
+// then we render an honest placeholder (`trophySeamCard`), NOT the local
+// engine's ledger — showing the viewer's own trophies on someone else's
+// profile would be a fake.  S3-T9 replaces the placeholder body with the real
+// synced showcase.
 // ===========================================================================
 struct PublicProfileView: View {
     @EnvironmentObject var gameState: GameState
@@ -41,6 +49,7 @@ struct PublicProfileView: View {
                     heroCard
                     if !isMe && SocialClient.shared.isSignedIn { actionRow }
                     statsGrid
+                    trophySeamCard
                     PlayerRanksCard(profile: profile, playerId: profile.id)
                 }
                 .padding(.horizontal, 18)
@@ -155,6 +164,34 @@ struct PublicProfileView: View {
         }
         .padding(18)
         .ppCard()
+    }
+
+    // MARK: - Trophy showcase seam (S2-T4 → filled by S3-T9)
+    //
+    // Honest placeholder, NOT a fake: another player's trophies live on the
+    // server, and that sync (per-grade counts + up to 3 showcased ids) is
+    // S3-T9.  We deliberately do NOT read the local `trophyEngine` here — that
+    // would paint the VIEWER'S own trophies onto someone else's profile.  When
+    // S3-T9 lands, it replaces this card's body with the synced showcase.
+    private var trophySeamCard: some View {
+        VStack(spacing: 10) {
+            sectionLabel("Trophies")
+            HStack(spacing: 10) {
+                Image(systemName: "trophy")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color(white: 0.45))
+                    .accessibilityHidden(true)
+                Text("Trophy showcases aren't shared yet — coming soon.")
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundStyle(Color(white: 0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(18)
+        .ppCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Trophies. Trophy showcases aren't shared yet. Coming soon.")
     }
 
     // MARK: - Relationship

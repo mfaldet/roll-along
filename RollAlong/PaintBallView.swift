@@ -176,6 +176,12 @@ struct PaintBallView: View {
             if !started && !isOver { startPrompt }
             if isOver { gameOverOverlay }
             if showMapName && !isOver { mapNameLabel }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-match; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -496,6 +502,8 @@ struct PaintBallView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: match ended — drain this match's trophies, coalesced (§6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private func ordinal(_ n: Int) -> String {
@@ -521,6 +529,8 @@ struct PaintBallView: View {
 
     private func reset() {
         guard cols > 0, rows > 0 else { return }
+        // S2-T2: fresh match — arm the toast queue (§6 coalesce-at-run-end).
+        gameState.beginTrophyRun()
         started = false
         isOver = false
         playerWon = false

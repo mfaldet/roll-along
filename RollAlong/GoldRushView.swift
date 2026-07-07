@@ -158,6 +158,12 @@ struct GoldRushView: View {
             if started && !isOver { chargeIndicator }
             if isOver { gameOverOverlay }
             if showMapName && started { mapNameLabel }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-match; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         // NOTE: no accessibilityIdentifier here — the "GoldRushView" anchor
@@ -432,6 +438,9 @@ struct GoldRushView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: round ended — drain this round's trophies at the result
+        // screen, coalesced (design.md §6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private var mapNameLabel: some View {
@@ -511,6 +520,9 @@ struct GoldRushView: View {
 
     private func reset() {
         guard arena.width > 0 else { return }
+        // S2-T2: fresh round — arm the toast queue (unlocks coalesce, surface
+        // only at the game-over overlay; design.md §6).
+        gameState.beginTrophyRun()
         engine.loadMap(index: mapIndex)   // engine's simulation walls (coin spawns avoid them)
         engine.resetBoard()               // fresh board, round left un-started
         loadMap()                         // view's render walls + map-name banner

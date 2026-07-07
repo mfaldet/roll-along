@@ -843,6 +843,31 @@ struct BallGameView: View {
                 if showWelcomeMoment       { welcomeMomentOverlay }
                 if showTutorialReward      { tutorialRewardOverlay }
 
+                // S2-T2: trophy-unlock banner host.  Renders NOTHING until a
+                // result overlay drains the queue (never during play — the
+                // queue's own gating enforces that; §6).  Reuses the shop /
+                // IAP celebration grammar (top-of-screen auto-dismiss banner).
+                // Tap deep-links to the Trophy Room, wired in S2-T3; a no-op
+                // seam here so the banner is complete without the room.
+                TrophyToastHost(queue: gameState.trophyToasts,
+                                hapticsEnabled: gameState.hapticsEnabled,
+                                soundEnabled: gameState.soundEnabled)
+
+                // S2-T5: the Platinum-capstone full-screen blowout.  Rendered
+                // ONLY on a result surface (`phase != .playing`) so the
+                // once-ever moment never lands over a live tilt run — the
+                // capstone can only latch during play, but the moment waits for
+                // the run to end, exactly like the coalesced banner.  The model
+                // gates it to fire exactly once ever.
+                if phase != .playing {
+                    CapstoneCelebrationHost(
+                        model: gameState.capstoneCelebration,
+                        skin: gameState.activeSkin,
+                        trail: gameState.equippedTrail,
+                        hapticsEnabled: gameState.hapticsEnabled,
+                        soundEnabled: gameState.soundEnabled)
+                }
+
                 // Screen border — always on top, colour reacts to game state
                 screenBorder
             }
@@ -4446,6 +4471,11 @@ struct BallGameView: View {
             BuyLivesSheet()
         }
         .transition(.opacity)
+        // S2-T2: an out-of-lives run end — drain any trophies earned on the
+        // final life at this result screen (design.md §6 "out-of-lives").
+        // Harmless when reached from the zero-lives spawn guard (nothing
+        // pending, no run was active).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     /// "Better Luck Tomorrow" — the Challenge of the Day is failed once the
@@ -4519,6 +4549,10 @@ struct BallGameView: View {
             spawnBall(in: arenaSize)
         }
         .transition(.opacity)
+        // S2-T2: the run ended in a fall — surface any trophies earned this
+        // run at the result screen, coalesced (design.md §6 lists "fell" as a
+        // run-end surface).  A retry re-arms the queue via `spawnBall`.
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private var winOverlay: some View {
@@ -4691,6 +4725,10 @@ struct BallGameView: View {
             .padding(.horizontal, 24)
         }
         .transition(.opacity)
+        // S2-T2: the run ended in a clear — drain any trophies this run
+        // earned into one coalesced banner (design.md §6 "coalesced at run
+        // end").  Called from the overlay's appearance, never during play.
+        .onAppear { gameState.endTrophyRun() }
     }
 
     // MARK: - Coin Pit payout screen
@@ -4787,6 +4825,9 @@ struct BallGameView: View {
             .padding(.horizontal, 24)
         }
         .transition(.opacity)
+        // S2-T2: Coin Pit's only end screen — drain the run's trophies here
+        // (the Coin Pit round is a `beginTrophyRun`-armed run like any other).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     // MARK: - Gold Rush in-round ×2 boost
@@ -5489,6 +5530,12 @@ struct BallGameView: View {
             firstAttemptClean = false
         }
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+
+        // S2-T2: a tilt run is now live — arm the trophy-toast queue so any
+        // unlock earned during this run is HELD and coalesced, never shown
+        // mid-run (design.md §6).  Each terminal result overlay drains it via
+        // `endTrophyRun()` on appearance.  Idempotent across Replay/respawn.
+        gameState.beginTrophyRun()
 
         // `level_attempt` is a climb-funnel event keyed to a climb level —
         // only meaningful for goal-reaching modes (the climb today, themed
@@ -7084,6 +7131,20 @@ final class AudioManager {
     func playCoin(enabled: Bool) {
         guard enabled else { return }
         AudioServicesPlaySystemSound(1306)
+    }
+
+    /// The Platinum-capstone fanfare (S2-T5) — a UNIQUE, bigger flourish
+    /// distinct from the standard win chime that every grade banner reuses
+    /// (design.md §6 "unique fanfare distinct from the standard chime").
+    /// Layers the synthesised win arpeggio with a brighter system fanfare
+    /// (1025, "Fanfare") so the once-ever moment sounds unmistakably grander.
+    /// Respects the player's sound setting like every other cue here.
+    func playCapstoneFanfare(enabled: Bool) {
+        guard enabled else { return }
+        // The familiar celebratory arpeggio…
+        playWin(enabled: true)
+        // …plus a distinct, brighter fanfare on top (respects silent mode).
+        AudioServicesPlaySystemSound(1025)
     }
 
     // MARK: - Win sound synthesis

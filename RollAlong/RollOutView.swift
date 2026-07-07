@@ -168,6 +168,10 @@ struct RollOutView: View {
                 .onTapGesture {
                     if phase == .ready && !outOfLives {
                         phase = .playing
+                        // S2-T2: a maze run begins — arm the toast queue so any
+                        // trophy earned this run coalesces and surfaces only at
+                        // the result overlay (design.md §6 "never mid-run").
+                        gameState.beginTrophyRun()
                         AnalyticsClient.shared.track(
                             "minigame_round_started",
                             properties: ["game_mode": .string("rollout"),
@@ -183,6 +187,12 @@ struct RollOutView: View {
             if phase == .cleared { clearedOverlay }
             if phase == .fell && !outOfLives { fellOverlay }
             if outOfLives && phase != .cleared { outOfLivesOverlay }
+
+            // S2-T2: trophy-unlock banner host — inert until a result overlay
+            // drains the queue (never mid-run; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -413,6 +423,9 @@ struct RollOutView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: maze cleared (the Roll Out trophy source) — drain this run's
+        // trophies at the result screen, coalesced (§6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private var fellOverlay: some View {
@@ -448,6 +461,10 @@ struct RollOutView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: run ended in a fall — surface any trophies earned this run
+        // at the result screen (design.md §6 lists "fell" as a run-end
+        // surface).  A retry re-arms via the tap-to-start handler.
+        .onAppear { gameState.endTrophyRun() }
     }
 
     private var livesWord: String {
@@ -491,6 +508,10 @@ struct RollOutView: View {
             }
             .padding(.horizontal, 28)
         }
+        // S2-T2: a last-life fall suppresses the fell overlay and shows this
+        // instead — drain the run's trophies here too (design.md §6
+        // "out-of-lives").
+        .onAppear { gameState.endTrophyRun() }
     }
 
     // MARK: - Geometry helpers

@@ -144,6 +144,12 @@ struct DiscoBallView: View {
             if phase == .memorize { memorizeHint }
             if phase == .choosing { difficultySelect }
             if phase == .gameOver { gameOverOverlay }
+
+            // S2-T2: trophy-unlock banner host — inert until the game-over
+            // overlay drains the queue (never mid-run; §6).
+            TrophyToastHost(queue: gameState.trophyToasts,
+                            hapticsEnabled: gameState.hapticsEnabled,
+                            soundEnabled: gameState.soundEnabled)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -474,6 +480,8 @@ struct DiscoBallView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Game over. \(crossings) crossings. Best \(max(best, crossings)). Plus \(runCoins) coins.")
+        // S2-T2: run ended — drain this run's trophies, coalesced (§6).
+        .onAppear { gameState.endTrophyRun() }
     }
 
     // MARK: - Lifecycle
@@ -500,6 +508,9 @@ struct DiscoBallView: View {
     }
 
     private func beginMemorize() {
+        // S2-T2: a run begins (first play or replay) — arm the toast queue so
+        // trophies coalesce and surface only at the game-over overlay (§6).
+        gameState.beginTrophyRun()
         touched = []
         revealHead = 0
         phaseEndAt = nil
