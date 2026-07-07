@@ -53,6 +53,15 @@ final class TrophyCloudMirrorTests: XCTestCase {
 
         func synchronize() { guard available else { return }; syncCount += 1 }
 
+        /// A stand-in for the notification-posting object. When available the
+        /// double exposes a stable `NSObject` a test can scope the observer to
+        /// (and post a `didChangeExternallyNotification` against); when
+        /// unavailable it returns `nil` so the mirror registers nothing (the
+        /// graceful no-op path). A test posting against `postingObject` drives the
+        /// mirror's observer exactly like a real iCloud external change.
+        let postingObject = NSObject()
+        var notificationObject: AnyObject? { available ? postingObject : nil }
+
         /// Seed the store as if another device (or a pre-reinstall run) had
         /// pushed this set.
         func seed(ids: [String], dates: [String: Date]) {
@@ -344,6 +353,109 @@ final class TrophyCloudMirrorTests: XCTestCase {
         XCTAssertTrue(restored.isEmpty)
         XCTAssertFalse(engine.isUnlocked("snake_first_win"),
                        "an unavailable store cannot restore — no crash, no restore")
+    }
+
+    // =======================================================================
+    // MARK: - Live external-change observer (S3-T8 gap — convergence WHILE OPEN)
+    // =======================================================================
+
+    func testExternalChangeReconcilesAndFiresCallback() throws {
+        // The cloud gains an unlock (from another device) AFTER this device's
+        // launch reconcile. A live external-change notification must pull it in
+        // and fire the app's sync callback — no relaunch needed.
+        let store = MemoryKVStore()
+        store.seed(ids: ["climb_stars_25"],
+                   dates: ["climb_stars_25": Date(timeIntervalSince1970: 1_650_000_000)])
+
+        let engine = try makeEngine()
+        XCTAssertFalse(engine.isUnlocked("climb_stars_25"), "local starts without the cloud's unlock")
+
+        let mirror = TrophyCloudMirror(store: store)
+        var callbackCount = 0
+        mirror.start(engine: engine) { callbackCount += 1 }
+
+        // Simulate iCloud delivering the external change for this store.
+        NotificationCenter.default.post(
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: store.postingObject)
+
+        XCTAssertTrue(engine.isUnlocked("climb_stars_25"),
+                      "an external change reconciles the cloud unlock into the local ledger while open")
+        XCTAssertEqual(callbackCount, 1,
+                       "the reconcile→sync callback fires exactly once per external change")
+    }
+
+    func testStartOnUnavailableStoreIsNoOpAndNeverFires() throws {
+        // No iCloud KV entitlement / signed out → start registers nothing; a
+        // stray notification can't drive a reconcile or the callback. Graceful
+        // degrade — the app behaves exactly as today.
+        let store = MemoryKVStore()
+        store.available = false
+
+        let engine = try makeEngine()
+        let mirror = TrophyCloudMirror(store: store)
+        var callbackCount = 0
+        mirror.start(engine: engine) { callbackCount += 1 }
+
+        // Even if a notification is posted against the (nil) object, nothing runs.
+        NotificationCenter.default.post(
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: store.postingObject)
+
+        XCTAssertEqual(callbackCount, 0, "no observer is registered when iCloud KV is unavailable")
+        XCTAssertTrue(engine.unlockedIDs.isEmpty, "nothing reconciled — pure no-op")
+    }
+
+    func testStartIsIdempotentNoDoubleReconcile() throws {
+        // Re-calling start must tear the prior observer down first, so a single
+        // external change drives exactly ONE reconcile/callback (not one per
+        // registration) — the app can re-wire on relaunch without doubling.
+        let store = MemoryKVStore()
+        store.seed(ids: ["climb_stars_25"],
+                   dates: ["climb_stars_25": Date(timeIntervalSince1970: 1_650_000_000)])
+
+        let engine = try makeEngine()
+        let mirror = TrophyCloudMirror(store: store)
+        var callbackCount = 0
+        mirror.start(engine: engine) { callbackCount += 1 }
+        mirror.start(engine: engine) { callbackCount += 1 }   // re-wire
+
+        NotificationCenter.default.post(
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: store.postingObject)
+
+        XCTAssertEqual(callbackCount, 1,
+                       "re-calling start replaces the observer — one change → one callback")
+    }
+
+    // =======================================================================
+    // MARK: - S4-T4 beta funnel — trophy_unlocked analytics event shape
+    // =======================================================================
+
+    func testTrophyUnlockEventCarriesIdAndTierNoPII() throws {
+        // The beta funnel event (S4-T4): name is `trophy_unlocked`, payload is
+        // EXACTLY {trophy_id, tier} — the stable id + grade, and nothing that
+        // could identify a player.
+        let engine = try makeEngine()
+        let trophy = try XCTUnwrap(engine.catalog.trophy(withID: "snake_first_win"))
+
+        let event = GameState.trophyUnlockEvent(for: trophy)
+
+        XCTAssertEqual(event.name, "trophy_unlocked")
+        XCTAssertEqual(event.payload["trophy_id"], "snake_first_win")
+        XCTAssertEqual(event.payload["tier"], trophy.tier.rawValue)
+        XCTAssertEqual(Set(event.payload.keys), ["trophy_id", "tier"],
+                       "no PII / no extra keys — the not-linked analytics envelope stays intact")
+    }
+
+    func testTrophyUnlockEventReportsCapstoneTier() throws {
+        // The Platinum capstone is a real live-unlock too; its event carries the
+        // platinum grade so the funnel can see completions distinctly.
+        let engine = try makeEngine()
+        let capstone = try XCTUnwrap(engine.catalog.trophy(withID: "capstone_all"))
+        let event = GameState.trophyUnlockEvent(for: capstone)
+        XCTAssertEqual(event.payload["tier"], "platinum")
+        XCTAssertEqual(event.payload["trophy_id"], "capstone_all")
     }
 
     private func mirror(_ store: TrophyKeyValueStore) -> TrophyCloudMirror {

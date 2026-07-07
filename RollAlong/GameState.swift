@@ -932,6 +932,16 @@ final class GameState: ObservableObject {
     /// (S2-T5; design.md §6).  Display-only — grants nothing (D1 never-mint).
     private func routeUnlockedToPresentation(_ unlocked: [TrophyDefinition]) {
         guard !unlocked.isEmpty else { return }
+        // Beta-hunter funnel telemetry (S4-T4): emit one fire-and-forget
+        // `trophy_unlocked` analytics event per LIVE unlock so a TestFlight beta
+        // yields an unlock funnel (which tiers land, which never do).  Observer
+        // ONLY — this reads the just-latched ledger and is downstream of the
+        // engine, so it can NEVER be a trigger source (§4 addenda: analytics is
+        // fire-and-forget, never the source of truth for an unlock).  Fires here,
+        // not in the engine, so it stays off the hot path and out of the pure
+        // ledger; backfill's grandfathered grants bypass this funnel by design,
+        // so they never inflate the live-unlock funnel.
+        emitTrophyUnlockAnalytics(unlocked)
         let capstoneID = CapstoneCelebrationModel.capstoneID
         let standard = unlocked.filter { $0.id != capstoneID }
         if !standard.isEmpty { trophyToasts.enqueue(standard) }
@@ -945,6 +955,38 @@ final class GameState: ObservableObject {
         if unlocked.contains(where: { trophyPins.isPinned($0.id) }) {
             trophyPins.pruneCompleted(using: trophyEngine)
         }
+    }
+
+    /// Fire one `trophy_unlocked` analytics event per newly-latched trophy
+    /// (S4-T4 beta funnel).  Carries the stable trophy `id` + `tier` grade only
+    /// — NO PII, no coin/stat payload — so the beta funnel can segment unlock
+    /// volume by grade without leaking anything the not-linked analytics envelope
+    /// doesn't already carry (`AnalyticsClient` is anonymous per-install).  Pure
+    /// side effect: buffered, batched, best-effort; a failed POST is silently
+    /// dropped and NEVER blocks or gates the unlock (which already latched
+    /// durably in the engine before this runs).
+    private func emitTrophyUnlockAnalytics(_ unlocked: [TrophyDefinition]) {
+        for trophy in unlocked {
+            let event = Self.trophyUnlockEvent(for: trophy)
+            AnalyticsClient.shared.track(event.name, properties: event.properties)
+        }
+    }
+
+    /// Pure builder for the `trophy_unlocked` event — event name + the exact
+    /// property payload (`trophy_id` + `tier`, and nothing else).  Split out so
+    /// the funnel's wire shape (name, keys, NO-PII contract) is unit-testable
+    /// without the `AnalyticsClient` singleton or the network.  `payload` returns
+    /// plain strings for assertion; the `properties` accessor wraps them for the
+    /// tracker.
+    static func trophyUnlockEvent(
+        for trophy: TrophyDefinition
+    ) -> (name: String, payload: [String: String], properties: [String: AnyEncodable]) {
+        let payload: [String: String] = [
+            "trophy_id": trophy.id,
+            "tier":      trophy.tier.rawValue,
+        ]
+        let properties = payload.mapValues { AnyEncodable.string($0) }
+        return ("trophy_unlocked", payload, properties)
     }
 
     /// Mark the start of a tilt run.  From here until `endTrophyRun()` the

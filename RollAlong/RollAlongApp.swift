@@ -84,6 +84,22 @@ struct RollAlongApp: App {
                     NotificationManager.shared.start()
                     gameState.reconcileLivesNotification()
                 }
+                .onAppear {
+                    // Live cross-device trophy convergence WHILE the app is open
+                    // (S3-T8 gap): observe iCloud KV external changes so an unlock
+                    // earned on another device reconciles in immediately, not just
+                    // at the next launch/foreground pass. On each change we pull
+                    // the cloud union in and flush the (now dirty-flagged) ledger
+                    // to the Supabase rails — the same reconcile→sync ordering the
+                    // launch task uses. A pure no-op when the iCloud KV entitlement
+                    // is absent (graceful degrade; no observer registered).
+                    TrophyCloudMirror.shared.start(engine: gameState.trophyEngine) {
+                        Task {
+                            await TrophySyncService.shared.sync(
+                                engine: gameState.trophyEngine)
+                        }
+                    }
+                }
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
