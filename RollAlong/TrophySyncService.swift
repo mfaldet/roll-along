@@ -2,13 +2,319 @@
 //  TrophySyncService.swift
 //  RollAlong
 //
-//  S0-T1 STUB — pre-registered in project.pbxproj to defuse later pbxproj
-//  conflicts (sprint-plan.md §2 S0-T1, §4a). Implementation lands in
-//  S3-T3..T5: idempotent full-snapshot upsert of unlocked ids (anonymous
-//  `trophy_unlocks` rail for all players + `player_trophies` when signed
-//  in), `ra_trophySyncDirty` drain, hydrate-on-sign-in as max-merge
-//  union. Never routed through AnalyticsClient (memory-only buffer). No
-//  logic may live here before S3.
+//  S3-T3 — Client trophy sync (docs/trophies/sprint-plan.md §2 S3-T3;
+//  design.md §3/§4 Option C). Idempotent FULL-SNAPSHOT upsert of every
+//  unlocked id, run on launch / foreground / sign-in whenever the engine's
+//  `ra_trophySyncDirty` flag is armed. The proven codebase pattern
+//  (internal-data-backend.md §7): a one-shot unlock event is converted into a
+//  self-healing snapshot ("here are ALL my unlocked ids"), so there is no
+//  fragile per-event outbox — a replay is always a no-op.
+//
+//  TWO PUSH PATHS (both must succeed before the flag clears):
+//   1. ALL players — signed-in or not — push the full unlock set to the
+//      anonymous `trophy_unlocks` rail, keyed by the install UUID (the SAME
+//      anonymous UUID `events` uses — `ra_analytics_user_id` in UserDefaults,
+//      no PII). Anon INSERT, `on_conflict` ignore-duplicates → replay-safe.
+//      This is why a signed-OUT player still counts toward rarity. Deliberately
+//      NOT routed through `AnalyticsClient` — its buffer is memory-only and
+//      would drop the snapshot on a kill (the whole reason S1-T8 armed a
+//      durable dirty flag instead).
+//   2. Signed-in players ADDITIONALLY upsert `player_trophies` (the showcase
+//      rail, FK → players, own-row write). A silent no-op until sign-in.
+//
+//  DIRTY-FLAG CONTRACT: `ra_trophySyncDirty` (armed by TrophyEngine on every
+//  unlock) is drained via `engine.clearSyncDirty()` ONLY when every applicable
+//  path succeeds. A partial failure (anon push ok, player push threw — or vice
+//  versa) leaves the flag ARMED so the next launch/foreground retries — the
+//  ratchet's deliver-at-least-once guarantee. Nothing here is a hydrate that
+//  overwrites local state; server→local restore is S3-T5.
+//
+//  TESTABILITY: all network is behind the `TrophyBackend` protocol, so the
+//  queue / idempotency / dirty-flag / signed-in-fan-out logic is unit-tested
+//  against a mock with ZERO live Supabase calls (the S3 hard rule). The real
+//  `SocialTrophyBackend` below mirrors SocialClient / AnalyticsClient's
+//  dependency-free PostgREST shape.
 //
 
 import Foundation
+
+// ===========================================================================
+// Backend abstraction — the ONLY seam that touches the network.
+// ===========================================================================
+
+/// The two server writes S3-T3 performs. Injected into `TrophySyncService` so
+/// the sync/queue/idempotency logic is provable against a mock. The real impl
+/// is `SocialTrophyBackend`; tests use an in-memory double.
+///
+/// Both calls take the FULL unlock set (a snapshot, not a delta) and MUST be
+/// idempotent server-side (`on_conflict … ignore-duplicates`), so replaying a
+/// snapshot never duplicates a row. An empty set is a no-op (never a network
+/// call — see the service).
+protocol TrophyBackend: Sendable {
+    /// Push the full unlock set to the anonymous `trophy_unlocks` rail keyed by
+    /// `installID` (the anonymous analytics UUID). All players call this.
+    /// Throws on any non-2xx / transport error so the caller keeps the flag
+    /// armed.
+    func upsertAnonUnlocks(installID: UUID, trophyIDs: [String]) async throws
+
+    /// Push the full unlock set to the signed-in `player_trophies` showcase
+    /// rail for `playerID` (own-row write). Only called when signed in.
+    func upsertPlayerTrophies(playerID: UUID, trophyIDs: [String]) async throws
+}
+
+// ===========================================================================
+// TrophySyncService — orchestrates the drain. No networking of its own.
+// ===========================================================================
+
+/// Drains `TrophyEngine`'s dirty flag by pushing the full unlock snapshot to
+/// the backend. Own type (not on GameState / the engine) so a sync never
+/// re-renders gameplay and the network seam stays injectable.
+///
+/// Not an `ObservableObject` — nothing observes it; it is a fire-and-forget
+/// service invoked at launch / foreground / sign-in. `@MainActor`-free like
+/// the engine (S2 note): callers `await` it off the hot path.
+final class TrophySyncService: @unchecked Sendable {
+
+    static let shared = TrophySyncService()
+
+    private let backend: TrophyBackend
+
+    /// Resolves the anonymous install UUID — the SAME id the analytics rail
+    /// uses (`ra_analytics_user_id`), so numerator (trophy_unlocks.install_id)
+    /// and denominator (distinct events.user_id) share one rail and can never
+    /// diverge. Read directly from UserDefaults with the analytics
+    /// generate-if-absent semantics; NEVER routed through AnalyticsClient.
+    private let installID: () -> UUID
+
+    /// The signed-in player's id, or nil when signed out. Wraps
+    /// `SocialClient.shared.currentUserId` in production; injectable for tests.
+    private let currentPlayerID: () -> UUID?
+
+    /// Serializes concurrent `sync` calls (launch + a fast foreground) so two
+    /// drains never race on the same flag. A drain in flight makes the next
+    /// call a no-op — the snapshot is idempotent, a second push is redundant.
+    private var isSyncing = false
+    private let lock = NSLock()
+
+    init(backend: TrophyBackend = SocialTrophyBackend(),
+         installID: @escaping () -> UUID = { TrophySyncService.resolveInstallID() },
+         currentPlayerID: @escaping () -> UUID? = { SocialClient.shared.currentUserId }) {
+        self.backend = backend
+        self.installID = installID
+        self.currentPlayerID = currentPlayerID
+    }
+
+    private convenience init() {
+        self.init(backend: SocialTrophyBackend())
+    }
+
+    // MARK: - Drain
+
+    /// Push the engine's full unlock snapshot to the backend when the dirty
+    /// flag is armed, clearing the flag ONLY on full success.
+    ///
+    /// Fire-and-forget from the caller's view (launch/foreground/sign-in);
+    /// swallows all errors so a signed-out or offline player never sees a
+    /// trophy-sync failure in the UI. Returns whether a full sync completed
+    /// (drained the flag) — used by tests, ignored by production call sites.
+    ///
+    /// Contract:
+    ///  • flag clear (dirty) → no-op, no network.
+    ///  • empty unlock set   → clears the flag with no network (nothing to push).
+    ///  • path (1) anon always; path (2) player only when signed in.
+    ///  • flag drains ONLY when every applicable path succeeded; any throw
+    ///    leaves it armed for the next launch/foreground.
+    @discardableResult
+    func sync(engine: TrophyEngine) async -> Bool {
+        // Read the flag + snapshot up front. `isSyncDirty` and `unlockedIDs`
+        // are the engine's own state; we never mutate the engine except the
+        // final `clearSyncDirty()` drain.
+        guard engine.isSyncDirty else { return false }
+
+        // Reentrancy guard: coalesce a launch + foreground double-fire. The
+        // lock is taken/released ENTIRELY within synchronous helpers (never
+        // held across an `await`), so the drain below can't overlap itself.
+        guard beginSyncing() else { return false }
+        defer { endSyncing() }
+
+        // Sorted for a stable, deterministic request body (test-friendly; the
+        // server ignores order). A `Set` → `[String]` snapshot taken once.
+        let ids = engine.unlockedIDs.sorted()
+
+        // Nothing to push (dirty but no unlocks — e.g. a flag armed then the
+        // sole unlock proved to be an unknown-catalog id that still counts):
+        // clear the flag, no network. `unlockedIDs` empty is the only case.
+        guard !ids.isEmpty else {
+            await MainActor.run { engine.clearSyncDirty() }
+            return true
+        }
+
+        do {
+            // Path 1 — anonymous rail, EVERY player. Must succeed.
+            try await backend.upsertAnonUnlocks(installID: installID(), trophyIDs: ids)
+
+            // Path 2 — signed-in showcase rail. Only when signed in; a
+            // signed-out player's flag still drains on path 1 alone.
+            if let playerID = currentPlayerID() {
+                try await backend.upsertPlayerTrophies(playerID: playerID, trophyIDs: ids)
+            }
+        } catch {
+            // Partial or total failure → leave the flag ARMED for next time.
+            // Deliberately silent: trophy sync never surfaces into the UI.
+            return false
+        }
+
+        // Full success across every applicable path → drain the flag. The
+        // engine sends its own objectWillChange for this (clearSyncDirty),
+        // which must happen on the main actor like every other @Published-
+        // adjacent mutation.
+        await MainActor.run { engine.clearSyncDirty() }
+        return true
+    }
+
+    /// Claims the single in-flight slot; false when a drain is already running.
+    /// Synchronous (the lock is never held across an await).
+    private func beginSyncing() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if isSyncing { return false }
+        isSyncing = true
+        return true
+    }
+
+    /// Releases the in-flight slot. Synchronous.
+    private func endSyncing() {
+        lock.lock(); isSyncing = false; lock.unlock()
+    }
+
+    // MARK: - Install UUID (anonymous rail key)
+
+    private static let installIDKey = "ra_analytics_user_id"
+
+    /// The anonymous device-install UUID — read from the SAME UserDefaults key
+    /// the analytics rail persists (`ra_analytics_user_id`), with the same
+    /// generate-and-store-if-absent semantics, so trophy_unlocks.install_id ==
+    /// events.user_id for this install. NOT routed through AnalyticsClient (its
+    /// buffer is memory-only); this only touches the durable UserDefaults key.
+    static func resolveInstallID(_ defaults: UserDefaults = .standard) -> UUID {
+        if let stored = defaults.string(forKey: installIDKey),
+           let uuid = UUID(uuidString: stored) {
+            return uuid
+        }
+        let new = UUID()
+        defaults.set(new.uuidString, forKey: installIDKey)
+        return new
+    }
+}
+
+// ===========================================================================
+// SocialTrophyBackend — the real PostgREST implementation.
+//
+// Mirrors SocialClient / AnalyticsClient: talks to PostgREST directly, no
+// Supabase SDK. The anon push uses the ANON key (like AnalyticsClient); the
+// signed-in push uses the player's Bearer token (like SocialClient). Server
+// schema: docs/trophies/trophy-schema.sql.
+// ===========================================================================
+
+struct SocialTrophyBackend: TrophyBackend {
+
+    // Same project + client-safe keys as the existing clients.
+    private static let projectURL = "https://mhwpcwauzvmtmuphtajs.supabase.co"
+
+    /// Anon (public) JWT — safe to embed; RLS allows only INSERT on
+    /// `trophy_unlocks` and never SELECT (docs/trophies/trophy-schema.sql).
+    /// Identical to AnalyticsClient.anonKey (the anonymous events rail).
+    private static let anonKey =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
+        "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1od3Bjd2F1enZtdG11cGh0YWpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMDI1MzMsImV4cCI6MjA5NTU3ODUzM30." +
+        "dKtYkbLF43vLYiCMaxhurBT8rTqAMxuKuJ2z5mkXKsM"
+
+    private let encoder = JSONEncoder()
+
+    // MARK: - Path 1: anonymous trophy_unlocks (all players)
+
+    func upsertAnonUnlocks(installID: UUID, trophyIDs: [String]) async throws {
+        guard !trophyIDs.isEmpty else { return }
+        let rows = trophyIDs.map {
+            AnonUnlockRow(install_id: installID.uuidString, trophy_id: $0)
+        }
+        // on_conflict ignore-duplicates → the UNIQUE (install_id, trophy_id)
+        // constraint makes a replay a no-op and preserves the server-side
+        // unlocked_at (client clocks ignored). return=minimal keeps it cheap.
+        try await postAnon(
+            path: "trophy_unlocks",
+            query: "on_conflict=install_id,trophy_id",
+            body: try encoder.encode(rows),
+            prefer: "resolution=ignore-duplicates,return=minimal"
+        )
+    }
+
+    // MARK: - Path 2: signed-in player_trophies (showcase rail)
+
+    func upsertPlayerTrophies(playerID: UUID, trophyIDs: [String]) async throws {
+        guard !trophyIDs.isEmpty else { return }
+        let token = try SocialClient.shared.trophyAccessToken()
+        let rows = trophyIDs.map {
+            PlayerTrophyRow(player_id: playerID.uuidString, trophy_id: $0)
+        }
+        // PK (player_id, trophy_id); ignore-duplicates → own-row idempotent
+        // upsert. RLS scopes the write to the player's own rows.
+        try await postAuthed(
+            path: "player_trophies",
+            query: "on_conflict=player_id,trophy_id",
+            body: try encoder.encode(rows),
+            token: token,
+            prefer: "resolution=ignore-duplicates,return=minimal"
+        )
+    }
+
+    // MARK: - REST core (mirrors SocialClient.send / AnalyticsClient.flush)
+
+    private func postAnon(path: String, query: String, body: Data, prefer: String) async throws {
+        var req = try request(path: path, query: query, body: body, prefer: prefer)
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(Self.anonKey)", forHTTPHeaderField: "Authorization")
+        try await run(req)
+    }
+
+    private func postAuthed(path: String, query: String, body: Data, token: String, prefer: String) async throws {
+        var req = try request(path: path, query: query, body: body, prefer: prefer)
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        try await run(req)
+    }
+
+    private func request(path: String, query: String, body: Data, prefer: String) throws -> URLRequest {
+        let urlString = "\(Self.projectURL)/rest/v1/\(path)"
+            + (query.isEmpty ? "" : "?\(query)")
+        guard let url = URL(string: urlString) else { throw SocialError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(prefer, forHTTPHeaderField: "Prefer")
+        req.httpBody = body
+        return req
+    }
+
+    private func run(_ req: URLRequest) async throws {
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw SocialError.http(status: -1, body: "no HTTP response")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw SocialError.http(status: http.statusCode,
+                                   body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    // MARK: - Wire rows (keys match docs/trophies/trophy-schema.sql columns)
+
+    private struct AnonUnlockRow: Encodable {
+        let install_id: String
+        let trophy_id: String
+    }
+
+    private struct PlayerTrophyRow: Encodable {
+        let player_id: String
+        let trophy_id: String
+    }
+}
