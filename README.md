@@ -1,6 +1,6 @@
 # Roll Along
 
-A tilt-driven iOS marble game for the App Store. Tilt the device to roll your marble through 100 climb levels and 7 competitive minigames, collect cosmetics, and compete on leaderboards.
+A tilt-driven iOS marble game for the App Store. Tilt the device to roll your marble through thousands of climb levels and 7 competitive minigames, collect cosmetics, and compete on leaderboards.
 
 **Platform:** iOS 18+ · **Language:** Swift / SwiftUI · **Physics:** CoreMotion + custom tick engine
 
@@ -9,7 +9,7 @@ A tilt-driven iOS marble game for the App Store. Tilt the device to roll your ma
 ## Features
 
 ### Climb mode
-100 procedurally-laid-out levels with increasing difficulty. Each level places the marble at the top (or bottom) of the arena and scores on time and stars. Lives regenerate over time or can be refilled via IAP.
+Thousands of procedurally-laid-out levels with increasing difficulty — the climb is effectively endless. Each level places the marble at the top (or bottom) of the arena and scores on time and stars. Lives regenerate over time or can be refilled via IAP.
 
 ### 7 Competitive minigames
 | Mode | Mechanic |
