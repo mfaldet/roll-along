@@ -1,5 +1,11 @@
 # App Store Metadata — Roll Along 1.0
 
+> **OUT OF DATE — do not copy from this file.** It was written for an early
+> 100-level build with no accounts, ads, purchases or data collection. The
+> current app has all of those. For what the app does now see `README.md`;
+> for the privacy answers see `RollAlong/PrivacyInfo.xcprivacy`. Kept for
+> history only (marked 2026-11-13).
+
 Everything you need to populate the App Store Connect listing.  Copy
 fields straight from this document.  Update when launch details solidify.
 

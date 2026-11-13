@@ -135,6 +135,25 @@
             </array>
         </dict>
 
+        <!-- B. Email address: the app does NOT request it, but Apple may still
+             include one (possibly a private-relay address) in the sign-in
+             token, and Supabase Auth stores it on the account record if so.
+             Declared to be safe.  If a fresh sign-in on a new account leaves
+             the email column empty in Supabase (Authentication → Users),
+             this entry can be removed. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
         <!-- B. Signed-in game data stored against the account and shown to
              other players: the preset nickname, climb level, stars, minigame
              bests and wins (leaderboards), clan membership, friends, life
