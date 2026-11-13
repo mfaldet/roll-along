@@ -231,10 +231,6 @@ struct LeaderboardView: View {
                 StatColumn(id: "COINS", width: 60, highlighted: sortKey == .coins) { p in
                     AnyView(self.coinCell(p.coinsCollected ?? 0)) },
             ]
-        case .pinball:
-            return [ StatColumn(id: "BEST", width: 92, highlighted: true) { p in
-                AnyView(self.iconCell(system: "gamecontroller.fill", tint: Self.pinTint,
-                                      value: (p.pinballBest ?? 0).formatted())) } ]
         case .zenGarden:
             return [ StatColumn(id: "TIME", width: 92, highlighted: true) { p in
                 AnyView(self.iconCell(system: "leaf.fill", tint: Self.zenTint,
@@ -325,8 +321,6 @@ struct LeaderboardView: View {
             parts.append("level \(profile.climbLevel)")
             parts.append("\(profile.totalStars) stars")
             parts.append("\(profile.coinsCollected ?? 0) coins")
-        case .pinball:
-            parts.append("best \(profile.pinballBest ?? 0)")
         case .zenGarden:
             parts.append("\(LeaderboardBoard.zenText(profile.zenSeconds ?? 0)) in the garden")
         case .rollUp:
@@ -379,7 +373,7 @@ struct LeaderboardView: View {
     // MARK: - Board picker (game filter)
 
     /// Per-board usage for the local player — drives the filter's "most played
-    /// first" ordering.  Competitive boards use real play counts; Pinball/Zen
+    /// first" ordering.  Competitive boards use real play counts; Zen/Roll Up
     /// have no play counter, so a binary "played" signal is used (ties fall back
     /// to alphabetical).  Roll Along uses climb level.
     private func boardUsage(_ b: LeaderboardBoard) -> Int {
@@ -390,7 +384,6 @@ struct LeaderboardView: View {
         }
         switch b {
         case .rollAlong: return gameState.currentLevel
-        case .pinball:   return gameState.pinballBest > 0 ? 1 : 0
         case .zenGarden: return gameState.zenSeconds   > 0 ? 1 : 0
         case .rollUp:    return gameState.rollupBest   > 0 ? 1 : 0
         default:         return 0

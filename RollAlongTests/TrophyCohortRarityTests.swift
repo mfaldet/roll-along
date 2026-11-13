@@ -500,7 +500,7 @@ final class TrophyCohortRarityTests: XCTestCase {
         // them. Rarity by design: one Common, one Very Rare, one Ultra Rare.
         let common = "climb_first_clear"      // 800/1000 = 80% → Common
         let veryRare = "climb_level_10"       // 120/1000 = 12% → Very Rare
-        let ultra = "pinball_score_50k"       // 20/1000 = 2%  → Ultra Rare
+        let ultra = "zen_10_hours"            // 20/1000 = 2%  → Ultra Rare
 
         var installs: [Install] = []
         for i in 0..<1000 {

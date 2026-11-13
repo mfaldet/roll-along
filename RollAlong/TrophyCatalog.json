@@ -293,9 +293,9 @@
       "tier": "bronze",
       "category": "minigames_arcade",
       "secret": false,
-      "lockedDescription": "Play all 12 minigames at least once.",
-      "unlockedDescription": "All 12 minigames played. The grand tour is complete.",
-      "criteria": { "metric": "minigames_played", "threshold": 12 },
+      "lockedDescription": "Play all 11 minigames at least once.",
+      "unlockedDescription": "All 11 minigames played. The grand tour is complete.",
+      "criteria": { "metric": "minigames_played", "threshold": 11 },
       "addedInVersion": "1.0"
     },
     {
@@ -483,39 +483,6 @@
       "lockedDescription": "Hold the hill for 45 seconds total in a single round.",
       "unlockedDescription": "Forty-five seconds on the hill in one round. Squatter's rights, earned.",
       "criteria": { "metric": "koth_best_hold_seconds", "threshold": 45 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "pinball_score_10k",
-      "title": "Bumper Crop",
-      "tier": "bronze",
-      "category": "minigames_per_game",
-      "secret": false,
-      "lockedDescription": "Score 10,000 in a single Pinball game.",
-      "unlockedDescription": "Ten thousand points — a real bumper crop.",
-      "criteria": { "metric": "pinball_best_score", "threshold": 10000 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "pinball_score_50k",
-      "title": "Silver Ball Society",
-      "tier": "silver",
-      "category": "minigames_per_game",
-      "secret": false,
-      "lockedDescription": "Score 50,000 in a single Pinball game.",
-      "unlockedDescription": "Fifty thousand points. Welcome to the Silver Ball Society.",
-      "criteria": { "metric": "pinball_best_score", "threshold": 50000 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "pinball_score_150k",
-      "title": "Lit the Special",
-      "tier": "gold",
-      "category": "minigames_per_game",
-      "secret": false,
-      "lockedDescription": "Score 150,000 in a single Pinball game.",
-      "unlockedDescription": "One hundred and fifty thousand points. You lit the Special.",
-      "criteria": { "metric": "pinball_best_score", "threshold": 150000 },
       "addedInVersion": "1.0"
     },
     {
@@ -937,17 +904,6 @@
       "addedInVersion": "1.0"
     },
     {
-      "id": "whimsy_roll_call",
-      "title": "R-O-L-L Call",
-      "tier": "silver",
-      "category": "secret_whimsy",
-      "secret": true,
-      "lockedDescription": "Complete all four ROLL rollover lanes in a single pinball ball.",
-      "unlockedDescription": "R-O-L-L — all four lanes, one ball. Roll call complete.",
-      "criteria": { "metric": "pinball_roll_lane_sweeps", "threshold": 1 },
-      "addedInVersion": "1.0"
-    },
-    {
       "id": "whimsy_high_roller",
       "title": "High Roller",
       "tier": "silver",
@@ -976,10 +932,10 @@
       "category": "capstone",
       "secret": false,
       "lockedDescription": "Unlock every visible Bronze, Silver, and Gold trophy.",
-      "unlockedDescription": "All 73 visible Bronze, Silver, and Gold trophies. Platinum. The rarest roll of all.",
+      "unlockedDescription": "All 70 visible Bronze, Silver, and Gold trophies. Platinum. The rarest roll of all.",
       "criteria": {
         "metric": "base_trophies_unlocked",
-        "threshold": 73,
+        "threshold": 70,
         "requiredTrophyIDs": [
           "climb_first_clear",
           "climb_level_10",
@@ -1023,9 +979,6 @@
           "marblecup_wins_10",
           "koth_first_win",
           "koth_hold_45",
-          "pinball_score_10k",
-          "pinball_score_50k",
-          "pinball_score_150k",
           "rollout_first_maze",
           "rollout_maze_10",
           "rollup_100m",

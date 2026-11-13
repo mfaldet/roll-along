@@ -164,7 +164,7 @@ final class TrophyMigrationTests: XCTestCase {
 
     /// A maxed-out save: past every derivable threshold in the catalog.
     /// Backfill must grant every derivable trophy (incl. the derivable
-    /// Diamonds) — but NOT the capstone (12 of its 73 base trophies need
+    /// Diamonds) — but NOT the capstone (12 of its 70 base trophies need
     /// live play the save can't prove) and NOT any NEW-counter/event/
     /// ownership/social metric.
     func testVeteranGrantsAllDerivableButNotCapstone() {
@@ -182,7 +182,7 @@ final class TrophyMigrationTests: XCTestCase {
             "daily_clears_50", "daily_login_30", "daily_week_streak",
             "arcade_grand_tour", "arcade_all_six", "arcade_wins_100",
             "arcade_hard_all", "snake_wins_10", "koth_hold_45",
-            "pinball_score_150k", "rollout_maze_10", "rollup_500m",
+            "rollout_maze_10", "rollup_500m",
             "disco_hard_10", "zen_10_hours", "coinpit_first_round",
             "coinpit_catch_90", "econ_pit_boss", "econ_nest_egg",
             "bundle_5", "pack_first", "skill_ace_veryhard", "skill_speed_10s",
@@ -193,7 +193,7 @@ final class TrophyMigrationTests: XCTestCase {
 
         // The capstone is NOT grantable from a save: 12 of its base
         // trophies (ownership, NEW counters, run/event flags) have no
-        // historical source, so the derived count can never reach 73.
+        // historical source, so the derived count can never reach 70.
         XCTAssertFalse(ids.contains("capstone_all"),
                        "capstone must not latch from backfill alone")
         XCTAssertFalse(engine.isUnlocked("capstone_all"))
@@ -208,11 +208,11 @@ final class TrophyMigrationTests: XCTestCase {
                            "\(never) needs live play — never backfilled")
         }
 
-        // Exactly 61 of the 73 capstone-eligible trophies are derivable —
+        // Exactly 58 of the 70 capstone-eligible trophies are derivable —
         // sanity-check the veteran actually cleared that many of them.
         let capstoneBase = Set(engine.catalog.capstone.criteria.requiredTrophyIDs ?? [])
         let grantedCapstoneBase = capstoneBase.filter { engine.isUnlocked($0) }
-        XCTAssertEqual(grantedCapstoneBase.count, 61,
+        XCTAssertEqual(grantedCapstoneBase.count, 58,
                        "veteran should hold every derivable capstone-base trophy")
     }
 

@@ -9,7 +9,7 @@ import SwiftUI
 //   • Challenge of the Day — a skinny banner (a short, brutal daily gauntlet).
 //   • CHALLENGE PACKS — themed 100-level gauntlets (cosmetic rewards).
 //   • COMPETITIVE     — mini-games vs. rivals (tickets, boards, a winner).
-//   • NEW WAYS TO PLAY— a change of pace (Zen Garden, Pinball, the reward runs).
+//   • NEW WAYS TO PLAY— a change of pace (Zen Garden, the reward runs).
 //
 // Each category is a horizontal shelf of equal rounded-square widgets — the
 // same fabric the home screen + Apple widgets use — so games can be reordered
@@ -43,7 +43,7 @@ struct GameMenuView: View {
 
     /// Arm a mode and return Home — the home Play button then launches it.
     /// (Replaces the old launch-on-tap so the player chooses, then confirms
-    /// with Play.)  `modeID` is a catalogue id, e.g. "climb", "pinball",
+    /// with Play.)  `modeID` is a catalogue id, e.g. "climb", "zen",
     /// "challenge.frozen-peaks".
     private func select(_ modeID: String) {
         gameState.currentModeID = modeID
@@ -594,7 +594,6 @@ struct GameMenuView: View {
         case "goldrush": return ("bag.fill",                 [c(1.00, 0.78, 0.30), c(0.90, 0.50, 0.15)])
         case "marblecup":return ("soccerball",               [c(0.30, 0.72, 0.55), c(0.22, 0.50, 0.85)])
         case "koth":     return ("flag.fill",                [c(0.25, 0.78, 0.70), c(0.20, 0.55, 0.60)])
-        case "pinball":  return ("hand.tap.fill",            [c(0.74, 0.40, 0.96), c(0.92, 0.30, 0.70)])
         case "rollout":  return ("circle.grid.cross.fill",   [c(0.30, 0.78, 0.58), c(0.16, 0.52, 0.50)])
         case "rollup":   return ("arrow.up.circle.fill",     [c(0.36, 0.62, 1.00), c(0.40, 0.34, 0.92)])
         case "disco":    return ("circle.grid.3x3.fill",     [c(0.32, 0.85, 1.00), c(0.80, 0.30, 0.95)])

@@ -372,7 +372,7 @@ struct TrophyRoomView: View {
     }
 
     /// Recomputed each render from the current engine snapshot + the latest
-    /// rarity index. Cheap: one pass over 89 rows of value types.
+    /// rarity index. Cheap: one pass over 85 rows of value types.
     private var model: TrophyRoomModel {
         TrophyRoomModel(engine: engine, rarity: rarity.index)
     }

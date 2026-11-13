@@ -178,7 +178,7 @@ final class SocialClient: @unchecked Sendable {
     // MARK: - Leaderboard
 
     /// Leaderboard rows, ordered by `order` (a PostgREST order clause).  The
-    /// default is the climb board; minigame boards pass e.g. "pinball_best.desc".
+    /// default is the climb board; minigame boards pass e.g. "zen_seconds.desc".
     func fetchLeaderboard(order: String = "climb_level.desc,total_stars.desc",
                           limit: Int = 100) async throws -> [PlayerProfile] {
         let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
@@ -792,7 +792,7 @@ enum BoardCategory: Int, CaseIterable {
 }
 
 enum LeaderboardBoard: String, CaseIterable, Identifiable {
-    case rollAlong, pinball, zenGarden, rollUp
+    case rollAlong, zenGarden, rollUp
     case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
     var id: String { rawValue }
 
@@ -800,7 +800,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var category: BoardCategory {
         switch self {
         case .rollAlong:                    return .adventure
-        case .pinball, .zenGarden, .rollUp: return .solo
+        case .zenGarden, .rollUp:           return .solo
         default:                            return .competitive   // the six competitive boards
         }
     }
@@ -809,7 +809,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .rollAlong:  return "Roll Along"
-        case .pinball:    return "Pinball"
         case .zenGarden:  return "Zen Garden"
         case .rollUp:     return "Roll Up"
         case .cometClash: return "Comet Clash"
@@ -822,7 +821,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     }
 
     /// The competitive GameMode id backing this board, or nil for the climb and
-    /// the solo (Pinball / Zen) boards.
+    /// the solo (Zen / Roll Up) boards.
     var competitiveModeID: String? {
         switch self {
         case .cometClash: return "snake"
@@ -839,7 +838,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var order: String {
         switch self {
         case .rollAlong:  return "climb_level.desc,total_stars.desc"
-        case .pinball:    return "pinball_best.desc"
         case .zenGarden:  return "zen_seconds.desc"
         // Default (Height) order; LeaderboardView swaps in the Time order when
         // the Roll Up board's sort toggle is set to Time.
@@ -861,7 +859,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         }
         switch self {
         case .rollAlong: return true                       // everyone has a climb level
-        case .pinball:   return (p.pinballBest ?? 0) > 0
         case .zenGarden: return (p.zenSeconds ?? 0) > 0
         case .rollUp:    return (p.rollupBest ?? 0) > 0
         default:         return true
@@ -877,7 +874,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         }
         switch self {
         case .rollAlong: return "Lv \(p.climbLevel) · \(p.totalStars)★ · \(p.coinsCollected ?? 0) coins"
-        case .pinball:   return "\((p.pinballBest ?? 0).formatted()) pts"
         case .zenGarden: return Self.zenText(p.zenSeconds ?? 0)
         case .rollUp:    return "\(p.rollupBest ?? 0) m · \(Self.rollUpTime(p.rollupBestSeconds ?? 0))"
         default:         return ""

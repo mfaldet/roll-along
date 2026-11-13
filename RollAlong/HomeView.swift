@@ -23,7 +23,7 @@ enum HomeRoute: Hashable {
     case mode(String)
     case profile
     case challengeTracks
-    /// The Trophy Room — the full 89-trophy catalog grouped by content area,
+    /// The Trophy Room — the full 85-trophy catalog grouped by content area,
     /// with locked/unlocked/progress states and secret masking (S2-T3).
     case trophies
     /// Another player's public profile (from Friends, a clan roster, or a deep link).
@@ -480,10 +480,6 @@ struct HomeView: View {
                     KingOfTheHillView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("koth")]) }
                         .firstPlayTutorial("koth")
-                case .mode("pinball"):
-                    PinballView()
-                        .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("pinball")]) }
-                        .firstPlayTutorial("pinball")
                 case .mode("rollout"):
                     RollOutView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("rollout")]) }
@@ -938,7 +934,7 @@ struct HomeView: View {
     }
 
     /// A compact Level Select button for the climb / challenge packs, or a stat
-    /// readout for the other modes (pinball best, zen time, coins earned,
+    /// readout for the other modes (zen time, coins earned,
     /// competitive wins).  Fills the narrow left-quarter cell of the Play row;
     /// competitive modes also float a name tag on the home marble.
     @ViewBuilder
@@ -948,9 +944,6 @@ struct HomeView: View {
             levelSelectButton(route: .levels)
         } else if gameState.currentMode is ChallengeTrackMode {
             levelSelectButton(route: .challengeTracks)
-        } else if id == "pinball" {
-            statChip(icon: "gamecontroller.fill",
-                     value: shortCount(gameState.pinballBest), caption: "best")
         } else if id == "zen" {
             statChip(icon: "leaf.fill",
                      value: zenTimeShort(gameState.zenSeconds), caption: "zen")
@@ -1389,7 +1382,6 @@ struct HomeView: View {
     /// call-to-action instead (Zen cycles through puns — see `zenPun`).
     private var playPrimary: String {
         switch gameState.currentModeID {
-        case "pinball":  return "Play Ball!"
         case "coinpit":  return "Pay tickets, earn coins"    // displayed "Gold Rush"
         case "goldrush": return "Smash, grab, earn tickets"  // displayed "Smash and Grab"
         case "zen":      return zenPun(at: Date())           // body cycles this live

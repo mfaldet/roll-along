@@ -698,7 +698,7 @@ final class GameState: ObservableObject {
         self.defaults = defaults
         self.now = now
         trophyStats = TrophyStats(defaults: defaults)
-        // Load the bundled 89-trophy catalog.  A decode/validation failure is
+        // Load the bundled 85-trophy catalog.  A decode/validation failure is
         // a build-breaking AUTHORING error, never a runtime condition to
         // recover from (TrophyCatalog house rules) — but GameState.init must
         // never trap, so fall back to an empty catalog whose engine simply
@@ -826,7 +826,10 @@ final class GameState: ObservableObject {
         minigameDifficultyBests = Self.loadTrackProgress(key: "ra_minigameDiffBests", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
-        currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
+        // A saved "last mode" that no longer exists in this build (e.g. Pinball,
+        // held back from v1.0) falls back to the climb.
+        let savedModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
+        currentModeID = GameModeCatalogue.mode(id: savedModeID) != nil ? savedModeID : "climb"
         dailyChallengeCompletions = Self.loadStringSet(forKey: "ra_dailyChallengeDone", defaults)
         dailyChallengeFailures    = Self.loadStringSet(forKey: "ra_dailyChallengeFailed", defaults)
         dailyChallengeRunStartedKey = defaults.string(forKey: "ra_dailyChallengeRunStarted")
@@ -1407,7 +1410,7 @@ final class GameState: ObservableObject {
     /// in the set.  Recording unconditionally is safe — a non-minigame id
     /// simply leaves both derivations unchanged.
     private func recordMinigamePlayedTrophies() {
-        // arcade_sampler (≥5) / arcade_grand_tour (all 12).
+        // arcade_sampler (≥5) / arcade_grand_tour (all 11).
         let played = TrophyMetric.minigameModeIDs.filter { playedModeIDs.contains($0) }.count
         fireTrophy(.minigamesPlayed, value: played)
         // coinpit_first_round (≥1 once "coinpit" has been played).

@@ -417,24 +417,6 @@ struct KingOfTheHillMode: GameMode {
     let showsScore                   = true
 }
 
-/// Pinball — classic single-ball pinball, NO tilt.  Tap the LEFT half of the
-/// screen to flick the left flipper, the RIGHT half for the right one.  Knock
-/// the ball into the pop bumpers up top to score; three balls, then the run's
-/// score banks coins.  Single-player against gravity and the drain.
-struct PinballMode: GameMode {
-    let id          = "pinball"
-    let displayName = "Pinball"
-    let tagline     = "No tilt — tap left & right to flick the flippers. Three balls."
-    let control:     ControlScheme   = .tiltAccel
-    let goal:        GoalKind        = .score
-    let onFail:      FailKind        = .none
-    let progression: ProgressionKind = .none
-    let lives:       LivesPolicy     = .unlimited
-    let hasHoles                     = false
-    let showsTimer                   = false
-    let showsScore                   = true
-}
-
 /// Roll Out — a true marble maze.  Tilt an extra-small ball through screen-
 /// filling maze walls from the start to the goal without dropping into a hole.
 /// Shares the climb's life economy: each fall costs a real life.  Self-contained
@@ -636,7 +618,6 @@ enum GameModeCatalogue {
         (GoldRushMode(),     true),    // self-contained GoldRushView — live
         (MarbleCupMode(),    true),    // self-contained MarbleCupView — live
         (KingOfTheHillMode(),true),    // self-contained KingOfTheHillView — live
-        (PinballMode(),      true),    // self-contained PinballView — live
         (RollOutMode(),      true),    // self-contained RollOutView — live
         (RollUpMode(),       true),    // self-contained RollUpView — live
         (DiscoBallMode(),    true),    // self-contained DiscoBallView — live
@@ -725,11 +706,6 @@ struct ModeTutorial {
                          goal: "Hold the moving hill — alone — the longest.",
                          hazard: "A rival in the zone makes it contested: nobody scores.",
                          reward: "Coins for your hold time, plus a win bonus.")
-        case "pinball":
-            return .init(controls: "No tilt — tap the LEFT or RIGHT half to flick that flipper.",
-                         goal: "Bash the bumpers up top for the highest score.",
-                         hazard: "Don't let all three balls drain past the flippers.",
-                         reward: "Your final score banks as coins.")
         case "rollout":
             return .init(controls: "Tilt to roll the tiny ball through the maze.",
                          goal: "Reach the flag at the top of each maze.",

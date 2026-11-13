@@ -72,18 +72,19 @@ final class TrophyCatalogTests: XCTestCase {
     // MARK: Bundled catalog shape
 
     /// The bundled catalog loads, validates, and has the ruled v1 shape:
-    /// 89 trophies — 49 Bronze / 25 Silver / 11 Gold / 3 Diamond /
-    /// 1 Platinum capstone (trophy-catalog.md §2, RULED 2026-07-02).
+    /// 85 trophies — 48 Bronze / 23 Silver / 10 Gold / 3 Diamond /
+    /// 1 Platinum capstone.  (The ruled catalog is 89; the 3 Pinball score
+    /// trophies and whimsy_roll_call are held back from v1.0 with Pinball.)
     func testBundledCatalogLoadsWithRuledShape() throws {
         let catalog = try loadCatalog()
-        XCTAssertEqual(catalog.count, 89)
+        XCTAssertEqual(catalog.count, 85)
         XCTAssertEqual(catalog.catalogVersion, 1)
 
         var tierCounts: [TrophyTier: Int] = [:]
         for trophy in catalog.trophies { tierCounts[trophy.tier, default: 0] += 1 }
-        XCTAssertEqual(tierCounts[.bronze], 49)
-        XCTAssertEqual(tierCounts[.silver], 25)
-        XCTAssertEqual(tierCounts[.gold], 11)
+        XCTAssertEqual(tierCounts[.bronze], 48)
+        XCTAssertEqual(tierCounts[.silver], 23)
+        XCTAssertEqual(tierCounts[.gold], 10)
         XCTAssertEqual(tierCounts[.diamond], 3)
         XCTAssertEqual(tierCounts[.platinum], 1)
 
@@ -168,7 +169,7 @@ final class TrophyCatalogTests: XCTestCase {
     func testEveryCriteriaMetricResolvesToAKnownMetricCase() throws {
         let raw = try JSONSerialization.jsonObject(with: rawCatalogData()) as? [String: Any]
         let trophies = try XCTUnwrap(raw?["trophies"] as? [[String: Any]])
-        XCTAssertEqual(trophies.count, 89)
+        XCTAssertEqual(trophies.count, 85)
         for trophy in trophies {
             let id = trophy["id"] as? String ?? "<missing id>"
             let criteria = try XCTUnwrap(trophy["criteria"] as? [String: Any],
@@ -182,15 +183,18 @@ final class TrophyCatalogTests: XCTestCase {
         }
     }
 
-    /// The engine must tolerate metrics that never fire: whimsy_roll_call
-    /// ships in the catalog even though the pinball ROLL lanes are unbuilt
-    /// (external blocker, sprint-plan.md §7).
-    func testNeverFiringRollCallMetricIsInCatalog() throws {
+    /// Pinball is held back from v1.0, so none of its trophies may ship:
+    /// a trophy nobody can earn must not appear in the Trophy Room.
+    func testHeldBackPinballTrophiesAreNotInCatalog() throws {
         let catalog = try loadCatalog()
-        let rollCall = try XCTUnwrap(catalog.trophy(withID: "whimsy_roll_call"))
-        XCTAssertEqual(rollCall.criteria.metric, .pinballRollLaneSweeps)
-        XCTAssertEqual(rollCall.tier, .silver)
-        XCTAssertTrue(rollCall.isSecret)
+        for id in ["pinball_score_10k", "pinball_score_50k", "pinball_score_150k",
+                   "whimsy_roll_call"] {
+            XCTAssertNil(catalog.trophy(withID: id), "\(id) must be held back with Pinball")
+        }
+        XCTAssertTrue(catalog.trophies.allSatisfy {
+            $0.criteria.metric != .pinballBestScore && $0.criteria.metric != .pinballRollLaneSweeps
+        })
+        XCTAssertFalse(TrophyMetric.minigameModeIDs.contains("pinball"))
     }
 
     // MARK: Guardrails — IAP / layout / banned vocabulary
@@ -273,17 +277,18 @@ final class TrophyCatalogTests: XCTestCase {
 
     // MARK: Secrets
 
-    /// Exactly the 5 Secret & Whimsy trophies are hidden (catalog §4,
-    /// ratified 2026-07-02), and nothing hidden gates the capstone.
+    /// Exactly the 4 shipping Secret & Whimsy trophies are hidden (catalog §4
+    /// lists 5; whimsy_roll_call is held back with Pinball), and nothing
+    /// hidden gates the capstone.
     func testExactlyFiveSecretsAllWhimsyAndOffCapstonePath() throws {
         let catalog = try loadCatalog()
         let secrets = catalog.trophies.filter(\.isSecret)
         XCTAssertEqual(Set(secrets.map(\.id)),
-                       ["whimsy_gravity_check", "whimsy_night_bloom", "whimsy_roll_call",
+                       ["whimsy_gravity_check", "whimsy_night_bloom",
                         "whimsy_high_roller", "whimsy_back_to_basics"])
         XCTAssertTrue(secrets.allSatisfy { $0.category == .secretWhimsy })
         // All whimsy trophies are secret and vice versa in v1.
-        XCTAssertEqual(catalog.trophies.filter { $0.category == .secretWhimsy }.count, 5)
+        XCTAssertEqual(catalog.trophies.filter { $0.category == .secretWhimsy }.count, 4)
         let capstoneIDs = Set(try XCTUnwrap(catalog.capstone.criteria.requiredTrophyIDs))
         XCTAssertTrue(capstoneIDs.isDisjoint(with: secrets.map(\.id)))
     }
@@ -298,19 +303,19 @@ final class TrophyCatalogTests: XCTestCase {
 
     // MARK: Capstone scope
 
-    /// Acceptance: the capstone requires exactly the 73 visible
+    /// Acceptance: the capstone requires exactly the 70 visible
     /// bronze/silver/gold ids — Social, Secret & Whimsy, and the Diamond
     /// tier quarantined off the capstone path (catalog §3.11).
     func testCapstoneRequiresExactlyThe73VisibleBaseTrophies() throws {
         let catalog = try loadCatalog()
         let capstone = catalog.capstone
         let required = try XCTUnwrap(capstone.criteria.requiredTrophyIDs)
-        XCTAssertEqual(required.count, 73)
-        XCTAssertEqual(capstone.criteria.threshold, 73)
+        XCTAssertEqual(required.count, 70)
+        XCTAssertEqual(capstone.criteria.threshold, 70)
         XCTAssertEqual(capstone.criteria.metric, .baseTrophiesUnlocked)
 
         let requiredSet = Set(required)
-        XCTAssertEqual(requiredSet.count, 73, "capstone list has duplicates")
+        XCTAssertEqual(requiredSet.count, 70, "capstone list has duplicates")
         XCTAssertEqual(requiredSet, TrophyCatalog.expectedCapstoneRequirement(in: catalog.trophies))
 
         for id in required {
@@ -326,15 +331,18 @@ final class TrophyCatalogTests: XCTestCase {
                            "social_sign_in", "social_first_friend", "social_friends_5",
                            "social_send_life", "social_lives_sent_25", "clan_join",
                            "clan_fulfill",
-                           "whimsy_gravity_check", "whimsy_night_bloom", "whimsy_roll_call",
+                           "whimsy_gravity_check", "whimsy_night_bloom",
                            "whimsy_high_roller", "whimsy_back_to_basics",
-                           "capstone_all"]
+                           "capstone_all",
+                           // held back with Pinball — must not gate Platinum
+                           "pinball_score_10k", "pinball_score_50k", "pinball_score_150k",
+                           "whimsy_roll_call"]
         for id in quarantined {
             XCTAssertFalse(requiredSet.contains(id), "\(id) must not gate the capstone")
         }
         // And the hard monuments that DO stay on the path.
         for id in ["daily_week_streak", "arcade_hard_all", "skill_clean_sheet_25",
-                   "balls_own_40", "pinball_score_150k"] {
+                   "balls_own_40", "zen_10_hours"] {
             XCTAssertTrue(requiredSet.contains(id), "\(id) missing from the capstone path")
         }
     }
@@ -476,7 +484,7 @@ final class TrophyEngineTests: XCTestCase {
         func advance(_ seconds: TimeInterval) { current = current.addingTimeInterval(seconds) }
     }
 
-    /// Engine over the real bundled 89-trophy catalog and the isolated
+    /// Engine over the real bundled 85-trophy catalog and the isolated
     /// suite (or a caller-supplied spy suite).
     private func makeEngine(clock: Clock = Clock(),
                             defaults: UserDefaults? = nil) throws -> TrophyEngine {
@@ -553,8 +561,8 @@ final class TrophyEngineTests: XCTestCase {
             XCTAssertEqual(interested, expected, "index wrong for \(metric.rawValue)")
             indexedTotal += interested.count
         }
-        // Everything is reachable exactly once: 88 metric-indexed + the capstone.
-        XCTAssertEqual(indexedTotal, 88)
+        // Everything is reachable exactly once: 84 metric-indexed + the capstone.
+        XCTAssertEqual(indexedTotal, 84)
         XCTAssertTrue(engine.trophies(interestedIn: .baseTrophiesUnlocked).isEmpty,
                       "the capstone must be cascade-only, never bump-evaluated")
     }
@@ -563,7 +571,7 @@ final class TrophyEngineTests: XCTestCase {
     /// Acceptance: a stat bump evaluates ONLY interested trophies —
     /// O(interested), never O(catalog). snake_wins has 2 trophies;
     /// climb_highest_unlocked has the catalog's biggest fan-out (8);
-    /// the catalog is 89.
+    /// the catalog is 85.
     func testStatBumpEvaluatesOnlyInterestedTrophies() throws {
         let engine = try makeEngine()
         engine.record(.snakeWins, value: 0)
@@ -791,13 +799,13 @@ final class TrophyEngineTests: XCTestCase {
     }
 
     /// Real-catalog spot check: one capstone-path unlock moves the
-    /// capstone's ledger-derived progress to exactly 1/73.
+    /// capstone's ledger-derived progress to exactly 1/70.
     func testCapstoneProgressDerivesFromLedgerOnRealCatalog() throws {
         let engine = try makeEngine()
         XCTAssertEqual(engine.progressFraction(for: "capstone_all"), 0)
         engine.record(.climbTotalStars, value: 25)           // climb_stars_25 is on the path
         XCTAssertEqual(engine.progressFraction(for: "capstone_all") ?? 0,
-                       1.0 / 73.0, accuracy: 0.000_001)
+                       1.0 / 70.0, accuracy: 0.000_001)
         XCTAssertFalse(engine.isUnlocked("capstone_all"))
     }
 
@@ -1017,7 +1025,7 @@ final class TrophyEngineTests: XCTestCase {
 // by reaching into TrophyEngine internals or hand-poking `ra_trophyUnlocks`.
 // This harness is the sanctioned way to do that: it owns an isolated
 // UserDefaults suite, a real `GameState`, and a real `TrophyEngine` over the
-// bundled 89-trophy catalog, and it drives them exactly the way the shipping
+// bundled 85-trophy catalog, and it drives them exactly the way the shipping
 // app will.
 //
 // THE ONE MOVE THE HARNESS MAKES: re-derive-and-record
@@ -1066,7 +1074,7 @@ final class TrophyTestHarness {
     let defaults: UserDefaults
     /// A real GameState decode over `defaults` — driven by its PUBLIC API.
     let gameState: GameState
-    /// A real engine over the bundled 89-trophy catalog and the same suite.
+    /// A real engine over the bundled 85-trophy catalog and the same suite.
     let engine: TrophyEngine
 
     private let suiteName: String
@@ -1393,7 +1401,7 @@ final class TrophyTestHarnessTests: XCTestCase {
         let h = TrophyTestHarness(save: .veteran)
         h.sync()
         for id in ["climb_first_clear", "climb_summit", "track_all_eight",
-                   "snake_wins_10", "pinball_score_150k", "zen_10_hours"] {
+                   "snake_wins_10", "zen_10_hours"] {
             h.assertUnlocked(id)
         }
         // A non-derivable, live-only trophy stays locked even on a maxed save.
@@ -2082,34 +2090,13 @@ final class TrophyMinigameWiringTests: XCTestCase {
         XCTAssertFalse(gs.trophyEngine.isUnlocked("koth_hold_45"))
     }
 
-    /// pinball_score_10k / _50k / _150k ride `pinballBest` through
-    /// `recordPinballScore`, at their exact thresholds.
-    func testPinballScoreTiers() {
+    /// Pinball is held back from v1.0: recording a pinball score must not
+    /// unlock anything (its trophies are not in the shipping catalog).
+    func testPinballScoreUnlocksNothingWhileHeldBack() {
         let gs = makeGameState()
-        _ = gs.recordPinballScore(9_999)
+        _ = gs.recordPinballScore(150_000)
         XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_10k"))
-
-        _ = gs.recordPinballScore(10_000)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_10k"))
-        XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_50k"))
-
-        _ = gs.recordPinballScore(50_000)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_50k"))
         XCTAssertFalse(gs.trophyEngine.isUnlocked("pinball_score_150k"))
-
-        _ = gs.recordPinballScore(150_000)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"))
-    }
-
-    /// A LATER lower pinball score never revokes a higher unlock (latched
-    /// ratchet) and the tier already earned stays lit.
-    func testPinballBestTrophyIsLatched() {
-        let gs = makeGameState()
-        _ = gs.recordPinballScore(150_000)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"))
-        _ = gs.recordPinballScore(1)   // a bad game later
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("pinball_score_150k"),
-                      "a latched trophy must never revoke")
     }
 
     /// rollup_100m / rollup_500m ride `minigameBests["rollup"]` (height, m)
@@ -2189,12 +2176,12 @@ final class TrophyMinigameWiringTests: XCTestCase {
 
     // MARK: Discovery (played-mode set)
 
-    /// arcade_sampler (5 distinct minigames) / arcade_grand_tour (all 12)
+    /// arcade_sampler (5 distinct minigames) / arcade_grand_tour (all 11)
     /// accumulate through `markModePlayed`.
     func testArcadeDiscoveryTiers() {
         let gs = makeGameState()
         let all = ["zen", "coinpit", "snake", "sumo", "paintball", "goldrush",
-                   "marblecup", "koth", "pinball", "rollout", "rollup", "disco"]
+                   "marblecup", "koth", "rollout", "rollup", "disco"]
         for m in all.prefix(4) { gs.markModePlayed(m) }
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"))
 
@@ -2202,19 +2189,24 @@ final class TrophyMinigameWiringTests: XCTestCase {
         XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_sampler"))
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
 
-        for m in all.dropFirst(5) { gs.markModePlayed(m) }   // all 12
+        XCTAssertEqual(Set(all), Set(TrophyMetric.minigameModeIDs))
+        for m in all.dropFirst(5).dropLast() { gs.markModePlayed(m) }   // 10 of 11
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
+        gs.markModePlayed("pinball")   // held back from v1.0 — must not count
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
+        gs.markModePlayed(all[all.count - 1])   // all 11
         XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
     }
 
     /// Playing a non-minigame mode id (or re-playing one already counted) does
-    /// not inflate `minigames_played` — the derivation intersects with the 12
+    /// not inflate `minigames_played` — the derivation intersects with the 11
     /// minigame ids and the set dedupes.
     func testNonMinigameAndRepeatPlaysDoNotInflateDiscovery() {
         let gs = makeGameState()
         gs.markModePlayed("climb")            // not a minigame id
         gs.markModePlayed("snake")
         gs.markModePlayed("snake")            // repeat
-        gs.markModePlayed("challenge.alpha")  // not one of the 12
+        gs.markModePlayed("challenge.alpha")  // not one of the 11
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"),
                        "only 1 distinct minigame played — must not reach 5")
     }
@@ -2831,7 +2823,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 ///  1. Fill the trigger-coverage gaps the per-task suites left (a handful of
 ///     mid-ladder climb thresholds and per-game minigame wins that no earlier
 ///     test asserted by id), each driven through the real GameState funnel.
-///  2. A DURABLE catalog-enumeration gate: every one of the 89 catalog
+///  2. A DURABLE catalog-enumeration gate: every one of the 85 catalog
 ///     trophies must have an explicit trigger test — the sole exception is
 ///     `whimsy_roll_call`, blocked on the unbuilt pinball ROLL lanes. Adding a
 ///     trophy without wiring+testing it makes `testEveryTrophyHasATriggerTest`
@@ -2896,26 +2888,25 @@ final class TrophyTriggerCoverageTests: XCTestCase {
 
     // MARK: The durable coverage gate
 
-    /// `whimsy_roll_call` is the sole trophy with no live trigger — its metric
-    /// `pinball_roll_lane_sweeps` is recorded nowhere (the pinball ROLL lanes
-    /// are an unbuilt roadmap item) and is watched by no other trophy.
-    func testRollCallIsTheSoleBlockedTrophy() throws {
+    /// No shipping trophy rides a Pinball metric while Pinball is held back
+    /// from v1.0 (both metrics stay declared for when the mode returns).
+    func testNoShippingTrophyUsesAPinballMetric() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
-        let rollCall = try XCTUnwrap(catalog.trophies.first { $0.id == "whimsy_roll_call" })
-        XCTAssertEqual(rollCall.criteria.metric, .pinballRollLaneSweeps)
-        let sharers = catalog.trophies.filter { $0.criteria.metric == .pinballRollLaneSweeps }
-        XCTAssertEqual(sharers.map(\.id), ["whimsy_roll_call"],
-                       "the blocked metric must be unique to whimsy_roll_call")
+        let pinball = catalog.trophies.filter {
+            $0.criteria.metric == .pinballRollLaneSweeps || $0.criteria.metric == .pinballBestScore
+        }
+        XCTAssertEqual(pinball.map(\.id), [],
+                       "pinball trophies are held back from v1.0 with the mode")
     }
 
-    /// DURABLE GATE: every catalog trophy except `whimsy_roll_call` has an
+    /// DURABLE GATE: every catalog trophy has an
     /// explicit trigger test somewhere in the trophy test suites. The covered
     /// set below is the hand-maintained checklist; a new trophy added to the
     /// catalog without being listed here (and wired + tested) fails this test.
     func testEveryTrophyHasATriggerTest() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
         let catalogIDs = Set(catalog.trophies.map(\.id))
-        XCTAssertEqual(catalogIDs.count, 89, "catalog is frozen at 89 v1 trophies")
+        XCTAssertEqual(catalogIDs.count, 85, "v1.0 ships 85 trophies (89 minus 4 held back with Pinball)")
 
         // Ids with an explicit trigger test, grouped by the S1 task/suite that
         // owns them. Keep in lockstep with the catalog.
@@ -2939,7 +2930,7 @@ final class TrophyTriggerCoverageTests: XCTestCase {
             "snake_first_win", "snake_wins_10", "sumo_first_win", "sumo_wins_10",
             "paintball_first_win", "paintball_coverage_60", "goldrush_first_win",
             "goldrush_wins_10", "marblecup_first_win", "marblecup_wins_10", "koth_first_win",
-            "koth_hold_45", "pinball_score_10k", "pinball_score_50k", "pinball_score_150k",
+            "koth_hold_45",
             "rollout_first_maze", "rollout_maze_10", "rollup_100m", "rollup_500m",
             "disco_cross_25", "disco_hard_10", "zen_hour", "zen_10_hours",
             "coinpit_first_round", "coinpit_catch_90",
@@ -2952,18 +2943,18 @@ final class TrophyTriggerCoverageTests: XCTestCase {
             // S1-T6 social
             "social_sign_in", "social_first_friend", "social_friends_5", "social_send_life",
             "social_lives_sent_25", "clan_join", "clan_fulfill",
-            // S1-T7 / S1-T3 secret whimsies (whimsy_roll_call excluded — blocked)
+            // S1-T7 / S1-T3 secret whimsies (whimsy_roll_call held back with Pinball)
             "whimsy_gravity_check", "whimsy_night_bloom", "whimsy_high_roller",
             "whimsy_back_to_basics",
             // capstone cascade
             "capstone_all",
         ]
 
-        // The one and only uncovered trophy is the pinball-blocked whimsy.
+        // Nothing is uncovered: the only trophy that ever lacked a trigger
+        // (whimsy_roll_call) is held back from v1.0 with Pinball.
         let uncovered = catalogIDs.subtracting(coveredByTriggerTests)
-        XCTAssertEqual(uncovered, ["whimsy_roll_call"],
-                       "exactly whimsy_roll_call may lack a trigger test (blocked on the "
-                       + "unbuilt pinball ROLL lanes); all others must be wired + tested")
+        XCTAssertEqual(uncovered, [],
+                       "every shipping trophy must be wired + tested")
         // No stale ids: everything claimed as covered is a real catalog trophy.
         XCTAssertTrue(coveredByTriggerTests.isSubset(of: catalogIDs),
                       "the covered checklist must not name a non-existent trophy")
