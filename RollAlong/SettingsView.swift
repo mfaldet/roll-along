@@ -14,7 +14,7 @@ struct SettingsView: View {
     @State private var showRestoreResult = false
     @State private var restoreResultMessage = ""
     @State private var isRestoring = false
-    @FocusState private var nameFocused: Bool
+    @State private var showNicknamePicker = false
 
     var body: some View {
         ZStack {
@@ -28,6 +28,7 @@ struct SettingsView: View {
                     accountSection
                     cosmeticsSection
                     purchasesSection
+                    aboutSection
                     resetSection
                 }
                 .padding(.horizontal, 20)
@@ -101,27 +102,28 @@ struct SettingsView: View {
     private var personalizationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Personalization")
-            HStack {
-                Text("Nickname")
-                    .font(.system(.body, design: .rounded))
-                    .foregroundStyle(Color(white: 0.75))
-                Spacer()
-                TextField("Enter a nickname", text: $gameState.playerName)
-                    .multilineTextAlignment(.trailing)
-                    .font(.system(.body, design: .rounded))
-                    .foregroundStyle(.white)
-                    .focused($nameFocused)
-                    .submitLabel(.done)
-                    .onSubmit { nameFocused = false }
-                    .autocorrectionDisabled()
-                    .onChange(of: gameState.playerName) { _, newValue in
-                        // Nickname: letters and numbers only, max 12 characters.
-                        let cleaned = String(newValue.filter { $0.isLetter || $0.isNumber }.prefix(12))
-                        if cleaned != newValue { gameState.playerName = cleaned }
-                    }
+            // Nicknames are assembled from preset words + a number (see
+            // `PresetNames`) — there is no free-text name anywhere in the app.
+            Button { showNicknamePicker = true } label: {
+                HStack {
+                    Text("Nickname")
+                        .font(.system(.body, design: .rounded))
+                        .foregroundStyle(Color(white: 0.75))
+                    Spacer()
+                    Text(gameState.playerName.isEmpty ? "Choose a nickname" : gameState.playerName)
+                        .font(.system(.body, design: .rounded))
+                        .foregroundStyle(gameState.playerName.isEmpty ? Color(white: 0.45) : .white)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color(white: 0.4))
+                }
+                .padding()
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
             }
-            .padding()
-            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showNicknamePicker) {
+                NicknamePickerSheet().environmentObject(gameState)
+            }
 
             ColorPicker(selection: Binding(get:  { gameState.primaryColor },
                                            set:  { gameState.primaryColor = $0 }),
@@ -454,8 +456,13 @@ struct SettingsView: View {
         if store.lastError?.hasPrefix("Restore") == true {
             restoreResultMessage = store.lastError
                 ?? "Restore failed. Check your connection and try again."
-        } else if gameState.unlimitedLives {
-            restoreResultMessage = "Restore complete — your purchases are active on this device."
+        } else if gameState.unlimitedLives || gameState.starterPackClaimed {
+            // Both restorable purchases count: Unlimited Lives and the Starter Pack.
+            var restored: [String] = []
+            if gameState.unlimitedLives     { restored.append("Unlimited Lives") }
+            if gameState.starterPackClaimed { restored.append("Starter Pack") }
+            restoreResultMessage = "Restore complete — active on this device: "
+                + restored.joined(separator: " and ") + "."
         } else {
             restoreResultMessage = "Restore complete. No previous purchases were found to restore."
         }
@@ -465,6 +472,50 @@ struct SettingsView: View {
     // ── Cosmetics — beneficial: sell coin-bought cosmetics back for the coins
     //    paid and tidy the locker.  Recoverable (re-buy anything anytime), so
     //    it sits with the friendly sections, above Purchases.
+    // Privacy policy + contact (App Review Guideline 5.1.1(i): the policy must be
+    // reachable inside the app; 1.2 / 2.5.18: published contact details).
+    private static let privacyPolicyURL = URL(string: "https://mfaldet.github.io/roll-along/privacy.html")!
+    private static let contactURL = URL(string: "mailto:mac.faldet@gmail.com?subject=Roll%20Along%20support")!
+
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("About")
+            VStack(spacing: 0) {
+                Link(destination: Self.privacyPolicyURL) {
+                    aboutRow(icon: "hand.raised.fill", title: "Privacy Policy")
+                }
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+                Link(destination: Self.contactURL) {
+                    aboutRow(icon: "envelope.fill", title: "Contact Us")
+                }
+            }
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+
+            Text("Questions, a problem with an ad, or a concern about another player? Contact us and we'll help.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+        }
+    }
+
+    private func aboutRow(icon: String, title: String) -> some View {
+        HStack {
+            Label {
+                Text(title)
+                    .font(.system(.body, design: .rounded))
+                    .foregroundStyle(Color(white: 0.75))
+            } icon: {
+                Image(systemName: icon)
+                    .foregroundStyle(Color(white: 0.55))
+            }
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color(white: 0.4))
+        }
+        .padding()
+        .contentShape(Rectangle())
+    }
+
     private var cosmeticsSection: some View {
         let cosmetic = gameState.coinLiquidationPreview()
         return VStack(alignment: .leading, spacing: 12) {
@@ -607,6 +658,120 @@ private struct ResetProgressConfirmSheet: View {
         .background(Color(white: 0.09).ignoresSafeArea())
         .presentationDetents([.height(400)])
         .presentationDragIndicator(.visible)
+    }
+}
+
+// ===========================================================================
+// Preset-name pickers — shared by Settings (nickname) and Clans (clan name).
+// Word lists and rules live in `PresetNames` (SocialClient.swift).
+// ===========================================================================
+
+/// Three wheels: first word · second word · number.
+struct PresetNameWheels: View {
+    @Binding var choice: PresetNames.Choice
+    let nouns: [String]
+    let numbers: ClosedRange<Int>
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Picker("First word", selection: $choice.adjective) {
+                ForEach(0..<PresetNames.adjectives.count, id: \.self) { i in
+                    Text(PresetNames.adjectives[i]).tag(i)
+                }
+            }
+            Picker("Second word", selection: $choice.noun) {
+                ForEach(0..<nouns.count, id: \.self) { i in
+                    Text(nouns[i]).tag(i)
+                }
+            }
+            Picker("Number", selection: $choice.number) {
+                ForEach(Array(numbers), id: \.self) { n in
+                    Text(String(n)).tag(n)
+                }
+            }
+            .frame(maxWidth: 90)
+        }
+        .pickerStyle(.wheel)
+        .frame(height: 150)
+        .environment(\.colorScheme, .dark)
+    }
+}
+
+/// Settings → Nickname.  Saves a preset-built nickname locally and, when the
+/// player is signed in, to their public profile.
+struct NicknamePickerSheet: View {
+    @EnvironmentObject var gameState: GameState
+    @Environment(\.dismiss) private var dismiss
+    @State private var choice = PresetNames.randomChoice(numbers: PresetNames.nicknameNumbers)
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(white: 0.08).ignoresSafeArea()
+                VStack(spacing: 18) {
+                    Text(PresetNames.nickname(choice))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.top, 12)
+                    PresetNameWheels(choice: $choice,
+                                     nouns: PresetNames.nouns,
+                                     numbers: PresetNames.nicknameNumbers)
+                    Button {
+                        choice = PresetNames.randomChoice(numbers: PresetNames.nicknameNumbers)
+                    } label: {
+                        Label("Shuffle", systemImage: "shuffle")
+                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 18).padding(.vertical, 10)
+                            .background(Capsule().fill(Color(white: 0.2)))
+                    }
+                    .buttonStyle(.plain)
+                    Text("Pick two words and a number. Other players see this name on leaderboards, in clans and on your profile.")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
+                        .multilineTextAlignment(.center)
+                    Spacer()
+                }
+                .padding(20)
+            }
+            .navigationTitle("Nickname")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.foregroundStyle(.white)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }.foregroundStyle(.white)
+                }
+            }
+            .onAppear {
+                if let current = PresetNames.parseNickname(gameState.playerName) { choice = current }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() {
+        let name = PresetNames.nickname(choice)
+        gameState.playerName = name
+        if SocialClient.shared.isSignedIn {
+            let level = gameState.highestUnlocked
+            let stars = gameState.totalStars
+            let coins = gameState.totalCoins
+            let lives = gameState.totalLives
+            Task {
+                try? await SocialClient.shared.upsertMyProfile(
+                    displayName:     name,
+                    climbLevel:      level,
+                    highestUnlocked: level,
+                    totalStars:      stars,
+                    coinsCollected:  coins,
+                    lives:           lives
+                )
+            }
+        }
+        dismiss()
     }
 }
 

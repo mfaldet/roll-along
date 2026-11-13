@@ -2,42 +2,32 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Roll Along calls ATTrackingManager.requestTrackingAuthorization via
-         AdManager.  If the user grants permission, the Google Mobile Ads SDK
-         may share IDFA with Google's ad network for cross-app ad targeting —
-         which meets Apple's definition of "tracking."  Must be <true/>.
-         (If user denies ATT, Google falls back to non-personalised ads and
-         no cross-app identifier is shared, but the request still happens.) -->
+    <!-- Roll Along does NOT track.  The app never shows the App Tracking
+         Transparency prompt, never reads the advertising identifier, and
+         every ad request is non-personalised (AdManager: npa=1) with teen
+         age treatment.  No data is linked with third-party data for
+         advertising and nothing is shared with data brokers.
+         The Google Mobile Ads SDK ships its own privacy manifest for what
+         the SDK itself collects; this file covers the app's own code. -->
     <key>NSPrivacyTracking</key>
-    <true/>
+    <false/>
 
-    <!-- Internet domains contacted for tracking purposes (personalised ads).
-         These are Google AdMob's core ad-serving and measurement domains.
-         The Google Mobile Ads SDK also declares its own PrivacyInfo.xcprivacy
-         (SDK v13.4.0, verified in Package.resolved; v10+ ships the manifest);
-         these entries here are the app-level complement.
-         The Google UMP SDK (v3.1.0, transitive dep of the Ads SDK, not directly
-         imported) also ships its own PrivacyInfo.xcprivacy — no supplement
-         needed from the app layer for either SDK. -->
+    <!-- No tracking, so no tracking domains. -->
     <key>NSPrivacyTrackingDomains</key>
-    <array>
-        <string>googlesyndication.com</string>
-        <string>doubleclick.net</string>
-        <string>googleadservices.com</string>
-        <string>googleadmob.com</string>
-    </array>
+    <array/>
 
-    <!-- First-party data collected by AnalyticsClient and sent to Supabase.
-         All data is anonymous — no PII, no real-world identity linkage.
-         Google Mobile Ads SDK declares its own data-collection types in its
-         bundled PrivacyInfo.xcprivacy (not repeated here). -->
+    <!-- What the app's own code sends off the device (all to the app's
+         Supabase backend).  Two groups:
+           A. ANONYMOUS analytics — keyed to a random per-install id, never
+              to the account.  Not linked.
+           B. SIGNED-IN social data — only after the player chooses Sign in
+              with Apple.  Linked to the account, used to run the feature. -->
     <key>NSPrivacyCollectedDataTypes</key>
     <array>
 
-        <!-- Anonymous per-install UUID (ra_analytics_user_id) generated on
-             first launch and stored in UserDefaults.  Sent to Supabase to
-             group analytics events by device across sessions.  Not linked
-             to any real-world identity; not used for cross-app tracking. -->
+        <!-- A. Random per-install UUID (ra_analytics_user_id), created on
+             first launch.  Groups analytics events and anonymous trophy
+             unlocks by install.  Not the advertising identifier. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeDeviceID</string>
@@ -51,13 +41,9 @@
             </array>
         </dict>
 
-        <!-- Gameplay events sent to Supabase: level_complete, level_fail,
-             minigame round start/over, challenge track progress, att_response,
-             the trophy_unlocked beta-funnel event (trophy id + tier, no PII),
-             and ad impression/rewarded/failed events.  Used for product
-             analytics and funnel analysis only.  This entry is the NOT-LINKED
-             gameplay envelope: it also covers the anonymous trophy rarity rail
-             (trophy_unlocks — anon install-UUID, INSERT-only, no identity). -->
+        <!-- A. Gameplay events: level start/win/fail, minigame rounds and
+             scores, challenge-track and daily-challenge progress, trophy
+             unlocks (also the anonymous trophy rarity counts). -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeGameplayContent</string>
@@ -71,39 +57,40 @@
             </array>
         </dict>
 
-        <!-- IDENTITY-LINKED gameplay content on the SIGNED-IN trophy rail.
-             When a player signs in with Apple (Supabase Auth), their unlocked
-             trophies (player_trophies) and curated public showcase
-             (player_showcase: up to 3 trophy ids + per-grade earned counts)
-             are stored keyed to player_id = auth.uid() and rendered on the
-             public profile.  Because these rows are tied to the account, this
-             is LINKED gameplay content — distinct from the not-linked analytics
-             envelope above and from the anonymous trophy_unlocks rarity rail.
-             Purpose is App Functionality (cross-device restore + public
-             showcase), NOT analytics or tracking.  No new data TYPE beyond the
-             account's existing signed-in social data (the public display name
-             lives on the pre-existing players row, already identity-linked by
-             the Friends/Clans social system — not introduced here).  This rail
-             is never used for cross-app tracking and cascades away on account
-             deletion (ON DELETE CASCADE). -->
+        <!-- A. Product interaction: app launch/resume, screens and purchase
+             sheets opened, buttons tapped, cosmetics equipped. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
-            <string>NSPrivacyCollectedDataTypeGameplayContent</string>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
-            <true/>
+            <false/>
             <key>NSPrivacyCollectedDataTypeTracking</key>
             <false/>
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
-                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
             </array>
         </dict>
 
-        <!-- IAP and cosmetic purchase events sent to Supabase:
-             iap_purchased, iap_failed, iap_pending, iap_cancelled,
-             cosmetic_purchased, pack_purchased.  Used for purchase funnel
-             analytics.  No payment details, card numbers, or receipt data
-             are collected — only event names and product IDs. -->
+        <!-- A. Advertising data: which steps of a rewarded ad happened
+             (loaded, started, reward earned, dismissed, failed).  No ad
+             content and no advertising identifier. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeAdvertisingData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+        <!-- A. Purchase events: in-app purchase started / completed /
+             cancelled / failed with the product id and displayed price, and
+             coin purchases of cosmetics.  No payment details. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
@@ -117,10 +104,8 @@
             </array>
         </dict>
 
-        <!-- Hardware model string ("iPhone17,1") and iOS version string
-             sent to Supabase as columns on every analytics event.  Used
-             for hardware/OS segmentation in product dashboards.  Not
-             linked to identity; not used for tracking. -->
+        <!-- A. Device model ("iPhone17,1"), iOS version and app version,
+             attached to every analytics event. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
@@ -134,16 +119,50 @@
             </array>
         </dict>
 
+        <!-- B. Account identifier: the Supabase user id created when the
+             player signs in with Apple.  The app does not request the
+             player's name or email address. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- B. Signed-in game data stored against the account and shown to
+             other players: the preset nickname, climb level, stars, minigame
+             bests and wins (leaderboards), clan membership, friends, life
+             gifts, and unlocked trophies / public trophy showcase.  Removed
+             by Settings → Delete Account. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeGameplayContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
     </array>
 
     <!-- Required-reason API declarations. -->
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
 
-        <!-- GameState uses UserDefaults for all player progression, settings,
-             owned cosmetics, lives, coins, IAP flags, and review prompt date.
-             AnalyticsClient also reads/writes ra_analytics_user_id.
-             Reason CA92.1: access info from the same app, per documentation. -->
+        <!-- UserDefaults holds the player's own save: progress, settings,
+             owned cosmetics, lives, coins, purchase flags and the analytics
+             install id.  Reason CA92.1: read/write information accessible
+             only to the app itself. -->
         <dict>
             <key>NSPrivacyAccessedAPIType</key>
             <string>NSPrivacyAccessedAPICategoryUserDefaults</string>

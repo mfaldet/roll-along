@@ -879,16 +879,17 @@ struct ClansView: View {
 
     /// Owner-only rename (the settings sheet calls this).  Returns a
     /// user-facing error string, or nil on success.
-    private func rename(to newName: String) async -> String? {
+    private func rename(to choice: PresetNames.Choice) async -> String? {
         guard let clan = myClan else { return "You're not in a clan." }
+        let newName = PresetNames.clanName(choice)
         do {
-            try await SocialClient.shared.renameClan(id: clan.id, name: newName)
+            try await SocialClient.shared.renameClan(id: clan.id, name: choice)
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "renamed")
             await load()
             flash("Clan renamed to “\(newName)”.")
             return nil
         } catch {
-            return "Couldn't rename — that name may already be taken."
+            return "Couldn't rename — that name is taken. Try a different number."
         }
     }
 
@@ -1123,25 +1124,17 @@ struct ClanDetailView: View {
 }
 
 // ===========================================================================
-// ClanCreateSheet — collects name / [TAG] / description and creates the clan.
+// ClanCreateSheet — picks a preset-built name (+ derived tag) and an optional
+// preset description, and creates the clan.
 // Posts a `created` activity event so the new clan's feed isn't empty.
 // ===========================================================================
 private struct ClanCreateSheet: View {
     @Environment(\.dismiss) var dismiss
-    @State private var name = ""
-    @State private var tag  = ""
-    @State private var desc = ""
+    @State private var choice = PresetNames.randomChoice(numbers: PresetNames.clanNumbers)
+    @State private var descIndex: Int? = nil       // nil = no description
     @State private var working = false
     @State private var error:  String?
     let onCreated: () -> Void
-
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedTag:  String { tag.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedDesc: String { desc.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    private var isValid: Bool {
-        (2...32).contains(trimmedName.count) && (2...5).contains(trimmedTag.count) && trimmedDesc.count <= 200
-    }
 
     var body: some View {
         NavigationStack {
@@ -1149,9 +1142,8 @@ private struct ClanCreateSheet: View {
                 Color(white: 0.08).ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        field(title: "Clan name", text: $name, placeholder: "Marble Climbers", limit: 32)
-                        field(title: "Tag (2–5 characters)", text: $tag, placeholder: "CLMB", limit: 5, uppercase: true)
-                        field(title: "Description (optional)", text: $desc, placeholder: "What's your clan about?", limit: 200)
+                        ClanNamePicker(choice: $choice)
+                        ClanDescriptionPicker(selection: $descIndex)
                         if let error {
                             Text(error).font(.system(.callout, design: .rounded)).foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
                         }
@@ -1165,41 +1157,96 @@ private struct ClanCreateSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.foregroundStyle(.white) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") { Task { await create() } }
-                        .foregroundStyle(isValid ? Color(red: 0.40, green: 0.66, blue: 1.0) : Color(white: 0.4))
-                        .disabled(!isValid || working)
+                        .foregroundStyle(Color(red: 0.40, green: 0.66, blue: 1.0))
+                        .disabled(working)
                 }
             }
-        }
-    }
-
-    private func field(title: String, text: Binding<String>, placeholder: String, limit: Int, uppercase: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(title.uppercased()).font(.system(.caption, design: .rounded).weight(.bold))
-                .foregroundStyle(Color(white: 0.5)).tracking(0.5)
-            TextField("", text: text, prompt: Text(placeholder))
-                .foregroundStyle(.white).autocorrectionDisabled()
-                .textInputAutocapitalization(uppercase ? .characters : .sentences)
-                .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.14)))
-                .onChange(of: text.wrappedValue) { _, newValue in
-                    var v = newValue
-                    if uppercase { v = v.uppercased() }
-                    if v.count > limit { v = String(v.prefix(limit)) }
-                    if v != newValue { text.wrappedValue = v }
-                }
         }
     }
 
     private func create() async {
         working = true; error = nil
         do {
-            let clan = try await SocialClient.shared.createClan(name: trimmedName, tag: trimmedTag, description: trimmedDesc)
+            let desc = descIndex.map { PresetNames.clanDescriptions[$0] } ?? ""
+            let clan = try await SocialClient.shared.createClan(name: choice, description: desc)
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "created")
             onCreated(); dismiss()
         } catch {
-            self.error = "Couldn't create — that name or tag may already be taken."
+            self.error = "Couldn't create — that name is taken. Try a different number."
         }
         working = false
+    }
+}
+
+// ===========================================================================
+// ClanNamePicker / ClanDescriptionPicker — the ONLY ways to set a clan's
+// name, tag and description.  Everything is assembled from `PresetNames`
+// lists; there is no text field, so there is no user-written content.
+// ===========================================================================
+private struct ClanNamePicker: View {
+    @Binding var choice: PresetNames.Choice
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CLAN NAME").font(.system(.caption, design: .rounded).weight(.bold))
+                .foregroundStyle(Color(white: 0.5)).tracking(0.5)
+            HStack(spacing: 8) {
+                Text("[\(PresetNames.clanTag(choice))]")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+                Text(PresetNames.clanName(choice))
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
+                Button {
+                    choice = PresetNames.randomChoice(numbers: PresetNames.clanNumbers)
+                } label: {
+                    Image(systemName: "shuffle").font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white).padding(9)
+                        .background(Circle().fill(Color(white: 0.2)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Shuffle name")
+            }
+            PresetNameWheels(choice: $choice,
+                             nouns: PresetNames.clanNouns,
+                             numbers: PresetNames.clanNumbers)
+            Text("Pick two words and a number. The tag is made from the name.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+        }
+    }
+}
+
+private struct ClanDescriptionPicker: View {
+    @Binding var selection: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("DESCRIPTION (OPTIONAL)").font(.system(.caption, design: .rounded).weight(.bold))
+                .foregroundStyle(Color(white: 0.5)).tracking(0.5)
+            ForEach(0..<PresetNames.clanDescriptions.count, id: \.self) { i in
+                Button {
+                    selection = (selection == i) ? nil : i
+                } label: {
+                    HStack {
+                        Text(PresetNames.clanDescriptions[i])
+                            .font(.system(.callout, design: .rounded))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        if selection == i {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color(red: 0.30, green: 0.75, blue: 0.42))
+                        }
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 11)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.14)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 
@@ -1219,12 +1266,12 @@ private struct ClanSettingsSheet: View {
     let clan: Clan
     let role: String                                  // owner | officer | member
     let alreadyAskedPromotion: Bool
-    let onRename:       (String) async -> String?     // → error text, nil = ok
+    let onRename:       (PresetNames.Choice) async -> String?   // → error text, nil = ok
     let onAskPromotion: () async -> Bool
     let onLeave:        () -> Void
     let onDisband:      () -> Void
 
-    @State private var name        = ""
+    @State private var nameChoice  = PresetNames.randomChoice(numbers: PresetNames.clanNumbers)
     @State private var renameBusy  = false
     @State private var renameError: String?
     @State private var askBusy     = false
@@ -1233,8 +1280,7 @@ private struct ClanSettingsSheet: View {
     @State private var confirmDisband = false
 
     private var isOwner:     Bool   { role == "owner" }
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var canSaveName: Bool   { trimmedName != clan.name && (2...32).contains(trimmedName.count) }
+    private var canSaveName: Bool   { PresetNames.clanName(nameChoice) != clan.name }
 
     var body: some View {
         NavigationStack {
@@ -1258,7 +1304,10 @@ private struct ClanSettingsSheet: View {
                     Button("Done") { dismiss() }.foregroundStyle(.white)
                 }
             }
-            .onAppear { name = clan.name }
+            .onAppear {
+                // Start the wheels on the current name when it is preset-format.
+                if let current = PresetNames.parseClanName(clan.name) { nameChoice = current }
+            }
         }
     }
 
@@ -1270,7 +1319,7 @@ private struct ClanSettingsSheet: View {
                 .foregroundStyle(isOwner ? Color(red: 1.00, green: 0.81, blue: 0.30)
                                          : Color(red: 0.55, green: 0.78, blue: 1.0))
             VStack(alignment: .leading, spacing: 2) {
-                Text(clan.name)
+                Text(clan.name.isEmpty ? "Clan" : clan.name)
                     .font(.system(.body, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
                 Text(roleLine)
@@ -1291,23 +1340,12 @@ private struct ClanSettingsSheet: View {
         }
     }
 
-    // Owner: clan personalization — just the name today; description, tag,
-    // colors and other preferences will live in this same section.
+    // Owner: clan personalization — the name (built from preset words; the tag
+    // follows the name).
     private var personalizationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             header("Personalization")
-            VStack(alignment: .leading, spacing: 7) {
-                Text("CLAN NAME")
-                    .font(.system(.caption2, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color(white: 0.5)).tracking(0.5)
-                TextField("", text: $name, prompt: Text("Clan name"))
-                    .foregroundStyle(.white).autocorrectionDisabled()
-                    .padding(.horizontal, 14).padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.14)))
-                    .onChange(of: name) { _, newValue in
-                        if newValue.count > 32 { name = String(newValue.prefix(32)) }
-                    }
-            }
+            ClanNamePicker(choice: $nameChoice)
             Button { Task { await saveName() } } label: {
                 ZStack {
                     Text("Save name").opacity(renameBusy ? 0 : 1)
@@ -1414,7 +1452,7 @@ private struct ClanSettingsSheet: View {
 
     private func saveName() async {
         renameBusy = true; renameError = nil
-        let err = await onRename(trimmedName)
+        let err = await onRename(nameChoice)
         renameBusy = false
         if let err { renameError = err } else { dismiss() }
     }

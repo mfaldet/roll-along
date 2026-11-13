@@ -729,7 +729,11 @@ final class GameState: ObservableObject {
         let level = max(1, saved)
         currentLevel = level
         activeSkin = BallSkin(rawValue: defaults.string(forKey: "ra_skin") ?? "") ?? .red
-        playerName = defaults.string(forKey: "ra_name") ?? ""
+        // Nicknames are preset-built only (see `PresetNames`).  A free-text
+        // name saved by an earlier build is dropped, so it is never shown or
+        // sent; the player picks a new one in Settings.
+        let savedName = defaults.string(forKey: "ra_name") ?? ""
+        playerName = PresetNames.parseNickname(savedName) != nil ? savedName : ""
         primaryColorHex = defaults.string(forKey: "ra_primaryColorHex") ?? Self.defaultPrimaryHex
         hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
@@ -2086,7 +2090,7 @@ final class GameState: ObservableObject {
             coinsCollected: totalCoins,
             pinballBest: pinballBest,
             zenSeconds: zenSeconds,
-            goldrushBest: goldrushBest,
+            goldrushBest: minigameBests["goldrush"],   // Smash and Grab best (see syncMinigameStats)
             snakeBest: minigameBests["snake"],
             sumoBest: minigameBests["sumo"],
             paintballBest: minigameBests["paintball"],
@@ -2107,7 +2111,10 @@ final class GameState: ObservableObject {
     /// (no-op signed out).
     func syncMinigameStats() {
         guard SocialClient.shared.isSignedIn else { return }
-        let p = pinballBest, z = zenSeconds, g = goldrushBest
+        // The server's `goldrush_best` column backs the SMASH AND GRAB board
+        // (mode id "goldrush"), so it carries that mode's best — NOT the
+        // local `goldrushBest`, which is the Gold Rush (coin pit) reward run.
+        let p = pinballBest, z = zenSeconds, g = minigameBests["goldrush", default: 0]
         let gw = minigameWins["goldrush", default: 0]
         let snB = minigameBests["snake", default: 0],     snW = minigameWins["snake", default: 0]
         let suB = minigameBests["sumo", default: 0],      suW = minigameWins["sumo", default: 0]
@@ -2131,7 +2138,8 @@ final class GameState: ObservableObject {
     /// Record a competitive-mode result's score (units are mode-specific). Keeps
     /// only the personal best and publishes it.  Called from every competitive
     /// view's finish path, win or lose, so the "Best" column reflects skill even
-    /// without a win.  Gold Rush uses `recordGoldRushCoins` instead (flat best).
+    /// without a win.  (The Gold Rush coin-pit reward run is separate: it uses
+    /// `recordGoldRushCoins` and has no leaderboard.)
     @discardableResult
     func recordCompetitiveScore(_ modeID: String, _ score: Int) -> Bool {
         guard score > 0 else { return false }

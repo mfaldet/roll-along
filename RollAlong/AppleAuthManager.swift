@@ -78,7 +78,10 @@ final class AppleAuthManager: NSObject, ObservableObject {
 
         let provider = ASAuthorizationAppleIDProvider()
         let request  = provider.createRequest()
-        request.requestedScopes = [.fullName, .email]
+        // Ask Apple for NOTHING beyond the sign-in itself: the game never uses
+        // a real name or an email address (App Review Guideline 5.1.1(iii),
+        // data minimisation).  The public name is the preset nickname.
+        request.requestedScopes = []
         request.nonce = Self.sha256(nonce)
 
         let controller = ASAuthorizationController(authorizationRequests: [request])

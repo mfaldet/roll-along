@@ -18,6 +18,9 @@ import GoogleMobileAds
 // request is tagged non-personalised (npa=1), so AdMob serves only generic
 // ads.  No ATT prompt is ever shown.
 //
+// Audience — the app is rated 13+.  Ad content is capped at Google's "Teen"
+// rating and every request carries teen age treatment (see `bootstrap`).
+//
 // DEBUG vs RELEASE — in DEBUG builds we use Google's documented test ad
 // unit ID so dev runs don't generate fraud impressions against the real
 // account.  Release builds use the real Roll Along ad unit.
@@ -72,6 +75,17 @@ final class AdManager: NSObject, ObservableObject {
     /// the system prompt never appears.  Every ad request is non-personalised.
     func bootstrap(with gameState: GameState) async {
         self.gameState = gameState
+        // Audience settings — set BEFORE the SDK starts so they apply to every
+        // request.  Roll Along is rated 13+ and is not directed at children:
+        //   • maxAdContentRating = teen — no ad rated above "Teen" is served
+        //     (App Review Guideline 2.5.18: ads must suit the app's age rating).
+        //   • ageRestrictedTreatment = teen — Google applies its teen ad-serving
+        //     protections to every request, since we never learn a player's age.
+        //     (Added in Google Mobile Ads SDK 13.3.0; replaces the deprecated
+        //     tagForChildDirectedTreatment / tagForUnderAgeOfConsent.)
+        let adConfig = MobileAds.shared.requestConfiguration
+        adConfig.maxAdContentRating = GADMaxAdContentRating.teen
+        adConfig.ageRestrictedTreatment = .teen
         // Start the Mobile Ads SDK.  All ad requests are non-personalised.
         _ = await MobileAds.shared.start()
         await loadRewarded()

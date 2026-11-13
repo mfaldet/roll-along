@@ -400,7 +400,7 @@ final class StoreKitManager: ObservableObject {
             // 60,000-coin grant) also drops ONE random not-yet-owned "Money"
             // cosmetic — up to three unlock across repeat purchases.
             if productID == .coins10000 {
-                grantedCosmetic = grantRandomMoneyCosmetic(gameState)
+                grantedCosmetic = grantMoneyBall(gameState)
             }
 
         case .unlimitedUnlock:
@@ -452,18 +452,14 @@ final class StoreKitManager: ObservableObject {
         return "the \(bundle.displayName) Collection"
     }
 
-    /// Grant ONE random "Money" cosmetic the player doesn't yet own — the ball,
-    /// trail, or floor.  Returns its display name (for the celebration) or nil if
-    /// all three are already owned.  Deliberately one-at-a-time so the trio
-    /// unlocks across repeat top-pack purchases rather than all at once.
-    private func grantRandomMoneyCosmetic(_ gs: GameState) -> String? {
-        var pool: [(name: String, grant: () -> Void)] = []
-        if !gs.isOwned(BallSkin.moneyBall)   { pool.append(("Money Ball", { gs.grant(BallSkin.moneyBall) })) }
-        if !gs.isOwned(TrailColor.moneyRoll) { pool.append(("Money Roll", { gs.grant(TrailColor.moneyRoll) })) }
-        if !gs.isOwned(Floor.moneyFull)      { pool.append(("Money Full", { gs.grant(Floor.moneyFull) })) }
-        guard let pick = pool.randomElement() else { return nil }
-        pick.grant()
-        return pick.name
+    /// Grant the top coin pack's fixed bonus item: the Money Ball skin.
+    /// Always the same item (never randomised), and the coin sheet says so
+    /// before purchase.  Returns its display name for the celebration, or nil
+    /// when the player already owns it (a repeat purchase is coins only).
+    private func grantMoneyBall(_ gs: GameState) -> String? {
+        guard !gs.isOwned(BallSkin.moneyBall) else { return nil }
+        gs.grant(BallSkin.moneyBall)
+        return BallSkin.moneyBall.displayName
     }
 
     // MARK: - Background transaction listener
