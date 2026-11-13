@@ -492,15 +492,19 @@ struct CosmeticShopView: View {
     }
 
     /// One Shop category section: a label over a 3-up row of buyable item cells.
+    /// Hidden when the category has nothing released yet (release calendar).
+    @ViewBuilder
     private func shopPicksSection<Item: CosmeticItem>(_ title: String,
                                                       items: [Item]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(title)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(items, id: \.id) { item in
-                    itemCell(item: item)
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionLabel(title)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                                    GridItem(.flexible(), spacing: 12),
+                                    GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                    ForEach(items, id: \.id) { item in
+                        itemCell(item: item)
+                    }
                 }
             }
         }
@@ -599,24 +603,32 @@ struct CosmeticShopView: View {
         case .ball:
             ballSection
         case .goal:
-            categoryGrid(items: GoalSkin.allCases)
+            categoryGrid(items: GoalSkin.allCases.filter { isListed($0) })
         case .trail:
             // Bundle-exclusive trails (Money Roll) hidden unless owned — same
             // rule as the Ball grid.
             categoryGrid(items: TrailColor.allCases.filter {
-                !$0.isBundleExclusive || gameState.isOwned($0)
+                (!$0.isBundleExclusive || gameState.isOwned($0)) && isListed($0)
             })
         case .floor:
             categoryGrid(items: Floor.allCases.filter {
-                !$0.isBundleExclusive || gameState.isOwned($0)
+                (!$0.isBundleExclusive || gameState.isOwned($0)) && isListed($0)
             })
         case .pit:
-            categoryGrid(items: Pit.allCases)
+            categoryGrid(items: Pit.allCases.filter { isListed($0) })
         case .boundary:
-            categoryGrid(items: Boundary.allCases)
+            categoryGrid(items: Boundary.allCases.filter { isListed($0) })
         case .music:
-            categoryGrid(items: MusicTrack.allCases)
+            categoryGrid(items: MusicTrack.allCases.filter { isListed($0) })
         }
+    }
+
+    /// Release-calendar filter for the Catalog grids: an item is listed once
+    /// its scheduled drop has arrived (`CosmeticSchedule`), or if the player
+    /// already owns it.  Unreleased collections are announced in the
+    /// "Coming soon" row instead.
+    private func isListed<Item: CosmeticItem>(_ item: Item) -> Bool {
+        CosmeticSchedule.isReleased(item) || gameState.isOwned(item)
     }
 
     private func categoryGrid<Item: CosmeticItem>(items: [Item]) -> some View {
@@ -640,11 +652,15 @@ struct CosmeticShopView: View {
     @ViewBuilder
     private var ballSection: some View {
         VStack(alignment: .leading, spacing: 22) {
-            if !BallPack.catalogue.isEmpty {
+            // Packs appear once every ball in them has been released.
+            let packs = BallPack.catalogue.filter {
+                CosmeticSchedule.isReleased($0) || gameState.ownsPack($0)
+            }
+            if !packs.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionLabel("PACKS")
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                        ForEach(BallPack.catalogue) { pack in
+                        ForEach(packs) { pack in
                             packCell(pack)
                         }
                     }
@@ -657,7 +673,7 @@ struct CosmeticShopView: View {
             // shown so the user can equip them (possession implies legitimate
             // acquisition via the bundle or challenge track).
             categoryGrid(items: BallSkin.allCases.filter {
-                !$0.isBundleExclusive || gameState.isOwned($0)
+                (!$0.isBundleExclusive || gameState.isOwned($0)) && isListed($0)
             })
         }
     }
@@ -1059,8 +1075,11 @@ struct CosmeticShopView: View {
         // Filtered by the chosen collection type, then sorted by full price
         // (simplest/cheapest up top), alphabetically for equal-priced bundles.
         // Seasonal bundles still appear only while their window is open.
+        // Collections not yet released (see `CosmeticSchedule`) are announced
+        // in the "Coming soon" row below rather than listed.
         let bundles = CosmeticBundle.catalogue
             .filter { !$0.isLimitedTime || $0.isAvailable }
+            .filter { CosmeticSchedule.isReleased($0) }
             .filter { bundleFilter.matches($0) }
             .sorted {
                 $0.fullPrice() != $1.fullPrice()
@@ -1070,6 +1089,7 @@ struct CosmeticShopView: View {
         LazyVStack(alignment: .leading, spacing: 0) {
             collectionFilterMenu
                 .padding(.bottom, 10)
+            comingSoonRow
             if bundles.isEmpty {
                 Text("No collections match this filter.")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -1082,6 +1102,41 @@ struct CosmeticShopView: View {
                         .padding(.bottom, 12)
                 }
             }
+        }
+    }
+
+    /// "Coming soon" — the next scheduled drop, by name and date.  Everything
+    /// the release calendar is holding back is announced here.
+    @ViewBuilder
+    private var comingSoonRow: some View {
+        if let next = CosmeticSchedule.nextDrop() {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("COMING SOON")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .kerning(1.4)
+                    Spacer()
+                    Text(next.date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+                Text(next.bundles.map(\.displayName).joined(separator: " · "))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(next.laterCount > 0
+                     ? "New collections arrive every 4 weeks — \(next.laterCount) more after these. Seasonal collections return each year."
+                     : "The last scheduled collections. Seasonal collections return each year.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+            .padding(.bottom, 12)
         }
     }
 
