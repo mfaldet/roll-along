@@ -689,6 +689,12 @@ struct BuyCoinsSheet: View {
                     // (+60% under the 2026-07 reprice — the old "×2 coins"
                     // claim no longer holds).
                     DiamondBonusLabel(text: bonus ?? "Best value")
+                    // The pack's fixed bonus item, stated before purchase.
+                    if !gameState.isOwned(BallSkin.moneyBall) {
+                        Text("Includes the Money Ball skin")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 0.40, green: 0.82, blue: 0.52))
+                    }
                 } else if let bonus {
                     Text(bonus)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -1351,8 +1357,8 @@ private struct PurchaseCelebrationOverlay: View {
             } else { return }
         case .coins:
             guard r.coins > 0 else { return }
-            // The top ($49.99) coin pack may also drop a secret "Money" cosmetic —
-            // announce it in place of the usual subtitle.
+            // The top ($49.99) coin pack also includes the Money Ball skin the
+            // first time — announce it in place of the usual subtitle.
             let sub = r.grantedCosmeticName.map { "🎉 Unlocked \($0)!" } ?? "Added to your balance"
             content = BadgeContent(title: "+\(r.coins.formatted(.number)) coins",
                                    subtitle: sub, kind: .coins)

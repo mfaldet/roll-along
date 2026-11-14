@@ -698,7 +698,7 @@ final class GameState: ObservableObject {
         self.defaults = defaults
         self.now = now
         trophyStats = TrophyStats(defaults: defaults)
-        // Load the bundled 89-trophy catalog.  A decode/validation failure is
+        // Load the bundled 85-trophy catalog.  A decode/validation failure is
         // a build-breaking AUTHORING error, never a runtime condition to
         // recover from (TrophyCatalog house rules) — but GameState.init must
         // never trap, so fall back to an empty catalog whose engine simply
@@ -729,7 +729,11 @@ final class GameState: ObservableObject {
         let level = max(1, saved)
         currentLevel = level
         activeSkin = BallSkin(rawValue: defaults.string(forKey: "ra_skin") ?? "") ?? .red
-        playerName = defaults.string(forKey: "ra_name") ?? ""
+        // Nicknames are preset-built only (see `PresetNames`).  A free-text
+        // name saved by an earlier build is dropped, so it is never shown or
+        // sent; the player picks a new one in Settings.
+        let savedName = defaults.string(forKey: "ra_name") ?? ""
+        playerName = PresetNames.parseNickname(savedName) != nil ? savedName : ""
         primaryColorHex = defaults.string(forKey: "ra_primaryColorHex") ?? Self.defaultPrimaryHex
         hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
@@ -826,7 +830,10 @@ final class GameState: ObservableObject {
         minigameDifficultyBests = Self.loadTrackProgress(key: "ra_minigameDiffBests", defaults)
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
-        currentModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
+        // A saved "last mode" that no longer exists in this build (e.g. Pinball,
+        // held back from v1.0) falls back to the climb.
+        let savedModeID = defaults.string(forKey: "ra_currentModeID") ?? "climb"
+        currentModeID = GameModeCatalogue.mode(id: savedModeID) != nil ? savedModeID : "climb"
         dailyChallengeCompletions = Self.loadStringSet(forKey: "ra_dailyChallengeDone", defaults)
         dailyChallengeFailures    = Self.loadStringSet(forKey: "ra_dailyChallengeFailed", defaults)
         dailyChallengeRunStartedKey = defaults.string(forKey: "ra_dailyChallengeRunStarted")
@@ -1407,7 +1414,7 @@ final class GameState: ObservableObject {
     /// in the set.  Recording unconditionally is safe — a non-minigame id
     /// simply leaves both derivations unchanged.
     private func recordMinigamePlayedTrophies() {
-        // arcade_sampler (≥5) / arcade_grand_tour (all 12).
+        // arcade_sampler (≥5) / arcade_grand_tour (all 11).
         let played = TrophyMetric.minigameModeIDs.filter { playedModeIDs.contains($0) }.count
         fireTrophy(.minigamesPlayed, value: played)
         // coinpit_first_round (≥1 once "coinpit" has been played).
@@ -2083,7 +2090,7 @@ final class GameState: ObservableObject {
             coinsCollected: totalCoins,
             pinballBest: pinballBest,
             zenSeconds: zenSeconds,
-            goldrushBest: goldrushBest,
+            goldrushBest: minigameBests["goldrush"],   // Smash and Grab best (see syncMinigameStats)
             snakeBest: minigameBests["snake"],
             sumoBest: minigameBests["sumo"],
             paintballBest: minigameBests["paintball"],
@@ -2104,7 +2111,10 @@ final class GameState: ObservableObject {
     /// (no-op signed out).
     func syncMinigameStats() {
         guard SocialClient.shared.isSignedIn else { return }
-        let p = pinballBest, z = zenSeconds, g = goldrushBest
+        // The server's `goldrush_best` column backs the SMASH AND GRAB board
+        // (mode id "goldrush"), so it carries that mode's best — NOT the
+        // local `goldrushBest`, which is the Gold Rush (coin pit) reward run.
+        let p = pinballBest, z = zenSeconds, g = minigameBests["goldrush", default: 0]
         let gw = minigameWins["goldrush", default: 0]
         let snB = minigameBests["snake", default: 0],     snW = minigameWins["snake", default: 0]
         let suB = minigameBests["sumo", default: 0],      suW = minigameWins["sumo", default: 0]
@@ -2128,7 +2138,8 @@ final class GameState: ObservableObject {
     /// Record a competitive-mode result's score (units are mode-specific). Keeps
     /// only the personal best and publishes it.  Called from every competitive
     /// view's finish path, win or lose, so the "Best" column reflects skill even
-    /// without a win.  Gold Rush uses `recordGoldRushCoins` instead (flat best).
+    /// without a win.  (The Gold Rush coin-pit reward run is separate: it uses
+    /// `recordGoldRushCoins` and has no leaderboard.)
     @discardableResult
     func recordCompetitiveScore(_ modeID: String, _ score: Int) -> Bool {
         guard score > 0 else { return false }

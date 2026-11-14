@@ -6,7 +6,7 @@
 //  validation (docs/trophies/sprint-plan.md §2 S0-T1; design.md §9;
 //  trophy-catalog.md §3).
 //
-//  The catalog is DATA: the 89 v1 trophies ship as `TrophyCatalog.json`
+//  The catalog is DATA: the 85 v1.0 trophies ship as `TrophyCatalog.json`
 //  (the LevelOverrides pattern) and this file defines the vocabulary the
 //  trophy engine evaluates against. House rules enforced here:
 //
@@ -375,10 +375,12 @@ enum TrophyMetric: String, Codable, CaseIterable {
         "snake", "sumo", "paintball", "goldrush", "marblecup", "koth",
     ]
 
-    /// All 12 minigame mode ids (`minigames_played` counts against these).
+    /// All 11 minigame mode ids in v1.0 (`minigames_played` counts against
+    /// these).  Pinball is held back from v1.0; add "pinball" back here (and
+    /// restore its trophies) when the mode returns.
     static let minigameModeIDs: [String] = [
         "zen", "coinpit", "snake", "sumo", "paintball", "goldrush",
-        "marblecup", "koth", "pinball", "rollout", "rollup", "disco",
+        "marblecup", "koth", "rollout", "rollup", "disco",
     ]
 }
 

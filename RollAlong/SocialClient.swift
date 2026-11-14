@@ -106,7 +106,9 @@ final class SocialClient: @unchecked Sendable {
                          lives: Int) async throws -> PlayerProfile {
         let me = try requireSession()
         let body = ProfileUpsert(id: me.userId,
-                                 display_name: displayName,
+                                 // Only a preset-format name is ever sent.
+                                 display_name: PresetNames.isValidNickname(displayName)
+                                     ? displayName : PresetNames.defaultNickname,
                                  climb_level: climbLevel,
                                  highest_unlocked: highestUnlocked,
                                  total_stars: totalStars,
@@ -178,7 +180,7 @@ final class SocialClient: @unchecked Sendable {
     // MARK: - Leaderboard
 
     /// Leaderboard rows, ordered by `order` (a PostgREST order clause).  The
-    /// default is the climb board; minigame boards pass e.g. "pinball_best.desc".
+    /// default is the climb board; minigame boards pass e.g. "zen_seconds.desc".
     func fetchLeaderboard(order: String = "climb_level.desc,total_stars.desc",
                           limit: Int = 100) async throws -> [PlayerProfile] {
         let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
@@ -467,10 +469,15 @@ final class SocialClient: @unchecked Sendable {
     /// Create a clan (you become its owner) and join it as `owner`.  Two
     /// writes: insert the clan with `return=representation` to recover its
     /// generated id, then insert your owner membership row.
-    func createClan(name: String, tag: String, description: String) async throws -> Clan {
+    /// The name and tag are built from a `PresetNames.Choice` and the
+    /// description must be one of the preset options (anything else is sent
+    /// as empty), so no free text can reach the server from here.
+    func createClan(name choice: PresetNames.Choice, description: String) async throws -> Clan {
         let me = try requireSession()
-        let insert = ClanInsert(name: name, tag: tag,
-                                description: description, owner_id: me.userId)
+        let insert = ClanInsert(name: PresetNames.clanName(choice),
+                                tag: PresetNames.clanTag(choice),
+                                description: PresetNames.isValidClanDescription(description) ? description : "",
+                                owner_id: me.userId)
         let data = try await send(method: "POST", path: "clans",
                                   bodyData: try encoder.encode([insert]),
                                   prefer: "return=representation")
@@ -516,11 +523,12 @@ final class SocialClient: @unchecked Sendable {
     /// Rename a clan — the first of the owner's personalization knobs (the RLS
     /// "clans update by owner" policy scopes the PATCH, so a non-owner's call
     /// matches zero rows).  The unique lower(name) index makes a taken name
-    /// throw; surface it as "name taken".  Future clan preference columns
-    /// (description, tag, colors…) extend `ClanUpdatePatch` the same way.
-    func renameClan(id: UUID, name: String) async throws {
+    /// (or its derived tag) throw; surface it as "name taken".
+    /// The new name is a `PresetNames.Choice`; the derived tag changes with it.
+    func renameClan(id: UUID, name choice: PresetNames.Choice) async throws {
         _ = try requireSession()
-        let body = ClanUpdatePatch(name: name)
+        let body = ClanUpdatePatch(name: PresetNames.clanName(choice),
+                                   tag: PresetNames.clanTag(choice))
         _ = try await send(method: "PATCH", path: "clans",
                            query: "id=eq.\(id.uuidString)",
                            bodyData: try encoder.encode(body),
@@ -623,6 +631,144 @@ final class SocialClient: @unchecked Sendable {
 }
 
 // ===========================================================================
+// PresetNames — every player-visible name is ASSEMBLED FROM PRESET PARTS.
+//
+// Roll Along has no free-text fields that other players can see.  A nickname
+// is  <word><word><number>  ("SwiftComet42"); a clan name is
+// <word> <plural word> <number>  ("Swift Comets 42"); the clan tag is derived
+// from the name ("SC42"); the clan description is one of a fixed list (or
+// none).  Clan chat was already fixed phrases.
+//
+// The same lists are enforced on the server by docs/social-schema-v4.sql
+// (GENERATED from the same source as this block — change both together), so
+// a modified client cannot store free text either.  Anything that does not
+// parse — e.g. a name saved before this rule existed — is never shown: the
+// model accessors below fall back to an empty string and the views show
+// their generic "Climber" / "Clan" placeholders.
+//
+// Kept in this file (not a new one) to avoid touching the Xcode project
+// structure, like the Keychain helper in AppleAuthManager.swift.
+// ===========================================================================
+enum PresetNames {
+    static let adjectives: [String] = [
+        "Swift", "Brave", "Lucky", "Happy", "Calm", "Bold", "Quick", "Sunny",
+        "Misty", "Rapid", "Jolly", "Noble", "Zippy", "Witty", "Merry", "Royal",
+        "Solar", "Lunar", "Amber", "Azure", "Coral", "Ivory", "Jade", "Mint",
+        "Neon", "Ruby", "Teal", "Gold", "Iron", "Agile", "Clear", "Eager",
+        "Grand", "Keen", "Kind", "Loyal", "Proud", "Vivid", "Wise", "Epic",
+    ]
+
+    static let nouns: [String] = [
+        "Orb", "Comet", "Star", "Moon", "Fox", "Otter", "Panda", "Koala",
+        "Tiger", "Eagle", "Robin", "Finch", "Whale", "Lynx", "Wolf", "Bear",
+        "Hawk", "Owl", "Maple", "Cedar", "Pine", "River", "Cloud", "Storm",
+        "Spark", "Flame", "Pixel", "Rover", "Racer", "Kite", "Wave", "Peak",
+        "Ridge", "Dune", "Stone", "Pearl", "Lark", "Heron", "Bison", "Lotus",
+    ]
+
+    /// Plural forms of `nouns`, index-for-index, for clan names.
+    static let clanNouns: [String] = [
+        "Orbs", "Comets", "Stars", "Moons", "Foxes", "Otters", "Pandas", "Koalas",
+        "Tigers", "Eagles", "Robins", "Finches", "Whales", "Lynxes", "Wolves", "Bears",
+        "Hawks", "Owls", "Maples", "Cedars", "Pines", "Rivers", "Clouds", "Storms",
+        "Sparks", "Flames", "Pixels", "Rovers", "Racers", "Kites", "Waves", "Peaks",
+        "Ridges", "Dunes", "Stones", "Pearls", "Larks", "Herons", "Bison", "Lotuses",
+    ]
+
+    /// The fixed clan descriptions a clan owner can pick from.
+    static let clanDescriptions: [String] = [
+        "Friendly clan. Everyone is welcome.",
+        "Daily players who share lives.",
+        "Casual climbers. No pressure.",
+        "Chasing the top of the leaderboard.",
+        "Minigame fans.",
+        "Trophy hunters.",
+        "Friends and family.",
+        "New players welcome. We help each other climb.",
+    ]
+
+    static let nicknameNumbers: ClosedRange<Int> = 1...99     // keeps a nickname <= 12 characters
+    static let clanNumbers:     ClosedRange<Int> = 1...999
+    /// Stored for a signed-in player who has not picked a nickname yet.
+    static let defaultNickname = "Climber"
+
+    /// One selection: an index into `adjectives`, an index into `nouns` /
+    /// `clanNouns`, and a number.
+    struct Choice: Equatable {
+        var adjective: Int
+        var noun: Int
+        var number: Int
+    }
+
+    static func randomChoice(numbers: ClosedRange<Int>) -> Choice {
+        Choice(adjective: Int.random(in: 0..<adjectives.count),
+               noun:      Int.random(in: 0..<nouns.count),
+               number:    Int.random(in: numbers))
+    }
+
+    // MARK: Build
+
+    static func nickname(_ c: Choice) -> String {
+        adjectives[c.adjective] + nouns[c.noun] + String(c.number)
+    }
+
+    static func clanName(_ c: Choice) -> String {
+        "\(adjectives[c.adjective]) \(clanNouns[c.noun]) \(c.number)"
+    }
+
+    /// The clan tag is derived, never typed: the two initials + the number
+    /// ("Swift Comets 42" -> "SC42", 3-5 characters).
+    static func clanTag(_ c: Choice) -> String {
+        "\(adjectives[c.adjective].prefix(1))\(clanNouns[c.noun].prefix(1))".uppercased()
+            + String(c.number)
+    }
+
+    // MARK: Parse / validate
+
+    private static func number(_ digits: String, in range: ClosedRange<Int>) -> Int? {
+        guard !digits.isEmpty, digits.first != "0",
+              digits.allSatisfy({ $0.isASCII && $0.isNumber }),
+              let n = Int(digits), range.contains(n) else { return nil }
+        return n
+    }
+
+    static func parseNickname(_ s: String) -> Choice? {
+        for (ai, adj) in adjectives.enumerated() where s.hasPrefix(adj) {
+            let rest = String(s.dropFirst(adj.count))
+            for (ni, noun) in nouns.enumerated() where rest.hasPrefix(noun) {
+                if let n = number(String(rest.dropFirst(noun.count)), in: nicknameNumbers) {
+                    return Choice(adjective: ai, noun: ni, number: n)
+                }
+            }
+        }
+        return nil
+    }
+
+    static func parseClanName(_ s: String) -> Choice? {
+        let parts = s.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 3,
+              let ai = adjectives.firstIndex(of: parts[0]),
+              let ni = clanNouns.firstIndex(of: parts[1]),
+              let n  = number(parts[2], in: clanNumbers) else { return nil }
+        return Choice(adjective: ai, noun: ni, number: n)
+    }
+
+    static func isValidNickname(_ s: String) -> Bool {
+        s == defaultNickname || parseNickname(s) != nil
+    }
+
+    static func isValidClanDescription(_ s: String) -> Bool {
+        s.isEmpty || clanDescriptions.contains(s)
+    }
+
+    /// A nickname safe to show: the value itself when it is a preset name,
+    /// else "" (callers show their generic placeholder).
+    static func shownNickname(_ raw: String) -> String {
+        isValidNickname(raw) ? raw : ""
+    }
+}
+
+// ===========================================================================
 // Errors
 // ===========================================================================
 enum SocialError: Error {
@@ -640,7 +786,12 @@ enum SocialError: Error {
 /// A player's public profile + game stats (no PII).
 struct PlayerProfile: Codable, Identifiable, Hashable {
     let id: UUID
-    var displayName: String
+    /// The stored display name exactly as the server returned it.  Never show
+    /// this directly — use `displayName`, which only passes preset names.
+    private var rawDisplayName: String
+    /// The name to show: the stored value when it is a preset-format name
+    /// (see `PresetNames`), else "" so views fall back to "Climber".
+    var displayName: String { PresetNames.shownNickname(rawDisplayName) }
     var climbLevel: Int
     var highestUnlocked: Int
     var totalStars: Int
@@ -694,7 +845,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
          rollupBest: Int? = nil, rollupBestSeconds: Int? = nil,
          createdAt: String? = nil, updatedAt: String? = nil,
          lastSeenAt: String? = nil, needsLivesAt: String? = nil) {
-        self.id = id; self.displayName = displayName; self.climbLevel = climbLevel
+        self.id = id; self.rawDisplayName = displayName; self.climbLevel = climbLevel
         self.highestUnlocked = highestUnlocked; self.totalStars = totalStars
         self.lives = lives; self.coinsCollected = coinsCollected
         self.pinballBest = pinballBest; self.zenSeconds = zenSeconds
@@ -740,7 +891,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case displayName     = "display_name"
+        case rawDisplayName  = "display_name"
         case climbLevel       = "climb_level"
         case highestUnlocked  = "highest_unlocked"
         case totalStars       = "total_stars"
@@ -792,7 +943,7 @@ enum BoardCategory: Int, CaseIterable {
 }
 
 enum LeaderboardBoard: String, CaseIterable, Identifiable {
-    case rollAlong, pinball, zenGarden, rollUp
+    case rollAlong, zenGarden, rollUp
     case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
     var id: String { rawValue }
 
@@ -800,7 +951,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var category: BoardCategory {
         switch self {
         case .rollAlong:                    return .adventure
-        case .pinball, .zenGarden, .rollUp: return .solo
+        case .zenGarden, .rollUp:           return .solo
         default:                            return .competitive   // the six competitive boards
         }
     }
@@ -809,7 +960,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .rollAlong:  return "Roll Along"
-        case .pinball:    return "Pinball"
         case .zenGarden:  return "Zen Garden"
         case .rollUp:     return "Roll Up"
         case .cometClash: return "Comet Clash"
@@ -822,7 +972,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     }
 
     /// The competitive GameMode id backing this board, or nil for the climb and
-    /// the solo (Pinball / Zen) boards.
+    /// the solo (Zen / Roll Up) boards.
     var competitiveModeID: String? {
         switch self {
         case .cometClash: return "snake"
@@ -839,7 +989,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var order: String {
         switch self {
         case .rollAlong:  return "climb_level.desc,total_stars.desc"
-        case .pinball:    return "pinball_best.desc"
         case .zenGarden:  return "zen_seconds.desc"
         // Default (Height) order; LeaderboardView swaps in the Time order when
         // the Roll Up board's sort toggle is set to Time.
@@ -861,7 +1010,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         }
         switch self {
         case .rollAlong: return true                       // everyone has a climb level
-        case .pinball:   return (p.pinballBest ?? 0) > 0
         case .zenGarden: return (p.zenSeconds ?? 0) > 0
         case .rollUp:    return (p.rollupBest ?? 0) > 0
         default:         return true
@@ -877,7 +1025,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         }
         switch self {
         case .rollAlong: return "Lv \(p.climbLevel) · \(p.totalStars)★ · \(p.coinsCollected ?? 0) coins"
-        case .pinball:   return "\((p.pinballBest ?? 0).formatted()) pts"
         case .zenGarden: return Self.zenText(p.zenSeconds ?? 0)
         case .rollUp:    return "\(p.rollupBest ?? 0) m · \(Self.rollUpTime(p.rollupBestSeconds ?? 0))"
         default:         return ""
@@ -962,15 +1109,31 @@ struct Friendship: Codable, Identifiable {
 /// A collaborative group.  `tag` is the short [TAG] shown beside member names.
 struct Clan: Codable, Identifiable, Hashable {
     let id: UUID
-    var name: String
-    var tag: String
-    var description: String
+    // Stored values exactly as the server returned them.  Never shown
+    // directly — the accessors below only pass preset-format values (see
+    // `PresetNames`), so a legacy or tampered row renders as a plain "Clan".
+    private var rawName: String
+    private var rawTag: String
+    private var rawDescription: String
     let ownerId: UUID
     var createdAt: String?
     var updatedAt: String?
 
+    /// The clan name when it is preset-format, else "".
+    var name: String { PresetNames.parseClanName(rawName) != nil ? rawName : "" }
+    /// The tag when it is the one derived from a preset-format name, else "".
+    var tag: String {
+        guard let c = PresetNames.parseClanName(rawName), PresetNames.clanTag(c) == rawTag else { return "" }
+        return rawTag
+    }
+    /// The description when it is one of the preset options, else "".
+    var description: String { PresetNames.isValidClanDescription(rawDescription) ? rawDescription : "" }
+
     enum CodingKeys: String, CodingKey {
-        case id, name, tag, description
+        case id
+        case rawName        = "name"
+        case rawTag         = "tag"
+        case rawDescription = "description"
         case ownerId   = "owner_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -1093,6 +1256,7 @@ private struct ClanMemberInsert: Encodable {
 /// description, tag, colors — become optional fields here).
 private struct ClanUpdatePatch: Encodable {
     let name: String
+    let tag: String
 }
 
 private struct ClanEventInsert: Encodable {

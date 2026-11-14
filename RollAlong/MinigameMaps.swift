@@ -12,7 +12,7 @@ import SwiftUI
 //     in SumoSurvivalView.
 //
 // Sprint status:
-//   S23 — PinballMap (12 maps) + PaintBallMap (10 maps)          ✅
+//   S23 — PaintBallMap (10 maps)  (Pinball held back from v1.0)   ✅
 //   S24 — CometClashMap (8) + GoldRushMap (8); wall engine        ✅
 //   S25 — SumoMap (8) + KOTHMap (8); pillar engine                ✅
 //   S26 — MarbleCupMap (8); pitch bumpers + goal width            ✅
@@ -45,87 +45,6 @@ struct SumoPillar {
     let radFrac: CGFloat   // fraction of base platform radius
     let angle:   CGFloat   // radians from +x axis
     let r:       CGFloat   // radius in points
-}
-
-// MARK: - Pinball
-
-/// Describes a single Pinball table layout.
-/// `bumperFracs` are (xFrac, yFrac) within the playfield rect, where
-/// (0,0) = field.minX/minY and (1,1) = field.maxX/maxY.
-/// Keep xFrac ≤ 0.74 to stay clear of the right launch lane (≈ rightmost 11%).
-///
-/// **Bumper count cap — keep ≤ 8.**
-/// `collideBumpers()` runs a ball-vs-each-bumper loop every physics tick
-/// (O(n) in bumpers).  All current maps use 3–7 bumpers; beyond ~10 the loop
-/// overhead becomes measurable at 60 fps.  If you need a denser layout,
-/// consider a spatial grid or broad-phase cull first.
-struct PinballMap {
-    let name: String
-    let bumperFracs: [(CGFloat, CGFloat)]
-}
-
-enum PinballMaps {
-    /// Active catalogue: a bundled `pinball.json` (authored in Marble Mapper)
-    /// overrides the built-in list; absent/empty → built-in (unchanged).
-    static var maps: [PinballMap] { MinigameMapStore.pinball ?? builtin }
-
-    static let builtin: [PinballMap] = [
-
-        // Every layout is mirror-symmetric about the playable centre (x≈0.44 —
-        // the launch lane occupies the right edge), so each table reads planned.
-
-        // 1 — Classic: a clean 3-bumper triangle
-        PinballMap(name: "Classic",
-                   bumperFracs: [(0.44, 0.15), (0.29, 0.31), (0.59, 0.31)]),
-
-        // 2 — Diamond: 4 bumpers in a diamond
-        PinballMap(name: "Diamond",
-                   bumperFracs: [(0.44, 0.12), (0.26, 0.28), (0.62, 0.28), (0.44, 0.44)]),
-
-        // 3 — Spread: a symmetric fan across the top
-        PinballMap(name: "Spread",
-                   bumperFracs: [(0.44, 0.13), (0.28, 0.20), (0.60, 0.20), (0.16, 0.30), (0.72, 0.30)]),
-
-        // 4 — Cluster: a hexagon in the upper centre
-        PinballMap(name: "Cluster",
-                   bumperFracs: [(0.44, 0.12), (0.27, 0.18), (0.61, 0.18),
-                                 (0.27, 0.32), (0.61, 0.32), (0.44, 0.38)]),
-
-        // 5 — Cross: a plus (+)
-        PinballMap(name: "Cross",
-                   bumperFracs: [(0.44, 0.13), (0.24, 0.27), (0.44, 0.27), (0.64, 0.27), (0.44, 0.41)]),
-
-        // 6 — Two Rows: two horizontal rows of 3
-        PinballMap(name: "Two Rows",
-                   bumperFracs: [(0.26, 0.16), (0.44, 0.16), (0.62, 0.16),
-                                 (0.26, 0.33), (0.44, 0.33), (0.62, 0.33)]),
-
-        // 7 — Zigzag: top trio + a flanking lower pair
-        PinballMap(name: "Zigzag",
-                   bumperFracs: [(0.20, 0.15), (0.44, 0.15), (0.68, 0.15), (0.32, 0.31), (0.56, 0.31)]),
-
-        // 8 — Centre Post: a diamond with a lower post
-        PinballMap(name: "Centre Post",
-                   bumperFracs: [(0.44, 0.14), (0.28, 0.28), (0.60, 0.28), (0.44, 0.46)]),
-
-        // 9 — Wide Ring: a hexagonal ring framing the play area
-        PinballMap(name: "Wide Ring",
-                   bumperFracs: [(0.44, 0.11), (0.22, 0.21), (0.66, 0.21),
-                                 (0.22, 0.37), (0.66, 0.37), (0.44, 0.45)]),
-
-        // 10 — Funnel: two converging pairs
-        PinballMap(name: "Funnel",
-                   bumperFracs: [(0.22, 0.14), (0.66, 0.14), (0.32, 0.33), (0.56, 0.33)]),
-
-        // 11 — Triangle: a wide-based triangle
-        PinballMap(name: "Triangle",
-                   bumperFracs: [(0.44, 0.13), (0.24, 0.39), (0.64, 0.39)]),
-
-        // 12 — Lattice: a symmetric six-bumper lattice
-        PinballMap(name: "Lattice",
-                   bumperFracs: [(0.30, 0.14), (0.58, 0.14), (0.44, 0.24),
-                                 (0.22, 0.32), (0.66, 0.32), (0.44, 0.43)]),
-    ]
 }
 
 // MARK: - Paint Ball
@@ -571,7 +490,6 @@ private struct MMSumo:   Decodable { let radFrac, angle, r: CGFloat }
 private struct MMSide:   Decodable { let yFrac: CGFloat; let side: String }
 
 enum MinigameMapStore {
-    static let pinball:    [PinballMap]?    = loadPinball()
     static let paintball:  [PaintBallMap]?  = loadPaintball()
     static let cometClash: [CometClashMap]? = loadCometClash()
     static let goldRush:   [GoldRushMap]?   = loadGoldRush()
@@ -588,12 +506,6 @@ enum MinigameMapStore {
 
     private static func side(_ s: String) -> MarbleCupMap.Side {
         s == "left" ? .left : (s == "right" ? .right : .both)
-    }
-
-    private struct PinballFile: Decodable { struct E: Decodable { let name: String; let bumpers: [MMPoint]? }; let maps: [E] }
-    private static func loadPinball() -> [PinballMap]? {
-        guard let f: PinballFile = loadJSON("pinball"), !f.maps.isEmpty else { return nil }
-        return f.maps.map { PinballMap(name: $0.name, bumperFracs: ($0.bumpers ?? []).map { ($0.x, $0.y) }) }
     }
 
     private struct PaintBallFile: Decodable { struct E: Decodable { let name: String; let pits: [MMPoint]? }; let maps: [E] }

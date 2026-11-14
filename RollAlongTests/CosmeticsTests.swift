@@ -636,4 +636,78 @@ final class CosmeticsTests: XCTestCase {
         gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = BallSkin.blue.coinCost * 10
         XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost / 2)
     }
+    // MARK: - Release calendar (CosmeticSchedule)
+
+    /// Every permanent collection is scheduled exactly once — at launch or in
+    /// one drop — and nothing is scheduled that isn't a permanent collection.
+    func testSchedule_everyPermanentBundleScheduledExactlyOnce() {
+        let scheduled = CosmeticSchedule.launchBundleIDs + CosmeticSchedule.drops.flatMap { $0 }
+        XCTAssertEqual(scheduled.count, Set(scheduled).count, "a collection is scheduled twice")
+        let permanent = Set(CosmeticBundle.catalogue.filter { !$0.isLimitedTime }.map(\.id))
+        XCTAssertEqual(Set(scheduled), permanent,
+                       "the schedule must cover exactly the permanent collections")
+    }
+
+    /// Collections the game gives away must be available on day one: the
+    /// Starter Pack's Aurora, the post-tutorial gift pool, and every
+    /// challenge-track reward.
+    func testSchedule_giftAndRewardBundlesAreLaunchContent() {
+        let launch = Set(CosmeticSchedule.launchBundleIDs)
+        XCTAssertTrue(launch.contains("aurora"))
+        for b in CosmeticBundle.catalogue where !b.isLimitedTime && b.rarity == .standard {
+            XCTAssertTrue(launch.contains(b.id), "gift-pool collection \(b.id) must be launch content")
+        }
+        for track in GameModeCatalogue.challengeTracks {
+            guard let id = ChallengeTrackMode.rewardBundleID(for: track.trackID) else { continue }
+            XCTAssertTrue(launch.contains(id), "track reward \(id) must be launch content")
+        }
+    }
+
+    /// Drops unlock on their date, counted from the launch date, 28 days apart.
+    func testSchedule_dropsUnlockOnTheirDates() {
+        let launch = CosmeticSchedule.launchDate
+        let dayBefore = launch.addingTimeInterval(-86_400)
+        XCTAssertTrue(CosmeticSchedule.isReleased(drop: 0, at: dayBefore), "launch content is always available")
+        XCTAssertFalse(CosmeticSchedule.isReleased(drop: 1, at: launch))
+        let firstDrop = CosmeticSchedule.releaseDate(forDrop: 1)
+        XCTAssertEqual(firstDrop.timeIntervalSince(launch), 28 * 86_400, accuracy: 2 * 3_600)
+        XCTAssertFalse(CosmeticSchedule.isReleased(drop: 1, at: firstDrop.addingTimeInterval(-60)))
+        XCTAssertTrue(CosmeticSchedule.isReleased(drop: 1, at: firstDrop))
+        XCTAssertNotNil(CosmeticSchedule.nextDrop(at: launch))
+        let afterAll = CosmeticSchedule.releaseDate(forDrop: CosmeticSchedule.drops.count)
+        XCTAssertNil(CosmeticSchedule.nextDrop(at: afterAll), "nothing is left to announce after the last drop")
+        for b in CosmeticBundle.catalogue {
+            XCTAssertTrue(CosmeticSchedule.isReleased(b, at: afterAll), "\(b.id) never releases")
+        }
+    }
+
+    /// An unreleased collection's items are held back with it; starter items
+    /// never are.
+    func testSchedule_itemsFollowTheirCollections() {
+        let launch = CosmeticSchedule.launchDate
+        XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.starter, at: launch))
+        for b in CosmeticBundle.catalogue where !b.isLimitedTime {
+            let drop = CosmeticSchedule.drop(of: b)
+            for ball in b.balls where ball.tier != .starter {
+                XCTAssertLessThanOrEqual(CosmeticSchedule.drop(of: ball), drop,
+                                         "\(ball.rawValue) must be out no later than \(b.id)")
+            }
+        }
+    }
+
+    /// Seasonal windows repeat every year instead of expiring for good.
+    func testSeasonalWindowsRepeatYearly() {
+        for b in CosmeticBundle.catalogue where b.isLimitedTime {
+            guard let from = b.availableFrom, let until = b.availableUntil else {
+                XCTFail("seasonal collection \(b.id) needs both dates"); continue
+            }
+            let mid = from.addingTimeInterval(until.timeIntervalSince(from) / 2)
+            XCTAssertTrue(b.isOpen(at: mid), "\(b.id) open mid-window")
+            XCTAssertFalse(b.isOpen(at: until.addingTimeInterval(86_400)),
+                           "\(b.id) closed the day after its window")
+            let nextYear = Calendar(identifier: .gregorian).date(byAdding: .year, value: 1, to: mid)!
+            XCTAssertTrue(b.isOpen(at: nextYear), "\(b.id) returns the following year")
+            XCTAssertFalse(b.isExpired)
+        }
+    }
 }

@@ -1,5 +1,10 @@
 # Pinball Rebuild — Sprint Roadmap
 
+> **Held back from v1.0 (2026-11-13).** Pinball is not in the app build. The
+> unfinished view is at `tools/pinball/PinballView.swift`. Note this roadmap
+> describes an earlier SpriteKit design; the held-back code uses Chipmunk and
+> has one table.
+
 > Status: **Sprints 1–2 — first working model committed (needs device build + feel tuning)**
 > Last updated: 2026-06-25
 

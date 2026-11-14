@@ -11,7 +11,8 @@ build/
 .build/
 .swiftpm/
 Packages/
-Package.resolved
+# Package.resolved IS committed (pins the exact package versions that were
+# built and tested) — do not ignore it.
 
 # CocoaPods (unused but kept for safety)
 Pods/

@@ -583,6 +583,9 @@ struct GoldRushView: View {
             won: engine.playerWon,
             score: engine.playerScore,
             basePayout: base)
+        // Leaderboard "best" for Smash and Grab = most coins grabbed in one
+        // round (win or lose), like every other competitive mode.
+        gameState.recordCompetitiveScore("goldrush", engine.playerScore)
         AnalyticsClient.shared.track(
             "goldrush_round_over",
             properties: ["won": .bool(engine.playerWon),

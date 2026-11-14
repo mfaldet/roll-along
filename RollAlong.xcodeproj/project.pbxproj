@@ -43,12 +43,10 @@
 		D502FEEF2FD5024E00CA86BD /* GoldRushView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */; };
 		D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */; };
 		D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */; };
-		D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D502FEF42FD5024E00CA86BD /* PinballView.swift */; };
 		FA0017010000000000000001 /* RollOutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0017010000000000000002 /* RollOutView.swift */; };
 		FA0017010000000000000003 /* RollUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0017010000000000000004 /* RollUpView.swift */; };
 		FA0018010000000000000001 /* ZenGardenTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0018010000000000000002 /* ZenGardenTools.swift */; };
 		FA0017020000000000000003 /* DiscoBallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0017020000000000000004 /* DiscoBallView.swift */; };
-		D569BB9A2FEE4DF6008E91A6 /* Chipmunk in Frameworks */ = {isa = PBXBuildFile; productRef = D569BB992FEE4DF6008E91A6 /* Chipmunk */; };
 		DA11FEED0000000000000001 /* DailyRewardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000002 /* DailyRewardView.swift */; };
 		DA11FEED0000000000000003 /* BallSkinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA11FEED0000000000000004 /* BallSkinView.swift */; };
 		FA000001000000000000FA01 /* MinigameMaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000001000000000000FA00 /* MinigameMaps.swift */; };
@@ -153,7 +151,6 @@
 		D502FEEE2FD5024E00CA86BD /* GoldRushView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldRushView.swift; sourceTree = "<group>"; };
 		D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarbleCupView.swift; sourceTree = "<group>"; };
 		D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KingOfTheHillView.swift; sourceTree = "<group>"; };
-		D502FEF42FD5024E00CA86BD /* PinballView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinballView.swift; sourceTree = "<group>"; };
 		FA0017010000000000000002 /* RollOutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollOutView.swift; sourceTree = "<group>"; };
 		FA0017010000000000000004 /* RollUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollUpView.swift; sourceTree = "<group>"; };
 		FA0018010000000000000002 /* ZenGardenTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenGardenTools.swift; sourceTree = "<group>"; };
@@ -215,7 +212,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */,
-				D569BB9A2FEE4DF6008E91A6 /* Chipmunk in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,7 +262,6 @@
 				DA11FEED0000000000000004 /* BallSkinView.swift */,
 				D502FEF02FD5024E00CA86BD /* MarbleCupView.swift */,
 				D502FEF22FD5024E00CA86BD /* KingOfTheHillView.swift */,
-				D502FEF42FD5024E00CA86BD /* PinballView.swift */,
 				FA0017010000000000000002 /* RollOutView.swift */,
 				FA0017010000000000000004 /* RollUpView.swift */,
 				FA0018010000000000000002 /* ZenGardenTools.swift */,
@@ -392,7 +387,6 @@
 			name = RollAlong;
 			packageProductDependencies = (
 				D502FED02FCB156C00CA86BD /* GoogleMobileAds */,
-				D569BB992FEE4DF6008E91A6 /* Chipmunk */,
 			);
 			productName = RollAlong;
 			productReference = AA000005000000000000AA00 /* RollAlong.app */;
@@ -456,7 +450,6 @@
 			packageReferences = (
 				D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
-				D569BB972FEE4B9B008E91A6 /* XCRemoteSwiftPackageReference "Chipmunk2D-SPM" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AA000010000000000000AA00 /* Products */;
@@ -522,7 +515,6 @@
 				DA11FEED0000000000000003 /* BallSkinView.swift in Sources */,
 				D502FEF12FD5024E00CA86BD /* MarbleCupView.swift in Sources */,
 				D502FEF32FD5024E00CA86BD /* KingOfTheHillView.swift in Sources */,
-				D502FEF52FD5024E00CA86BD /* PinballView.swift in Sources */,
 				FA0017010000000000000001 /* RollOutView.swift in Sources */,
 				FA0017010000000000000003 /* RollUpView.swift in Sources */,
 				FA0018010000000000000001 /* ZenGardenTools.swift in Sources */,
@@ -751,10 +743,11 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -783,10 +776,11 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -801,7 +795,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.macfaldet.RollAlongTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RollAlong.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RollAlong";
 			};
 			name = Debug;
@@ -817,7 +811,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.macfaldet.RollAlongTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RollAlong.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RollAlong";
 			};
 			name = Release;
@@ -832,7 +826,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.macfaldet.RollAlongUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = RollAlong;
 			};
 			name = Debug;
@@ -847,7 +841,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.macfaldet.RollAlongUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = RollAlong;
 			};
 			name = Release;
@@ -902,14 +896,6 @@
 				minimumVersion = 13.4.0;
 			};
 		};
-		D569BB972FEE4B9B008E91A6 /* XCRemoteSwiftPackageReference "Chipmunk2D-SPM" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/spencerkohan/Chipmunk2D-SPM";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 7.0.3;
-			};
-		};
 		FB000001000000000000FB00 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing.git";
@@ -925,11 +911,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D502FECF2FCB156C00CA86BD /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
-		};
-		D569BB992FEE4DF6008E91A6 /* Chipmunk */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D569BB972FEE4B9B008E91A6 /* XCRemoteSwiftPackageReference "Chipmunk2D-SPM" */;
-			productName = Chipmunk;
 		};
 		FB000002000000000000FB00 /* SnapshotTesting */ = {
 			isa = XCSwiftPackageProductDependency;

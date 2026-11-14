@@ -46,7 +46,7 @@ final class TrophyShowcaseModelTests: XCTestCase {
         super.tearDown()
     }
 
-    /// A fresh engine over the REAL bundled 89-trophy catalog, backed by a
+    /// A fresh engine over the REAL bundled 85-trophy catalog, backed by a
     /// throwaway defaults suite. Fixed clock so unlock timestamps are
     /// deterministic. No GameState — proves the model derives purely from the
     /// engine for the pure-model tests.

@@ -1519,6 +1519,169 @@ enum BundleDiscount: String, CaseIterable {
 }
 
 // ===========================================================================
+// CosmeticSchedule — the release calendar.  Most cosmetics are HELD BACK at
+// launch and arrive in drops, one every 4 weeks, for about 11 months.
+//
+//   • Everything is counted from ONE date: `launchDate`.  Set it to the App
+//     Store release day before submitting — nothing else needs to change.
+//   • The schedule ships inside the app (no server switch).  Unreleased
+//     collections are announced in the Catalog's "Coming soon" row with their
+//     date, and App Review is told about the calendar in the review notes —
+//     nothing here is a hidden feature.
+//   • Permanent collections: `launchBundleIDs` are available on day one (they
+//     include every collection the game GIVES away: the Starter Pack's
+//     Aurora, the post-tutorial gift pool, and the eight challenge-track
+//     rewards).  The rest unlock by `drops`, drop n at launch + n × 28 days.
+//   • Seasonal collections are not on this list — they follow their own
+//     yearly window (see `CosmeticBundle.currentWindow`).
+//   • Single items follow their collections: an item is released when the
+//     earliest permanent collection containing it is.  Items in no permanent
+//     collection are spread across launch and drops 3 / 6 / 9 by name.
+//   • Uses the device clock, like the hourly shop rotation.
+//
+// CosmeticsTests pins the invariants (every permanent collection scheduled
+// exactly once; gift and reward collections at launch).
+// ===========================================================================
+enum CosmeticSchedule {
+    /// THE LAUNCH DATE.  ⚠️ PLACEHOLDER — set to the real App Store release
+    /// day before submitting.  Every drop date is counted from this.
+    static let launchDate: Date = CosmeticBundle.date(2027, 1, 15)
+
+    /// Days between drops.
+    static let dropIntervalDays = 28
+
+    /// Permanent collections available from day one.
+    static let launchBundleIDs: [String] = [
+        // Starter Pack + post-tutorial gift pool
+        "aurora", "nature", "citrus", "sketchbook", "midas",
+        // Challenge-track rewards (ChallengeTrackMode.rewardBundleID)
+        "winter", "cosmos", "lava-flow", "neon", "haunted",
+        "ancient-temple", "abyssal-depths", "champion",
+    ]
+
+    /// The drops, in order.  `drops[0]` unlocks 28 days after launch,
+    /// `drops[1]` 56 days after, and so on.
+    static let drops: [[String]] = [
+        ["hellfire", "heavens", "golf", "paper-world"],
+        ["nightclub", "ocean", "soccer"],
+        ["planets", "space-travel", "pastel"],
+        ["velvet-night", "golden-hour", "full-court"],
+        ["arcade", "bloom", "aquarium"],
+        ["noir", "zen-garden", "billiards-hall"],
+        ["eclipse", "dune", "candyland"],
+        ["realistic-marble", "tempest", "diamond"],
+        ["crystal-cavern", "midnight-carnival", "high-roller"],
+        ["quicksilver", "oracle", "geode"],
+        ["lava-lamp", "plasma-globe", "cathedral"],
+        ["magma-core", "neon-city", "clockwork"],
+    ]
+
+    /// Collection id → drop number (0 = launch, 1 = first drop, …).
+    static let bundleDrop: [String: Int] = {
+        var map: [String: Int] = [:]
+        for id in launchBundleIDs { map[id] = 0 }
+        for (index, ids) in drops.enumerated() {
+            for id in ids { map[id] = index + 1 }
+        }
+        return map
+    }()
+
+    // MARK: Dates
+
+    /// The day a drop unlocks (drop 0 = launch day).
+    static func releaseDate(forDrop drop: Int) -> Date {
+        guard drop > 0 else { return launchDate }
+        return Calendar(identifier: .gregorian)
+            .date(byAdding: .day, value: drop * dropIntervalDays, to: launchDate) ?? .distantFuture
+    }
+
+    static func isReleased(drop: Int, at now: Date = Date()) -> Bool {
+        drop <= 0 || now >= releaseDate(forDrop: drop)
+    }
+
+    // MARK: Collections
+
+    static func drop(of bundle: CosmeticBundle) -> Int {
+        if bundle.isLimitedTime { return 0 }          // seasonal: its yearly window governs
+        return bundleDrop[bundle.id] ?? 0
+    }
+
+    static func isReleased(_ bundle: CosmeticBundle, at now: Date = Date()) -> Bool {
+        isReleased(drop: drop(of: bundle), at: now)
+    }
+
+    // MARK: Single items
+
+    private static func key(_ type: String, _ rawValue: String) -> String { type + "|" + rawValue }
+
+    /// "<Type>|<rawValue>" → earliest drop among the permanent collections
+    /// that contain the item.  Built once.
+    private static let itemDrop: [String: Int] = {
+        var map: [String: Int] = [:]
+        func note(_ type: String, _ rawValues: [String], _ drop: Int) {
+            for raw in rawValues {
+                let k = type + "|" + raw
+                map[k] = min(map[k] ?? drop, drop)
+            }
+        }
+        for bundle in CosmeticBundle.catalogue where !bundle.isLimitedTime {
+            let d = bundleDrop[bundle.id] ?? 0
+            note(String(describing: BallSkin.self),   bundle.balls.map(\.rawValue),  d)
+            note(String(describing: GoalSkin.self),   bundle.goals.map(\.rawValue),  d)
+            note(String(describing: TrailColor.self), bundle.trails.map(\.rawValue), d)
+            note(String(describing: Floor.self),      bundle.floors.map(\.rawValue), d)
+            note(String(describing: Pit.self),        bundle.pits.map(\.rawValue),   d)
+            note(String(describing: MusicTrack.self), bundle.music.map(\.rawValue),  d)
+        }
+        return map
+    }()
+
+    /// Items in no permanent collection: launch, or drop 3 / 6 / 9, chosen by
+    /// a stable hash of the name (FNV-1a) so it never changes between builds.
+    static func looseDrop(_ rawValue: String) -> Int {
+        var hash: UInt32 = 2_166_136_261
+        for byte in rawValue.utf8 { hash = (hash ^ UInt32(byte)) &* 16_777_619 }
+        return Int(hash % 4) * 3
+    }
+
+    static func drop<Item: CosmeticItem>(of item: Item) -> Int {
+        if item.tier == .starter { return 0 }
+        if let d = itemDrop[key(String(describing: Item.self), item.rawValue)] { return d }
+        return looseDrop(item.rawValue)
+    }
+
+    static func isReleased<Item: CosmeticItem>(_ item: Item, at now: Date = Date()) -> Bool {
+        isReleased(drop: drop(of: item), at: now)
+    }
+
+    /// A ball pack is released once every ball in it is.
+    static func isReleased(_ pack: BallPack, at now: Date = Date()) -> Bool {
+        pack.skins.allSatisfy { isReleased($0, at: now) }
+    }
+
+    // MARK: Coming soon
+
+    struct Upcoming {
+        let date: Date
+        let bundles: [CosmeticBundle]
+        /// Collections scheduled in later drops, after this one.
+        let laterCount: Int
+    }
+
+    /// The next drop that has not unlocked yet, or nil once all have.
+    static func nextDrop(at now: Date = Date()) -> Upcoming? {
+        for (index, ids) in drops.enumerated() {
+            let drop = index + 1
+            if isReleased(drop: drop, at: now) { continue }
+            let bundles = ids.compactMap { id in CosmeticBundle.catalogue.first { $0.id == id } }
+            let later = drops.dropFirst(drop).reduce(0) { $0 + $1.count }
+            return Upcoming(date: releaseDate(forDrop: drop), bundles: bundles, laterCount: later)
+        }
+        return nil
+    }
+}
+
+// ===========================================================================
 // Shop rotation — the curated storefront refreshes every hour.  A
 // deterministic window index seeds which bundle + odds-and-ends cosmetics are
 // featured, so the selection is stable within a window and identical
@@ -1539,33 +1702,41 @@ enum ShopRotation {
         return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
     }
 
-    // Pools of coin-purchasable items eligible to be featured.
+    // Pools of coin-purchasable items eligible to be featured.  Only RELEASED
+    // items and collections (see `CosmeticSchedule`) can ever be featured.
     static var bundlePool: [CosmeticBundle] {
-        CosmeticBundle.catalogue.filter { $0.isAvailable && !$0.isExpired }
+        CosmeticBundle.catalogue.filter {
+            $0.isAvailable && !$0.isExpired && CosmeticSchedule.isReleased($0)
+        }
     }
     static var ballPool: [BallSkin] {
-        BallSkin.allCases.filter { !$0.isBundleExclusive && $0.tier != .starter }
+        BallSkin.allCases.filter {
+            !$0.isBundleExclusive && $0.tier != .starter && CosmeticSchedule.isReleased($0)
+        }
     }
     static var trailPool: [TrailColor] {
         // Exclude the free default (graphite), the bundle-only trails, and the
         // IAP-secret Money Roll.
         TrailColor.allCases.filter { $0.tier != .starter && !$0.isBundleExclusive
-            && $0 != .graphite && $0 != .air && $0 != .raybeam }
+            && $0 != .graphite && $0 != .air && $0 != .raybeam
+            && CosmeticSchedule.isReleased($0) }
     }
     static var goalPool: [GoalSkin] {
-        GoalSkin.allCases.filter { $0.tier != .starter }
+        GoalSkin.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
     }
     static var floorPool: [Floor] {
-        Floor.allCases.filter { $0.tier != .starter && !$0.isBundleExclusive }
+        Floor.allCases.filter {
+            $0.tier != .starter && !$0.isBundleExclusive && CosmeticSchedule.isReleased($0)
+        }
     }
     static var pitPool: [Pit] {
-        Pit.allCases.filter { $0.tier != .starter }
+        Pit.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
     }
     static var boundaryPool: [Boundary] {
-        Boundary.allCases.filter { $0.tier != .starter }
+        Boundary.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
     }
     static var musicPool: [MusicTrack] {
-        MusicTrack.allCases.filter { $0.tier != .starter }
+        MusicTrack.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
     }
 
     private static func pick<T>(_ pool: [T], _ window: Int, salt: Int) -> T? {
@@ -1737,30 +1908,58 @@ struct CosmeticBundle: Identifiable {
     /// True when this bundle has an expiry date (i.e., is seasonal).
     var isLimitedTime: Bool { availableUntil != nil }
 
+    /// Seasonal windows REPEAT EVERY YEAR.  `availableFrom` / `availableUntil`
+    /// describe the first window; this returns the earliest yearly repeat that
+    /// has not ended yet, so a season that has already passed simply comes
+    /// round again next year instead of disappearing for good.  nil for a
+    /// permanent bundle.  (Holidays that move — Lunar New Year, Mardi Gras —
+    /// keep the same calendar days each year; adjust the dates in an update
+    /// if exactness matters.)
+    func currentWindow(at now: Date = Date()) -> (from: Date, until: Date)? {
+        guard let until = availableUntil else { return nil }
+        let from = availableFrom ?? until
+        let calendar = Calendar(identifier: .gregorian)
+        for years in 0..<100 {
+            guard let end = calendar.date(byAdding: .year, value: years, to: until) else { break }
+            if now < end {
+                let start = calendar.date(byAdding: .year, value: years, to: from) ?? from
+                return (start, end)
+            }
+        }
+        return nil
+    }
+
+    /// True when `now` falls within the availability window (always true for
+    /// a permanent bundle — release timing is `CosmeticSchedule`'s job).
+    func isOpen(at now: Date) -> Bool {
+        guard isLimitedTime else {
+            if let from = availableFrom, now < from { return false }
+            return true
+        }
+        guard let window = currentWindow(at: now) else { return false }
+        return now >= window.from
+    }
+
     /// True when the current date falls within the availability window.
-    var isAvailable: Bool {
-        let now = Date()
-        if let from  = availableFrom,  now < from  { return false }
-        if let until = availableUntil, now >= until { return false }
-        return true
-    }
+    var isAvailable: Bool { isOpen(at: Date()) }
 
-    /// True when availableUntil is in the past.
+    /// True when a limited-time bundle has no future window left (never the
+    /// case in practice now that seasons repeat yearly).
     var isExpired: Bool {
-        guard let until = availableUntil else { return false }
-        return Date() >= until
+        isLimitedTime && currentWindow() == nil
     }
 
-    /// True when availableFrom is in the future (offer hasn't opened yet).
+    /// True when the offer hasn't opened yet (waiting for its next window).
     var isUpcoming: Bool {
+        if isLimitedTime { return !isAvailable && !isExpired }
         guard let from = availableFrom else { return false }
         return Date() < from
     }
 
-    /// Full days remaining until expiry.  nil when not limited or already
-    /// expired.  0 = "ends today" (less than 24 h left).
+    /// Full days remaining until the current window closes.  nil when not
+    /// limited or not currently open.  0 = "ends today" (less than 24 h left).
     var daysRemaining: Int? {
-        guard isLimitedTime, isAvailable, let until = availableUntil else { return nil }
+        guard isLimitedTime, isAvailable, let until = currentWindow()?.until else { return nil }
         let days = Calendar.current.dateComponents([.day], from: Date(), to: until).day ?? 0
         return max(0, days)
     }
@@ -2291,6 +2490,8 @@ struct CosmeticBundle: Identifiable {
         ),
 
         // ── Seasonal bundles (limited-time, return annually) ───────────
+        // The dates below are each season's FIRST window; it repeats on the
+        // same calendar days every year (CosmeticBundle.currentWindow).
         //
         // Items used here are shared with permanent bundles for now.  S4 will
         // add bespoke exclusive cosmetics (beach ball, sandy floor, wave trail,

@@ -26,3 +26,12 @@ constants tuned in `sim.py` carry straight into the Swift build.
 `sim.py` (run → render trajectory PNG → tune → repeat) is the source of truth for
 geometry + constants. When it plays great, port the geometry + the tuned numbers
 into the Swift Chipmunk layer.
+
+## Held back from v1.0
+
+`PinballView.swift` in this folder is the unfinished in-app Pinball view. It
+was removed from the Xcode project for v1.0 and is not built. To bring it
+back: add the file and the Chipmunk2D package to the app target again,
+re-register `PinballMode` in `GameMode.swift`, restore the leaderboard board
+and the four trophies (see `docs/trophies/trophy-catalog.md`), and add
+"pinball" back to `TrophyMetric.minigameModeIDs`.

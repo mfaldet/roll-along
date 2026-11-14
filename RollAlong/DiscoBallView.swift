@@ -363,7 +363,7 @@ struct DiscoBallView: View {
         .accessibilityHidden(true)
     }
 
-    /// Start-screen difficulty selector — pick Normal or Hardcore before each
+    /// Start-screen difficulty selector — pick Easy, Normal or Hardcore before each
     /// run, mirroring how the competitive games offer a difficulty first.
     private var difficultySelect: some View {
         ZStack {

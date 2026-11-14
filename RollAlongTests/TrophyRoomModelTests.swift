@@ -43,7 +43,7 @@ final class TrophyRoomModelTests: XCTestCase {
         super.tearDown()
     }
 
-    /// A fresh engine over the REAL bundled 89-trophy catalog, backed by a
+    /// A fresh engine over the REAL bundled 85-trophy catalog, backed by a
     /// throwaway defaults suite (the GameStateTests injected-defaults
     /// pattern). No GameState anywhere — this is the (d) acceptance proof:
     /// the model derives purely from `TrophyEngine`.
