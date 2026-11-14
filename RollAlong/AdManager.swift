@@ -84,7 +84,7 @@ final class AdManager: NSObject, ObservableObject {
         //     (Added in Google Mobile Ads SDK 13.3.0; replaces the deprecated
         //     tagForChildDirectedTreatment / tagForUnderAgeOfConsent.)
         let adConfig = MobileAds.shared.requestConfiguration
-        adConfig.maxAdContentRating = GADMaxAdContentRating.teen
+        adConfig.maxAdContentRating = .teen
         adConfig.ageRestrictedTreatment = .teen
         // Start the Mobile Ads SDK.  All ad requests are non-personalised.
         _ = await MobileAds.shared.start()

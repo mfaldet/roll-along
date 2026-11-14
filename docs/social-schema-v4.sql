@@ -54,6 +54,15 @@ returns boolean language sql immutable as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 0b · Tags no longer need to be unique
+-- ---------------------------------------------------------------------------
+-- A derived tag is two initials + the number, so two different names can share
+-- one ("Swift Comets 42" and "Solar Cedars 42" are both SC42).  The NAME index
+-- already guarantees clans are unique; keeping the tag index would reject
+-- free names as "taken".
+drop index if exists public.clans_tag_unique_idx;
+
+-- ---------------------------------------------------------------------------
 -- 1 · Rewrite existing rows that are not preset-format
 -- ---------------------------------------------------------------------------
 update public.players
@@ -77,8 +86,7 @@ begin
             candidate := 'Swift Comets ' || n;
             exit when not exists (
                 select 1 from public.clans
-                 where lower(name) = lower(candidate)
-                    or lower(tag)  = lower(public.ra_clan_tag_for(candidate)));
+                 where lower(name) = lower(candidate));
         end loop;
         update public.clans
            set name = candidate, tag = public.ra_clan_tag_for(candidate)

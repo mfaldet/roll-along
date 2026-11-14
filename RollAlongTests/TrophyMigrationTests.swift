@@ -480,7 +480,7 @@ final class TrophyMigrationTests: XCTestCase {
         writeStringSet(consecutiveDailyKeys(count: 60), key: "ra_dailyChallengeDone")
         defaults.set(45, forKey: "ra_dailyStreak")
 
-        // Minigames: all 12 played; 100+ competitive wins spread across the
+        // Minigames: all 11 played; 100+ competitive wins spread across the
         // 6 modes (≥10 each); Hard wins in all 6; big bests.
         writeStringSet(Set(TrophyMetric.minigameModeIDs), key: "ra_playedModeIDs")
         writeStringDict(["snake": 20, "sumo": 20, "paintball": 20,
