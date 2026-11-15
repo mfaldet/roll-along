@@ -885,7 +885,7 @@ final class TrophyEngineTests: XCTestCase {
 
         // A brand-new unlock after a successful sync re-arms the flag.
         XCTAssertEqual(relaunched.record(.climbTotalStars, value: 150).map(\.id),
-                       ["climb_stars_150"])
+                       ["climb_stars_50", "climb_stars_75", "climb_stars_150"])
         XCTAssertTrue(relaunched.isSyncDirty, "a later unlock re-arms the drained flag")
         XCTAssertTrue(defaults.bool(forKey: TrophyEngine.syncDirtyKey))
     }

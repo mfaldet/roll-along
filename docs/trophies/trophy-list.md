@@ -105,7 +105,7 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 | Bronze I | Taste of the Arcade | Play 5 different minigames. |
 | Bronze II | The Grand Tour | Play 10 different minigames. |
 
-**Stack: Difficulty** · icon `speedometer` · fallback `gauge`
+**Stack: Difficulty** · icon `speedometer` · fallback `chart.bar`
 
 | Step | Title | What it asks |
 |---|---|---|
@@ -117,7 +117,7 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
 | Six of the Best | Silver | Win at least once in each of the 6 competitive minigames. | `6.circle.fill` | `6.circle` |
-| Hundred-Round Veteran | Gold | Win 100 competitive minigame rounds. | `medal.fill` | `rosette` |
+| Hundred-Round Veteran | Gold | Win 100 competitive minigame rounds. | `shield.lefthalf.filled` | `shield` |
 
 ### Comet Clash
 
