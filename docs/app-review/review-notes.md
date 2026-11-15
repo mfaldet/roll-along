@@ -32,6 +32,9 @@ One rewarded video (Google AdMob), shown only when the player chooses "Watch ad"
 NAMES AND CHAT — NO USER-WRITTEN CONTENT
 Players cannot type any text that other players see. Nicknames (Settings > Nickname) and clan names are assembled from preset word lists plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
 
+CLANS AND RANKINGS
+A clan holds up to 12 players. The Clans screen has a read-only Rankings tab that orders clans by their members' total levels or total stars; there are no prizes and nothing can be bought there. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week. A player can ask their clan for a life; each clanmate can give one life to a request, at no cost to the giver. Lives received this way are the same in-game lives that refill free over time; nothing here has cash value and nothing is traded.
+
 ACCOUNT DELETION
 Settings > Account > Delete Account (visible when signed in). After confirming, Apple asks the player to confirm once more; the account and all its server data (profile, friends, clan membership, leaderboard entries, trophies) are then deleted immediately and the player is signed out.
 

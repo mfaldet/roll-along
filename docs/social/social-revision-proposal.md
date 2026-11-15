@@ -1,15 +1,29 @@
 # Social and clans revision proposal
 
-**Status: proposal only. Nothing built, nothing applied to the database.**
-Written 2026-11-15.
+**Status: the launch part is built (2026-11-15); Battle Week is designed,
+not built. Nothing has been applied to the database.**
+
+Decisions taken since this was written:
+
+- **Launch build:** level badge everywhere, weekly pace, read-only clan
+  rankings, compact clan header with a ranked member list, member cap, the
+  first score guards, and server-side battle-star counting. The database
+  side is `docs/social-schema-v5.sql`.
+- **Member cap is 12**, not the 30 first proposed.
+- **Battle Week is the first update. The first one runs February 1 to 7,
+  2027.** Prizes are coins and tickets for every tier as listed below, plus
+  one exclusive ball skin for the top tier. Promote and remove-member
+  controls also go in the first update.
+- **Clan life requests:** giving never costs the giver a life, and a player
+  can give to any one request only once (database rule in v5).
 
 **Goal:** a player's Adventure level becomes their public standing, other
 players' progress is easy to see, and clans compete.
 
 **In short:** parts (a) and (b) and a read-only version of (c) are small and
 could ship with version 1.0. Battle Week (d) needs server jobs, a prize
-claim, and a guard against faked scores; it should be the first update. A
-January 1 start is possible but tight.
+claim, and a guard against faked scores; it is the first update, with the
+first Battle Week on February 1 to 7, 2027.
 
 ---
 
@@ -119,19 +133,20 @@ refreshed every few minutes by a scheduled job; the app does not change.
 
 ### Opening a clan
 
-A compact header: name, tag, "23 / 30 members", total levels, total stars,
+A compact header: name, tag, "7 of 12 members", total levels, total stars,
 this week's levels (battle stars during Battle Week).
 
 Then the ranked member list. Each row: rank, name, role, level badge, stars,
 this week's contribution. Sorted by this week's contribution, with level as
 the alternative.
 
-### Member cap: 30
+### Member cap: 12
 
-There is none today. I propose **30**, enforced in the database so a
-modified app cannot exceed it.
+There was none. It is now **12**, enforced in the database so a modified app
+cannot exceed it (`clan_member_cap` in `docs/social-schema-v5.sql`; the app
+shows the same number from `Clan.memberCap`).
 
-- Large enough for a friend group or a family and their friends.
+- Large enough for a friend group or a family.
 - Small enough that a ranking by totals is a fair fight. Without a cap the
   biggest clan always wins and everyone joins it.
 - Battle Week scores are totals, so the cap is what keeps them comparable.
@@ -153,8 +168,10 @@ more for the role controls.
 ## d) Battle Week
 
 Days 1 to 7 of every month. A clan's score is its **battle stars**: the new
-Adventure stars its members earned in that week. First one: January 1 to 7,
-2027.
+Adventure stars its members earned in that week. First one: February 1 to
+7, 2027. The server already counts battle stars in days 1 to 7 of every
+month once v5 is applied, so January 1 to 7 is a silent rehearsal with no
+screens and no prizes.
 
 **The week is measured in UTC**, so it starts and ends at the same moment
 for everyone. The app shows the countdown in the player's local time.
@@ -373,7 +390,7 @@ clans can be added then without changing anything else.
 |---|---|---|---|---|
 | a) Level badge everywhere | ~150 lines | none | no | Low |
 | b) Weekly pace | ~120 lines | ~40 lines | no (trigger) | Low |
-| c) Clan rankings, clan header, ranked members, cap of 30 | ~400 lines | ~80 lines | no (view) | Medium |
+| c) Clan rankings, clan header, ranked members, cap of 12 | ~400 lines | ~80 lines | no (view) | Medium |
 | c) Role controls | ~150 lines | ~30 lines | no | Medium |
 | Anti-faking guards | none | ~60 lines | no | Low |
 | d) Battle Week | ~700 lines | ~250 lines | yes | High |
@@ -386,7 +403,7 @@ needs a build and a test pass on your side.
 - **a) Level badge.** App only.
 - **b) Weekly pace.**
 - **c) Rankings by total levels and stars**, the clan header, the ranked
-  member list and the cap of 30.
+  member list and the cap of 12.
 - **The first two anti-faking guards**, since rankings make faked numbers
   visible to everyone.
 - **Sending progress when stars change**, which (d) needs later and which
@@ -401,24 +418,26 @@ changes waiting for you. Role controls can wait.
 - **d) Battle Week**, with the remaining guards and the closing job.
 - **Role controls.**
 
-**About January 1.** For the first Battle Week to run January 1 to 7, the
-update has to be approved and in players' hands before then. That means
-submitting around December 20, in the days when App Review is typically at
-its slowest. The safer plan is to put the **counting** on the server before
-January 1 (it needs no app update beyond sending stars promptly, which is in
-the launch build), so January's battle stars are recorded either way, and
-let the Battle Week screens and prizes arrive with the update. If the update
-slips, January still has a real result to show; if that feels too tight, the
-first Battle Week moves to February 1 to 7 with nothing lost.
+**Timing.** The first Battle Week is February 1 to 7, 2027, so the update
+with the Battle Week screens, prize claim and role controls needs to be
+approved and in players' hands before February 1: submit by mid-January.
+Counting is already on the server from launch (v5), so January 1 to 7
+produces a real result to test the closing job against, with nothing shown
+to players.
+
+**With a cap of 12** the most a clan can score in a Battle Week is 12
+members × 150 counted stars a day × 7 days = 12,600 battle stars. The
+qualifying floor (25) and the Diamond floor (150) are unchanged.
 
 ---
 
-## Decisions needed
+## Decisions taken
 
-1. Member cap of 30?
-2. Coins and tickets as prizes, or exclusive cosmetics, or both?
-3. The tier amounts above?
-4. Role controls with the launch, or in the first update?
-5. House clans: no for now?
-6. First Battle Week January 1 to 7, with counting on the server first and
-   the screens in the update, or February 1 to 7?
+1. Member cap: **12**.
+2. Prizes: coins and tickets for every tier, plus one exclusive ball skin
+   for the top tier.
+3. Tier amounts: as in the table above.
+4. Role controls: first update.
+5. House clans: not now.
+6. First Battle Week: February 1 to 7, 2027; counting on the server from
+   launch.
