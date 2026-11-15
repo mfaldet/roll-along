@@ -463,39 +463,241 @@ struct TrophyToastHost: View {
     @ObservedObject var queue: TrophyToastQueue
     var hapticsEnabled: Bool = true
     var soundEnabled: Bool = true
-    /// Called when the player taps the banner (S2-T2 routes to the room).
+    /// Kept for source compatibility.  A tap now dismisses the moment.
     var onOpenTrophyRoom: ((TrophyToastBatch) -> Void)? = nil
 
-    /// Seconds a banner stays before auto-dismiss (design.md §6 ~3s).
+    /// Seconds a single trophy stays before auto-dismiss.
     var autoDismissSeconds: Double = 3.0
+    /// Seconds EACH trophy stays when several were earned in one run — they
+    /// are shown one after another, briefly.
+    var multiDwellSeconds: Double = 1.8
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Which trophy of the current batch is on screen.
+    @State private var index = 0
+
+    // The trophy moment: a card in the CENTER of the screen over a dimmed
+    // scrim.  It only ever appears on a result surface or a menu (the queue
+    // never presents during a run), and while it is up the scrim takes every
+    // touch, so nothing underneath — "Next level", "Play again" — can start
+    // until it is dismissed.  A tap dismisses it (or moves to the next trophy
+    // when several were earned).
     var body: some View {
-        VStack {
-            if let batch = queue.presented {
-                TrophyToastBanner(batch: batch,
-                                  hapticsEnabled: hapticsEnabled,
-                                  soundEnabled: soundEnabled,
-                                  onTap: { onOpenTrophyRoom?(batch) })
-                    .id(batch.id)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .task(id: batch.id) {
-                        // Auto-dismiss after the dwell window. Cancels
-                        // cleanly if the batch changes (new .task id).
-                        let ns = UInt64(autoDismissSeconds * 1_000_000_000)
-                        try? await Task.sleep(nanoseconds: ns)
-                        withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
-                            queue.dismissPresented()
-                        }
+        ZStack {
+            if let batch = queue.presented, !batch.trophies.isEmpty {
+                let i = min(index, batch.trophies.count - 1)
+                let trophy = batch.trophies[i]
+
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+
+                TrophyMomentCard(
+                    trophy: trophy,
+                    position: batch.count > 1 ? "\(i + 1) of \(batch.count)" : nil,
+                    hapticsEnabled: hapticsEnabled,
+                    soundEnabled: soundEnabled)
+                    .id(trophy.id)
+                    .padding(.horizontal, 28)
+                    .transition(reduceMotion ? .opacity
+                                             : .scale(scale: 0.85).combined(with: .opacity))
+                    .task(id: "\(batch.id.uuidString)|\(i)") {
+                        let dwell = batch.count > 1 ? multiDwellSeconds : autoDismissSeconds
+                        try? await Task.sleep(nanoseconds: UInt64(dwell * 1_000_000_000))
+                        if Task.isCancelled { return }
+                        advance(batch)
                     }
             }
-            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let batch = queue.presented { advance(batch) }
         }
         .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
                    value: queue.presented?.id)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: index)
         .allowsHitTesting(queue.presented != nil)
+        .onChange(of: queue.presented?.id) { _, _ in index = 0 }
+    }
+
+    /// Next trophy of the batch, or dismiss after the last one.
+    private func advance(_ batch: TrophyToastBatch) {
+        if index + 1 < batch.trophies.count {
+            index += 1
+        } else {
+            index = 0
+            queue.dismissPresented()
+        }
+    }
+}
+
+// MARK: - The trophy moment card
+
+/// A small four-point star for the sparkle burst (drawn, so it does not
+/// depend on any SF Symbol existing).
+struct TrophySparkleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let r = min(rect.width, rect.height) / 2
+        let inner = r * 0.28
+        var path = Path()
+        for k in 0..<8 {
+            let angle = Double(k) * .pi / 4 - .pi / 2
+            let radius = k % 2 == 0 ? r : inner
+            let p = CGPoint(x: c.x + CGFloat(cos(angle)) * radius,
+                            y: c.y + CGFloat(sin(angle)) * radius)
+            if k == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// One trophy, shown big: its own icon inside the tier-colored badge (round
+/// for a stack step, hexagon for a feat), the title, and — for a step of a
+/// stack — the stack and step name.  A short sparkle burst plays once; with
+/// Reduce Motion the card simply appears, with the same dwell.
+struct TrophyMomentCard: View {
+
+    let trophy: TrophyDefinition
+    /// "2 of 3" when several trophies are being shown in turn.
+    var position: String? = nil
+    var hapticsEnabled: Bool = true
+    var soundEnabled: Bool = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var burst = false
+
+    private var style: TrophyGradeStyle { TrophyGradeStyle.forTier(trophy.tier) }
+    private var isFeat: Bool {
+        TrophyCatalog.bundled.tile(forTrophyID: trophy.id)?.kind == .feat
+    }
+    /// "Levels passed · Silver II" for a stack step, else "Gold trophy".
+    private var detailLine: String {
+        TrophyIcon.stackStepLine(forTrophyID: trophy.id) ?? "\(trophy.tier.displayName) trophy"
+    }
+
+    var body: some View {
+        let accent = style.accent
+        VStack(spacing: 10) {
+            ZStack {
+                if !reduceMotion { sparkles(accent) }
+                if isFeat {
+                    TrophyHexagon().fill(accent.opacity(0.22))
+                    TrophyHexagon().stroke(accent, lineWidth: 4)
+                } else {
+                    Circle().fill(accent.opacity(0.22))
+                    Circle().stroke(accent, lineWidth: 4)
+                }
+                Image(systemName: TrophyIcon.name(forTrophyID: trophy.id) ?? style.glyph)
+                    .font(.system(size: 44, weight: .bold))
+                    .foregroundStyle(accent)
+            }
+            .frame(width: 112, height: 112)
+            .scaleEffect(reduceMotion || burst ? 1.0 : 0.6)
+            .padding(.bottom, 4)
+            .accessibilityHidden(true)
+
+            Text("TROPHY UNLOCKED")
+                .font(.caption.weight(.bold))
+                .kerning(1.2)
+                .foregroundStyle(.secondary)
+
+            Text(trophy.title)
+                .font(.system(.title2, design: .rounded).weight(.bold))
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+
+            Text(detailLine)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(accent)
+
+            Text(trophy.unlockedDescription)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let position {
+                Text(position)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Tap to continue")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
+        }
+        .padding(22)
+        .frame(maxWidth: 320)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(accent.opacity(0.85), lineWidth: 2)
+        )
+        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Trophy unlocked: \(trophy.title), \(detailLine).")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Dismisses this trophy.")
+        .onAppear {
+            Self.announce("Trophy unlocked: \(trophy.title), \(detailLine).")
+            Self.fireFeedback(style: style, haptics: hapticsEnabled, sound: soundEnabled)
+            if !reduceMotion {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) { burst = true }
+            }
+        }
+    }
+
+    /// Eight small stars that fly outward from the badge and fade, once.
+    private func sparkles(_ accent: Color) -> some View {
+        ZStack {
+            ForEach(0..<8, id: \.self) { k in
+                let angle = Double(k) * .pi / 4 + .pi / 8
+                let distance: CGFloat = burst ? 86 : 34
+                TrophySparkleShape()
+                    .fill(accent)
+                    .frame(width: k % 2 == 0 ? 16 : 11, height: k % 2 == 0 ? 16 : 11)
+                    .offset(x: CGFloat(cos(angle)) * distance,
+                            y: CGFloat(sin(angle)) * distance)
+                    .opacity(burst ? 0 : 1)
+                    .animation(.easeOut(duration: 0.9).delay(Double(k) * 0.04), value: burst)
+            }
+        }
+    }
+
+    private static func announce(_ text: String) {
+        #if canImport(UIKit)
+        UIAccessibility.post(notification: .announcement, argument: text)
+        #endif
+    }
+
+    /// The grade's haptic + the signature unlock sound, honoring the
+    /// player's haptics/sound settings.  Feedback only.
+    private static func fireFeedback(style: TrophyGradeStyle, haptics: Bool, sound: Bool) {
+        #if canImport(UIKit)
+        if haptics {
+            let generator: UIImpactFeedbackGenerator
+            switch style.impact {
+            case .light:  generator = UIImpactFeedbackGenerator(style: .light)
+            case .medium: generator = UIImpactFeedbackGenerator(style: .medium)
+            case .heavy:  generator = UIImpactFeedbackGenerator(style: .heavy)
+            }
+            generator.impactOccurred()
+            if style.diamondDoubleTap {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                }
+            }
+        }
+        #endif
+        AudioManager.shared.playWin(enabled: sound)
     }
 }
 

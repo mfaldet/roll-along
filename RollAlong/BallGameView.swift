@@ -841,12 +841,11 @@ struct BallGameView: View {
                 if showWelcomeMoment       { welcomeMomentOverlay }
                 if showTutorialReward      { tutorialRewardOverlay }
 
-                // S2-T2: trophy-unlock banner host.  Renders NOTHING until a
-                // result overlay drains the queue (never during play — the
-                // queue's own gating enforces that; §6).  Reuses the shop /
-                // IAP celebration grammar (top-of-screen auto-dismiss banner).
-                // Tap deep-links to the Trophy Room, wired in S2-T3; a no-op
-                // seam here so the banner is complete without the room.
+                // Trophy moment host.  Renders NOTHING until a result overlay
+                // drains the queue (never during play — the queue's own gating
+                // enforces that).  The moment is a centered card over a scrim
+                // that takes every touch, so the next level cannot start until
+                // it is dismissed (tap, or about 3 seconds).
                 TrophyToastHost(queue: gameState.trophyToasts,
                                 hapticsEnabled: gameState.hapticsEnabled,
                                 soundEnabled: gameState.soundEnabled)

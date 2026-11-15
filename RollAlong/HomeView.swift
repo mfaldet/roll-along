@@ -388,6 +388,20 @@ struct HomeView: View {
                         .zIndex(80)
                 }
 
+                // Trophy moment on the home screen itself: covers a trophy earned
+                // here (a daily reward claim) and anything a run left pending
+                // when the player came straight home.  Returning home counts as
+                // the end of any run.
+                // Only while Home is the front screen: a pushed game screen
+                // has its own host, and two hosts would play the moment twice.
+                if nav.path.isEmpty {
+                    TrophyToastHost(queue: gameState.trophyToasts,
+                                    hapticsEnabled: gameState.hapticsEnabled,
+                                    soundEnabled: gameState.soundEnabled)
+                        .zIndex(85)
+                        .onAppear { gameState.endTrophyRun() }
+                }
+
                 // Sign-in prompt — raised when a signed-out player taps a locked
                 // social button (Leaderboard / Clans / Friends).  Auto-dismisses
                 // the instant sign-in succeeds (see SignInPromptView).

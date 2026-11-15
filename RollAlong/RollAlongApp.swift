@@ -39,7 +39,13 @@ struct RollAlongApp: App {
                     // Restore a persisted Sign in with Apple session (refresh
                     // token in the Keychain) so the player stays signed in
                     // across launches without re-authenticating.
-                    await AppleAuthManager.shared.restoreSession()
+                    // Under the UI-test runner (`--uitesting`) the saved session
+                    // is NOT restored, so the tests always start signed out — on
+                    // a simulator and on a phone that has signed in before alike.
+                    // The saved session is untouched; a normal launch restores it.
+                    if !CommandLine.arguments.contains("--uitesting") {
+                        await AppleAuthManager.shared.restoreSession()
+                    }
                     // From here on, any sign-in — from Settings OR from the
                     // "Sign in to play with friends" prompt — creates/updates
                     // the player's public profile row.  Without this the row
