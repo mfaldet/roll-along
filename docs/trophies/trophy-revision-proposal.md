@@ -1,5 +1,9 @@
 # Trophy revision proposal
 
+> **Not adopted (2026-11-15).** This 48-trophy proposal was replaced by the
+> owner's own design: 92 trophies as stacks and feats. See
+> [`trophy-list.md`](trophy-list.md). Kept for the record only.
+
 **Status: proposal only.** Nothing in the catalog, the Swift code or the tests
 has been changed. Written 2026-11-15 against the 85-trophy catalog on the
 `claude/upbeat-einstein-3c16ns` branch.

@@ -1,5 +1,10 @@
 # Roll Along — Trophy System
 
+> **Current list (2026-11-15):** 92 trophies shown as 47 tiles. See
+> [trophy-list.md](trophy-list.md). The documents below describe the earlier
+> 89-trophy design and how the system works; the system is unchanged, the
+> list is not.
+
 *Package produced 2026-07-02 by a multi-agent research → design → plan → QA pipeline (24 agents across four workflow runs; every code claim adversarially verified against source).*
 
 **Provenance:** researched and code-verified at `064f3cd`; reconciled same day to `origin/main` `42d1925` (PRs #113/#114/#118/#119/#120/#122/#123/#124 merged in range — including the tier reprice); tip-drift note for `fb98819` (IAP launch-race fix, StoreKit-only) applied. Line refs are anchored by symbol; see [research/repo-delta-2026-07-02.md](research/repo-delta-2026-07-02.md) for the symbol→line map before trusting any `file:line`.

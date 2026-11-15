@@ -1,5 +1,12 @@
 # Roll Along — v1 Trophy Catalog
 
+> **Superseded for v1.0 (2026-11-15).** The shipping list is 92 trophies drawn
+> as 47 tiles (stacks and feats) in four sections. See
+> [`trophy-list.md`](trophy-list.md), generated from `TrophyCatalog.json`.
+> Ten trophies described below were removed, seventeen were added, and four
+> changed tier or threshold. The rest of this document is the earlier
+> 89-trophy design and is kept for its reasoning.
+
 > **v1.0 ships 85 of these 89 trophies (2026-11-13).** Pinball is held back
 > from v1.0, so `pinball_score_10k`, `pinball_score_50k`, `pinball_score_150k`
 > and `whimsy_roll_call` are not in the shipping `TrophyCatalog.json`. Platinum

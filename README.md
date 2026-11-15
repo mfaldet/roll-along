@@ -25,7 +25,7 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 ### Everything else
 
 - **Cosmetics.** 74 ball skins plus goals, trails, floors, pits, boundaries and music, bought with coins. Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
-- **Trophies.** 85 trophies in v1.0, with a Platinum for earning the 70 visible Bronze/Silver/Gold ones. Trophies never grant coins.
+- **Trophies.** 92 trophies in v1.0, shown in the Trophy Room as 47 tiles in four sections (Climb, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 74 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
 - **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Unlimited Lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
 - **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
 - **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
@@ -62,7 +62,7 @@ Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, J
 
 ## Planned
 
-- Pinball, rebuilt, in a later update (with its three score trophies and the "play every minigame" trophy going back to 12).
+- Pinball, rebuilt, in a later update, with its own trophies.
 - More Roll Out mazes.
 - Real sound effects.
 - iPad support.
