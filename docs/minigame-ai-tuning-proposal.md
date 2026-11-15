@@ -1,8 +1,70 @@
 # Competitive minigame opponents: how they work and how to tune them
 
-**Status: report and proposal. No code changed.** Written 2026-11-15 from a
-read of the six competitive minigames. Nothing here was measured by playing;
-where a number is a starting guess it says so.
+**Status: built (2026-11-15), not yet played.** The proposal below was
+approved and is in the code. It could not be compiled or played where it was
+written, so every number is still a starting guess to be checked on a phone.
+The sections after "Where the numbers live" are the original report and
+describe the opponents as they were BEFORE this change.
+
+## Where the numbers live
+
+Every tuning number is in one table: `OpponentTuning` in
+`RollAlong/GameState.swift`. Change a value, raise `OpponentTuning.version`
+by one, rebuild.
+
+| Number | Easy | Normal | Hard |
+|---|---|---|---|
+| Reaction delay | 0.45 s | 0.30 s | 0.18 s |
+| Aiming error (held 0.5 s) | 25° | 14° | 7° |
+| Mistake about every | 4 s | 7 s | 12 s |
+| Mistake lasts | 0.8 s | 0.6 s | 0.4 s |
+| Effort (share of full opponent push) | 40% | 55% | 70% |
+| Smash and Grab top speed | 72% | 85% | 100% |
+| Sumo Survival shove | 0.30 | 0.40 | 0.50 |
+| King of the Hill opponents going for the zone at once | 1 | 2 | 3 |
+
+"Full opponent push" is each game's own opponent base push (`aiAccelBase` in
+that game's file), which is already a little below the player's full-tilt
+push.
+
+Setup numbers in the same table: Sumo Survival start ring and first-target
+time, King of the Hill start ring, turn length, hang-back and overshoot
+distances, Comet Clash obstacle delay share, Smash and Grab coin spreading,
+Marble Cup sudden-death length.
+
+What was built:
+
+- **Shared:** `OpponentBrain` (same file) gives each opponent a delayed view
+  of its target, a held aiming error, scheduled mistakes and an effort share.
+  The old sway and one-frame dips are gone.
+- **Comet Clash:** chases where the spark was; notices a blocked path late;
+  during a mistake stops checking for obstacles.
+- **Sumo Survival:** all four marbles start evenly spaced on one ring (nobody
+  in the middle). Each opponent's first target is another opponent, for 4
+  seconds, then whoever is nearest. Shove strength follows difficulty. During
+  a mistake it ignores the rim.
+- **Paint Ball:** a mistake sends it to floor it has already painted, puddles
+  not avoided.
+- **Smash and Grab:** the bully's charge uses the same delayed, imperfect
+  aim. Opponents prefer different coins. A mistake sends one after the
+  farthest coin.
+- **Marble Cup:** a level score at full time goes to sudden death (next goal
+  wins) for up to 30 seconds. Still level is a draw: no win, no loss, not
+  counted in the win rate. During a mistake the opponent attacks the ball
+  from the wrong side. In 2v2 your teammate has the same limits.
+- **King of the Hill:** all four marbles start the same distance from the
+  first zone. Opponents take turns going for the zone (1 at a time on Easy, 2
+  on Normal, all 3 on Hard), switching every 6 seconds. A mistake is an
+  overshoot.
+- **Analytics:** `minigame_result` now also carries `placement`, `score`,
+  `best_rival_score`, `duration_s`, `draw` and `ai_version` (the tuning
+  version). Query 6 in `docs/soft-launch-metrics.sql` is rewritten to use it.
+
+Targets are now 70% / 50% / 30% (Easy / Normal / Hard).
+
+---
+
+# Original report (before the change)
 
 ## The main finding
 

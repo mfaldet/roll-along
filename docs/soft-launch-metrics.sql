@@ -106,18 +106,70 @@ group by 1
 order by clear_rate_pct;
 
 
--- 6. Competitive round completion + win-rate per mode -----------------------
--- Started vs over = do rounds get finished (or rage-quit)?  win-rate from the
--- 'won' property on the *_over events.
-select replace(replace(replace(event_name, '_round_over',''), '_match_over',''), '_game_over','') as mode,
-       count(*)                                                       as rounds_over,
+-- 6. Competitive win rate per game and difficulty ---------------------------
+-- From `minigame_result`, the one event every competitive game sends at the
+-- end of a round (game, difficulty, won, draw, placement, score,
+-- best_rival_score, duration_s, ai_version).  Draws (Marble Cup only) are
+-- left out of the win rate.  `ai_version` is the opponent tuning version
+-- (OpponentTuning.version in GameState.swift): compare like with like.
+-- Rounds sent by builds older than tuning version 2 have no ai_version.
+-- Targets for an average player: Easy 70%, Normal 50%, Hard 30%.
+select properties->>'game'                                            as game,
+       properties->>'difficulty'                                      as difficulty,
+       coalesce(properties->>'ai_version', 'pre-2')                   as ai_version,
+       count(*)                                                       as rounds,
        count(*) filter (where properties->>'won' = 'true')            as wins,
+       count(*) filter (where properties->>'draw' = 'true')           as draws,
        round(100.0 * count(*) filter (where properties->>'won' = 'true')
-             / nullif(count(*), 0), 1)                                as player_win_pct
+             / nullif(count(*) filter (where coalesce(properties->>'draw','false') <> 'true'), 0), 1)
+                                                                      as player_win_pct,
+       round(avg((properties->>'placement')::numeric), 2)             as avg_placement,
+       round(avg((properties->>'score')::numeric
+                 - (properties->>'best_rival_score')::numeric), 1)    as avg_margin,
+       round(avg((properties->>'duration_s')::numeric), 0)            as avg_seconds
 from events
-where event_name like '%_over'
+where event_name = 'minigame_result'
+group by 1, 2, 3
+order by 1, 3, 2;
+
+-- 6b. The same for "an average player": the MIDDLE of the per-install win
+-- rates, so a few people who play hundreds of rounds do not swamp the number.
+-- Only installs with at least 5 decided rounds in the cell are counted.
+with per_install as (
+    select user_id,
+           properties->>'game'                                        as game,
+           properties->>'difficulty'                                  as difficulty,
+           coalesce(properties->>'ai_version', 'pre-2')               as ai_version,
+           count(*)                                                   as rounds,
+           avg(case when properties->>'won' = 'true' then 1.0 else 0.0 end) as win_rate
+    from events
+    where event_name = 'minigame_result'
+      and coalesce(properties->>'draw','false') <> 'true'
+    group by 1, 2, 3, 4
+    having count(*) >= 5
+)
+select game, difficulty, ai_version,
+       count(*)                                                       as installs,
+       round(100.0 * (percentile_cont(0.5) within group (order by win_rate))::numeric, 1)
+                                                                      as median_win_pct,
+       round(100.0 * (percentile_cont(0.25) within group (order by win_rate))::numeric, 1)
+                                                                      as lower_quarter_pct,
+       round(100.0 * (percentile_cont(0.75) within group (order by win_rate))::numeric, 1)
+                                                                      as upper_quarter_pct
+from per_install
+group by 1, 2, 3
+order by 1, 3, 2;
+
+-- 6c. Do rounds get finished?  Started vs finished per game (a big gap means
+-- people quit mid-round).  Uses each game's own start event.
+select event_name, count(*) as n
+from events
+where event_name like '%_round_started'
+   or event_name like '%_match_started'
+   or event_name like '%_game_started'
+   or event_name = 'minigame_result'
 group by 1
-order by rounds_over desc;
+order by 1;
 
 
 -- 7. ⭐ SHARE-RATE — are wins share-worthy? (the virality experiment) --------

@@ -2366,9 +2366,15 @@ final class GameState: ObservableObject {
                               difficulty: MinigameDifficulty,
                               won: Bool,
                               score: Int,
-                              basePayout: Int) -> Int {
+                              basePayout: Int,
+                              draw: Bool = false,
+                              placement: Int? = nil,
+                              bestRivalScore: Int? = nil,
+                              durationSeconds: Int? = nil) -> Int {
         let key = Self.minigameDifficultyKey(modeID, difficulty)
-        minigameDifficultyPlays[key, default: 0] += 1
+        // A draw is not a win and not a loss: it is left out of the attempt
+        // count, so it does not pull the win rate down.
+        if !draw { minigameDifficultyPlays[key, default: 0] += 1 }
         if won {
             minigameDifficultyWins[key, default: 0] += 1
             recordCompetitiveWin(modeID)
@@ -2387,16 +2393,20 @@ final class GameState: ObservableObject {
         }
         let payout = minigamePayout(base: basePayout, difficulty: difficulty)
         if payout > 0 { addCoins(payout) }
-        AnalyticsClient.shared.track(
-            "minigame_result",
-            properties: [
-                "game":        .string(modeID),
-                "difficulty":  .string(difficulty.rawValue),
-                "won":         .bool(won),
-                "base_payout": .int(basePayout),
-                "payout":      .int(payout),
-            ]
-        )
+        var properties: [String: AnyEncodable] = [
+            "game":        .string(modeID),
+            "difficulty":  .string(difficulty.rawValue),
+            "won":         .bool(won),
+            "draw":        .bool(draw),
+            "base_payout": .int(basePayout),
+            "payout":      .int(payout),
+            "score":       .int(score),
+            "ai_version":  .int(OpponentTuning.version),
+        ]
+        if let placement       { properties["placement"]        = .int(placement) }
+        if let bestRivalScore  { properties["best_rival_score"] = .int(bestRivalScore) }
+        if let durationSeconds { properties["duration_s"]       = .int(durationSeconds) }
+        AnalyticsClient.shared.track("minigame_result", properties: properties)
         return payout
     }
 
@@ -2931,47 +2941,8 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Multiplier on rival steering acceleration — lower means lazier
-    /// course-corrections and wider cornering.
-    var aiAccelScale: CGFloat {
-        switch self {
-        case .easy:   return 0.55
-        case .normal: return 0.78
-        case .hard:   return 1.0
-        }
-    }
-
-    /// Multiplier on rival top speed — the main handicap: below 1.0 the
-    /// player can simply outrun the AI in a straight line.
-    var aiSpeedScale: CGFloat {
-        switch self {
-        case .easy:   return 0.72
-        case .normal: return 0.85
-        case .hard:   return 1.0
-        }
-    }
-
-    /// Peak aim wander (radians) layered onto rival steering so lower
-    /// difficulties don't track like homing missiles — they weave and drift
-    /// off-target for a beat, the way a person misjudges.  Zero on Hard, which
-    /// keeps the surgical pursuit players expect at the top.
-    var aiAimError: CGFloat {
-        switch self {
-        case .easy:   return 1.15   // markedly wider wander than Normal
-        case .normal: return 0.42
-        case .hard:   return 0.0
-        }
-    }
-
-    /// Per-tick chance a rival momentarily eases off the gas — a human "let off"
-    /// beat that breaks relentless pursuit.  Zero on Hard.
-    var aiHesitationChance: Double {
-        switch self {
-        case .easy:   return 0.28   // eases off far more often than Normal
-        case .normal: return 0.08
-        case .hard:   return 0.0
-        }
-    }
+    // Opponent strength per difficulty lives in `OpponentTuning` (below) —
+    // one table for all six competitive minigames.
 
     /// Payout multiplier applied to a competitive minigame's coin winnings.
     /// Compressed spread (2026-07-01 economy calibration, see
@@ -2996,53 +2967,238 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The win-rate each difficulty is *designed* to land near — the calibration
-    /// target for `payoutMultiplier` (payout ≈ inversely proportional to win
-    /// odds → roughly even expected value).  Retune the scale tables when the
-    /// tracked rates (`GameState.minigameSuccessRate`) drift far from these.
+    /// The win rate each difficulty is designed to land near for an average
+    /// player.  Documentation and test-report target only; nothing in the game
+    /// reads it.  Retune `OpponentTuning` when real results drift from these.
     var targetWinRate: Double {
         switch self {
-        case .easy:   return 0.80
-        case .normal: return 0.45
-        case .hard:   return 0.22
+        case .easy:   return 0.70
+        case .normal: return 0.50
+        case .hard:   return 0.30
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// MinigameAI — shared "humanizer" for rival steering across the competitive
-// minigames.  Turns flawless homing into something that reads as a person:
-// a slow, organic aim weave plus occasional eased-off ticks, both scaled by
-// `MinigameDifficulty`.  Stateless — every wobble is derived from (seed, tick),
-// so callers need no per-bot storage; pass a stable per-rival `seed` (its colour
-// index or slot) and the view's tick counter.
-// ---------------------------------------------------------------------------
-enum MinigameAI {
-    /// The aim-wander (radians) to add to a rival's heading this tick — a slow
-    /// two-frequency weave so the bot drifts off-target and back, rather than
-    /// snapping.  Zero when the difficulty asks for surgical aim (Hard).
-    static func weaveAngle(seed: Int, tick: Int, difficulty: MinigameDifficulty) -> CGFloat {
-        let error = difficulty.aiAimError
-        guard error > 0 else { return 0 }
-        let t = Double(tick), s = Double(seed)
-        // ~2.3s and ~8s periods: a gentle sway layered on a longer drift.
-        let weave = sin(t * 0.045 + s * 2.1) * 0.5
-                  + sin(t * 0.013 + s * 1.3) * 0.5
-        return CGFloat(weave) * error
+// ===========================================================================
+// OpponentTuning — EVERY opponent tuning number, in one place.
+//
+// To retune: change a value here, raise `version` by one, rebuild.  All six
+// competitive minigames (Comet Clash, Sumo Survival, Paint Ball, Smash and
+// Grab, Marble Cup, King of the Hill) read these and nothing else.
+// ===========================================================================
+enum OpponentTuning {
+
+    /// Tuning-version number.  Sent with every finished round as `ai_version`
+    /// so results before and after a change can be told apart.  RAISE IT BY
+    /// ONE whenever any number in this table changes.
+    static let version = 2
+
+    /// The human limits of one difficulty.
+    struct Limits {
+        /// Seconds between something happening and the opponent acting on it.
+        let reactionDelaySeconds: Double
+        /// It aims off-target by up to this many degrees either way.
+        let aimErrorDegrees: Double
+        /// A visible mistake happens about this often (seconds)…
+        let mistakeEverySeconds: Double
+        /// …and lasts this long (seconds).
+        let mistakeLengthSeconds: Double
+        /// Share of the game's full opponent push it uses (1.0 = everything).
+        let effort: Double
+        /// Smash and Grab only: share of top speed it may reach.
+        let smashGrabTopSpeed: Double
+        /// Sumo Survival only: how hard it leans into a shove (a firm player
+        /// tilt is about 0.8 to 1.0).
+        let sumoShove: Double
+        /// King of the Hill only: how many opponents go for the zone at once.
+        /// The rest hang back and take turns.
+        let kothContenders: Int
     }
 
-    /// A steering acceleration toward (dx, dy) at magnitude `scale`, but aimed
-    /// imperfectly (weave) and occasionally eased off (hesitation) per the
-    /// difficulty.  Drop-in replacement for a `unit(dx:dy:scale:)` chase vector.
-    static func humanizedSteer(dx: CGFloat, dy: CGFloat, scale: CGFloat,
-                               seed: Int, tick: Int,
-                               difficulty: MinigameDifficulty) -> CGVector {
+    static let easy = Limits(
+        reactionDelaySeconds: 0.45,
+        aimErrorDegrees:      25,
+        mistakeEverySeconds:  4,
+        mistakeLengthSeconds: 0.8,
+        effort:               0.40,
+        smashGrabTopSpeed:    0.72,
+        sumoShove:            0.30,
+        kothContenders:       1)
+
+    static let normal = Limits(
+        reactionDelaySeconds: 0.30,
+        aimErrorDegrees:      14,
+        mistakeEverySeconds:  7,
+        mistakeLengthSeconds: 0.6,
+        effort:               0.55,
+        smashGrabTopSpeed:    0.85,
+        sumoShove:            0.40,
+        kothContenders:       2)
+
+    static let hard = Limits(
+        reactionDelaySeconds: 0.18,
+        aimErrorDegrees:      7,
+        mistakeEverySeconds:  12,
+        mistakeLengthSeconds: 0.4,
+        effort:               0.70,
+        smashGrabTopSpeed:    1.0,
+        sumoShove:            0.50,
+        kothContenders:       3)
+
+    static func limits(for difficulty: MinigameDifficulty) -> Limits {
+        switch difficulty {
+        case .easy:   return easy
+        case .normal: return normal
+        case .hard:   return hard
+        }
+    }
+
+    // ---- Shared by every difficulty --------------------------------------
+
+    /// An aiming error is held this long (seconds) before a new one is picked,
+    /// so the opponent really misses instead of wobbling around the target.
+    static let aimErrorHoldSeconds: Double = 0.5
+    /// Mistakes are not on a clock: each gap is the difficulty's
+    /// `mistakeEverySeconds` stretched or shrunk by up to this share.
+    static let mistakeTimingSpread: Double = 0.4
+
+    // ---- Game setup ------------------------------------------------------
+
+    /// Comet Clash: obstacles are noticed after this share of the reaction
+    /// delay (a full delay would fly every opponent into the first trail).
+    static let cometObstacleDelayShare: Double = 0.25
+    /// Sumo Survival: all four marbles start on a ring this share of the way
+    /// out from the center, evenly spaced.  Nobody starts in the middle.
+    static let sumoStartRing: Double = 0.50
+    /// Sumo Survival: each opponent's first target is another OPPONENT, picked
+    /// at random, held this long (seconds) before it goes for whoever is nearest.
+    static let sumoFirstTargetSeconds: Double = 4
+    /// King of the Hill: all four marbles start this share of the smaller
+    /// field side away from the first zone, evenly spaced.
+    static let kothStartRing: Double = 0.30
+    /// King of the Hill: the opponents allowed to go for the zone change this
+    /// often (seconds).
+    static let kothRotateSeconds: Double = 6
+    /// King of the Hill: opponents waiting their turn keep this far (points)
+    /// from the zone.
+    static let kothHangBackDistance: Double = 130
+    /// King of the Hill: during a mistake an opponent rolls on this far
+    /// (points) past the zone.
+    static let kothOvershootDistance: Double = 120
+    /// Smash and Grab: each opponent prefers a coin no other opponent is
+    /// closer to, so the three do not all chase the same one.
+    static let smashGrabSpreadOut = true
+    /// Marble Cup: a level score at full time goes to sudden death (next goal
+    /// wins) for at most this long (seconds).  Still level after that is a
+    /// draw: not a win and not a loss.
+    static let marbleCupSuddenDeathSeconds = 30
+}
+
+// ---------------------------------------------------------------------------
+// OpponentBrain — one opponent's human limits, tick by tick.  Each opponent in
+// each competitive minigame owns one.  It gives the steering code four things:
+//   • `perceive(_:)`   — where the target WAS one reaction delay ago;
+//   • `push(...)`      — a push toward a point, aimed off by the held aiming
+//                        error and scaled by effort;
+//   • `isMistaking`    — true during a visible mistake (each game decides
+//                        what the mistake looks like);
+//   • `effort`         — the share of full push to use.
+// Call `advance()` exactly once per 60 Hz tick.  All numbers come from
+// `OpponentTuning`.  The random source is seedable so a headless simulation
+// can be repeated.
+// ---------------------------------------------------------------------------
+struct OpponentBrain {
+
+    let limits: OpponentTuning.Limits
+
+    /// Share of full push this opponent uses.
+    var effort: CGFloat { CGFloat(limits.effort) }
+    /// True while the opponent is in the middle of a visible mistake.
+    var isMistaking: Bool { mistakeTicksLeft > 0 }
+    /// The aiming error (radians) currently being held.
+    private(set) var aimError: CGFloat = 0
+
+    private var rngState: UInt64
+    private var seen: [CGPoint] = []
+    private var aimHoldTicksLeft = 0
+    private var mistakeTicksLeft = 0
+    private var ticksUntilMistake = 0
+
+    init(difficulty: MinigameDifficulty, seed: UInt64? = nil) {
+        limits = OpponentTuning.limits(for: difficulty)
+        rngState = seed ?? UInt64.random(in: 1...UInt64.max)
+        ticksUntilMistake = nextMistakeGap()
+    }
+
+    /// Ticks of reaction delay.
+    var delayTicks: Int { max(0, Int((limits.reactionDelaySeconds * 60).rounded())) }
+
+    /// Step the timers one tick.  Returns true on the tick a mistake BEGINS.
+    @discardableResult
+    mutating func advance() -> Bool {
+        if aimHoldTicksLeft <= 0 {
+            let maxError = limits.aimErrorDegrees * Double.pi / 180
+            aimError = CGFloat((unitRandom() * 2 - 1) * maxError)
+            aimHoldTicksLeft = max(1, Int((OpponentTuning.aimErrorHoldSeconds * 60).rounded()))
+        }
+        aimHoldTicksLeft -= 1
+
+        if mistakeTicksLeft > 0 {
+            mistakeTicksLeft -= 1
+            return false
+        }
+        ticksUntilMistake -= 1
+        if ticksUntilMistake <= 0 {
+            mistakeTicksLeft = max(1, Int((limits.mistakeLengthSeconds * 60).rounded()))
+            ticksUntilMistake = nextMistakeGap()
+            return true
+        }
+        return false
+    }
+
+    /// Feed the true target position for this tick; get back where it was one
+    /// reaction delay ago.  (Early in a round, before a full delay has passed,
+    /// this is the first position it ever saw.)
+    mutating func perceive(_ current: CGPoint) -> CGPoint {
+        seen.append(current)
+        let keep = delayTicks + 1
+        if seen.count > keep { seen.removeFirst(seen.count - keep) }
+        return seen[0]
+    }
+
+    /// Forget what was seen (new round, new kickoff).
+    mutating func forget() { seen.removeAll(keepingCapacity: true) }
+
+    /// A unit direction turned by the held aiming error.
+    func aimed(dx: CGFloat, dy: CGFloat) -> CGVector {
         let m = hypot(dx, dy)
         guard m > 0 else { return .zero }
-        let ang = atan2(dy, dx) + weaveAngle(seed: seed, tick: tick, difficulty: difficulty)
-        var thrust = scale
-        let hesitation = difficulty.aiHesitationChance
-        if hesitation > 0, Double.random(in: 0..<1) < hesitation { thrust *= 0.35 }
-        return CGVector(dx: cos(ang) * thrust, dy: sin(ang) * thrust)
+        let angle = atan2(dy, dx) + aimError
+        return CGVector(dx: cos(angle), dy: sin(angle))
+    }
+
+    /// A push from `from` toward `target`: aimed off by the held error, at
+    /// `fullPush` × effort.
+    func push(from: CGPoint, toward target: CGPoint, fullPush: CGFloat) -> CGVector {
+        let d = aimed(dx: target.x - from.x, dy: target.y - from.y)
+        let strength = fullPush * effort
+        return CGVector(dx: d.dx * strength, dy: d.dy * strength)
+    }
+
+    /// A random number in 0..<1 from this brain's own seedable source.
+    mutating func unitRandom() -> Double {
+        // SplitMix64.
+        rngState &+= 0x9E37_79B9_7F4A_7C15
+        var z = rngState
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        z ^= z >> 31
+        return Double(z >> 11) / 9_007_199_254_740_992.0
+    }
+
+    private mutating func nextMistakeGap() -> Int {
+        let spread = OpponentTuning.mistakeTimingSpread
+        let factor = 1 + (unitRandom() * 2 - 1) * spread
+        return max(1, Int((limits.mistakeEverySeconds * factor * 60).rounded()))
     }
 }

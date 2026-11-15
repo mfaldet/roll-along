@@ -31,9 +31,9 @@ struct PaintBallView: View {
 
     private let marbleRadius: CGFloat = 16
     private let playerAccel:  CGFloat = 1_500     // your tilt → acceleration
-    private let aiAccelBase:  CGFloat = 1_150     // a touch slower than you
-    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
-    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
+    /// Full opponent push.  Each opponent uses its effort share of this
+    /// (`OpponentTuning`).
+    private let aiAccelBase:  CGFloat = 1_150
     private let friction:     CGFloat = 0.990
     private let maxSpeed:     CGFloat = 620
     private let wallBounce:   CGFloat = 0.70
@@ -93,6 +93,8 @@ struct PaintBallView: View {
     // MARK: - State
 
     @State private var painters: [Painter] = []
+    /// One brain per opponent (human limits from `OpponentTuning`), by color.
+    @State private var brains: [Int: OpponentBrain] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     /// Recent positions per painter (colorIndex → points) for the trail layer.
@@ -584,6 +586,7 @@ struct PaintBallView: View {
             zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         trails = [:]
         painters = fresh
+        brains = [:]
     }
 
     private func endRound() {
@@ -599,7 +602,10 @@ struct PaintBallView: View {
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "paintball", difficulty: gameState.minigameDifficulty,
-                won: playerWon, score: pct, basePayout: base)
+                won: playerWon, score: pct, basePayout: base,
+                placement: 1 + (1..<coverage.count).filter { coverage[$0] > coverage[0] }.count,
+                bestRivalScore: (1..<coverage.count).map { percent($0) }.max() ?? 0,
+                durationSeconds: roundTick / 60)
             AnalyticsClient.shared.track(
                 "paintball_round_over",
                 properties: ["won": .bool(playerWon),
@@ -688,36 +694,51 @@ struct PaintBallView: View {
         p.stuckPit = -1
     }
 
+    /// Opponent steering.  Human limits (`OpponentTuning`): it heads for
+    /// where its chosen spot WAS one reaction delay ago (so a new choice takes
+    /// a moment to show), with a held aiming error, at its effort share; and
+    /// when a mistake begins it picks a BAD spot — floor it has already
+    /// painted, puddles not avoided — and rolls there.
     private func steerBot(_ p: inout Painter) {
-        if localTick >= p.retargetAt
-            || hypot(p.target.x - p.pos.x, p.target.y - p.pos.y) < 40 {
+        var brain = brains[p.colorIndex] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        let mistakeBegan = brain.advance()
+        if mistakeBegan {
+            p.target = pickTarget(for: p, badly: true)
+            p.retargetAt = localTick + retargetTicks
+        } else if !brain.isMistaking,
+                  localTick >= p.retargetAt
+                    || hypot(p.target.x - p.pos.x, p.target.y - p.pos.y) < 40 {
             p.target = pickTarget(for: p)
             p.retargetAt = localTick + retargetTicks
         }
         let dt: CGFloat = 1.0 / 60.0
-        let s = MinigameAI.humanizedSteer(dx: p.target.x - p.pos.x, dy: p.target.y - p.pos.y,
-                                          scale: aiAccel, seed: p.colorIndex, tick: localTick,
-                                          difficulty: gameState.minigameDifficulty)
+        let seen = brain.perceive(p.target)
+        let s = brain.push(from: p.pos, toward: seen, fullPush: aiAccelBase)
+        brains[p.colorIndex] = brain
         p.vel.dx += s.dx * dt
         p.vel.dy += s.dy * dt
     }
 
     /// Sample a handful of points and head for the most worthwhile one:
-    /// bare floor beats a rival's paint beats the bot's own colour.
-    private func pickTarget(for p: Painter) -> CGPoint {
+    /// bare floor beats a rival's paint beats the bot's own color.
+    /// `badly` is the mistake version: its own color scores best and puddles
+    /// are not avoided.
+    private func pickTarget(for p: Painter, badly: Bool = false) -> CGPoint {
         var best = p.pos
         var bestScore = -1
         let margin: CGFloat = 36
         for _ in 0..<10 {
             let x = CGFloat.random(in: margin...(arena.width - margin))
             let y = CGFloat.random(in: margin...(arena.height - margin))
-            if pits.contains(where: { hypot(x - $0.pos.x, y - $0.pos.y) < $0.radius + marbleRadius * 1.5 }) {
+            if !badly,
+               pits.contains(where: { hypot(x - $0.pos.x, y - $0.pos.y) < $0.radius + marbleRadius * 1.5 }) {
                 continue
             }
             let col = min(cols - 1, max(0, Int(x / cellW)))
             let row = min(rows - 1, max(0, Int(y / cellH)))
             let v = grid[row * cols + col]
-            let worth = (v < 0) ? 2 : (Int(v) == p.colorIndex ? 0 : 1)
+            let good = (v < 0) ? 2 : (Int(v) == p.colorIndex ? 0 : 1)
+            let worth = badly ? 2 - good : good
             let travel = Int(hypot(x - p.pos.x, y - p.pos.y) / 18)
             let score = worth * 1_000 + travel + Int.random(in: 0...40)
             if score > bestScore { bestScore = score; best = CGPoint(x: x, y: y) }

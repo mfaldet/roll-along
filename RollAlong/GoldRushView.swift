@@ -582,7 +582,10 @@ struct GoldRushView: View {
             difficulty: gameState.minigameDifficulty,
             won: engine.playerWon,
             score: engine.playerScore,
-            basePayout: base)
+            basePayout: base,
+            placement: engine.playerPlacement,
+            bestRivalScore: engine.bestRivalScore,
+            durationSeconds: engine.roundSecondsPlayed)
         // Leaderboard "best" for Smash and Grab = most coins grabbed in one
         // round (win or lose), like every other competitive mode.
         gameState.recordCompetitiveScore("goldrush", engine.playerScore)
@@ -612,9 +615,7 @@ struct GoldRushView: View {
         engine.playerInput = CGVector(dx: CGFloat(motion.gravity.x),
                                       dy: CGFloat(motion.gravity.y))
         let difficulty = gameState.minigameDifficulty
-        engine.aiAccelScale = difficulty.aiAccelScale
-        engine.aiSpeedScale = difficulty.aiSpeedScale
-        engine.difficulty   = difficulty
+        engine.difficulty = difficulty       // opponents read OpponentTuning for it
         let wasOver = engine.isOver
         engine.tick()
         syncFromEngine()

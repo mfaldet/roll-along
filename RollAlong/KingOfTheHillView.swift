@@ -31,9 +31,9 @@ struct KingOfTheHillView: View {
 
     private let marbleRadius: CGFloat = 17
     private let playerAccel:  CGFloat = 1_500
+    /// Full opponent push.  Each opponent uses its effort share of this
+    /// (`OpponentTuning`).
     private let aiAccelBase:  CGFloat = 1_250
-    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
-    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let friction:     CGFloat = 0.990
     private let maxSpeed:     CGFloat = 660
     private let wallBounce:   CGFloat = 0.70
@@ -78,6 +78,8 @@ struct KingOfTheHillView: View {
     // MARK: - State
 
     @State private var racers: [Racer] = []
+    /// One brain per opponent (human limits from `OpponentTuning`), by color.
+    @State private var brains: [Int: OpponentBrain] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     /// Recent positions per racer (colorIndex → points) for the trail layer.
@@ -466,12 +468,18 @@ struct KingOfTheHillView: View {
         zoneCenter = CGPoint(x: field.midX, y: field.midY)
         zoneTarget = randomZonePoint()
 
-        var fresh: [Racer] = [Racer(pos: CGPoint(x: field.midX, y: field.maxY - 40),
+        // Fair start: all four marbles on one circle around the first zone
+        // (the field center), evenly spaced, the player at the bottom — so
+        // the player is exactly as far from the zone as every opponent.
+        brains = [:]
+        let startR = min(field.width, field.height) * CGFloat(OpponentTuning.kothStartRing)
+        let total = Double(rivalCount + 1)
+        var fresh: [Racer] = [Racer(pos: clampToField(CGPoint(x: field.midX, y: field.midY + startR)),
                                     colorIndex: 0, isPlayer: true)]
         for i in 0..<rivalCount {
-            let angle = (Double(i) / Double(rivalCount)) * 2 * .pi
-            let p = CGPoint(x: field.midX + CGFloat(cos(angle)) * field.width * 0.3,
-                            y: field.midY + CGFloat(sin(angle)) * field.height * 0.22)
+            let angle = Double.pi / 2 + (Double(i + 1) / total) * 2 * Double.pi
+            let p = CGPoint(x: field.midX + CGFloat(cos(angle)) * startR,
+                            y: field.midY + CGFloat(sin(angle)) * startR)
             fresh.append(Racer(pos: clampToField(p),
                                colorIndex: (i % (Self.palette.count - 1)) + 1,
                                isPlayer: false))
@@ -496,7 +504,10 @@ struct KingOfTheHillView: View {
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "koth", difficulty: gameState.minigameDifficulty,
-                won: playerWon, score: holdSec, basePayout: base)
+                won: playerWon, score: holdSec, basePayout: base,
+                placement: 1 + racers.filter { !$0.isPlayer && $0.holdTicks > playerHoldTicks }.count,
+                bestRivalScore: bestRivalHoldTicks / 60,
+                durationSeconds: roundTick / 60)
             AnalyticsClient.shared.track(
                 "koth_round_over",
                 properties: ["won": .bool(playerWon),
@@ -532,11 +543,7 @@ struct KingOfTheHillView: View {
                 racers[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
                 racers[i].vel.dy += CGFloat(motion.gravity.y) * playerAccel * dt
             } else {
-                let s = MinigameAI.humanizedSteer(
-                    dx: zoneCenter.x - racers[i].pos.x,
-                    dy: zoneCenter.y - racers[i].pos.y, scale: aiAccel,
-                    seed: racers[i].colorIndex, tick: localTick,
-                    difficulty: gameState.minigameDifficulty)
+                let s = opponentSteer(racers[i])
                 racers[i].vel.dx += s.dx * dt
                 racers[i].vel.dy += s.dy * dt
             }
@@ -556,6 +563,43 @@ struct KingOfTheHillView: View {
         for r in racers { recordTrail(&trails, r.colorIndex, r.pos) }
 
         if roundTick >= roundTicks { endRun() }
+    }
+
+    /// Opponent steering.  Only some opponents go for the zone at a time
+    /// (`kothContenders` per difficulty, taking turns every
+    /// `kothRotateSeconds`); the others hang back at a distance.  Human limits
+    /// (`OpponentTuning`): it heads for where its goal WAS one reaction delay
+    /// ago, with a held aiming error, at its effort share; and during a
+    /// mistake a contender overshoots — it rolls on past the zone.
+    private func opponentSteer(_ r: Racer) -> CGVector {
+        var brain = brains[r.colorIndex] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        brain.advance()
+
+        // Whose turn is it?  Opponent colors are 1…rivalCount.
+        let slot = max(0, r.colorIndex - 1)
+        let turn = roundTick / max(1, Int(OpponentTuning.kothRotateSeconds * 60))
+        let contesting = (slot + turn) % max(1, rivalCount) < brain.limits.kothContenders
+
+        var goal = zoneCenter
+        if contesting {
+            let speed = hypot(r.vel.dx, r.vel.dy)
+            if brain.isMistaking && speed > 1 {
+                let over = CGFloat(OpponentTuning.kothOvershootDistance)
+                goal = CGPoint(x: zoneCenter.x + r.vel.dx / speed * over,
+                               y: zoneCenter.y + r.vel.dy / speed * over)
+            }
+        } else {
+            // Wait at a distance, on its own side of the zone.
+            let back = CGFloat(OpponentTuning.kothHangBackDistance)
+            var away = unit(dx: r.pos.x - zoneCenter.x, dy: r.pos.y - zoneCenter.y, scale: 1)
+            if away.dx == 0 && away.dy == 0 { away = CGVector(dx: 0, dy: -1) }
+            goal = clampToField(CGPoint(x: zoneCenter.x + away.dx * back,
+                                        y: zoneCenter.y + away.dy * back))
+        }
+
+        let seen = brain.perceive(goal)
+        brains[r.colorIndex] = brain
+        return brain.push(from: r.pos, toward: seen, fullPush: aiAccelBase)
     }
 
     /// The hill wanders toward a waypoint, picking a fresh one when it arrives.

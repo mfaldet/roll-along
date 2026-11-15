@@ -34,9 +34,9 @@ struct MarbleCupView: View {
     private let marbleRadius: CGFloat = 18
     private let ballRadius:   CGFloat = 14
     private let playerAccel:  CGFloat = 1_320     // calmer roll — the match was too hectic
-    private let aiAccelBase:  CGFloat = 1_060     // a touch slower than you
-    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
-    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
+    /// Full opponent push.  Each opponent (and your 2v2 teammate) uses its
+    /// effort share of this (`OpponentTuning`).
+    private let aiAccelBase:  CGFloat = 1_060
     private let marbleFriction: CGFloat = 0.990
     private let ballFriction:   CGFloat = 0.993   // the ball glides further
     private let marbleMaxSpeed: CGFloat = 560      // calmer roll (was 660)
@@ -100,6 +100,12 @@ struct MarbleCupView: View {
     // MARK: - State
 
     @State private var movers: [Mover] = []
+    /// One brain per computer-controlled marble (human limits from
+    /// `OpponentTuning`).  Cleared at every kickoff.
+    @State private var brains: [UUID: OpponentBrain] = [:]
+    /// Level at full time: the next goal wins (see
+    /// `OpponentTuning.marbleCupSuddenDeathSeconds`).
+    @State private var suddenDeath = false
     /// Per-AI keystone look (skin+trail+name), keyed by mover id, dealt in
     /// `placeForKickoff()`.  2v2 deals an ally + two rivals.
     @State private var aiLooks: [UUID: RivalCosmetics.Look] = [:]
@@ -401,7 +407,8 @@ struct MarbleCupView: View {
     }
 
     private var timeString: String {
-        String(format: "%d:%02d", secondsLeft / 60, secondsLeft % 60)
+        if suddenDeath { return "NEXT GOAL WINS" }
+        return String(format: "%d:%02d", secondsLeft / 60, secondsLeft % 60)
     }
 
     private var goalBanner: some View {
@@ -621,6 +628,7 @@ struct MarbleCupView: View {
         playerGoals = 0
         aiGoals = 0
         celebrateUntil = 0
+        suddenDeath = false
         loadMap()
         placeForKickoff()
     }
@@ -670,6 +678,7 @@ struct MarbleCupView: View {
         for (k, ai) in ais.enumerated() where k < looks.count { byId[ai.id] = looks[k] }
         aiLooks = byId
         trails = [:]
+        brains = [:]
     }
 
     /// Pick the format and kick off.  (Tapping a start-screen button calls this.)
@@ -688,6 +697,8 @@ struct MarbleCupView: View {
         guard !isOver else { return }
         isOver = true
         playerWon = playerGoals > aiGoals
+        // Still level after sudden death: a true draw — not a win, not a loss.
+        let isDraw = playerGoals == aiGoals
         if !awarded {
             awarded = true
             let base = matchBasePayout(goals: playerGoals, won: playerWon)
@@ -695,10 +706,16 @@ struct MarbleCupView: View {
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "marblecup", difficulty: gameState.minigameDifficulty,
-                won: playerWon, score: playerGoals, basePayout: base)
+                won: playerWon, score: playerGoals, basePayout: base,
+                draw: isDraw,
+                placement: isDraw ? nil : (playerWon ? 1 : 2),
+                bestRivalScore: aiGoals,
+                durationSeconds: roundTick / 60)
             AnalyticsClient.shared.track(
                 "marblecup_match_over",
                 properties: ["won": .bool(playerWon),
+                             "draw": .bool(isDraw),
+                             "sudden_death": .bool(suddenDeath),
                              "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "goals_for": .int(playerGoals),
                              "goals_against": .int(aiGoals),
@@ -763,13 +780,34 @@ struct MarbleCupView: View {
 
         for m in movers where m.role != .ball { recordTrail(&trails, m.id, m.pos) }
 
-        if !isOver && roundTick >= roundTicks { endMatch() }
+        // Full time.  A level score goes to sudden death (next goal wins, see
+        // `scoreGoal`) for a limited time; still level after that is a draw.
+        if !isOver && roundTick >= roundTicks {
+            let suddenDeathTicks = OpponentTuning.marbleCupSuddenDeathSeconds * 60
+            if playerGoals != aiGoals {
+                endMatch()
+            } else if !suddenDeath {
+                suddenDeath = true
+                if gameState.hapticsEnabled { Haptics.warning() }
+            } else if roundTick >= roundTicks + suddenDeathTicks {
+                endMatch()
+            }
+        }
     }
 
-    /// AI: defend its own goal when the ball is in its defensive third, otherwise
-    /// line up behind the ball and shove it toward the goal it attacks.  Works for
-    /// both teams via `ai.attacksTop` (top-attackers are the player's ally).
-    private func botSteer(_ ai: Mover, ballPos: CGPoint, seed: Int) -> CGVector {
+    /// Computer-controlled marble: defend its own goal when the ball is in its
+    /// defensive third, otherwise line up behind the ball and shove it toward
+    /// the goal it attacks.  Works for both teams via `ai.attacksTop`
+    /// (top-attackers are the player's teammate).  Human limits
+    /// (`OpponentTuning`): it plays the ball where it WAS one reaction delay
+    /// ago, with a held aiming error, at its effort share; and during a
+    /// mistake it runs at the ball from the WRONG side.
+    private func botSteer(_ ai: Mover, ballPos trueBallPos: CGPoint, seed: Int) -> CGVector {
+        var brain = brains[ai.id] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        brain.advance()
+        let ballPos = brain.perceive(trueBallPos)
+        brains[ai.id] = brain
+
         let attackGoal = CGPoint(x: field.midX, y: ai.attacksTop ? field.minY : field.maxY)
         let defendGoal = CGPoint(x: field.midX, y: ai.attacksTop ? field.maxY : field.minY)
         // The ball is in our defensive third (near the goal we defend)?
@@ -777,18 +815,19 @@ struct MarbleCupView: View {
             ? (ballPos.y > field.maxY - field.height * 0.36)
             : (ballPos.y < field.minY + field.height * 0.36)
         let target: CGPoint
-        if inDefThird {
+        if inDefThird && !brain.isMistaking {
             target = CGPoint(x: (ballPos.x + defendGoal.x) / 2,
                              y: (ballPos.y + defendGoal.y) / 2 + (ai.attacksTop ? -8 : 8))
         } else {
-            // Position on the far side of the ball from the attack goal.
+            // Position on the far side of the ball from the attack goal — or,
+            // during a mistake, on the near side (it will push the ball the
+            // wrong way if it gets there).
             let dir = unit(dx: ballPos.x - attackGoal.x, dy: ballPos.y - attackGoal.y, scale: 1)
-            target = CGPoint(x: ballPos.x + dir.dx * (ballRadius + marbleRadius * 0.9),
-                             y: ballPos.y + dir.dy * (ballRadius + marbleRadius * 0.9))
+            let side: CGFloat = brain.isMistaking ? -1 : 1
+            target = CGPoint(x: ballPos.x + dir.dx * side * (ballRadius + marbleRadius * 0.9),
+                             y: ballPos.y + dir.dy * side * (ballRadius + marbleRadius * 0.9))
         }
-        return MinigameAI.humanizedSteer(dx: target.x - ai.pos.x, dy: target.y - ai.pos.y,
-                                         scale: aiAccel, seed: seed, tick: localTick,
-                                         difficulty: gameState.minigameDifficulty)
+        return brain.push(from: ai.pos, toward: target, fullPush: aiAccelBase)
     }
 
     /// Tap-to-dash: override the player marble's velocity to a burst in the tilt
@@ -891,6 +930,10 @@ struct MarbleCupView: View {
     private func scoreGoal(playerScored: Bool) {
         if playerScored { playerGoals += 1 } else { aiGoals += 1 }
         lastScorerPlayer = playerScored
+        if suddenDeath {            // the golden goal — the match ends here
+            endMatch()
+            return
+        }
         celebrateUntil = localTick + celebrateTicks
         if gameState.hapticsEnabled {
             if playerScored { Haptics.success() } else { Haptics.warning() }

@@ -127,16 +127,31 @@ final class GoldRushEngine {
     /// use; a view would set this from `BallMotion.gravity` each frame.
     var playerInput: CGVector = .zero
 
-    /// AI handicap multipliers (1.0 = full strength = the original AI).  The
-    /// host view sets these from the player's MinigameDifficulty; headless /
-    /// test use keeps the defaults so the performance baseline measures the
-    /// busiest AI.  Applied to rival steering acceleration and top speed —
-    /// never to the player's marble.
-    var aiAccelScale: CGFloat = 1.0
-    var aiSpeedScale: CGFloat = 1.0
-    /// Difficulty for AI "humanizing" (aim weave + ease-off).  Defaults to
-    /// `.hard` so headless/test runs keep the surgical, full-strength AI.
-    var difficulty: MinigameDifficulty = .hard
+    /// The opponents' difficulty.  Every opponent number (reaction delay,
+    /// aiming error, mistakes, effort, top speed) comes from `OpponentTuning`
+    /// for this difficulty.  Set it BEFORE `resetBoard()` / `startRound()`.
+    /// Defaults to `.hard` so headless/test runs measure the busiest opponents.
+    var difficulty: MinigameDifficulty = .hard {
+        // A changed difficulty gives every opponent a fresh brain with the
+        // new limits (made on demand in `botSteer`).
+        didSet { if difficulty != oldValue { brains = [:] } }
+    }
+    /// Optional fixed seed for the opponents' random choices (tests).
+    var opponentSeed: UInt64? = nil
+
+    /// One brain per opponent, keyed by `colorIndex`.
+    private var brains: [Int: OpponentBrain] = [:]
+    /// The bully's charge aim for this tick (set by `botSteer`): where it
+    /// BELIEVES the leader is, with its aiming error.  Nil when not chasing.
+    private var bullyChargeAim: [Int: CGVector] = [:]
+    /// Ticks the round has been live (for `duration_s` in the result event).
+    var roundSecondsPlayed: Int { roundTick / 60 }
+    /// Best opponent score (for the result event's margin).
+    var bestRivalScore: Int { racers.filter { !$0.isPlayer }.map(\.score).max() ?? 0 }
+    /// The player's finishing place, 1 to 4 (ties go to the player).
+    var playerPlacement: Int {
+        1 + racers.filter { !$0.isPlayer && $0.score > playerScore }.count
+    }
 
     // MARK: - Computed
 
@@ -198,6 +213,10 @@ final class GoldRushEngine {
         }
         racers = fresh
 
+        brains = [:]
+        bullyChargeAim = [:]
+        for r in fresh where !r.isPlayer { brains[r.colorIndex] = makeBrain(r.colorIndex) }
+
         for _ in 0..<initialCoins { spawnCoin() }
     }
 
@@ -255,7 +274,7 @@ final class GoldRushEngine {
                 racers[i].vel.dx += playerInput.dx * playerAccel * dt
                 racers[i].vel.dy += playerInput.dy * playerAccel * dt
             } else {
-                let steer = botSteer(racers[i])
+                let steer = botSteer(racers[i])   // also advances this opponent's brain
                 racers[i].vel.dx += steer.dx * dt
                 racers[i].vel.dy += steer.dy * dt
                 maybeAICharge(at: i)        // the bully commits a ram when it's bearing down
@@ -264,7 +283,9 @@ final class GoldRushEngine {
             racers[i].vel.dy *= friction
             // Rivals get a difficulty-scaled speed cap; the player never does.
             // A live charge lifts the cap to `chargeSpeed` so the dash reads.
-            let baseCap = racers[i].isPlayer ? maxSpeed : maxSpeed * aiSpeedScale
+            let baseCap = racers[i].isPlayer
+                ? maxSpeed
+                : maxSpeed * CGFloat(OpponentTuning.limits(for: difficulty).smashGrabTopSpeed)
             let cap = racers[i].charging > 0 ? max(baseCap, chargeSpeed) : baseCap
             let s = hypot(racers[i].vel.dx, racers[i].vel.dy)
             if s > cap {
@@ -284,37 +305,90 @@ final class GoldRushEngine {
         if roundTick >= roundTicks { endRound() }
     }
 
-    /// Head for the nearest grabbable coin.  A "bully" rival instead chases the
-    /// current leader when they're close, to bump coins loose.
-    private func botSteer(_ r: Racer) -> CGVector {
-        let accel = aiAccel * aiAccelScale
+    /// Head for a coin.  A "bully" opponent instead chases the current leader
+    /// when they are close, to bump coins loose.  Human limits (all from
+    /// `OpponentTuning`): it acts on where its target WAS one reaction delay
+    /// ago, aims off by a held error, pushes at its effort share, and during a
+    /// mistake goes for the FARTHEST coin instead of a near one.
+    private func makeBrain(_ colorIndex: Int) -> OpponentBrain {
+        let seed = opponentSeed.map { $0 &+ UInt64(colorIndex) &* 7_919 }
+        return OpponentBrain(difficulty: difficulty, seed: seed)
+    }
 
-        // Primary goal: harass the leader (if aggro + close), else nearest coin,
-        // else drift back to center.
-        let base: CGVector
-        if r.aggro, let leader = leaderToHarass(than: r),
+    private func botSteer(_ r: Racer) -> CGVector {
+        var brain = brains[r.colorIndex] ?? makeBrain(r.colorIndex)
+        brain.advance()
+        let fullPush = aiAccel
+        let accel = fullPush * brain.effort
+
+        // Where it would ideally go this tick.
+        var goal = center
+        var chasing = false
+        var pushScale: CGFloat = 1
+        if r.aggro, !brain.isMistaking, let leader = leaderToHarass(than: r),
            hypot(leader.pos.x - r.pos.x, leader.pos.y - r.pos.y) < ramSeekRange {
-            base = MinigameAI.humanizedSteer(dx: leader.pos.x - r.pos.x, dy: leader.pos.y - r.pos.y,
-                                             scale: accel, seed: r.colorIndex, tick: localTick,
-                                             difficulty: difficulty)
-        } else if let coin = nearestCoin(to: r) {
-            base = MinigameAI.humanizedSteer(dx: coin.pos.x - r.pos.x, dy: coin.pos.y - r.pos.y,
-                                             scale: accel, seed: r.colorIndex, tick: localTick,
-                                             difficulty: difficulty)
+            goal = leader.pos
+            chasing = true
+        } else if brain.isMistaking, let far = farthestCoin(from: r) {
+            goal = far.pos
+        } else if let coin = preferredCoin(for: r) {
+            goal = coin.pos
         } else {
-            base = MinigameAI.humanizedSteer(dx: center.x - r.pos.x, dy: center.y - r.pos.y,
-                                             scale: accel * 0.5, seed: r.colorIndex, tick: localTick,
-                                             difficulty: difficulty)
+            pushScale = 0.5          // bare board: drift back to the center
         }
 
+        // What it actually acts on: the goal as it was one reaction delay ago.
+        let seen = brain.perceive(goal)
+        let dir = brain.aimed(dx: seen.x - r.pos.x, dy: seen.y - r.pos.y)
+        let base = CGVector(dx: dir.dx * accel * pushScale, dy: dir.dy * accel * pushScale)
+
+        // The bully's charge uses the same late, imperfect picture.
+        if chasing {
+            bullyChargeAim[r.colorIndex] = CGVector(dx: seen.x - r.pos.x, dy: seen.y - r.pos.y)
+        } else {
+            bullyChargeAim[r.colorIndex] = nil
+        }
+        brains[r.colorIndex] = brain
+
         // Always layer on a push away from nearby edges.  Without it a strong
-        // steering force (high difficulty) presses a rival into a wall faster
-        // than the bounce recovers — two aggro rivals could chase each other
-        // into a corner and stay pinned, making Hard play easier than Medium.
-        // The push scales WITH `accel`, so it stays ahead of steering at every
-        // difficulty.
+        // steering force presses an opponent into a wall faster than the
+        // bounce recovers.  The push scales WITH `accel`, so it stays ahead of
+        // steering at every difficulty.
         let push = edgeRepulsion(for: r, accel: accel)
         return CGVector(dx: base.dx + push.dx, dy: base.dy + push.dy)
+    }
+
+    /// The nearest coin that no OTHER opponent is closer to, so the three
+    /// opponents spread out (`OpponentTuning.smashGrabSpreadOut`).  Falls back
+    /// to the plain nearest coin.
+    private func preferredCoin(for r: Racer) -> Coin? {
+        guard OpponentTuning.smashGrabSpreadOut else { return nearestCoin(to: r) }
+        var best: Coin?
+        var bestD = CGFloat.greatestFiniteMagnitude
+        for c in coins {
+            if c.ignoreRacer == r.id && localTick < c.ignoreUntil { continue }
+            let d = hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y)
+            if d >= bestD { continue }
+            var someoneCloser = false
+            for o in racers where !o.isPlayer && o.id != r.id {
+                if hypot(c.pos.x - o.pos.x, c.pos.y - o.pos.y) < d { someoneCloser = true; break }
+            }
+            if someoneCloser { continue }
+            bestD = d
+            best = c
+        }
+        return best ?? nearestCoin(to: r)
+    }
+
+    private func farthestCoin(from r: Racer) -> Coin? {
+        var best: Coin?
+        var bestD: CGFloat = -1
+        for c in coins {
+            if c.ignoreRacer == r.id && localTick < c.ignoreUntil { continue }
+            let d = hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y)
+            if d > bestD { bestD = d; best = c }
+        }
+        return best
     }
 
     /// Outward force that ramps from 0 at the band edge to its strongest right
@@ -490,17 +564,18 @@ final class GoldRushEngine {
         return Coin(pos: p, value: 1, ignoreRacer: who, ignoreUntil: localTick + spillImmunityTicks, born: localTick)
     }
 
-    /// The aggro "bully" rival commits a charge when it's bearing down on the
-    /// current leader and close enough to connect within the dash window.
-    /// Index-based on purpose: the leader is read (which touches `racers`) by
-    /// value *before* we take the `inout` into `racers[i]`, so the two accesses
-    /// never overlap (Swift exclusivity would trap otherwise).
+    /// The "bully" opponent commits a charge when it BELIEVES the leader is
+    /// close enough to hit within the dash.  It judges range and direction from
+    /// its delayed picture of the leader (`bullyChargeAim`, set in `botSteer`)
+    /// and its aiming error applies, so the charge can come late and miss —
+    /// the same limits as its steering.
     private func maybeAICharge(at i: Int) {
         guard racers[i].aggro, racers[i].chargeCD == 0 else { return }
-        guard let leader = leaderToHarass(than: racers[i]) else { return }
-        let dx = leader.pos.x - racers[i].pos.x, dy = leader.pos.y - racers[i].pos.y
-        guard hypot(dx, dy) < chargeAITriggerRange else { return }
-        _ = fireCharge(&racers[i], aim: CGVector(dx: dx, dy: dy))
+        let key = racers[i].colorIndex
+        guard let aim = bullyChargeAim[key] else { return }
+        guard hypot(aim.dx, aim.dy) < chargeAITriggerRange else { return }
+        let dir = brains[key]?.aimed(dx: aim.dx, dy: aim.dy) ?? aim
+        _ = fireCharge(&racers[i], aim: dir)
     }
 
     /// Override the marble's velocity with a short forward dash in `aim`'s
