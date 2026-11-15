@@ -1,5 +1,12 @@
 # Minigame difficulty & payout
 
+> **Updated 2026-11-15.** Opponent strength no longer comes from
+> `aiAccelScale` / `aiSpeedScale` on `MinigameDifficulty`. Every opponent
+> number now lives in one table, `OpponentTuning` in
+> `RollAlong/GameState.swift` (see `docs/minigame-ai-tuning-proposal.md`).
+> Targets are 70% / 50% / 30%. The payout multipliers below are unchanged;
+> mentions of the old knobs are historical.
+
 How the competitive minigames let the player trade risk for reward, and how we
 keep that trade **fair** over time.
 

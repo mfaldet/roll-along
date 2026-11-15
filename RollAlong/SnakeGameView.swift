@@ -58,9 +58,9 @@ struct SnakeGameView: View {
     private let rivalCount     = 3                 // AI rival comets
 
     // Rival AI
+    /// Full opponent push.  Each opponent uses its effort share of this
+    /// (`OpponentTuning`).
     private let aiAccelBase:   CGFloat = 1_200
-    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
-    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
     private let aiLookAhead:   CGFloat = 78         // forward probe distance for avoidance
     private let aiTurn:        CGFloat = 0.85       // radians to swing when the path ahead is blocked
     private let aiAvoidRadius: CGFloat = 34         // a probe within this of a wall counts as blocked
@@ -114,6 +114,10 @@ struct SnakeGameView: View {
     // MARK: - State
 
     @State private var cycles: [Cycle] = []
+    /// One brain per opponent (human limits from `OpponentTuning`), by index.
+    @State private var brains: [Int: OpponentBrain] = [:]
+    /// Ticks each opponent has seen its path blocked without reacting yet.
+    @State private var blockedFor: [Int: Int] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     @State private var orbs:   [Orb]   = []
@@ -462,6 +466,8 @@ struct SnakeGameView: View {
         isOver = false
         playerWon = false
         awarded = false
+        brains = [:]
+        blockedFor = [:]
 
         let cx = arena.width / 2, cy = arena.height / 2
         var fresh: [Cycle] = [
@@ -507,9 +513,14 @@ struct SnakeGameView: View {
             gameState.recordCompetitiveScore("snake", power)   // leaderboard best
             // Difficulty scales the payout + records the attempt/win for tracking
             // (also banks the coins and, on a win, bumps the tally + ticket).
+            // Placement: 1st when you outlive everyone, else one place per
+            // opponent still alive when you fell.
             let banked = gameState.recordMinigameResult(
                 modeID: "snake", difficulty: gameState.minigameDifficulty,
-                won: didWin, score: power, basePayout: base)
+                won: didWin, score: power, basePayout: base,
+                placement: didWin ? 1 : 1 + rivalsAlive,
+                bestRivalScore: cycles.filter { !$0.isPlayer }.map(\.power).max() ?? 0,
+                durationSeconds: localTick / 60)
             AnalyticsClient.shared.track(
                 "comet_round_over",
                 properties: ["won": .bool(didWin),
@@ -746,27 +757,44 @@ struct SnakeGameView: View {
 
     // MARK: - Rival AI
 
-    /// Steer a rival: drive toward the nearest spark, but if a wall or trail is
-    /// dead ahead, swing toward whichever side has more open space.
+    /// Steer an opponent: drive toward the nearest spark, but if a wall or
+    /// trail is dead ahead, swing toward whichever side has more open space.
+    /// Human limits (`OpponentTuning`): it notices a blocked path a moment
+    /// late, chases where the spark WAS one reaction delay ago with a held
+    /// aiming error, pushes at its effort share, and during a mistake stops
+    /// checking for obstacles altogether.
     private func aiSteer(_ i: Int) -> CGVector {
         let c = cycles[i]
+        var brain = brains[i] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        brain.advance()
+        defer { brains[i] = brain }
+
+        let aiAccel = aiAccelBase * brain.effort
         let heading = c.heading
         let ahead = project(from: c.pos, heading: heading, dist: aiLookAhead)
 
-        if isBlocked(ahead, for: i) {
-            let leftH  = heading - aiTurn
-            let rightH = heading + aiTurn
-            let lc = clearance(project(from: c.pos, heading: leftH,  dist: aiLookAhead), for: i)
-            let rc = clearance(project(from: c.pos, heading: rightH, dist: aiLookAhead), for: i)
-            let chosen = lc >= rc ? leftH : rightH
-            return CGVector(dx: cos(chosen) * aiAccel, dy: sin(chosen) * aiAccel)
+        if !brain.isMistaking && isBlocked(ahead, for: i) {
+            let waited = (blockedFor[i] ?? 0) + 1
+            blockedFor[i] = waited
+            let noticeAfter = Int((Double(brain.delayTicks) * OpponentTuning.cometObstacleDelayShare).rounded())
+            if waited > noticeAfter {
+                let leftH  = heading - aiTurn
+                let rightH = heading + aiTurn
+                let lc = clearance(project(from: c.pos, heading: leftH,  dist: aiLookAhead), for: i)
+                let rc = clearance(project(from: c.pos, heading: rightH, dist: aiLookAhead), for: i)
+                let chosen = lc >= rc ? leftH : rightH
+                return CGVector(dx: cos(chosen) * aiAccel, dy: sin(chosen) * aiAccel)
+            }
+        } else {
+            blockedFor[i] = 0
         }
 
         if let orb = nearestOrb(to: c.pos) {
-            let u = unit(orb.x - c.pos.x, orb.y - c.pos.y)
+            let seen = brain.perceive(orb)
+            let u = brain.aimed(dx: seen.x - c.pos.x, dy: seen.y - c.pos.y)
             let fx = cos(heading) * aiForwardBias
             let fy = sin(heading) * aiForwardBias
-            return CGVector(dx: (u.x + fx) * aiAccel, dy: (u.y + fy) * aiAccel)
+            return CGVector(dx: (u.dx + fx) * aiAccel, dy: (u.dy + fy) * aiAccel)
         }
         return CGVector(dx: cos(heading) * aiAccel, dy: sin(heading) * aiAccel)
     }

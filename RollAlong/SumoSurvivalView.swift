@@ -38,9 +38,9 @@ struct SumoSurvivalView: View {
 
     private let marbleRadius: CGFloat = 19
     private let playerAccel:  CGFloat = 1_520     // your tilt → acceleration
-    private let aiAccelBase:  CGFloat = 900       // rival acceleration (≈60% of you — easier)
-    /// Rival acceleration scaled by the chosen difficulty (Hard == base AI).
-    private var aiAccel: CGFloat { aiAccelBase * gameState.minigameDifficulty.aiAccelScale }
+    /// Full opponent push.  Each opponent uses its effort share of this
+    /// (`OpponentTuning`).
+    private let aiAccelBase:  CGFloat = 900
     private let friction:     CGFloat = 0.992     // marbles glide on the floor
     private let maxSpeed:     CGFloat = 780
     private let restitution:  CGFloat = 0.92      // bounciness of marble hits
@@ -48,9 +48,8 @@ struct SumoSurvivalView: View {
     private let shrinkFrac:    CGFloat = 0.42     // ring closes to 58% of full…
     private let shrinkOverTicks     = 35 * 60     // …across ~35s, so rounds resolve
     private let edgePull       = 0.55             // AI retreats from the rim past this × radius (self-preserving)
-    // Aim wobble + ease-off are now difficulty-scaled (MinigameDifficulty
-    // aiAimError / aiHesitationChance) so Easy/Normal rivals feel beatable.
-    private let aiStrength:   CGFloat = 0.45      // AI's duel "push" (< a firm player tilt of ~0.8–1.0)
+    // Opponent reaction delay, aiming error, mistakes, effort and shove
+    // strength all come from `OpponentTuning`, per difficulty.
     private let pushGain:     CGFloat = 2.4       // how much drive-into-contact adds to collision mass
 
     private let roundCount     = 3
@@ -99,6 +98,13 @@ struct SumoSurvivalView: View {
     // MARK: - State
 
     @State private var roster:  [Racer]  = []     // the 4 contestants (stable across rounds)
+    /// One brain per opponent (human limits from `OpponentTuning`).
+    @State private var brains: [UUID: OpponentBrain] = [:]
+    /// Each opponent's first target of the round: another OPPONENT, never the
+    /// player, so nobody starts the round hunting the player.
+    @State private var firstTarget: [UUID: UUID] = [:]
+    /// Ticks played across the whole match (for the result event).
+    @State private var matchTicks = 0
     @State private var bumpers: [Bumper] = []     // active this round
     @State private var poofs:   [Poof]   = []
     @State private var rivalLooks: [UUID: RivalCosmetics.Look] = [:]
@@ -564,6 +570,7 @@ struct SumoSurvivalView: View {
         roundOver = false
         awarded = false
         round = 1
+        matchTicks = 0
         poofs = []
         radius = baseRadius
 
@@ -580,9 +587,12 @@ struct SumoSurvivalView: View {
         showMapName = true
     }
 
-    /// Lay out the current round: player center, three rivals spaced on a ring.
-    /// Keeps the roster + scores; clears only per-round state.  Does NOT set
-    /// `started` (round 1 waits for a tap; later rounds start from the overlay).
+    /// Lay out the current round: all four marbles evenly spaced on one ring
+    /// (the player at the bottom), so nobody starts surrounded.  Each opponent
+    /// gets a fresh brain and a first target picked at random among the OTHER
+    /// opponents.  Keeps the roster + scores; clears only per-round state.
+    /// Does NOT set `started` (round 1 waits for a tap; later rounds start
+    /// from the overlay).
     private func startRound() {
         guard baseRadius > 0 else { return }
         roundOver = false
@@ -593,19 +603,28 @@ struct SumoSurvivalView: View {
         poofs = []
         trails = [:]
 
+        // Player first (bottom of the ring), then the opponents clockwise.
+        let ordered = roster.filter { $0.isPlayer } + roster.filter { !$0.isPlayer }
+        let spawnR = baseRadius * CGFloat(OpponentTuning.sumoStartRing)
         var fresh: [Bumper] = []
-        if let p = roster.first(where: { $0.isPlayer }) {
-            fresh.append(Bumper(id: p.id, pos: center, color: p.color, isPlayer: true))
-        }
-        let ais = roster.filter { !$0.isPlayer }
-        let spawnR = baseRadius * 0.62
-        for (i, racer) in ais.enumerated() {
-            let angle = (Double(i) / Double(max(1, ais.count))) * 2 * .pi - .pi / 2
+        for (i, racer) in ordered.enumerated() {
+            let angle = Double.pi / 2 + (Double(i) / Double(max(1, ordered.count))) * 2 * Double.pi
             let pos = CGPoint(x: center.x + CGFloat(cos(angle)) * spawnR,
                               y: center.y + CGFloat(sin(angle)) * spawnR)
-            fresh.append(Bumper(id: racer.id, pos: pos, color: racer.color, isPlayer: false))
+            fresh.append(Bumper(id: racer.id, pos: pos,
+                                color: racer.color, isPlayer: racer.isPlayer))
         }
         bumpers = fresh
+
+        let opponentIDs = roster.filter { !$0.isPlayer }.map(\.id)
+        var freshBrains: [UUID: OpponentBrain] = [:]
+        var targets: [UUID: UUID] = [:]
+        for id in opponentIDs {
+            freshBrains[id] = OpponentBrain(difficulty: gameState.minigameDifficulty)
+            if let pick = opponentIDs.filter({ $0 != id }).randomElement() { targets[id] = pick }
+        }
+        brains = freshBrains
+        firstTarget = targets
     }
 
     /// Called when a round resolves (one marble left).  Advances to the next
@@ -639,7 +658,10 @@ struct SumoSurvivalView: View {
         // Difficulty scales the payout + records the attempt/win for tracking.
         let coins = gameState.recordMinigameResult(
             modeID: "sumo", difficulty: gameState.minigameDifficulty,
-            won: playerRank == 0, score: points, basePayout: base)
+            won: playerRank == 0, score: points, basePayout: base,
+            placement: playerRank + 1,
+            bestRivalScore: order.filter { !$0.isPlayer }.map(\.points).max() ?? 0,
+            durationSeconds: matchTicks / 60)
         AnalyticsClient.shared.track(
             "sumo_match_over",
             properties: ["placement": .int(playerRank + 1),
@@ -658,6 +680,7 @@ struct SumoSurvivalView: View {
         prunePoofs()
         guard started, !roundOver, !matchOver, baseRadius > 0 else { return }
         roundTicks += 1
+        matchTicks += 1
         updateRing()
         let dt: CGFloat = 1.0 / 60.0
 
@@ -716,36 +739,50 @@ struct SumoSurvivalView: View {
         return CGVector(dx: g.dx / m, dy: g.dy / m)
     }
 
-    /// Gentle, self-preserving AI: chase the nearest marble with wobbly aim,
-    /// retreat from the rim early, and occasionally ease off.  Returns the
-    /// acceleration to apply and the duel drive (unit dir × aiStrength).
+    /// Opponent steering: charge a marble, retreat from the rim.  Human limits
+    /// (`OpponentTuning`): for the first few seconds its target is another
+    /// opponent, then whoever is nearest; it charges where the target WAS one
+    /// reaction delay ago with a held aiming error, at its effort share; and
+    /// during a mistake it forgets the rim and keeps charging.  Returns the
+    /// acceleration to apply and the duel drive (unit direction × shove).
     private func aiSteer(for b: Bumper, seed: Int) -> (steer: CGVector, drive: CGVector) {
+        var brain = brains[b.id] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        brain.advance()
+        defer { brains[b.id] = brain }
+
+        // Who to charge.
         var target: CGPoint?
-        var best = CGFloat.greatestFiniteMagnitude
-        for o in bumpers where o.id != b.id {
-            let d = hypot(o.pos.x - b.pos.x, o.pos.y - b.pos.y)
-            if d < best { best = d; target = o.pos }
+        let firstTicks = Int(OpponentTuning.sumoFirstTargetSeconds * 60)
+        if roundTicks <= firstTicks, let tid = firstTarget[b.id],
+           let t = bumpers.first(where: { $0.id == tid }) {
+            target = t.pos
+        } else {
+            var best = CGFloat.greatestFiniteMagnitude
+            for o in bumpers where o.id != b.id {
+                let d = hypot(o.pos.x - b.pos.x, o.pos.y - b.pos.y)
+                if d < best { best = d; target = o.pos }
+            }
         }
         var dir = CGVector(dx: 0, dy: 0)
-        if let t = target { dir = unitVec(dx: t.x - b.pos.x, dy: t.y - b.pos.y) }
+        if let t = target {
+            let seen = brain.perceive(t)
+            dir = brain.aimed(dx: seen.x - b.pos.x, dy: seen.y - b.pos.y)
+        }
 
-        // Imperfect aim — a slow organic weave, wider on lower difficulties.
-        dir = rotate(dir, by: MinigameAI.weaveAngle(seed: seed, tick: localTick,
-                                                    difficulty: gameState.minigameDifficulty))
-
-        // Self-preservation: bias hard toward center when near the rim.
+        // Self-preservation: bias hard toward center when near the rim —
+        // unless it is in the middle of a mistake, when it keeps charging.
         let fromC = CGVector(dx: b.pos.x - center.x, dy: b.pos.y - center.y)
         let distC = hypot(fromC.dx, fromC.dy)
-        if distC > radius * edgePull {
+        if !brain.isMistaking && distC > radius * edgePull {
             let inward = unitVec(dx: -fromC.dx, dy: -fromC.dy)
             dir = unitVec(dx: dir.dx * 0.3 + inward.dx * 1.2,
                           dy: dir.dy * 0.3 + inward.dy * 1.2)
         }
 
-        // Occasionally hesitate (ease off) so they don't laser-charge.
-        let strength: CGFloat = (Double.random(in: 0..<1) < gameState.minigameDifficulty.aiHesitationChance) ? 0.25 : 1.0
-        return (CGVector(dx: dir.dx * aiAccel * strength, dy: dir.dy * aiAccel * strength),
-                CGVector(dx: dir.dx * aiStrength * strength, dy: dir.dy * aiStrength * strength))
+        let accel = aiAccelBase * brain.effort
+        let shove = CGFloat(brain.limits.sumoShove)
+        return (CGVector(dx: dir.dx * accel, dy: dir.dy * accel),
+                CGVector(dx: dir.dx * shove, dy: dir.dy * shove))
     }
 
     /// Mass-weighted elastic collisions.  Each marble's mass grows with how

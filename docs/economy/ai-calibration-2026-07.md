@@ -137,7 +137,7 @@ Every match already emits `minigame_result`
           count(*)                   AS n,
           avg((properties->>'won')::boolean::int) AS win_rate
    FROM events
-   WHERE name = 'minigame_result'
+   WHERE event_name = 'minigame_result'
    GROUP BY 1, 2
    HAVING count(*) >= 200;
    ```
