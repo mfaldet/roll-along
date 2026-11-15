@@ -360,16 +360,8 @@ struct FriendsView: View {
                             .font(.system(.body, design: .rounded).weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Text("\(level)")
-                            .font(.system(.caption, design: .rounded).weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule().fill(world.accent.opacity(0.28))
-                                    .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
-                            )
+                        LevelBadge(level: level)
+                        WeekPaceLabel(levels: profile?.levelsThisWeek ?? 0)
                     }
                 }
             }
@@ -678,5 +670,70 @@ private extension String {
     var nonEmpty: String? {
         let t = trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? nil : t
+    }
+}
+
+// ===========================================================================
+// Shared social bits — used by Friends, Clans, the leaderboard and Home.
+// Kept in this file (not a new one) to avoid touching the Xcode project.
+// ===========================================================================
+
+/// The level badge shown next to a player's name everywhere: the Adventure
+/// level in a capsule tinted with that level's world color.
+struct LevelBadge: View {
+    let level: Int
+    var compact: Bool = false
+
+    var body: some View {
+        let world = World.world(for: max(1, level))
+        Text("\(max(1, level))")
+            .font(.system(compact ? .caption2 : .caption, design: .rounded).weight(.bold))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .padding(.horizontal, compact ? 6 : 7)
+            .padding(.vertical, compact ? 1 : 2)
+            .background(
+                Capsule().fill(world.accent.opacity(0.28))
+                    .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
+            )
+            .fixedSize()
+            .accessibilityLabel("Level \(max(1, level))")
+    }
+}
+
+/// Weekly pace: "+12 this week" (levels gained since Monday 00:00 UTC).
+/// Draws nothing when the player has gained no levels this week.
+struct WeekPaceLabel: View {
+    let levels: Int
+
+    var body: some View {
+        if levels > 0 {
+            Text("+\(levels) this week")
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color(red: 0.30, green: 0.75, blue: 0.42))
+                .lineLimit(1)
+                .fixedSize()
+                .accessibilityLabel("\(levels) levels this week")
+        }
+    }
+}
+
+/// Red circular badge with a count (open life requests).  Draws nothing at 0.
+struct CountBadge: View {
+    let count: Int
+
+    var body: some View {
+        if count > 0 {
+            Text(count > 99 ? "99+" : "\(count)")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
+                .frame(minWidth: 18, minHeight: 18)
+                .background(Capsule().fill(Color(red: 0.92, green: 0.20, blue: 0.24)))
+                .fixedSize()
+                .accessibilityLabel("\(count) open life request\(count == 1 ? "" : "s")")
+        }
     }
 }

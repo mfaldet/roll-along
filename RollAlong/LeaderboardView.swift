@@ -292,6 +292,7 @@ struct LeaderboardView: View {
                 .font(.system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold))
                 .foregroundStyle(isMe ? .white : Color(white: 0.92))
                 .lineLimit(1)
+            LevelBadge(level: profile.climbLevel, compact: true)
 
             Spacer(minLength: 0)
 

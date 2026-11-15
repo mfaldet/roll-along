@@ -288,6 +288,30 @@ struct SettingsView: View {
             sectionHeader("Game")
 
             VStack(spacing: 0) {
+                Toggle(isOn: $gameState.tapToStart) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Tap to Start")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundStyle(Color(white: 0.75))
+                            Text(gameState.tapToStart
+                                 ? "A level waits until you tap"
+                                 : "Auto Start: a level begins by itself")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color(white: 0.42))
+                        }
+                    } icon: {
+                        Image(systemName: gameState.tapToStart
+                              ? "hand.tap.fill"
+                              : "play.circle.fill")
+                            .foregroundStyle(Color(white: 0.55))
+                    }
+                }
+                .tint(Color(red: 0.20, green: 0.50, blue: 0.96))
+                .padding()
+
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+
                 Toggle(isOn: $gameState.ballStartsAtTop) {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {

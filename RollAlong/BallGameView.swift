@@ -283,6 +283,26 @@ struct BallGameView: View {
         return false
     }
 
+    /// Modes the "Tap to Start / Auto Start" setting applies to: Adventure,
+    /// Challenge Tracks and Challenge of the Day.  To leave Challenge of the
+    /// Day on Auto Start, remove the `.oneShot` case below.
+    private var startSettingApplies: Bool {
+        switch activeMode.progression {
+        case .mainClimb, .challengeTrack, .oneShot: return activeMode.goal == .reachGoal
+        default: return false
+        }
+    }
+
+    /// True when a freshly loaded level stays paused until the player taps.
+    private var waitsForTapToStart: Bool { startSettingApplies && gameState.tapToStart }
+
+    /// The start-of-level lock: open-ended with Tap to Start, otherwise the
+    /// short automatic beat.  The level clock starts when the lock releases,
+    /// never when the level loads.
+    private var newSpawnLock: Date {
+        waitsForTapToStart ? .distantFuture : .now.addingTimeInterval(spawnLockDuration)
+    }
+
     /// Round length bought at Start: time-tickets × 30 s.
     private var coinPitStakedDuration: TimeInterval {
         Double(max(1, coinPitTimeTicketsStaked)) * GameState.goldRushSecondsPerTicket
@@ -4162,10 +4182,12 @@ struct BallGameView: View {
             VStack {
                 Spacer()
                 HStack(spacing: 8) {
+                    // Bigger when the level is waiting on the tap (Tap to
+                    // Start), so the prompt cannot be missed.
                     Image(systemName: "hand.tap.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: waitsForTapToStart ? 20 : 15, weight: .semibold))
                     Text(tapToStartHintText)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(.system(size: waitsForTapToStart ? 20 : 15, weight: .semibold, design: .rounded))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -5502,7 +5524,7 @@ struct BallGameView: View {
             tutorialPhase  = .notTutorial
             // Zen Garden has no "tap to start" — the ball rests, locked, until
             // the player holds the garden to roll it (see tick()).
-            spawnLockUntil = usesSandTrail ? nil : .now.addingTimeInterval(spawnLockDuration)
+            spawnLockUntil = usesSandTrail ? nil : newSpawnLock
             tutorialCoinBonus = 0
         }
 
@@ -5865,7 +5887,7 @@ struct BallGameView: View {
             // the clear pays its full tier bonus.
             tutorialCoinBonus = 0
             levelStartTime = nil
-            spawnLockUntil = .now.addingTimeInterval(spawnLockDuration)
+            spawnLockUntil = newSpawnLock
             respawnAfterPitFall(in: geoSize)
             return
         }

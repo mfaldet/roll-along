@@ -400,6 +400,15 @@ struct HomeView: View {
                                     soundEnabled: gameState.soundEnabled)
                         .zIndex(85)
                         .onAppear { gameState.endTrophyRun() }
+                        // The Clans badge: counted when Home comes to the front
+                        // (and on sign-in / sign-out), then once a minute while
+                        // Home stays in front.
+                        .task(id: auth.isSignedIn) {
+                            while !Task.isCancelled {
+                                gameState.refreshClanRequestBadge()
+                                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                            }
+                        }
                 }
 
                 // Sign-in prompt — raised when a signed-out player taps a locked
@@ -775,6 +784,14 @@ struct HomeView: View {
             } else {
                 NavigationLink(value: route) {
                     squareNavButtonFace(icon, locked: false)
+                        // Clans: red count of clanmates' open life requests
+                        // this player has not given to yet.
+                        .overlay(alignment: .topTrailing) {
+                            if route == HomeRoute.clans {
+                                CountBadge(count: gameState.clanRequestBadge)
+                                    .offset(x: 5, y: -5)
+                            }
+                        }
                 }
             }
         }

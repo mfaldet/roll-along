@@ -196,8 +196,28 @@ final class SocialClient: @unchecked Sendable {
                  + "snake_best,sumo_best,paintball_best,marblecup_best,koth_best,"
                  + "snake_wins,sumo_wins,paintball_wins,marblecup_wins,koth_wins,goldrush_wins,"
                  + "rollup_best,rollup_best_seconds"
-        let query = "select=\(cols)&order=\(order)&limit=\(limit)"
-        let data = try await send(method: "GET", path: "players", query: query)
+        return try await getPlayers(columns: cols, rest: "&order=\(order)&limit=\(limit)",
+                                    hideExcluded: true)
+    }
+
+    /// Columns added by docs/social-schema-v5.sql (the weekly baseline).
+    private static let v5PlayerColumns = ",week_start,week_start_level,week_start_stars"
+
+    /// Read `players` rows, asking for the v5 columns too.  Until
+    /// docs/social-schema-v5.sql has been run the server answers 400 for a
+    /// column it does not know, so this falls back to the older query — the
+    /// lists keep working, just without weekly pace or the exclusion filter.
+    /// `rest` is the remainder of the query string, starting with "&".
+    private func getPlayers(columns: String, rest: String,
+                            hideExcluded: Bool = false) async throws -> [PlayerProfile] {
+        let v5 = "select=\(columns)\(Self.v5PlayerColumns)"
+               + (hideExcluded ? "&excluded=is.false" : "") + rest
+        let data: Data
+        do {
+            data = try await send(method: "GET", path: "players", query: v5)
+        } catch SocialError.http(let status, _) where status == 400 || status == 404 {
+            data = try await send(method: "GET", path: "players", query: "select=\(columns)" + rest)
+        }
         return try decode([PlayerProfile].self, from: data)
     }
 
@@ -358,22 +378,68 @@ final class SocialClient: @unchecked Sendable {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? trimmed
-        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives"
-            + "&display_name=ilike.*\(escaped)*"
+        let cols = "id,display_name,climb_level,highest_unlocked,total_stars,lives"
+        let query = "&display_name=ilike.*\(escaped)*"
             + "&id=neq.\(me.userId.uuidString)"
             + "&order=climb_level.desc&limit=\(limit)"
-        let data = try await send(method: "GET", path: "players", query: query)
-        return try decode([PlayerProfile].self, from: data)
+        return try await getPlayers(columns: cols, rest: query)
     }
 
     /// Resolve a set of player ids to their profiles (e.g. friends from edges).
     func fetchProfiles(ids: [UUID]) async throws -> [PlayerProfile] {
         guard !ids.isEmpty else { return [] }
         let list = ids.map { $0.uuidString }.joined(separator: ",")
-        let query = "select=id,display_name,climb_level,highest_unlocked,total_stars,lives,needs_lives_at"
-            + "&id=in.(\(list))"
-        let data = try await send(method: "GET", path: "players", query: query)
-        return try decode([PlayerProfile].self, from: data)
+        return try await getPlayers(
+            columns: "id,display_name,climb_level,highest_unlocked,total_stars,lives,needs_lives_at",
+            rest: "&id=in.(\(list))")
+    }
+
+    // MARK: - Clan life requests (give once per request)
+
+    private struct RequestGiftRow: Decodable {
+        let recipient: UUID
+        let requestAt: String?
+        enum CodingKeys: String, CodingKey {
+            case recipient = "recipient_id"
+            case requestAt = "request_at"
+        }
+    }
+
+    /// Identifies one life request: the asker plus the moment they asked.
+    static func requestKey(_ asker: UUID, _ askedAt: String) -> String {
+        "\(asker.uuidString)|\(askedAt)"
+    }
+
+    /// The life requests the signed-in player has ALREADY given to, as
+    /// `requestKey`s.  Read from the server, so it survives closing the app.
+    /// Empty when signed out, or before docs/social-schema-v5.sql is run.
+    func fetchMyRequestGiftKeys() async -> Set<String> {
+        guard let me = currentUserId else { return [] }
+        let query = "select=recipient_id,request_at&sender_id=eq.\(me.uuidString)"
+            + "&request_at=not.is.null&order=created_at.desc&limit=200"
+        guard let data = try? await send(method: "GET", path: "life_gifts", query: query),
+              let rows = try? decode([RequestGiftRow].self, from: data) else { return [] }
+        var keys: Set<String> = []
+        for row in rows {
+            if let at = row.requestAt { keys.insert(Self.requestKey(row.recipient, at)) }
+        }
+        return keys
+    }
+
+    /// How many clanmates have an open life request the signed-in player has
+    /// not given to yet — the number on the red badge.  0 when signed out or
+    /// in no clan.  Four small reads.
+    func countOpenClanRequests() async -> Int {
+        guard let me = currentUserId,
+              let membership = try? await fetchMyClanMembership(),
+              let roster = try? await fetchClanRoster(clanId: membership.clanId) else { return 0 }
+        let others = roster.map { $0.playerId }.filter { $0 != me }
+        guard !others.isEmpty,
+              let profiles = try? await fetchProfiles(ids: others) else { return 0 }
+        let asking = profiles.filter { $0.isAskingForLives }
+        guard !asking.isEmpty else { return 0 }
+        let given = await fetchMyRequestGiftKeys()
+        return asking.filter { !given.contains(Self.requestKey($0.id, $0.needsLivesAt ?? "")) }.count
     }
 
     /// Every friendship edge involving the signed-in player.  RLS already
@@ -463,6 +529,19 @@ final class SocialClient: @unchecked Sendable {
             + "&order=name.asc&limit=\(limit)"
         let data = try await send(method: "GET", path: "clans", query: query)
         return try decode([Clan].self, from: data)
+    }
+
+    /// Clans ranked by total levels or total stars (the read-only
+    /// `clan_rankings` view from docs/social-schema-v5.sql).  Throws until
+    /// that file has been run.
+    func fetchClanRankings(byStars: Bool, limit: Int = 100) async throws -> [ClanRanking] {
+        _ = try requireSession()
+        let order = byStars ? "total_stars.desc,total_levels.desc" : "total_levels.desc,total_stars.desc"
+        let query = "select=id,name,tag,description,owner_id,created_at,updated_at,"
+            + "member_count,total_levels,total_stars,week_levels"
+            + "&order=\(order)&limit=\(limit)"
+        let data = try await send(method: "GET", path: "clan_rankings", query: query)
+        return try decode([ClanRanking].self, from: data)
     }
 
     /// Every membership row for a clan (resolve player_ids to profiles via
@@ -942,6 +1021,31 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     // When the player last tapped "Ask for a life" (null = not asking). Optional
     // + decode-resilient like the stats above.
     var needsLivesAt: String?
+    // Weekly baseline (docs/social-schema-v5.sql), kept by the server: the
+    // Monday (UTC) the baseline belongs to, and the level / stars the player
+    // had when that week began.  Absent before v5 → no weekly pace shown.
+    var weekStart: String? = nil
+    var weekStartLevel: Int? = nil
+    var weekStartStars: Int? = nil
+
+    /// Levels gained since Monday 00:00 UTC ("+12 this week").  0 when the
+    /// stored baseline is from an earlier week (the player has not played
+    /// this week) or is absent.
+    var levelsThisWeek: Int {
+        guard let weekStart, let base = weekStartLevel,
+              weekStart == Self.currentWeekStartUTC() else { return 0 }
+        return max(0, climbLevel - base)
+    }
+
+    /// This week's Monday in UTC as "yyyy-MM-dd" — the same value the
+    /// database computes with date_trunc('week', now() at time zone 'utc').
+    static func currentWeekStartUTC(now: Date = Date()) -> String {
+        var cal = Calendar(identifier: .iso8601)          // weeks start Monday
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let monday = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+        let c = cal.dateComponents([.year, .month, .day], from: monday)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
 
     /// Memberwise init with defaults — lets local code build a profile from
     /// GameState values for the profile "Player Ranks" readout.  (Codable's
@@ -1029,6 +1133,9 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
         case needsLivesAt     = "needs_lives_at"
+        case weekStart        = "week_start"
+        case weekStartLevel   = "week_start_level"
+        case weekStartStars   = "week_start_stars"
     }
 }
 
@@ -1249,6 +1356,41 @@ struct Clan: Codable, Identifiable, Hashable {
         case ownerId   = "owner_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+extension Clan {
+    /// Most members a clan can hold.  The database enforces the same number
+    /// (`clan_member_cap` in docs/social-schema-v5.sql) — change both.
+    static let memberCap = 12
+}
+
+/// One row of the clan rankings: the clan plus its totals, summed by the
+/// server (`clan_rankings` view, docs/social-schema-v5.sql).
+struct ClanRanking: Decodable, Identifiable {
+    let clan: Clan
+    let memberCount: Int
+    let totalLevels: Int
+    let totalStars: Int
+    let weekLevels: Int
+
+    var id: UUID { clan.id }
+    var isFull: Bool { memberCount >= Clan.memberCap }
+
+    private enum Keys: String, CodingKey {
+        case memberCount = "member_count"
+        case totalLevels = "total_levels"
+        case totalStars  = "total_stars"
+        case weekLevels  = "week_levels"
+    }
+
+    init(from decoder: Decoder) throws {
+        clan = try Clan(from: decoder)
+        let c = try decoder.container(keyedBy: Keys.self)
+        memberCount = try c.decodeIfPresent(Int.self, forKey: .memberCount) ?? 0
+        totalLevels = try c.decodeIfPresent(Int.self, forKey: .totalLevels) ?? 0
+        totalStars  = try c.decodeIfPresent(Int.self, forKey: .totalStars)  ?? 0
+        weekLevels  = try c.decodeIfPresent(Int.self, forKey: .weekLevels)  ?? 0
     }
 }
 

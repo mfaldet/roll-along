@@ -39,7 +39,7 @@ struct ClansView: View {
     @State private var isSearching = false
 
     // Secondary nav.
-    enum Tab: Hashable { case mine, browse }
+    enum Tab: Hashable { case mine, browse, rankings }
     @State private var tab: Tab = .mine
     @State private var tabPinned = false   // honour the user's pick after first load
 
@@ -56,7 +56,30 @@ struct ClansView: View {
     @State private var chatSending   = false   // a quick-chat post in flight
     @State private var banner: String?
 
+    // Life requests I have already given to (server-read, see
+    // SocialClient.fetchMyRequestGiftKeys) — a request can be given to once.
+    @State private var givenRequestKeys: Set<String> = []
+
+    // Clan rankings (read-only).
+    @State private var rankings: [ClanRanking] = []
+    @State private var rankByStars = false
+    @State private var rankingsLoading = false
+    @State private var rankingsUnavailable = false
+
     private var myId: UUID? { SocialClient.shared.currentUserId }
+
+    /// The request key of a member who is asking right now, else nil.
+    private func openRequestKey(_ id: UUID) -> String? {
+        guard let at = rosterProfiles[id]?.needsLivesAt, !at.isEmpty else { return nil }
+        return SocialClient.requestKey(id, at)
+    }
+    /// True when this clanmate has an open request I have not given to.
+    private func needsMyLife(_ id: UUID) -> Bool {
+        guard id != myId, let key = openRequestKey(id) else { return false }
+        return !givenRequestKeys.contains(key)
+    }
+    /// The number on the red badge.
+    private var openRequestCount: Int { roster.filter { needsMyLife($0.playerId) }.count }
     private var inClan:   Bool { membership != nil }
     private var iAmAsking: Bool { myId.flatMap { rosterProfiles[$0]?.isAskingForLives } ?? false }
     /// True once my promotion ask is in the (recent) feed — keeps the settings
@@ -128,8 +151,10 @@ struct ClansView: View {
                     VStack(spacing: 20) {
                         if tab == .mine {
                             if inClan { myClanSections } else { createCallout }
-                        } else {
+                        } else if tab == .browse {
                             browseSections
+                        } else {
+                            rankingsSection
                         }
                     }
                     .padding(.horizontal, 16)
@@ -145,11 +170,101 @@ struct ClansView: View {
         Picker("", selection: $tab) {
             Text(inClan ? "My Clan" : "Create").tag(Tab.mine)
             Text("Browse").tag(Tab.browse)
+            Text("Rankings").tag(Tab.rankings)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .onChange(of: tab) { _, _ in tabPinned = true }
+        .onChange(of: tab) { _, newTab in
+            tabPinned = true
+            if newTab == .rankings { Task { await loadRankings() } }
+        }
+    }
+
+    // MARK: - Rankings (read-only)
+
+    @ViewBuilder
+    private var rankingsSection: some View {
+        Picker("", selection: $rankByStars) {
+            Text("Total levels").tag(false)
+            Text("Total stars").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: rankByStars) { _, _ in Task { await loadRankings() } }
+
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("Clan rankings", "list.number")
+            if rankingsLoading && rankings.isEmpty {
+                ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.vertical, 16)
+            } else if rankingsUnavailable {
+                Text("Clan rankings are not available yet.")
+                    .font(.system(.callout, design: .rounded)).foregroundStyle(Color(white: 0.5)).padding(.vertical, 6)
+            } else if rankings.isEmpty {
+                Text("No clans yet — be the first to start one.")
+                    .font(.system(.callout, design: .rounded)).foregroundStyle(Color(white: 0.5)).padding(.vertical, 6)
+            } else {
+                ForEach(Array(rankings.enumerated()), id: \.element.id) { index, row in
+                    rankingRow(row, rank: index + 1)
+                }
+            }
+        }
+    }
+
+    private func rankingRow(_ row: ClanRanking, rank: Int) -> some View {
+        let mine = row.clan.id == myClan?.id
+        return Button { nav.goToClan(row.clan) } label: {
+            HStack(spacing: 12) {
+                Text("\(rank)")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
+                    .foregroundStyle(Color(white: 0.6))
+                    .frame(minWidth: 26, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        if let t = row.clan.tag.nonEmpty {
+                            Text("[\(t)]").font(.system(.caption, design: .rounded).weight(.bold))
+                                .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+                        }
+                        Text(row.clan.name.nonEmpty ?? "Clan")
+                            .font(.system(.body, design: .rounded).weight(mine ? .bold : .semibold))
+                            .foregroundStyle(.white).lineLimit(1)
+                    }
+                    HStack(spacing: 8) {
+                        Text("\(row.memberCount) of \(Clan.memberCap) members")
+                            .font(.system(.caption2, design: .rounded)).foregroundStyle(Color(white: 0.5))
+                        WeekPaceLabel(levels: row.weekLevels)
+                    }
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 4) {
+                    Image(systemName: rankByStars ? "star.fill" : "flag.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(rankByStars ? Color(red: 1.0, green: 0.81, blue: 0.30)
+                                                     : Color(red: 0.30, green: 0.75, blue: 0.42))
+                    Text("\(rankByStars ? row.totalStars : row.totalLevels)")
+                        .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 14)
+                .fill(mine ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.16) : Color(white: 0.14)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Rank \(rank). \(row.clan.name.nonEmpty ?? "Clan"). "
+            + "\(row.memberCount) of \(Clan.memberCap) members. "
+            + "\(row.totalLevels) total levels, \(row.totalStars) total stars.")
+    }
+
+    private func loadRankings() async {
+        rankingsLoading = true
+        defer { rankingsLoading = false }
+        do {
+            rankings = try await SocialClient.shared.fetchClanRankings(byStars: rankByStars)
+            rankingsUnavailable = false
+        } catch {
+            rankings = []
+            rankingsUnavailable = true
+        }
     }
 
     // MARK: - My clan
@@ -194,7 +309,7 @@ struct ClansView: View {
     /// Members · combined climb levels · lives shared (a sense of the collective).
     private var clanStatsRow: some View {
         HStack(spacing: 10) {
-            clanStat("\(roster.count)", "Members", "person.3.fill", Color(red: 0.55, green: 0.78, blue: 1.0))
+            clanStat("\(roster.count) of \(Clan.memberCap)", "Members", "person.3.fill", Color(red: 0.55, green: 0.78, blue: 1.0))
             clanStat("\(combinedLevels)", "Levels", "flag.fill", Color(red: 0.30, green: 0.75, blue: 0.42))
             clanStat("\(livesShared)", "Lives shared", "heart.fill", Color(red: 0.95, green: 0.32, blue: 0.45))
         }
@@ -276,14 +391,19 @@ struct ClansView: View {
 
     private var rosterSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Red badge: open life requests I have not given to yet.
             sectionHeader("Roster", "person.3.fill")
+                .overlay(alignment: .trailing) { CountBadge(count: openRequestCount) }
             ForEach(sortedRoster) { member in rosterRow(member) }
         }
     }
 
-    /// Owner pinned to the top, then by climb level descending.
+    /// Open life requests I can still give to first, then the owner, then by
+    /// level descending.
     private var sortedRoster: [ClanMember] {
         roster.sorted { a, b in
+            let na = needsMyLife(a.playerId), nb = needsMyLife(b.playerId)
+            if na != nb { return na }
             if a.isOwner != b.isOwner { return a.isOwner }
             return (rosterProfiles[a.playerId]?.climbLevel ?? 0) > (rosterProfiles[b.playerId]?.climbLevel ?? 0)
         }
@@ -296,21 +416,24 @@ struct ClansView: View {
         let world = World.world(for: max(1, level))
         let isMe  = member.playerId == myId
         let asking = prof?.isAskingForLives ?? false
+        let waitingOnMe = needsMyLife(member.playerId)
         return HStack(spacing: 12) {
             Button { if let prof { nav.goToPlayer(prof) } } label: {
                 HStack(spacing: 12) {
                     avatar(name, tint: world.accent)
+                        // Red badge on the request itself; clears when I give,
+                        // or when the request is filled or cancelled.
+                        .overlay(alignment: .topTrailing) {
+                            CountBadge(count: waitingOnMe ? 1 : 0).offset(x: 6, y: -6)
+                        }
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 7) {
                             Text(name)
                                 .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
                                 .foregroundStyle(.white).lineLimit(1)
-                            Text("\(level)")
-                                .font(.system(.caption2, design: .rounded).weight(.bold)).monospacedDigit()
-                                .foregroundStyle(.white).padding(.horizontal, 6).padding(.vertical, 1)
-                                .background(Capsule().fill(world.accent.opacity(0.28))
-                                    .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1)))
+                            LevelBadge(level: level, compact: true)
                         }
+                        WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
                         if asking {
                             Text("needs a life ♥")
                                 .font(.system(.caption2, design: .rounded).weight(.semibold))
@@ -332,7 +455,15 @@ struct ClansView: View {
 
     @ViewBuilder
     private func sendLifeControl(_ id: UUID) -> some View {
-        if sentLifeIds.contains(id) {
+        if let key = openRequestKey(id) {
+            // An open request: each clanmate can give to it once.  Giving
+            // never costs the giver a life.
+            if givenRequestKeys.contains(key) {
+                tag("Given ♥", Color(red: 0.95, green: 0.32, blue: 0.45))
+            } else {
+                actionButton("Give life", busy: busyIds.contains(id)) { await sendLife(to: id) }
+            }
+        } else if sentLifeIds.contains(id) {
             tag("Sent ♥", Color(red: 0.95, green: 0.32, blue: 0.45))
         } else {
             actionButton("Send life", busy: busyIds.contains(id)) { await sendLife(to: id) }
@@ -435,9 +566,12 @@ struct ClansView: View {
             }
             VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
                 if !mine {
-                    Text(who)
-                        .font(.system(.caption2, design: .rounded).weight(.semibold))
-                        .foregroundStyle(world.accent)
+                    HStack(spacing: 5) {
+                        Text(who)
+                            .font(.system(.caption2, design: .rounded).weight(.semibold))
+                            .foregroundStyle(world.accent)
+                        LevelBadge(level: rosterProfiles[e.actorId]?.climbLevel ?? 1, compact: true)
+                    }
                 }
                 Text(bubbleText(e))
                     .font(.system(.subheadline, design: .rounded))
@@ -754,9 +888,13 @@ struct ClansView: View {
                 var map: [UUID: PlayerProfile] = [:]
                 for p in profs { map[p.id] = p }
                 myClan = clan; roster = members; rosterProfiles = map; events = evs; browse = []
+                givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
+                gameState.clanRequestBadge = openRequestCount
                 if !tabPinned { tab = .mine }
             } else {
                 myClan = nil; roster = []; events = []
+                givenRequestKeys = []
+                gameState.clanRequestBadge = 0
                 browse = try await SocialClient.shared.fetchClans()
                 if !tabPinned { tab = .browse }
             }
@@ -821,8 +959,14 @@ struct ClansView: View {
         // later clear the recipient's ask): a life to a clanmate who was asking
         // is a request FULFILLMENT (`clan_fulfill`), not just a gift.
         let wasAsking = rosterProfiles[id]?.isAskingForLives ?? false
+        let requestKey = openRequestKey(id)
         do {
             try await SocialClient.shared.sendLife(to: id, amount: 1)
+            // The request is now one I have given to: its badge clears.
+            if let requestKey {
+                givenRequestKeys.insert(requestKey)
+                gameState.clanRequestBadge = openRequestCount
+            }
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "sent_life", target: id)
             // social_send_life / social_lives_sent_25 (S1-T6): every clan gift
             // counts toward lives sent, whether or not it fulfills a request.
@@ -830,7 +974,25 @@ struct ClansView: View {
             // clan_fulfill (S1-T6): additionally, a gift to an asking clanmate.
             if wasAsking { gameState.recordClanRequestFulfilled() }
             sentLifeIds.insert(id); flash("Life sent ♥")
+        } catch SocialError.http(_, let body) where body.contains("already_gave") {
+            // The server refused a second gift to the same request.
+            if let requestKey { givenRequestKeys.insert(requestKey) }
+            gameState.clanRequestBadge = openRequestCount
+            flash("You already gave to this request.")
         } catch { flash("Couldn't send a life — try again.") }
+    }
+
+    /// Re-read who is asking and what I have given to, so a request that was
+    /// filled, cancelled or newly posted shows within one poll.
+    private func refreshRequests() async {
+        guard let clan = myClan,
+              let members = try? await SocialClient.shared.fetchClanRoster(clanId: clan.id),
+              let profs = try? await SocialClient.shared.fetchProfiles(ids: members.map { $0.playerId })
+        else { return }
+        roster = members
+        for p in profs { rosterProfiles[p.id] = p }
+        givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
+        gameState.clanRequestBadge = openRequestCount
     }
 
     private func thank(_ actorId: UUID) async {
@@ -874,6 +1036,7 @@ struct ClansView: View {
             try? await Task.sleep(nanoseconds: 20_000_000_000)
             guard !Task.isCancelled else { return }
             await refreshEvents()
+            await refreshRequests()
         }
     }
 
@@ -938,6 +1101,8 @@ struct ClanDetailView: View {
     private var iAmMember: Bool { roster.contains { $0.playerId == myId } }
     private var inAnotherClan: Bool { (myMembership != nil) && myMembership?.clanId != clan.id }
     private var combinedLevels: Int { roster.reduce(0) { $0 + (profiles[$1.playerId]?.climbLevel ?? 0) } }
+    private var combinedStars:  Int { roster.reduce(0) { $0 + (profiles[$1.playerId]?.totalStars ?? 0) } }
+    private var isFull: Bool { roster.count >= Clan.memberCap }
 
     var body: some View {
         ZStack {
@@ -945,7 +1110,6 @@ struct ClanDetailView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     header
-                    statsRow
                     joinAction
                     rosterSection
                 }
@@ -972,37 +1136,31 @@ struct ClanDetailView: View {
         .task { await load() }
     }
 
+    /// Compact header: tag and name on one line, the description, then one
+    /// line of totals ("7 of 12 members · 412 levels · 980 stars").
     private var header: some View {
-        VStack(spacing: 10) {
-            if let t = clan.tag.nonEmpty {
-                Text("[\(t)]").font(.system(.headline, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                if let t = clan.tag.nonEmpty {
+                    Text("[\(t)]").font(.system(.subheadline, design: .rounded).weight(.bold))
+                        .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+                }
+                Text(clan.name.nonEmpty ?? "Clan").font(.system(.title3, design: .rounded).weight(.bold))
+                    .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 0)
             }
-            Text(clan.name.nonEmpty ?? "Clan").font(.system(.title2, design: .rounded).weight(.bold))
-                .foregroundStyle(.white).multilineTextAlignment(.center)
             if let d = clan.description.nonEmpty {
-                Text(d).font(.system(.callout, design: .rounded)).foregroundStyle(Color(white: 0.6))
-                    .multilineTextAlignment(.center)
+                Text(d).font(.system(.footnote, design: .rounded)).foregroundStyle(Color(white: 0.6))
+            }
+            if !loading {
+                Text("\(roster.count) of \(Clan.memberCap) members · \(combinedLevels) levels · \(combinedStars) stars")
+                    .font(.system(.caption, design: .rounded).weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(Color(white: 0.72))
             }
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 22).padding(.horizontal, 18)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.13)))
-    }
-
-    private var statsRow: some View {
-        HStack(spacing: 10) {
-            stat("\(roster.count)", "Members", Color(red: 0.55, green: 0.78, blue: 1.0))
-            stat("\(combinedLevels)", "Combined levels", Color(red: 0.30, green: 0.75, blue: 0.42))
-        }
-    }
-    private func stat(_ v: String, _ l: String, _ c: Color) -> some View {
-        VStack(spacing: 6) {
-            Text(v).font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(.white).minimumScaleFactor(0.5).lineLimit(1)
-            Text(l).font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color(white: 0.48))
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14).padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.13)))
     }
 
     @ViewBuilder
@@ -1017,6 +1175,14 @@ struct ClanDetailView: View {
             Text("Leave your current clan to join another")
                 .font(.system(.caption, design: .rounded)).foregroundStyle(Color(white: 0.5))
                 .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+        } else if loading {
+            EmptyView()
+        } else if isFull {
+            Text("This clan is full (\(Clan.memberCap) of \(Clan.memberCap) members)")
+                .font(.system(.callout, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color(white: 0.6))
+                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                .background(Capsule().fill(Color(white: 0.16)))
         } else {
             Button { Task { await join() } } label: {
                 ZStack {
@@ -1034,49 +1200,66 @@ struct ClanDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Image(systemName: "person.3.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color(white: 0.5))
-                Text("ROSTER").font(.system(.caption, design: .rounded).weight(.bold)).foregroundStyle(Color(white: 0.5)).tracking(0.5)
+                Text("MEMBERS").font(.system(.caption, design: .rounded).weight(.bold)).foregroundStyle(Color(white: 0.5)).tracking(0.5)
                 Spacer()
             }
             if loading {
                 ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.vertical, 16)
             } else {
-                ForEach(sorted) { m in rosterRow(m) }
+                ForEach(Array(sorted.enumerated()), id: \.element.id) { index, m in
+                    rosterRow(m, rank: index + 1)
+                }
             }
         }
     }
 
-    private func rosterRow(_ m: ClanMember) -> some View {
+    /// One ranked member: rank, name, level badge, role, stars and this
+    /// week's levels.
+    private func rosterRow(_ m: ClanMember, rank: Int) -> some View {
         let prof = profiles[m.playerId]
         let nm = prof?.displayName.nonEmpty ?? "Roller"
         let lvl = prof?.climbLevel ?? 1
-        let world = World.world(for: max(1, lvl))
+        let stars = prof?.totalStars ?? 0
         return Button { if let prof { nav.goToPlayer(prof) } } label: {
             HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(world.accent.opacity(0.28)).frame(width: 36, height: 36)
-                    Text(String(nm.first ?? "?").uppercased())
-                        .font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                Text("\(rank)")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
+                    .foregroundStyle(Color(white: 0.6))
+                    .frame(minWidth: 22, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 7) {
+                        Text(nm).font(.system(.body, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white).lineLimit(1)
+                        LevelBadge(level: lvl, compact: true)
+                        if m.role != "member" {
+                            Text(m.role.capitalized).font(.system(.caption2, design: .rounded).weight(.bold))
+                                .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                        }
+                    }
+                    WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
                 }
-                Text(nm).font(.system(.body, design: .rounded).weight(.semibold)).foregroundStyle(.white).lineLimit(1)
-                Text("\(lvl)").font(.system(.caption2, design: .rounded).weight(.bold)).monospacedDigit()
-                    .foregroundStyle(.white).padding(.horizontal, 6).padding(.vertical, 1)
-                    .background(Capsule().fill(world.accent.opacity(0.28)))
                 Spacer(minLength: 8)
-                if m.role != "member" {
-                    Text(m.role.capitalized).font(.system(.caption2, design: .rounded).weight(.bold))
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill").font(.system(size: 11))
                         .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                    Text("\(stars)").font(.system(.subheadline, design: .rounded).weight(.bold))
+                        .monospacedDigit().foregroundStyle(.white)
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
             .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
         }
         .buttonStyle(.plain).disabled(prof == nil)
+        .accessibilityLabel("Rank \(rank). \(nm), level \(lvl), \(stars) stars"
+            + (m.role != "member" ? ", \(m.role)" : "") + ".")
     }
 
+    /// Ranked by level, then stars.
     private var sorted: [ClanMember] {
         roster.sorted { a, b in
-            if a.isOwner != b.isOwner { return a.isOwner }
-            return (profiles[a.playerId]?.climbLevel ?? 0) > (profiles[b.playerId]?.climbLevel ?? 0)
+            let la = profiles[a.playerId]?.climbLevel ?? 0, lb = profiles[b.playerId]?.climbLevel ?? 0
+            if la != lb { return la > lb }
+            return (profiles[a.playerId]?.totalStars ?? 0) > (profiles[b.playerId]?.totalStars ?? 0)
         }
     }
 
@@ -1109,6 +1292,9 @@ struct ClanDetailView: View {
             // clan_join (S1-T6): latched on a successful join.
             gameState.recordClanJoined()
             flash("Joined \(clan.name.nonEmpty ?? "the clan")!")
+        } catch SocialError.http(_, let body) where body.contains("clan_full") {
+            await load()
+            flash("This clan is full (\(Clan.memberCap) members).")
         } catch {
             flash("Couldn't join — you may already be in a clan.")
         }

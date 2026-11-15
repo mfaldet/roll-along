@@ -165,6 +165,31 @@ final class GameState: ObservableObject {
     @Published var ballStartsAtTop: Bool {
         didSet { defaults.set(ballStartsAtTop, forKey: "ra_startAtTop") }
     }
+    /// How a level starts.  true = "Tap to Start": the level loads paused and
+    /// begins when the player taps.  false = "Auto Start": it begins by itself
+    /// after a short beat.  Default is Tap to Start.  Applies to Adventure,
+    /// Challenge Tracks and Challenge of the Day (see BallGameView).
+    /// Clanmates' open life requests this player has not given to yet — the
+    /// red badge on Home's Clans button.  Not saved; refreshed from the server
+    /// (see `refreshClanRequestBadge`).
+    @Published var clanRequestBadge: Int = 0
+
+    /// Re-count the badge from the server.  Called when Home comes to the
+    /// front, once a minute while it stays there, and by the clan page.
+    func refreshClanRequestBadge() {
+        guard SocialClient.shared.isSignedIn else {
+            if clanRequestBadge != 0 { clanRequestBadge = 0 }
+            return
+        }
+        Task { @MainActor [weak self] in
+            let n = await SocialClient.shared.countOpenClanRequests()
+            if self?.clanRequestBadge != n { self?.clanRequestBadge = n }
+        }
+    }
+
+    @Published var tapToStart: Bool {
+        didSet { defaults.set(tapToStart, forKey: "ra_tapToStart") }
+    }
     /// How hard the competitive-minigame AI plays (see MinigameDifficulty).
     @Published var minigameDifficulty: MinigameDifficulty {
         didSet { defaults.set(minigameDifficulty.rawValue, forKey: "ra_minigameDifficulty") }
@@ -739,6 +764,7 @@ final class GameState: ObservableObject {
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true
         introEnabled = defaults.object(forKey: "ra_introEnabled") as? Bool ?? false
         ballStartsAtTop = defaults.object(forKey: "ra_startAtTop") as? Bool ?? true
+        tapToStart = defaults.object(forKey: "ra_tapToStart") as? Bool ?? true
         shopFreshNotifEnabled = defaults.object(forKey: "ra_notifShopFresh") as? Bool ?? false
         livesFullNotifEnabled = defaults.object(forKey: "ra_notifLivesFull") as? Bool ?? false
         // Public trophy showcase — DEFAULT ON (design.md §7 / D6).
@@ -1199,6 +1225,10 @@ final class GameState: ObservableObject {
         let noPriorClear = bestTime[level] == nil
         if stars > (bestStars[level] ?? 0) {
             bestStars[level] = stars
+            // Send the new star total right away (not only on the next level
+            // advance), so stars earned by replaying a level reach the
+            // leaderboards and clan totals promptly.
+            syncSocialProgress()
         }
         if let existing = bestTime[level] {
             if time < existing { bestTime[level] = time }
