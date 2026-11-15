@@ -53,18 +53,18 @@ final class TrophyPublicShowcaseTests: XCTestCase {
         // Showcase surface — the subject under test.
         func upsertShowcase(_ showcase: TrophyPublicShowcase, playerID: UUID) async throws {
             if failUpsert { throw Boom() }
-            lock.lock(); upserts.append((showcase, playerID)); lock.unlock()
+            lock.withLock { upserts.append((showcase, playerID)) }
         }
         func deleteShowcase(playerID: UUID) async throws {
             if failDelete { throw Boom() }
-            lock.lock(); deletes.append(playerID); lock.unlock()
+            lock.withLock { deletes.append(playerID) }
         }
         func fetchShowcase(playerID: UUID) async throws -> TrophyPublicShowcase? {
-            lock.lock(); defer { lock.unlock() }; return fetchResult
+            return lock.withLock { fetchResult }
         }
 
-        var upsertCount: Int { lock.lock(); defer { lock.unlock() }; return upserts.count }
-        var deleteCount: Int { lock.lock(); defer { lock.unlock() }; return deletes.count }
+        var upsertCount: Int { lock.withLock { upserts.count } }
+        var deleteCount: Int { lock.withLock { deletes.count } }
     }
 
     // MARK: - Fixtures

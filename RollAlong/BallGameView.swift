@@ -7060,6 +7060,10 @@ final class AudioManager {
     private let player = AVAudioPlayerNode()
     private var winBuffer:  AVAudioPCMBuffer?
     private var sessionConfigured = false
+    /// Every audio-session and engine call runs on this queue, never on the
+    /// main thread: activating the session can block for a moment, and the
+    /// system warns when that happens on the main thread.
+    private let audioQueue = DispatchQueue(label: "rollalong.audio", qos: .userInitiated)
 
     private init() {}
 
@@ -7070,19 +7074,21 @@ final class AudioManager {
         guard !sessionConfigured else { return }
         sessionConfigured = true
 
-        // Ambient + mixWithOthers: respects the silent switch, mixes with
-        // music apps, never ducks anything.
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
-        try? session.setActive(true)
+        audioQueue.async { [self] in
+            // Ambient + mixWithOthers: respects the silent switch, mixes with
+            // music apps, never ducks anything.
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            try? session.setActive(true)
 
-        engine.attach(player)
-        let format = engine.outputNode.outputFormat(forBus: 0)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        winBuffer = makeWinBuffer(format: format)
+            engine.attach(player)
+            let format = engine.outputNode.outputFormat(forBus: 0)
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+            winBuffer = makeWinBuffer(format: format)
 
-        engine.prepare()
-        try? engine.start()
+            engine.prepare()
+            try? engine.start()
+        }
 
         // Keep the engine warm.  The system STOPS the engine on an audio
         // interruption (call, Siri, another app) or an engine-config change
@@ -7112,14 +7118,21 @@ final class AudioManager {
 
     /// Re-activate the session and restart the engine if the system stopped it.
     private func restartEngine() {
-        try? AVAudioSession.sharedInstance().setActive(true)
-        guard !engine.isRunning else { return }
-        engine.prepare()
-        try? engine.start()
+        audioQueue.async { [self] in
+            try? AVAudioSession.sharedInstance().setActive(true)
+            guard !engine.isRunning else { return }
+            engine.prepare()
+            try? engine.start()
+        }
     }
 
     func playWin(enabled: Bool) {
-        guard enabled, let buffer = winBuffer else { return }
+        guard enabled else { return }
+        audioQueue.async { [self] in playWinOnAudioQueue() }
+    }
+
+    private func playWinOnAudioQueue() {
+        guard let buffer = winBuffer else { return }
         // Only play when the engine is ALREADY running — i.e. it has been
         // rendering IO cycles.  If the system stopped it (interruption / route
         // change / backgrounding), restart it for next time but SKIP this one
