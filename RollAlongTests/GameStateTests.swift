@@ -1030,3 +1030,75 @@ final class MinigameAICalibrationTests: XCTestCase {
             "difficulty spread collapsed: easy \(easy) vs hard \(hard)")
     }
 }
+
+// ===========================================================================
+// Preset names — every player-visible name is assembled from fixed lists.
+// ===========================================================================
+final class PresetNamesTests: XCTestCase {
+
+    func testWordListsAreCleanAndSized() {
+        XCTAssertEqual(PresetNames.adjectives.count, 117)
+        XCTAssertEqual(PresetNames.nouns.count, 129)
+        XCTAssertEqual(PresetNames.clanAdjectives.count, 165)
+        XCTAssertEqual(PresetNames.clanNouns.count, 199)
+        for list in [PresetNames.adjectives, PresetNames.nouns,
+                     PresetNames.clanAdjectives, PresetNames.clanNouns] {
+            XCTAssertEqual(Set(list).count, list.count, "a word appears twice in a list")
+            for word in list {
+                XCTAssertTrue(word.allSatisfy { $0.isASCII && $0.isLetter }, "\(word): letters only")
+                XCTAssertEqual(word.prefix(1), word.prefix(1).uppercased(), "\(word): capitalized")
+            }
+        }
+        // A nickname must fit the 12 characters the in-game name tags allow.
+        for word in PresetNames.adjectives + PresetNames.nouns {
+            XCTAssertLessThanOrEqual(word.count, 5, "\(word) is too long for a nickname")
+        }
+        XCTAssertTrue(Set(PresetNames.adjectives).isDisjoint(with: PresetNames.nouns))
+    }
+
+    /// Every nickname the pickers can build reads back as exactly the same
+    /// choice, so no two selections produce the same text.
+    func testEveryNicknameParsesBackToItsChoice() {
+        var seen = Set<String>()
+        for a in 0..<PresetNames.adjectives.count {
+            for n in 0..<PresetNames.nouns.count {
+                let choice = PresetNames.Choice(adjective: a, noun: n, number: 7)
+                let name = PresetNames.nickname(choice)
+                XCTAssertLessThanOrEqual(name.count, 12, name)
+                XCTAssertTrue(seen.insert(name).inserted, "\(name) can be built two ways")
+                XCTAssertEqual(PresetNames.parseNickname(name), choice, name)
+            }
+        }
+    }
+
+    func testEveryClanNameParsesBackAndFitsTheServerLimits() {
+        for a in 0..<PresetNames.clanAdjectives.count {
+            for n in 0..<PresetNames.clanNouns.count {
+                let choice = PresetNames.Choice(adjective: a, noun: n, number: 999)
+                let name = PresetNames.clanName(choice)
+                XCTAssertLessThanOrEqual(name.count, 32, name)
+                XCTAssertEqual(PresetNames.parseClanName(name), choice, name)
+                let tag = PresetNames.clanTag(choice)
+                XCTAssertTrue((2...5).contains(tag.count), tag)
+            }
+        }
+    }
+
+    func testFreeTextAndBlockedNumbersAreRejected() {
+        XCTAssertNil(PresetNames.parseNickname("Mackenzie"))
+        XCTAssertNil(PresetNames.parseNickname("SwiftComet"))       // no number
+        XCTAssertNil(PresetNames.parseNickname("SwiftComet07"))     // leading zero
+        XCTAssertNil(PresetNames.parseNickname("SwiftComet100"))    // out of range
+        XCTAssertNil(PresetNames.parseNickname("SwiftComet69"))     // blocked number
+        XCTAssertNotNil(PresetNames.parseNickname("SwiftComet42"))
+        XCTAssertNil(PresetNames.parseClanName("The Stones"))
+        XCTAssertNil(PresetNames.parseClanName("Swift Comets 666")) // blocked number
+        XCTAssertNotNil(PresetNames.parseClanName("Swift Comets 1"))
+        XCTAssertFalse(PresetNames.nicknameNumbers.contains(88))
+        XCTAssertFalse(PresetNames.clanNumbers.contains(420))
+        XCTAssertTrue(PresetNames.isValidNickname(PresetNames.defaultNickname))
+        XCTAssertFalse(PresetNames.isValidClanDescription("anything typed"))
+        XCTAssertTrue(PresetNames.isValidClanDescription(""))
+    }
+}
+

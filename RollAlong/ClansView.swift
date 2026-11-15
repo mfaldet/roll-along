@@ -1130,7 +1130,7 @@ struct ClanDetailView: View {
 // ===========================================================================
 private struct ClanCreateSheet: View {
     @Environment(\.dismiss) var dismiss
-    @State private var choice = PresetNames.randomChoice(numbers: PresetNames.clanNumbers)
+    @State private var choice = PresetNames.randomClanChoice()
     @State private var descIndex: Int? = nil       // nil = no description
     @State private var working = false
     @State private var error:  String?
@@ -1200,7 +1200,7 @@ private struct ClanNamePicker: View {
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Spacer()
                 Button {
-                    choice = PresetNames.randomChoice(numbers: PresetNames.clanNumbers)
+                    choice = PresetNames.randomClanChoice()
                 } label: {
                     Image(systemName: "shuffle").font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white).padding(9)
@@ -1210,6 +1210,7 @@ private struct ClanNamePicker: View {
                 .accessibilityLabel("Shuffle name")
             }
             PresetNameWheels(choice: $choice,
+                             adjectives: PresetNames.clanAdjectives,
                              nouns: PresetNames.clanNouns,
                              numbers: PresetNames.clanNumbers)
             Text("Pick two words and a number. The tag is made from the name.")
@@ -1271,7 +1272,7 @@ private struct ClanSettingsSheet: View {
     let onLeave:        () -> Void
     let onDisband:      () -> Void
 
-    @State private var nameChoice  = PresetNames.randomChoice(numbers: PresetNames.clanNumbers)
+    @State private var nameChoice  = PresetNames.randomClanChoice()
     @State private var renameBusy  = false
     @State private var renameError: String?
     @State private var askBusy     = false

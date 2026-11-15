@@ -658,29 +658,118 @@ final class SocialClient: @unchecked Sendable {
 // structure, like the Keychain helper in AppleAuthManager.swift.
 // ===========================================================================
 enum PresetNames {
+    // Word lists are alphabetical so the picker wheels are easy to scan.
+    // A stored name is the assembled TEXT, never an index, so reordering or
+    // adding words never changes anyone's existing name.
+
+    /// First word of a nickname (117 words, each <= 5 letters).
     static let adjectives: [String] = [
-        "Swift", "Brave", "Lucky", "Happy", "Calm", "Bold", "Quick", "Sunny",
-        "Misty", "Rapid", "Jolly", "Noble", "Zippy", "Witty", "Merry", "Royal",
-        "Solar", "Lunar", "Amber", "Azure", "Coral", "Ivory", "Jade", "Mint",
-        "Neon", "Ruby", "Teal", "Gold", "Iron", "Agile", "Clear", "Eager",
-        "Grand", "Keen", "Kind", "Loyal", "Proud", "Vivid", "Wise", "Epic",
+        "Agile", "Alert", "Alpha", "Amber", "Aqua", "Avid", "Azure", "Blue",
+        "Bold", "Brave", "Brisk", "Calm", "Chief", "Clear", "Cool", "Coral",
+        "Cozy", "Crisp", "Cyan", "Daily", "Dandy", "Deft", "Dusty", "Eager",
+        "Early", "Elite", "Epic", "Fair", "Fancy", "Fast", "Fiery", "Fine",
+        "First", "Fleet", "Fresh", "Funny", "Giant", "Glad", "Gold", "Grand",
+        "Great", "Green", "Handy", "Happy", "Hardy", "Hazel", "Icy", "Ideal",
+        "Iron", "Ivory", "Jade", "Jazzy", "Jolly", "Jumbo", "Keen", "Kind",
+        "Light", "Lilac", "Loyal", "Lucid", "Lucky", "Lunar", "Magic", "Major",
+        "Mega", "Merry", "Mint", "Misty", "Neat", "Neon", "Nifty", "Noble",
+        "Olive", "Onyx", "Opal", "Peppy", "Polar", "Prime", "Proud", "Quick",
+        "Quiet", "Rapid", "Regal", "Rosy", "Royal", "Ruby", "Rusty", "Sage",
+        "Sandy", "Shiny", "Sleek", "Smart", "Snowy", "Solar", "Solid", "Sonic",
+        "Spry", "Sunny", "Super", "Swift", "Teal", "Tidy", "Topaz", "True",
+        "Turbo", "Urban", "Vast", "Vivid", "Warm", "Wavy", "Wild", "Windy",
+        "Wise", "Witty", "Zen", "Zesty", "Zippy",
     ]
 
+    /// Second word of a nickname (129 words, each <= 5 letters).
     static let nouns: [String] = [
-        "Orb", "Comet", "Star", "Moon", "Fox", "Otter", "Panda", "Koala",
-        "Tiger", "Eagle", "Robin", "Finch", "Whale", "Lynx", "Wolf", "Bear",
-        "Hawk", "Owl", "Maple", "Cedar", "Pine", "River", "Cloud", "Storm",
-        "Spark", "Flame", "Pixel", "Rover", "Racer", "Kite", "Wave", "Peak",
-        "Ridge", "Dune", "Stone", "Pearl", "Lark", "Heron", "Bison", "Lotus",
+        "Acorn", "Aspen", "Atlas", "Bear", "Bison", "Blaze", "Bolt", "Brook",
+        "Camel", "Cedar", "Cliff", "Cloud", "Cobra", "Comet", "Crane", "Creek",
+        "Crow", "Cub", "Daisy", "Dawn", "Delta", "Dingo", "Dove", "Drake",
+        "Drift", "Dune", "Eagle", "Ember", "Fern", "Finch", "Fjord", "Flame",
+        "Flare", "Fox", "Frost", "Gale", "Gecko", "Gem", "Glade", "Glow",
+        "Goose", "Grove", "Gull", "Hare", "Hawk", "Heath", "Heron", "Hippo",
+        "Horse", "Ibis", "Jet", "Kite", "Koala", "Koi", "Lake", "Lark",
+        "Leaf", "Lemur", "Llama", "Lotus", "Lynx", "Mango", "Maple", "Marsh",
+        "Mesa", "Moon", "Moose", "Moth", "Mouse", "Newt", "Nova", "Oak",
+        "Ocean", "Orb", "Orca", "Otter", "Owl", "Panda", "Peak", "Pearl",
+        "Pilot", "Pine", "Pixel", "Plume", "Pony", "Prism", "Puma", "Quail",
+        "Quest", "Quill", "Racer", "Raven", "Reef", "Rhino", "Ridge", "River",
+        "Robin", "Rook", "Rover", "Sable", "Shark", "Sky", "Sloth", "Snail",
+        "Spark", "Squid", "Stag", "Star", "Stone", "Stork", "Storm", "Sun",
+        "Swan", "Tapir", "Tide", "Tiger", "Torch", "Trout", "Tulip", "Vale",
+        "Viper", "Vole", "Wave", "Whale", "Wind", "Wolf", "Wren", "Yak",
+        "Zebra",
     ]
 
-    /// Plural forms of `nouns`, index-for-index, for clan names.
+    /// First word of a clan name (165 words: the nickname list plus longer ones).
+    static let clanAdjectives: [String] = [
+        "Agile", "Alert", "Alpha", "Amber", "Ancient", "Aqua",
+        "Arctic", "Avid", "Azure", "Blazing", "Blue", "Bold",
+        "Brave", "Brisk", "Bronze", "Calm", "Chief", "Clear",
+        "Clever", "Cobalt", "Cool", "Copper", "Coral", "Cosmic",
+        "Cozy", "Crimson", "Crisp", "Crystal", "Cyan", "Daily",
+        "Dandy", "Daring", "Deft", "Dusty", "Eager", "Early",
+        "Electric", "Elite", "Emerald", "Endless", "Epic", "Eternal",
+        "Fair", "Fancy", "Fast", "Fearless", "Fiery", "Fine",
+        "First", "Fleet", "Fresh", "Frosted", "Funny", "Galactic",
+        "Gentle", "Giant", "Glad", "Gold", "Golden", "Grand",
+        "Granite", "Great", "Green", "Handy", "Happy", "Hardy",
+        "Hazel", "Hidden", "Humble", "Icy", "Ideal", "Iron",
+        "Ivory", "Jade", "Jazzy", "Jolly", "Jumbo", "Keen",
+        "Kind", "Light", "Lightning", "Lilac", "Lively", "Loyal",
+        "Lucid", "Lucky", "Lunar", "Magic", "Major", "Marble",
+        "Mega", "Mellow", "Merry", "Mighty", "Mint", "Misty",
+        "Modern", "Moonlit", "Neat", "Neon", "Nifty", "Nimble",
+        "Noble", "Olive", "Onyx", "Opal", "Peppy", "Polar",
+        "Prime", "Proud", "Quick", "Quiet", "Radiant", "Rainbow",
+        "Rapid", "Regal", "Rising", "Roaring", "Rolling", "Rosy",
+        "Royal", "Ruby", "Rusty", "Sage", "Sandy", "Scarlet",
+        "Shining", "Shiny", "Silver", "Sleek", "Smart", "Snowy",
+        "Soaring", "Solar", "Solid", "Sonic", "Spry", "Steady",
+        "Stellar", "Sunlit", "Sunny", "Super", "Swift", "Teal",
+        "Thunder", "Tidy", "Topaz", "True", "Tumbling", "Turbo",
+        "Urban", "Valiant", "Vast", "Vibrant", "Vivid", "Wandering",
+        "Warm", "Wavy", "Wild", "Windy", "Wise", "Witty",
+        "Zen", "Zesty", "Zippy",
+    ]
+
+    /// Second word of a clan name (199 plural words).
     static let clanNouns: [String] = [
-        "Orbs", "Comets", "Stars", "Moons", "Foxes", "Otters", "Pandas", "Koalas",
-        "Tigers", "Eagles", "Robins", "Finches", "Whales", "Lynxes", "Wolves", "Bears",
-        "Hawks", "Owls", "Maples", "Cedars", "Pines", "Rivers", "Clouds", "Storms",
-        "Sparks", "Flames", "Pixels", "Rovers", "Racers", "Kites", "Waves", "Peaks",
-        "Ridges", "Dunes", "Stones", "Pearls", "Larks", "Herons", "Bison", "Lotuses",
+        "Acorns", "Acrobats", "Anchors", "Aspens", "Atlases", "Aviators",
+        "Badgers", "Bears", "Bison", "Blazes", "Bolts", "Breezes",
+        "Brooks", "Builders", "Camels", "Canyons", "Captains", "Cedars",
+        "Champions", "Chipmunks", "Cliffs", "Clouds", "Cobras", "Comets",
+        "Cranes", "Creeks", "Crows", "Cubs", "Cyclones", "Daisies",
+        "Dawns", "Deltas", "Dingoes", "Dolphins", "Doves", "Dragonflies",
+        "Dragons", "Drakes", "Dreamers", "Drifts", "Dunes", "Eagles",
+        "Embers", "Explorers", "Falcons", "Ferns", "Finches", "Fireflies",
+        "Fjords", "Flames", "Flamingos", "Flares", "Foxes", "Frosts",
+        "Galaxies", "Gales", "Geckos", "Geese", "Gems", "Glaciers",
+        "Glades", "Glows", "Griffins", "Groves", "Guardians", "Gulls",
+        "Hamsters", "Harbors", "Hares", "Hawks", "Heaths", "Hedgehogs",
+        "Herons", "Hippos", "Horses", "Ibises", "Inventors", "Islands",
+        "Jaguars", "Jets", "Kites", "Koalas", "Koi", "Lagoons",
+        "Lakes", "Lanterns", "Larks", "Leaves", "Legends", "Lemurs",
+        "Leopards", "Llamas", "Lotuses", "Lynxes", "Mammoths", "Mangoes",
+        "Maples", "Marbles", "Marshes", "Mavericks", "Meadows", "Mesas",
+        "Meteors", "Mice", "Moons", "Moose", "Moths", "Mustangs",
+        "Narwhals", "Navigators", "Newts", "Nomads", "Novas", "Oaks",
+        "Oceans", "Orbs", "Orcas", "Orchards", "Otters", "Owls",
+        "Pandas", "Panthers", "Parrots", "Peaks", "Pearls", "Pelicans",
+        "Penguins", "Pilots", "Pines", "Pioneers", "Pixels", "Planets",
+        "Plumes", "Ponies", "Prisms", "Puffins", "Pumas", "Quail",
+        "Quests", "Quills", "Raccoons", "Racers", "Rainbows", "Rangers",
+        "Ravens", "Reefs", "Rhinos", "Ridges", "Rivers", "Robins",
+        "Rockets", "Rollers", "Rooks", "Rovers", "Sables", "Sentinels",
+        "Sharks", "Skies", "Sloths", "Snails", "Snowflakes", "Sparks",
+        "Sparrows", "Squid", "Squirrels", "Stags", "Stars", "Stones",
+        "Storks", "Storms", "Summits", "Sunbeams", "Suns", "Swans",
+        "Tapirs", "Tides", "Tigers", "Torches", "Toucans", "Trout",
+        "Tulips", "Tumblers", "Turtles", "Unicorns", "Vales", "Vipers",
+        "Voles", "Voyagers", "Walruses", "Wanderers", "Waves", "Whales",
+        "Winds", "Wizards", "Wolves", "Wrens", "Yaks", "Yetis",
+        "Zebras",
     ]
 
     /// The fixed clan descriptions a clan owner can pick from.
@@ -695,23 +784,37 @@ enum PresetNames {
         "New players welcome. We help each other out.",
     ]
 
-    static let nicknameNumbers: ClosedRange<Int> = 1...99     // keeps a nickname <= 12 characters
-    static let clanNumbers:     ClosedRange<Int> = 1...999
+    /// Numbers that are never offered or accepted.
+    static let blockedNumbers: Set<Int> = [69, 88, 420, 666]
+    /// Nickname numbers: 1...99 minus the blocked ones (keeps a nickname
+    /// within 12 characters).
+    static let nicknameNumbers: [Int] = (1...99).filter { !blockedNumbers.contains($0) }
+    /// Clan numbers: 1...999 minus the blocked ones.
+    static let clanNumbers: [Int] = (1...999).filter { !blockedNumbers.contains($0) }
+
     /// Stored for a signed-in player who has not picked a nickname yet.
     static let defaultNickname = "Roller"
 
-    /// One selection: an index into `adjectives`, an index into `nouns` /
-    /// `clanNouns`, and a number.
+    /// One selection: an index into the first-word list, an index into the
+    /// second-word list, and a number.  Which lists depends on what is being
+    /// named: `adjectives`/`nouns` for a nickname, `clanAdjectives`/
+    /// `clanNouns` for a clan.
     struct Choice: Equatable {
         var adjective: Int
         var noun: Int
         var number: Int
     }
 
-    static func randomChoice(numbers: ClosedRange<Int>) -> Choice {
+    static func randomNicknameChoice() -> Choice {
         Choice(adjective: Int.random(in: 0..<adjectives.count),
                noun:      Int.random(in: 0..<nouns.count),
-               number:    Int.random(in: numbers))
+               number:    nicknameNumbers.randomElement() ?? 1)
+    }
+
+    static func randomClanChoice() -> Choice {
+        Choice(adjective: Int.random(in: 0..<clanAdjectives.count),
+               noun:      Int.random(in: 0..<clanNouns.count),
+               number:    clanNumbers.randomElement() ?? 1)
     }
 
     // MARK: Build
@@ -721,22 +824,23 @@ enum PresetNames {
     }
 
     static func clanName(_ c: Choice) -> String {
-        "\(adjectives[c.adjective]) \(clanNouns[c.noun]) \(c.number)"
+        "\(clanAdjectives[c.adjective]) \(clanNouns[c.noun]) \(c.number)"
     }
 
     /// The clan tag is derived, never typed: the two initials + the number
     /// ("Swift Comets 42" -> "SC42", 3-5 characters).
     static func clanTag(_ c: Choice) -> String {
-        "\(adjectives[c.adjective].prefix(1))\(clanNouns[c.noun].prefix(1))".uppercased()
+        "\(clanAdjectives[c.adjective].prefix(1))\(clanNouns[c.noun].prefix(1))".uppercased()
             + String(c.number)
     }
 
     // MARK: Parse / validate
 
-    private static func number(_ digits: String, in range: ClosedRange<Int>) -> Int? {
+    private static func number(_ digits: String, upTo maximum: Int) -> Int? {
         guard !digits.isEmpty, digits.first != "0",
               digits.allSatisfy({ $0.isASCII && $0.isNumber }),
-              let n = Int(digits), range.contains(n) else { return nil }
+              let n = Int(digits), (1...maximum).contains(n),
+              !blockedNumbers.contains(n) else { return nil }
         return n
     }
 
@@ -744,7 +848,7 @@ enum PresetNames {
         for (ai, adj) in adjectives.enumerated() where s.hasPrefix(adj) {
             let rest = String(s.dropFirst(adj.count))
             for (ni, noun) in nouns.enumerated() where rest.hasPrefix(noun) {
-                if let n = number(String(rest.dropFirst(noun.count)), in: nicknameNumbers) {
+                if let n = number(String(rest.dropFirst(noun.count)), upTo: 99) {
                     return Choice(adjective: ai, noun: ni, number: n)
                 }
             }
@@ -755,9 +859,9 @@ enum PresetNames {
     static func parseClanName(_ s: String) -> Choice? {
         let parts = s.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 3,
-              let ai = adjectives.firstIndex(of: parts[0]),
+              let ai = clanAdjectives.firstIndex(of: parts[0]),
               let ni = clanNouns.firstIndex(of: parts[1]),
-              let n  = number(parts[2], in: clanNumbers) else { return nil }
+              let n  = number(parts[2], upTo: 999) else { return nil }
         return Choice(adjective: ai, noun: ni, number: n)
     }
 

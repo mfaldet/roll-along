@@ -1034,43 +1034,75 @@ struct HomeView: View {
     /// Floating coin-balance pill in the top-right corner.  Tappable —
     /// opens the Get Coins sheet (not the shop; the shop has its own button
     /// in the bottom grid now).
-    // Gift pill — top-centre call-to-action shown only while a daily reward is
-    // unclaimed.  Tapping opens DailyRewardView; it vanishes once claimed
-    // (until tomorrow).  Auto-present covers first-glance discovery; this is
-    // the re-entry affordance if the player dismissed the sheet.
+    // Streak pill — top center, between the lives pill and the coin pill, in
+    // the same capsule style.  Always shown: a small flame + the player's
+    // CURRENT daily reward streak in days (`liveStreak`: the streak the reward
+    // trophies count, or 0 once a day has been missed).  Dimmed at zero.
+    // Tapping opens the daily reward.  While today's reward is unclaimed the
+    // pill gets a gold outline and a red dot on its corner (drawn as an
+    // overlay, so the pill does not get wider).
     @ViewBuilder
     private var dailyRewardPill: some View {
-        if gameState.dailyRewardAvailable {
-            VStack {
-                Button { showDailyRewardSheet = true } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.30))
-                        Text("Daily Reward")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+        let streak    = gameState.liveStreak
+        let unclaimed = gameState.dailyRewardAvailable
+        let lit       = streak > 0
+        let gold      = Color(red: 1.0, green: 0.82, blue: 0.30)
+        VStack {
+          // Hidden copies of the lives and coin pills reserve exactly their
+          // widths, so the streak pill sits centered in the space BETWEEN
+          // them and can never overlap either one, on any screen width.
+          HStack(spacing: 6) {
+            livesPillLabel(unlimited: gameState.unlimitedLives,
+                           regen: gameState.displayedLives,
+                           total: gameState.totalLives)
+                .hidden()
+                .accessibilityHidden(true)
+            Spacer(minLength: 0)
+            Button { showDailyRewardSheet = true } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(lit ? Color(red: 1.0, green: 0.55, blue: 0.20)
+                                             : Color(white: 0.42))
+                    Text("\(streak)")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(lit ? Color.white : Color(white: 0.48))
+                        .monospacedDigit()
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color(white: 0.14))
+                        .overlay(
+                            Capsule().stroke(unclaimed ? gold.opacity(0.85) : Color(white: 0.28),
+                                             lineWidth: unclaimed ? 1.2 : 0.8)
+                        )
+                )
+                .overlay(alignment: .topTrailing) {
+                    if unclaimed {
                         Circle()
                             .fill(Color(red: 1.0, green: 0.36, blue: 0.36))
-                            .frame(width: 7, height: 7)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 2, y: -2)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule()
-                            .fill(Color(white: 0.14))
-                            .overlay(Capsule().stroke(Color(red: 1.0, green: 0.82, blue: 0.30).opacity(0.5),
-                                                      lineWidth: 1))
-                    )
                 }
-                .buttonStyle(.plain)
-                .homeBallCollider()
-                .accessibilityLabel("Daily reward available")
-                .accessibilityHint("Opens the daily reward.")
-                Spacer()
             }
-            .padding(.top, 8)
+            .buttonStyle(.plain)
+            .homeBallCollider()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(streak == 1 ? "Daily streak: 1 day" : "Daily streak: \(streak) days")
+            .accessibilityValue(unclaimed ? "Today's reward is ready to claim" : "Today's reward claimed")
+            .accessibilityHint("Opens the daily reward.")
+            Spacer(minLength: 0)
+            coinPillLabel
+                .hidden()
+                .accessibilityHidden(true)
+          }
+          .padding(.horizontal, 30)
+          Spacer()
         }
+        .padding(.top, 8)
     }
 
     /// True when launched by the UI test runner (SmokeTests passes
@@ -1144,37 +1176,86 @@ struct HomeView: View {
         }
     }
 
+    /// The coin pill's visible capsule (also used, hidden, to reserve its
+    /// exact width when the streak pill is laid out between the two pills).
+    private var coinPillLabel: some View {
+        HStack(spacing: 6) {
+            // Shared coin graphic — the same minted coin used on
+            // every screen.  Slightly larger than a plain glyph so
+            // the detail reads inside the small pill.
+            CoinIcon(size: 18)
+
+            Text(GameState.coinPillText(gameState.coinBalance))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(gameState.coinBalance)))
+                .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(white: 0.55))
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color(white: 0.14))
+                .overlay(
+                    Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
+                )
+        )
+    }
+
+    /// The lives pill's visible capsule (also used, hidden, to reserve its
+    /// exact width when the streak pill is laid out between the two pills).
+    private func livesPillLabel(unlimited: Bool, regen: Int, total: Int) -> some View {
+        HStack(spacing: 6) {
+            marbleIcon(filled: true, gold: unlimited, size: 18)
+
+            if unlimited {
+                Image(systemName: "infinity")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Self.diamondLifeGradient)
+            } else {
+                Text("\(total)")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Self.livesCountColor(regen: regen, total: total))
+                    .monospacedDigit()
+
+                if let secs = gameState.timeToNextLife() {
+                    HStack(spacing: 3) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(Self.formatCountdown(secs))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(Color(white: 0.62))
+                }
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(white: 0.55))
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color(white: 0.14))
+                .overlay(
+                    Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
+                )
+        )
+    }
+
     private var coinBalancePill: some View {
         VStack {
             HStack {
                 Spacer()
                 Button { showBuyCoinsSheet = true } label: {
-                    HStack(spacing: 6) {
-                        // Shared coin graphic — the same minted coin used on
-                        // every screen.  Slightly larger than a plain glyph so
-                        // the detail reads inside the small pill.
-                        CoinIcon(size: 18)
-
-                        Text(GameState.coinPillText(gameState.coinBalance))
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .monospacedDigit()
-                            .contentTransition(.numericText(value: Double(gameState.coinBalance)))
-                            .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color(white: 0.55))
-                    }
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color(white: 0.14))
-                            .overlay(
-                                Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
-                            )
-                    )
+                    coinPillLabel
                 }
                 .buttonStyle(.plain)
                 .homeBallCollider()
@@ -1208,44 +1289,7 @@ struct HomeView: View {
                         AnalyticsClient.shared.track("home_lives_pill_tapped")
                         showBuyLivesSheet = true
                     } label: {
-                        HStack(spacing: 6) {
-                            marbleIcon(filled: true, gold: unlimited, size: 18)
-
-                            if unlimited {
-                                Image(systemName: "infinity")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(Self.diamondLifeGradient)
-                            } else {
-                                Text("\(total)")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Self.livesCountColor(regen: regen, total: total))
-                                    .monospacedDigit()
-
-                                if let secs = gameState.timeToNextLife() {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: "clock")
-                                            .font(.system(size: 10, weight: .semibold))
-                                        Text(Self.formatCountdown(secs))
-                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                            .monospacedDigit()
-                                    }
-                                    .foregroundStyle(Color(white: 0.62))
-                                }
-                            }
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color(white: 0.55))
-                        }
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color(white: 0.14))
-                                .overlay(
-                                    Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
-                                )
-                        )
+                        livesPillLabel(unlimited: unlimited, regen: regen, total: total)
                     }
                     .buttonStyle(.plain)
                     .homeBallCollider()

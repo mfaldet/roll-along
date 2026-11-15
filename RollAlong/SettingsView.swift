@@ -682,23 +682,24 @@ private struct ResetProgressConfirmSheet: View {
 /// Three wheels: first word · second word · number.
 struct PresetNameWheels: View {
     @Binding var choice: PresetNames.Choice
+    let adjectives: [String]
     let nouns: [String]
-    let numbers: ClosedRange<Int>
+    let numbers: [Int]
 
     var body: some View {
         HStack(spacing: 0) {
             Picker("First word", selection: $choice.adjective) {
-                ForEach(0..<PresetNames.adjectives.count, id: \.self) { i in
-                    Text(PresetNames.adjectives[i]).tag(i)
+                ForEach(0..<adjectives.count, id: \.self) { i in
+                    Text(adjectives[i]).lineLimit(1).minimumScaleFactor(0.6).tag(i)
                 }
             }
             Picker("Second word", selection: $choice.noun) {
                 ForEach(0..<nouns.count, id: \.self) { i in
-                    Text(nouns[i]).tag(i)
+                    Text(nouns[i]).lineLimit(1).minimumScaleFactor(0.6).tag(i)
                 }
             }
             Picker("Number", selection: $choice.number) {
-                ForEach(Array(numbers), id: \.self) { n in
+                ForEach(numbers, id: \.self) { n in
                     Text(String(n)).tag(n)
                 }
             }
@@ -715,7 +716,7 @@ struct PresetNameWheels: View {
 struct NicknamePickerSheet: View {
     @EnvironmentObject var gameState: GameState
     @Environment(\.dismiss) private var dismiss
-    @State private var choice = PresetNames.randomChoice(numbers: PresetNames.nicknameNumbers)
+    @State private var choice = PresetNames.randomNicknameChoice()
 
     var body: some View {
         NavigationStack {
@@ -727,10 +728,11 @@ struct NicknamePickerSheet: View {
                         .foregroundStyle(.white)
                         .padding(.top, 12)
                     PresetNameWheels(choice: $choice,
+                                     adjectives: PresetNames.adjectives,
                                      nouns: PresetNames.nouns,
                                      numbers: PresetNames.nicknameNumbers)
                     Button {
-                        choice = PresetNames.randomChoice(numbers: PresetNames.nicknameNumbers)
+                        choice = PresetNames.randomNicknameChoice()
                     } label: {
                         Label("Shuffle", systemImage: "shuffle")
                             .font(.system(.subheadline, design: .rounded).weight(.semibold))
