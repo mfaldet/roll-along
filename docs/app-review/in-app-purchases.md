@@ -7,10 +7,10 @@ find them.
 
 | # | Product ID | Type | Name | Price (USD) | What it gives | Screen to screenshot |
 |---|---|---|---|---|---|---|
-| 1 | `com.macfaldet.RollAlong.lives.pack1` | Consumable | 10 Lives | $0.99 | 10 lives added to the reserve | Buy Lives sheet |
-| 2 | `com.macfaldet.RollAlong.lives.pack5` | Consumable | 60 Lives | $4.99 | 60 lives | Buy Lives sheet |
-| 3 | `com.macfaldet.RollAlong.lives.pack10` | Consumable | 130 Lives | $9.99 | 130 lives | Buy Lives sheet |
-| 4 | `com.macfaldet.RollAlong.unlimited` | Non-consumable | Unlimited Lives | $19.99 | Lives never run out, plus the Diamond ball skin | Buy Lives sheet, scrolled so Unlimited Lives is visible |
+| 1 | `com.macfaldet.RollAlong.lives.pack1` | Consumable | 10 Lives | $0.99 | 10 lives added to the reserve | Get Lives sheet |
+| 2 | `com.macfaldet.RollAlong.lives.pack5` | Consumable | 60 Lives | $4.99 | 60 lives | Get Lives sheet |
+| 3 | `com.macfaldet.RollAlong.lives.pack10` | Consumable | 130 Lives | $9.99 | 130 lives | Get Lives sheet |
+| 4 | `com.macfaldet.RollAlong.unlimited` | Non-consumable | Unlimited Lives | $19.99 | Lives never run out, plus the Diamond ball skin | Get Lives sheet, scrolled so Unlimited Lives is visible |
 | 5 | `com.macfaldet.RollAlong.coins.100` | Consumable | 750 coins | $0.99 | 750 coins | Get Coins sheet |
 | 6 | `com.macfaldet.RollAlong.coins.600` | Consumable | 4,500 coins | $4.99 | 4,500 coins | Get Coins sheet |
 | 7 | `com.macfaldet.RollAlong.coins.1300` | Consumable | 10,000 coins | $9.99 | 10,000 coins | Get Coins sheet |
@@ -24,7 +24,7 @@ the ID. Do not rename them.
 
 ## How to reach each screen
 
-- **Buy Lives sheet:** Home screen → tap the lives counter at the top-left.
+- **Get Lives sheet:** Home screen → tap the lives counter at the top-left.
 - **Get Coins sheet:** Home → Shop → tap the coin balance at the top-right.
 - **Starter Pack offer sheet:** appears by itself on the Home screen the first
   time the coin balance reaches 250, and can be reopened for 48 hours. On a
@@ -55,4 +55,4 @@ the ID. Do not rename them.
 
 - The screen and button names above come from reading the code. Confirm them
   on the phone.
-- Whether the Buy Lives sheet shows Unlimited Lives without scrolling.
+- Whether the Get Lives sheet shows Unlimited Lives without scrolling.
