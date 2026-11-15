@@ -394,11 +394,13 @@ struct HomeView: View {
                 // the end of any run.
                 // Only while Home is the front screen: a pushed game screen
                 // has its own host, and two hosts would play the moment twice.
-                if nav.path.isEmpty {
+                // Not while the daily-reward sheet is up either: the sheet shows
+                // the moment itself, on top (see the sheet below).
+                if nav.path.isEmpty && !showDailyRewardSheet {
                     TrophyToastHost(queue: gameState.trophyToasts,
                                     hapticsEnabled: gameState.hapticsEnabled,
                                     soundEnabled: gameState.soundEnabled)
-                        .zIndex(85)
+                        .zIndex(86)
                         .onAppear { gameState.endTrophyRun() }
                         // The Clans badge: counted when Home comes to the front
                         // (and on sign-in / sign-out), then once a minute while
@@ -572,6 +574,13 @@ struct HomeView: View {
             .sheet(isPresented: $showDailyRewardSheet) {
                 DailyRewardView()
                     .environmentObject(gameState)
+                    // A trophy earned by claiming (the streak trophies) shows
+                    // here, over the sheet, not hidden behind it.
+                    .overlay {
+                        TrophyToastHost(queue: gameState.trophyToasts,
+                                        hapticsEnabled: gameState.hapticsEnabled,
+                                        soundEnabled: gameState.soundEnabled)
+                    }
             }
             .sheet(isPresented: $showStarterPackSheet) {
                 StarterPackSheet()

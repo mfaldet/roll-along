@@ -165,10 +165,6 @@ final class GameState: ObservableObject {
     @Published var ballStartsAtTop: Bool {
         didSet { defaults.set(ballStartsAtTop, forKey: "ra_startAtTop") }
     }
-    /// How a level starts.  true = "Tap to Start": the level loads paused and
-    /// begins when the player taps.  false = "Auto Start": it begins by itself
-    /// after a short beat.  Default is Tap to Start.  Applies to Adventure,
-    /// Challenge Tracks and Challenge of the Day (see BallGameView).
     /// Clanmates' open life requests this player has not given to yet — the
     /// red badge on Home's Clans button.  Not saved; refreshed from the server
     /// (see `refreshClanRequestBadge`).
@@ -187,6 +183,10 @@ final class GameState: ObservableObject {
         }
     }
 
+    /// How a level starts.  true = "Tap to Start": the level loads paused and
+    /// begins when the player taps.  false = "Auto Start": it begins by itself
+    /// after a short beat.  Default is Tap to Start.  Applies to Adventure,
+    /// Challenge Tracks and Challenge of the Day (see BallGameView).
     @Published var tapToStart: Bool {
         didSet { defaults.set(tapToStart, forKey: "ra_tapToStart") }
     }
@@ -1223,12 +1223,10 @@ final class GameState: ObservableObject {
         // `skill_first_try` (§6 item 7).  Once stamped it would always read
         // "cleared," so it must be read here first.
         let noPriorClear = bestTime[level] == nil
+        var starsImproved = false
         if stars > (bestStars[level] ?? 0) {
             bestStars[level] = stars
-            // Send the new star total right away (not only on the next level
-            // advance), so stars earned by replaying a level reach the
-            // leaderboards and clan totals promptly.
-            syncSocialProgress()
+            starsImproved = true
         }
         if let existing = bestTime[level] {
             if time < existing { bestTime[level] = time }
@@ -1243,6 +1241,11 @@ final class GameState: ObservableObject {
         if level >= highestUnlocked {
             highestUnlocked = level + 1
         }
+        // Send the new star total right away (not only on the next level
+        // advance), so stars earned by replaying a level reach the
+        // leaderboards and clan totals promptly.  After the level and coin
+        // updates above, so one message carries all three.
+        if starsImproved { syncSocialProgress() }
         // Consecutive no-fall clear streak (§6 item 6): a goal-reached run
         // in this game either cleared or fell, so every recorded clear is a
         // fall-free run — the fall side already reset the streak at

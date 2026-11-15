@@ -4170,6 +4170,10 @@ struct BallGameView: View {
     /// The view sits in front of the play area and grabs taps so the
     /// player can begin without targeting any specific control.  Home
     /// button is rendered above this overlay so it stays tappable.
+    /// The large prompt is for the plain "Tap to start" only, not the long
+    /// level-1 tutorial sentences.
+    private var bigStartHint: Bool { waitsForTapToStart && tutorialPhase == .notTutorial }
+
     private var tapToStartOverlay: some View {
         ZStack {
             // Full-screen invisible tap target — release the lock on
@@ -4185,9 +4189,9 @@ struct BallGameView: View {
                     // Bigger when the level is waiting on the tap (Tap to
                     // Start), so the prompt cannot be missed.
                     Image(systemName: "hand.tap.fill")
-                        .font(.system(size: waitsForTapToStart ? 20 : 15, weight: .semibold))
+                        .font(.system(size: bigStartHint ? 20 : 15, weight: .semibold))
                     Text(tapToStartHintText)
-                        .font(.system(size: waitsForTapToStart ? 20 : 15, weight: .semibold, design: .rounded))
+                        .font(.system(size: bigStartHint ? 20 : 15, weight: .semibold, design: .rounded))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }

@@ -161,7 +161,10 @@ struct ClansView: View {
                     .padding(.vertical, 18)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .refreshable { await load() }
+                .refreshable {
+                    await load()
+                    if tab == .rankings { await loadRankings() }
+                }
             }
         }
     }
@@ -212,6 +215,8 @@ struct ClansView: View {
 
     private func rankingRow(_ row: ClanRanking, rank: Int) -> some View {
         let mine = row.clan.id == myClan?.id
+        let clanName: String = row.clan.name.nonEmpty ?? "Clan"
+        let spoken: String = "Rank \(rank). \(clanName). \(row.memberCount) of \(Clan.memberCap) members. \(row.totalLevels) total levels, \(row.totalStars) total stars."
         return Button { nav.goToClan(row.clan) } label: {
             HStack(spacing: 12) {
                 Text("\(rank)")
@@ -250,18 +255,20 @@ struct ClansView: View {
                 .fill(mine ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.16) : Color(white: 0.14)))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Rank \(rank). \(row.clan.name.nonEmpty ?? "Clan"). "
-            + "\(row.memberCount) of \(Clan.memberCap) members. "
-            + "\(row.totalLevels) total levels, \(row.totalStars) total stars.")
+        .accessibilityLabel(spoken)
     }
 
     private func loadRankings() async {
+        let byStars = rankByStars
         rankingsLoading = true
         defer { rankingsLoading = false }
         do {
-            rankings = try await SocialClient.shared.fetchClanRankings(byStars: rankByStars)
+            let rows = try await SocialClient.shared.fetchClanRankings(byStars: byStars)
+            guard byStars == rankByStars else { return }   // the sort changed meanwhile
+            rankings = rows
             rankingsUnavailable = false
         } catch {
+            guard byStars == rankByStars else { return }
             rankings = []
             rankingsUnavailable = true
         }
@@ -1220,6 +1227,8 @@ struct ClanDetailView: View {
         let nm = prof?.displayName.nonEmpty ?? "Roller"
         let lvl = prof?.climbLevel ?? 1
         let stars = prof?.totalStars ?? 0
+        let roleText: String = m.role != "member" ? ", \(m.role)" : ""
+        let spoken: String = "Rank \(rank). \(nm), level \(lvl), \(stars) stars\(roleText)."
         return Button { if let prof { nav.goToPlayer(prof) } } label: {
             HStack(spacing: 12) {
                 Text("\(rank)")
@@ -1250,8 +1259,7 @@ struct ClanDetailView: View {
             .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
         }
         .buttonStyle(.plain).disabled(prof == nil)
-        .accessibilityLabel("Rank \(rank). \(nm), level \(lvl), \(stars) stars"
-            + (m.role != "member" ? ", \(m.role)" : "") + ".")
+        .accessibilityLabel(spoken)
     }
 
     /// Ranked by level, then stars.
