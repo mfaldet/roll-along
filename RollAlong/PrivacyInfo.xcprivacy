@@ -4,7 +4,7 @@
 <dict>
     <!-- Roll Along does NOT track.  The app never shows the App Tracking
          Transparency prompt, never reads the advertising identifier, and
-         every ad request is non-personalised (AdManager: npa=1) with teen
+         every ad request is non-personalized (AdManager: npa=1) with teen
          age treatment.  No data is linked with third-party data for
          advertising and nothing is shared with data brokers.
          The Google Mobile Ads SDK ships its own privacy manifest for what
@@ -89,7 +89,7 @@
         </dict>
 
         <!-- A. Purchase events: in-app purchase started / completed /
-             cancelled / failed with the product id and displayed price, and
+             canceled / failed with the product id and displayed price, and
              coin purchases of cosmetics.  No payment details. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>

@@ -90,7 +90,7 @@ struct SettingsView: View {
         deleteAccountError = nil
         // Re-confirm with Apple first.  That yields a one-time code the server
         // uses to revoke the Sign in with Apple token as part of deletion.
-        // Cancelling Apple's sheet cancels the deletion; if Apple cannot
+        // Canceling Apple's sheet cancels the deletion; if Apple cannot
         // provide a code for any other reason the account is still deleted.
         var appleCode: String? = nil
         switch await auth.requestAuthorizationCode() {

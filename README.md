@@ -27,7 +27,7 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 - **Cosmetics.** 74 ball skins plus goals, trails, floors, pits, boundaries and music, bought with coins. Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
 - **Trophies.** 85 trophies in v1.0, with a Platinum for earning the 70 visible Bronze/Silver/Gold ones. Trophies never grant coins.
 - **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Unlimited Lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
-- **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalised; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
+- **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
 - **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
 - **Friends, clans, leaderboards.** Friend requests, sending lives, clans with a fixed-phrase chat, and leaderboards for the climb and the minigames.
 - **No free text.** Nicknames and clan names are assembled from preset words plus a number, clan tags are derived from the name, and clan descriptions come from a fixed list (`PresetNames` in `SocialClient.swift`). Nothing a player types is ever shown to another player.
@@ -77,7 +77,7 @@ Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, J
 |---|---|---|
 | **Apple** | Sign in with Apple, in-app purchases | |
 | **Supabase** | Sign-in sessions, database (profiles, leaderboards, friends, clans, trophies), the `delete-account` function, analytics events | One project. The keys in the source are Supabase's public client keys; data is protected by the row-level rules in `docs/*.sql`. |
-| **Google AdMob** | Rewarded video ads | Non-personalised only. |
+| **Google AdMob** | Rewarded video ads | Non-personalized only. |
 | **GitHub Pages** | The privacy policy page | Published from the `gh-pages` branch. `docs/site/privacy.html` is the working copy. |
 
 Nothing else is contacted. In particular the app does not use Vercel, Game Center or a push-notification server.
@@ -117,7 +117,7 @@ RollAlong/
 docs/
 ├── *.sql                         database schema and access rules (apply in order; v4 = preset names)
 ├── delete-account-apple-revoke.md   server change for revoking the Apple token on deletion
-├── app-review-notes.md           text for App Store Connect's review notes
+├── app-review/                   review notes, purchase table and App Privacy answers for App Store Connect
 ├── site/privacy.html             working copy of the published privacy policy
 ├── trophies/, economy/, research/   design notes
 └── AppStore.md, TestFlight.md    OUT OF DATE — see the note at the top of each

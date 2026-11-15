@@ -453,7 +453,7 @@ final class StoreKitManager: ObservableObject {
     }
 
     /// Grant the top coin pack's fixed bonus item: the Money Ball skin.
-    /// Always the same item (never randomised), and the coin sheet says so
+    /// Always the same item (never randomized), and the coin sheet says so
     /// before purchase.  Returns its display name for the celebration, or nil
     /// when the player already owns it (a repeat purchase is coins only).
     private func grantMoneyBall(_ gs: GameState) -> String? {
