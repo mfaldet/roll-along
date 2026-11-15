@@ -3069,6 +3069,7 @@ enum OpponentTuning {
     static let cometObstacleDelayShare: Double = 0.25
     /// Sumo Survival: all four marbles start on a ring this share of the way
     /// out from the center, evenly spaced.  Nobody starts in the middle.
+    /// (The ring is turned as needed so no one starts on a pillar.)
     static let sumoStartRing: Double = 0.50
     /// Sumo Survival: each opponent's first target is another OPPONENT, picked
     /// at random, held this long (seconds) before it goes for whoever is nearest.

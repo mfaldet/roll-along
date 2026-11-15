@@ -823,7 +823,9 @@ struct MarbleCupView: View {
             // during a mistake, on the near side (it will push the ball the
             // wrong way if it gets there).
             let dir = unit(dx: ballPos.x - attackGoal.x, dy: ballPos.y - attackGoal.y, scale: 1)
-            let side: CGFloat = brain.isMistaking ? -1 : 1
+            // Only OPPONENTS make the wrong-side mistake; your 2v2 teammate
+            // (attacksTop) never pushes the ball toward your own goal.
+            let side: CGFloat = (brain.isMistaking && !ai.attacksTop) ? -1 : 1
             target = CGPoint(x: ballPos.x + dir.dx * side * (ballRadius + marbleRadius * 0.9),
                              y: ballPos.y + dir.dy * side * (ballRadius + marbleRadius * 0.9))
         }

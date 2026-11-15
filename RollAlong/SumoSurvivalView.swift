@@ -606,9 +606,31 @@ struct SumoSurvivalView: View {
         // Player first (bottom of the ring), then the opponents clockwise.
         let ordered = roster.filter { $0.isPlayer } + roster.filter { !$0.isPlayer }
         let spawnR = baseRadius * CGFloat(OpponentTuning.sumoStartRing)
+        // Turn the whole ring, in 15-degree steps, to whichever position
+        // keeps every start point farthest from this map's pillars, so
+        // nobody starts on top of one.  With no pillar nearby the turn is 0
+        // and the player starts at the bottom.
+        let count = max(1, ordered.count)
+        var bestTurn: Double = 0
+        var bestGap: CGFloat = -.greatestFiniteMagnitude
+        for step in 0..<6 {
+            let turn = Double(step) * Double.pi / 12
+            var gap: CGFloat = .greatestFiniteMagnitude
+            for i in 0..<count {
+                let a = Double.pi / 2 + turn + (Double(i) / Double(count)) * 2 * Double.pi
+                let sx = center.x + CGFloat(cos(a)) * spawnR
+                let sy = center.y + CGFloat(sin(a)) * spawnR
+                for p in currentPillars {
+                    let px = center.x + cos(p.angle) * p.radFrac * baseRadius
+                    let py = center.y + sin(p.angle) * p.radFrac * baseRadius
+                    gap = min(gap, hypot(sx - px, sy - py) - p.r)
+                }
+            }
+            if gap > bestGap + 0.5 { bestGap = gap; bestTurn = turn }
+        }
         var fresh: [Bumper] = []
         for (i, racer) in ordered.enumerated() {
-            let angle = Double.pi / 2 + (Double(i) / Double(max(1, ordered.count))) * 2 * Double.pi
+            let angle = Double.pi / 2 + bestTurn + (Double(i) / Double(count)) * 2 * Double.pi
             let pos = CGPoint(x: center.x + CGFloat(cos(angle)) * spawnR,
                               y: center.y + CGFloat(sin(angle)) * spawnR)
             fresh.append(Bumper(id: racer.id, pos: pos,
