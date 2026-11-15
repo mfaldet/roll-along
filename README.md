@@ -1,6 +1,6 @@
 # Roll Along
 
-A tilt-controlled marble game for iPhone. Tilt the phone to roll a marble through an endless climb, 11 minigames and 8 challenge tracks; collect cosmetics; earn trophies; compete on leaderboards.
+A tilt-controlled marble game for iPhone. Tilt the phone to roll a marble through the endless Adventure mode, 11 minigames and 8 challenge tracks; collect cosmetics; earn trophies; compete on leaderboards.
 
 **Platform:** iPhone, iOS 18 or later · **Language:** Swift / SwiftUI · **Build:** Xcode 26 or later
 
@@ -10,11 +10,13 @@ Version 1.0 is being prepared for TestFlight and the App Store. This file says w
 
 ## What works
 
+The main mode is called **Adventure** in the game. In the code it is still named `climb` (ids, file comments, database columns); those internal names are unchanged.
+
 ### Game modes
 
 | Mode | What you do |
 |---|---|
-| **Climb** | Tilt to the goal past the holes. The first 100 levels are authored (`LevelOverrides.json`); after that levels are generated, so the climb does not end. Stars, coins and lives. |
+| **Adventure** (the main mode) | Tilt to the goal past the holes. The first 100 levels are authored (`LevelOverrides.json`); after that levels are generated, so Adventure does not end. Stars, coins and lives. |
 | **Challenge of the Day** | A short date-seeded run with three attempts and a coin reward. |
 | **Challenge Tracks** (8) | Themed 100-level tracks generated from a seed. Finishing one grants a cosmetic collection. |
 | **Competitive minigames** (6, against AI rivals) | Comet Clash, Sumo Survival, Paint Ball, Smash and Grab, Marble Cup, King of the Hill |
@@ -25,11 +27,11 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 ### Everything else
 
 - **Cosmetics.** 74 ball skins plus goals, trails, floors, pits, boundaries and music, bought with coins. Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
-- **Trophies.** 92 trophies in v1.0, shown in the Trophy Room as 47 tiles in four sections (Climb, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 74 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
+- **Trophies.** 92 trophies in v1.0, shown in the Trophy Room as 47 tiles in four sections (Adventure, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 74 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
 - **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Unlimited Lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
 - **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
 - **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
-- **Friends, clans, leaderboards.** Friend requests, sending lives, clans with a fixed-phrase chat, and leaderboards for the climb and the minigames.
+- **Friends, clans, leaderboards.** Friend requests, sending lives, clans with a fixed-phrase chat, and leaderboards for Adventure and the minigames.
 - **No free text.** Nicknames and clan names are assembled from preset words plus a number, clan tags are derived from the name, and clan descriptions come from a fixed list (`PresetNames` in `SocialClient.swift`). Nothing a player types is ever shown to another player.
 - **Notifications.** Two local notifications (shop restock, lives full), each switched on by the player in Settings. No push server.
 - **Analytics.** The app's own anonymous event log. See *Services*.
@@ -51,7 +53,7 @@ Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, J
 
 - **Pinball is not in v1.0.** It is unfinished, so it has been removed from the build along with its leaderboard and trophies. The work in progress is kept in `tools/pinball/` (not part of the app).
 - **Roll Out has five mazes**, which repeat.
-- **Climb sound effects are system placeholder sounds.**
+- **Adventure sound effects are system placeholder sounds.**
 - **Five authored levels** (78, 83, 89, 92, 97) have a coin on the rim of a hole. `node scripts/verify-levels.mjs` lists them.
 - **Leaderboard scores are not verified by the server.** A signed-in player's own row accepts whatever the app sends.
 - **Trophy tables are not on the live database yet** (checked 2026-11-15). Until `docs/trophies/trophy-schema.sql` is applied, trophies work on the device but rarity figures and the public trophy showcase do not.
@@ -103,7 +105,7 @@ RollAlong/
 ├── RollAlongApp.swift            app entry, launch tasks
 ├── HomeView.swift                routing hub
 ├── GameMode.swift                mode registry and tutorial text
-├── BallGameView.swift            climb engine (also Zen, Gold Rush, daily, tracks)
+├── BallGameView.swift            Adventure engine (also Zen, Gold Rush, daily, tracks)
 ├── *View.swift                   one file per self-contained minigame
 ├── GameState.swift               all saved player state
 ├── Cosmetics.swift               cosmetic catalogue, shop rotation, release calendar

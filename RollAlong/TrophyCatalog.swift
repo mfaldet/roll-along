@@ -97,7 +97,7 @@ enum TrophyCategory: String, Codable, CaseIterable {
     /// Player-facing section header (Trophy Room grouping, S2-T3).
     var displayName: String {
         switch self {
-        case .climb:            return "Climb"
+        case .climb:            return "Adventure"
         case .challengeTracks:  return "Challenge Tracks"
         case .daily:            return "Daily Challenge & Streaks"
         case .minigamesArcade:  return "Minigames — Arcade-Wide"
@@ -524,7 +524,7 @@ enum TrophyTileSection: String, Codable, CaseIterable {
     /// Player-facing section header.
     var displayName: String {
         switch self {
-        case .climb:      return "Climb"
+        case .climb:      return "Adventure"
         case .challenges: return "Challenges"
         case .minigames:  return "Minigames"
         case .personal:   return "Personal"

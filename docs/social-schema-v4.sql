@@ -6,7 +6,7 @@
 --
 -- What this does
 --   1. Rewrites any existing free-text value to a preset-format one:
---        players.display_name  -> 'Climber'
+--        players.display_name  -> 'Roller'
 --        clans.name            -> 'Swift Comets <n>'  (n unique per clan)
 --        clans.tag             -> derived from the name (two initials + number)
 --        clans.description     -> ''
@@ -23,7 +23,7 @@
 -- ---------------------------------------------------------------------------
 create or replace function public.ra_is_preset_nickname(n text)
 returns boolean language sql immutable as $$
-    select n = 'Climber'
+    select n = 'Roller'
         or n ~ '^(Swift|Brave|Lucky|Happy|Calm|Bold|Quick|Sunny|Misty|Rapid|Jolly|Noble|Zippy|Witty|Merry|Royal|Solar|Lunar|Amber|Azure|Coral|Ivory|Jade|Mint|Neon|Ruby|Teal|Gold|Iron|Agile|Clear|Eager|Grand|Keen|Kind|Loyal|Proud|Vivid|Wise|Epic)(Orb|Comet|Star|Moon|Fox|Otter|Panda|Koala|Tiger|Eagle|Robin|Finch|Whale|Lynx|Wolf|Bear|Hawk|Owl|Maple|Cedar|Pine|River|Cloud|Storm|Spark|Flame|Pixel|Rover|Racer|Kite|Wave|Peak|Ridge|Dune|Stone|Pearl|Lark|Heron|Bison|Lotus)([1-9][0-9]?)$'
 $$;
 
@@ -44,12 +44,12 @@ returns boolean language sql immutable as $$
     select d = '' or d in (
         'Friendly clan. Everyone is welcome.',
         'Daily players who share lives.',
-        'Casual climbers. No pressure.',
+        'Casual players. No pressure.',
         'Chasing the top of the leaderboard.',
         'Minigame fans.',
         'Trophy hunters.',
         'Friends and family.',
-        'New players welcome. We help each other climb.'
+        'New players welcome. We help each other out.'
     )
 $$;
 
@@ -66,7 +66,7 @@ drop index if exists public.clans_tag_unique_idx;
 -- 1 · Rewrite existing rows that are not preset-format
 -- ---------------------------------------------------------------------------
 update public.players
-   set display_name = 'Climber'
+   set display_name = 'Roller'
  where not public.ra_is_preset_nickname(display_name);
 
 -- Clans: give each non-conforming clan the first free 'Swift Comets <n>'.

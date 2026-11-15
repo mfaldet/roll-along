@@ -2952,6 +2952,8 @@ final class TrophyRevisionTests: XCTestCase {
             for text in [trophy.title, trophy.lockedDescription, trophy.unlockedDescription] {
                 XCTAssertFalse(text.contains("Coin Pit"), "\(trophy.id): says Coin Pit")
                 XCTAssertFalse(text.contains("Medium"), "\(trophy.id): the difficulty is called Normal")
+                XCTAssertFalse(text.lowercased().contains("climb"),
+                               "\(trophy.id): the main mode is called Adventure")
             }
         }
         XCTAssertTrue(try XCTUnwrap(catalog.trophy(withID: "disco_hard_10"))
@@ -3019,7 +3021,7 @@ final class TrophyRevisionTests: XCTestCase {
     func testRoomSectionsAndOrdering() throws {
         let model = TrophyRoomModel(engine: try makeEngine())
         XCTAssertEqual(model.tileSections.map(\.title),
-                       ["Climb", "Challenges", "Minigames", "Personal"])
+                       ["Adventure", "Challenges", "Minigames", "Personal"])
         for section in model.tileSections {
             for sub in section.subsections {
                 let kinds = sub.tiles.map(\.kind)

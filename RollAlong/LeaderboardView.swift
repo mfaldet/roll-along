@@ -288,7 +288,7 @@ struct LeaderboardView: View {
 
             // The own-row is already cued by the green tint + left bar and the
             // player's own nickname, so no "YOU" badge is needed.
-            Text(profile.displayName.isEmpty ? "Climber" : profile.displayName)
+            Text(profile.displayName.isEmpty ? "Roller" : profile.displayName)
                 .font(.system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold))
                 .foregroundStyle(isMe ? .white : Color(white: 0.92))
                 .lineLimit(1)
@@ -314,7 +314,7 @@ struct LeaderboardView: View {
 
     /// A spoken summary covering every column on the current board.
     private func rowAccessibilityLabel(rank: Int, profile: PlayerProfile, isMe: Bool) -> String {
-        let name = profile.displayName.isEmpty ? "Climber" : profile.displayName
+        let name = profile.displayName.isEmpty ? "Roller" : profile.displayName
         var parts = ["Rank \(rank). \(name)"]
         switch selectedBoard {
         case .rollAlong:
@@ -621,7 +621,7 @@ struct LeaderboardView: View {
         let isClimb = (selectedBoard == .rollAlong)
         return messageBlock(
             icon: "trophy",
-            title: isClimb ? "No climbers yet" : "No scores yet",
+            title: isClimb ? "No players yet" : "No scores yet",
             message: isClimb
                 ? "Be the first on the board — clear a level to post your rank."
                 : "Be the first on the board — play a round of \(selectedBoard.title) to post your rank.",
@@ -644,7 +644,7 @@ struct LeaderboardView: View {
         messageBlock(
             icon: "trophy.fill",
             title: "Climb the global board",
-            message: "Sign in with Apple to see where you rank against climbers worldwide, join clans, and send friends extra lives. Your level progress is saved on this device either way.",
+            message: "Sign in with Apple to see where you rank against players worldwide, join clans, and send friends extra lives. Your level progress is saved on this device either way.",
             actionTitle: "Sign in from Settings",
             action: { nav.goToSettings() }
         )

@@ -7,7 +7,7 @@ app changes.
 ---
 
 ```
-Roll Along is a tilt-controlled marble game. It needs a physical iPhone: the marble is steered by tilting the device.
+Roll Along is a tilt-controlled marble game. It needs a physical iPhone: the marble is steered by tilting the device. The main mode is called Adventure; the "Play" button on the Home screen starts it.
 
 SIGN-IN — NO DEMO ACCOUNT NEEDED
 The game is fully playable without an account. Sign in with Apple is optional and is the only sign-in method; please use your own Apple ID. It is needed only for Leaderboard, Clans and Friends. The app does not request name or email. To sign in: Home > Settings > Account > Sign in with Apple (tapping Leaderboard, Clans or Friends while signed out also offers it).

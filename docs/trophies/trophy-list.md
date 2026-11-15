@@ -10,51 +10,51 @@
 
 Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
-## Climb
+## Adventure
 
 **Stack: Levels passed** · icon `mountain.2.fill` · fallback `flag.fill`
 
 | Step | Title | What it asks |
 |---|---|---|
-| Bronze I | Get the Ball Rolling | Clear climb level 1. |
-| Bronze II | Training Wheels Off | Clear climb level 10. |
-| Bronze III | Gathering Momentum | Clear climb level 50. |
-| Silver I | Beyond the Meadow | Clear climb level 100 — all of World 1, Meadowgate. |
-| Silver II | Boulder and Bolder | Clear climb level 250. |
-| Silver III | The Long Roll | Clear climb level 500. |
-| Gold I | Unstoppable Force | Clear climb level 1,000. |
-| Gold II | Altitude Sickness (new) | Clear climb level 1,500. |
-| Gold III | Halfway to Heaven (new) | Clear climb level 2,500. |
-| Diamond | The Summit | Clear climb level 5,000 — the last level of World 50, The Summit. |
+| Bronze I | Get the Ball Rolling | Clear Adventure level 1. |
+| Bronze II | Training Wheels Off | Clear Adventure level 10. |
+| Bronze III | Gathering Momentum | Clear Adventure level 50. |
+| Silver I | Beyond the Meadow | Clear Adventure level 100 — all of World 1, Meadowgate. |
+| Silver II | Boulder and Bolder | Clear Adventure level 250. |
+| Silver III | The Long Roll | Clear Adventure level 500. |
+| Gold I | Unstoppable Force | Clear Adventure level 1,000. |
+| Gold II | Altitude Sickness (new) | Clear Adventure level 1,500. |
+| Gold III | Halfway to Heaven (new) | Clear Adventure level 2,500. |
+| Diamond | The Summit | Clear Adventure level 5,000 — the last level of World 50, The Summit. |
 
 **Stack: Stars earned** · icon `star.fill` · fallback `star`
 
 | Step | Title | What it asks |
 |---|---|---|
-| Bronze I | Star Search | Earn 25 climb stars. |
-| Bronze II | Stargazer (new) | Earn 50 climb stars. |
-| Bronze III | Rising Star (new) | Earn 75 climb stars. |
-| Silver I | Star-Studded | Earn 150 climb stars. |
-| Silver II | Constellation (new) | Earn 300 climb stars. |
-| Silver III | Star Power (new) | Earn 500 climb stars. |
-| Gold I | A Thousand Points of Light (new) | Earn 1,000 climb stars. |
-| Gold II | Milky Way (new) | Earn 3,000 climb stars. |
-| Gold III | Supernova (new) | Earn 5,000 climb stars. |
-| Diamond | Written in the Stars (new) | Earn 10,000 climb stars. |
+| Bronze I | Star Search | Earn 25 Adventure stars. |
+| Bronze II | Stargazer (new) | Earn 50 Adventure stars. |
+| Bronze III | Rising Star (new) | Earn 75 Adventure stars. |
+| Silver I | Star-Studded | Earn 150 Adventure stars. |
+| Silver II | Constellation (new) | Earn 300 Adventure stars. |
+| Silver III | Star Power (new) | Earn 500 Adventure stars. |
+| Gold I | A Thousand Points of Light (new) | Earn 1,000 Adventure stars. |
+| Gold II | Milky Way (new) | Earn 3,000 Adventure stars. |
+| Gold III | Supernova (new) | Earn 5,000 Adventure stars. |
+| Diamond | Written in the Stars (new) | Earn 10,000 Adventure stars. |
 
 **Stack: Levels in a row without a fall** · icon `hand.raised.slash.fill` · fallback `hand.raised.fill`
 
 | Step | Title | What it asks |
 |---|---|---|
-| Bronze | Steady Hands (new) | Clear 5 climb levels in a row without a single fall. |
-| Silver | Clean Sheet | Clear 10 climb levels in a row without a single fall. |
-| Gold I | Untouchable | Clear 25 climb levels in a row without a single fall. |
-| Gold II | Nerves of Steel (new) | Clear 50 climb levels in a row without a single fall. |
-| Diamond | Flawless Hundred (new) | Clear 100 climb levels in a row without a single fall. |
+| Bronze | Steady Hands (new) | Clear 5 Adventure levels in a row without a single fall. |
+| Silver | Clean Sheet | Clear 10 Adventure levels in a row without a single fall. |
+| Gold I | Untouchable | Clear 25 Adventure levels in a row without a single fall. |
+| Gold II | Nerves of Steel (new) | Clear 50 Adventure levels in a row without a single fall. |
+| Diamond | Flawless Hundred (new) | Clear 100 Adventure levels in a row without a single fall. |
 
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
-| Gone in Ten Seconds | Bronze | Clear any climb level in 10 seconds or less. | `stopwatch.fill` | `timer` |
+| Gone in Ten Seconds | Bronze | Clear any Adventure level in 10 seconds or less. | `stopwatch.fill` | `timer` |
 | First Try! | Bronze | Earn 3 stars on a level on your very first attempt. | `1.circle.fill` | `1.circle` |
 | Spotless | Silver | Earn 3 stars and bank all 3 pickup coins in one single run. | `sparkles` | `wand.and.stars` |
 | One Hundred Perfect Rolls | Gold | Hold 3 stars on every level of any single world. | `globe.americas.fill` | `globe` |
@@ -279,7 +279,7 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
-| Gravity Check (secret) | Bronze | Fall into the pit on climb level 1. | `arrow.down.to.line` | `arrow.down` |
+| Gravity Check (secret) | Bronze | Fall into the pit on Adventure level 1. | `arrow.down.to.line` | `arrow.down` |
 | Night Bloom (secret) | Bronze | Tend the Zen Garden between midnight and 4 AM. | `moon.stars.fill` | `moon.fill` |
 | High Roller (secret) | Silver | Stake 5 or more tickets on a single Gold Rush round. | `dice.fill` | `suit.spade.fill` |
 | Back to Basics (secret) | Bronze | Equip the full all-starter loadout while owning 20 or more cosmetics. | `arrow.uturn.backward.circle.fill` | `arrow.uturn.backward` |
@@ -290,7 +290,7 @@ Icon `trophy.fill` · fallback `star.circle.fill`.
 
 Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends & Clans and Secrets. That is **74 trophies**:
 
-- **Climb** (26): Get the Ball Rolling, Training Wheels Off, Gathering Momentum, Beyond the Meadow, Boulder and Bolder, The Long Roll, Unstoppable Force, Altitude Sickness, Halfway to Heaven, Star Search, Stargazer, Rising Star, Star-Studded, Constellation, Star Power, A Thousand Points of Light, Milky Way, Supernova, One Hundred Perfect Rolls, Gone in Ten Seconds, Steady Hands, Clean Sheet, First Try!, Spotless, Untouchable, Nerves of Steel
+- **Adventure** (26): Get the Ball Rolling, Training Wheels Off, Gathering Momentum, Beyond the Meadow, Boulder and Bolder, The Long Roll, Unstoppable Force, Altitude Sickness, Halfway to Heaven, Star Search, Stargazer, Rising Star, Star-Studded, Constellation, Star Power, A Thousand Points of Light, Milky Way, Supernova, One Hundred Perfect Rolls, Gone in Ten Seconds, Steady Hands, Clean Sheet, First Try!, Spotless, Untouchable, Nerves of Steel
 - **Challenges** (13): Sidetracked, Deep in the Pack, Track Record, Triple Crown, High Five, Run the Gauntlet, Carpe Rollem, Seven-Day Roller, Ten Brutal Mornings, Month of Marbles, Season Ticket, Fifty Days of Grit, The Brutal Week
 - **Minigames · All minigames** (7): Taste of the Arcade, The Grand Tour, Opening Night, Perfectly Normal, Six of the Best, Hard Bargain, Hundred-Round Veteran
 - **Minigames · Comet Clash** (2): Last Comet Standing, Ten-Tail Comet
@@ -313,23 +313,23 @@ Not required: the six Diamond trophies, the seven Friends & Clans trophies and t
 
 | Title | Tier | Locked text | Unlocked text |
 |---|---|---|---|
-| Altitude Sickness | Gold | Clear climb level 1,500. | Fifteen hundred levels up. The air is getting thin. |
-| Halfway to Heaven | Gold | Clear climb level 2,500. | Level 2,500 cleared. Exactly halfway to the Summit. |
-| Stargazer | Bronze | Earn 50 climb stars. | Fifty stars. You have started looking up. |
-| Rising Star | Bronze | Earn 75 climb stars. | Seventy-five stars, and still rising. |
-| Constellation | Silver | Earn 300 climb stars. | Three hundred stars. Enough to draw your own constellation. |
-| Star Power | Silver | Earn 500 climb stars. | Five hundred stars. That is real star power. |
-| A Thousand Points of Light | Gold | Earn 1,000 climb stars. | One thousand stars, every one of them earned. |
-| Milky Way | Gold | Earn 3,000 climb stars. | Three thousand stars. You have rolled out a galaxy. |
-| Supernova | Gold | Earn 5,000 climb stars. | Five thousand stars. Blindingly bright. |
-| Written in the Stars | Diamond | Earn 10,000 climb stars. | Ten thousand stars. It was always going to be you. |
+| Altitude Sickness | Gold | Clear Adventure level 1,500. | Fifteen hundred levels up. The air is getting thin. |
+| Halfway to Heaven | Gold | Clear Adventure level 2,500. | Level 2,500 cleared. Exactly halfway to the Summit. |
+| Stargazer | Bronze | Earn 50 Adventure stars. | Fifty stars. You have started looking up. |
+| Rising Star | Bronze | Earn 75 Adventure stars. | Seventy-five stars, and still rising. |
+| Constellation | Silver | Earn 300 Adventure stars. | Three hundred stars. Enough to draw your own constellation. |
+| Star Power | Silver | Earn 500 Adventure stars. | Five hundred stars. That is real star power. |
+| A Thousand Points of Light | Gold | Earn 1,000 Adventure stars. | One thousand stars, every one of them earned. |
+| Milky Way | Gold | Earn 3,000 Adventure stars. | Three thousand stars. You have rolled out a galaxy. |
+| Supernova | Gold | Earn 5,000 Adventure stars. | Five thousand stars. Blindingly bright. |
+| Written in the Stars | Diamond | Earn 10,000 Adventure stars. | Ten thousand stars. It was always going to be you. |
 | High Five | Gold | Complete 5 Challenge Tracks. | Five Challenge Tracks complete. High five. |
 | Season Ticket | Gold | Reach a 90-day daily reward streak. | Ninety days in a row. You hold a season ticket. |
 | Around the Sun | Diamond | Reach a 365-day daily reward streak. | A full year without missing a day. Once around the sun. |
 | Perfectly Normal | Silver | Win any competitive minigame on Normal difficulty or harder. | A win on Normal. Nothing average about it. |
-| Steady Hands | Bronze | Clear 5 climb levels in a row without a single fall. | Five levels, zero falls. Steady hands. |
-| Nerves of Steel | Gold | Clear 50 climb levels in a row without a single fall. | Fifty levels without a fall. Nerves of steel. |
-| Flawless Hundred | Diamond | Clear 100 climb levels in a row without a single fall. | One hundred levels in a row and not one fall. Flawless. |
+| Steady Hands | Bronze | Clear 5 Adventure levels in a row without a single fall. | Five levels, zero falls. Steady hands. |
+| Nerves of Steel | Gold | Clear 50 Adventure levels in a row without a single fall. | Fifty levels without a fall. Nerves of steel. |
+| Flawless Hundred | Diamond | Clear 100 Adventure levels in a row without a single fall. | One hundred levels in a row and not one fall. Flawless. |
 
 ## Icons
 

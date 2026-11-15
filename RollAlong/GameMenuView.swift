@@ -173,7 +173,7 @@ struct GameMenuView: View {
                         Text("Roll Along")
                             .font(.system(size: 34, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("The endless climb · Level \(gameState.currentLevel)")
+                        Text("Endless Adventure · Level \(gameState.currentLevel)")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.9))
                     }

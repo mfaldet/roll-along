@@ -220,7 +220,7 @@ struct LevelSelectView: View {
             .frame(width: 62, height: 62)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(name.isEmpty ? "Climber" : name)
+                Text(name.isEmpty ? "Roller" : name)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -236,7 +236,7 @@ struct LevelSelectView: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.14)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "\(name.isEmpty ? "Climber" : name), climb level \(level), "
+            "\(name.isEmpty ? "Roller" : name), Adventure level \(level), "
             + "World \(world.index)."
         )
     }

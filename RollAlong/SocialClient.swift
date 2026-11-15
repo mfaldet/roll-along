@@ -652,7 +652,7 @@ final class SocialClient: @unchecked Sendable {
 // a modified client cannot store free text either.  Anything that does not
 // parse — e.g. a name saved before this rule existed — is never shown: the
 // model accessors below fall back to an empty string and the views show
-// their generic "Climber" / "Clan" placeholders.
+// their generic "Roller" / "Clan" placeholders.
 //
 // Kept in this file (not a new one) to avoid touching the Xcode project
 // structure, like the Keychain helper in AppleAuthManager.swift.
@@ -687,18 +687,18 @@ enum PresetNames {
     static let clanDescriptions: [String] = [
         "Friendly clan. Everyone is welcome.",
         "Daily players who share lives.",
-        "Casual climbers. No pressure.",
+        "Casual players. No pressure.",
         "Chasing the top of the leaderboard.",
         "Minigame fans.",
         "Trophy hunters.",
         "Friends and family.",
-        "New players welcome. We help each other climb.",
+        "New players welcome. We help each other out.",
     ]
 
     static let nicknameNumbers: ClosedRange<Int> = 1...99     // keeps a nickname <= 12 characters
     static let clanNumbers:     ClosedRange<Int> = 1...999
     /// Stored for a signed-in player who has not picked a nickname yet.
-    static let defaultNickname = "Climber"
+    static let defaultNickname = "Roller"
 
     /// One selection: an index into `adjectives`, an index into `nouns` /
     /// `clanNouns`, and a number.
@@ -798,7 +798,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     /// this directly — use `displayName`, which only passes preset names.
     private var rawDisplayName: String
     /// The name to show: the stored value when it is a preset-format name
-    /// (see `PresetNames`), else "" so views fall back to "Climber".
+    /// (see `PresetNames`), else "" so views fall back to "Roller".
     var displayName: String { PresetNames.shownNickname(rawDisplayName) }
     var climbLevel: Int
     var highestUnlocked: Int

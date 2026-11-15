@@ -260,7 +260,7 @@ struct FriendsView: View {
 
     private func giftRow(_ gift: LifeGift) -> some View {
         let sender = profiles[gift.senderId]
-        let name   = sender?.displayName.nonEmpty ?? "A climber"
+        let name   = sender?.displayName.nonEmpty ?? "A roller"
         return HStack(spacing: 14) {
             avatar(name, tint: Color(red: 0.95, green: 0.32, blue: 0.45))
             VStack(alignment: .leading, spacing: 3) {
@@ -346,7 +346,7 @@ struct FriendsView: View {
         _ profile: PlayerProfile?,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
-        let name  = profile?.displayName.nonEmpty ?? "Climber"
+        let name  = profile?.displayName.nonEmpty ?? "Roller"
         let level = profile?.climbLevel ?? 1
         let world = World.world(for: max(1, level))
         return HStack(spacing: 14) {
@@ -463,8 +463,8 @@ struct FriendsView: View {
     private var emptyState: some View {
         messageBlock(
             icon: "person.2",
-            title: "Climb together",
-            message: "Search for friends by name to send each other extra lives. The more you climb, the higher you both rank.",
+            title: "Roll together",
+            message: "Search for friends by name to send each other extra lives. The further you get in Adventure, the higher you both rank.",
             actionTitle: nil, action: nil
         )
     }
@@ -631,7 +631,7 @@ struct FriendsView: View {
         do {
             try await SocialClient.shared.sendFriendRequest(to: profile.id)
             await load()
-            flash("Request sent to \(profile.displayName.nonEmpty ?? "climber").")
+            flash("Request sent to \(profile.displayName.nonEmpty ?? "roller").")
         } catch {
             flash("Couldn't send request — try again.")
         }

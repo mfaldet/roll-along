@@ -42,7 +42,7 @@ struct SettingsView: View {
             // waiting for their next level clear to PATCH progress).
             auth.onSignedIn = { [weak gameState] in
                 guard let gameState else { return }
-                let name = gameState.playerName.isEmpty ? "Climber" : gameState.playerName
+                let name = gameState.playerName.isEmpty ? "Roller" : gameState.playerName
                 Task {
                     try? await SocialClient.shared.upsertMyProfile(
                         displayName:     name,
@@ -171,7 +171,7 @@ struct SettingsView: View {
                         Text("Signed in")
                             .font(.system(.body, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("Your climb appears on leaderboards.")
+                        Text("Your Adventure level appears on leaderboards.")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.45))
                     }

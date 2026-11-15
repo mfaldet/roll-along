@@ -75,7 +75,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func scheduleLivesFull(at date: Date) {
         schedule(id: ID.livesFull, at: date,
                  title: "Lives Restored",
-                 body: "You're back to a full bar of 10 — ready to climb.")
+                 body: "You're back to a full bar of 10 — ready to roll.")
     }
     func cancelLivesFull() { cancel(id: ID.livesFull) }
 

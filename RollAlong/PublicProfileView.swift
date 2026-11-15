@@ -165,7 +165,7 @@ struct PublicProfileView: View {
         VStack(spacing: 16) {
             sectionLabel("Career")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                statCell("\(profile.climbLevel)",        "Climb Level", "flag.fill",  world.accent)
+                statCell("\(profile.climbLevel)",        "Adventure Level", "flag.fill",  world.accent)
                 statCell("\(profile.highestUnlocked)",   "Max Level",   "flag.checkered", Color(red: 0.30, green: 0.75, blue: 0.42))
                 statCell("\(profile.totalStars)",        "Stars",       "star.fill",  Color(red: 1.0, green: 0.80, blue: 0.20))
                 statCell("\(profile.coinsCollected ?? 0)", "Coins",     "circle.fill", Color(red: 0.95, green: 0.75, blue: 0.20))

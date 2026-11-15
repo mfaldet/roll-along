@@ -291,7 +291,7 @@ struct ClansView: View {
 
     private func rosterRow(_ member: ClanMember) -> some View {
         let prof  = rosterProfiles[member.playerId]
-        let name  = prof?.displayName.nonEmpty ?? "Climber"
+        let name  = prof?.displayName.nonEmpty ?? "Roller"
         let level = prof?.climbLevel ?? 1
         let world = World.world(for: max(1, level))
         let isMe  = member.playerId == myId
@@ -348,7 +348,7 @@ struct ClansView: View {
     private static let quickChats: [(kind: String, text: String)] = [
         ("chat_hi",        "Hi team! 👋"),
         ("chat_lets_roll", "Let's roll! 🚀"),
-        ("chat_nice",      "Nice climbing! 🔥"),
+        ("chat_nice",      "Nice rolling! 🔥"),
         ("chat_gl",        "Good luck! 🍀"),
         ("chat_ty",        "Thank you! 💙"),
     ]
@@ -540,7 +540,7 @@ struct ClansView: View {
 
     private func name(of id: UUID) -> String {
         if id == myId { return "You" }
-        return rosterProfiles[id]?.displayName.nonEmpty ?? "A climber"
+        return rosterProfiles[id]?.displayName.nonEmpty ?? "A roller"
     }
 
     // MARK: - Create callout (My Clan tab when not in a clan)
@@ -1047,7 +1047,7 @@ struct ClanDetailView: View {
 
     private func rosterRow(_ m: ClanMember) -> some View {
         let prof = profiles[m.playerId]
-        let nm = prof?.displayName.nonEmpty ?? "Climber"
+        let nm = prof?.displayName.nonEmpty ?? "Roller"
         let lvl = prof?.climbLevel ?? 1
         let world = World.world(for: max(1, lvl))
         return Button { if let prof { nav.goToPlayer(prof) } } label: {

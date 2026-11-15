@@ -7,8 +7,8 @@
       "tier": "bronze",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 1.",
-      "unlockedDescription": "You cleared your first climb level. The ball is officially rolling.",
+      "lockedDescription": "Clear Adventure level 1.",
+      "unlockedDescription": "You cleared your first Adventure level. The ball is officially rolling.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 2 },
       "addedInVersion": "1.0"
     },
@@ -18,7 +18,7 @@
       "tier": "bronze",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 10.",
+      "lockedDescription": "Clear Adventure level 10.",
       "unlockedDescription": "Ten levels down — the training wheels are off.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 11 },
       "addedInVersion": "1.0"
@@ -29,7 +29,7 @@
       "tier": "bronze",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 50.",
+      "lockedDescription": "Clear Adventure level 50.",
       "unlockedDescription": "Fifty levels cleared. That's momentum.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 51 },
       "addedInVersion": "1.0"
@@ -40,7 +40,7 @@
       "tier": "silver",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 100 — all of World 1, Meadowgate.",
+      "lockedDescription": "Clear Adventure level 100 — all of World 1, Meadowgate.",
       "unlockedDescription": "Meadowgate is behind you. Forty-nine worlds to go.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 101 },
       "addedInVersion": "1.0"
@@ -51,7 +51,7 @@
       "tier": "silver",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 250.",
+      "lockedDescription": "Clear Adventure level 250.",
       "unlockedDescription": "Two hundred and fifty levels — boulder and bolder with every roll.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 251 },
       "addedInVersion": "1.0"
@@ -62,7 +62,7 @@
       "tier": "silver",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 500.",
+      "lockedDescription": "Clear Adventure level 500.",
       "unlockedDescription": "Five hundred levels. This is the long roll, and you're still rolling.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 501 },
       "addedInVersion": "1.0"
@@ -73,7 +73,7 @@
       "tier": "gold",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 1,000.",
+      "lockedDescription": "Clear Adventure level 1,000.",
       "unlockedDescription": "One thousand levels cleared. Unstoppable.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 1001 },
       "addedInVersion": "1.0"
@@ -84,7 +84,7 @@
       "tier": "gold",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 1,500.",
+      "lockedDescription": "Clear Adventure level 1,500.",
       "unlockedDescription": "Fifteen hundred levels up. The air is getting thin.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 1501 },
       "addedInVersion": "1.0"
@@ -95,7 +95,7 @@
       "tier": "gold",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 2,500.",
+      "lockedDescription": "Clear Adventure level 2,500.",
       "unlockedDescription": "Level 2,500 cleared. Exactly halfway to the Summit.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 2501 },
       "addedInVersion": "1.0"
@@ -106,7 +106,7 @@
       "tier": "diamond",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Clear climb level 5,000 — the last level of World 50, The Summit.",
+      "lockedDescription": "Clear Adventure level 5,000 — the last level of World 50, The Summit.",
       "unlockedDescription": "Level 5,000. World 50. The Summit is yours.",
       "criteria": { "metric": "climb_highest_unlocked", "threshold": 5001 },
       "addedInVersion": "1.0"
@@ -117,7 +117,7 @@
       "tier": "bronze",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 25 climb stars.",
+      "lockedDescription": "Earn 25 Adventure stars.",
       "unlockedDescription": "Twenty-five stars found. Keep searching.",
       "criteria": { "metric": "climb_total_stars", "threshold": 25 },
       "addedInVersion": "1.0"
@@ -128,7 +128,7 @@
       "tier": "bronze",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 50 climb stars.",
+      "lockedDescription": "Earn 50 Adventure stars.",
       "unlockedDescription": "Fifty stars. You have started looking up.",
       "criteria": { "metric": "climb_total_stars", "threshold": 50 },
       "addedInVersion": "1.0"
@@ -139,7 +139,7 @@
       "tier": "bronze",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 75 climb stars.",
+      "lockedDescription": "Earn 75 Adventure stars.",
       "unlockedDescription": "Seventy-five stars, and still rising.",
       "criteria": { "metric": "climb_total_stars", "threshold": 75 },
       "addedInVersion": "1.0"
@@ -150,7 +150,7 @@
       "tier": "silver",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 150 climb stars.",
+      "lockedDescription": "Earn 150 Adventure stars.",
       "unlockedDescription": "One hundred and fifty stars — a star-studded run.",
       "criteria": { "metric": "climb_total_stars", "threshold": 150 },
       "addedInVersion": "1.0"
@@ -161,7 +161,7 @@
       "tier": "silver",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 300 climb stars.",
+      "lockedDescription": "Earn 300 Adventure stars.",
       "unlockedDescription": "Three hundred stars. Enough to draw your own constellation.",
       "criteria": { "metric": "climb_total_stars", "threshold": 300 },
       "addedInVersion": "1.0"
@@ -172,7 +172,7 @@
       "tier": "silver",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 500 climb stars.",
+      "lockedDescription": "Earn 500 Adventure stars.",
       "unlockedDescription": "Five hundred stars. That is real star power.",
       "criteria": { "metric": "climb_total_stars", "threshold": 500 },
       "addedInVersion": "1.0"
@@ -183,7 +183,7 @@
       "tier": "gold",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 1,000 climb stars.",
+      "lockedDescription": "Earn 1,000 Adventure stars.",
       "unlockedDescription": "One thousand stars, every one of them earned.",
       "criteria": { "metric": "climb_total_stars", "threshold": 1000 },
       "addedInVersion": "1.0"
@@ -194,7 +194,7 @@
       "tier": "gold",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 3,000 climb stars.",
+      "lockedDescription": "Earn 3,000 Adventure stars.",
       "unlockedDescription": "Three thousand stars. You have rolled out a galaxy.",
       "criteria": { "metric": "climb_total_stars", "threshold": 3000 },
       "addedInVersion": "1.0"
@@ -205,7 +205,7 @@
       "tier": "gold",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 5,000 climb stars.",
+      "lockedDescription": "Earn 5,000 Adventure stars.",
       "unlockedDescription": "Five thousand stars. Blindingly bright.",
       "criteria": { "metric": "climb_total_stars", "threshold": 5000 },
       "addedInVersion": "1.0"
@@ -216,7 +216,7 @@
       "tier": "diamond",
       "category": "climb",
       "secret": false,
-      "lockedDescription": "Earn 10,000 climb stars.",
+      "lockedDescription": "Earn 10,000 Adventure stars.",
       "unlockedDescription": "Ten thousand stars. It was always going to be you.",
       "criteria": { "metric": "climb_total_stars", "threshold": 10000 },
       "addedInVersion": "1.0"
@@ -876,7 +876,7 @@
       "tier": "bronze",
       "category": "skill_style",
       "secret": false,
-      "lockedDescription": "Clear any climb level in 10 seconds or less.",
+      "lockedDescription": "Clear any Adventure level in 10 seconds or less.",
       "unlockedDescription": "A level cleared in ten seconds flat. Gone.",
       "criteria": { "metric": "fastest_clear_seconds", "threshold": 10.0, "comparison": "lte" },
       "addedInVersion": "1.0"
@@ -887,7 +887,7 @@
       "tier": "bronze",
       "category": "skill_style",
       "secret": false,
-      "lockedDescription": "Clear 5 climb levels in a row without a single fall.",
+      "lockedDescription": "Clear 5 Adventure levels in a row without a single fall.",
       "unlockedDescription": "Five levels, zero falls. Steady hands.",
       "criteria": { "metric": "no_fall_clear_streak_best", "threshold": 5 },
       "addedInVersion": "1.0"
@@ -898,7 +898,7 @@
       "tier": "silver",
       "category": "skill_style",
       "secret": false,
-      "lockedDescription": "Clear 10 climb levels in a row without a single fall.",
+      "lockedDescription": "Clear 10 Adventure levels in a row without a single fall.",
       "unlockedDescription": "Ten straight clears, zero falls. A clean sheet.",
       "criteria": { "metric": "no_fall_clear_streak_best", "threshold": 10 },
       "addedInVersion": "1.0"
@@ -931,7 +931,7 @@
       "tier": "gold",
       "category": "skill_style",
       "secret": false,
-      "lockedDescription": "Clear 25 climb levels in a row without a single fall.",
+      "lockedDescription": "Clear 25 Adventure levels in a row without a single fall.",
       "unlockedDescription": "Twenty-five clears without a single fall. Untouchable.",
       "criteria": { "metric": "no_fall_clear_streak_best", "threshold": 25 },
       "addedInVersion": "1.0"
@@ -942,7 +942,7 @@
       "tier": "gold",
       "category": "skill_style",
       "secret": false,
-      "lockedDescription": "Clear 50 climb levels in a row without a single fall.",
+      "lockedDescription": "Clear 50 Adventure levels in a row without a single fall.",
       "unlockedDescription": "Fifty levels without a fall. Nerves of steel.",
       "criteria": { "metric": "no_fall_clear_streak_best", "threshold": 50 },
       "addedInVersion": "1.0"
@@ -953,7 +953,7 @@
       "tier": "diamond",
       "category": "skill_style",
       "secret": false,
-      "lockedDescription": "Clear 100 climb levels in a row without a single fall.",
+      "lockedDescription": "Clear 100 Adventure levels in a row without a single fall.",
       "unlockedDescription": "One hundred levels in a row and not one fall. Flawless.",
       "criteria": { "metric": "no_fall_clear_streak_best", "threshold": 100 },
       "addedInVersion": "1.0"
@@ -964,7 +964,7 @@
       "tier": "bronze",
       "category": "secret_whimsy",
       "secret": true,
-      "lockedDescription": "Fall into the pit on climb level 1.",
+      "lockedDescription": "Fall into the pit on Adventure level 1.",
       "unlockedDescription": "You fell into the pit on level 1. Gravity: confirmed working.",
       "criteria": { "metric": "level_one_falls", "threshold": 1 },
       "addedInVersion": "1.0"

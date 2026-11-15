@@ -186,7 +186,7 @@ extension GameMode {
 struct ClimbMode: GameMode {
     let id          = "climb"
     let displayName = "Adventure"
-    let tagline     = "Climb the endless tower, one level at a time."
+    let tagline     = "Roll up the endless tower, one level at a time."
     let section:     GameModeSection = .climb
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .reachGoal
