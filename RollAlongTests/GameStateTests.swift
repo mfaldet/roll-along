@@ -1128,7 +1128,7 @@ final class PresetNamesTests: XCTestCase {
             XCTAssertEqual(Set(list).count, list.count, "a word appears twice in a list")
             for word in list {
                 XCTAssertTrue(word.allSatisfy { $0.isASCII && $0.isLetter }, "\(word): letters only")
-                XCTAssertEqual(word.prefix(1), word.prefix(1).uppercased(), "\(word): capitalized")
+                XCTAssertEqual(String(word.prefix(1)), word.prefix(1).uppercased(), "\(word): capitalized")
             }
         }
         // A nickname must fit the 12 characters the in-game name tags allow.
