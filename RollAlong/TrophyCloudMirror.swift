@@ -272,22 +272,33 @@ final class UbiquitousTrophyKVStore: TrophyKeyValueStore {
     private static let idsKey = "ra_trophy_cloud_unlocks"
     private static let datesKey = "ra_trophy_cloud_unlock_dates"
 
-    /// The system store. `NSUbiquitousKeyValueStore.default` is safe to
-    /// reference even without the entitlement (it just never syncs); we gate all
-    /// real use behind `isAvailable` so a mis-provisioned build is inert, not
-    /// crashing.
-    private let store: NSUbiquitousKeyValueStore
+    /// SWITCHED OFF FOR v1.0.  The app does not carry the iCloud key-value
+    /// entitlement, so the system store can never sync and merely creating it
+    /// logs "Trying to initialize NSUbiquitousKeyValueStore without a store
+    /// identifier".  While this is false the system store is never created
+    /// and the mirror is a pure no-op.
+    ///
+    /// To switch iCloud trophy backup on later: add the iCloud capability
+    /// with "Key-value storage" to the app target in Xcode (which adds
+    /// `com.apple.developer.ubiquity-kvstore-identifier` to
+    /// RollAlong.entitlements), set this to true, and test a delete +
+    /// reinstall on a real device.
+    static let isEnabledInThisBuild = false
 
-    /// Cached availability. iCloud KV is usable when the entitlement is present
-    /// AND the device has an iCloud (ubiquity) identity. `ubiquityIdentityToken`
-    /// is nil when the user is signed out of iCloud — the cheap, allocation-free
-    /// availability probe Apple documents for exactly this.
+    /// The system store, created only on first real use (never while the
+    /// feature is switched off or the device has no iCloud account).
+    private let injectedStore: NSUbiquitousKeyValueStore?
+    private lazy var store: NSUbiquitousKeyValueStore = injectedStore ?? .default
+
+    /// iCloud KV is usable when the feature is switched on AND the device has
+    /// an iCloud (ubiquity) identity.  `ubiquityIdentityToken` is nil when the
+    /// user is signed out of iCloud.
     var isAvailable: Bool {
-        FileManager.default.ubiquityIdentityToken != nil
+        Self.isEnabledInThisBuild && FileManager.default.ubiquityIdentityToken != nil
     }
 
-    init(store: NSUbiquitousKeyValueStore = .default) {
-        self.store = store
+    init(store: NSUbiquitousKeyValueStore? = nil) {
+        self.injectedStore = store
     }
 
     /// Observe `didChangeExternallyNotification` on the wrapped system store —

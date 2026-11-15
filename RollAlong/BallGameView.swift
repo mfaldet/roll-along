@@ -101,8 +101,6 @@ struct BallGameView: View {
     /// Confirmation before quitting an in-progress CotD run from the home
     /// button — leaving forfeits the day, so we guard against a stray tap.
     @State private var showDailyQuitConfirm:          Bool   = false
-    @State private var showLivesPlaceholderAlert:     Bool   = false
-    @State private var livesPlaceholderMessage:       String = ""
 
     // StoreKit purchase sheets (Sprint 4h)
     @State private var showBuyLivesSheet:             Bool   = false
@@ -4461,11 +4459,6 @@ struct BallGameView: View {
                 }
                 .padding(.horizontal, 24)
             }
-        }
-        .alert("Coming soon", isPresented: $showLivesPlaceholderAlert) {
-            Button("Got it", role: .cancel) { }
-        } message: {
-            Text(livesPlaceholderMessage)
         }
         .sheet(isPresented: $showBuyLivesSheet) {
             BuyLivesSheet()

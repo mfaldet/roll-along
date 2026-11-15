@@ -64,7 +64,12 @@ final class SocialClient: @unchecked Sendable {
     /// in the `delete-account` Edge Function under elevated privileges; this
     /// just invokes it with the player's bearer token.  Clears the local
     /// session on success — sign the user out afterwards.
-    func deleteMyAccount() async throws {
+    ///
+    /// `appleAuthorizationCode` is a fresh one-time code from Sign in with
+    /// Apple (see `AppleAuthManager.requestAuthorizationCode`).  When present
+    /// it is sent to the function so the server can revoke the player's Apple
+    /// token; the account is deleted either way.
+    func deleteMyAccount(appleAuthorizationCode: String? = nil) async throws {
         let session = try requireSession()
         guard let url = URL(string: "\(Self.projectURL)/functions/v1/delete-account") else {
             throw SocialError.badURL
@@ -74,6 +79,9 @@ final class SocialClient: @unchecked Sendable {
         req.setValue("application/json",        forHTTPHeaderField: "Content-Type")
         req.setValue(Self.apiKey,               forHTTPHeaderField: "apikey")
         req.setValue("Bearer \(session.token)", forHTTPHeaderField: "Authorization")
+        if let appleAuthorizationCode {
+            req.httpBody = try encoder.encode(["apple_authorization_code": appleAuthorizationCode])
+        }
 
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse else {

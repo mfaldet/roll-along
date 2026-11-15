@@ -40,6 +40,33 @@ struct RollAlongApp: App {
                     // token in the Keychain) so the player stays signed in
                     // across launches without re-authenticating.
                     await AppleAuthManager.shared.restoreSession()
+                    // From here on, any sign-in — from Settings OR from the
+                    // "Sign in to play with friends" prompt — creates/updates
+                    // the player's public profile row.  Without this the row
+                    // was only created when the sign-in happened on the
+                    // Settings screen, and clans/friends failed for a player
+                    // who signed in from the prompt.  (Installed AFTER the
+                    // silent session restore above, so a restore never
+                    // overwrites the server profile with this device's stats.)
+                    let state = gameState
+                    AppleAuthManager.shared.onSignedIn = { [weak state] in
+                        guard let state else { return }
+                        let name  = state.playerName.isEmpty ? PresetNames.defaultNickname : state.playerName
+                        let level = state.highestUnlocked
+                        let stars = state.totalStars
+                        let coins = state.totalCoins
+                        let lives = state.totalLives
+                        Task {
+                            try? await SocialClient.shared.upsertMyProfile(
+                                displayName:     name,
+                                climbLevel:      level,
+                                highestUnlocked: level,
+                                totalStars:      stars,
+                                coinsCollected:  coins,
+                                lives:           lives
+                            )
+                        }
+                    }
                 }
                 .task {
                     // Trophy bootstrap, in order, every launch:

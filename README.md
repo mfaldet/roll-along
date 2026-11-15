@@ -43,7 +43,7 @@ Most cosmetics are held back at launch and released on a schedule stored in the 
 - The Catalog shows the next drop and its date in a "Coming soon" row.
 - 16 seasonal collections open for their window each year.
 
-> **Before submitting:** `CosmeticSchedule.launchDate` is a placeholder. Set it to the real release day.
+Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, Jun 1, Jun 29, Jul 27, Aug 24, Sep 21, Oct 19 and Nov 16, 2027. If the release day moves, change `CosmeticSchedule.launchDate` and every drop moves with it.
 
 ---
 
@@ -54,8 +54,10 @@ Most cosmetics are held back at launch and released on a schedule stored in the 
 - **Climb sound effects are system placeholder sounds.**
 - **Five authored levels** (78, 83, 89, 92, 97) have a coin on the rim of a hole. `node scripts/verify-levels.mjs` lists them.
 - **Leaderboard scores are not verified by the server.** A signed-in player's own row accepts whatever the app sends.
-- **Account deletion** removes all server data, but whether the server function also revokes the Sign in with Apple token has not been confirmed.
-- **iCloud trophy backup** is written but switched off (the entitlement is not added), so trophies do not yet survive a reinstall for signed-out players.
+- **Trophy tables are not on the live database yet** (checked 2026-11-15). Until `docs/trophies/trophy-schema.sql` is applied, trophies work on the device but rarity figures and the public trophy showcase do not.
+- **Account deletion** removes all server data. The app now asks Apple for a one-time code and sends it to the server so the Sign in with Apple token can be revoked, but the server half is not deployed yet (`docs/delete-account-apple-revoke.md`).
+- **iCloud trophy backup** is written but switched off for v1.0 (`UbiquitousTrophyKVStore.isEnabledInThisBuild`). Nothing in the game is backed up to iCloud: deleting the app, or moving to a new phone without restoring a backup, loses local progress. Purchases restore from Apple, and signed-in players get their trophies back from the server once the trophy tables exist.
+- **Invite links use the `rollalong://` scheme**, which most messaging apps do not turn into a tappable link.
 - **Automated tests cover** trophies, game state, purchases and cosmetics. Minigame play, sign-in and the social screens are tested by hand only. There is no CI.
 
 ## Planned
@@ -114,6 +116,8 @@ RollAlong/
 └── PrivacyInfo.xcprivacy         privacy manifest
 docs/
 ├── *.sql                         database schema and access rules (apply in order; v4 = preset names)
+├── delete-account-apple-revoke.md   server change for revoking the Apple token on deletion
+├── app-review-notes.md           text for App Store Connect's review notes
 ├── site/privacy.html             working copy of the published privacy policy
 ├── trophies/, economy/, research/   design notes
 └── AppStore.md, TestFlight.md    OUT OF DATE — see the note at the top of each

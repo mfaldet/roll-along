@@ -1522,8 +1522,8 @@ enum BundleDiscount: String, CaseIterable {
 // CosmeticSchedule — the release calendar.  Most cosmetics are HELD BACK at
 // launch and arrive in drops, one every 4 weeks, for about 11 months.
 //
-//   • Everything is counted from ONE date: `launchDate`.  Set it to the App
-//     Store release day before submitting — nothing else needs to change.
+//   • Everything is counted from ONE date: `launchDate` (the App Store
+//     release day).  If the release moves, change only that.
 //   • The schedule ships inside the app (no server switch).  Unreleased
 //     collections are announced in the Catalog's "Coming soon" row with their
 //     date, and App Review is told about the calendar in the review notes —
@@ -1543,9 +1543,14 @@ enum BundleDiscount: String, CaseIterable {
 // exactly once; gift and reward collections at launch).
 // ===========================================================================
 enum CosmeticSchedule {
-    /// THE LAUNCH DATE.  ⚠️ PLACEHOLDER — set to the real App Store release
-    /// day before submitting.  Every drop date is counted from this.
-    static let launchDate: Date = CosmeticBundle.date(2027, 1, 15)
+    /// THE LAUNCH DATE: December 15, 2026 (start of the day on the player's
+    /// device).  Every drop date is counted from this:
+    ///    1  Jan 12, 2027     5  May  4, 2027      9  Aug 24, 2027
+    ///    2  Feb  9, 2027     6  Jun  1, 2027     10  Sep 21, 2027
+    ///    3  Mar  9, 2027     7  Jun 29, 2027     11  Oct 19, 2027
+    ///    4  Apr  6, 2027     8  Jul 27, 2027     12  Nov 16, 2027
+    /// If the release day moves, change this one line.
+    static let launchDate: Date = CosmeticBundle.date(2026, 12, 15)
 
     /// Days between drops.
     static let dropIntervalDays = 28

@@ -231,8 +231,8 @@ enum GoldRushMaps {
         GoldRushMap(name: "Split",
                     walls: [WallSegFrac(x1: 0.50, y1: 0.34, x2: 0.50, y2: 0.68)]),
 
-        // 5 — Pinball: 3 angled walls that deflect marbles unexpectedly
-        GoldRushMap(name: "Pinball",
+        // 5 — Deflectors: 3 angled walls that deflect marbles unexpectedly
+        GoldRushMap(name: "Deflectors",
                     walls: [WallSegFrac(x1: 0.14, y1: 0.55, x2: 0.38, y2: 0.36),
                              WallSegFrac(x1: 0.44, y1: 0.30, x2: 0.56, y2: 0.30),
                              WallSegFrac(x1: 0.62, y1: 0.36, x2: 0.86, y2: 0.55)]),

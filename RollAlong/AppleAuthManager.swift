@@ -98,6 +98,44 @@ final class AppleAuthManager: NSObject, ObservableObject {
         isSignedIn = false
     }
 
+    // MARK: - Fresh authorization code (account deletion)
+
+    /// Outcome of asking Apple for a one-time authorization code.
+    enum AuthorizationCodeResult {
+        case code(String)   // Apple returned a fresh code
+        case cancelled      // the player dismissed Apple's sheet
+        case unavailable    // Apple returned no code / the request failed
+    }
+
+    private var codeContinuation: CheckedContinuation<AuthorizationCodeResult, Never>?
+
+    /// Ask Apple for a fresh, single-use authorization code by re-confirming
+    /// Sign in with Apple.  Used only by Delete Account: the server trades the
+    /// code for an Apple token and revokes it (Apple's account-deletion
+    /// guidance for apps that use Sign in with Apple), so the app also
+    /// disappears from the player's "Sign in with Apple" list.
+    func requestAuthorizationCode() async -> AuthorizationCodeResult {
+        guard codeContinuation == nil else { return .unavailable }
+        return await withCheckedContinuation { continuation in
+            codeContinuation = continuation
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            request.requestedScopes = []
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
+        }
+    }
+
+    /// Finish a pending `requestAuthorizationCode()`.  Returns true when a
+    /// request was pending (so the normal sign-in handling must be skipped).
+    private func finishCodeRequest(_ result: AuthorizationCodeResult) -> Bool {
+        guard let continuation = codeContinuation else { return false }
+        codeContinuation = nil
+        continuation.resume(returning: result)
+        return true
+    }
+
     // MARK: - Supabase id_token exchange
 
     private func exchangeWithSupabase(idToken: String, rawNonce: String) async {
@@ -226,15 +264,22 @@ extension AppleAuthManager: ASAuthorizationControllerDelegate {
         controller: ASAuthorizationController,
         didCompleteWithAuthorization authorization: ASAuthorization
     ) {
-        guard
-            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-            let tokenData  = credential.identityToken,
-            let idToken    = String(data: tokenData, encoding: .utf8)
-        else {
-            Task { @MainActor in self.fail("Apple did not return an identity token.") }
-            return
-        }
+        let appleCredential = authorization.credential as? ASAuthorizationAppleIDCredential
+        // One-time authorization code — only used by the Delete Account flow.
+        let authorizationCode: String? = appleCredential?.authorizationCode
+            .flatMap { String(data: $0, encoding: .utf8) }
+        let idToken: String? = appleCredential?.identityToken
+            .flatMap { String(data: $0, encoding: .utf8) }
         Task { @MainActor in
+            // A pending Delete Account code request takes this result.
+            let codeResult: AuthorizationCodeResult =
+                authorizationCode.map { .code($0) } ?? .unavailable
+            if self.finishCodeRequest(codeResult) { return }
+
+            guard let idToken else {
+                self.fail("Apple did not return an identity token.")
+                return
+            }
             guard let nonce = self.currentNonce else {
                 self.fail("Missing sign-in nonce; please try again.")
                 return
@@ -247,7 +292,10 @@ extension AppleAuthManager: ASAuthorizationControllerDelegate {
         controller: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
+        let wasCancelled = (error as? ASAuthorizationError)?.code == .canceled
         Task { @MainActor in
+            // A pending Delete Account code request takes this result.
+            if self.finishCodeRequest(wasCancelled ? .cancelled : .unavailable) { return }
             // User cancellation isn't a real error — keep it quiet.
             if let authError = error as? ASAuthorizationError,
                authError.code == .canceled {

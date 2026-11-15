@@ -88,8 +88,21 @@ struct SettingsView: View {
     private func performAccountDeletion() async {
         isDeletingAccount = true
         deleteAccountError = nil
+        // Re-confirm with Apple first.  That yields a one-time code the server
+        // uses to revoke the Sign in with Apple token as part of deletion.
+        // Cancelling Apple's sheet cancels the deletion; if Apple cannot
+        // provide a code for any other reason the account is still deleted.
+        var appleCode: String? = nil
+        switch await auth.requestAuthorizationCode() {
+        case .code(let code): appleCode = code
+        case .cancelled:
+            deleteAccountError = "Account not deleted. Confirm with Apple to finish deleting your account."
+            isDeletingAccount = false
+            return
+        case .unavailable:    appleCode = nil
+        }
         do {
-            try await SocialClient.shared.deleteMyAccount()
+            try await SocialClient.shared.deleteMyAccount(appleAuthorizationCode: appleCode)
             auth.signOut()
         } catch {
             deleteAccountError = "Couldn't delete your account. Check your connection and try again."
@@ -266,7 +279,7 @@ struct SettingsView: View {
             Button("Delete", role: .destructive) { Task { await performAccountDeletion() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This permanently deletes your account and all its data — profile, friends, clan membership, and leaderboard standing. This can't be undone.")
+            Text("This permanently deletes your account and all its data — profile, friends, clan membership, and leaderboard standing. This can't be undone. Apple will ask you to confirm once more.")
         }
     }
 
@@ -475,7 +488,7 @@ struct SettingsView: View {
     // Privacy policy + contact (App Review Guideline 5.1.1(i): the policy must be
     // reachable inside the app; 1.2 / 2.5.18: published contact details).
     private static let privacyPolicyURL = URL(string: "https://mfaldet.github.io/roll-along/privacy.html")!
-    private static let contactURL = URL(string: "mailto:mac.faldet@gmail.com?subject=Roll%20Along%20support")!
+    private static let contactURL = URL(string: "mailto:rollalongsupport@gmail.com?subject=Roll%20Along%20support")!
 
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 12) {
