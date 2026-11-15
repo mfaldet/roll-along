@@ -23,7 +23,7 @@ enum HomeRoute: Hashable {
     case mode(String)
     case profile
     case challengeTracks
-    /// The Trophy Room — the full 85-trophy catalog grouped by content area,
+    /// The Trophy Room — the full 92-trophy catalog as 47 tiles in four sections,
     /// with locked/unlocked/progress states and secret masking (S2-T3).
     case trophies
     /// Another player's public profile (from Friends, a clan roster, or a deep link).

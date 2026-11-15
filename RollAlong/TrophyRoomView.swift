@@ -40,6 +40,9 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Section ordering (design.md §7 play-path)
 
@@ -128,6 +131,10 @@ struct TrophyRoomRow: Identifiable, Equatable {
     /// Grade accent color — same single source of truth.
     var gradeAccent: Color { TrophyGradeStyle.forTier(tier).accent }
 
+    /// The SF Symbol of the tile this trophy is drawn on (its own icon), or
+    /// the grade glyph when the catalog has no tile layout.
+    var tileIcon: String { TrophyIcon.name(forTrophyID: id) ?? gradeGlyph }
+
     /// Player-facing grade name ("Bronze" … "Platinum").
     var gradeName: String { tier.displayName }
 
@@ -169,6 +176,99 @@ struct TrophyRoomSection: Identifiable, Equatable {
     /// Earned / total for the section's little "3/12" progress caption.
     var unlockedCount: Int { rows.filter(\.isUnlocked).count }
     var total: Int { rows.count }
+}
+
+// MARK: - Tiles (stacks and feats)
+
+/// One tile as the Trophy Room draws it: a STACK (steps of one measure shown
+/// as a single evolving tile) or a FEAT (a one-off trophy).  Display only —
+/// each step is still its own trophy row with its own id, rarity and date.
+struct TrophyRoomTile: Identifiable, Equatable {
+    let id: String
+    let kind: TrophyTile.Kind
+    /// Stack name or feat title, already masked for a locked secret.
+    let displayTitle: String
+    let icon: String
+    let fallbackIcon: String
+    /// The tile's trophies, lowest step first (one for a feat).
+    let steps: [TrophyRoomRow]
+    /// Step names, index-for-index with `steps` ("Bronze I", "Silver II").
+    let stepLabels: [String]
+
+    var earnedCount: Int { steps.filter(\.isUnlocked).count }
+    var isEarned: Bool { earnedCount > 0 }
+    var isComplete: Bool { earnedCount == steps.count }
+    /// A locked secret: title, icon and criteria all stay hidden.
+    var isMasked: Bool { !steps.isEmpty && steps.allSatisfy(\.isMasked) }
+
+    /// Index of the highest step earned, or nil when none is.
+    var highestEarnedIndex: Int? { steps.lastIndex(where: \.isUnlocked) }
+
+    /// The tier the tile wears: the highest step earned, else the first step.
+    var displayTier: TrophyTier {
+        if let i = highestEarnedIndex { return steps[i].tier }
+        return steps.first?.tier ?? .bronze
+    }
+
+    /// The line under the title: the highest step earned for a stack
+    /// ("Silver II"), the tier for a feat, "Locked" when nothing is earned.
+    var caption: String {
+        if isMasked { return "Secret" }
+        switch kind {
+        case .stack:
+            guard let i = highestEarnedIndex else { return "Locked" }
+            return stepLabels[i]
+        case .feat:
+            return steps.first?.gradeName ?? ""
+        }
+    }
+
+    var accessibilityLabel: String {
+        if isMasked { return "Hidden trophy, locked" }
+        switch kind {
+        case .stack:
+            let state = highestEarnedIndex.map { "\(stepLabels[$0]) earned" } ?? "not started"
+            return "\(displayTitle), \(state), \(earnedCount) of \(steps.count) steps"
+        case .feat:
+            return "\(displayTitle), \(caption) trophy, \(isEarned ? "earned" : "locked")"
+        }
+    }
+}
+
+/// A sub-heading inside a section ("Comet Clash") with its tiles — stacks
+/// first, then feats.
+struct TrophyRoomSubsection: Identifiable, Equatable {
+    let id: String
+    /// "" when the section has no sub-headings.
+    let title: String
+    let tiles: [TrophyRoomTile]
+}
+
+/// One of the four Trophy Room sections.
+struct TrophyRoomTileSection: Identifiable, Equatable {
+    let section: TrophyTileSection
+    let subsections: [TrophyRoomSubsection]
+
+    var id: String { section.rawValue }
+    var title: String { section.displayName }
+    var unlockedCount: Int {
+        subsections.reduce(0) { $0 + $1.tiles.reduce(0) { $0 + $1.earnedCount } }
+    }
+    var total: Int {
+        subsections.reduce(0) { $0 + $1.tiles.reduce(0) { $0 + $1.steps.count } }
+    }
+}
+
+/// The Platinum badge in the header: the capstone's own row plus how many of
+/// its required trophies are earned.
+struct TrophyRoomPlatinum: Equatable {
+    let row: TrophyRoomRow
+    let icon: String
+    let fallbackIcon: String
+    let earnedCount: Int
+    let requiredCount: Int
+
+    var fraction: Double { requiredCount > 0 ? Double(earnedCount) / Double(requiredCount) : 0 }
 }
 
 /// The room's header summary — overall completion % + per-grade counts.
@@ -221,6 +321,23 @@ struct TrophyRoomModel: Equatable {
     /// Header summary (completion % + per-grade counts).
     let summary: TrophyRoomSummary
 
+    /// The four tile sections the screen draws (Climb, Challenges, Minigames,
+    /// Personal).  Empty when the catalog has no tile layout.
+    let tileSections: [TrophyRoomTileSection]
+
+    /// The Platinum header badge, or nil when the catalog has no tile layout.
+    let platinum: TrophyRoomPlatinum?
+
+    /// Look a tile up by id (the detail sheet re-reads it so it stays live).
+    func tile(withID id: String) -> TrophyRoomTile? {
+        for section in tileSections {
+            for sub in section.subsections {
+                if let tile = sub.tiles.first(where: { $0.id == id }) { return tile }
+            }
+        }
+        return nil
+    }
+
     /// The rarity slot's placeholder — the label a row shows whenever rarity
     /// is suppressed: before the stats feed lands, during cold-start, for a
     /// paused trophy, or for a trophy with no stats row yet (design.md §3/§9).
@@ -248,6 +365,7 @@ struct TrophyRoomModel: Equatable {
 
         // Resolve every trophy to a row, honoring the secret-masking policy.
         var rowsByCategory: [TrophyCategory: [TrophyRoomRow]] = [:]
+        var rowByID: [String: TrophyRoomRow] = [:]
         var unlocked = 0
         // Per-grade tallies, seeded at 0 for every rung so the header is
         // stable even with an empty ledger.
@@ -306,6 +424,7 @@ struct TrophyRoomModel: Equatable {
                 rarityDetailPercent: rarityDisplay.detailPercent)
 
             rowsByCategory[trophy.category, default: []].append(row)
+            rowByID[trophy.id] = row
 
             totalByTier[trophy.tier, default: 0] += 1
             if isUnlocked {
@@ -337,6 +456,92 @@ struct TrophyRoomModel: Equatable {
             capstoneUnlocked: catalog.trophies.contains {
                 $0.tier.isCapstone && engine.isUnlocked($0.id)
             })
+
+        // ---- Tiles: the catalog's display layout over the rows above. ----
+        var roomTiles: [TrophyRoomTile] = []
+        var sectionOfTile: [String: TrophyTileSection] = [:]
+        var subsectionOfTile: [String: String] = [:]
+        var platinumBadge: TrophyRoomPlatinum? = nil
+        for tile in catalog.tiles {
+            let steps = tile.trophies.compactMap { rowByID[$0] }
+            guard !steps.isEmpty else { continue }
+            if tile.section == .platinum {
+                let requiredIDs = catalog.capstone.criteria.requiredTrophyIDs ?? []
+                platinumBadge = TrophyRoomPlatinum(
+                    row: steps[0],
+                    icon: tile.icon,
+                    fallbackIcon: tile.fallbackIcon,
+                    earnedCount: requiredIDs.filter { engine.isUnlocked($0) }.count,
+                    requiredCount: requiredIDs.count)
+                continue
+            }
+            let masked = steps.allSatisfy(\.isMasked)
+            // A feat shows its trophy's (possibly masked) title; a stack shows
+            // the stack's name.
+            let title = tile.kind == .feat ? steps[0].displayTitle
+                                           : (masked ? Self.maskedTitle : tile.title)
+            roomTiles.append(TrophyRoomTile(
+                id: tile.id,
+                kind: tile.kind,
+                displayTitle: title,
+                icon: tile.icon,
+                fallbackIcon: tile.fallbackIcon,
+                steps: steps,
+                stepLabels: steps.map { catalog.stepLabel(forTrophyID: $0.id) ?? $0.gradeName }))
+            sectionOfTile[tile.id] = tile.section
+            subsectionOfTile[tile.id] = tile.subsection
+        }
+
+        var builtSections: [TrophyRoomTileSection] = []
+        for section in TrophyTileSection.allCases where section != .platinum {
+            let inSection = roomTiles.filter { sectionOfTile[$0.id] == section }
+            guard !inSection.isEmpty else { continue }
+            // Sub-headings in first-appearance (authored) order.
+            var order: [String] = []
+            for tile in inSection {
+                let name = subsectionOfTile[tile.id] ?? ""
+                if !order.contains(name) { order.append(name) }
+            }
+            let subsections = order.map { name -> TrophyRoomSubsection in
+                let tiles = inSection.filter { (subsectionOfTile[$0.id] ?? "") == name }
+                // Stacks first, then feats; authored order within each.
+                let ordered = tiles.filter { $0.kind == .stack } + tiles.filter { $0.kind == .feat }
+                return TrophyRoomSubsection(id: "\(section.rawValue)|\(name)", title: name, tiles: ordered)
+            }
+            builtSections.append(TrophyRoomTileSection(section: section, subsections: subsections))
+        }
+        self.tileSections = builtSections
+        self.platinum = platinumBadge
+    }
+}
+
+// MARK: - Icon resolution
+
+/// Resolves a tile's SF Symbol, falling back to the tile's second choice when
+/// the first does not exist on this iOS version.
+enum TrophyIcon {
+    static func resolved(icon: String, fallback: String) -> String {
+        #if canImport(UIKit)
+        return UIImage(systemName: icon) != nil ? icon : fallback
+        #else
+        return icon
+        #endif
+    }
+
+    /// The icon of the tile a trophy is drawn on, from the bundled catalog.
+    static func name(forTrophyID id: String) -> String? {
+        guard let tile = TrophyCatalog.bundled.tile(forTrophyID: id) else { return nil }
+        return resolved(icon: tile.icon, fallback: tile.fallbackIcon)
+    }
+
+    /// "Levels passed · Silver II" for a step of a multi-step stack, or nil
+    /// for a feat or a one-step stack (their title already says it all).
+    static func stackStepLine(forTrophyID id: String) -> String? {
+        let catalog = TrophyCatalog.bundled
+        guard let tile = catalog.tile(forTrophyID: id), tile.kind == .stack,
+              tile.trophies.count > 1,
+              let step = catalog.stepLabel(forTrophyID: id) else { return nil }
+        return "\(tile.title) · \(step)"
     }
 }
 
@@ -372,30 +577,60 @@ struct TrophyRoomView: View {
     }
 
     /// Recomputed each render from the current engine snapshot + the latest
-    /// rarity index. Cheap: one pass over 85 rows of value types.
+    /// rarity index. Cheap: one pass over 92 rows of value types.
     private var model: TrophyRoomModel {
         TrophyRoomModel(engine: engine, rarity: rarity.index)
     }
 
+    /// The tile whose detail sheet is open.
+    @State private var selection: TileSelection?
+    private struct TileSelection: Identifiable { let id: String }
+
+    private static let tileColumns = [GridItem(.flexible(), spacing: 12, alignment: .top),
+                                      GridItem(.flexible(), spacing: 12, alignment: .top),
+                                      GridItem(.flexible(), spacing: 12, alignment: .top)]
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
+                if let platinum = model.platinum {
+                    platinumBadge(platinum)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                }
+
                 header(model.summary)
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
 
                 pinCaption
                     .padding(.horizontal, 16)
 
-                ForEach(model.sections) { section in
+                // Four sections of tiles.  In every sub-heading, stacks come
+                // first and feats after (the model orders them).
+                ForEach(model.tileSections) { section in
                     Section {
-                        ForEach(section.rows) { row in
-                            TrophyRoomRowView(
-                                row: row,
-                                isPinned: pins.isPinned(row.id),
-                                canPinMore: pins.canPinMore,
-                                onTogglePin: { pins.toggle(row.id) })
-                                .padding(.horizontal, 16)
+                        ForEach(section.subsections) { sub in
+                            VStack(alignment: .leading, spacing: 10) {
+                                if !sub.title.isEmpty {
+                                    Text(sub.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
+                                LazyVGrid(columns: Self.tileColumns, alignment: .center, spacing: 16) {
+                                    ForEach(sub.tiles) { tile in
+                                        Button {
+                                            selection = TileSelection(id: tile.id)
+                                        } label: {
+                                            TrophyTileView(tile: tile)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel(tile.accessibilityLabel)
+                                        .accessibilityHint("Shows details")
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
                         }
                     } header: {
                         sectionHeader(section)
@@ -412,6 +647,56 @@ struct TrophyRoomView: View {
         // reuses the cache). Fire-and-forget: rarity is a garnish, so a failed
         // or slow fetch just leaves the placeholders in place.
         .task { await rarity.loadIfNeeded() }
+        .sheet(item: $selection) { selected in
+            // Re-read the tile from the live model so pins and unlocks made
+            // while the sheet is open show immediately.
+            if let tile = self.model.tile(withID: selected.id) {
+                TrophyTileDetailSheet(tile: tile, pins: pins)
+            }
+        }
+    }
+
+    // MARK: Platinum badge (header)
+
+    /// One large badge for the Platinum trophy with its progress.  Tapping is
+    /// not needed: everything about it is shown here.
+    @ViewBuilder
+    private func platinumBadge(_ platinum: TrophyRoomPlatinum) -> some View {
+        let style = TrophyGradeStyle.forTier(.platinum)
+        let earned = platinum.row.isUnlocked
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(style.accent.opacity(earned ? 0.25 : 0.10))
+                Circle().stroke(style.accent.opacity(earned ? 1 : 0.45), lineWidth: 4)
+                Image(systemName: TrophyIcon.resolved(icon: platinum.icon, fallback: platinum.fallbackIcon))
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(earned ? style.accent : Color.secondary.opacity(0.7))
+            }
+            .frame(width: 84, height: 84)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(platinum.row.displayTitle)
+                    .font(.system(.title2, design: .rounded).weight(.bold))
+                Text(platinum.row.displayDescription)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ProgressView(value: platinum.fraction)
+                    .tint(style.accent)
+                Text(earned ? "Earned" : "\(platinum.earnedCount) of \(platinum.requiredCount)")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.regularMaterial))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(earned
+            ? "Platinum trophy, earned"
+            : "Platinum trophy, \(platinum.earnedCount) of \(platinum.requiredCount) required trophies earned")
     }
 
     /// A quiet caption stating how many chase pins are set, so the pin cap is
@@ -519,7 +804,7 @@ struct TrophyRoomView: View {
     // MARK: Section header
 
     @ViewBuilder
-    private func sectionHeader(_ section: TrophyRoomSection) -> some View {
+    private func sectionHeader(_ section: TrophyRoomTileSection) -> some View {
         HStack {
             Text(section.title)
                 .font(.headline)
@@ -570,7 +855,7 @@ struct TrophyRoomRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: row.isMasked ? "questionmark.circle" : row.gradeGlyph)
+            Image(systemName: row.isMasked ? "questionmark.circle" : row.tileIcon)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(row.isUnlocked ? row.gradeAccent : row.gradeAccent.opacity(0.4))
                 .frame(width: 30)
@@ -660,5 +945,151 @@ struct TrophyRoomRowView: View {
             return "Earned before trophies launched"
         }
         return "Earned \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+}
+
+// MARK: - Tile shapes
+
+/// The feat tile's shape: a pointed-top hexagon (stacks use a circle).
+struct TrophyHexagon: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + w * 0.5, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + w, y: rect.minY + h * 0.25))
+        path.addLine(to: CGPoint(x: rect.minX + w, y: rect.minY + h * 0.75))
+        path.addLine(to: CGPoint(x: rect.minX + w * 0.5, y: rect.minY + h))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + h * 0.75))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + h * 0.25))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - One tile
+
+/// A Trophy Room tile.
+/// • Stack: a ROUND badge in the tier color of the highest step earned, the
+///   step name underneath ("Silver II") and one small marker per step.
+/// • Feat: a HEXAGON badge in its tier color, no markers.
+/// Locked tiles are dimmed; a locked secret shows a question mark.
+struct TrophyTileView: View {
+
+    let tile: TrophyRoomTile
+
+    private var accent: Color { TrophyGradeStyle.forTier(tile.displayTier).accent }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            badge
+                .frame(width: 70, height: 70)
+
+            Text(tile.displayTitle)
+                .font(.caption.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(tile.caption)
+                .font(.caption2)
+                .foregroundStyle(tile.isEarned ? accent : Color.secondary)
+                .lineLimit(1)
+
+            if tile.kind == .stack && tile.steps.count > 1 {
+                stepMarkers
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+    }
+
+    @ViewBuilder
+    private var badge: some View {
+        let fill = accent.opacity(tile.isEarned ? 0.20 : 0.07)
+        let line = accent.opacity(tile.isEarned ? 1.0 : 0.35)
+        ZStack {
+            if tile.kind == .stack {
+                Circle().fill(fill)
+                Circle().stroke(line, lineWidth: 3)
+            } else {
+                TrophyHexagon().fill(fill)
+                TrophyHexagon().stroke(line, lineWidth: 3)
+            }
+            Image(systemName: tile.isMasked
+                  ? "questionmark"
+                  : TrophyIcon.resolved(icon: tile.icon, fallback: tile.fallbackIcon))
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(tile.isEarned ? accent : Color.secondary.opacity(0.65))
+        }
+    }
+
+    /// One small marker per step: filled in that step's tier color when
+    /// earned, faint when not.
+    private var stepMarkers: some View {
+        HStack(spacing: 3) {
+            ForEach(tile.steps) { step in
+                Capsule()
+                    .fill(step.isUnlocked ? step.gradeAccent : Color.secondary.opacity(0.25))
+                    .frame(width: 6, height: 4)
+            }
+        }
+    }
+}
+
+// MARK: - Tile detail sheet
+
+/// Everything about one tile: each step (or the single feat) with its step
+/// name, title, description, progress, rarity, date earned, and the pin
+/// control for a step that can still be chased.
+struct TrophyTileDetailSheet: View {
+
+    let tile: TrophyRoomTile
+    @ObservedObject var pins: TrophyPinStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Spacer()
+                        TrophyTileView(tile: tile)
+                            .frame(width: 140)
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+
+                    ForEach(Array(tile.steps.enumerated()), id: \.element.id) { index, row in
+                        VStack(alignment: .leading, spacing: 2) {
+                            if tile.kind == .stack && !row.isMasked {
+                                Text(tile.stepLabels[index].uppercased())
+                                    .font(.caption2.weight(.bold))
+                                    .kerning(0.8)
+                                    .foregroundStyle(row.isUnlocked ? row.gradeAccent : Color.secondary)
+                            }
+                            TrophyRoomRowView(
+                                row: row,
+                                isPinned: pins.isPinned(row.id),
+                                canPinMore: pins.canPinMore,
+                                onTogglePin: { pins.toggle(row.id) })
+                        }
+                        if index < tile.steps.count - 1 { Divider() }
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle(tile.displayTitle)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents(tile.steps.count > 2 ? [.large] : [.medium, .large])
     }
 }

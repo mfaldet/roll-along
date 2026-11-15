@@ -279,7 +279,7 @@ struct PublicProfileView: View {
             ZStack {
                 Circle().fill(style.accent.opacity(0.18)).frame(width: 52, height: 52)
                     .overlay(Circle().stroke(style.accent.opacity(0.48), lineWidth: 1.2))
-                Image(systemName: style.glyph)
+                Image(systemName: TrophyIcon.name(forTrophyID: id) ?? style.glyph)
                     .font(.system(size: 22)).foregroundStyle(style.accent)
             }
             Text(def?.title ?? "Trophy")

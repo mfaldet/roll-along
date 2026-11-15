@@ -758,7 +758,7 @@ private struct ChaseChipStrip: View {
     /// One chase chip: grade glyph, trophy name, a progress bar + percent.
     private func chipCard(_ chip: ChaseChip) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: chip.isMasked ? "questionmark.circle" : chip.gradeGlyph)
+            Image(systemName: chip.isMasked ? "questionmark.circle" : chip.tileIcon)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(chip.gradeAccent)
                 .accessibilityHidden(true)

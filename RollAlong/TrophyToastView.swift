@@ -203,6 +203,25 @@ struct TrophyToastBatch: Identifiable, Equatable {
         return tally.joined(separator: " · ")
     }
 
+    /// The banner's icon: the trophy's own tile icon for a single unlock,
+    /// the top grade's glyph for a coalesced batch of several.
+    var icon: String {
+        if trophies.count == 1, let name = TrophyIcon.name(forTrophyID: trophies[0].id) {
+            return name
+        }
+        return style.glyph
+    }
+
+    /// The secondary line AS DRAWN: for a single unlock that is a step of a
+    /// stack it names the stack and the step ("Levels passed · Silver II");
+    /// otherwise it is `subline`.
+    var detailLine: String {
+        if trophies.count == 1, let line = TrophyIcon.stackStepLine(forTrophyID: trophies[0].id) {
+            return line
+        }
+        return subline
+    }
+
     /// VoiceOver announcement — speaks title + grade so the grade is never
     /// color-only (design.md §6). "Trophy unlocked: <name>, <Grade>."
     var accessibilityAnnouncement: String {
@@ -342,7 +361,7 @@ struct TrophyToastBanner: View {
     var body: some View {
         let style = batch.style
         HStack(spacing: 12) {
-            Image(systemName: style.glyph)
+            Image(systemName: batch.icon)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(style.accent)
                 .accessibilityHidden(true)
@@ -354,7 +373,7 @@ struct TrophyToastBanner: View {
                     .fontWeight(.semibold)
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
-                Text(batch.subline)
+                Text(batch.detailLine)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

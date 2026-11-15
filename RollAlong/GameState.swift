@@ -698,7 +698,7 @@ final class GameState: ObservableObject {
         self.defaults = defaults
         self.now = now
         trophyStats = TrophyStats(defaults: defaults)
-        // Load the bundled 85-trophy catalog.  A decode/validation failure is
+        // Load the bundled 92-trophy catalog.  A decode/validation failure is
         // a build-breaking AUTHORING error, never a runtime condition to
         // recover from (TrophyCatalog house rules) — but GameState.init must
         // never trap, so fall back to an empty catalog whose engine simply
@@ -1397,6 +1397,16 @@ final class GameState: ObservableObject {
             competitiveModesWonHard += 1
         }
         fireTrophy(.competitiveModesWonHard, value: competitiveModesWonHard)
+
+        // arcade_normal_once (≥1): count of the 6 modes with a win on Normal
+        // or harder, from the same per-difficulty dict.
+        var competitiveModesWonNormal = 0
+        for id in TrophyMetric.competitiveModeIDs
+        where minigameDifficultyWins["\(id)|normal", default: 0] >= 1
+            || minigameDifficultyWins["\(id)|hard", default: 0] >= 1 {
+            competitiveModesWonNormal += 1
+        }
+        fireTrophy(.competitiveModesWonNormal, value: competitiveModesWonNormal)
 
         // Per-game lifetime win tallies — <mode>_first_win / <mode>_wins_10.
         fireTrophy(.snakeWins,     value: minigameWins["snake", default: 0])

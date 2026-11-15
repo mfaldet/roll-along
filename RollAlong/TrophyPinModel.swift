@@ -203,6 +203,8 @@ struct ChaseChip: Identifiable, Equatable {
     /// Grade glyph (SF Symbol) — from the single `TrophyGradeStyle` source so
     /// the Diamond grade never borrows the cosmetic gem (design.md §2 R2).
     var gradeGlyph: String { TrophyGradeStyle.forTier(tier).glyph }
+    /// The trophy's own tile icon (grade glyph when the catalog has no layout).
+    var tileIcon: String { TrophyIcon.name(forTrophyID: id) ?? gradeGlyph }
     /// Grade accent color — same single source of truth.
     var gradeAccent: Color { TrophyGradeStyle.forTier(tier).accent }
 

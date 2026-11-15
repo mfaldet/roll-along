@@ -6,7 +6,7 @@
 //  validation (docs/trophies/sprint-plan.md §2 S0-T1; design.md §9;
 //  trophy-catalog.md §3).
 //
-//  The catalog is DATA: the 85 v1.0 trophies ship as `TrophyCatalog.json`
+//  The catalog is DATA: the 92 v1.0 trophies ship as `TrophyCatalog.json`
 //  (the LevelOverrides pattern) and this file defines the vocabulary the
 //  trophy engine evaluates against. House rules enforced here:
 //
@@ -189,6 +189,13 @@ enum TrophyMetric: String, Codable, CaseIterable {
     /// Count of the 6 competitive modes with ≥1 win on Hard
     /// (`minigameDifficultyWins["<id>|hard"]`).
     case competitiveModesWonHard = "competitive_modes_won_hard"
+    /// Count of the 6 competitive modes with ≥1 win on Normal difficulty OR
+    /// HARDER (`minigameDifficultyWins["<id>|normal"]` / `"<id>|hard"`) —
+    /// `arcade_normal_once`.  A Hard win counts so the Difficulty stack can
+    /// never show Gold without Silver.  Derived from the same persisted
+    /// per-difficulty win dictionary as the Hard count, so wins from before
+    /// this trophy existed count too.
+    case competitiveModesWonNormal = "competitive_modes_won_normal"
 
     // Minigames — per game (existing; mode-id naming trap documented in
     // trophy-catalog.md §3.5: `goldrush` = Smash and Grab; the Coin Pit
@@ -342,7 +349,7 @@ enum TrophyMetric: String, Codable, CaseIterable {
              .dailyPlayed, .dailyClears, .dailyRewardStreakBest,
              .dailyClearStreakBest,
              .minigamesPlayed, .competitiveWins, .competitiveModesWon,
-             .competitiveModesWonHard,
+             .competitiveModesWonHard, .competitiveModesWonNormal,
              .snakeWins, .sumoWins, .paintballWins, .goldrushWins,
              .marblecupWins, .kothWins,
              .paintballBestCoverage, .kothBestHoldSeconds, .pinballBestScore,
@@ -505,6 +512,51 @@ enum TrophyCatalogError: Error, Equatable {
     case unknownRequiredID(String)
     case capstoneListMismatch(missing: [String], extra: [String])
     case ledgerMetricOutsideCapstone(id: String)
+    case tileLayoutInvalid(reason: String)
+}
+
+// MARK: - Tiles (Trophy Room display grouping)
+
+/// The four Trophy Room sections, plus the Platinum header badge.
+enum TrophyTileSection: String, Codable, CaseIterable {
+    case climb, challenges, minigames, personal, platinum
+
+    /// Player-facing section header.
+    var displayName: String {
+        switch self {
+        case .climb:      return "Climb"
+        case .challenges: return "Challenges"
+        case .minigames:  return "Minigames"
+        case .personal:   return "Personal"
+        case .platinum:   return "Platinum"
+        }
+    }
+}
+
+/// One tile in the Trophy Room.  DISPLAY ONLY: every trophy keeps its own id,
+/// criteria, rarity and unlock date; a tile just says which trophies are drawn
+/// together and with which icon.
+///
+/// • `stack` — steps of one measure, drawn as ONE tile that evolves to the
+///   highest step earned.  May hold any number of steps, including one.
+/// • `feat`  — a one-off trophy with its own tile (exactly one trophy).
+struct TrophyTile: Codable, Equatable, Identifiable {
+    enum Kind: String, Codable { case stack, feat }
+
+    let id: String
+    let kind: Kind
+    /// Stack name ("Levels passed") or, for a feat, the trophy's title.
+    let title: String
+    let section: TrophyTileSection
+    /// Sub-heading inside the section ("Comet Clash", "Friends & Clans"), or
+    /// "" when the section has no sub-headings.
+    let subsection: String
+    /// SF Symbol for the tile.  No two tiles share one.
+    let icon: String
+    /// SF Symbol drawn instead if `icon` does not exist on this iOS version.
+    let fallbackIcon: String
+    /// Trophy ids on this tile, lowest step first.
+    let trophies: [String]
 }
 
 /// The loaded, validated v1 trophy catalog.
@@ -520,6 +572,11 @@ struct TrophyCatalog {
     let trophies: [TrophyDefinition]
     /// Definition lookup by frozen id.
     private let byID: [String: TrophyDefinition]
+    /// Trophy Room tiles in display order (empty for a catalog authored
+    /// without a tile layout, e.g. small test catalogs).
+    let tiles: [TrophyTile]
+    /// Trophy id → index into `tiles`.
+    private let tileIndexByTrophyID: [String: Int]
 
     /// The launch content version — the capstone's frozen base list is
     /// exactly the visible bronze/silver/gold trophies added in this
@@ -535,7 +592,12 @@ struct TrophyCatalog {
     /// `load(bundle:)` succeeds in every shipping build and test host).  An
     /// engine over it evaluates nothing and never unlocks, so a missing
     /// resource degrades to "no trophies" rather than a crash.
-    static let empty = TrophyCatalog(catalogVersion: 0, trophies: [], byID: [:])
+    static let empty = TrophyCatalog(catalogVersion: 0, trophies: [], byID: [:], tiles: [])
+
+    /// The catalog bundled with the app, loaded once.  For display lookups
+    /// (a trophy's tile icon and step name) from places that only hold a
+    /// trophy id.  Falls back to `empty` if the resource cannot be read.
+    static let bundled: TrophyCatalog = (try? TrophyCatalog.load()) ?? .empty
 
     var count: Int { trophies.count }
 
@@ -546,6 +608,31 @@ struct TrophyCatalog {
     }
 
     func trophy(withID id: String) -> TrophyDefinition? { byID[id] }
+
+    // MARK: Tiles
+
+    /// The tile a trophy is drawn on, or nil when the catalog has no layout.
+    func tile(forTrophyID id: String) -> TrophyTile? {
+        tileIndexByTrophyID[id].map { tiles[$0] }
+    }
+
+    /// The step name of a trophy inside its tile: the tier name, plus a Roman
+    /// numeral when the tile has several steps of that tier ("Bronze II",
+    /// "Silver I", "Diamond").  Works for feats too (just the tier name).
+    func stepLabel(forTrophyID id: String) -> String? {
+        guard let tile = tile(forTrophyID: id), let me = byID[id] else { return nil }
+        let sameTier = tile.trophies.filter { byID[$0]?.tier == me.tier }
+        guard sameTier.count > 1, let position = sameTier.firstIndex(of: id) else {
+            return me.tier.displayName
+        }
+        return "\(me.tier.displayName) \(Self.romanNumeral(position + 1))"
+    }
+
+    /// 1…10 as Roman numerals (a stack never has more steps of one tier).
+    static func romanNumeral(_ n: Int) -> String {
+        let numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+        return (1...numerals.count).contains(n) ? numerals[n - 1] : String(n)
+    }
 
     // MARK: Loading
 
@@ -565,26 +652,86 @@ struct TrophyCatalog {
     static func load(from data: Data) throws -> TrophyCatalog {
         let file = try JSONDecoder().decode(CatalogFile.self, from: data)
         try validate(file.trophies)
+        let tiles = file.tiles ?? []
+        try validateTiles(tiles, trophies: file.trophies)
         var index: [String: TrophyDefinition] = [:]
         index.reserveCapacity(file.trophies.count)
         for trophy in file.trophies { index[trophy.id] = trophy }
         return TrophyCatalog(catalogVersion: file.catalogVersion,
                              trophies: file.trophies,
-                             byID: index)
+                             byID: index,
+                             tiles: tiles)
     }
 
     /// On-disk shape of `TrophyCatalog.json`.
     struct CatalogFile: Codable {
         let catalogVersion: Int
         let trophies: [TrophyDefinition]
+        /// Trophy Room tile layout.  Optional so small test catalogs can
+        /// omit it; the bundled catalog always has one.
+        var tiles: [TrophyTile]? = nil
     }
 
     private init(catalogVersion: Int,
                  trophies: [TrophyDefinition],
-                 byID: [String: TrophyDefinition]) {
+                 byID: [String: TrophyDefinition],
+                 tiles: [TrophyTile]) {
         self.catalogVersion = catalogVersion
         self.trophies = trophies
         self.byID = byID
+        self.tiles = tiles
+        var tileIndex: [String: Int] = [:]
+        for (i, tile) in tiles.enumerated() {
+            for id in tile.trophies { tileIndex[id] = i }
+        }
+        self.tileIndexByTrophyID = tileIndex
+    }
+
+    /// Tile-layout guardrails.  An empty layout is allowed (no tiles at all);
+    /// a non-empty one must place every trophy on exactly one tile, give each
+    /// tile its own icon, keep feats to a single trophy, and order a stack's
+    /// steps from lowest tier to highest.
+    static func validateTiles(_ tiles: [TrophyTile], trophies: [TrophyDefinition]) throws {
+        guard !tiles.isEmpty else { return }
+        var tierByID: [String: TrophyTier] = [:]
+        for trophy in trophies { tierByID[trophy.id] = trophy.tier }
+
+        var tileIDs = Set<String>()
+        var icons = Set<String>()
+        var placed = Set<String>()
+        for tile in tiles {
+            guard tileIDs.insert(tile.id).inserted else {
+                throw TrophyCatalogError.tileLayoutInvalid(reason: "duplicate tile id \(tile.id)")
+            }
+            guard !tile.icon.isEmpty, !tile.fallbackIcon.isEmpty else {
+                throw TrophyCatalogError.tileLayoutInvalid(reason: "\(tile.id) is missing an icon")
+            }
+            guard icons.insert(tile.icon).inserted else {
+                throw TrophyCatalogError.tileLayoutInvalid(reason: "icon \(tile.icon) is used by two tiles")
+            }
+            guard !tile.trophies.isEmpty else {
+                throw TrophyCatalogError.tileLayoutInvalid(reason: "\(tile.id) has no trophies")
+            }
+            if tile.kind == .feat && tile.trophies.count != 1 {
+                throw TrophyCatalogError.tileLayoutInvalid(reason: "feat \(tile.id) must hold exactly one trophy")
+            }
+            var previousRank = -1
+            for id in tile.trophies {
+                guard let tier = tierByID[id] else {
+                    throw TrophyCatalogError.tileLayoutInvalid(reason: "\(tile.id) names unknown trophy \(id)")
+                }
+                guard placed.insert(id).inserted else {
+                    throw TrophyCatalogError.tileLayoutInvalid(reason: "\(id) is on two tiles")
+                }
+                guard tier.rank >= previousRank else {
+                    throw TrophyCatalogError.tileLayoutInvalid(reason: "\(tile.id) steps are not in tier order")
+                }
+                previousRank = tier.rank
+            }
+        }
+        if let missing = trophies.first(where: { !placed.contains($0.id) }) {
+            throw TrophyCatalogError.tileLayoutInvalid(reason: "\(missing.id) is not on any tile")
+        }
     }
 
     // MARK: Guardrail validation

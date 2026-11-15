@@ -811,7 +811,7 @@ struct ProfileTrophyCard: View {
                     .overlay(
                         Circle().stroke(entry.gradeAccent.opacity(0.48), lineWidth: 1.2)
                     )
-                Image(systemName: entry.gradeGlyph)
+                Image(systemName: entry.tileIcon)
                     .font(.system(size: 22))
                     .foregroundStyle(entry.gradeAccent)
             }

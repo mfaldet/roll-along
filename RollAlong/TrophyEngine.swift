@@ -759,6 +759,12 @@ enum TrophyBackfill {
             competitiveModesWonHard += 1
         }
         snap[.competitiveModesWonHard] = Double(competitiveModesWonHard)
+        var competitiveModesWonNormal = 0
+        for id in TrophyMetric.competitiveModeIDs
+        where hardWins["\(id)|normal", default: 0] >= 1 || hardWins["\(id)|hard", default: 0] >= 1 {
+            competitiveModesWonNormal += 1
+        }
+        snap[.competitiveModesWonNormal] = Double(competitiveModesWonNormal)
 
         // — Minigames — per game (existing wins/bests) —
         snap[.snakeWins]     = Double(wins["snake", default: 0])
