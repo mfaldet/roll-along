@@ -32,7 +32,7 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 - **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
 - **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
 - **Friends, clans, leaderboards.** Friend requests, sending lives, clans with a fixed-phrase chat, and leaderboards for Adventure and the minigames.
-- **No free text.** Nicknames and clan names are assembled from preset words plus a number, clan tags are derived from the name, and clan descriptions come from a fixed list (`PresetNames` in `SocialClient.swift`). Nothing a player types is ever shown to another player.
+- **No free text.** Nicknames and clan names are assembled from preset words plus a number (about 1.5 million possible nicknames and 32 million clan names; lists in `docs/social/preset-names.md`), clan tags are derived from the name, and clan descriptions come from a fixed list (`PresetNames` in `SocialClient.swift`). Nothing a player types is ever shown to another player.
 - **Notifications.** Two local notifications (shop restock, lives full), each switched on by the player in Settings. No push server.
 - **Analytics.** The app's own anonymous event log. See *Services*.
 
@@ -121,6 +121,8 @@ docs/
 ├── delete-account-apple-revoke.md   server change for revoking the Apple token on deletion
 ├── app-review/                   review notes, purchase table and App Privacy answers for App Store Connect
 ├── site/privacy.html             working copy of the published privacy policy
+├── social/                       preset name lists; social and clans revision proposal
+├── minigame-ai-tuning-proposal.md   how the opponents work and how to tune them
 ├── trophies/, economy/, research/   design notes
 └── AppStore.md, TestFlight.md    OUT OF DATE — see the note at the top of each
 tools/pinball/                    held-back Pinball work, not built into the app
