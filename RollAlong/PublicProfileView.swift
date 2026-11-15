@@ -357,6 +357,8 @@ struct PublicProfileView: View {
         busy = true; defer { busy = false }
         do { try await SocialClient.shared.sendLife(to: profile.id, amount: 1)
              sentLife = true; flash("Life sent ♥")
+        } catch SocialError.http(_, let body) where body.contains("gift_limit") {
+            sentLife = true; flash("You already sent this player a life today.")
         } catch { flash("Couldn't send a life — try again.") }
     }
 

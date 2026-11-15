@@ -76,7 +76,9 @@ struct ClansView: View {
 
     /// The request key of a member who is asking right now, else nil.
     private func openRequestKey(_ id: UUID) -> String? {
-        guard let at = rosterProfiles[id]?.needsLivesAt, !at.isEmpty else { return nil }
+        // An expired request is no longer open, even before the server clears it.
+        guard let prof = rosterProfiles[id], prof.isAskingForLives,
+              let at = prof.needsLivesAt, !at.isEmpty else { return nil }
         return SocialClient.requestKey(id, at)
     }
     /// True when this clanmate has an open request I have not given to.
@@ -256,7 +258,7 @@ struct ClansView: View {
             Text("\(prize.clanName) finished \(place)")
                 .font(.system(.headline, design: .rounded).weight(.bold))
                 .foregroundStyle(.white).multilineTextAlignment(.center)
-            Text("\(tier) tier · you earned \(prize.contribution) stars for the clan")
+            Text("\(tier.isEmpty ? "Ranked" : tier + " tier") · you earned \(prize.contribution) stars for the clan")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.65)).multilineTextAlignment(.center)
             Button { Task { await claim(prize) } } label: {
@@ -1003,7 +1005,7 @@ struct ClansView: View {
     // MARK: - Data
 
     private func load() async {
-        guard auth.isSignedIn else { return }
+        guard auth.isSignedIn else { prizes = []; return }
         isLoading = true
         errorText = nil
         await SocialClient.shared.refreshSocialSettings()
@@ -1116,7 +1118,10 @@ struct ClansView: View {
             gameState.recordLifeSent()
             // clan_fulfill (S1-T6): additionally, a gift to an asking clanmate.
             if wasAsking { gameState.recordClanRequestFulfilled() }
-            sentLifeIds.insert(id); flash("Life sent ♥")
+            // An ordinary gift uses up today's "Send life" to this player; a
+            // gift that answered a request does not.
+            if requestKey == nil { sentLifeIds.insert(id) }
+            flash("Life sent ♥")
         } catch SocialError.http(_, let body) where body.contains("already_gave") {
             // The server refused a second gift to the same request.
             if let requestKey { givenRequestKeys.insert(requestKey) }

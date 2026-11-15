@@ -434,7 +434,8 @@ final class SocialClient: @unchecked Sendable {
               let data = try? await send(method: "POST", path: "rpc/ra_social_settings",
                                          bodyData: Data("{}".utf8)),
               let values = try? decode([String: Int].self, from: data) else { return }
-        SocialSettings.current = SocialSettings(values)
+        let settings = SocialSettings(values)
+        await MainActor.run { SocialSettings.current = settings }
     }
 
     // MARK: - Monthly clan battle
@@ -1169,7 +1170,14 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
 
     /// Seconds until this player may open another life request (0 = now).
     func askWaitRemaining(now: Date = Date()) -> TimeInterval {
-        guard let at = livesRequestClosedAt, let closed = SeasonCalendar.parseTimestamp(at) else { return 0 }
+        var closedAt = livesRequestClosedAt.flatMap { SeasonCalendar.parseTimestamp($0) }
+        // A request that ran out of time closed at that moment — the server
+        // counts the wait from there even before it has cleared the request.
+        if let at = needsLivesAt, !at.isEmpty, let opened = SeasonCalendar.parseTimestamp(at) {
+            let expiry = opened.addingTimeInterval(Double(SocialSettings.current.requestHours) * 3600)
+            if expiry <= now { closedAt = max(closedAt ?? expiry, expiry) }
+        }
+        guard let closed = closedAt else { return 0 }
         let ready = closed.addingTimeInterval(Double(SocialSettings.current.cooldownHours) * 3600)
         return max(0, ready.timeIntervalSince(now))
     }

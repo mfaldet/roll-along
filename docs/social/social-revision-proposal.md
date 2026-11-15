@@ -131,8 +131,7 @@ A compact header: name, tag, "7 of 12 members", total levels, total stars,
 this season's score, wins, and last month's finish.
 
 Then the ranked member list. Each row: rank, name, role, level badge, stars,
-this week's contribution. Sorted by this week's contribution, with level as
-the alternative.
+stars this season and levels this week. Sorted by level.
 
 ### Member cap: 12
 
@@ -151,8 +150,8 @@ Showing roles in the list makes them matter, so the missing controls should
 come with it: the owner can promote a member to officer, demote, and remove
 a member; a leaving owner hands the clan to an officer. The database today
 does not allow a role to be changed at all, so this needs a small rule
-change as well as the screens. This could be deferred, but a ranked member
-list with no way to remove an inactive member will be the first complaint.
+change as well as the screens. **Not built yet**; a ranked member list with
+no way to remove an inactive member will be the first complaint.
 
 **Size:** about 80 lines of SQL and 400 lines of app code, plus about 150
 more for the role controls.
