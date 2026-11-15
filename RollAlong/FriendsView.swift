@@ -550,6 +550,9 @@ struct FriendsView: View {
             gifts    = loadedGifts
             edges    = loadedEdges
             profiles = map
+            // One "Send life" per friend per day: mark today's as sent.
+            let sentToday = await SocialClient.shared.fetchMyGiftsToday()
+            sentLifeIds.formUnion(sentToday)
         } catch {
             errorText = "The social server is unreachable right now. Pull to refresh or try again."
         }
@@ -638,6 +641,9 @@ struct FriendsView: View {
             gameState.recordLifeSent()
             sentLifeIds.insert(id)
             flash("Life sent ♥")
+        } catch SocialError.http(_, let body) where body.contains("gift_limit") {
+            sentLifeIds.insert(id)
+            flash("You already sent this friend a life today.")
         } catch {
             flash("Couldn't send a life — try again.")
         }
@@ -734,6 +740,62 @@ struct CountBadge: View {
                 .background(Capsule().fill(Color(red: 0.92, green: 0.20, blue: 0.24)))
                 .fixedSize()
                 .accessibilityLabel("\(count) open life request\(count == 1 ? "" : "s")")
+        }
+    }
+}
+
+/// A clan's standing in the monthly clan battle: this season's score, its
+/// wins (months finished first) and where it finished last month.
+struct ClanStandingLine: View {
+    let standing: ClanRanking
+    var centered: Bool = true
+
+    var body: some View {
+        VStack(alignment: centered ? .center : .leading, spacing: 3) {
+            HStack(spacing: 10) {
+                HStack(spacing: 4) {
+                    Image(systemName: "star.circle.fill")
+                    Text("\(SeasonCalendar.monthName()) season: \(standing.seasonScore)")
+                }
+                .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                if let wins = standing.winsLine {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                        Text(wins)
+                    }
+                    .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                }
+            }
+            .font(.system(.caption, design: .rounded).weight(.bold))
+            .monospacedDigit()
+            if let last = standing.lastMonthLine {
+                Text(last)
+                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color(white: 0.6))
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One member's stars for the clan this season ("★ 37 this season").
+/// Draws nothing at 0.
+struct SeasonStarsLabel: View {
+    let stars: Int
+
+    var body: some View {
+        if stars > 0 {
+            HStack(spacing: 3) {
+                Image(systemName: "star.fill").font(.system(size: 9))
+                Text("\(stars) this season")
+            }
+            .font(.system(.caption2, design: .rounded).weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+            .lineLimit(1)
+            .fixedSize()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(stars) stars this season")
         }
     }
 }

@@ -62,7 +62,13 @@ struct ClansView: View {
 
     // Clan rankings (read-only).
     @State private var rankings: [ClanRanking] = []
-    @State private var rankByStars = false
+    @State private var rankSort: ClanRankSort = .season
+
+    // Monthly clan battle.
+    @State private var myStanding: ClanRanking?          // my clan's season score, wins, last finish
+    @State private var seasonStars: [UUID: Int] = [:]    // each member's stars this season
+    @State private var prizes: [SeasonPrize] = []        // unclaimed, newest first
+    @State private var claimingPrize = false
     @State private var rankingsLoading = false
     @State private var rankingsUnavailable = false
 
@@ -149,6 +155,7 @@ struct ClansView: View {
                 segmentedNav
                 ScrollView {
                     VStack(spacing: 20) {
+                        if let prize = prizes.first { prizeCard(prize) }
                         if tab == .mine {
                             if inClan { myClanSections } else { createCallout }
                         } else if tab == .browse {
@@ -188,12 +195,15 @@ struct ClansView: View {
 
     @ViewBuilder
     private var rankingsSection: some View {
-        Picker("", selection: $rankByStars) {
-            Text("Total levels").tag(false)
-            Text("Total stars").tag(true)
+        Picker("", selection: $rankSort) {
+            Text("Season").tag(ClanRankSort.season)
+            Text("Levels").tag(ClanRankSort.levels)
+            Text("Stars").tag(ClanRankSort.stars)
         }
         .pickerStyle(.segmented)
-        .onChange(of: rankByStars) { _, _ in Task { await loadRankings() } }
+        .onChange(of: rankSort) { _, _ in Task { await loadRankings() } }
+
+        if rankSort == .season { seasonBanner }
 
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Clan rankings", "list.number")
@@ -213,10 +223,79 @@ struct ClansView: View {
         }
     }
 
+    /// "December season · 16 days left", and what the season is.
+    private var seasonBanner: some View {
+        let days = SeasonCalendar.daysRemaining()
+        let prizesOn = SeasonCalendar.awardsPrizes(SeasonCalendar.seasonKey())
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("\(SeasonCalendar.monthName()) season · \(days) day\(days == 1 ? "" : "s") left")
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(.white)
+            Text(prizesOn
+                 ? "A clan's score is the new Adventure stars its members earn this month. Top clans win coins at month end."
+                 : "A clan's score is the new Adventure stars its members earn this month. This first season is a warm-up: clans are ranked, with no prizes.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.6))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+    }
+
+    /// Last month's result with a Claim button.  Shown on the Clans screen
+    /// until claimed; if several months are waiting, the newest shows first.
+    private func prizeCard(_ prize: SeasonPrize) -> some View {
+        let month = SeasonCalendar.monthName(prize.season)
+        let tier = SeasonCalendar.tierName(prize.tier)
+        let place = "\(SeasonCalendar.ordinal(prize.clanRank)) of \(prize.clansRanked)"
+        return VStack(spacing: 10) {
+            Text("\(month) season result")
+                .font(.system(.caption, design: .rounded).weight(.bold))
+                .foregroundStyle(Color(white: 0.6)).tracking(0.5)
+            Text("\(prize.clanName) finished \(place)")
+                .font(.system(.headline, design: .rounded).weight(.bold))
+                .foregroundStyle(.white).multilineTextAlignment(.center)
+            Text("\(tier) tier · you earned \(prize.contribution) stars for the clan")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.65)).multilineTextAlignment(.center)
+            Button { Task { await claim(prize) } } label: {
+                ZStack {
+                    Text("Claim \(prize.coins) coins").opacity(claimingPrize ? 0 : 1)
+                    if claimingPrize { ProgressView().tint(.black).scaleEffect(0.8) }
+                }
+                .font(.system(.body, design: .rounded).weight(.bold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity).padding(.vertical, 12)
+                .background(Capsule().fill(Color(red: 1.0, green: 0.81, blue: 0.30)))
+            }
+            .disabled(claimingPrize).buttonStyle(.plain)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.13))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(red: 1.0, green: 0.81, blue: 0.30).opacity(0.7), lineWidth: 1.5)))
+    }
+
+    private func claim(_ prize: SeasonPrize) async {
+        guard !claimingPrize else { return }
+        claimingPrize = true
+        defer { claimingPrize = false }
+        do {
+            // Server first: a failed call must never credit coins.
+            let coins = try await SocialClient.shared.claimSeasonPrize(season: prize.season)
+            if coins > 0 { gameState.addCoins(coins) }
+            prizes.removeAll { $0.season == prize.season }
+            flash(coins > 0 ? "\(coins) coins added!" : "That prize was already claimed.")
+        } catch {
+            flash("Couldn't claim — try again.")
+        }
+    }
+
     private func rankingRow(_ row: ClanRanking, rank: Int) -> some View {
         let mine = row.clan.id == myClan?.id
         let clanName: String = row.clan.name.nonEmpty ?? "Clan"
-        let spoken: String = "Rank \(rank). \(clanName). \(row.memberCount) of \(Clan.memberCap) members. \(row.totalLevels) total levels, \(row.totalStars) total stars."
+        let spoken: String = "Rank \(rank). \(clanName). \(row.memberCount) of \(Clan.memberCap) members. Season score \(row.seasonScore). \(row.totalLevels) total levels, \(row.totalStars) total stars. \(row.seasonWins) wins."
         return Button { nav.goToClan(row.clan) } label: {
             HStack(spacing: 12) {
                 Text("\(rank)")
@@ -236,16 +315,24 @@ struct ClansView: View {
                     HStack(spacing: 8) {
                         Text("\(row.memberCount) of \(Clan.memberCap) members")
                             .font(.system(.caption2, design: .rounded)).foregroundStyle(Color(white: 0.5))
-                        WeekPaceLabel(levels: row.weekLevels)
+                        if let wins = row.winsLine {
+                            Text(wins)
+                                .font(.system(.caption2, design: .rounded).weight(.bold))
+                                .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                        }
+                    }
+                    if let last = row.lastMonthLine {
+                        Text(last)
+                            .font(.system(.caption2, design: .rounded)).foregroundStyle(Color(white: 0.5))
                     }
                 }
                 Spacer(minLength: 8)
                 HStack(spacing: 4) {
-                    Image(systemName: rankByStars ? "star.fill" : "flag.fill")
+                    Image(systemName: rankSort == .levels ? "flag.fill" : "star.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(rankByStars ? Color(red: 1.0, green: 0.81, blue: 0.30)
-                                                     : Color(red: 0.30, green: 0.75, blue: 0.42))
-                    Text("\(rankByStars ? row.totalStars : row.totalLevels)")
+                        .foregroundStyle(rankSort == .levels ? Color(red: 0.30, green: 0.75, blue: 0.42)
+                                                             : Color(red: 1.0, green: 0.81, blue: 0.30))
+                    Text("\(rankValue(row))")
                         .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
                         .foregroundStyle(.white)
                 }
@@ -258,17 +345,26 @@ struct ClansView: View {
         .accessibilityLabel(spoken)
     }
 
+    /// The number a ranking row shows for the current sort.
+    private func rankValue(_ row: ClanRanking) -> Int {
+        switch rankSort {
+        case .season: return row.seasonScore
+        case .levels: return row.totalLevels
+        case .stars:  return row.totalStars
+        }
+    }
+
     private func loadRankings() async {
-        let byStars = rankByStars
+        let sort = rankSort
         rankingsLoading = true
         defer { rankingsLoading = false }
         do {
-            let rows = try await SocialClient.shared.fetchClanRankings(byStars: byStars)
-            guard byStars == rankByStars else { return }   // the sort changed meanwhile
+            let rows = try await SocialClient.shared.fetchClanRankings(sort: sort)
+            guard sort == rankSort else { return }   // the sort changed meanwhile
             rankings = rows
             rankingsUnavailable = false
         } catch {
-            guard byStars == rankByStars else { return }
+            guard sort == rankSort else { return }
             rankings = []
             rankingsUnavailable = true
         }
@@ -306,6 +402,7 @@ struct ClansView: View {
                     .foregroundStyle(Color(white: 0.6))
                     .multilineTextAlignment(.center)
             }
+            if let standing = myStanding { ClanStandingLine(standing: standing) }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
@@ -340,6 +437,8 @@ struct ClansView: View {
     // The lives loop: ask for a life (or cancel) — clan-mates see it on the roster.
     @ViewBuilder
     private var lifeLoopSection: some View {
+        let settings = SocialSettings.current
+        let wait = myId.flatMap { rosterProfiles[$0]?.askWaitRemaining() } ?? 0
         if iAmAsking {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
@@ -350,6 +449,10 @@ struct ClansView: View {
                         .foregroundStyle(.white)
                     Spacer()
                 }
+                Text("Up to \(settings.requestSize) lives, one from each clanmate. Closes after \(settings.requestHours) hours.")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Button { Task { await cancelAsk() } } label: {
                     actionLabel("Cancel request", busy: actionBusy, tint: Color(white: 0.22))
                 }
@@ -358,6 +461,17 @@ struct ClansView: View {
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 16)
                 .fill(Color(red: 0.95, green: 0.32, blue: 0.45).opacity(0.14)))
+        } else if wait > 0 {
+            // The wait between requests, shown where the ask button is.
+            HStack(spacing: 8) {
+                Image(systemName: "clock.fill")
+                Text("You can ask again in \(Self.waitText(wait))")
+            }
+            .font(.system(.body, design: .rounded).weight(.semibold))
+            .foregroundStyle(Color(white: 0.6))
+            .frame(maxWidth: .infinity).padding(.vertical, 13)
+            .background(Capsule().fill(Color(white: 0.16)))
+            .accessibilityElement(children: .combine)
         } else {
             Button { Task { await askForLives() } } label: {
                 HStack(spacing: 8) {
@@ -372,6 +486,14 @@ struct ClansView: View {
             }
             .disabled(actionBusy).buttonStyle(.plain)
         }
+    }
+
+    /// "5 h 12 min" / "12 min" for a wait in seconds (rounded up to a minute).
+    private static func waitText(_ seconds: TimeInterval) -> String {
+        let minutes = max(1, Int(ceil(seconds / 60)))
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return "\(m) min" }
+        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
     }
 
     private var inviteRow: some View {
@@ -440,7 +562,10 @@ struct ClansView: View {
                                 .foregroundStyle(.white).lineLimit(1)
                             LevelBadge(level: level, compact: true)
                         }
-                        WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
+                        HStack(spacing: 8) {
+                            SeasonStarsLabel(stars: seasonStars[member.playerId] ?? 0)
+                            WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
+                        }
                         if asking {
                             Text("needs a life ♥")
                                 .font(.system(.caption2, design: .rounded).weight(.semibold))
@@ -881,6 +1006,9 @@ struct ClansView: View {
         guard auth.isSignedIn else { return }
         isLoading = true
         errorText = nil
+        await SocialClient.shared.refreshSocialSettings()
+        // Last month's result: shown here until claimed, in a clan or not.
+        prizes = await SocialClient.shared.fetchUnclaimedPrizes()
         do {
             let mem = try await SocialClient.shared.fetchMyClanMembership()
             membership = mem
@@ -896,12 +1024,17 @@ struct ClansView: View {
                 for p in profs { map[p.id] = p }
                 myClan = clan; roster = members; rosterProfiles = map; events = evs; browse = []
                 givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
+                let sentToday = await SocialClient.shared.fetchMyGiftsToday()
+                sentLifeIds.formUnion(sentToday)
                 gameState.clanRequestBadge = openRequestCount
+                myStanding  = await SocialClient.shared.fetchClanStanding(id: mem.clanId)
+                seasonStars = await SocialClient.shared.fetchSeasonContributions(clanId: mem.clanId)
                 if !tabPinned { tab = .mine }
             } else {
                 myClan = nil; roster = []; events = []
                 givenRequestKeys = []
                 gameState.clanRequestBadge = 0
+                myStanding = nil; seasonStars = [:]
                 browse = try await SocialClient.shared.fetchClans()
                 if !tabPinned { tab = .browse }
             }
@@ -950,6 +1083,9 @@ struct ClansView: View {
             try await SocialClient.shared.askForLives()
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "requested_life")
             await load(); flash("Your clan knows you need a life ♥")
+        } catch SocialError.http(_, let body) where body.contains("request_cooldown") {
+            await load()
+            flash("You asked recently — you can ask again after the wait.")
         } catch { flash("Couldn't post your request — try again.") }
     }
 
@@ -986,6 +1122,9 @@ struct ClansView: View {
             if let requestKey { givenRequestKeys.insert(requestKey) }
             gameState.clanRequestBadge = openRequestCount
             flash("You already gave to this request.")
+        } catch SocialError.http(_, let body) where body.contains("gift_limit") {
+            sentLifeIds.insert(id)
+            flash("You already sent this player a life today.")
         } catch { flash("Couldn't send a life — try again.") }
     }
 
@@ -1000,6 +1139,8 @@ struct ClansView: View {
         for p in profs { rosterProfiles[p.id] = p }
         givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
         gameState.clanRequestBadge = openRequestCount
+        seasonStars = await SocialClient.shared.fetchSeasonContributions(clanId: clan.id)
+        if let standing = await SocialClient.shared.fetchClanStanding(id: clan.id) { myStanding = standing }
     }
 
     private func thank(_ actorId: UUID) async {
@@ -1103,6 +1244,8 @@ struct ClanDetailView: View {
     @State private var loading = true
     @State private var joining = false
     @State private var bannerText: String?
+    @State private var standing: ClanRanking?           // season score, wins, last finish
+    @State private var seasonStars: [UUID: Int] = [:]   // each member's stars this season
 
     private var myId: UUID? { SocialClient.shared.currentUserId }
     private var iAmMember: Bool { roster.contains { $0.playerId == myId } }
@@ -1164,6 +1307,7 @@ struct ClanDetailView: View {
                     .font(.system(.caption, design: .rounded).weight(.semibold)).monospacedDigit()
                     .foregroundStyle(Color(white: 0.72))
             }
+            if let standing { ClanStandingLine(standing: standing, centered: false) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 14).padding(.horizontal, 16)
@@ -1245,7 +1389,10 @@ struct ClanDetailView: View {
                                 .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
                         }
                     }
-                    WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
+                    HStack(spacing: 8) {
+                        SeasonStarsLabel(stars: seasonStars[m.playerId] ?? 0)
+                        WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
+                    }
                 }
                 Spacer(minLength: 8)
                 HStack(spacing: 4) {
@@ -1280,6 +1427,9 @@ struct ClanDetailView: View {
 
     private func load() async {
         loading = true; defer { loading = false }
+        await SocialClient.shared.refreshSocialSettings()
+        standing    = await SocialClient.shared.fetchClanStanding(id: clan.id)
+        seasonStars = await SocialClient.shared.fetchSeasonContributions(clanId: clan.id)
         myMembership = try? await SocialClient.shared.fetchMyClanMembership()
         if let members = try? await SocialClient.shared.fetchClanRoster(clanId: clan.id) {
             roster = members

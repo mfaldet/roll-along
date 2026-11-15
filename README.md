@@ -31,7 +31,8 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 - **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Unlimited Lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
 - **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
 - **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
-- **Friends, clans, leaderboards.** Friend requests, sending lives, clans with a fixed-phrase chat, and leaderboards for Adventure and the minigames. A player's Adventure level shows as a badge next to their name; friends and clan lists show levels gained this week. A clan holds up to 12 players. The Clans screen has a read-only Rankings tab (total levels or total stars). A clanmate's life request can be given to once per player, at no cost to the giver; open requests show as a red count on Home's Clans button.
+- **Friends, clans, leaderboards.** Friend requests, sending lives, clans with a fixed-phrase chat, and leaderboards for Adventure and the minigames. A player's Adventure level shows as a badge next to their name; friends and clan lists show levels gained this week. A clan holds up to 12 players. A clanmate's life request collects up to 6 lives, one per clanmate, at no cost to the giver; it closes after 24 hours, and the asker waits 6 hours before the next. Open requests show as a red count on Home's Clans button. "Send life" to a friend is one per friend per day.
+- **Monthly clan battle.** A season is a calendar month. A clan's season score is the new Adventure stars its members earn that month, counted by the server. Clans → Rankings sorts by season score (also total levels and total stars) and shows the days left. At month end the server ranks the clans and awards coins by tier to members who contributed; the clan that finishes first gets a win. A player claims their coins on the Clans screen. December 2026 is a rehearsal with no prizes. Design: `docs/social/social-revision-proposal.md`.
 - **How a level starts.** Settings → Tap to Start (the default: a level waits for a tap) or Auto Start. Applies to Adventure, Challenge Tracks and Challenge of the Day. The level clock starts when play starts.
 - **No free text.** Nicknames and clan names are assembled from preset words plus a number (about 1.5 million possible nicknames and 32 million clan names; lists in `docs/social/preset-names.md`), clan tags are derived from the name, and clan descriptions come from a fixed list (`PresetNames` in `SocialClient.swift`). Nothing a player types is ever shown to another player.
 - **Notifications.** Two local notifications (shop restock, lives full), each switched on by the player in Settings. No push server.
@@ -56,10 +57,10 @@ Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, J
 - **Roll Out has five mazes**, which repeat.
 - **Adventure sound effects are system placeholder sounds.**
 - **Five authored levels** (78, 83, 89, 92, 97) have a coin on the rim of a hole. `node scripts/verify-levels.mjs` lists them.
-- **Leaderboard scores are only lightly checked by the server.** `docs/social-schema-v5.sql` refuses impossible values (more than three stars per level), caps the stars that count toward a Battle Week per day, and adds a switch to exclude a player or clan. It does not stop a determined cheater.
-- **`docs/social-schema-v5.sql` is not on the live database yet.** Until it is applied, weekly pace, clan rankings, the 12-member cap and the give-once rule for life requests do not work; the rest of the social screens fall back to how they worked before.
-- **Battle Week is not built.** The server counts battle stars from launch (once v5 is applied); the screens and prizes come in the first update, with the first Battle Week on February 1 to 7, 2027.
-- **Asking a clan for lives has no limit yet**: no cooldown and no fixed request size. See `docs/social/social-revision-proposal.md`.
+- **Leaderboard and season scores are only lightly checked by the server.** `docs/social-schema-v5.sql` refuses impossible values (more than three stars per level), caps the stars that count toward a season per day, and adds a switch to exclude a player or clan. It does not stop a determined cheater.
+- **`docs/social-schema-v5.sql` is not on the live database yet.** Until it is applied (with `docs/social-schedule.sql`), weekly pace, clan rankings, the monthly clan battle, the 12-member cap and the life-request limits do not work; the rest of the social screens fall back to how they worked before.
+- **The month-end job has never run on the live database.** It was tested on a local database only. If the Supabase project is paused the scheduled jobs do not run; the month-end job catches up the day after it wakes.
+- **Clan owners cannot remove or promote members yet.**
 - **Trophy tables are not on the live database yet** (checked 2026-11-15). Until `docs/trophies/trophy-schema.sql` is applied, trophies work on the device but rarity figures and the public trophy showcase do not.
 - **Account deletion** removes all server data. The app now asks Apple for a one-time code and sends it to the server so the Sign in with Apple token can be revoked, but the server half is not deployed yet (`docs/delete-account-apple-revoke.md`).
 - **iCloud trophy backup** is written but switched off for v1.0 (`UbiquitousTrophyKVStore.isEnabledInThisBuild`). Nothing in the game is backed up to iCloud: deleting the app, or moving to a new phone without restoring a backup, loses local progress. Purchases restore from Apple, and signed-in players get their trophies back from the server once the trophy tables exist.
@@ -121,11 +122,11 @@ RollAlong/
 ├── Trophy*.swift, TrophyCatalog.json   trophy system
 └── PrivacyInfo.xcprivacy         privacy manifest
 docs/
-├── *.sql                         database schema and access rules (apply in order; v4 = preset names, v5 = pace, rankings, cap, guards)
+├── *.sql                         database schema and access rules (apply in order; v4 = preset names, v5 = pace, cap, guards, life requests, monthly clan battle; then social-schedule.sql)
 ├── delete-account-apple-revoke.md   server change for revoking the Apple token on deletion
 ├── app-review/                   review notes, purchase table and App Privacy answers for App Store Connect
 ├── site/privacy.html             working copy of the published privacy policy
-├── social/                       preset name lists; social and clans revision proposal
+├── social/                       preset name lists; social and clans design (monthly clan battle)
 ├── minigame-ai-tuning-proposal.md   how the opponents work and how to tune them
 ├── trophies/, economy/, research/   design notes
 └── AppStore.md, TestFlight.md    OUT OF DATE — see the note at the top of each

@@ -1,29 +1,25 @@
-# Social and clans revision proposal
+# Social and clans: the design as built
 
-**Status: the launch part is built (2026-11-15); Battle Week is designed,
-not built. Nothing has been applied to the database.**
+**Status (2026-11-15): built on the branch for version 1.0. Nothing has been
+applied to the database.** The app side is in `SocialClient.swift`,
+`ClansView.swift`, `FriendsView.swift` and `HomeView.swift`; the database
+side is `docs/social-schema-v5.sql` and `docs/social-schedule.sql`.
 
-Decisions taken since this was written:
+This file began as a proposal. Sections a to c below keep its reasoning; the
+rest describes what was decided and built. An earlier weekly event ("Battle
+Week") was replaced by the monthly clan battle and is no longer part of the
+design.
 
-- **Launch build:** level badge everywhere, weekly pace, read-only clan
-  rankings, compact clan header with a ranked member list, member cap, the
-  first score guards, and server-side battle-star counting. The database
-  side is `docs/social-schema-v5.sql`.
-- **Member cap is 12**, not the 30 first proposed.
-- **Battle Week is the first update. The first one runs February 1 to 7,
-  2027.** Prizes are coins and tickets for every tier as listed below, plus
-  one exclusive ball skin for the top tier. Promote and remove-member
-  controls also go in the first update.
-- **Clan life requests:** giving never costs the giver a life, and a player
-  can give to any one request only once (database rule in v5).
+**Decisions**
 
-**Goal:** a player's Adventure level becomes their public standing, other
-players' progress is easy to see, and clans compete.
-
-**In short:** parts (a) and (b) and a read-only version of (c) are small and
-could ship with version 1.0. Battle Week (d) needs server jobs, a prize
-claim, and a guard against faked scores; it is the first update, with the
-first Battle Week on February 1 to 7, 2027.
+- A player's Adventure level is their public standing: a badge next to their
+  name everywhere.
+- Friends and clan lists show levels gained this week.
+- A clan holds up to **12** members.
+- Clans compete in a **monthly clan battle** with coin prizes. It ships in
+  version 1.0.
+- Clan life requests have limits (below). Giving never costs the giver.
+- Promote and remove-member controls are **not built**; see the end.
 
 ---
 
@@ -119,12 +115,10 @@ the top.
 ### The ranking
 
 A new "Rankings" section on the clans page listing all clans, sortable by
-total levels passed and total stars. During Battle Week it sorts by battle
-stars automatically and says so in the header.
+this season's score (the default), total levels passed and total stars.
 
 Each row: rank, tag and name, member count out of the cap, the total being
-sorted by. Your own clan is pinned at the bottom of the screen with its rank
-when it is not in view.
+sorted by, wins and last month's finish. Your own clan's row is highlighted.
 
 **How it is computed.** A database view that adds up each clan's members'
 levels and stars. At launch scale (hundreds of clans) the view can be
@@ -134,7 +128,7 @@ refreshed every few minutes by a scheduled job; the app does not change.
 ### Opening a clan
 
 A compact header: name, tag, "7 of 12 members", total levels, total stars,
-this week's levels (battle stars during Battle Week).
+this season's score, wins, and last month's finish.
 
 Then the ranked member list. Each row: rank, name, role, level badge, stars,
 this week's contribution. Sorted by this week's contribution, with level as
@@ -149,7 +143,7 @@ shows the same number from `Clan.memberCap`).
 - Large enough for a friend group or a family.
 - Small enough that a ranking by totals is a fair fight. Without a cap the
   biggest clan always wins and everyone joins it.
-- Battle Week scores are totals, so the cap is what keeps them comparable.
+- Season scores are totals, so the cap is what keeps them comparable.
 
 ### Roles
 
@@ -165,279 +159,139 @@ more for the role controls.
 
 ---
 
-## d) Battle Week
 
-Days 1 to 7 of every month. A clan's score is its **battle stars**: the new
-Adventure stars its members earned in that week. First one: February 1 to
-7, 2027. The server already counts battle stars in days 1 to 7 of every
-month once v5 is applied, so January 1 to 7 is a silent rehearsal with no
-screens and no prizes.
+## d) The monthly clan battle
 
-**The week is measured in UTC**, so it starts and ends at the same moment
-for everyone. The app shows the countdown in the player's local time.
+A **season** is a calendar month, measured in UTC so it starts and ends at
+the same moment for everyone.
 
-### How battle stars are counted
+**Season score.** A clan's score is the new Adventure stars its members
+earned that month. The server counts them, not the app: a trigger on the
+player row sees every increase in a player's star total and adds it to a
+record for that player **and the clan they are in at that moment**. A star
+stays with the clan it was earned for; leaving does not move it.
 
-The server counts them, not the app. A trigger on the player row sees every
-increase in a player's star total. During Battle Week it adds the increase
-to a contribution record for that player **and the clan they are in at that
-moment**.
+- Only stars above the player's highest-ever total count, so resetting
+  progress and re-earning stars scores nothing.
+- At most 150 new stars per player per day count (50 levels at three stars).
+- The app sends the star total whenever it rises, not only on a new level.
 
-This requires one app change: send progress whenever stars increase, not
-only on a level advance. Otherwise stars earned by replaying levels would
-not count until the player's next new level.
+**Where it shows**
 
-### Joining or leaving mid-week
+- Clans → Rankings sorts by this season's score by default and shows "December
+  season · 16 days left". Total levels and total stars are the other sorts.
+- Each rankings row and the clan header show the clan's wins and where it
+  finished last month.
+- The clan page shows the clan's season score and each member's stars this
+  season.
 
-- **Stars stay with the clan they were earned for.** Leaving does not take
-  them away from the old clan, and does not bring them to the new one.
-- **A player who joins mid-week** contributes to the new clan from that
-  moment.
-- **A prize needs two things:** being a member when the week ends, and
-  having contributed at least 10 battle stars to that clan. This stops
-  players hopping into the winning clan on day 7.
-- **The member cap still applies**, so a full clan cannot be stacked.
+**Month end.** A scheduled database job runs every day at 00:10 UTC and
+closes any finished month that has not been closed. On the 1st that is the
+month that just ended; a missed run is caught up the next day.
 
-### Tiers and prizes
+1. Clans with at least 25 season stars are ranked by score. Ties go to the
+   older clan.
+2. Tiers, by percentile of the ranked clans:
 
-Clans that scored at least 25 battle stars are ranked. Tiers are by
-percentile of those clans:
+   | Tier | Clans | Coins per eligible member |
+   |---|---|---|
+   | Diamond | Top 5% | 3,000 |
+   | Gold | Next 15% (to the top 20%) | 1,500 |
+   | Silver | Next 30% (to the top 50%) | 750 |
+   | Bronze | The rest of the ranked clans | 250 |
 
-| Tier | Clans | Prize per eligible member |
+   With fewer than 20 ranked clans, tiers go by rank: 1st Diamond, 2nd and
+   3rd Gold, 4th to 8th Silver, 9th and below Bronze. Diamond also needs a
+   score of at least 150; below that the clan gets Gold.
+3. **Eligible** means a member of the clan when the job runs who earned at
+   least 10 season stars for that clan. This stops hopping into the winning
+   clan on the last day.
+4. **A win** is finishing first. The clan's win count goes up by one.
+5. Every ranked clan records its finish, shown as "Last month: 3rd of 40 ·
+   Gold" for the following month.
+
+**Prizes are coins only**: no skin, no tickets. For scale: an active player
+earns roughly 600 to 1,000 coins a day; the $0.99 pack is 750 coins and the
+$4.99 pack is 4,500. Diamond is worth about four days of play, or a little
+under $4 at pack prices, once a month.
+
+**Claiming.** The job writes one prize record per eligible player. The next
+time the player opens the Clans screen, a card shows the month, the clan's
+finish, the tier and a Claim button. The server marks the prize claimed
+first and the app then adds the coins. Unclaimed prizes are kept until
+claimed, with no expiry; they are removed only when the account is deleted.
+The coin balance lives on the device, so the server can only ensure each
+prize is claimed once.
+
+**The first season.** December 2026 is a partial month (launch is December
+15). It runs as a rehearsal: clans are ranked and the finish is shown, with
+no coins and no win counted. The first prize season is January 2027. This is
+one setting (`season_prizes_from`).
+
+## e) Clan life requests and gifts
+
+| Rule | Value | Setting |
 |---|---|---|
-| Diamond | Top 5% | 3,000 coins and 5 tickets |
-| Gold | Next 15% (to the top 20%) | 1,500 coins and 3 tickets |
-| Silver | Next 30% (to the top 50%) | 750 coins and 1 ticket |
-| Bronze | Everyone else who qualified | 250 coins |
+| Lives one request collects, one per clanmate | 6 | `life_request_size` |
+| An unfilled request closes after | 24 hours | `life_request_hours` |
+| Wait after a request closes (filled, expired or cancelled) | 6 hours | `life_request_cooldown_hours` |
+| "Send life" outside a request, per player per day | 1 | `gift_per_friend_per_day` |
+| Clan member cap | 12 | `clan_member_cap` |
 
-How those sit in the existing economy:
+- Giving never costs the giver a life.
+- A player can give to any one request only once.
+- The ask button shows the remaining wait.
+- A red count on Home's Clans button, on the Roster header and on each
+  request row shows open requests this player has not given to.
 
-- An active player earns roughly 600 to 1,000 coins a day from play.
-- A Standard cosmetic costs 750; a Legendary 1,500; collections run from
-  4,500 to 13,500.
-- A perfect week of daily rewards pays 105.
+All of these are rows in the `ra_config` table and take effect when changed
+in the dashboard; the app reads them when the Clans screen opens. None needs
+an app update.
 
-So Bronze is a small thank-you, Silver is one Standard cosmetic, Gold is one
-Legendary, and Diamond is two Legendary items or most of a small collection:
-worth chasing once a month, not enough to replace playing or buying.
+## What runs on the server
 
-A note on an earlier decision: the repo records that *trophies* never grant
-coins. Battle prizes would be the first coins granted for a social result.
-That is a choice to make knowingly. A coin-free alternative is an exclusive
-cosmetic per tier, which costs art.
-
-### When there are only a handful of clans
-
-Percentiles do not work with eight clans. Rule: **with fewer than 20
-qualifying clans, tiers are by rank.**
-
-| Rank | Tier |
-|---|---|
-| 1st | Diamond |
-| 2nd and 3rd | Gold |
-| 4th to 8th | Silver |
-| 9th and below | Bronze |
-
-Two guards keep this honest when there are very few clans:
-
-- The 25-star minimum still applies, so an idle clan gets nothing.
-- Diamond also requires at least 150 battle stars. A lone clan that barely
-  played gets Gold at most.
-
-### How a member sees their own contribution
-
-On the clan page during Battle Week: "Your battle stars: 37, 3rd in the
-clan", above the member list, with the clan's current rank and the gap to
-the clan above. The member list shows each member's battle stars.
-
-### How the result is announced and the prize claimed
-
-There is no push, so:
-
-- **In the app.** The first time the app opens after the week ends, a result
-  sheet shows the clan's rank, its tier and the player's prize, with a Claim
-  button.
-- **A local notification.** For players who turn it on, the phone schedules
-  "Battle Week results are in" for the morning of the 8th. This is the same
-  kind of opt-in local notification the app already has.
-- **Claiming.** The closing job writes one prize record per eligible player.
-  Claiming marks the record as claimed on the server, then adds the coins and
-  tickets on the phone. This is the same pattern as claiming a life gift.
-  Because the wallet lives on the phone, the server cannot enforce the
-  balance; it can only ensure each prize is claimed once.
-- **Unclaimed prizes** stay available until the next Battle Week ends.
-
-### Outside Battle Week
-
-The clans page shows a countdown to the next one, last month's top three
-clans, and your own clan's rank and tier from last month. The ranking falls
-back to total levels and total stars.
-
-**Size:** about 250 lines of SQL and 700 lines of app code.
-
----
-
-## What must run on the server
-
-| Job | When | How |
+| Piece | When | How |
 |---|---|---|
-| Weekly baseline (part b) | On each player update | Trigger. No schedule. |
-| Clan totals (part c) | On request | View. No schedule at launch scale. |
-| Member cap (part c) | On each join | Trigger. |
-| Battle star counting (part d) | On each player update during the week | Trigger. |
-| Closing a Battle Week: rank clans, assign tiers, write prize records | 8th of each month, shortly after 00:00 UTC | Scheduled database function. |
+| Weekly baseline, daily star cap, season-star counting, request rules | On each player update | Trigger |
+| Member cap | On each join | Trigger |
+| One gift per request; request fills; one gift per friend per day | On each gift | Trigger |
+| Close finished months, rank clans, write prizes | Daily at 00:10 UTC | Scheduled job (`pg_cron`) |
+| Close life requests older than 24 hours | Every 15 minutes | Scheduled job (`pg_cron`) |
 
-**The schedule.** Supabase can run a database function on a timer with its
-`pg_cron` extension. The trophy rarity job already in this repo
-(`docs/trophies/trophy-rollup.sql`) was designed the same way and has not
-been deployed yet, so this would be the same setup done once for both.
+Set up once: run `docs/social-schema-v5.sql`, then `docs/social-schedule.sql`.
+Nothing needs doing each month. If the Supabase project is paused the jobs
+do not run; the month-end job catches up the day after the project wakes.
 
-**What you would set up yourself**
+## How scores could be faked, and the guards in place
 
-1. Turn on the `pg_cron` extension in the Supabase dashboard.
-2. Run the SQL file for each part in the SQL editor, in order.
-3. Run one line that schedules the closing job, and check it is listed.
-4. After the first Battle Week, check the result and prize tables look right
-   before the next one.
+A signed-in player can write their own row with the public key. The guards:
 
-I would write the SQL files and a one-step-at-a-time guide. I cannot apply
-them or see the result, so the first real run of the closing job is the
-riskiest moment in this whole proposal. A dry-run mode, which computes the
-result without writing prizes, should be part of it.
+1. **Impossible-value rule.** Stars can never exceed three per level
+   unlocked; the write is refused.
+2. **Daily cap** on the stars that count toward a season (150).
+3. **Only stars above the player's highest-ever total count.**
+4. **Server-owned columns.** The app cannot write the weekly baseline, the
+   season records, a clan's wins or finish, or the exclusion switch.
+5. **Exclusion switch.** `excluded` on a player or a clan, set in the
+   dashboard, removes them from leaderboards, rankings, season scores and
+   prizes.
+6. **Modest prizes.** Coins that only buy cosmetics, at most about four days
+   of play per month.
 
----
+This stops casual tampering and makes the rest visible. It does not stop a
+determined cheater, who can still send plausible-looking progress.
 
-## How scores could be faked, and the smallest reasonable guard
+## Privacy
 
-**How.** A tampered app can sign in normally and tell the server its player
-has any level and any number of stars. Today nothing checks. Once stars
-decide prizes, someone will try.
+Other players can see a player's level, stars, levels gained this week and
+stars earned for their clan this season, and that they have asked for a
+life. The privacy page says so. The App Privacy answers and the privacy
+file in the project are unchanged: this is gameplay content linked to the
+account, already declared.
 
-**Guards, in order of value for effort**
+## Not built: promote and remove-member controls
 
-1. **An impossible-value rule.** Stars can never exceed three per level
-   passed. One line in the database; blocks the crudest fakes.
-2. **A rate limit on battle stars.** The trigger counts at most a set number
-   of new stars per player per day toward the battle (I suggest 150, which is
-   50 levels at three stars, more than a long day of real play). Anything
-   above still shows on the profile but does not score.
-3. **A limit on level jumps.** A level can rise by at most a set amount per
-   update.
-4. **An exclusion switch.** A flag on a player and on a clan that removes
-   them from rankings and prizes, set by you in the dashboard after looking
-   at an outlier report the closing job produces.
-5. **Keep prizes modest.** Coins that only buy cosmetics, in amounts a player
-   could earn in a few days, give little reason to cheat.
-
-That is the smallest reasonable set: about 60 lines of SQL. It stops casual
-tampering and makes the rest visible. It does not stop a determined cheater
-who fakes plausible play; only checking every run on the server would, and
-that is a different project.
-
----
-
-## Privacy page, App Privacy answers, review notes
-
-- **Privacy page.** One sentence to add: other players can see your weekly
-  progress and your clan's results. The page already says level and progress
-  are shown to other players.
-- **App Privacy answers.** No change. Weekly progress and battle stars are
-  "Gameplay Content, linked to the user, App Functionality", which is already
-  declared.
-- **Privacy file in the project.** No change, same reason.
-- **Review notes.** Add a short Battle Week paragraph: a monthly in-game clan
-  event, prizes are in-game coins and tickets with no cash value, nothing is
-  bought to enter.
-- **Age rating questionnaire.** "Contests" would be answered yes. Apple's
-  definitions put infrequent contests at 4+ and frequent ones at 13+; the app
-  is already aiming for 13+, so either answer is covered.
-- **Names.** Nothing here adds typed text. Everything shown is a preset name
-  and numbers.
-
----
-
-## Optional idea: house clans
-
-Openly labeled clans run by the game, so the rankings are not empty in the
-first weeks.
-
-**What I think.** It is acceptable if done strictly, and I would still
-rather not.
-
-If it is done, the rules that keep it honest:
-
-- A distinct badge and the words "House clan, run by Roll Along" wherever it
-  appears. No member list of invented players.
-- House clans **never take a prize tier**. Tiers are computed from real
-  clans only; house clans are shown as pace markers in the list.
-- Their scores follow a published, fixed pace (for example "a steady 40
-  stars a day"), not a number tuned to stay just ahead of players.
-- They cannot be joined.
-- They disappear automatically once there are 20 real clans.
-
-**Why I would rather not.** Even labeled, a ranking half-filled by the house
-reads as padding, and it adds a moving part to the closing job on its first
-runs. The handful-of-clans rule above already makes a small ranking work,
-and an honest "8 clans competing" is fine for a first month among family
-and friends. If the ranking feels empty after the first Battle Week, house
-clans can be added then without changing anything else.
-
----
-
-## Size of the work, and what fits before December 15
-
-| Part | App code | SQL | Needs a server job | Risk |
-|---|---|---|---|---|
-| a) Level badge everywhere | ~150 lines | none | no | Low |
-| b) Weekly pace | ~120 lines | ~40 lines | no (trigger) | Low |
-| c) Clan rankings, clan header, ranked members, cap of 12 | ~400 lines | ~80 lines | no (view) | Medium |
-| c) Role controls | ~150 lines | ~30 lines | no | Medium |
-| Anti-faking guards | none | ~60 lines | no | Low |
-| d) Battle Week | ~700 lines | ~250 lines | yes | High |
-
-None of it can be compiled or run against the database here, so each part
-needs a build and a test pass on your side.
-
-### Before the December 15 launch
-
-- **a) Level badge.** App only.
-- **b) Weekly pace.**
-- **c) Rankings by total levels and stars**, the clan header, the ranked
-  member list and the cap of 12.
-- **The first two anti-faking guards**, since rankings make faked numbers
-  visible to everyone.
-- **Sending progress when stars change**, which (d) needs later and which
-  fixes stale star counts today.
-
-That is roughly 700 lines of app code and 180 of SQL. It is achievable, but
-it is added to a launch build that already has a long list of untested
-changes waiting for you. Role controls can wait.
-
-### First update
-
-- **d) Battle Week**, with the remaining guards and the closing job.
-- **Role controls.**
-
-**Timing.** The first Battle Week is February 1 to 7, 2027, so the update
-with the Battle Week screens, prize claim and role controls needs to be
-approved and in players' hands before February 1: submit by mid-January.
-Counting is already on the server from launch (v5), so January 1 to 7
-produces a real result to test the closing job against, with nothing shown
-to players.
-
-**With a cap of 12** the most a clan can score in a Battle Week is 12
-members × 150 counted stars a day × 7 days = 12,600 battle stars. The
-qualifying floor (25) and the Diamond floor (150) are unchanged.
-
----
-
-## Decisions taken
-
-1. Member cap: **12**.
-2. Prizes: coins and tickets for every tier, plus one exclusive ball skin
-   for the top tier.
-3. Tier amounts: as in the table above.
-4. Role controls: first update.
-5. House clans: not now.
-6. First Battle Week: February 1 to 7, 2027; counting on the server from
-   launch.
+Today a clan has an owner and members, and roles cannot change. With a cap
+of 12, an owner needs to remove inactive members. The database already
+allows an owner to remove a member; the app has no button for it. Promotion
+needs a small database rule as well. This is waiting on a decision.

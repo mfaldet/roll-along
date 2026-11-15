@@ -201,7 +201,8 @@ final class SocialClient: @unchecked Sendable {
     }
 
     /// Columns added by docs/social-schema-v5.sql (the weekly baseline).
-    private static let v5PlayerColumns = ",week_start,week_start_level,week_start_stars"
+    private static let v5PlayerColumns =
+        ",week_start,week_start_level,week_start_stars,lives_request_closed_at"
 
     /// Read `players` rows, asking for the v5 columns too.  Until
     /// docs/social-schema-v5.sql has been run the server answers 400 for a
@@ -410,6 +411,82 @@ final class SocialClient: @unchecked Sendable {
         "\(asker.uuidString)|\(askedAt)"
     }
 
+    /// The players the signed-in player has already sent an ORDINARY life gift
+    /// to today (UTC) — "Send life" allows one per player per day.  Gifts that
+    /// answered a clan request are not included.
+    func fetchMyGiftsToday() async -> Set<UUID> {
+        guard let me = currentUserId else { return [] }
+        let today = SeasonCalendar.dayKey()
+        let query = "select=recipient_id,request_at&sender_id=eq.\(me.uuidString)"
+            + "&request_at=is.null&created_at=gte.\(today)&limit=500"
+        guard let data = try? await send(method: "GET", path: "life_gifts", query: query),
+              let rows = try? decode([RequestGiftRow].self, from: data) else { return [] }
+        return Set(rows.map { $0.recipient })
+    }
+
+    // MARK: - Settings kept on the server
+
+    /// Read the player-facing numbers (member cap, request limits, season
+    /// minimums) from the server into `SocialSettings.current`.  Keeps the
+    /// built-in defaults when the read fails or v5 has not been run.
+    func refreshSocialSettings() async {
+        guard isSignedIn,
+              let data = try? await send(method: "POST", path: "rpc/ra_social_settings",
+                                         bodyData: Data("{}".utf8)),
+              let values = try? decode([String: Int].self, from: data) else { return }
+        SocialSettings.current = SocialSettings(values)
+    }
+
+    // MARK: - Monthly clan battle
+
+    /// One clan's standing (season score, wins, last finish), or nil when
+    /// the rankings view is not available.
+    func fetchClanStanding(id: UUID) async -> ClanRanking? {
+        let query = "select=\(Self.rankingColumns)&id=eq.\(id.uuidString)&limit=1"
+        guard let data = try? await send(method: "GET", path: "clan_rankings", query: query),
+              let rows = try? decode([ClanRanking].self, from: data) else { return nil }
+        return rows.first
+    }
+
+    private struct SeasonScoreRow: Decodable {
+        let player: UUID
+        let stars: Int
+        enum CodingKeys: String, CodingKey { case player = "player_id"; case stars }
+    }
+
+    /// Each player's stars for this clan in the current season (month).
+    /// Includes players who earned stars for the clan and have since left.
+    func fetchSeasonContributions(clanId: UUID) async -> [UUID: Int] {
+        let query = "select=player_id,stars&clan_id=eq.\(clanId.uuidString)"
+            + "&season=eq.\(SeasonCalendar.seasonKey())"
+        guard let data = try? await send(method: "GET", path: "clan_season_scores", query: query),
+              let rows = try? decode([SeasonScoreRow].self, from: data) else { return [:] }
+        var map: [UUID: Int] = [:]
+        for row in rows { map[row.player] = row.stars }
+        return map
+    }
+
+    /// The signed-in player's unclaimed season prizes, newest first.
+    func fetchUnclaimedPrizes() async -> [SeasonPrize] {
+        guard let me = currentUserId else { return [] }
+        let query = "select=season,clan_name,clan_rank,clans_ranked,tier,contribution,coins"
+            + "&player_id=eq.\(me.uuidString)&claimed_at=is.null&order=season.desc&limit=24"
+        guard let data = try? await send(method: "GET", path: "clan_season_prizes", query: query),
+              let rows = try? decode([SeasonPrize].self, from: data) else { return [] }
+        return rows
+    }
+
+    private struct ClaimBody: Encodable { let p_season: String }
+
+    /// Claim one prize on the server.  Returns the coins to credit on the
+    /// device — 0 when it was already claimed.  Server first: a failed call
+    /// must never credit coins.
+    func claimSeasonPrize(season: String) async throws -> Int {
+        let data = try await send(method: "POST", path: "rpc/ra_claim_season_prize",
+                                  bodyData: try encoder.encode(ClaimBody(p_season: season)))
+        return try decode(Int.self, from: data)
+    }
+
     /// The life requests the signed-in player has ALREADY given to, as
     /// `requestKey`s.  Read from the server, so it survives closing the app.
     /// Empty when signed out, or before docs/social-schema-v5.sql is run.
@@ -531,15 +608,17 @@ final class SocialClient: @unchecked Sendable {
         return try decode([Clan].self, from: data)
     }
 
-    /// Clans ranked by total levels or total stars (the read-only
-    /// `clan_rankings` view from docs/social-schema-v5.sql).  Throws until
-    /// that file has been run.
-    func fetchClanRankings(byStars: Bool, limit: Int = 100) async throws -> [ClanRanking] {
+    private static let rankingColumns =
+        "id,name,tag,description,owner_id,created_at,updated_at,"
+        + "member_count,total_levels,total_stars,week_levels,season_score,"
+        + "season_wins,last_season,last_season_rank,last_season_clans,last_season_tier"
+
+    /// Clans ranked by this season's score, total levels or total stars (the
+    /// read-only `clan_rankings` view from docs/social-schema-v5.sql).  Throws
+    /// until that file has been run.
+    func fetchClanRankings(sort: ClanRankSort, limit: Int = 100) async throws -> [ClanRanking] {
         _ = try requireSession()
-        let order = byStars ? "total_stars.desc,total_levels.desc" : "total_levels.desc,total_stars.desc"
-        let query = "select=id,name,tag,description,owner_id,created_at,updated_at,"
-            + "member_count,total_levels,total_stars,week_levels"
-            + "&order=\(order)&limit=\(limit)"
+        let query = "select=\(Self.rankingColumns)&order=\(sort.orderClause)&limit=\(limit)"
         let data = try await send(method: "GET", path: "clan_rankings", query: query)
         return try decode([ClanRanking].self, from: data)
     }
@@ -1027,6 +1106,9 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     var weekStart: String? = nil
     var weekStartLevel: Int? = nil
     var weekStartStars: Int? = nil
+    /// When this player's last life request closed (filled, expired or
+    /// cancelled) — the wait before the next one counts from here.
+    var livesRequestClosedAt: String? = nil
 
     /// Levels gained since Monday 00:00 UTC ("+12 this week").  0 when the
     /// stored baseline is from an earlier week (the player has not played
@@ -1077,7 +1159,20 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     }
 
     /// True when the player is currently asking clan-mates for lives.
-    var isAskingForLives: Bool { (needsLivesAt?.isEmpty == false) }
+    /// A request older than the limit (24 hours by default) has expired and
+    /// no longer counts, even before the server has cleared it.
+    var isAskingForLives: Bool {
+        guard let at = needsLivesAt, !at.isEmpty else { return false }
+        guard let opened = SeasonCalendar.parseTimestamp(at) else { return true }
+        return Date().timeIntervalSince(opened) < Double(SocialSettings.current.requestHours) * 3600
+    }
+
+    /// Seconds until this player may open another life request (0 = now).
+    func askWaitRemaining(now: Date = Date()) -> TimeInterval {
+        guard let at = livesRequestClosedAt, let closed = SeasonCalendar.parseTimestamp(at) else { return 0 }
+        let ready = closed.addingTimeInterval(Double(SocialSettings.current.cooldownHours) * 3600)
+        return max(0, ready.timeIntervalSince(now))
+    }
 
     /// This player's best score in a competitive mode, keyed by GameMode id.
     func competitiveBest(_ modeID: String) -> Int {
@@ -1136,6 +1231,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case weekStart        = "week_start"
         case weekStartLevel   = "week_start_level"
         case weekStartStars   = "week_start_stars"
+        case livesRequestClosedAt = "lives_request_closed_at"
     }
 }
 
@@ -1359,29 +1455,189 @@ struct Clan: Codable, Identifiable, Hashable {
     }
 }
 
-extension Clan {
-    /// Most members a clan can hold.  The database enforces the same number
-    /// (`clan_member_cap` in docs/social-schema-v5.sql) — change both.
-    static let memberCap = 12
+/// The social numbers that live on the server (`ra_config` in
+/// docs/social-schema-v5.sql) so they can change without an app update.
+/// The values below are only the defaults used until the server answers.
+struct SocialSettings {
+    var memberCap = 12
+    var requestSize = 6
+    var requestHours = 24
+    var cooldownHours = 6
+    var giftsPerFriendPerDay = 1
+    var seasonMinClanScore = 25
+    var seasonMinMemberStars = 10
+    /// First season (yyyymm) that awards coins; earlier ones are a rehearsal.
+    var seasonPrizesFrom = 202701
+
+    init() {}
+    init(_ v: [String: Int]) {
+        memberCap            = v["clan_member_cap"] ?? memberCap
+        requestSize          = v["life_request_size"] ?? requestSize
+        requestHours         = v["life_request_hours"] ?? requestHours
+        cooldownHours        = v["life_request_cooldown_hours"] ?? cooldownHours
+        giftsPerFriendPerDay = v["gift_per_friend_per_day"] ?? giftsPerFriendPerDay
+        seasonMinClanScore   = v["season_min_clan_score"] ?? seasonMinClanScore
+        seasonMinMemberStars = v["season_min_member_stars"] ?? seasonMinMemberStars
+        seasonPrizesFrom     = v["season_prizes_from"] ?? seasonPrizesFrom
+    }
+
+    /// Read on the main thread by the views; replaced by
+    /// `SocialClient.refreshSocialSettings()`.
+    static var current = SocialSettings()
 }
 
-/// One row of the clan rankings: the clan plus its totals, summed by the
-/// server (`clan_rankings` view, docs/social-schema-v5.sql).
+/// Dates for the monthly clan battle.  A season is a calendar month in UTC,
+/// named by its first day ("2026-12-01") exactly as the database names it.
+enum SeasonCalendar {
+    private static var utc: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        return cal
+    }
+
+    /// "yyyy-MM-dd" for a date, in UTC.
+    static func dayKey(_ date: Date = Date()) -> String {
+        let c = utc.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// The season a date falls in: the first day of its month, UTC.
+    static func seasonKey(_ date: Date = Date()) -> String {
+        let c = utc.dateComponents([.year, .month], from: date)
+        return String(format: "%04d-%02d-01", c.year ?? 0, c.month ?? 0)
+    }
+
+    /// The season before the one a date falls in.
+    static func previousSeasonKey(_ date: Date = Date()) -> String {
+        let cal = utc
+        let earlier = cal.date(byAdding: .month, value: -1, to: date) ?? date
+        return seasonKey(earlier)
+    }
+
+    /// Whole days left in the current season, counting today (1 on the last day).
+    static func daysRemaining(_ date: Date = Date()) -> Int {
+        let cal = utc
+        guard let month = cal.dateInterval(of: .month, for: date) else { return 0 }
+        return max(1, Int(ceil(month.end.timeIntervalSince(date) / 86_400)))
+    }
+
+    /// "December" for "2026-12-01" (and for today when no key is given).
+    static func monthName(_ key: String? = nil) -> String {
+        var month = utc.component(.month, from: Date())
+        if let key {
+            let parts = key.split(separator: "-")
+            if parts.count >= 2, let m = Int(parts[1]), (1...12).contains(m) { month = m }
+        }
+        let names = ["January", "February", "March", "April", "May", "June", "July",
+                     "August", "September", "October", "November", "December"]
+        return names[month - 1]
+    }
+
+    /// True when a season key (yyyy-MM-01) awards coins and counts wins.
+    static func awardsPrizes(_ key: String) -> Bool {
+        let parts = key.split(separator: "-")
+        guard parts.count >= 2, let y = Int(parts[0]), let m = Int(parts[1]) else { return true }
+        return y * 100 + m >= SocialSettings.current.seasonPrizesFrom
+    }
+
+    /// Parse a server timestamp ("2026-11-15T12:00:00.123456+00:00").
+    static func parseTimestamp(_ text: String) -> Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return withFraction.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    }
+
+    /// "1st", "2nd", "3rd", "4th" …
+    static func ordinal(_ n: Int) -> String {
+        let tens = (n / 10) % 10, ones = n % 10
+        if tens == 1 { return "\(n)th" }
+        switch ones {
+        case 1:  return "\(n)st"
+        case 2:  return "\(n)nd"
+        case 3:  return "\(n)rd"
+        default: return "\(n)th"
+        }
+    }
+
+    /// "Diamond" for "diamond"; "" for anything unexpected.
+    static func tierName(_ raw: String?) -> String {
+        switch raw {
+        case "diamond": return "Diamond"
+        case "gold":    return "Gold"
+        case "silver":  return "Silver"
+        case "bronze":  return "Bronze"
+        default:        return ""
+        }
+    }
+}
+
+extension Clan {
+    /// Most members a clan can hold.  Comes from the server
+    /// (`clan_member_cap`), 12 until the server answers.
+    static var memberCap: Int { SocialSettings.current.memberCap }
+}
+
+/// How the Rankings tab is ordered.
+enum ClanRankSort: Hashable {
+    case season, levels, stars
+
+    var orderClause: String {
+        switch self {
+        case .season: return "season_score.desc,total_levels.desc"
+        case .levels: return "total_levels.desc,total_stars.desc"
+        case .stars:  return "total_stars.desc,total_levels.desc"
+        }
+    }
+}
+
+/// One row of the clan rankings: the clan plus its totals and standing,
+/// computed by the server (`clan_rankings` view, docs/social-schema-v5.sql).
 struct ClanRanking: Decodable, Identifiable {
     let clan: Clan
     let memberCount: Int
     let totalLevels: Int
     let totalStars: Int
     let weekLevels: Int
+    /// New Adventure stars earned for this clan this month.
+    let seasonScore: Int
+    /// Months this clan finished first.
+    let seasonWins: Int
+    let lastSeason: String?
+    let lastSeasonRank: Int?
+    let lastSeasonClans: Int?
+    let lastSeasonTier: String?
 
     var id: UUID { clan.id }
     var isFull: Bool { memberCount >= Clan.memberCap }
+
+    /// "Last month: 3rd of 40 · Gold" — nil unless the clan was ranked in
+    /// the season that just ended.
+    var lastMonthLine: String? {
+        guard let lastSeason, lastSeason == SeasonCalendar.previousSeasonKey(),
+              let rank = lastSeasonRank else { return nil }
+        var line = "Last month: \(SeasonCalendar.ordinal(rank))"
+        if let total = lastSeasonClans, total > 0 { line += " of \(total)" }
+        let tier = SeasonCalendar.tierName(lastSeasonTier)
+        if !tier.isEmpty { line += " · \(tier)" }
+        return line
+    }
+
+    /// "2 wins" / "1 win" / nil.
+    var winsLine: String? {
+        seasonWins > 0 ? "\(seasonWins) win\(seasonWins == 1 ? "" : "s")" : nil
+    }
 
     private enum Keys: String, CodingKey {
         case memberCount = "member_count"
         case totalLevels = "total_levels"
         case totalStars  = "total_stars"
         case weekLevels  = "week_levels"
+        case seasonScore = "season_score"
+        case seasonWins  = "season_wins"
+        case lastSeason  = "last_season"
+        case lastSeasonRank  = "last_season_rank"
+        case lastSeasonClans = "last_season_clans"
+        case lastSeasonTier  = "last_season_tier"
     }
 
     init(from decoder: Decoder) throws {
@@ -1391,6 +1647,35 @@ struct ClanRanking: Decodable, Identifiable {
         totalLevels = try c.decodeIfPresent(Int.self, forKey: .totalLevels) ?? 0
         totalStars  = try c.decodeIfPresent(Int.self, forKey: .totalStars)  ?? 0
         weekLevels  = try c.decodeIfPresent(Int.self, forKey: .weekLevels)  ?? 0
+        seasonScore = try c.decodeIfPresent(Int.self, forKey: .seasonScore) ?? 0
+        seasonWins  = try c.decodeIfPresent(Int.self, forKey: .seasonWins)  ?? 0
+        lastSeason      = try c.decodeIfPresent(String.self, forKey: .lastSeason)
+        lastSeasonRank  = try c.decodeIfPresent(Int.self, forKey: .lastSeasonRank)
+        lastSeasonClans = try c.decodeIfPresent(Int.self, forKey: .lastSeasonClans)
+        lastSeasonTier  = try c.decodeIfPresent(String.self, forKey: .lastSeasonTier)
+    }
+}
+
+/// A coin prize from a finished season, waiting to be claimed.
+struct SeasonPrize: Decodable, Identifiable {
+    let season: String
+    private let rawClanName: String
+    let clanRank: Int
+    let clansRanked: Int
+    let tier: String
+    let contribution: Int
+    let coins: Int
+
+    var id: String { season }
+    /// The clan's name when it is preset-format, else a neutral phrase.
+    var clanName: String { PresetNames.parseClanName(rawClanName) != nil ? rawClanName : "Your clan" }
+
+    enum CodingKeys: String, CodingKey {
+        case season
+        case rawClanName  = "clan_name"
+        case clanRank     = "clan_rank"
+        case clansRanked  = "clans_ranked"
+        case tier, contribution, coins
     }
 }
 
