@@ -834,9 +834,17 @@ struct SumoSurvivalView: View {
             let progress = pow(seconds / mainSeconds, OpponentTuning.sumoShrinkCurve)
             share = 1 - (1 - OpponentTuning.sumoShrinkTo) * progress
         } else {
-            let extra = min(1, (seconds - mainSeconds) / max(1, OpponentTuning.sumoSqueezeSeconds))
-            share = OpponentTuning.sumoShrinkTo
-                  - (OpponentTuning.sumoShrinkTo - OpponentTuning.sumoSqueezeTo) * extra
+            let squeezeSeconds = max(1, OpponentTuning.sumoSqueezeSeconds)
+            let extra = min(1, (seconds - mainSeconds) / squeezeSeconds)
+            var closing = OpponentTuning.sumoShrinkTo
+                        - (OpponentTuning.sumoShrinkTo - OpponentTuning.sumoSqueezeTo) * extra
+            // Last stand: keep closing slowly so a stand-off always ends.
+            let overtime = seconds - mainSeconds - squeezeSeconds
+            if overtime > 0 {
+                closing = max(OpponentTuning.sumoSmallestRing,
+                              closing - OpponentTuning.sumoLastStandPerSecond * overtime)
+            }
+            share = closing
         }
         radius = baseRadius * CGFloat(share)
     }

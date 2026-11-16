@@ -224,12 +224,14 @@ enum GoldRushMaps {
                              WallSegFrac(x1: 0.05, y1: 0.66, x2: 0.42, y2: 0.66),
                              WallSegFrac(x1: 0.58, y1: 0.66, x2: 0.95, y2: 0.66)]),
 
-        // 3 — Box: 4 walls forming an open square — centre coin-collection pocket
+        // 3 — Box: 4 walls forming a square that is OPEN AT ALL FOUR CORNERS —
+        // centre coin-collection pocket.  (The walls used to meet at the
+        // corners, sealing the marbles inside.)
         GoldRushMap(name: "Box",
-                    walls: [WallSegFrac(x1: 0.22, y1: 0.32, x2: 0.78, y2: 0.32),
-                             WallSegFrac(x1: 0.22, y1: 0.74, x2: 0.78, y2: 0.74),
-                             WallSegFrac(x1: 0.22, y1: 0.32, x2: 0.22, y2: 0.74),
-                             WallSegFrac(x1: 0.78, y1: 0.32, x2: 0.78, y2: 0.74)]),
+                    walls: [WallSegFrac(x1: 0.34, y1: 0.32, x2: 0.66, y2: 0.32),
+                             WallSegFrac(x1: 0.34, y1: 0.74, x2: 0.66, y2: 0.74),
+                             WallSegFrac(x1: 0.22, y1: 0.43, x2: 0.22, y2: 0.63),
+                             WallSegFrac(x1: 0.78, y1: 0.43, x2: 0.78, y2: 0.63)]),
 
         // 4 — Split: one vertical wall with gaps at top and bottom — two-room arena
         GoldRushMap(name: "Split",

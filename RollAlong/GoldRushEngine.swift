@@ -153,7 +153,11 @@ final class GoldRushEngine {
     // Which parts of the arena can be reached from the middle (walls can
     // close an area off).  Coins only spawn, and marbles only start, where
     // every marble can get to.
-    private let reachCell: CGFloat = 20
+    // The grid must be fine enough to find the narrowest gap a marble fits
+    // through: at 20 points the Maze map's one way out of the middle (about
+    // 52 points wide, 18 once the marble's radius is taken off both sides)
+    // was found on some phone sizes and missed on others.
+    private let reachCell: CGFloat = 10
     private var reachCols = 0
     private var reachRows = 0
     private var reachable: [Bool] = []
@@ -414,10 +418,14 @@ final class GoldRushEngine {
             // Each opponent has its OWN top speed (its difficulty and skill);
             // the player has the full one.  A live charge lifts the cap to
             // `chargeSpeed` so the dash reads.
-            let baseCap = racers[i].isPlayer
-                ? maxSpeed
-                : maxSpeed * CGFloat((brains[racers[i].colorIndex]?.limits
-                                        ?? OpponentTuning.limits(for: difficulty)).smashGrabTopSpeed)
+            let baseCap: CGFloat
+            if racers[i].isPlayer {
+                baseCap = maxSpeed
+            } else {
+                let limits = brains[racers[i].colorIndex]?.limits
+                    ?? OpponentTuning.limits(for: difficulty)
+                baseCap = maxSpeed * CGFloat(limits.smashGrabTopSpeed)
+            }
             let cap = racers[i].charging > 0 ? max(baseCap, chargeSpeed) : baseCap
             let s = hypot(racers[i].vel.dx, racers[i].vel.dy)
             if s > cap {
@@ -787,11 +795,24 @@ final class GoldRushEngine {
     }
 
     private func makeSpill(at pos: CGPoint, by who: UUID) -> Coin {
-        let angle = Double.random(in: 0..<(2 * .pi))
-        let r = CGFloat.random(in: 18...34)
-        var p = CGPoint(x: pos.x + CGFloat(cos(angle)) * r, y: pos.y + CGFloat(sin(angle)) * r)
-        p.x = min(max(edgeBand, p.x), arena.width - edgeBand)
-        p.y = min(max(topReserve + edgeBand, p.y), arena.height - bottomReserve - edgeBand)
+        func clamped(_ q: CGPoint) -> CGPoint {
+            CGPoint(x: min(max(edgeBand, q.x), arena.width - edgeBand),
+                    y: min(max(topReserve + edgeBand, q.y), arena.height - bottomReserve - edgeBand))
+        }
+        // A dropped coin must not land across a wall or in a closed-off area,
+        // where nobody could pick it up again.  Failing a few tries it lands
+        // where the marble that dropped it is.
+        var p = clamped(pos)
+        for _ in 0..<6 {
+            let angle = Double.random(in: 0..<(2 * .pi))
+            let r = CGFloat.random(in: 18...34)
+            let q = clamped(CGPoint(x: pos.x + CGFloat(cos(angle)) * r,
+                                    y: pos.y + CGFloat(sin(angle)) * r))
+            if isReachable(q) && !wallBetween(pos, q) {
+                p = q
+                break
+            }
+        }
         return Coin(pos: p, value: 1, ignoreRacer: who, ignoreUntil: localTick + spillImmunityTicks, born: localTick)
     }
 

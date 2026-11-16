@@ -3267,6 +3267,11 @@ enum OpponentTuning {
     /// any stand-off.
     static let sumoSqueezeSeconds: Double = 12
     static let sumoSqueezeTo: Double = 0.34
+    /// Sumo Survival: after the squeeze the ring still loses this share of its
+    /// full size every second, down to `sumoSmallestRing`, so two careful
+    /// marbles cannot circle forever.
+    static let sumoLastStandPerSecond: Double = 0.02
+    static let sumoSmallestRing: Double = 0.14
     /// Sumo Survival: once the player is out, the rest of the round plays at
     /// this many times normal speed.
     static let sumoSpectateSpeed: Int = 3
