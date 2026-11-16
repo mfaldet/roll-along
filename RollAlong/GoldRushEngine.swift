@@ -41,7 +41,6 @@ final class GoldRushEngine {
     private let initialCoins       = 12
     private let maxCoins           = 18
     private let spawnEveryTicks    = 20
-    private let coinsPerSpill      = 3
     private let spillImmunityTicks = 45
     private let ramSeekRange: CGFloat = 220
     private let winBonus           = 15
@@ -85,6 +84,8 @@ final class GoldRushEngine {
         var charging: Int = 0
         /// Ticks until this marble may charge again (0 = ready).
         var chargeCD: Int = 0
+        /// Until this tick the marble cannot be made to drop more coins.
+        var noSpillUntil: Int = 0
     }
 
     struct Coin: Identifiable {
@@ -134,13 +135,28 @@ final class GoldRushEngine {
     var difficulty: MinigameDifficulty = .hard {
         // A changed difficulty gives every opponent a fresh brain with the
         // new limits (made on demand in `botSteer`).
-        didSet { if difficulty != oldValue { brains = [:] } }
+        didSet { if difficulty != oldValue { brains = [:]; restTicks = [:]; wanderPoint = [:] } }
     }
     /// Optional fixed seed for the opponents' random choices (tests).
     var opponentSeed: UInt64? = nil
 
     /// One brain per opponent, keyed by `colorIndex`.
     private var brains: [Int: OpponentBrain] = [:]
+    /// Each opponent's skill for this round (0 clumsy … 1 sharp), dealt in
+    /// `resetBoard()` so the three are one clumsy, one average, one sharp.
+    private var skills: [Int: Double] = [:]
+    /// Ticks an opponent still coasts after picking up a coin.
+    private var restTicks: [Int: Int] = [:]
+    /// Where an opponent is wandering to while it has no coin in view.
+    private var wanderPoint: [Int: CGPoint] = [:]
+
+    // Which parts of the arena can be reached from the middle (walls can
+    // close an area off).  Coins only spawn, and marbles only start, where
+    // every marble can get to.
+    private let reachCell: CGFloat = 20
+    private var reachCols = 0
+    private var reachRows = 0
+    private var reachable: [Bool] = []
     /// The bully's charge aim for this tick (set by `botSteer`): where it
     /// BELIEVES the leader is, with its aiming error.  Nil when not chasing.
     private var bullyChargeAim: [Int: CGVector] = [:]
@@ -186,6 +202,97 @@ final class GoldRushEngine {
     func updateArena(_ size: CGSize) {
         arena = size
         center = CGPoint(x: size.width / 2, y: size.height / 2)
+        buildReachability()
+    }
+
+    /// Flood-fill from the arena's middle over a coarse grid, treating every
+    /// cell a marble cannot occupy (too near a wall or the border) as closed.
+    /// With no walls the whole grid is left empty, meaning "everywhere".
+    private func buildReachability() {
+        reachable = []
+        guard !walls.isEmpty, arena.width > 0, arena.height > 0 else { return }
+        reachCols = max(1, Int((arena.width / reachCell).rounded(.up)))
+        reachRows = max(1, Int((arena.height / reachCell).rounded(.up)))
+        let total = reachCols * reachRows
+        var open = [Bool](repeating: false, count: total)
+        for row in 0..<reachRows {
+            for col in 0..<reachCols {
+                let p = CGPoint(x: (CGFloat(col) + 0.5) * reachCell,
+                                y: (CGFloat(row) + 0.5) * reachCell)
+                if p.x < marbleRadius || p.x > arena.width - marbleRadius { continue }
+                if p.y < topReserve + marbleRadius || p.y > arena.height - marbleRadius { continue }
+                if distanceToNearestWall(p) < marbleRadius { continue }
+                open[row * reachCols + col] = true
+            }
+        }
+        // Start from the open cell nearest the middle.
+        var start = -1
+        var startD = CGFloat.greatestFiniteMagnitude
+        for idx in 0..<total where open[idx] {
+            let x = (CGFloat(idx % reachCols) + 0.5) * reachCell
+            let y = (CGFloat(idx / reachCols) + 0.5) * reachCell
+            let d = hypot(x - center.x, y - center.y)
+            if d < startD { startD = d; start = idx }
+        }
+        guard start >= 0 else { return }
+        var seen = [Bool](repeating: false, count: total)
+        var queue = [start]
+        seen[start] = true
+        var head = 0
+        while head < queue.count {
+            let idx = queue[head]
+            head += 1
+            let col = idx % reachCols, row = idx / reachCols
+            if col > 0             { visit(idx - 1,         open, &seen, &queue) }
+            if col < reachCols - 1 { visit(idx + 1,         open, &seen, &queue) }
+            if row > 0             { visit(idx - reachCols, open, &seen, &queue) }
+            if row < reachRows - 1 { visit(idx + reachCols, open, &seen, &queue) }
+        }
+        reachable = seen
+    }
+
+    private func visit(_ idx: Int, _ open: [Bool], _ seen: inout [Bool], _ queue: inout [Int]) {
+        if open[idx] && !seen[idx] {
+            seen[idx] = true
+            queue.append(idx)
+        }
+    }
+
+    /// True when a marble starting in the middle can get to `p`.
+    private func isReachable(_ p: CGPoint) -> Bool {
+        guard !reachable.isEmpty else { return true }
+        let col = Int(p.x / reachCell), row = Int(p.y / reachCell)
+        guard col >= 0, col < reachCols, row >= 0, row < reachRows else { return false }
+        return reachable[row * reachCols + col]
+    }
+
+    private func distanceToNearestWall(_ p: CGPoint) -> CGFloat {
+        var best = CGFloat.greatestFiniteMagnitude
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq))
+            best = min(best, hypot(p.x - (p1.x + t * dx), p.y - (p1.y + t * dy)))
+        }
+        return best
+    }
+
+    /// True when a wall lies between `a` and `b`.
+    private func wallBetween(_ a: CGPoint, _ b: CGPoint) -> Bool {
+        func side(_ p: CGPoint, _ q: CGPoint, _ r: CGPoint) -> CGFloat {
+            (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
+        }
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let d1 = side(p1, p2, a), d2 = side(p1, p2, b)
+            let d3 = side(a, b, p1),  d4 = side(a, b, p2)
+            if d1 * d2 < 0 && d3 * d4 < 0 { return true }
+        }
+        return false
     }
 
     /// Lay out a fresh board — player in the centre, rivals on a ring, the
@@ -202,18 +309,41 @@ final class GoldRushEngine {
         roundTick = 0
         poofs = []
         coins = []
+        buildReachability()
 
         var fresh: [Racer] = [Racer(pos: center, colorIndex: 0, isPlayer: true, aggro: false)]
         let ringR = min(arena.width, arena.height) * 0.30
         for i in 0..<rivalCount {
             let angle = (Double(i) / Double(rivalCount)) * 2 * .pi - .pi / 2
-            let p = CGPoint(x: center.x + CGFloat(cos(angle)) * ringR,
-                            y: center.y + CGFloat(sin(angle)) * ringR)
+            // Pull the start point in toward the middle until it is somewhere
+            // every marble can reach (a wall can cut the ring off).
+            var p = center
+            var shrink: CGFloat = 1.0
+            while shrink > 0.15 {
+                let candidate = CGPoint(x: center.x + CGFloat(cos(angle)) * ringR * shrink,
+                                        y: center.y + CGFloat(sin(angle)) * ringR * shrink)
+                if isReachable(candidate) && distanceToNearestWall(candidate) >= marbleRadius * 1.5 {
+                    p = candidate
+                    break
+                }
+                shrink -= 0.15
+            }
+            if p == center {
+                p = CGPoint(x: center.x + CGFloat(cos(angle)) * marbleRadius * 2.5,
+                            y: center.y + CGFloat(sin(angle)) * marbleRadius * 2.5)
+            }
             fresh.append(Racer(pos: p, colorIndex: i + 1, isPlayer: false, aggro: i == 0))
         }
         racers = fresh
 
+        // Each opponent draws its own skill for the round: one clumsy, one
+        // average, one sharp, in random order.
+        let dealt = OpponentTuning.dealSkills(rivalCount, seed: opponentSeed)
+        skills = [:]
+        for i in 0..<rivalCount { skills[i + 1] = dealt[i] }
         brains = [:]
+        restTicks = [:]
+        wanderPoint = [:]
         bullyChargeAim = [:]
         for r in fresh where !r.isPlayer { brains[r.colorIndex] = makeBrain(r.colorIndex) }
 
@@ -281,11 +411,13 @@ final class GoldRushEngine {
             }
             racers[i].vel.dx *= friction
             racers[i].vel.dy *= friction
-            // Rivals get a difficulty-scaled speed cap; the player never does.
-            // A live charge lifts the cap to `chargeSpeed` so the dash reads.
+            // Each opponent has its OWN top speed (its difficulty and skill);
+            // the player has the full one.  A live charge lifts the cap to
+            // `chargeSpeed` so the dash reads.
             let baseCap = racers[i].isPlayer
                 ? maxSpeed
-                : maxSpeed * CGFloat(OpponentTuning.limits(for: difficulty).smashGrabTopSpeed)
+                : maxSpeed * CGFloat((brains[racers[i].colorIndex]?.limits
+                                        ?? OpponentTuning.limits(for: difficulty)).smashGrabTopSpeed)
             let cap = racers[i].charging > 0 ? max(baseCap, chargeSpeed) : baseCap
             let s = hypot(racers[i].vel.dx, racers[i].vel.dy)
             if s > cap {
@@ -305,21 +437,35 @@ final class GoldRushEngine {
         if roundTick >= roundTicks { endRound() }
     }
 
-    /// Head for a coin.  A "bully" opponent instead chases the current leader
-    /// when they are close, to bump coins loose.  Human limits (all from
-    /// `OpponentTuning`): it acts on where its target WAS one reaction delay
-    /// ago, aims off by a held error, pushes at its effort share, and during a
-    /// mistake goes for the FARTHEST coin instead of a near one.
     private func makeBrain(_ colorIndex: Int) -> OpponentBrain {
         let seed = opponentSeed.map { $0 &+ UInt64(colorIndex) &* 7_919 }
-        return OpponentBrain(difficulty: difficulty, seed: seed)
+        return OpponentBrain(difficulty: difficulty,
+                             skill: skills[colorIndex] ?? 0.5,
+                             seed: seed)
     }
 
+    /// One opponent's push for this tick.
+    ///
+    /// What it wants: a coin it can SEE and has NOTICED (see `canTarget`).
+    /// One opponent (the "bully") instead chases the current leader when
+    /// they are close, to dash into them.  With no coin in view it wanders.
+    ///
+    /// Its human limits, all from `OpponentTuning` at this opponent's
+    /// difficulty and skill:
+    ///   • reaction delay — it acts on where its goal WAS a moment ago;
+    ///   • aiming error   — it pushes off-line by a held error;
+    ///   • push share     — it uses only part of the full opponent push;
+    ///   • mistakes       — for a moment it goes for the FARTHEST coin and
+    ///                      stops steering away from the edges;
+    ///   • it coasts for a moment after each coin it picks up.
     private func botSteer(_ r: Racer) -> CGVector {
         var brain = brains[r.colorIndex] ?? makeBrain(r.colorIndex)
         brain.advance()
-        let fullPush = aiAccel
-        let accel = fullPush * brain.effort
+        let accel = aiAccel * brain.effort
+        let skill = brain.skill
+        let noticeTicks = Int((OpponentTuning.smashGrabNoticeSeconds(difficulty)
+                                .value(skill: skill) * 60).rounded())
+        let sight = CGFloat(OpponentTuning.smashGrabSightDistance(difficulty).value(skill: skill))
 
         // Where it would ideally go this tick.
         var goal = center
@@ -329,62 +475,114 @@ final class GoldRushEngine {
            hypot(leader.pos.x - r.pos.x, leader.pos.y - r.pos.y) < ramSeekRange {
             goal = leader.pos
             chasing = true
-        } else if brain.isMistaking, let far = farthestCoin(from: r) {
+            wanderPoint[r.colorIndex] = nil
+        } else if brain.isMistaking,
+                  let far = farthestCoin(from: r, noticeTicks: noticeTicks, sight: sight) {
             goal = far.pos
-        } else if let coin = preferredCoin(for: r) {
+            wanderPoint[r.colorIndex] = nil
+        } else if let coin = preferredCoin(for: r, noticeTicks: noticeTicks, sight: sight) {
             goal = coin.pos
+            wanderPoint[r.colorIndex] = nil
         } else {
-            pushScale = 0.5          // bare board: drift back to the center
+            // Nothing in view: wander to a random spot until a coin shows up.
+            var spot = wanderPoint[r.colorIndex] ?? r.pos
+            if wanderPoint[r.colorIndex] == nil
+                || hypot(spot.x - r.pos.x, spot.y - r.pos.y) < marbleRadius * 2.5 {
+                spot = randomReachablePoint(using: &brain) ?? center
+                wanderPoint[r.colorIndex] = spot
+            }
+            goal = spot
+            pushScale = CGFloat(OpponentTuning.smashGrabWanderPush)
         }
 
         // What it actually acts on: the goal as it was one reaction delay ago.
         let seen = brain.perceive(goal)
         let dir = brain.aimed(dx: seen.x - r.pos.x, dy: seen.y - r.pos.y)
+
+        // Coasting after a pickup: no push at all.
+        let resting = (restTicks[r.colorIndex] ?? 0) > 0
+        if resting {
+            restTicks[r.colorIndex] = (restTicks[r.colorIndex] ?? 1) - 1
+            pushScale = 0
+        }
         let base = CGVector(dx: dir.dx * accel * pushScale, dy: dir.dy * accel * pushScale)
 
-        // The bully's charge uses the same late, imperfect picture.
-        if chasing {
+        // The bully's dash uses the same late, imperfect picture.
+        if chasing && !resting {
             bullyChargeAim[r.colorIndex] = CGVector(dx: seen.x - r.pos.x, dy: seen.y - r.pos.y)
         } else {
             bullyChargeAim[r.colorIndex] = nil
         }
+        let mistaking = brain.isMistaking
         brains[r.colorIndex] = brain
 
-        // Always layer on a push away from nearby edges.  Without it a strong
-        // steering force presses an opponent into a wall faster than the
-        // bounce recovers.  The push scales WITH `accel`, so it stays ahead of
-        // steering at every difficulty.
+        // Layer on a push away from nearby edges.  Without it a strong
+        // steering force presses an opponent into the border faster than the
+        // bounce recovers.  During a mistake it is left off, so the opponent
+        // runs into the edge.
+        if mistaking && OpponentTuning.smashGrabMistakeHitsEdges { return base }
         let push = edgeRepulsion(for: r, accel: accel)
         return CGVector(dx: base.dx + push.dx, dy: base.dy + push.dy)
     }
 
-    /// The nearest coin that no OTHER opponent is closer to, so the three
-    /// opponents spread out (`OpponentTuning.smashGrabSpreadOut`).  Falls back
-    /// to the plain nearest coin.
-    private func preferredCoin(for r: Racer) -> Coin? {
-        guard OpponentTuning.smashGrabSpreadOut else { return nearestCoin(to: r) }
-        var best: Coin?
-        var bestD = CGFloat.greatestFiniteMagnitude
-        for c in coins {
-            if c.ignoreRacer == r.id && localTick < c.ignoreUntil { continue }
-            let d = hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y)
-            if d >= bestD { continue }
-            var someoneCloser = false
-            for o in racers where !o.isPlayer && o.id != r.id {
-                if hypot(c.pos.x - o.pos.x, c.pos.y - o.pos.y) < d { someoneCloser = true; break }
-            }
-            if someoneCloser { continue }
-            bestD = d
-            best = c
+    /// A random point every marble can reach, drawn from the opponent's own
+    /// (seedable) random source.
+    private func randomReachablePoint(using brain: inout OpponentBrain) -> CGPoint? {
+        let margin = edgeBand
+        let top = topReserve + edgeBand
+        let bottom = arena.height - bottomReserve - edgeBand
+        guard arena.width > 2 * margin, bottom > top else { return nil }
+        for _ in 0..<8 {
+            let x = margin + CGFloat(brain.unitRandom()) * (arena.width - 2 * margin)
+            let y = top + CGFloat(brain.unitRandom()) * (bottom - top)
+            let p = CGPoint(x: x, y: y)
+            if isReachable(p) { return p }
         }
-        return best ?? nearestCoin(to: r)
+        return nil
     }
 
-    private func farthestCoin(from r: Racer) -> Coin? {
+    /// Whether opponent `r` may go for coin `c` right now: not one it just
+    /// dropped, on the board long enough to have been noticed, and within
+    /// sight.
+    private func canTarget(_ c: Coin, _ r: Racer, noticeTicks: Int, sight: CGFloat) -> Bool {
+        if c.ignoreRacer == r.id && localTick < c.ignoreUntil { return false }
+        if localTick - c.born < noticeTicks { return false }
+        return hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y) <= sight
+    }
+
+    /// The best coin for `r`: the nearest one no OTHER opponent is closer to,
+    /// so the three opponents spread out (`OpponentTuning.smashGrabSpreadOut`).
+    /// Opponents that take walls into account treat a coin behind a wall as
+    /// much farther away.  Falls back to the plain nearest coin.
+    private func preferredCoin(for r: Racer, noticeTicks: Int, sight: CGFloat) -> Coin? {
+        let avoidsWalls = OpponentTuning.smashGrabAvoidsWalls(difficulty) && !walls.isEmpty
+        let penalty = CGFloat(OpponentTuning.smashGrabBlockedCoinPenalty)
+        var best: Coin?
+        var bestCost = CGFloat.greatestFiniteMagnitude
+        var nearest: Coin?
+        var nearestCost = CGFloat.greatestFiniteMagnitude
+        for c in coins where canTarget(c, r, noticeTicks: noticeTicks, sight: sight) {
+            let d = hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y)
+            let cost = (avoidsWalls && wallBetween(r.pos, c.pos)) ? d * penalty : d
+            if cost < nearestCost { nearestCost = cost; nearest = c }
+            if cost >= bestCost { continue }
+            if OpponentTuning.smashGrabSpreadOut {
+                var someoneCloser = false
+                for o in racers where !o.isPlayer && o.id != r.id {
+                    if hypot(c.pos.x - o.pos.x, c.pos.y - o.pos.y) < d { someoneCloser = true; break }
+                }
+                if someoneCloser { continue }
+            }
+            bestCost = cost
+            best = c
+        }
+        return best ?? nearest
+    }
+
+    private func farthestCoin(from r: Racer, noticeTicks: Int, sight: CGFloat) -> Coin? {
         var best: Coin?
         var bestD: CGFloat = -1
-        for c in coins {
-            if c.ignoreRacer == r.id && localTick < c.ignoreUntil { continue }
+        for c in coins where canTarget(c, r, noticeTicks: noticeTicks, sight: sight) {
             let d = hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y)
             if d > bestD { bestD = d; best = c }
         }
@@ -406,17 +604,6 @@ final class GoldRushEngine {
         if top    < margin { fy += (1 - top    / margin) * strength }
         if bottom < margin { fy -= (1 - bottom / margin) * strength }
         return CGVector(dx: fx, dy: fy)
-    }
-
-    private func nearestCoin(to r: Racer) -> Coin? {
-        var best: Coin?
-        var bestD = CGFloat.greatestFiniteMagnitude
-        for c in coins {
-            if c.ignoreRacer == r.id && localTick < c.ignoreUntil { continue }
-            let d = hypot(c.pos.x - r.pos.x, c.pos.y - r.pos.y)
-            if d < bestD { bestD = d; best = c }
-        }
-        return best
     }
 
     private func leaderToHarass(than r: Racer) -> Racer? {
@@ -485,16 +672,38 @@ final class GoldRushEngine {
                            + (racers[j].vel.dy - racers[i].vel.dy) * ny
                 guard relVel < 0 else { continue }
 
-                // Decide the spill from the closing velocity, BEFORE the bounce
-                // alters it.  Coins only spill when exactly one marble is mid-
-                // charge: that marble is the rammer, the other is the victim.
-                // An ordinary bump (neither charging) or a charge-vs-charge
-                // clash knocks nothing loose.
+                // Decide the spill from the closing speed, BEFORE the bounce
+                // alters it.  The faster the hit, the more coins drop
+                // (numbers in `OpponentTuning`):
+                //   • exactly one marble dashing → the other drops 3 to 6;
+                //   • nobody dashing → a fast bump makes the SLOWER marble
+                //     drop 1 or 2; a slow bump drops nothing;
+                //   • both dashing → nothing.
+                let closing = -relVel
                 let iCharging = racers[i].charging > 0
                 let jCharging = racers[j].charging > 0
-                let rammedVictim: Int? = (iCharging != jCharging && -relVel > chargeSpillImpact)
-                    ? (iCharging ? j : i)
-                    : nil
+                var rammedVictim: Int? = nil
+                var dropCount = 0
+                if iCharging != jCharging {
+                    if closing > chargeSpillImpact {
+                        rammedVictim = iCharging ? j : i
+                        dropCount = dashDrop(closing: closing)
+                    }
+                } else if !iCharging, OpponentTuning.smashGrabBumpDropCoins > 0,
+                          closing >= CGFloat(OpponentTuning.smashGrabBumpDropSpeed) {
+                    // How fast each marble was moving INTO the other.
+                    let iInto = racers[i].vel.dx * nx + racers[i].vel.dy * ny
+                    let jInto = -(racers[j].vel.dx * nx + racers[j].vel.dy * ny)
+                    if abs(iInto - jInto) >= closing * CGFloat(OpponentTuning.smashGrabBumpHitterShare) {
+                        rammedVictim = iInto > jInto ? j : i
+                        dropCount = closing >= CGFloat(OpponentTuning.smashGrabHardBumpDropSpeed)
+                            ? OpponentTuning.smashGrabHardBumpDropCoins
+                            : OpponentTuning.smashGrabBumpDropCoins
+                    }
+                }
+                if let hit = rammedVictim, localTick < racers[hit].noSpillUntil {
+                    rammedVictim = nil          // it only just dropped some
+                }
 
                 let jImp = -(1 + restitution) * relVel / 2
                 racers[i].vel.dx -= jImp * nx
@@ -503,8 +712,10 @@ final class GoldRushEngine {
                 racers[j].vel.dy += jImp * ny
 
                 if let hit = rammedVictim {
-                    let k = min(coinsPerSpill, racers[hit].score)
+                    let k = min(dropCount, racers[hit].score)
                     if k > 0 {
+                        racers[hit].noSpillUntil = localTick
+                            + Int((OpponentTuning.smashGrabDropImmunitySeconds * 60).rounded())
                         racers[hit].score -= k
                         for _ in 0..<k { spilled.append(makeSpill(at: racers[hit].pos, by: racers[hit].id)) }
                         poofs.append(Poof(pos: racers[hit].pos,
@@ -515,6 +726,18 @@ final class GoldRushEngine {
             }
         }
         if !spilled.isEmpty { coins.append(contentsOf: spilled) }
+    }
+
+    /// Coins a connecting dash knocks loose: the minimum at the slowest hit
+    /// that counts, rising in a straight line to the maximum at full dash
+    /// speed.
+    private func dashDrop(closing: CGFloat) -> Int {
+        let low = chargeSpillImpact
+        let high = max(low + 1, CGFloat(OpponentTuning.smashGrabDashFullSpeed))
+        let t = min(1, max(0, (closing - low) / (high - low)))
+        let lo = CGFloat(OpponentTuning.smashGrabDashDropMin)
+        let hi = CGFloat(OpponentTuning.smashGrabDashDropMax)
+        return Int((lo + (hi - lo) * t).rounded())
     }
 
     private func collectCoins() {
@@ -528,6 +751,13 @@ final class GoldRushEngine {
                 if hypot(racers[i].pos.x - c.pos.x, racers[i].pos.y - c.pos.y) < grab {
                     racers[i].score += c.value
                     taken = true
+                    // An opponent coasts for a moment after a pickup.
+                    if !racers[i].isPlayer {
+                        let key = racers[i].colorIndex
+                        let pause = OpponentTuning.smashGrabPauseAfterCoinSeconds(difficulty)
+                            .value(skill: skills[key] ?? 0.5)
+                        restTicks[key] = Int((pause * 60).rounded())
+                    }
                     break
                 }
             }
@@ -550,6 +780,7 @@ final class GoldRushEngine {
             let pt = CGPoint(x: x, y: y)
             if racers.contains(where: { hypot($0.pos.x - x, $0.pos.y - y) < marbleRadius * 2 }) { continue }
             if isNearWall(pt) { continue }
+            if !isReachable(pt) { continue }      // never behind a closed-off wall
             coins.append(Coin(pos: pt, value: value, born: localTick))
             return
         }
@@ -575,7 +806,12 @@ final class GoldRushEngine {
         guard let aim = bullyChargeAim[key] else { return }
         guard hypot(aim.dx, aim.dy) < chargeAITriggerRange else { return }
         let dir = brains[key]?.aimed(dx: aim.dx, dy: aim.dy) ?? aim
-        _ = fireCharge(&racers[i], aim: dir)
+        if fireCharge(&racers[i], aim: dir) {
+            // Opponents wait longer between dashes than the player has to.
+            let gap = OpponentTuning.smashGrabDashEverySeconds(difficulty)
+                .value(skill: skills[key] ?? 0.5)
+            racers[i].chargeCD = max(chargeCooldownTicks, Int((gap * 60).rounded()))
+        }
     }
 
     /// Override the marble's velocity with a short forward dash in `aim`'s

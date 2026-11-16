@@ -961,9 +961,19 @@ final class MinigameAICalibrationTests: XCTestCase {
 
     // MARK: - One headless round
 
+    /// What one round produced.
+    private struct RoundResult {
+        let won: Bool
+        let playerCoins: Int
+        let bestOpponentCoins: Int
+    }
+
     /// Exactly what GoldRushView's per-frame driver does, minus rendering:
-    /// set the knobs from the difficulty, feed playerInput, tick to round end.
-    private func runRound(difficulty: MinigameDifficulty, map: Int) -> Bool {
+    /// set the difficulty, feed `playerInput` (the view feeds the phone's tilt
+    /// through the same property), fire `chargePlayer()` for a tap, and tick
+    /// the REAL engine to round end.  This is the only simulation of this
+    /// game; there is no separate copy of the rules.
+    private func runRound(difficulty: MinigameDifficulty, map: Int) -> RoundResult {
         let engine = GoldRushEngine(arena: arena)
         engine.loadMap(index: map)
         engine.difficulty = difficulty      // opponents read OpponentTuning for it
@@ -977,10 +987,12 @@ final class MinigameAICalibrationTests: XCTestCase {
             tick += 1
             if tick > 4_000 {                    // 60 s round = 3_600 ticks
                 XCTFail("round failed to end — engine round-clock regression")
-                return false
+                return RoundResult(won: false, playerCoins: 0, bestOpponentCoins: 0)
             }
         }
-        return engine.playerWon
+        return RoundResult(won: engine.playerWon,
+                           playerCoins: engine.playerScore,
+                           bestOpponentCoins: engine.bestRivalScore)
     }
 
     // MARK: - The calibration report
@@ -994,18 +1006,26 @@ final class MinigameAICalibrationTests: XCTestCase {
 
     private func measureCell(_ difficulty: MinigameDifficulty) {
         var wins = 0
+        var playerCoins = 0
+        var bestOpponentCoins = 0
         for round in 0..<roundsPerCell {
             // Cycle the shipped maps so no single layout dominates.
-            if runRound(difficulty: difficulty,
-                        map: round % max(1, GoldRushMaps.maps.count)) {
-                wins += 1
-            }
+            let result = runRound(difficulty: difficulty,
+                                  map: round % max(1, GoldRushMaps.maps.count))
+            if result.won { wins += 1 }
+            playerCoins += result.playerCoins
+            bestOpponentCoins += result.bestOpponentCoins
         }
         let rate = Double(wins) / Double(roundsPerCell)
         Self.measured[difficulty] = rate
         // The report — read it from the test log; this is the harness output.
-        print(String(format: "[AI-CALIBRATION] goldrush %@ n=%d win-rate %.3f (target %.2f)",
-                     difficulty.rawValue, roundsPerCell, rate, difficulty.targetWinRate))
+        // The scripted player always knows where the nearest coin is and
+        // never tires, so read these as a comparison BETWEEN difficulties,
+        // not as what a person will score.
+        print(String(format: "[AI-CALIBRATION] Smash and Grab %@ (tuning v%d) rounds=%d  scripted-player win rate %.3f  mean player coins %.1f  mean best-opponent coins %.1f",
+                     difficulty.rawValue, OpponentTuning.version, roundsPerCell, rate,
+                     Double(playerCoins) / Double(roundsPerCell),
+                     Double(bestOpponentCoins) / Double(roundsPerCell)))
     }
 
     func testWinRate_1_easy()   { measureCell(.easy) }
@@ -1018,7 +1038,7 @@ final class MinigameAICalibrationTests: XCTestCase {
               let normal = Self.measured[.normal],
               let hard = Self.measured[.hard] else { return }
 
-        print(String(format: "[AI-CALIBRATION] goldrush summary (tuning v%d) easy %.3f normal %.3f hard %.3f",
+        print(String(format: "[AI-CALIBRATION] Smash and Grab summary (tuning v%d) scripted-player win rate: easy %.3f normal %.3f hard %.3f",
                      OpponentTuning.version, easy, normal, hard))
 
         // Deliberately LOOSE assertions: the harness measures, real results

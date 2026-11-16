@@ -231,7 +231,7 @@ is expected, not a sign the tuning is wrong.
 1. **Build the shared limits** and use them in each game's steering code.
    Each game makes its decision in one place, so this is roughly 10 to 25
    lines per game plus the shared part.
-2. **Tune Smash and Grab by simulation.** It is the only game that can play
+2. **Tune Smash and Grab with the calibration test (see the last section).** It is the only game that can play
    itself without a screen, and a test already runs 200 rounds per
    difficulty. Change its scripted player to tilt like a real one first.
 3. **Tune the other five by hand** on a phone. They cannot simulate without
@@ -281,3 +281,57 @@ not linked, Analytics".
 One limit of this data: events are per install, not per skill level. "An
 average player" has to be approximated as the middle of the per-install win
 rates, which the query can do.
+
+## Smash and Grab after the first play test (2026-11-16, tuning v3)
+
+**Withdrawn figures.** After the first build, win rates of 91% (Easy), 83.5%
+(Normal) and 67% (Hard) were reported for Smash and Grab. They came from a
+separate copy of the game's rules written in another language, not from the
+game's own code, and real play contradicted them (Easy was lost). **Those
+figures were wrong and are withdrawn.** That copy has been dropped. The only
+simulation of this game is now `MinigameAICalibrationTests` in
+`RollAlongTests/GameStateTests.swift`, which plays the real engine
+(`GoldRushEngine`) through the same two inputs the screen uses: the tilt
+value and the tap to dash. Its scripted player always knows where the
+nearest coin is and never tires, so its output compares difficulties with
+each other; it does not predict what a person will score.
+
+**What the trace found**
+
+- All the limits did reach the opponents. The reaction delay, aiming error,
+  mistakes and push share were applied per opponent every tick; the brains
+  were not being reset.
+- Top speed was the same for all three opponents (the middle value of the
+  difficulty). It is now each opponent's own.
+- **The limits barely changed how many coins opponents took.** The board
+  never holds more than 18 coins and gets a new one three times a second, so
+  nearly every coin is picked up by somebody on every difficulty. Three
+  opponents sweeping the board take about the same total whether they are a
+  little faster or a little slower. That is why the three levels felt alike.
+- **Each new round uses the next map.** "Play Again" moves to the next
+  arena, so Easy, Normal and Hard played back to back are played on three
+  different maps. On the "Box" map the four walls meet at the corners and
+  close the middle off: every marble started inside, coins that landed
+  outside could never be reached, and once 18 of them had piled up outside
+  no more appeared. Scores on that map collapse for everyone. A different
+  map in each round is the most likely reason opponents scored far less in
+  the Hard round than in the Easy one. This could not be confirmed without
+  the phone.
+
+**What changed**
+
+- Coins only appear, and marbles only start, where every marble can get to.
+- Opponents now differ in ways that change how many coins they take: how
+  long a coin lies there before they notice it, how far they can see, how
+  long they coast after a pickup, how often the dashing opponent dashes, and
+  whether they plan around walls. All per difficulty and per opponent skill.
+- Each opponent draws its own skill for the round, so one is clumsy, one
+  average and one sharp.
+- During a mistake an opponent heads for the farthest coin and stops
+  steering away from the edges, so it runs into the border.
+- Coins knocked loose scale with the speed of the hit: a dash drops 3 to 6,
+  a fast ordinary bump makes the slower marble drop 1 or 2, a slow bump
+  drops nothing. A marble that just dropped coins cannot be made to drop
+  more for one second.
+
+Every number is in the "SMASH AND GRAB" block of `OpponentTuning`.
