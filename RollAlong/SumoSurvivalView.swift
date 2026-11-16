@@ -45,12 +45,12 @@ struct SumoSurvivalView: View {
     private let maxSpeed:     CGFloat = 780
     private let restitution:  CGFloat = 0.92      // bounciness of marble hits
     private let platformMargin: CGFloat = 26      // void gap around the platform
-    private let shrinkFrac:    CGFloat = 0.42     // ring closes to 58% of full…
-    private let shrinkOverTicks     = 35 * 60     // …across ~35s, so rounds resolve
-    private let edgePull       = 0.55             // AI retreats from the rim past this × radius (self-preserving)
-    // Opponent reaction delay, aiming error, mistakes, effort and shove
-    // strength all come from `OpponentTuning`, per difficulty.
-    private let pushGain:     CGFloat = 2.4       // how much drive-into-contact adds to collision mass
+    // Everything else that shapes a round lives in `OpponentTuning` (the
+    // "SUMO SURVIVAL" block): opponent reaction delay, aiming error,
+    // mistakes, effort, shove strength and rim sense per difficulty and
+    // skill; the hit boost; the ring's shrink schedule; the spectating
+    // speed-up.
+    private var pushGain: CGFloat { CGFloat(OpponentTuning.sumoPushGain) }
 
     private let roundCount     = 3
     private let winnerPoints   = 5
@@ -103,6 +103,13 @@ struct SumoSurvivalView: View {
     /// Each opponent's first target of the round: another OPPONENT, never the
     /// player, so nobody starts the round hunting the player.
     @State private var firstTarget: [UUID: UUID] = [:]
+    /// Each opponent's skill for this match (0 clumsy … 1 sharp), dealt once
+    /// with its name and look so the same opponent stays clumsy or sharp for
+    /// all three rounds.
+    @State private var skills: [UUID: Double] = [:]
+    /// Each opponent's own recent positions: it judges the rim from where it
+    /// WAS one reaction delay ago, not where it is.
+    @State private var ownSeen: [UUID: [CGPoint]] = [:]
     /// Ticks played across the whole match (for the result event).
     @State private var matchTicks = 0
     @State private var bumpers: [Bumper] = []     // active this round
@@ -369,15 +376,29 @@ struct SumoSurvivalView: View {
             Spacer()
             HStack(spacing: 7) {
                 Image(systemName: "eye.fill").font(.system(size: 13, weight: .bold))
-                Text("You're out — watching the round finish")
+                Text("You're out — the round is finishing")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 16).padding(.vertical, 9)
             .background(Capsule().fill(Color.black.opacity(0.6)))
+            .allowsHitTesting(false)
+            // No human is left in the round: let the player jump to the result.
+            Button { skipToResult() } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "forward.end.fill").font(.system(size: 14, weight: .bold))
+                    Text("Skip to result")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 22).padding(.vertical, 12)
+                .background(Capsule().fill(Color.white))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("SumoSkipToResult")
+            .padding(.top, 8)
             .padding(.bottom, 40)
         }
-        .allowsHitTesting(false)
     }
 
     private var startPrompt: some View {
@@ -580,8 +601,20 @@ struct SumoSurvivalView: View {
                            color: Self.rivalColors[i % Self.rivalColors.count]))
         }
         roster = r
-        rivalLooks = [:]
-        for racer in roster where !racer.isPlayer { rivalLooks[racer.id] = RivalCosmetics.random() }
+        // Names, looks and skills are dealt ONCE per match and kept for all
+        // three rounds.  `deal` hands out different names and looks; the
+        // skills are one clumsy, one average and one sharp opponent.
+        let rivalIDs = r.filter { !$0.isPlayer }.map(\.id)
+        let looks = RivalCosmetics.deal(rivalIDs.count)
+        let dealtSkills = OpponentTuning.dealSkills(rivalIDs.count)
+        var freshLooks: [UUID: RivalCosmetics.Look] = [:]
+        var freshSkills: [UUID: Double] = [:]
+        for (i, id) in rivalIDs.enumerated() {
+            if i < looks.count { freshLooks[id] = looks[i] }
+            if i < dealtSkills.count { freshSkills[id] = dealtSkills[i] }
+        }
+        rivalLooks = freshLooks
+        skills = freshSkills
 
         startRound()
         showMapName = true
@@ -642,11 +675,13 @@ struct SumoSurvivalView: View {
         var freshBrains: [UUID: OpponentBrain] = [:]
         var targets: [UUID: UUID] = [:]
         for id in opponentIDs {
-            freshBrains[id] = OpponentBrain(difficulty: gameState.minigameDifficulty)
+            freshBrains[id] = OpponentBrain(difficulty: gameState.minigameDifficulty,
+                                            skill: skills[id] ?? 0.5)
             if let pick = opponentIDs.filter({ $0 != id }).randomElement() { targets[id] = pick }
         }
         brains = freshBrains
         firstTarget = targets
+        ownSeen = [:]
     }
 
     /// Called when a round resolves (one marble left).  Advances to the next
@@ -700,6 +735,46 @@ struct SumoSurvivalView: View {
     private func tick() {
         localTick &+= 1
         prunePoofs()
+        // Once the player is out, the rest of the round plays faster.
+        let steps = playerSpectating ? max(1, OpponentTuning.sumoSpectateSpeed) : 1
+        for _ in 0..<steps { simulateStep() }
+    }
+
+    /// "Skip to result": play the rest of the round at once.  It runs the
+    /// very same simulation steps, so the finishing order, points, payout and
+    /// events are exactly what watching it would have produced.
+    private func skipToResult() {
+        guard playerSpectating, started, !roundOver, !matchOver else { return }
+        var budget = Int(OpponentTuning.sumoSkipMaxSeconds * 60)
+        while budget > 0, started, !roundOver, !matchOver {
+            simulateStep()
+            budget -= 1
+        }
+        // Still standing after the time limit: out they go, nearest the rim
+        // first, until the round has its result.
+        while started, !roundOver, !matchOver, !bumpers.isEmpty {
+            let outermost = bumpers.max { a, b in
+                hypot(a.pos.x - center.x, a.pos.y - center.y) < hypot(b.pos.x - center.x, b.pos.y - center.y)
+            }
+            guard let out = outermost else { break }
+            if bumpers.count == 1 {
+                recordFinish(out, points: winnerPoints, poof: false)
+                bumpers = []
+                endRound()
+            } else {
+                recordFinish(out, points: fallPoints(orderIndex: fallenThisRound.count), poof: true)
+                bumpers.removeAll { $0.id == out.id }
+                if bumpers.count == 1, let w = bumpers.first {
+                    recordFinish(w, points: winnerPoints, poof: false)
+                    bumpers = []
+                    endRound()
+                }
+            }
+        }
+    }
+
+    /// One 60 Hz step of the round.
+    private func simulateStep() {
         guard started, !roundOver, !matchOver, baseRadius > 0 else { return }
         roundTicks += 1
         matchTicks += 1
@@ -748,10 +823,22 @@ struct SumoSurvivalView: View {
         trails = trails.filter { liveIds.contains($0.key) }
     }
 
-    /// Close the ring over the round, down to `1 - shrinkFrac` of full.
+    /// Close the ring over the round: slowly at first, faster as the round
+    /// goes on, then a final squeeze that ends any stand-off.  All numbers
+    /// are in `OpponentTuning`.
     private func updateRing() {
-        let progress = min(1, CGFloat(roundTicks) / CGFloat(shrinkOverTicks))
-        radius = baseRadius * (1 - shrinkFrac * progress)
+        let seconds = Double(roundTicks) / 60
+        let mainSeconds = max(1, OpponentTuning.sumoShrinkSeconds)
+        let share: Double
+        if seconds <= mainSeconds {
+            let progress = pow(seconds / mainSeconds, OpponentTuning.sumoShrinkCurve)
+            share = 1 - (1 - OpponentTuning.sumoShrinkTo) * progress
+        } else {
+            let extra = min(1, (seconds - mainSeconds) / max(1, OpponentTuning.sumoSqueezeSeconds))
+            share = OpponentTuning.sumoShrinkTo
+                  - (OpponentTuning.sumoShrinkTo - OpponentTuning.sumoSqueezeTo) * extra
+        }
+        radius = baseRadius * CGFloat(share)
     }
 
     /// Clamp the tilt vector to magnitude ≤ 1 — the player's "push strength".
@@ -762,15 +849,23 @@ struct SumoSurvivalView: View {
     }
 
     /// Opponent steering: charge a marble, retreat from the rim.  Human limits
-    /// (`OpponentTuning`): for the first few seconds its target is another
-    /// opponent, then whoever is nearest; it charges where the target WAS one
-    /// reaction delay ago with a held aiming error, at its effort share; and
-    /// during a mistake it forgets the rim and keeps charging.  Returns the
-    /// acceleration to apply and the duel drive (unit direction × shove).
+    /// (`OpponentTuning`), all per opponent (difficulty + its own skill):
+    ///   • for the first few seconds its target is another opponent, then
+    ///     whoever is nearest;
+    ///   • it charges where the target WAS one reaction delay ago, with a
+    ///     held aiming error, at its effort share;
+    ///   • it judges the rim from where IT was one reaction delay ago (plus,
+    ///     for sharper opponents, where its speed is carrying it), starts to
+    ///     pull back late or early, and pulls weakly or firmly (`SumoRim`);
+    ///   • during a mistake it forgets the rim and charges harder.
+    /// Returns the acceleration to apply and the duel drive (the charge
+    /// direction × its shove strength).
     private func aiSteer(for b: Bumper, seed: Int) -> (steer: CGVector, drive: CGVector) {
-        var brain = brains[b.id] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        let difficulty = gameState.minigameDifficulty
+        var brain = brains[b.id] ?? OpponentBrain(difficulty: difficulty, skill: skills[b.id] ?? 0.5)
         brain.advance()
         defer { brains[b.id] = brain }
+        let rim = OpponentTuning.sumoRim(for: difficulty, skill: brain.skill)
 
         // Who to charge.
         var target: CGPoint?
@@ -785,26 +880,44 @@ struct SumoSurvivalView: View {
                 if d < best { best = d; target = o.pos }
             }
         }
-        var dir = CGVector(dx: 0, dy: 0)
+        var charge = CGVector(dx: 0, dy: 0)
         if let t = target {
             let seen = brain.perceive(t)
-            dir = brain.aimed(dx: seen.x - b.pos.x, dy: seen.y - b.pos.y)
+            charge = brain.aimed(dx: seen.x - b.pos.x, dy: seen.y - b.pos.y)
         }
+        var dir = charge
 
-        // Self-preservation: bias hard toward center when near the rim —
-        // unless it is in the middle of a mistake, when it keeps charging.
-        let fromC = CGVector(dx: b.pos.x - center.x, dy: b.pos.y - center.y)
+        // Where it thinks it is: its own position one reaction delay ago.
+        var history = ownSeen[b.id] ?? []
+        history.append(b.pos)
+        let keep = brain.delayTicks + 1
+        if history.count > keep { history.removeFirst(history.count - keep) }
+        ownSeen[b.id] = history
+        let sensed = history.first ?? b.pos
+        // Sharper opponents also allow for the slide their speed will cause.
+        let look = CGFloat(rim.lookAheadSeconds)
+        let ahead = CGPoint(x: sensed.x + b.vel.dx * look, y: sensed.y + b.vel.dy * look)
+
+        // Self-preservation near the rim — skipped entirely during a mistake.
+        let fromC = CGVector(dx: ahead.x - center.x, dy: ahead.y - center.y)
         let distC = hypot(fromC.dx, fromC.dy)
-        if !brain.isMistaking && distC > radius * edgePull {
+        let startR = radius * CGFloat(rim.startShare)
+        if !brain.isMistaking && distC > startR {
+            // 0 where the pull begins … 1 at the rim (and beyond).
+            let depth = min(1, (distC - startR) / max(1, radius - startR))
+            let pull = CGFloat(rim.pull) * (0.5 + 0.5 * depth)
+            let keepCharge = max(0.25, 1 - 0.6 * min(1.25, pull))
             let inward = unitVec(dx: -fromC.dx, dy: -fromC.dy)
-            dir = unitVec(dx: dir.dx * 0.3 + inward.dx * 1.2,
-                          dy: dir.dy * 0.3 + inward.dy * 1.2)
+            dir = unitVec(dx: charge.dx * keepCharge + inward.dx * pull,
+                          dy: charge.dy * keepCharge + inward.dy * pull)
         }
 
-        let accel = aiAccelBase * brain.effort
+        var accel = aiAccelBase * brain.effort
+        if brain.isMistaking { accel *= CGFloat(rim.mistakePush) }
         let shove = CGFloat(brain.limits.sumoShove)
+        // It leans into a hit along its CHARGE, even while steering back in.
         return (CGVector(dx: dir.dx * accel, dy: dir.dy * accel),
-                CGVector(dx: dir.dx * shove, dy: dir.dy * shove))
+                CGVector(dx: charge.dx * shove, dy: charge.dy * shove))
     }
 
     /// Mass-weighted elastic collisions.  Each marble's mass grows with how
@@ -839,7 +952,12 @@ struct SumoSurvivalView: View {
                 let relVel = (bumpers[j].vel.dx - bumpers[i].vel.dx) * nx
                            + (bumpers[j].vel.dy - bumpers[i].vel.dy) * ny
                 guard relVel < 0 else { continue }
-                let jImp = -(1 + restitution) * relVel / (1 / mI + 1 / mJ)
+                // A sharper bounce: every hit is boosted, and even a slow
+                // touch throws the pair apart at a minimum speed.
+                let reduced = 1 / (1 / mI + 1 / mJ)
+                let plain = -(1 + restitution) * relVel * reduced
+                let jImp = max(plain * CGFloat(OpponentTuning.sumoHitBoost),
+                               CGFloat(OpponentTuning.sumoMinKick) * reduced)
                 bumpers[i].vel.dx -= (jImp / mI) * nx
                 bumpers[i].vel.dy -= (jImp / mI) * ny
                 bumpers[j].vel.dx += (jImp / mJ) * nx

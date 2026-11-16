@@ -3151,6 +3151,78 @@ enum OpponentTuning {
     /// Sumo Survival: each opponent's first target is another OPPONENT, picked
     /// at random, held this long (seconds) before it goes for whoever is nearest.
     static let sumoFirstTargetSeconds: Double = 4
+
+    /// Sumo Survival: how well one opponent looks after itself near the rim.
+    struct SumoRim {
+        /// It starts pulling back once it is this share of the way out to
+        /// the rim (0.55 = early and safe, 0.90 = only at the very edge).
+        let startShare: Double
+        /// How hard it steers back toward the center (0.3 = barely, 1.2 =
+        /// drops the charge and retreats).
+        let pull: Double
+        /// It judges the rim from where its speed will carry it this many
+        /// seconds from now.  0 = it only notices when it is already there,
+        /// so a fast charge slides off.
+        let lookAheadSeconds: Double
+        /// During a mistake it forgets the rim and pushes this many times
+        /// harder than usual — the blind charge that carries it off the edge.
+        let mistakePush: Double
+    }
+    /// Rim sense per difficulty: the clumsy end and the sharp end of the
+    /// range (each opponent sits somewhere between, by its skill).
+    /// Easy opponents notice the rim late and brake weakly, so they fall off
+    /// without help.  Hard opponents retreat early and anticipate their slide.
+    static let sumoRimEasy   = (clumsy: SumoRim(startShare: 0.92, pull: 0.35, lookAheadSeconds: 0.00, mistakePush: 1.8),
+                                sharp:  SumoRim(startShare: 0.82, pull: 0.60, lookAheadSeconds: 0.05, mistakePush: 1.5))
+    static let sumoRimNormal = (clumsy: SumoRim(startShare: 0.76, pull: 0.80, lookAheadSeconds: 0.10, mistakePush: 1.3),
+                                sharp:  SumoRim(startShare: 0.68, pull: 1.00, lookAheadSeconds: 0.20, mistakePush: 1.15))
+    static let sumoRimHard   = (clumsy: SumoRim(startShare: 0.62, pull: 1.10, lookAheadSeconds: 0.28, mistakePush: 1.0),
+                                sharp:  SumoRim(startShare: 0.55, pull: 1.30, lookAheadSeconds: 0.40, mistakePush: 1.0))
+
+    /// One opponent's rim sense: `skill` 0 is the clumsy end, 1 the sharp end.
+    static func sumoRim(for difficulty: MinigameDifficulty, skill: Double) -> SumoRim {
+        let band: (clumsy: SumoRim, sharp: SumoRim)
+        switch difficulty {
+        case .easy:   band = sumoRimEasy
+        case .normal: band = sumoRimNormal
+        case .hard:   band = sumoRimHard
+        }
+        let t = min(1, max(0, skill))
+        func mix(_ a: Double, _ z: Double) -> Double { a + (z - a) * t }
+        return SumoRim(startShare:       mix(band.clumsy.startShare, band.sharp.startShare),
+                       pull:             mix(band.clumsy.pull, band.sharp.pull),
+                       lookAheadSeconds: mix(band.clumsy.lookAheadSeconds, band.sharp.lookAheadSeconds),
+                       mistakePush:      mix(band.clumsy.mistakePush, band.sharp.mistakePush))
+    }
+
+    /// Sumo Survival: how much leaning into a hit adds to a marble's weight
+    /// in a collision (both the player's tilt and an opponent's `sumoShove`).
+    static let sumoPushGain: Double = 2.4
+    /// Sumo Survival: every hit is this many times stronger than a plain
+    /// bounce, so collisions visibly move marbles.
+    static let sumoHitBoost: Double = 1.35
+    /// Sumo Survival: even a slow touch throws the two marbles apart at
+    /// least this fast (points per second).
+    static let sumoMinKick: Double = 140
+    /// Sumo Survival: the ring closes to `sumoShrinkTo` of its full size over
+    /// this many seconds…
+    static let sumoShrinkSeconds: Double = 24
+    static let sumoShrinkTo: Double = 0.50
+    /// …slowly at first and faster as the round goes on (1 = steady; higher
+    /// = later and sharper).
+    static let sumoShrinkCurve: Double = 1.7
+    /// Sumo Survival: if the round is still going after that, the ring keeps
+    /// squeezing to `sumoSqueezeTo` over this many more seconds, which ends
+    /// any stand-off.
+    static let sumoSqueezeSeconds: Double = 12
+    static let sumoSqueezeTo: Double = 0.34
+    /// Sumo Survival: once the player is out, the rest of the round plays at
+    /// this many times normal speed.
+    static let sumoSpectateSpeed: Int = 3
+    /// Sumo Survival: "Skip to result" plays at most this many seconds of the
+    /// round at once; anything still standing after that goes out in order,
+    /// nearest the rim first.
+    static let sumoSkipMaxSeconds: Double = 60
     // (end Sumo Survival)
 
 
