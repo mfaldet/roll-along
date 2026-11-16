@@ -46,7 +46,7 @@ struct KingOfTheHillView: View {
     private let minKnockSpeed: CGFloat = 200
     private let rivalCount         = 3
     private let roundSeconds       = 60
-    private let zoneRadius:   CGFloat = 28      // tight — fits a single marble at a time
+    private let zoneRadius:   CGFloat = CGFloat(OpponentTuning.kothZoneRadius)
     private let zoneDriftSpeed: CGFloat = 42       // points per second the hill wanders
     private let zoneRepickDist: CGFloat = 14       // re-aim when this close to its target
     private let coinsPerHoldSec    = 2
@@ -80,6 +80,10 @@ struct KingOfTheHillView: View {
     @State private var racers: [Racer] = []
     /// One brain per opponent (human limits from `OpponentTuning`), by color.
     @State private var brains: [Int: OpponentBrain] = [:]
+    /// Each opponent's skill for this round (by color), dealt in reset().
+    @State private var rivalSkills: [Int: Double] = [:]
+    /// The round tick at which the current holder started holding alone.
+    @State private var holderSinceTick = 0
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     /// Recent positions per racer (colorIndex → points) for the trail layer.
@@ -330,12 +334,11 @@ struct KingOfTheHillView: View {
     }
 
     private func holdStat(title: String, ticks: Int, color: Color) -> some View {
-        let s = ticks / 60
         return HStack(spacing: 6) {
             Text(title)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
                 .foregroundStyle(Color(white: 0.55))
-            Text(String(format: "%d:%02d", s / 60, s % 60))
+            Text(Self.holdText(ticks))
                 .font(.system(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(color)
                 .monospacedDigit()
@@ -343,6 +346,11 @@ struct KingOfTheHillView: View {
         .padding(.horizontal, 12).padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.12)))
+    }
+
+    /// Time held, to one decimal place: "4.3 s".
+    private static func holdText(_ ticks: Int) -> String {
+        String(format: "%.1f s", Double(ticks) / 60.0)
     }
 
     private var timeString: String {
@@ -384,7 +392,7 @@ struct KingOfTheHillView: View {
                     Text(title)
                         .font(.system(size: 42, weight: .black, design: .rounded))
                         .foregroundStyle(titleColor)
-                    Text("held \(String(format: "%d:%02d", holdSec / 60, holdSec % 60)) · best rival \(String(format: "%d:%02d", bestRivalHoldTicks / 60 / 60, (bestRivalHoldTicks / 60) % 60))")
+                    Text("held \(Self.holdText(playerHoldTicks)) · best rival \(Self.holdText(bestRivalHoldTicks))")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
                 }
@@ -418,7 +426,7 @@ struct KingOfTheHillView: View {
                     }
                     ResultShareButton(result: ShareableResult(
                         mode: "King of the Hill",
-                        headline: String(format: "%d:%02d", holdSec / 60, holdSec % 60),
+                        headline: Self.holdText(playerHoldTicks),
                         subtitle: playerWon ? "Held the crown 👑" : "Held the hill",
                         skin: gameState.activeSkin,
                         trail: gameState.equippedTrail,
@@ -464,6 +472,7 @@ struct KingOfTheHillView: View {
         awarded = false
         roundTick = 0
         holderID = nil
+        holderSinceTick = 0
         contested = false
         zoneCenter = CGPoint(x: field.midX, y: field.midY)
         zoneTarget = randomZonePoint()
@@ -487,6 +496,11 @@ struct KingOfTheHillView: View {
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
             zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
+        // Each opponent draws its own skill for the round: one clumsy, one
+        // average, one sharp.  (The brains are built on the first tick, so a
+        // difficulty picked on the start screen is the one that is used.)
+        rivalSkills = Dictionary(uniqueKeysWithValues:
+            zip(rivals.map(\.colorIndex), OpponentTuning.dealSkills(rivals.count)))
         racers = fresh
         trails.removeAll()
         showMapName = true
@@ -550,7 +564,8 @@ struct KingOfTheHillView: View {
             racers[i].vel.dx *= friction
             racers[i].vel.dy *= friction
             let sp = hypot(racers[i].vel.dx, racers[i].vel.dy)
-            if sp > maxSpeed { let k = maxSpeed / sp; racers[i].vel.dx *= k; racers[i].vel.dy *= k }
+            let cap = racers[i].isPlayer ? maxSpeed : opponentTopSpeed(racers[i])
+            if sp > cap { let k = cap / sp; racers[i].vel.dx *= k; racers[i].vel.dy *= k }
             racers[i].pos.x += racers[i].vel.dx * dt
             racers[i].pos.y += racers[i].vel.dy * dt
             bounceWalls(&racers[i])
@@ -565,14 +580,26 @@ struct KingOfTheHillView: View {
         if roundTick >= roundTicks { endRun() }
     }
 
+    /// An opponent's top speed: lower for a low push share, so a clumsy
+    /// opponent is visibly slower than a sharp one.
+    private func opponentTopSpeed(_ r: Racer) -> CGFloat {
+        let effort = brains[r.colorIndex]?.effort ?? 0.5
+        let floor = CGFloat(OpponentTuning.kothTopSpeedAtZeroEffort)
+        return maxSpeed * min(1, floor + (1 - floor) * effort)
+    }
+
     /// Opponent steering.  Only some opponents go for the zone at a time
     /// (`kothContenders` per difficulty, taking turns every
-    /// `kothRotateSeconds`); the others hang back at a distance.  Human limits
+    /// `kothRotateSeconds`).  The others do not idle: they stay right beside
+    /// the zone, and once one marble has held it alone for
+    /// `kothPressAfterSeconds` they go and bump the holder out.  Human limits
     /// (`OpponentTuning`): it heads for where its goal WAS one reaction delay
-    /// ago, with a held aiming error, at its effort share; and during a
+    /// ago, with a held aiming error, at its push share; and during a
     /// mistake a contender overshoots — it rolls on past the zone.
     private func opponentSteer(_ r: Racer) -> CGVector {
-        var brain = brains[r.colorIndex] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        var brain = brains[r.colorIndex]
+            ?? OpponentBrain(difficulty: gameState.minigameDifficulty,
+                             skill: rivalSkills[r.colorIndex] ?? 0.5)
         brain.advance()
 
         // Whose turn is it?  Opponent colors are 1…rivalCount.
@@ -589,12 +616,21 @@ struct KingOfTheHillView: View {
                                y: zoneCenter.y + r.vel.dy / speed * over)
             }
         } else {
-            // Wait at a distance, on its own side of the zone.
-            let back = CGFloat(OpponentTuning.kothHangBackDistance)
-            var away = unit(dx: r.pos.x - zoneCenter.x, dy: r.pos.y - zoneCenter.y, scale: 1)
-            if away.dx == 0 && away.dy == 0 { away = CGVector(dx: 0, dy: -1) }
-            goal = clampToField(CGPoint(x: zoneCenter.x + away.dx * back,
-                                        y: zoneCenter.y + away.dy * back))
+            // Not its turn.  Has someone else been sitting in the zone alone
+            // for long enough?  Then go and bump them out.
+            let pressTicks = Int(OpponentTuning.kothPressAfterSeconds(gameState.minigameDifficulty) * 60)
+            if let holder = racers.first(where: { $0.id == holderID }),
+               holder.id != r.id, !brain.isMistaking,
+               roundTick - holderSinceTick >= pressTicks {
+                goal = holder.pos
+            } else {
+                // Otherwise wait right beside the zone, on its own side.
+                let wait = CGFloat(OpponentTuning.kothWaitDistance)
+                var away = unit(dx: r.pos.x - zoneCenter.x, dy: r.pos.y - zoneCenter.y, scale: 1)
+                if away.dx == 0 && away.dy == 0 { away = CGVector(dx: 0, dy: -1) }
+                goal = clampToField(CGPoint(x: zoneCenter.x + away.dx * wait,
+                                            y: zoneCenter.y + away.dy * wait))
+            }
         }
 
         let seen = brain.perceive(goal)
@@ -634,6 +670,7 @@ struct KingOfTheHillView: View {
         }
         if insideIdx.count == 1 {
             racers[insideIdx[0]].holdTicks += 1
+            if holderID != racers[insideIdx[0]].id { holderSinceTick = roundTick }
             holderID = racers[insideIdx[0]].id
             contested = false
         } else {

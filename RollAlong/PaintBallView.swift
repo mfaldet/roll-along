@@ -95,6 +95,8 @@ struct PaintBallView: View {
     @State private var painters: [Painter] = []
     /// One brain per opponent (human limits from `OpponentTuning`), by color.
     @State private var brains: [Int: OpponentBrain] = [:]
+    /// Each opponent's skill for this round (by color), dealt in spawnPainters().
+    @State private var rivalSkills: [Int: Double] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     /// Recent positions per painter (colorIndex → points) for the trail layer.
@@ -586,6 +588,11 @@ struct PaintBallView: View {
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
             zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
+        // Each opponent draws its own skill for the round: one clumsy, one
+        // average, one sharp.  (The brains are built on the first tick, so a
+        // difficulty picked on the start screen is the one that is used.)
+        rivalSkills = Dictionary(uniqueKeysWithValues:
+            zip(rivals.map(\.colorIndex), OpponentTuning.dealSkills(rivals.count)))
         trails = [:]
         painters = fresh
         brains = [:]
@@ -686,8 +693,9 @@ struct PaintBallView: View {
             painters[i].vel.dx *= friction
             painters[i].vel.dy *= friction
             let s = hypot(painters[i].vel.dx, painters[i].vel.dy)
-            if s > maxSpeed {
-                let k = maxSpeed / s
+            let cap = painters[i].isPlayer ? maxSpeed : opponentTopSpeed(painters[i])
+            if s > cap {
+                let k = cap / s
                 painters[i].vel.dx *= k
                 painters[i].vel.dy *= k
             }
@@ -704,6 +712,14 @@ struct PaintBallView: View {
         for p in painters { recordTrail(&trails, p.colorIndex, p.pos) }
 
         if roundTick >= roundTicks { endRound() }
+    }
+
+    /// An opponent's top speed: lower for a low push share, so a clumsy
+    /// opponent is visibly slower than a sharp one.
+    private func opponentTopSpeed(_ p: Painter) -> CGFloat {
+        let effort = brains[p.colorIndex]?.effort ?? 0.5
+        let floor = CGFloat(OpponentTuning.paintBallTopSpeedAtZeroEffort)
+        return maxSpeed * min(1, floor + (1 - floor) * effort)
     }
 
     private func releaseFromPit(_ p: inout Painter) {
@@ -723,15 +739,26 @@ struct PaintBallView: View {
     /// when a mistake begins it picks a BAD spot — floor it has already
     /// painted, puddles not avoided — and rolls there.
     private func steerBot(_ p: inout Painter) {
-        var brain = brains[p.colorIndex] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
+        var brain = brains[p.colorIndex]
+            ?? OpponentBrain(difficulty: gameState.minigameDifficulty,
+                             skill: rivalSkills[p.colorIndex] ?? 0.5)
         let mistakeBegan = brain.advance()
+        // How carefully it chooses: more spots weighed up = better choices.
+        let spots = max(2, Int((OpponentTuning.paintBallSpotsAtZeroEffort
+                                + OpponentTuning.paintBallSpotsPerEffort * Double(brain.effort)).rounded()))
         if mistakeBegan {
-            p.target = pickTarget(for: p, badly: true)
+            // A visible error: straight into a puddle, or back over its own paint.
+            if let pit = pits.randomElement(),
+               brain.unitRandom() < OpponentTuning.paintBallMistakePuddleChance {
+                p.target = pit.pos
+            } else {
+                p.target = pickTarget(for: p, badly: true, spots: spots)
+            }
             p.retargetAt = localTick + retargetTicks
         } else if !brain.isMistaking,
                   localTick >= p.retargetAt
                     || hypot(p.target.x - p.pos.x, p.target.y - p.pos.y) < 40 {
-            p.target = pickTarget(for: p)
+            p.target = pickTarget(for: p, spots: spots)
             p.retargetAt = localTick + retargetTicks
         }
         let dt: CGFloat = 1.0 / 60.0
@@ -746,11 +773,12 @@ struct PaintBallView: View {
     /// bare floor beats a rival's paint beats the bot's own color.
     /// `badly` is the mistake version: its own color scores best and puddles
     /// are not avoided.
-    private func pickTarget(for p: Painter, badly: Bool = false) -> CGPoint {
+    private func pickTarget(for p: Painter, badly: Bool = false, spots: Int = 10) -> CGPoint {
         var best = p.pos
         var bestScore = -1
         let margin: CGFloat = 36
-        for _ in 0..<10 {
+        guard arena.width > margin * 2, arena.height > margin * 2 else { return p.pos }
+        for _ in 0..<max(1, spots) {
             let x = CGFloat.random(in: margin...(arena.width - margin))
             let y = CGFloat.random(in: margin...(arena.height - margin))
             if !badly,
