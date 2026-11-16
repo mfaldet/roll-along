@@ -79,6 +79,7 @@ struct ClansView: View {
     /// device so a player who was removed can be told so.
     private static let lastClanIdKey = "ra_lastClanId"
     private static let lastClanNameKey = "ra_lastClanName"
+    private static let lastClanPlayerKey = "ra_lastClanPlayer"   // whose clan it was
     @State private var rankingsLoading = false
     @State private var rankingsUnavailable = false
 
@@ -1124,6 +1125,7 @@ struct ClansView: View {
                 // Remember the clan, so a later removal can be explained.
                 UserDefaults.standard.set(mem.clanId.uuidString, forKey: Self.lastClanIdKey)
                 UserDefaults.standard.set(clan?.name ?? "", forKey: Self.lastClanNameKey)
+                UserDefaults.standard.set(mem.playerId.uuidString, forKey: Self.lastClanPlayerKey)
                 givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
                 let sentToday = await SocialClient.shared.fetchMyGiftsToday()
                 sentLifeIds.formUnion(sentToday)
@@ -1137,8 +1139,14 @@ struct ClansView: View {
                 // removed this player, or the clan was disbanded.  Say so once.
                 if UserDefaults.standard.string(forKey: Self.lastClanIdKey) != nil {
                     let old = UserDefaults.standard.string(forKey: Self.lastClanNameKey)?.nonEmpty
+                    // Only for the account that was in it (another account may
+                    // have signed in on this device since).
+                    let sameAccount = UserDefaults.standard.string(forKey: Self.lastClanPlayerKey)
+                        == myId?.uuidString
                     Self.forgetLastClan()
-                    flash("You are no longer in \(old ?? "your clan"). You were removed, or the clan was disbanded.")
+                    if sameAccount {
+                        flash("You are no longer in \(old ?? "your clan"). You were removed, or the clan was disbanded.")
+                    }
                 }
                 givenRequestKeys = []
                 gameState.clanRequestBadge = 0
@@ -1168,6 +1176,7 @@ struct ClansView: View {
     private static func forgetLastClan() {
         UserDefaults.standard.removeObject(forKey: lastClanIdKey)
         UserDefaults.standard.removeObject(forKey: lastClanNameKey)
+        UserDefaults.standard.removeObject(forKey: lastClanPlayerKey)
     }
 
     private func leave() async {

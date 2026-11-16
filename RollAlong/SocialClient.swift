@@ -686,9 +686,14 @@ final class SocialClient: @unchecked Sendable {
     /// the player already earned for the clan stay with the clan.
     func removeClanMember(clanId: UUID, playerId: UUID) async throws {
         _ = try requireSession()
-        _ = try await send(method: "DELETE", path: "clan_members",
-                           query: "clan_id=eq.\(clanId.uuidString)&player_id=eq.\(playerId.uuidString)",
-                           prefer: "return=minimal")
+        // Ask for the deleted row back: a delete the server refuses (the
+        // caller is no longer the owner) answers "ok" with nothing removed,
+        // and that must not be reported as a removal.
+        let data = try await send(method: "DELETE", path: "clan_members",
+                                  query: "clan_id=eq.\(clanId.uuidString)&player_id=eq.\(playerId.uuidString)",
+                                  prefer: "return=representation")
+        let removed = try decode([ClanMember].self, from: data)
+        if removed.isEmpty { throw SocialError.emptyResponse }
     }
 
     private struct TransferBody: Encodable {
