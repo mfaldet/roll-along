@@ -648,7 +648,9 @@ struct PaintBallView: View {
     /// painting would silently stop.  Rebuild it — bare — for the new size and
     /// keep the round going.
     private func ensureGridMatchesArena() {
-        guard cols > 0, rows > 0 else { return }
+        // Not once the round is over: the result screen reads `coverage`, and
+        // wiping it there would turn the final score into 0%.
+        guard cols > 0, rows > 0, !isOver else { return }
         let cells = cols * rows
         if grid.count == cells, paintTick.count == cells, blocked.count == cells,
            coverage.count == colorCount { return }

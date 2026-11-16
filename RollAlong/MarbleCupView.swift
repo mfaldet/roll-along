@@ -51,7 +51,7 @@ struct MarbleCupView: View {
     private let celebrateTicks     = 75            // GOAL! freeze (~1.25s, clock paused)
     private let coinsPerGoal       = 15
     private let winBonus           = 30
-    /// Base-payout floor — a 90 s match can never pay 0, even a goalless loss.
+    /// Base-payout floor — a match can never pay 0, even a goalless loss.
     private let lossFloor          = 15
 
     /// Single source of truth for the match's base payout (pre-difficulty):
@@ -715,6 +715,7 @@ struct MarbleCupView: View {
         for i in movers.indices {
             movers[i].vel = .zero
             movers[i].charging = 0
+            movers[i].chargeCD = 0          // the dash is ready again at every kickoff
             switch movers[i].role {
             case .player:
                 movers[i].pos = spots.player
