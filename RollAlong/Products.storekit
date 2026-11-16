@@ -8,7 +8,7 @@
       "internalID": "11000001",
       "localizations": [
         {
-          "description": "10 lives added to your reserve.",
+          "description": "10 lives.",
           "displayName": "10 Lives",
           "locale": "en_US"
         }
@@ -23,7 +23,7 @@
       "internalID": "11000002",
       "localizations": [
         {
-          "description": "60 reserve lives — 20% more per dollar.",
+          "description": "60 lives.",
           "displayName": "60 Lives",
           "locale": "en_US"
         }
@@ -38,7 +38,7 @@
       "internalID": "11000003",
       "localizations": [
         {
-          "description": "130 reserve lives — our best value.",
+          "description": "130 lives.",
           "displayName": "130 Lives",
           "locale": "en_US"
         }
