@@ -425,86 +425,68 @@ struct BuyLivesSheet: View {
 
     private var lifePackCards: some View {
         VStack(spacing: 10) {
-            productCard(
-                pid: .livesPack1,
-                title: "10 Lives",
-                subtitle: "Added to your reserve",
-                buttonLabel: store.displayPrice(for: .livesPack1, fallback: "$0.99")
-            )
-            productCard(
-                pid: .livesPack5,
-                title: "60 Lives",
-                subtitle: "Added to your reserve",
-                bonus: lifeBonus(.livesPack5, lives: 60),
-                buttonLabel: store.displayPrice(for: .livesPack5, fallback: "$4.99")
-            )
-            productCard(
-                pid: .livesPack10,
-                title: "130 Lives",
-                subtitle: "Added to your reserve — best value",
-                bonus: lifeBonus(.livesPack10, lives: 130),
-                buttonLabel: store.displayPrice(for: .livesPack10, fallback: "$9.99")
-            )
+            lifePackCard(pid: .livesPack1)
+            lifePackCard(pid: .livesPack5)
+            lifePackCard(pid: .livesPack10)
         }
     }
 
-    /// % more lives than buying the same spend as base 10-life ($0.99) packs,
-    /// rounded to the nearest 10%.  Nil for the base pack (it IS the base rate).
-    /// Mirrors `coinBonus` so the Get Lives sheet reads like Get Coins.
-    private func lifeBonus(_ pid: StoreKitManager.ProductID, lives: Int) -> String? {
-        let baseRate = 10.0 / 0.99           // lives per dollar at the base pack
-        let price: Double
+    /// The price of a lives pack as a number: the live App Store price once
+    /// products have loaded, else the catalog price.
+    private func livesPackPrice(_ pid: StoreKitManager.ProductID) -> Double {
+        if let product = store.product(for: pid) {
+            return NSDecimalNumber(decimal: product.price).doubleValue
+        }
         switch pid {
-        case .livesPack5:  price = 4.99
-        case .livesPack10: price = 9.99
-        default:           return nil
+        case .livesPack1:  return 0.99
+        case .livesPack5:  return 4.99
+        case .livesPack10: return 9.99
+        default:           return 0
         }
-        let livesIfBoughtAsBase = baseRate * price
-        let pct = (Double(lives) / livesIfBoughtAsBase - 1.0) * 100.0
-        let rounded = Int((pct / 10.0).rounded()) * 10
-        return rounded > 0 ? "+\(rounded)% lives" : nil
     }
 
-    private func productCard(
-        pid: StoreKitManager.ProductID,
-        title: String,
-        subtitle: String,
-        bonus: String? = nil,
-        badge: String? = nil,
-        badgeColor: Color = .clear,
-        buttonLabel: String,
-        isDisabled: Bool = false,
-        isLarge: Bool = false
-    ) -> some View {
+    /// Percent saved per life against the smallest pack, from the real prices:
+    ///   1 − (this pack's price ÷ its lives) ÷ (smallest pack's price ÷ its lives)
+    /// rounded to a whole percent.  Nil for the smallest pack (it IS the base
+    /// price) and whenever a pack is not actually cheaper per life.
+    /// With today's prices: 60 lives → 16%, 130 lives → 22%.
+    private func percentSaved(_ pid: StoreKitManager.ProductID) -> Int? {
+        let smallest = StoreKitManager.ProductID.livesPack1
+        guard pid != smallest, pid.rewardLives > 0, smallest.rewardLives > 0 else { return nil }
+        let basePerLife = livesPackPrice(smallest) / Double(smallest.rewardLives)
+        let thisPerLife = livesPackPrice(pid) / Double(pid.rewardLives)
+        guard basePerLife > 0, thisPerLife > 0 else { return nil }
+        let percent = Int(((1 - thisPerLife / basePerLife) * 100).rounded())
+        return percent > 0 ? percent : nil
+    }
+
+    /// One lives pack, laid out like a coin pack on the Get Coins sheet: a jar
+    /// of marbles that is bigger for bigger packs, the number of lives, the
+    /// percent saved (not on the smallest pack), and the price button.
+    private func lifePackCard(pid: StoreKitManager.ProductID) -> some View {
         let inProgress = store.purchaseInProgress == pid
+        let lives = pid.rewardLives
+        let saved = percentSaved(pid)
+        let priceText = store.displayPrice(for: pid, fallback: Self.fallbackPrice(pid))
+        let spoken: String = saved.map { "Buy \(lives) lives for \(priceText). Save \($0) percent." }
+            ?? "Buy \(lives) lives for \(priceText)."
         return HStack(alignment: .center, spacing: 12) {
+            MarbleJarIcon(tier: Self.jarTier(pid))
+                .frame(width: 40, height: 36)
+                .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .font(.system(size: isLarge ? 17 : 15,
-                                       weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                    if let badge {
-                        Text(badge)
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .kerning(0.8)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(badgeColor))
-                    }
-                }
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.65))
-                // Free-lives bonus vs. the base pack — green, mirrors Get Coins.
-                if let bonus {
-                    Text(bonus)
+                Text("\(lives) Lives")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                if let saved {
+                    Text("Save \(saved)%")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(red: 0.40, green: 0.82, blue: 0.52))
                 }
             }
             Spacer()
+
             Button {
                 Task { await store.purchase(pid) }
             } label: {
@@ -515,30 +497,40 @@ struct BuyLivesSheet: View {
                         .frame(width: 56, height: 30)
                         .background(Capsule().fill(Color.white))
                 } else {
-                    Text(buttonLabel)
+                    Text(priceText)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(isDisabled ? Color(white: 0.45) : .black)
+                        .foregroundStyle(.black)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(
-                            Capsule().fill(isDisabled ? Color(white: 0.25) : .white)
-                        )
+                        .background(Capsule().fill(.white))
                 }
             }
             .buttonStyle(.plain)
-            .disabled(isDisabled || inProgress)
+            .disabled(inProgress)
+            .accessibilityLabel(spoken)
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(isLarge ? Color(white: 0.16) : Color(white: 0.13))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(isLarge ? Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.5)
-                                        : Color.clear,
-                                lineWidth: 1.0)
-                )
+                .fill(Color(white: 0.13))
         )
+    }
+
+    /// 0 = smallest jar … 2 = largest.
+    private static func jarTier(_ pid: StoreKitManager.ProductID) -> Int {
+        switch pid {
+        case .livesPack5:  return 1
+        case .livesPack10: return 2
+        default:           return 0
+        }
+    }
+
+    private static func fallbackPrice(_ pid: StoreKitManager.ProductID) -> String {
+        switch pid {
+        case .livesPack5:  return "$4.99"
+        case .livesPack10: return "$9.99"
+        default:           return "$0.99"
+        }
     }
 
     private static let redLifeGradient = LinearGradient(
@@ -775,6 +767,71 @@ struct BuyCoinsSheet: View {
 // treasure chest (gems on the bigger one) → a jewel-stuffed vault for the top
 // pack.  All drawn in pure SwiftUI shapes so they scale crisply and reuse the
 // shared CoinIcon gold so the coins match the rest of the app.
+
+/// Lives-pack art for the Get Lives sheet: a glass jar of red marbles.  The
+/// jar and the number of marbles in it grow with the pack (tier 0 smallest,
+/// 2 largest), so the packs read at a glance like the coin hoards below.
+/// Drawn in a Canvas — no image assets and no SF Symbols.
+private struct MarbleJarIcon: View {
+    let tier: Int
+
+    var body: some View {
+        Canvas { ctx, size in
+            let t = min(2, max(0, tier))
+            let scales: [CGFloat] = [0.62, 0.80, 1.0]
+            let scale = scales[t]
+            let columns = [2, 3, 4][t]
+            let marbleCount = [3, 6, 10][t]
+
+            // Jar body, sitting on the bottom edge, centered.
+            let bodyW = size.width * 0.80 * scale
+            let bodyH = size.height * 0.84 * scale
+            let bodyX = (size.width - bodyW) / 2
+            let bodyY = size.height - bodyH
+            let jar = CGRect(x: bodyX, y: bodyY, width: bodyW, height: bodyH)
+            let jarPath = Path(roundedRect: jar, cornerRadius: bodyW * 0.20)
+
+            // Marbles: rows of `columns`, filled from the bottom up.
+            let pad = bodyW * 0.09
+            let d = (bodyW - pad * 2) / CGFloat(columns)
+            var drawn = 0
+            var row = 0
+            while drawn < marbleCount {
+                let inRow = min(columns, marbleCount - drawn)
+                // Center a short top row.
+                let rowInset = (CGFloat(columns - inRow) * d) / 2
+                for col in 0..<inRow {
+                    let x = bodyX + pad + rowInset + CGFloat(col) * d
+                    let y = jar.maxY - pad - CGFloat(row + 1) * d
+                    let marble = CGRect(x: x + d * 0.06, y: y + d * 0.06,
+                                        width: d * 0.88, height: d * 0.88)
+                    ctx.fill(Path(ellipseIn: marble),
+                             with: .linearGradient(
+                                Gradient(colors: [Color(red: 1.00, green: 0.36, blue: 0.36),
+                                                  Color(red: 0.76, green: 0.13, blue: 0.13)]),
+                                startPoint: CGPoint(x: marble.midX, y: marble.minY),
+                                endPoint: CGPoint(x: marble.midX, y: marble.maxY)))
+                    let shine = CGRect(x: marble.minX + marble.width * 0.20,
+                                       y: marble.minY + marble.height * 0.18,
+                                       width: marble.width * 0.26, height: marble.height * 0.26)
+                    ctx.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.6)))
+                }
+                drawn += inRow
+                row += 1
+            }
+
+            // Glass over the marbles, then the rim and the lid.
+            ctx.fill(jarPath, with: .color(.white.opacity(0.10)))
+            ctx.stroke(jarPath, with: .color(Color(white: 0.85).opacity(0.9)), lineWidth: 1.3)
+            let lidW = bodyW * 0.72
+            let lidH = max(3, bodyH * 0.13)
+            let lid = CGRect(x: (size.width - lidW) / 2, y: bodyY - lidH * 0.75,
+                             width: lidW, height: lidH)
+            ctx.fill(Path(roundedRect: lid, cornerRadius: lidH * 0.35),
+                     with: .color(Color(white: 0.72)))
+        }
+    }
+}
 
 /// Lowest tier — just a few coins in a little pile.
 private struct FewCoinsIcon: View {

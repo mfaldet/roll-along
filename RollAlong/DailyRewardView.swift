@@ -16,7 +16,6 @@ import SwiftUI
 
 struct DailyRewardView: View {
     @EnvironmentObject var gameState: GameState
-    @Environment(\.dismiss) private var dismiss
 
     @State private var celebrate   = false
     @State private var lastAwarded = 0
@@ -160,13 +159,8 @@ struct DailyRewardView: View {
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
                 }
-                Text("Tomorrow: \(gameState.nextDailyRewardAmount) coins")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.6))
-                Button("Done") { dismiss() }
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.7))
-                    .padding(.top, 2)
+                // No Done button: the sheet closes like the Get Lives and
+                // Get Coins sheets — drag it down by the grabber, or tap above.
             }
         }
     }
