@@ -39,8 +39,15 @@ struct PaintBallView: View {
     private let wallBounce:   CGFloat = 0.70
     private let rivalCount         = 3
     private let roundSeconds       = 60
-    private let cellSize:     CGFloat = 24         // paint-grid resolution
-    private let paintRadius:  CGFloat = 23         // brush blob radius around a marble
+    /// Target side of one floor square, in points — about one marble wide
+    /// (a marble is 32 across).  The arena is divided into a whole number of
+    /// columns and rows of near-square tiles of about this size, so the real
+    /// side is within a point or two of it.  The floor is DRAWN and COUNTED
+    /// on this one grid.
+    private let cellSize:     CGFloat = 32
+    /// A marble paints every square its brush circle touches.  Slightly
+    /// smaller than the marble (16), so a square is not taken by a graze.
+    private let paintRadius:  CGFloat = 14
     private let penaltySeconds     = 3             // freeze time on falling in a pit
     private let pitCount           = 6
     private let pitRadius:    CGFloat = 26
@@ -202,47 +209,49 @@ struct PaintBallView: View {
 
     // MARK: - Render layers
 
-    /// The painted floor.  Each cell is a blob, but the blobs are accumulated
-    /// into ONE path per colour and filled once — so overlapping cells merge
-    /// into continuous paint with curvy (arc) edges instead of a seamed dot
-    /// grid.  Per-cell jitter (stable hash) breaks up the lattice so the
-    /// frontier reads as organic splotches, and each freshly painted cell
-    /// "blooms" in (and re-blooms when a rival paints over it).
+    /// The floor: a visible grid of squares.  Every square is drawn exactly
+    /// where it is counted — a bare square is dark, a painted square is filled
+    /// edge to edge in its painter's color, and a square under a puddle (which
+    /// can never be painted and is not counted) is drawn darker.  So the
+    /// percentages in the top bar always match what is on screen.  A freshly
+    /// painted square pops in briefly.
     private var paintLayer: some View {
         Canvas { ctx, _ in
             guard cols > 0, rows > 0,
-                  grid.count == cols * rows, paintTick.count == grid.count else { return }
-            let baseRad = max(cellW, cellH) * 0.72
-            let bloom   = 12.0   // ticks (~0.2s) for a tile to pop to full size
+                  grid.count == cols * rows, paintTick.count == grid.count,
+                  blocked.count == grid.count else { return }
+            let gap: CGFloat = 1.5          // the grid line between squares
+            let pop = 8.0                   // ticks for a new square to reach full size
 
+            var bare = Path()
+            var dead = Path()
             var paths = [Path](repeating: Path(), count: colorCount)
             for row in 0..<rows {
-                let base   = row * cols
-                let cyBase = (CGFloat(row) + 0.5) * cellH
+                let y = CGFloat(row) * cellH
                 for col in 0..<cols {
-                    let idx = base + col
+                    let idx = row * cols + col
+                    let tile = CGRect(x: CGFloat(col) * cellW + gap / 2, y: y + gap / 2,
+                                      width: cellW - gap, height: cellH - gap)
+                    if blocked[idx] {
+                        dead.addRoundedRect(in: tile, cornerSize: CGSize(width: 4, height: 4))
+                        continue
+                    }
                     let v = grid[idx]
-                    if v < 0 || Int(v) >= colorCount { continue }
-
-                    // Stable per-cell jitter → organic, non-gridded edges.
-                    let h = Self.hash2(col, row)
-                    let jx = (CGFloat(h & 0xFF)        / 255.0 - 0.5) * cellW * 0.5
-                    let jy = (CGFloat(h >> 8  & 0xFF)  / 255.0 - 0.5) * cellH * 0.5
-                    let rmul = 0.82 + CGFloat(h >> 16 & 0xFF) / 255.0 * 0.42   // 0.82…1.24
-
-                    // Bloom: scale the blob up from nothing over `bloom` ticks.
-                    let t    = max(0, min(1, Double(localTick - paintTick[idx]) / bloom))
-                    let rad  = baseRad * rmul * CGFloat(Self.easeOutBack(t))
-                    if rad <= 0.3 { continue }
-
-                    let cx = (CGFloat(col) + 0.5) * cellW + jx
-                    let cy = cyBase + jy
-                    paths[Int(v)].addEllipse(in: CGRect(x: cx - rad, y: cy - rad,
-                                                        width: rad * 2, height: rad * 2))
+                    if v < 0 || Int(v) >= colorCount {
+                        bare.addRoundedRect(in: tile, cornerSize: CGSize(width: 4, height: 4))
+                        continue
+                    }
+                    // Pop-in: the square grows from 60% to full over `pop` ticks.
+                    let t = max(0, min(1, Double(localTick - paintTick[idx]) / pop))
+                    let shrink = (1 - CGFloat(t)) * 0.2
+                    let shown = tile.insetBy(dx: tile.width * shrink, dy: tile.height * shrink)
+                    paths[Int(v)].addRoundedRect(in: shown, cornerSize: CGSize(width: 4, height: 4))
                 }
             }
+            ctx.fill(dead, with: .color(Color(white: 0.03)))
+            ctx.fill(bare, with: .color(Color(white: 0.13)))
             for i in 0..<colorCount {
-                ctx.fill(paths[i], with: .color(Self.paintColors[i].opacity(0.96)))
+                ctx.fill(paths[i], with: .color(Self.paintColors[i]))
             }
         }
     }
@@ -527,9 +536,11 @@ struct PaintBallView: View {
         guard size.width > 0, size.height > 0 else { return }
         arena = size
         center = CGPoint(x: size.width / 2, y: size.height / 2)
-        cols = max(1, Int(size.width / cellSize))
-        rows = max(1, Int(size.height / cellSize))
+        // A whole number of columns across, then as many rows as keeps the
+        // tiles closest to square.  No leftover strip at any edge.
+        cols = max(1, Int((size.width / cellSize).rounded()))
         cellW = size.width / CGFloat(cols)
+        rows = max(1, Int((size.height / cellW).rounded()))
         cellH = size.height / CGFloat(rows)
     }
 
@@ -850,21 +861,26 @@ struct PaintBallView: View {
     @discardableResult
     private func stamp(_ g: inout [Int8], _ cov: inout [Int], _ pt: inout [Int],
                        at pos: CGPoint, color: Int) -> Bool {
+        guard cellW > 0, cellH > 0 else { return false }
         let c0 = Int(pos.x / cellW)
         let r0 = Int(pos.y / cellH)
-        let span = 2
+        let span = 1
         var changed = false
         for dr in -span...span {
             let r = r0 + dr
             if r < 0 || r >= rows { continue }
-            let cy = (CGFloat(r) + 0.5) * cellH
+            let top = CGFloat(r) * cellH
             for dc in -span...span {
                 let c = c0 + dc
                 if c < 0 || c >= cols { continue }
                 let idx = r * cols + c
                 if blocked[idx] { continue }
-                let cx = (CGFloat(c) + 0.5) * cellW
-                if hypot(cx - pos.x, cy - pos.y) > paintRadius { continue }
+                // Whole squares: a square is painted when the brush circle
+                // touches it (nearest point of the square within the brush).
+                let left = CGFloat(c) * cellW
+                let nearX = min(max(pos.x, left), left + cellW)
+                let nearY = min(max(pos.y, top),  top + cellH)
+                if hypot(nearX - pos.x, nearY - pos.y) > paintRadius { continue }
                 let old = g[idx]
                 if Int(old) == color { continue }
                 if old >= 0 { cov[Int(old)] -= 1 }
