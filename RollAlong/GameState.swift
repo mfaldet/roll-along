@@ -3176,6 +3176,101 @@ enum OpponentTuning {
     /// Smash and Grab: each opponent prefers a coin no other opponent is
     /// closer to, so the three do not all chase the same one.
     static let smashGrabSpreadOut = true
+
+    /// A value for the clumsy end and the sharp end of one difficulty; each
+    /// opponent gets the value at its own skill (see `dealSkills`).
+    struct SmashGrabRange {
+        let clumsy: Double
+        let sharp: Double
+        func value(skill: Double) -> Double {
+            clumsy + (sharp - clumsy) * min(1, max(0, skill))
+        }
+    }
+
+    /// Seconds a coin lies on the board before an opponent NOTICES it.  Until
+    /// then the opponent does not go for it, so the player gets first try at
+    /// fresh coins.  The strongest single lever on how many coins opponents
+    /// take.
+    static func smashGrabNoticeSeconds(_ d: MinigameDifficulty) -> SmashGrabRange {
+        switch d {
+        case .easy:   return SmashGrabRange(clumsy: 2.6,  sharp: 1.6)
+        case .normal: return SmashGrabRange(clumsy: 0.9,  sharp: 0.5)
+        case .hard:   return SmashGrabRange(clumsy: 0.15, sharp: 0.0)
+        }
+    }
+
+    /// How far (points) an opponent can see a coin.  Beyond this it wanders
+    /// until one comes into view.  A phone screen is about 390 points wide.
+    /// Hard sees the whole board.
+    static func smashGrabSightDistance(_ d: MinigameDifficulty) -> SmashGrabRange {
+        switch d {
+        case .easy:   return SmashGrabRange(clumsy: 150,     sharp: 200)
+        case .normal: return SmashGrabRange(clumsy: 280,     sharp: 380)
+        case .hard:   return SmashGrabRange(clumsy: 100_000, sharp: 100_000)
+        }
+    }
+
+    /// Seconds an opponent coasts, not pushing, after picking up a coin.
+    static func smashGrabPauseAfterCoinSeconds(_ d: MinigameDifficulty) -> SmashGrabRange {
+        switch d {
+        case .easy:   return SmashGrabRange(clumsy: 2.4,  sharp: 1.6)
+        case .normal: return SmashGrabRange(clumsy: 1.2,  sharp: 0.8)
+        case .hard:   return SmashGrabRange(clumsy: 0.15, sharp: 0.0)
+        }
+    }
+
+    /// Seconds between dashes for the one opponent that dashes at the leader.
+    /// (The player's own dash recharges in 1.5 seconds.)
+    static func smashGrabDashEverySeconds(_ d: MinigameDifficulty) -> SmashGrabRange {
+        switch d {
+        case .easy:   return SmashGrabRange(clumsy: 7.0, sharp: 5.0)
+        case .normal: return SmashGrabRange(clumsy: 3.5, sharp: 2.5)
+        case .hard:   return SmashGrabRange(clumsy: 2.0, sharp: 1.5)
+        }
+    }
+
+    /// Whether opponents take walls into account when choosing a coin.  Easy
+    /// opponents do not: they head straight for a coin behind a wall and bump
+    /// into it.
+    static func smashGrabAvoidsWalls(_ d: MinigameDifficulty) -> Bool {
+        switch d {
+        case .easy:           return false
+        case .normal, .hard:  return true
+        }
+    }
+    /// A coin with a wall in the way counts as this many times farther off
+    /// (for opponents that take walls into account).
+    static let smashGrabBlockedCoinPenalty: Double = 3
+    /// Share of its push an opponent uses while wandering with no coin in view.
+    static let smashGrabWanderPush: Double = 0.6
+    /// During a mistake an opponent also stops steering away from the edges,
+    /// so it runs into the border.
+    static let smashGrabMistakeHitsEdges = true
+
+    // Coins knocked loose by a hit.  The faster the hit, the more drop.
+    /// A DASH that connects drops this many coins at the slowest hit that
+    /// counts…
+    static let smashGrabDashDropMin = 3
+    /// …rising to this many at `smashGrabDashFullSpeed`.
+    static let smashGrabDashDropMax = 6
+    /// Closing speed (points per second) at which a dash drops the most.  A
+    /// dash launches at 760.
+    static let smashGrabDashFullSpeed: Double = 760
+    /// An ordinary bump (nobody dashing) drops coins only at or above this
+    /// closing speed (points per second)…
+    static let smashGrabBumpDropSpeed: Double = 360
+    /// …this many coins (set to 0 for "only a dash knocks coins loose")…
+    static let smashGrabBumpDropCoins = 1
+    /// …and this many at or above the hard-bump speed.
+    static let smashGrabHardBumpDropSpeed: Double = 560
+    static let smashGrabHardBumpDropCoins = 2
+    /// In a bump the faster marble is the hitter.  Their speeds into the hit
+    /// must differ by at least this share of the closing speed, or nobody
+    /// drops anything (an even head-on bump).
+    static let smashGrabBumpHitterShare: Double = 0.3
+    /// After dropping coins a marble cannot be made to drop more for this
+    /// long (seconds).
+    static let smashGrabDropImmunitySeconds: Double = 1.0
     // (end Smash and Grab)
 
 
