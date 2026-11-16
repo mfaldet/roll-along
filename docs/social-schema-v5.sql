@@ -20,7 +20,9 @@
 --                              one ordinary gift per friend per day
 --   7. month-end               ra_close_season, ra_claim_season_prize
 --   8. clan_rankings           the view the app's Rankings tab reads
---   9. a check query           (expected output is described at the bottom)
+--   9. clan leadership         hand over ownership; a clan is never left
+--                              without an owner
+--  10. a check query           (expected output is described at the bottom)
 --
 -- The app works before this file is run (it falls back to the older
 -- queries), but everything listed above needs it.
@@ -383,6 +385,11 @@ begin
         new.last_season_clans := old.last_season_clans;
         new.last_season_tier  := old.last_season_tier;
         new.last_season_score := old.last_season_score;
+        -- Ownership changes only through ra_transfer_clan_ownership or the
+        -- automatic hand-over (section 9), which set this marker.
+        if coalesce(current_setting('ra.owner_change', true), '') <> '1' then
+            new.owner_id := old.owner_id;
+        end if;
     end if;
     return new;
 end $$;
@@ -634,7 +641,115 @@ group by c.id;
 grant select on public.clan_rankings to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 9 · Check.  Expected: settings = 16, triggers = 4, functions = 10,
+-- 9 · Clan leadership.
+--     • The owner can hand the clan to another member
+--       (ra_transfer_clan_ownership).
+--     • The owner can already remove a member: the "leave or owner removes"
+--       delete rule from the first social schema allows it.
+--     • A clan is never left without an owner.  If the owner leaves, or
+--       deletes their account, the clan passes to the longest-standing
+--       remaining member.  If nobody else is in it, the clan is removed.
+-- ---------------------------------------------------------------------------
+alter table public.clan_events drop constraint if exists clan_events_kind_valid;
+alter table public.clan_events add constraint clan_events_kind_valid
+    check (
+        kind in ('created','joined','left','sent_life','requested_life','thanked',
+                 'requested_promotion','renamed','removed','new_owner')
+        or (kind like 'chat\_%' and char_length(kind) between 6 and 32)
+    );
+
+-- Pass a clan to its longest-standing member other than `p_leaving`.
+-- Returns the new owner, or null when nobody else is in the clan.
+create or replace function public.ra_hand_over_clan(p_clan uuid, p_leaving uuid)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+    heir uuid;
+begin
+    select player_id into heir
+      from public.clan_members
+     where clan_id = p_clan and player_id <> p_leaving
+     order by joined_at asc, player_id
+     limit 1;
+    if heir is null then return null; end if;
+
+    perform set_config('ra.owner_change', '1', true);
+    update public.clans set owner_id = heir where id = p_clan;
+    perform set_config('ra.owner_change', '', true);
+    update public.clan_members set role = 'owner'  where clan_id = p_clan and player_id = heir;
+    update public.clan_members set role = 'member' where clan_id = p_clan and player_id = p_leaving;
+    insert into public.clan_events (clan_id, actor_id, target_id, kind)
+    values (p_clan, heir, heir, 'new_owner');
+    return heir;
+end $$;
+revoke all on function public.ra_hand_over_clan(uuid, uuid) from public, anon, authenticated;
+
+-- The owner hands the clan to a member of their choice.
+create or replace function public.ra_transfer_clan_ownership(p_clan uuid, p_new_owner uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+    if not exists (select 1 from public.clans where id = p_clan and owner_id = auth.uid()) then
+        raise exception 'not_owner' using hint = 'Only the clan owner can hand over the clan.';
+    end if;
+    if p_new_owner = auth.uid() then return; end if;
+    if not exists (select 1 from public.clan_members
+                    where clan_id = p_clan and player_id = p_new_owner) then
+        raise exception 'not_a_member' using hint = 'That player is not in this clan.';
+    end if;
+    perform set_config('ra.owner_change', '1', true);
+    update public.clans set owner_id = p_new_owner where id = p_clan;
+    perform set_config('ra.owner_change', '', true);
+    update public.clan_members set role = 'owner'  where clan_id = p_clan and player_id = p_new_owner;
+    update public.clan_members set role = 'member' where clan_id = p_clan and player_id = auth.uid();
+    insert into public.clan_events (clan_id, actor_id, target_id, kind)
+    values (p_clan, auth.uid(), p_new_owner, 'new_owner');
+end $$;
+revoke all on function public.ra_transfer_clan_ownership(uuid, uuid) from public, anon;
+grant execute on function public.ra_transfer_clan_ownership(uuid, uuid) to authenticated;
+
+-- The owner's own membership row was deleted (they left): hand the clan on,
+-- or remove it when it is now empty.
+create or replace function public.ra_clan_owner_left()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+    if exists (select 1 from public.clans
+                where id = old.clan_id and owner_id = old.player_id) then
+        if public.ra_hand_over_clan(old.clan_id, old.player_id) is null then
+            delete from public.clans where id = old.clan_id;
+        end if;
+    end if;
+    return null;
+end $$;
+
+drop trigger if exists clan_members_owner_left on public.clan_members;
+create trigger clan_members_owner_left
+    after delete on public.clan_members
+    for each row execute function public.ra_clan_owner_left();
+
+-- A player row is about to be deleted (account deletion).  Without this the
+-- clans they own would be deleted with them, members and all.  Hand each one
+-- on first; a clan with nobody else in it is still removed.
+create or replace function public.ra_player_hand_over()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+    c record;
+begin
+    for c in select id from public.clans where owner_id = old.id loop
+        perform public.ra_hand_over_clan(c.id, old.id);
+    end loop;
+    return old;
+end $$;
+
+drop trigger if exists players_hand_over on public.players;
+create trigger players_hand_over
+    before delete on public.players
+    for each row execute function public.ra_player_hand_over();
+
+-- ---------------------------------------------------------------------------
+-- 10 · Check.  Expected: settings = 16, triggers = 6, functions = 14,
 --     season_tables = 4, rankings_view = 1, new_columns = 15 and
 --     clans_over_cap = 0.  (A clan already over the cap keeps its members; it
 --     simply cannot take new ones until it is back under.)
@@ -642,13 +757,16 @@ grant select on public.clan_rankings to authenticated;
 select
     (select count(*) from public.ra_config)                                              as settings,
     (select count(*) from pg_trigger where not tgisinternal
-        and tgname in ('players_guard','clan_members_cap','clans_guard','life_gifts_request')) as triggers,
+        and tgname in ('players_guard','clan_members_cap','clans_guard','life_gifts_request',
+                       'clan_members_owner_left','players_hand_over'))                    as triggers,
     (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
       where ns.nspname = 'public'
         and p.proname in ('ra_config_int','ra_social_settings','ra_players_guard',
                           'ra_expire_life_requests','ra_clan_member_cap','ra_clans_guard',
                           'ra_life_gift_request','ra_close_one_season','ra_close_season',
-                          'ra_claim_season_prize'))                                       as functions,
+                          'ra_claim_season_prize','ra_hand_over_clan',
+                          'ra_transfer_clan_ownership','ra_clan_owner_left',
+                          'ra_player_hand_over'))                                         as functions,
     (select count(*) from information_schema.tables
       where table_schema = 'public'
         and table_name in ('clan_season_scores','clan_seasons',

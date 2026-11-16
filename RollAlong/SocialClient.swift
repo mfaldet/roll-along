@@ -434,8 +434,10 @@ final class SocialClient: @unchecked Sendable {
               let data = try? await send(method: "POST", path: "rpc/ra_social_settings",
                                          bodyData: Data("{}".utf8)),
               let values = try? decode([String: Int].self, from: data) else { return }
-        let settings = SocialSettings(values)
-        await MainActor.run { SocialSettings.current = settings }
+        var settings = SocialSettings(values)
+        settings.loadedFromServer = true
+        let loaded = settings
+        await MainActor.run { SocialSettings.current = loaded }
     }
 
     // MARK: - Monthly clan battle
@@ -677,6 +679,28 @@ final class SocialClient: @unchecked Sendable {
         let query = "clan_id=eq.\(id.uuidString)&player_id=eq.\(me.userId.uuidString)"
         _ = try await send(method: "DELETE", path: "clan_members",
                            query: query, prefer: "return=minimal")
+    }
+
+    /// Owner only: remove another member from the clan.  (The database's
+    /// "leave or owner removes" rule refuses anyone else.)  The season stars
+    /// the player already earned for the clan stay with the clan.
+    func removeClanMember(clanId: UUID, playerId: UUID) async throws {
+        _ = try requireSession()
+        _ = try await send(method: "DELETE", path: "clan_members",
+                           query: "clan_id=eq.\(clanId.uuidString)&player_id=eq.\(playerId.uuidString)",
+                           prefer: "return=minimal")
+    }
+
+    private struct TransferBody: Encodable {
+        let p_clan: UUID
+        let p_new_owner: UUID
+    }
+
+    /// Owner only: hand the clan to another member.  The server swaps the two
+    /// roles (docs/social-schema-v5.sql, `ra_transfer_clan_ownership`).
+    func transferClanOwnership(clanId: UUID, to newOwner: UUID) async throws {
+        _ = try await send(method: "POST", path: "rpc/ra_transfer_clan_ownership",
+                           bodyData: try encoder.encode(TransferBody(p_clan: clanId, p_new_owner: newOwner)))
     }
 
     /// Disband a clan you own — deleting the row cascades every membership.
@@ -1476,6 +1500,9 @@ struct SocialSettings {
     var seasonMinMemberStars = 10
     /// First season (yyyymm) that awards coins; earlier ones are a rehearsal.
     var seasonPrizesFrom = 202701
+    /// True once the server has answered — i.e. docs/social-schema-v5.sql is
+    /// in place, including the rule that hands a clan on when its owner leaves.
+    var loadedFromServer = false
 
     init() {}
     init(_ v: [String: Int]) {

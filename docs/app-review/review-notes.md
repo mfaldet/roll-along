@@ -37,6 +37,8 @@ A clan holds up to 12 players. A player's level is shown as a small badge next t
 
 Clans compete each calendar month. A clan's season score is the number of new stars its members earn in the main game that month; it is counted by our server. Clans > Rankings lists clans by season score (or by total levels or total stars). At the end of the month the server ranks the clans, and members of ranked clans who contributed receive in-game coins (250 to 3,000 depending on the clan's tier), which they claim on the Clans screen. The first season, December 2026, is a warm-up with no prizes. There is no entry fee and nothing to buy to take part; the result depends only on play. Coins are the game's soft currency: they buy cosmetic items only, have no cash value, and cannot be traded, transferred or cashed out.
 
+A clan's owner can remove a member from the clan and can hand ownership to another member; if an owner leaves or deletes their account, the clan passes to its longest-standing member. Removal only ends that player's membership; they keep their account and progress and can join any clan.
+
 A player can ask their clan for lives: a request collects up to 6 lives, one from each clanmate, at no cost to the giver, closes after 24 hours, and can be repeated after a 6-hour wait. A player can also send one life per day to each friend. These are the same in-game lives that refill free over time.
 
 ACCOUNT DELETION

@@ -19,7 +19,8 @@ design.
 - Clans compete in a **monthly clan battle** with coin prizes. It ships in
   version 1.0.
 - Clan life requests have limits (below). Giving never costs the giver.
-- Promote and remove-member controls are **not built**; see the end.
+- The owner can remove a member and hand over ownership; see the end.
+  Promote and demote ranks are not built.
 
 ---
 
@@ -288,9 +289,32 @@ life. The privacy page says so. The App Privacy answers and the privacy
 file in the project are unchanged: this is gameplay content linked to the
 account, already declared.
 
-## Not built: promote and remove-member controls
+## Clan leader controls
 
-Today a clan has an owner and members, and roles cannot change. With a cap
-of 12, an owner needs to remove inactive members. The database already
-allows an owner to remove a member; the app has no button for it. Promotion
-needs a small database rule as well. This is waiting on a decision.
+Built for version 1.0: **remove a member** and **hand over ownership**.
+Promote and demote ranks are not built.
+
+- **Remove.** On the roster, the owner's menu beside a member has "Remove
+  from clan", with a confirmation. The database already allowed an owner to
+  delete another member's membership; nothing else can.
+  - The removed player is not notified at once (there is no push). The next
+    time they open the Clans screen they see "You are no longer in <clan>.
+    You were removed, or the clan was disbanded." and land on Browse. They
+    can join any clan, including the same one.
+  - The season stars they earned stay with the clan and still count in its
+    score. The removed player gets no prize from that clan, because prizes go
+    to members at month end.
+  - The clan chat shows "<owner> removed <player> from the clan".
+- **Hand over.** The same menu has "Make owner", with a confirmation. The
+  server swaps the two roles; the old owner stays as a member. The app cannot
+  change a clan's owner any other way.
+- **A clan is never left without an owner.** If the owner leaves, or deletes
+  their account, the clan passes to the longest-standing remaining member
+  automatically (database triggers). If nobody else is in the clan, the clan
+  is removed. Before this, an owner had no Leave button, and deleting the
+  owner's player row deleted the clan and every membership with it unless the
+  `delete-account` function reassigned it first.
+- The owner now has "Leave clan" in clan settings, shown only when there is
+  someone to hand the clan to.
+
+Everything here is in section 9 of `docs/social-schema-v5.sql`.

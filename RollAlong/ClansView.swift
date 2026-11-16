@@ -69,6 +69,16 @@ struct ClansView: View {
     @State private var seasonStars: [UUID: Int] = [:]    // each member's stars this season
     @State private var prizes: [SeasonPrize] = []        // unclaimed, newest first
     @State private var claimingPrize = false
+
+    // Owner controls: the member waiting on a confirmation.
+    @State private var confirmRemove: ClanMember?
+    @State private var confirmHandOver: ClanMember?
+    private var iAmOwner: Bool { membership?.isOwner ?? false }
+
+    /// The clan this player was last seen in (id and name), kept on the
+    /// device so a player who was removed can be told so.
+    private static let lastClanIdKey = "ra_lastClanId"
+    private static let lastClanNameKey = "ra_lastClanName"
     @State private var rankingsLoading = false
     @State private var rankingsUnavailable = false
 
@@ -139,9 +149,78 @@ struct ClansView: View {
                               alreadyAskedPromotion: iAskedForPromotion,
                               onRename:       { await rename(to: $0) },
                               onAskPromotion: { await askForPromotion() },
+                              ownerCanLeave:  SocialSettings.current.loadedFromServer && roster.count > 1,
                               onLeave:        { Task { await leave() } },
                               onDisband:      { Task { await disband() } })
         }
+        .confirmationDialog(
+            "Remove \(confirmRemove.map { memberName($0.playerId) } ?? "this member") from the clan?",
+            isPresented: Binding(get: { confirmRemove != nil },
+                                 set: { if !$0 { confirmRemove = nil } }),
+            titleVisibility: .visible, presenting: confirmRemove
+        ) { member in
+            Button("Remove", role: .destructive) { Task { await remove(member) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("They can join again later. The stars they earned for the clan this season stay with the clan.")
+        }
+        .confirmationDialog(
+            "Make \(confirmHandOver.map { memberName($0.playerId) } ?? "this member") the clan owner?",
+            isPresented: Binding(get: { confirmHandOver != nil },
+                                 set: { if !$0 { confirmHandOver = nil } }),
+            titleVisibility: .visible, presenting: confirmHandOver
+        ) { member in
+            Button("Hand over ownership") { Task { await handOver(to: member) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("You stay in the clan as a member. Only the new owner can undo this.")
+        }
+    }
+
+    /// A member's shown name ("Roller" when unknown).
+    private func memberName(_ id: UUID) -> String {
+        rosterProfiles[id]?.displayName.nonEmpty ?? "Roller"
+    }
+
+    /// The owner's menu on another member's row: hand over, remove.
+    private func ownerMenu(_ member: ClanMember) -> some View {
+        Menu {
+            Button { confirmHandOver = member } label: {
+                Label("Make owner", systemImage: "crown")
+            }
+            Button(role: .destructive) { confirmRemove = member } label: {
+                Label("Remove from clan", systemImage: "person.fill.badge.minus")
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 20))
+                .foregroundStyle(Color(white: 0.6))
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Owner options for \(memberName(member.playerId))")
+    }
+
+    private func remove(_ member: ClanMember) async {
+        guard let clan = myClan, iAmOwner, member.playerId != myId else { return }
+        busyIds.insert(member.playerId); defer { busyIds.remove(member.playerId) }
+        let name = memberName(member.playerId)
+        do {
+            try await SocialClient.shared.removeClanMember(clanId: clan.id, playerId: member.playerId)
+            try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "removed",
+                                                         target: member.playerId)
+            await load(); flash("\(name) was removed from the clan.")
+        } catch { flash("Couldn't remove \(name) — try again.") }
+    }
+
+    private func handOver(to member: ClanMember) async {
+        guard let clan = myClan, iAmOwner, member.playerId != myId else { return }
+        actionBusy = true; defer { actionBusy = false }
+        let name = memberName(member.playerId)
+        do {
+            try await SocialClient.shared.transferClanOwnership(clanId: clan.id, to: member.playerId)
+            await load(); flash("\(name) is now the clan owner.")
+        } catch { flash("Couldn't hand over the clan — try again.") }
     }
 
     // MARK: - Content + secondary nav
@@ -563,6 +642,12 @@ struct ClansView: View {
                                 .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
                                 .foregroundStyle(.white).lineLimit(1)
                             LevelBadge(level: level, compact: true)
+                            if member.isOwner && !isMe {
+                                Image(systemName: "crown.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                                    .accessibilityLabel("Owner")
+                            }
                         }
                         HStack(spacing: 8) {
                             SeasonStarsLabel(stars: seasonStars[member.playerId] ?? 0)
@@ -578,8 +663,10 @@ struct ClansView: View {
             }
             .buttonStyle(.plain).disabled(prof == nil)
             Spacer(minLength: 8)
-            if !isMe { sendLifeControl(member.playerId) }
-            else { roleBadge(member.role) }
+            if !isMe {
+                sendLifeControl(member.playerId)
+                if iAmOwner { ownerMenu(member) }
+            } else { roleBadge(member.role) }
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 14)
@@ -621,7 +708,8 @@ struct ClansView: View {
         Dictionary(uniqueKeysWithValues: quickChats.map { ($0.kind, $0.text) })
 
     /// Membership / clan changes render as centered one-liners, not bubbles.
-    private static let systemKinds: Set<String> = ["created", "joined", "left", "renamed"]
+    private static let systemKinds: Set<String> =
+        ["created", "joined", "left", "renamed", "removed", "new_owner"]
 
     private var chatSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -793,6 +881,12 @@ struct ClansView: View {
         case "joined":  return "\(actor) joined the clan"
         case "left":    return "\(actor) left the clan"
         case "renamed": return "\(actor) renamed the clan"
+        case "removed":
+            let who = e.targetId.map { name(of: $0) } ?? "a member"
+            return "\(actor) removed \(who) from the clan"
+        case "new_owner":
+            let who = e.targetId.map { name(of: $0) } ?? actor
+            return who == "You" ? "You are now the clan owner" : "\(who) is now the clan owner"
         default:        return "\(actor) was here"
         }
     }
@@ -802,6 +896,8 @@ struct ClansView: View {
         case "joined", "created": return "person.fill.badge.plus"
         case "left":              return "person.fill.badge.minus"
         case "renamed":           return "pencil.line"
+        case "removed":           return "person.fill.badge.minus"
+        case "new_owner":         return "crown.fill"
         default:                  return "sparkle"
         }
     }
@@ -1025,6 +1121,9 @@ struct ClansView: View {
                 var map: [UUID: PlayerProfile] = [:]
                 for p in profs { map[p.id] = p }
                 myClan = clan; roster = members; rosterProfiles = map; events = evs; browse = []
+                // Remember the clan, so a later removal can be explained.
+                UserDefaults.standard.set(mem.clanId.uuidString, forKey: Self.lastClanIdKey)
+                UserDefaults.standard.set(clan?.name ?? "", forKey: Self.lastClanNameKey)
                 givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
                 let sentToday = await SocialClient.shared.fetchMyGiftsToday()
                 sentLifeIds.formUnion(sentToday)
@@ -1034,6 +1133,13 @@ struct ClansView: View {
                 if !tabPinned { tab = .mine }
             } else {
                 myClan = nil; roster = []; events = []
+                // In a clan last time and not now, without leaving: the owner
+                // removed this player, or the clan was disbanded.  Say so once.
+                if UserDefaults.standard.string(forKey: Self.lastClanIdKey) != nil {
+                    let old = UserDefaults.standard.string(forKey: Self.lastClanNameKey)?.nonEmpty
+                    Self.forgetLastClan()
+                    flash("You are no longer in \(old ?? "your clan"). You were removed, or the clan was disbanded.")
+                }
                 givenRequestKeys = []
                 gameState.clanRequestBadge = 0
                 myStanding = nil; seasonStars = [:]
@@ -1059,12 +1165,18 @@ struct ClansView: View {
 
     // MARK: - Actions
 
+    private static func forgetLastClan() {
+        UserDefaults.standard.removeObject(forKey: lastClanIdKey)
+        UserDefaults.standard.removeObject(forKey: lastClanNameKey)
+    }
+
     private func leave() async {
         guard let clan = myClan else { return }
         actionBusy = true; defer { actionBusy = false }
         do {
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "left")
             try await SocialClient.shared.leaveClan(id: clan.id)
+            Self.forgetLastClan()
             tabPinned = false; await load(); flash("You left the clan.")
         } catch { flash("Couldn't leave — try again.") }
     }
@@ -1074,6 +1186,7 @@ struct ClansView: View {
         actionBusy = true; defer { actionBusy = false }
         do {
             try await SocialClient.shared.disbandClan(id: clan.id)
+            Self.forgetLastClan()
             tabPinned = false; await load(); flash("Clan disbanded.")
         } catch { flash("Couldn't disband — try again.") }
     }
@@ -1618,6 +1731,9 @@ private struct ClanSettingsSheet: View {
     let alreadyAskedPromotion: Bool
     let onRename:       (PresetNames.Choice) async -> String?   // → error text, nil = ok
     let onAskPromotion: () async -> Bool
+    /// True when the owner may leave: there is someone to hand the clan to,
+    /// and the server rule that does the hand-over is in place.
+    var ownerCanLeave: Bool = false
     let onLeave:        () -> Void
     let onDisband:      () -> Void
 
@@ -1773,6 +1889,26 @@ private struct ClanSettingsSheet: View {
                 Text("Disbanding removes the clan for everyone.")
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color(white: 0.45))
+                if ownerCanLeave {
+                    Button { confirmLeave = true } label: {
+                        Text("Leave clan")
+                            .font(.system(.body, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity).padding(.vertical, 13)
+                            .background(Capsule().fill(Color(white: 0.22)))
+                    }
+                    .buttonStyle(.plain)
+                    .confirmationDialog("Leave your own clan?", isPresented: $confirmLeave,
+                                        titleVisibility: .visible) {
+                        Button("Leave", role: .destructive) { dismiss(); onLeave() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("The clan passes to its longest-standing member.")
+                    }
+                    Text("To choose the next owner yourself, use the menu beside a member on the roster. If you leave without choosing, the clan passes to its longest-standing member.")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
+                }
             } else {
                 Button { confirmLeave = true } label: {
                     Text("Leave clan")
