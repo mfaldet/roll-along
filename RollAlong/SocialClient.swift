@@ -1526,8 +1526,9 @@ struct SocialSettings {
     static var current = SocialSettings()
 }
 
-/// Dates for the monthly clan battle.  A season is a calendar month in UTC,
-/// named by its first day ("2026-12-01") exactly as the database names it.
+/// Dates for the monthly clan battle.  A season is a calendar month in
+/// Eastern time (America/New_York), named by its first day ("2026-12-01")
+/// exactly as the database names it.
 enum SeasonCalendar {
     private static var utc: Calendar {
         var cal = Calendar(identifier: .gregorian)
@@ -1541,29 +1542,45 @@ enum SeasonCalendar {
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
-    /// The season a date falls in: the first day of its month, UTC.
+    /// The clock the monthly clan battle runs on: Eastern time, by its
+    /// NAMED zone so daylight saving is handled.  The database uses the same
+    /// name (`ra_season_now()` in docs/social-schema-v5.sql) — change both.
+    static let seasonTimeZoneName = "America/New_York"
+    private static var eastern: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: seasonTimeZoneName) ?? .gmt
+        return cal
+    }
+
+    /// The season a date falls in: the first day of its month, Eastern time.
     static func seasonKey(_ date: Date = Date()) -> String {
-        let c = utc.dateComponents([.year, .month], from: date)
+        let c = eastern.dateComponents([.year, .month], from: date)
         return String(format: "%04d-%02d-01", c.year ?? 0, c.month ?? 0)
     }
 
     /// The season before the one a date falls in.
     static func previousSeasonKey(_ date: Date = Date()) -> String {
-        let cal = utc
-        let earlier = cal.date(byAdding: .month, value: -1, to: date) ?? date
+        let cal = eastern
+        // From the first of this month, so "one month back" can never skip
+        // a short month.
+        let monthStart = cal.dateInterval(of: .month, for: date)?.start ?? date
+        let earlier = cal.date(byAdding: .month, value: -1, to: monthStart) ?? date
         return seasonKey(earlier)
     }
 
-    /// Whole days left in the current season, counting today (1 on the last day).
+    /// Days left in the current season, counting today (1 on the last day).
+    /// The season ends at midnight Eastern on the 1st of next month.
     static func daysRemaining(_ date: Date = Date()) -> Int {
-        let cal = utc
+        let cal = eastern
         guard let month = cal.dateInterval(of: .month, for: date) else { return 0 }
-        return max(1, Int(ceil(month.end.timeIntervalSince(date) / 86_400)))
+        let today = cal.startOfDay(for: date)
+        let days = cal.dateComponents([.day], from: today, to: month.end).day ?? 1
+        return max(1, days)
     }
 
     /// "December" for "2026-12-01" (and for today when no key is given).
     static func monthName(_ key: String? = nil) -> String {
-        var month = utc.component(.month, from: Date())
+        var month = eastern.component(.month, from: Date())
         if let key {
             let parts = key.split(separator: "-")
             if parts.count >= 2, let m = Int(parts[1]), (1...12).contains(m) { month = m }

@@ -162,8 +162,9 @@ more for the role controls.
 
 ## d) The monthly clan battle
 
-A **season** is a calendar month, measured in UTC so it starts and ends at
-the same moment for everyone.
+A **season** is a calendar month in **Eastern time** (America/New_York): it
+starts and ends at midnight Eastern, the same moment for everyone. The named
+zone is used, so daylight saving is handled.
 
 **Season score.** A clan's score is the new Adventure stars its members
 earned that month. The server counts them, not the app: a trigger on the
@@ -174,6 +175,7 @@ stays with the clan it was earned for; leaving does not move it.
 - Only stars above the player's highest-ever total count, so resetting
   progress and re-earning stars scores nothing.
 - At most 150 new stars per player per day count (50 levels at three stars).
+  The day is an Eastern-time day, like the season.
 - The app sends the star total whenever it rises, not only on a new level.
 
 **Where it shows**
@@ -185,9 +187,12 @@ stays with the clan it was earned for; leaving does not move it.
 - The clan page shows the clan's season score and each member's stars this
   season.
 
-**Month end.** A scheduled database job runs every day at 00:10 UTC and
-closes any finished month that has not been closed. On the 1st that is the
-month that just ended; a missed run is caught up the next day.
+**Month end.** A scheduled database job runs at ten past every hour and
+closes any finished month (Eastern time) that has not been closed. The first
+run after midnight Eastern on the 1st closes the month that just ended; a
+missed run is caught up within the hour. It runs hourly because the
+scheduler's clock is UTC and midnight Eastern moves by an hour with daylight
+saving.
 
 1. Clans with at least 25 season stars are ranked by score. Ties go to the
    older clan.
@@ -255,7 +260,7 @@ an app update.
 | Weekly baseline, daily star cap, season-star counting, request rules | On each player update | Trigger |
 | Member cap | On each join | Trigger |
 | One gift per request; request fills; one gift per friend per day | On each gift | Trigger |
-| Close finished months, rank clans, write prizes | Daily at 00:10 UTC | Scheduled job (`pg_cron`) |
+| Close finished months, rank clans, write prizes | Hourly, at ten past; acts once after midnight Eastern on the 1st | Scheduled job (`pg_cron`) |
 | Close life requests older than 24 hours | Every 15 minutes | Scheduled job (`pg_cron`) |
 
 Set up once: run `docs/social-schema-v5.sql`, then `docs/social-schedule.sql`.

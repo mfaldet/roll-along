@@ -45,7 +45,7 @@ alter table public.ra_config enable row level security;
 insert into public.ra_config (key, value, note) values
     ('clan_member_cap',             12,     'Most members a clan can hold'),
     ('stars_per_level_max',         3,      'Impossible-value rule: stars can never exceed this many per level unlocked'),
-    ('season_daily_star_cap',       150,    'Most new stars per player per UTC day that count toward the clan season score'),
+    ('season_daily_star_cap',       150,    'Most new stars per player per day (Eastern time) that count toward the clan season score'),
     ('life_request_size',           6,      'Lives one request collects (one per clanmate) before it closes'),
     ('life_request_hours',          24,     'Hours after which an unfilled request closes by itself'),
     ('life_request_cooldown_hours', 6,      'Hours a player waits after a request closes before opening another'),
@@ -60,6 +60,17 @@ insert into public.ra_config (key, value, note) values
     ('season_coins_bronze',         250,    'Prize per eligible member'),
     ('season_prizes_from',          202701, 'First season (yyyymm) that awards coins and counts wins. Earlier seasons are a rehearsal: ranked and shown, no coins, no win')
 on conflict (key) do nothing;
+
+-- The clock the monthly clan battle runs on: the current date and time in
+-- America/New_York.  A season starts and ends at midnight Eastern, and the
+-- daily star cap resets at midnight Eastern.  Using the NAMED zone means
+-- daylight saving is handled by the database.  To move the battle to another
+-- zone, change the name here and in `SeasonCalendar` in the app.
+create or replace function public.ra_season_now()
+returns timestamp
+language sql stable as $$
+    select now() at time zone 'America/New_York'
+$$;
 
 create or replace function public.ra_config_int(k text, fallback integer)
 returns integer
@@ -110,7 +121,9 @@ alter table public.clans add column if not exists last_season_score integer;
 alter table public.life_gifts add column if not exists request_at timestamptz;
 
 -- ---------------------------------------------------------------------------
--- 3 · Season tables.  A season is a calendar month (UTC), named by its first
+-- 3 · Season tables.  A season is a calendar month in EASTERN TIME
+--     (America/New_York: it starts and ends at midnight Eastern, with
+--     daylight saving handled by the named zone), named by its first
 --     day.  The app can read; only the triggers and the month-end job write.
 -- ---------------------------------------------------------------------------
 drop table if exists public.battle_contributions;   -- earlier draft of this file
@@ -186,9 +199,9 @@ create or replace function public.ra_players_guard()
 returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
-    now_utc    timestamp := now() at time zone 'utc';
-    this_week  date      := date_trunc('week', now() at time zone 'utc')::date;   -- Monday
-    today      date      := (now() at time zone 'utc')::date;
+    season_now timestamp := public.ra_season_now();                               -- Eastern
+    this_week  date      := date_trunc('week', now() at time zone 'utc')::date;   -- Monday, UTC
+    today      date      := public.ra_season_now()::date;                         -- Eastern day (star cap)
     -- True for requests from the app; false for you in the SQL editor, the
     -- scheduled jobs and the delete-account function.
     from_app   boolean   := coalesce(auth.role(), '') = 'authenticated';
@@ -302,7 +315,7 @@ begin
                  limit 1;
                 if my_clan is not null then
                     insert into public.clan_season_scores as sc (season, clan_id, player_id, stars)
-                    values (date_trunc('month', now_utc)::date, my_clan, new.id, counted)
+                    values (date_trunc('month', season_now)::date, my_clan, new.id, counted)
                     on conflict (season, clan_id, player_id)
                     do update set stars = sc.stars + counted, updated_at = now();
                 end if;
@@ -471,10 +484,12 @@ create trigger life_gifts_request
 
 -- ---------------------------------------------------------------------------
 -- 7 · Month end.
---     ra_close_season() closes every finished month that has scores and has
---     not been closed yet, oldest first.  docs/social-schedule.sql runs it
---     daily, so a month is closed minutes after it ends, and a missed run
---     (for example a paused project) is caught up the next day.
+--     ra_close_season() closes every finished month (Eastern time) that has
+--     scores and has not been closed yet, oldest first.
+--     docs/social-schedule.sql runs it every hour, so a month is closed
+--     within minutes of midnight Eastern whatever the daylight-saving offset,
+--     and a missed run (for example a paused project) is caught up within
+--     the hour.
 -- ---------------------------------------------------------------------------
 create or replace function public.ra_close_one_season(s date)
 returns integer
@@ -569,7 +584,7 @@ create or replace function public.ra_close_season()
 returns integer
 language plpgsql security definer set search_path = public as $$
 declare
-    this_month date := date_trunc('month', now() at time zone 'utc')::date;
+    this_month date := date_trunc('month', public.ra_season_now())::date;   -- Eastern
     s date;
     closed integer := 0;
 begin
@@ -628,7 +643,7 @@ select
                 from public.clan_season_scores sc
                 join public.players sp on sp.id = sc.player_id and not sp.excluded
                where sc.clan_id = c.id
-                 and sc.season = date_trunc('month', now() at time zone 'utc')::date), 0)::int
+                 and sc.season = date_trunc('month', public.ra_season_now())::date), 0)::int
                                                                          as season_score,
     c.season_wins, c.last_season, c.last_season_rank, c.last_season_clans,
     c.last_season_tier, c.last_season_score
@@ -749,7 +764,7 @@ create trigger players_hand_over
     for each row execute function public.ra_player_hand_over();
 
 -- ---------------------------------------------------------------------------
--- 10 · Check.  Expected: settings = 16, triggers = 6, functions = 14,
+-- 10 · Check.  Expected: settings = 16, triggers = 6, functions = 15,
 --     season_tables = 4, rankings_view = 1, new_columns = 15 and
 --     clans_over_cap = 0.  (A clan already over the cap keeps its members; it
 --     simply cannot take new ones until it is back under.)
@@ -761,7 +776,7 @@ select
                        'clan_members_owner_left','players_hand_over'))                    as triggers,
     (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
       where ns.nspname = 'public'
-        and p.proname in ('ra_config_int','ra_social_settings','ra_players_guard',
+        and p.proname in ('ra_config_int','ra_season_now','ra_social_settings','ra_players_guard',
                           'ra_expire_life_requests','ra_clan_member_cap','ra_clans_guard',
                           'ra_life_gift_request','ra_close_one_season','ra_close_season',
                           'ra_claim_season_prize','ra_hand_over_clan',
