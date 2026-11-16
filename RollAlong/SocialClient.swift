@@ -115,8 +115,9 @@ final class SocialClient: @unchecked Sendable {
         let me = try requireSession()
         let body = ProfileUpsert(id: me.userId,
                                  // Only a preset-format name is ever sent.
-                                 display_name: PresetNames.isValidNickname(displayName)
-                                     ? displayName : PresetNames.defaultNickname,
+                                 display_name: PresetNames.shownNickname(displayName).isEmpty
+                                     ? PresetNames.defaultNickname
+                                     : PresetNames.shownNickname(displayName),
                                  climb_level: climbLevel,
                                  highest_unlocked: highestUnlocked,
                                  total_stars: totalStars,
@@ -830,7 +831,8 @@ final class SocialClient: @unchecked Sendable {
 // PresetNames — every player-visible name is ASSEMBLED FROM PRESET PARTS.
 //
 // Roll Along has no free-text fields that other players can see.  A nickname
-// is  <word><word><number>  ("SwiftComet42"); a clan name is
+// is  <word><word>  ("SwiftComet", no number, not unique — the player's
+// Adventure level is shown beside it as part of the name); a clan name is
 // <word> <plural word> <number>  ("Swift Comets 42"); the clan tag is derived
 // from the name ("SC42"); the clan description is one of a fixed list (or
 // none).  Clan chat was already fixed phrases.
@@ -974,9 +976,10 @@ enum PresetNames {
 
     /// Numbers that are never offered or accepted.
     static let blockedNumbers: Set<Int> = [69, 88, 420, 666]
-    /// Nickname numbers: 1...99 minus the blocked ones (keeps a nickname
-    /// within 12 characters).
-    static let nicknameNumbers: [Int] = (1...99).filter { !blockedNumbers.contains($0) }
+    /// Longest possible nickname, in characters (the longest first word plus
+    /// the longest second word).  The database allows up to 24.
+    static let nicknameMaxLength: Int =
+        (adjectives.map(\.count).max() ?? 0) + (nouns.map(\.count).max() ?? 0)
     /// Clan numbers: 1...999 minus the blocked ones.
     static let clanNumbers: [Int] = (1...999).filter { !blockedNumbers.contains($0) }
 
@@ -986,7 +989,8 @@ enum PresetNames {
     /// One selection: an index into the first-word list, an index into the
     /// second-word list, and a number.  Which lists depends on what is being
     /// named: `adjectives`/`nouns` for a nickname, `clanAdjectives`/
-    /// `clanNouns` for a clan.
+    /// `clanNouns` for a clan.  A NICKNAME HAS NO NUMBER: its `number` is
+    /// always 0 and is never shown or stored.
     struct Choice: Equatable {
         var adjective: Int
         var noun: Int
@@ -996,7 +1000,7 @@ enum PresetNames {
     static func randomNicknameChoice() -> Choice {
         Choice(adjective: Int.random(in: 0..<adjectives.count),
                noun:      Int.random(in: 0..<nouns.count),
-               number:    nicknameNumbers.randomElement() ?? 1)
+               number:    0)
     }
 
     static func randomClanChoice() -> Choice {
@@ -1007,8 +1011,11 @@ enum PresetNames {
 
     // MARK: Build
 
+    /// A nickname is the two words only ("SwiftComet").  The player's
+    /// Adventure level is shown beside it everywhere (`PlayerNameLabel`), in
+    /// the place a number used to occupy.  Nicknames are not unique.
     static func nickname(_ c: Choice) -> String {
-        adjectives[c.adjective] + nouns[c.noun] + String(c.number)
+        adjectives[c.adjective] + nouns[c.noun]
     }
 
     static func clanName(_ c: Choice) -> String {
@@ -1032,16 +1039,28 @@ enum PresetNames {
         return n
     }
 
+    /// The two words of a nickname, or nil when `s` is not exactly
+    /// `<first word><second word>`.
     static func parseNickname(_ s: String) -> Choice? {
         for (ai, adj) in adjectives.enumerated() where s.hasPrefix(adj) {
             let rest = String(s.dropFirst(adj.count))
-            for (ni, noun) in nouns.enumerated() where rest.hasPrefix(noun) {
-                if let n = number(String(rest.dropFirst(noun.count)), upTo: 99) {
-                    return Choice(adjective: ai, noun: ni, number: n)
-                }
+            if let ni = nouns.firstIndex(of: rest) {
+                return Choice(adjective: ai, noun: ni, number: 0)
             }
         }
         return nil
+    }
+
+    /// A nickname in the format used before numbers were dropped
+    /// (`<first word><second word><1…99>`, e.g. "SwiftComet42"): returns the
+    /// two words.  Lets a name saved by an earlier build, or not yet
+    /// rewritten by docs/social-schema-v4.sql, keep showing — without its
+    /// number.
+    static func parseLegacyNickname(_ s: String) -> Choice? {
+        let digits = s.reversed().prefix { $0.isASCII && $0.isNumber }.count
+        guard (1...2).contains(digits),
+              number(String(s.suffix(digits)), upTo: 99) != nil else { return nil }
+        return parseNickname(String(s.dropLast(digits)))
     }
 
     static func parseClanName(_ s: String) -> Choice? {
@@ -1062,9 +1081,12 @@ enum PresetNames {
     }
 
     /// A nickname safe to show: the value itself when it is a preset name,
-    /// else "" (callers show their generic placeholder).
+    /// the two words when it is an old-format name with a number, else ""
+    /// (callers show their generic placeholder).
     static func shownNickname(_ raw: String) -> String {
-        isValidNickname(raw) ? raw : ""
+        if isValidNickname(raw) { return raw }
+        if let old = parseLegacyNickname(raw) { return nickname(old) }
+        return ""
     }
 }
 

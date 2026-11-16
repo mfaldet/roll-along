@@ -173,7 +173,9 @@ struct SnakeGameView: View {
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: c.isPlayer ? "YOU" : (rivalLooks[c.colorIndex]?.name ?? "Rival"),
                                              color: c.isPlayer ? gameState.primaryColor : Self.palette[c.colorIndex % Self.palette.count],
-                                             isPlayer: c.isPlayer)
+                                             isPlayer: c.isPlayer,
+                                             level: c.isPlayer ? gameState.highestUnlocked
+                                                               : (rivalLooks[c.colorIndex]?.level ?? 1))
                                     .offset(y: -12).allowsHitTesting(false)
                             }
                             .position(c.pos)
@@ -523,7 +525,7 @@ struct SnakeGameView: View {
 
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
-            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count, near: gameState.highestUnlocked)))
         cycles = fresh
 
         orbs = []

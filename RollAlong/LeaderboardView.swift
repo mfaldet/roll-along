@@ -288,11 +288,11 @@ struct LeaderboardView: View {
 
             // The own-row is already cued by the green tint + left bar and the
             // player's own nickname, so no "YOU" badge is needed.
-            Text(profile.displayName.isEmpty ? "Roller" : profile.displayName)
-                .font(.system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold))
-                .foregroundStyle(isMe ? .white : Color(white: 0.92))
-                .lineLimit(1)
-            LevelBadge(level: profile.climbLevel, compact: true)
+            PlayerNameLabel(name: profile.displayName.isEmpty ? "Roller" : profile.displayName,
+                            level: profile.climbLevel,
+                            font: .system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold),
+                            color: isMe ? .white : Color(white: 0.92),
+                            compact: true)
 
             Spacer(minLength: 0)
 

@@ -264,7 +264,8 @@ struct HomeView: View {
                                 RivalNameTag(
                                     label: gameState.playerName.isEmpty ? "YOU" : gameState.playerName,
                                     color: gameState.primaryColor,
-                                    isPlayer: true)
+                                    isPlayer: true,
+                                    level: gameState.highestUnlocked)
                                     .position(x: ballPos.x, y: ballPos.y - ballRadius - 16)
                                     .allowsHitTesting(false)
                             }

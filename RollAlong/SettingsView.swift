@@ -123,9 +123,16 @@ struct SettingsView: View {
                         .font(.system(.body, design: .rounded))
                         .foregroundStyle(Color(white: 0.75))
                     Spacer()
-                    Text(gameState.playerName.isEmpty ? "Choose a nickname" : gameState.playerName)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(gameState.playerName.isEmpty ? Color(white: 0.45) : .white)
+                    if gameState.playerName.isEmpty {
+                        Text("Choose a nickname")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(Color(white: 0.45))
+                    } else {
+                        PlayerNameLabel(name: gameState.playerName,
+                                        level: gameState.highestUnlocked,
+                                        font: .system(.body, design: .rounded),
+                                        compact: true)
+                    }
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color(white: 0.4))
@@ -703,12 +710,13 @@ private struct ResetProgressConfirmSheet: View {
 // Word lists and rules live in `PresetNames` (SocialClient.swift).
 // ===========================================================================
 
-/// Three wheels: first word · second word · number.
+/// Wheels: first word · second word, and — when `numbers` is given — a
+/// number.  Nicknames have no number (two wheels); clan names do (three).
 struct PresetNameWheels: View {
     @Binding var choice: PresetNames.Choice
     let adjectives: [String]
     let nouns: [String]
-    let numbers: [Int]
+    var numbers: [Int] = []
 
     var body: some View {
         HStack(spacing: 0) {
@@ -722,12 +730,14 @@ struct PresetNameWheels: View {
                     Text(nouns[i]).lineLimit(1).minimumScaleFactor(0.6).tag(i)
                 }
             }
-            Picker("Number", selection: $choice.number) {
-                ForEach(numbers, id: \.self) { n in
-                    Text(String(n)).tag(n)
+            if !numbers.isEmpty {
+                Picker("Number", selection: $choice.number) {
+                    ForEach(numbers, id: \.self) { n in
+                        Text(String(n)).tag(n)
+                    }
                 }
+                .frame(maxWidth: 90)
             }
-            .frame(maxWidth: 90)
         }
         .pickerStyle(.wheel)
         .frame(height: 150)
@@ -747,14 +757,15 @@ struct NicknamePickerSheet: View {
             ZStack {
                 Color(white: 0.08).ignoresSafeArea()
                 VStack(spacing: 18) {
-                    Text(PresetNames.nickname(choice))
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                    // Preview exactly as other players will see it: the two
+                    // words with the Adventure level beside them.
+                    PlayerNameLabel(name: PresetNames.nickname(choice),
+                                    level: gameState.highestUnlocked,
+                                    font: .system(size: 28, weight: .bold, design: .rounded))
                         .padding(.top, 12)
                     PresetNameWheels(choice: $choice,
                                      adjectives: PresetNames.adjectives,
-                                     nouns: PresetNames.nouns,
-                                     numbers: PresetNames.nicknameNumbers)
+                                     nouns: PresetNames.nouns)
                     Button {
                         choice = PresetNames.randomNicknameChoice()
                     } label: {
@@ -765,7 +776,7 @@ struct NicknamePickerSheet: View {
                             .background(Capsule().fill(Color(white: 0.2)))
                     }
                     .buttonStyle(.plain)
-                    Text("Pick two words and a number. Other players see this name on leaderboards, in clans and on your profile.")
+                    Text("Pick two words. Your Adventure level is shown next to your name. Other players see it on leaderboards, in clans and on your profile. Names are not unique.")
                         .font(.system(.caption, design: .rounded))
                         .foregroundStyle(Color(white: 0.45))
                         .multilineTextAlignment(.center)

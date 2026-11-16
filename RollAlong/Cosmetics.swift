@@ -3058,7 +3058,21 @@ struct BallPack: Identifiable {
 // Used by GoldRushView and the other competitive views.
 // ---------------------------------------------------------------------------
 enum RivalCosmetics {
-    struct Look { let skin: BallSkin; let trail: TrailColor; let name: String }
+    /// `level` is the Adventure level shown on the opponent's name tag, so a
+    /// computer opponent's tag reads like a player's.  It is for show only
+    /// (it has nothing to do with how well the opponent plays), is dealt once
+    /// with the name and look, and stays the same for the round or match.
+    struct Look {
+        let skin: BallSkin
+        let trail: TrailColor
+        let name: String
+        var level: Int = 1
+    }
+
+    /// A show level near the player's own: 60% to 140% of it, at least 1.
+    static func showLevel(near playerLevel: Int) -> Int {
+        max(1, Int((Double(max(1, playerLevel)) * Double.random(in: 0.6...1.4)).rounded()))
+    }
 
     /// Desirable (skin, trail) pairs — easily edited; add/swap any pair.
     static let showcase: [(skin: BallSkin, trail: TrailColor)] = [
@@ -3072,19 +3086,22 @@ enum RivalCosmetics {
         "Quill", "Bandit", "Comet", "Jinx", "Rook", "Sly", "Pixel",
     ]
 
-    /// Deal `count` distinct rival looks (skin + trail + nickname), shuffled.
-    static func deal(_ count: Int) -> [Look] {
+    /// Deal `count` distinct rival looks (skin + trail + nickname + show
+    /// level), shuffled.  `playerLevel` is the human player's Adventure level.
+    static func deal(_ count: Int, near playerLevel: Int = 1) -> [Look] {
         let s = showcase.shuffled(), n = names.shuffled()
         return (0..<max(0, count)).map { i in
             let p = s[i % s.count]
-            return Look(skin: p.skin, trail: p.trail, name: n[i % n.count])
+            return Look(skin: p.skin, trail: p.trail, name: n[i % n.count],
+                        level: showLevel(near: playerLevel))
         }
     }
 
     /// One random look — for modes that spawn rivals one at a time (waves).
-    static func random() -> Look {
+    static func random(near playerLevel: Int = 1) -> Look {
         let p = showcase.randomElement()!
-        return Look(skin: p.skin, trail: p.trail, name: names.randomElement()!)
+        return Look(skin: p.skin, trail: p.trail, name: names.randomElement()!,
+                    level: showLevel(near: playerLevel))
     }
 }
 
@@ -3192,6 +3209,9 @@ struct RivalNameTag: View {
     let color: Color
     let isPlayer: Bool
     var isLeader: Bool = false      // draws a crown above the tag (current leader)
+    /// The Adventure level shown as part of the name (the player's own, or a
+    /// computer opponent's dealt show level).  nil = no badge.
+    var level: Int? = nil
     var body: some View {
         VStack(spacing: 1) {
             if isLeader {
@@ -3200,15 +3220,20 @@ struct RivalNameTag: View {
                     .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.30))
                     .shadow(color: .black.opacity(0.55), radius: 1, y: 0.5)
             }
-            Text(label)
-                .font(.system(size: isPlayer ? 11 : 10,
-                              weight: isPlayer ? .heavy : .bold, design: .rounded))
-                .foregroundStyle(isPlayer ? Color.white : color)
+            HStack(spacing: 3) {
+                Text(label)
+                    .font(.system(size: isPlayer ? 11 : 10,
+                                  weight: isPlayer ? .heavy : .bold, design: .rounded))
+                    .foregroundStyle(isPlayer ? Color.white : color)
+                if let level { LevelBadge(level: level, tiny: true) }
+            }
                 .padding(.horizontal, 6).padding(.vertical, 2)
                 .background(Capsule().fill(Color.black.opacity(isPlayer ? 0.6 : 0.42)))
                 .overlay(Capsule().stroke(color.opacity(0.95), lineWidth: isPlayer ? 1.5 : 1))
         }
         .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(level.map { "\(label), level \(max(1, $0))" } ?? label)
     }
 }
 

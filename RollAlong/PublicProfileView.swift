@@ -105,10 +105,9 @@ struct PublicProfileView: View {
             }
             .shadow(color: .black.opacity(0.6), radius: 14, x: 0, y: 8)
 
-            Text(profile.displayName.nonEmptyName)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
+            PlayerNameLabel(name: profile.displayName.nonEmptyName,
+                            level: profile.climbLevel,
+                            font: .system(size: 24, weight: .bold, design: .rounded))
 
             HStack(spacing: 8) {
                 pill(text: "Level \(profile.climbLevel)", color: world.accent)

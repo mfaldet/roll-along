@@ -758,7 +758,8 @@ final class GameState: ObservableObject {
         // name saved by an earlier build is dropped, so it is never shown or
         // sent; the player picks a new one in Settings.
         let savedName = defaults.string(forKey: "ra_name") ?? ""
-        playerName = PresetNames.parseNickname(savedName) != nil ? savedName : ""
+        // A name from the earlier format with a number keeps its two words.
+        playerName = PresetNames.shownNickname(savedName)
         primaryColorHex = defaults.string(forKey: "ra_primaryColorHex") ?? Self.defaultPrimaryHex
         hapticsEnabled = defaults.object(forKey: "ra_haptics") as? Bool ?? true
         soundEnabled = defaults.object(forKey: "ra_sound") as? Bool ?? true

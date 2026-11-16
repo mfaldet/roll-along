@@ -639,10 +639,9 @@ struct ClansView: View {
                         }
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 7) {
-                            Text(name)
-                                .font(.system(.body, design: .rounded).weight(isMe ? .bold : .semibold))
-                                .foregroundStyle(.white).lineLimit(1)
-                            LevelBadge(level: level, compact: true)
+                            PlayerNameLabel(name: name, level: level,
+                                            font: .system(.body, design: .rounded).weight(isMe ? .bold : .semibold),
+                                            compact: true)
                             if member.isOwner && !isMe {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 11))
@@ -789,12 +788,10 @@ struct ClansView: View {
             }
             VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
                 if !mine {
-                    HStack(spacing: 5) {
-                        Text(who)
-                            .font(.system(.caption2, design: .rounded).weight(.semibold))
-                            .foregroundStyle(world.accent)
-                        LevelBadge(level: rosterProfiles[e.actorId]?.climbLevel ?? 1, compact: true)
-                    }
+                    PlayerNameLabel(name: who,
+                                    level: rosterProfiles[e.actorId]?.climbLevel ?? 1,
+                                    font: .system(.caption2, design: .rounded).weight(.semibold),
+                                    color: world.accent, compact: true)
                 }
                 Text(bubbleText(e))
                     .font(.system(.subheadline, design: .rounded))
@@ -1508,9 +1505,7 @@ struct ClanDetailView: View {
                     .frame(minWidth: 22, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 7) {
-                        Text(nm).font(.system(.body, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.white).lineLimit(1)
-                        LevelBadge(level: lvl, compact: true)
+                        PlayerNameLabel(name: nm, level: lvl, compact: true)
                         if m.role != "member" {
                             Text(m.role.capitalized).font(.system(.caption2, design: .rounded).weight(.bold))
                                 .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))

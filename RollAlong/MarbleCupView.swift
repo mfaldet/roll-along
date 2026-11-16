@@ -168,7 +168,8 @@ struct MarbleCupView: View {
                                 RivalNameTag(label: nameTagLabel(m),
                                              color: nameTagColor(m),
                                              isPlayer: m.role == .player,
-                                             isLeader: isLeader(m))
+                                             isLeader: isLeader(m),
+                                             level: nameTagLevel(m))
                                     .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(m.pos)
@@ -327,6 +328,13 @@ struct MarbleCupView: View {
         if m.role == .player { return "YOU" }
         if m.attacksTop      { return "ALLY" }
         return aiLooks[m.id]?.name ?? "Rival"
+    }
+
+    /// The level shown with the name: your own Adventure level, or the
+    /// computer marble's dealt show level.
+    private func nameTagLevel(_ m: Mover) -> Int {
+        if m.role == .player { return gameState.highestUnlocked }
+        return aiLooks[m.id]?.level ?? 1
     }
 
     /// Name-tag tint: you keep your colour, your ally is blue, rivals are red.
@@ -689,7 +697,7 @@ struct MarbleCupView: View {
         movers = [player] + ais + [ball]
 
         // Keystone: deal each AI a showcase look (ally first, then rivals).
-        let looks = RivalCosmetics.deal(ais.count)
+        let looks = RivalCosmetics.deal(ais.count, near: gameState.highestUnlocked)
         var byId: [UUID: RivalCosmetics.Look] = [:]
         for (k, ai) in ais.enumerated() where k < looks.count { byId[ai.id] = looks[k] }
         aiLooks = byId
