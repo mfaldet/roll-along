@@ -170,18 +170,22 @@ enum CometClashMaps {
                                   PillarFrac(cx: 0.50, cy: 0.72, r: 20),
                                   PillarFrac(cx: 0.80, cy: 0.68, r: 18)]),
 
-        // 6 — Corridor: two long vertical walls forcing a narrow centre lane
+        // 6 — Corridor: two vertical walls forming a center lane.  The ends
+        //     are open wide enough to roll around, so the side lanes are not
+        //     dead ends.
         CometClashMap(name: "Corridor",
-                      walls: [WallSegFrac(x1: 0.30, y1: 0.06, x2: 0.30, y2: 0.94),
-                               WallSegFrac(x1: 0.70, y1: 0.06, x2: 0.70, y2: 0.94)],
+                      walls: [WallSegFrac(x1: 0.30, y1: 0.20, x2: 0.30, y2: 0.80),
+                               WallSegFrac(x1: 0.70, y1: 0.20, x2: 0.70, y2: 0.80)],
                       asteroids: []),
 
-        // 7 — Diamond: 4 angled segments forming a diamond-shaped interior obstacle
+        // 7 — Diamond: 4 angled segments in a diamond, OPEN at all four
+        //     corners.  (It used to be a closed shape, which sealed in
+        //     whoever started inside it.)
         CometClashMap(name: "Diamond",
-                      walls: [WallSegFrac(x1: 0.26, y1: 0.50, x2: 0.50, y2: 0.24),
-                               WallSegFrac(x1: 0.50, y1: 0.24, x2: 0.74, y2: 0.50),
-                               WallSegFrac(x1: 0.74, y1: 0.50, x2: 0.50, y2: 0.76),
-                               WallSegFrac(x1: 0.50, y1: 0.76, x2: 0.26, y2: 0.50)],
+                      walls: [WallSegFrac(x1: 0.332, y1: 0.422, x2: 0.428, y2: 0.318),
+                               WallSegFrac(x1: 0.572, y1: 0.318, x2: 0.668, y2: 0.422),
+                               WallSegFrac(x1: 0.668, y1: 0.578, x2: 0.572, y2: 0.682),
+                               WallSegFrac(x1: 0.428, y1: 0.682, x2: 0.332, y2: 0.578)],
                       asteroids: []),
 
         // 8 — Chaos: 3 angled walls + 3 asteroid rocks

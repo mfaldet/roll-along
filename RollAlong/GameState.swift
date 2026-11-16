@@ -3136,9 +3136,60 @@ enum OpponentTuning {
 
     // ---- COMET CLASH -----------------------------------------------------
 
-    /// Comet Clash: obstacles are noticed after this share of the reaction
-    /// delay (a full delay would fly every opponent into the first trail).
-    static let cometObstacleDelayShare: Double = 0.25
+    // Speed (points per second).  Before tuning v3 every comet ran at 540.
+    /// Comet Clash: the fastest any comet can go.
+    static let cometTopSpeed: Double = 240
+    /// Comet Clash: a comet never drops below this; it always keeps rolling.
+    static let cometCruiseSpeed: Double = 90
+    /// Comet Clash: how hard the player's tilt pushes (full tilt).
+    static let cometPlayerPush: Double = 1_100
+    /// Comet Clash: an opponent's top speed is this share of `cometTopSpeed`
+    /// at zero effort, rising to all of it at full effort.  So Easy opponents
+    /// roll at roughly three quarters of the player's top speed.
+    static let cometOpponentSpeedFloor: Double = 0.62
+    /// Comet Clash: how quickly an opponent gets up to speed (points/s²).
+    static let cometOpponentSpeedUp: Double = 260
+    /// Comet Clash: how fast an opponent can turn (degrees per second) at zero
+    /// effort and at full effort.  Clumsy opponents turn wide.
+    static let cometTurnSlowDegrees: Double = 150
+    static let cometTurnFastDegrees: Double = 330
+
+    // The tail.  It is measured in LENGTH (points), not time, so it is the
+    // same behind a slow comet and a fast one.
+    /// Comet Clash: tail length when the round starts.
+    static let cometTailStartLength: Double = 110
+    /// Comet Clash: the tail grows by this much every second of the round.
+    static let cometTailGrowthPerSecond: Double = 7
+    /// Comet Clash: extra tail per point of charge (a spark or a knockout).
+    static let cometTailPerCharge: Double = 28
+    /// Comet Clash: the tail never gets longer than this.
+    static let cometTailMaxLength: Double = 620
+    /// Comet Clash: distance between the points the tail is made of.
+    static let cometTailPointSpacing: Double = 6
+    /// Comet Clash: a knocked-out comet's tail is gone within this long (seconds).
+    static let cometDeadTailFadeSeconds: Double = 0.8
+    /// Comet Clash: a comet cannot hit this much of its OWN newest tail, so
+    /// bouncing off a wall is survivable.
+    static let cometOwnTailIgnoreLength: Double = 110
+
+    // Opponent look-ahead.  Opponents avoid trails and walls first and go
+    // for sparks second.
+    /// Comet Clash: an opponent looks this far ahead in time (seconds × its
+    /// speed = distance)…
+    static let cometLookAheadSeconds: Double = 0.6
+    /// …but never less than this many points.
+    static let cometLookAheadMin: Double = 70
+    /// Comet Clash: an opponent re-decides where to steer once per this share
+    /// of its reaction delay (never more often than every other tick).
+    static let cometReplanDelayShare: Double = 0.33
+    /// Comet Clash: during a mistake an opponent only looks this share of its
+    /// normal distance ahead — it reacts late and may clip a trail.
+    static let cometMistakeLookShare: Double = 0.3
+    /// Comet Clash: no opponent makes a mistake in the first seconds of a round.
+    static let cometGraceSeconds: Double = 8
+    /// Comet Clash: every comet starts at least this far (points) from any
+    /// wall, rock or edge, and all four start in the same open area.
+    static let cometStartClearance: Double = 46
     // (end Comet Clash)
 
 
