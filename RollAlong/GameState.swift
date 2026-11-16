@@ -3162,9 +3162,25 @@ enum OpponentTuning {
     /// King of the Hill: the opponents allowed to go for the zone change this
     /// often (seconds).
     static let kothRotateSeconds: Double = 6
-    /// King of the Hill: opponents waiting their turn keep this far (points)
-    /// from the zone.
-    static let kothHangBackDistance: Double = 130
+    /// King of the Hill: radius of the zone (points).  A marble is 17.
+    static let kothZoneRadius: Double = 36
+    /// King of the Hill: opponents waiting their turn stay this far (points)
+    /// from the zone's center — right beside it, not off to the side.
+    static let kothWaitDistance: Double = 78
+    /// King of the Hill: once the same marble has held the zone alone for this
+    /// long (seconds), the waiting opponents stop waiting and go and bump it
+    /// out.  Shorter = the holder is contested sooner.
+    static func kothPressAfterSeconds(_ difficulty: MinigameDifficulty) -> Double {
+        switch difficulty {
+        case .easy:   return 3.5
+        case .normal: return 1.8
+        case .hard:   return 0.6
+        }
+    }
+    /// King of the Hill: an opponent's top speed is this share of full speed
+    /// at zero push, rising to full speed at full push.  Without it every
+    /// opponent reaches the same top speed whatever its push share.
+    static let kothTopSpeedAtZeroEffort: Double = 0.45
     /// King of the Hill: during a mistake an opponent rolls on this far
     /// (points) past the zone.
     static let kothOvershootDistance: Double = 120
@@ -3185,11 +3201,27 @@ enum OpponentTuning {
     /// wins) for at most this long (seconds).  Still level after that is a
     /// draw: not a win and not a loss.
     static let marbleCupSuddenDeathSeconds = 30
+    /// Marble Cup: length of a match (seconds).
+    static let marbleCupMatchSeconds = 60
+    /// Marble Cup: radius of the ball (points).  The marbles are 18.
+    static let marbleCupBallRadius: Double = 17
     // (end Marble Cup)
 
 
     // ---- PAINT BALL ------------------------------------------------------
 
+    /// Paint Ball: an opponent's top speed is this share of full speed at
+    /// zero push, rising to full speed at full push.  Without it every
+    /// opponent reaches the same top speed whatever its push share.
+    static let paintBallTopSpeedAtZeroEffort: Double = 0.45
+    /// Paint Ball: how many spots an opponent weighs up when choosing where
+    /// to paint next — this many at zero push share…
+    static let paintBallSpotsAtZeroEffort: Double = 3
+    /// …plus this many more at full push share.  More spots = better choices.
+    static let paintBallSpotsPerEffort: Double = 15
+    /// Paint Ball: when a mistake begins, the chance the opponent heads
+    /// straight for a puddle (otherwise it heads for floor it already painted).
+    static let paintBallMistakePuddleChance: Double = 0.5
     // (end Paint Ball)
 }
 

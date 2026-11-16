@@ -4,7 +4,7 @@ import SwiftUI
 // MarbleCupView — the "Marble Cup" competitive mode (marble soccer / Rocket
 // League).
 //
-// A 90-second 1v1 match on a portrait pitch.  Tilt to accelerate your marble
+// A one-minute 1v1 match on a portrait pitch.  Tilt to accelerate your marble
 // and slam a neutral ball into the opponent's goal (the TOP mouth).  The AI
 // defends that goal and tries to push the ball into yours (the BOTTOM mouth).
 // Most goals when the clock hits zero wins.  Own goals count — mind your
@@ -32,7 +32,7 @@ struct MarbleCupView: View {
     // MARK: - Tunables
 
     private let marbleRadius: CGFloat = 18
-    private let ballRadius:   CGFloat = 14
+    private let ballRadius:   CGFloat = CGFloat(OpponentTuning.marbleCupBallRadius)
     private let playerAccel:  CGFloat = 1_320     // calmer roll — the match was too hectic
     /// Full opponent push.  Each opponent (and your 2v2 teammate) uses its
     /// effort share of this (`OpponentTuning`).
@@ -47,7 +47,7 @@ struct MarbleCupView: View {
     private let ballMass:   CGFloat = 1.0          // light — gets launched
     private let marbleRestitution: CGFloat = 0.50
     private let ballRestitution:   CGFloat = 0.88
-    private let roundSeconds       = 90
+    private let roundSeconds       = OpponentTuning.marbleCupMatchSeconds
     private let celebrateTicks     = 75            // GOAL! freeze (~1.25s, clock paused)
     private let coinsPerGoal       = 15
     private let winBonus           = 30
@@ -103,9 +103,14 @@ struct MarbleCupView: View {
     /// One brain per computer-controlled marble (human limits from
     /// `OpponentTuning`).  Cleared at every kickoff.
     @State private var brains: [UUID: OpponentBrain] = [:]
+    /// The difficulty the current brains were dealt for (the picker can be
+    /// changed on the start screen after the marbles are placed).
+    @State private var brainsDifficulty: MinigameDifficulty = .normal
     /// Level at full time: the next goal wins (see
     /// `OpponentTuning.marbleCupSuddenDeathSeconds`).
     @State private var suddenDeath = false
+    /// How far the ball has rolled, as a turn of its pattern (radians).
+    @State private var ballSpin: CGFloat = 0
     /// Per-AI keystone look (skin+trail+name), keyed by mover id, dealt in
     /// `placeForKickoff()`.  2v2 deals an ally + two rivals.
     @State private var aiLooks: [UUID: RivalCosmetics.Look] = [:]
@@ -334,10 +339,17 @@ struct MarbleCupView: View {
         ZStack {
             switch m.role {
             case .ball:
-                Circle().fill(RadialGradient(colors: [.white, Color(white: 0.80)],
+                // A soccer ball: white with black patches — the same symbol
+                // as the Marble Cup icon — turning as it rolls.
+                Circle().fill(RadialGradient(colors: [.white, Color(white: 0.86)],
                                              center: .init(x: 0.36, y: 0.32),
                                              startRadius: 1, endRadius: m.radius * 1.5))
-                    .overlay(Circle().stroke(Color(white: 0.55), lineWidth: 1))
+                Image(systemName: "soccerball")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Color(white: 0.08))
+                    .rotationEffect(.radians(Double(ballSpin)))
+                Circle().stroke(Color(white: 0.25), lineWidth: 1)
             case .player:
                 BallSkinView(skin: gameState.activeSkin, diameter: m.radius * 2)
             case .ai:
@@ -451,7 +463,7 @@ struct MarbleCupView: View {
             Text("Marble Cup")
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
-            Text("Knock the ball into the top goal.\nMost goals in 90 seconds wins.")
+            Text("Knock the ball into the top goal.\nMost goals in \(roundSeconds) seconds wins.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
@@ -475,7 +487,7 @@ struct MarbleCupView: View {
         .padding(26)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.62)))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Marble Cup. Choose 1 v 1 or 2 v 2 to start. Tilt to knock the ball into the top goal; tap to dash. Most goals in 90 seconds wins.")
+        .accessibilityLabel("Marble Cup. Choose 1 v 1 or 2 v 2 to start. Tilt to knock the ball into the top goal; tap to dash. Most goals in \(roundSeconds) seconds wins.")
     }
 
     private func modeButton(_ m: MatchMode, title: String, subtitle: String) -> some View {
@@ -641,35 +653,39 @@ struct MarbleCupView: View {
         showMapName = true
     }
 
-    /// Ball at centre, marbles back in their halves, all stationary.  The player
-    /// + ally attack the TOP mouth; the rival(s) attack the BOTTOM.
-    private func placeForKickoff() {
+    /// Where everyone stands at a kickoff, in the fixed order of `movers`:
+    /// the player, the computer marbles (in 2v2: teammate, then the two
+    /// rivals), then the ball.  The player + teammate attack the TOP mouth;
+    /// the rival(s) attack the BOTTOM.
+    private func kickoffSpots() -> (player: CGPoint, ais: [(pos: CGPoint, attacksTop: Bool)], ball: CGPoint) {
         let cx = field.midX, w = field.width
         let bottomY = field.minY + field.height * 0.72
         let topY    = field.minY + field.height * 0.28
-
-        // Player always attacks the top goal.
         let playerX = mode == .twoVtwo ? cx + w * 0.15 : cx
-        let player = Mover(pos: CGPoint(x: playerX, y: bottomY),
-                           role: .player, radius: marbleRadius, mass: marbleMass,
-                           attacksTop: true)
-
-        var ais: [Mover] = []
+        var ais: [(pos: CGPoint, attacksTop: Bool)] = []
         if mode == .twoVtwo {
-            // Ally (player's team) in the bottom half + two rivals up top.
-            ais.append(Mover(pos: CGPoint(x: cx - w * 0.18, y: field.minY + field.height * 0.80),
-                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: true))
-            ais.append(Mover(pos: CGPoint(x: cx - w * 0.15, y: topY),
-                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: false))
-            ais.append(Mover(pos: CGPoint(x: cx + w * 0.18, y: field.minY + field.height * 0.20),
-                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: false))
+            ais.append((pos: CGPoint(x: cx - w * 0.18, y: field.minY + field.height * 0.80), attacksTop: true))
+            ais.append((pos: CGPoint(x: cx - w * 0.15, y: topY), attacksTop: false))
+            ais.append((pos: CGPoint(x: cx + w * 0.18, y: field.minY + field.height * 0.20), attacksTop: false))
         } else {
-            ais.append(Mover(pos: CGPoint(x: cx, y: topY),
-                             role: .ai, radius: marbleRadius, mass: marbleMass, attacksTop: false))
+            ais.append((pos: CGPoint(x: cx, y: topY), attacksTop: false))
         }
+        return (player: CGPoint(x: playerX, y: bottomY), ais: ais, ball: CGPoint(x: cx, y: field.midY))
+    }
 
-        let ball = Mover(pos: CGPoint(x: cx, y: field.midY),
-                         role: .ball, radius: ballRadius, mass: ballMass)
+    /// Set up a NEW match: create the marbles and the ball, and deal each
+    /// computer marble its name, its look and its skill ONCE.  They keep all
+    /// three for the whole match, through every goal and sudden death.
+    private func placeForKickoff() {
+        let spots = kickoffSpots()
+        let player = Mover(pos: spots.player, role: .player, radius: marbleRadius,
+                           mass: marbleMass, attacksTop: true)
+        var ais: [Mover] = []
+        for spot in spots.ais {
+            ais.append(Mover(pos: spot.pos, role: .ai, radius: marbleRadius,
+                             mass: marbleMass, attacksTop: spot.attacksTop))
+        }
+        let ball = Mover(pos: spots.ball, role: .ball, radius: ballRadius, mass: ballMass)
         movers = [player] + ais + [ball]
 
         // Keystone: deal each AI a showcase look (ally first, then rivals).
@@ -677,14 +693,54 @@ struct MarbleCupView: View {
         var byId: [UUID: RivalCosmetics.Look] = [:]
         for (k, ai) in ais.enumerated() where k < looks.count { byId[ai.id] = looks[k] }
         aiLooks = byId
+
+        // Each computer marble draws its own skill inside the difficulty's range.
+        let skills = OpponentTuning.dealSkills(ais.count)
+        var freshBrains: [UUID: OpponentBrain] = [:]
+        for (k, ai) in ais.enumerated() {
+            freshBrains[ai.id] = OpponentBrain(difficulty: gameState.minigameDifficulty,
+                                               skill: k < skills.count ? skills[k] : 0.5)
+        }
+        brains = freshBrains
+        brainsDifficulty = gameState.minigameDifficulty
         trails = [:]
-        brains = [:]
+        ballSpin = 0
+    }
+
+    /// After a goal: put the SAME marbles and ball back on their kickoff
+    /// spots, stationary.  Names, looks and skills are untouched.
+    private func resetPositionsForKickoff() {
+        let spots = kickoffSpots()
+        var aiIndex = 0
+        for i in movers.indices {
+            movers[i].vel = .zero
+            movers[i].charging = 0
+            switch movers[i].role {
+            case .player:
+                movers[i].pos = spots.player
+            case .ai:
+                if aiIndex < spots.ais.count { movers[i].pos = spots.ais[aiIndex].pos }
+                aiIndex += 1
+            case .ball:
+                movers[i].pos = spots.ball
+            }
+        }
+        // What each computer marble last saw is stale after the restart.
+        for id in Array(brains.keys) {
+            if var brain = brains[id] { brain.forget(); brains[id] = brain }
+        }
+        trails = [:]
     }
 
     /// Pick the format and kick off.  (Tapping a start-screen button calls this.)
     private func startMatch(_ m: MatchMode) {
+        // Deal afresh only when the format or the difficulty differs from
+        // what is already on the pitch — otherwise the opponent you saw on
+        // the start screen is the one you play.
+        let needsNewDeal = m != mode || movers.isEmpty
+            || brainsDifficulty != gameState.minigameDifficulty
         mode = m
-        placeForKickoff()
+        if needsNewDeal { placeForKickoff() }
         started = true
         AnalyticsClient.shared.track(
             "marblecup_match_started",
@@ -776,6 +832,12 @@ struct MarbleCupView: View {
 
         resolveCollisions()
         resolveBumperCollisions()
+        // Turn the ball's pattern by the distance it rolled this tick.
+        if let ball = movers.first(where: { $0.role == .ball }), ball.radius > 0 {
+            let rolled = hypot(ball.vel.dx, ball.vel.dy) * dt / ball.radius
+            ballSpin += ball.vel.dx >= 0 ? rolled : -rolled
+            if abs(ballSpin) > 1_000 { ballSpin = 0 }
+        }
         checkGoal()
 
         for m in movers where m.role != .ball { recordTrail(&trails, m.id, m.pos) }
@@ -803,6 +865,7 @@ struct MarbleCupView: View {
     /// ago, with a held aiming error, at its effort share; and during a
     /// mistake it runs at the ball from the WRONG side.
     private func botSteer(_ ai: Mover, ballPos trueBallPos: CGPoint, seed: Int) -> CGVector {
+        // Dealt at kickoff (`placeForKickoff`); the fallback is only a safety net.
         var brain = brains[ai.id] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
         brain.advance()
         let ballPos = brain.perceive(trueBallPos)
@@ -940,7 +1003,7 @@ struct MarbleCupView: View {
         if gameState.hapticsEnabled {
             if playerScored { Haptics.success() } else { Haptics.warning() }
         }
-        placeForKickoff()
+        resetPositionsForKickoff()
     }
 
     // MARK: - Bumper collision (S26)
