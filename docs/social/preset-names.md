@@ -1,7 +1,8 @@
 # Preset names
 
-Roll Along has no typed text that another player can see. Nicknames and clan
-names are assembled from the fixed lists below plus a number. The lists live
+Roll Along has no typed text that another player can see. A nickname is two
+words from the fixed lists below; a clan name is two words plus a number. The
+lists live
 in `PresetNames` in `RollAlong/SocialClient.swift` and, identically, in
 `docs/social-schema-v4.sql`, which makes the database refuse anything else.
 **Change both together.**
@@ -10,20 +11,29 @@ in `PresetNames` in `RollAlong/SocialClient.swift` and, identically, in
 |---|---|---|
 | Nickname first words | 40 | 117 |
 | Nickname second words | 40 | 129 |
-| Nickname numbers | 99 | 97 |
-| **Distinct nicknames** | **158,400** | **1,464,021** |
+| Nickname numbers | 99 | none |
+| **Distinct nicknames** | **158,400** | **15,093** |
 | Clan first words | 40 | 165 |
 | Clan second words | 40 | 199 |
 | Clan numbers | 999 | 995 |
 | **Distinct clan names** | **1,598,400** | **32,670,825** |
 
-- A nickname is `<first word><second word><number>`, for example
-  `SwiftComet42`. Nickname words are five letters or fewer so a nickname never
-  exceeds 12 characters.
+- A nickname is `<first word><second word>`, for example `SwiftComet`. It
+  has **no number**. Nickname words are five letters or fewer, so a nickname
+  never exceeds 10 characters. The default for a signed-in player who has not
+  picked one is `Roller`.
+- A player's **Adventure level** is shown as part of the name everywhere, in
+  the place the number used to be: `SwiftComet` followed by the level badge.
+  The level is not stored in the name; it comes from the player's progress.
+- Until `docs/social-schema-v4.sql` has been run, a name saved in the earlier
+  format (`SwiftComet42`) is shown as its two words (`SwiftComet`).
 - A clan name is `<first word> <second word> <number>`, for example
   `Swift Comets 42`. Its tag is the two initials and the number (`SC42`).
-- The numbers 69, 88, 420 and 666 are never offered or accepted.
-- Nicknames do not have to be unique. Clan names do.
+- The clan numbers 69, 88, 420 and 666 are never offered or accepted.
+- Nicknames are not unique: with 15,093 combinations many players will share
+  one, and the level beside the name tells them apart at a glance. Friend
+  requests, gifts and clan membership all go by the player's account, never
+  by the name. Clan names are unique.
 
 ## How the lists were checked
 

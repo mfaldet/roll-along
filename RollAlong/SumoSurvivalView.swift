@@ -188,7 +188,9 @@ struct SumoSurvivalView: View {
                             .overlay(alignment: .top) {
                                 RivalNameTag(label: b.isPlayer ? "YOU" : (rivalLooks[b.id]?.name ?? "Rival"),
                                              color: b.isPlayer ? gameState.primaryColor : b.color,
-                                             isPlayer: b.isPlayer)
+                                             isPlayer: b.isPlayer,
+                                             level: b.isPlayer ? gameState.highestUnlocked
+                                                               : (rivalLooks[b.id]?.level ?? 1))
                                     .offset(y: -13).allowsHitTesting(false)
                             }
                             .position(b.pos)
@@ -354,6 +356,8 @@ struct SumoSurvivalView: View {
                     Text(r.isPlayer ? "YOU" : (rivalLooks[r.id]?.name ?? "Rival"))
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(r.isPlayer ? .white : Color(white: 0.8))
+                    LevelBadge(level: r.isPlayer ? gameState.highestUnlocked
+                                                 : (rivalLooks[r.id]?.level ?? 1), tiny: true)
                         .lineLimit(1)
                     Text("\(r.points)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
@@ -551,6 +555,8 @@ struct SumoSurvivalView: View {
             Text(r.isPlayer ? "YOU" : (rivalLooks[r.id]?.name ?? "Rival"))
                 .font(.system(size: 16, weight: r.isPlayer ? .black : .semibold, design: .rounded))
                 .foregroundStyle(r.isPlayer ? .white : Color(white: 0.82))
+            LevelBadge(level: r.isPlayer ? gameState.highestUnlocked
+                                         : (rivalLooks[r.id]?.level ?? 1), compact: true)
             Spacer()
             Text(trailing)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -605,7 +611,7 @@ struct SumoSurvivalView: View {
         // three rounds.  `deal` hands out different names and looks; the
         // skills are one clumsy, one average and one sharp opponent.
         let rivalIDs = r.filter { !$0.isPlayer }.map(\.id)
-        let looks = RivalCosmetics.deal(rivalIDs.count)
+        let looks = RivalCosmetics.deal(rivalIDs.count, near: gameState.highestUnlocked)
         let dealtSkills = OpponentTuning.dealSkills(rivalIDs.count)
         var freshLooks: [UUID: RivalCosmetics.Look] = [:]
         var freshSkills: [UUID: Double] = [:]

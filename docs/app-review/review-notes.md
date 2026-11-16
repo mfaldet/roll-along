@@ -30,7 +30,7 @@ ADS
 One rewarded video (Google AdMob), shown only when the player chooses "Watch ad" for an extra life. Ads are non-personalized, limited to Google's "Teen" content rating, and the app does not track (no ATT prompt, no IDFA).
 
 NAMES AND CHAT — NO USER-WRITTEN CONTENT
-Players cannot type any text that other players see. Nicknames (Settings > Nickname) and clan names are assembled from preset word lists plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
+Players cannot type any text that other players see. A nickname (Settings > Nickname) is two words chosen from preset lists, shown with the player's level beside it; a clan name is two preset words plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
 
 CLANS AND THE MONTHLY CLAN BATTLE
 A clan holds up to 12 players. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week.

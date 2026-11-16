@@ -1,12 +1,19 @@
 -- ===========================================================================
 -- Roll Along — social schema v4: PRESET NAMES ONLY (no free text).
 --
+-- A NICKNAME is two preset words and nothing else ('SwiftComet').  It has no
+-- number and does not need to be unique; the app shows the player's
+-- Adventure level beside it.  A CLAN NAME is two words and a number
+-- ('Swift Comets 42') and is unique.
+--
 -- GENERATED from the same word lists as `PresetNames` in
 -- RollAlong/SocialClient.swift.  Change both together.
 --
 -- What this does
 --   1. Rewrites any existing free-text value to a preset-format one:
---        players.display_name  -> 'Roller'
+--        players.display_name  -> the same two words without the number when
+--                                 it is an old-format nickname
+--                                 ('SwiftComet42' -> 'SwiftComet'), else 'Roller'
 --        clans.name            -> 'Swift Comets <n>'  (n unique per clan)
 --        clans.tag             -> derived from the name (two initials + number)
 --        clans.description     -> ''
@@ -24,9 +31,18 @@
 create or replace function public.ra_is_preset_nickname(n text)
 returns boolean language sql immutable as $$
     select n = 'Roller'
-        or case when n ~ '^(Agile|Alert|Alpha|Amber|Aqua|Avid|Azure|Blue|Bold|Brave|Brisk|Calm|Chief|Clear|Cool|Coral|Cozy|Crisp|Cyan|Daily|Dandy|Deft|Dusty|Eager|Early|Elite|Epic|Fair|Fancy|Fast|Fiery|Fine|First|Fleet|Fresh|Funny|Giant|Glad|Gold|Grand|Great|Green|Handy|Happy|Hardy|Hazel|Icy|Ideal|Iron|Ivory|Jade|Jazzy|Jolly|Jumbo|Keen|Kind|Light|Lilac|Loyal|Lucid|Lucky|Lunar|Magic|Major|Mega|Merry|Mint|Misty|Neat|Neon|Nifty|Noble|Olive|Onyx|Opal|Peppy|Polar|Prime|Proud|Quick|Quiet|Rapid|Regal|Rosy|Royal|Ruby|Rusty|Sage|Sandy|Shiny|Sleek|Smart|Snowy|Solar|Solid|Sonic|Spry|Sunny|Super|Swift|Teal|Tidy|Topaz|True|Turbo|Urban|Vast|Vivid|Warm|Wavy|Wild|Windy|Wise|Witty|Zen|Zesty|Zippy)(Acorn|Aspen|Atlas|Bear|Bison|Blaze|Bolt|Brook|Camel|Cedar|Cliff|Cloud|Cobra|Comet|Crane|Creek|Crow|Cub|Daisy|Dawn|Delta|Dingo|Dove|Drake|Drift|Dune|Eagle|Ember|Fern|Finch|Fjord|Flame|Flare|Fox|Frost|Gale|Gecko|Gem|Glade|Glow|Goose|Grove|Gull|Hare|Hawk|Heath|Heron|Hippo|Horse|Ibis|Jet|Kite|Koala|Koi|Lake|Lark|Leaf|Lemur|Llama|Lotus|Lynx|Mango|Maple|Marsh|Mesa|Moon|Moose|Moth|Mouse|Newt|Nova|Oak|Ocean|Orb|Orca|Otter|Owl|Panda|Peak|Pearl|Pilot|Pine|Pixel|Plume|Pony|Prism|Puma|Quail|Quest|Quill|Racer|Raven|Reef|Rhino|Ridge|River|Robin|Rook|Rover|Sable|Shark|Sky|Sloth|Snail|Spark|Squid|Stag|Star|Stone|Stork|Storm|Sun|Swan|Tapir|Tide|Tiger|Torch|Trout|Tulip|Vale|Viper|Vole|Wave|Whale|Wind|Wolf|Wren|Yak|Zebra)([1-9][0-9]?)$'
-                then substring(n from '[0-9]+$')::int not in (69, 88)
-                else false end
+        or n ~ '^(Agile|Alert|Alpha|Amber|Aqua|Avid|Azure|Blue|Bold|Brave|Brisk|Calm|Chief|Clear|Cool|Coral|Cozy|Crisp|Cyan|Daily|Dandy|Deft|Dusty|Eager|Early|Elite|Epic|Fair|Fancy|Fast|Fiery|Fine|First|Fleet|Fresh|Funny|Giant|Glad|Gold|Grand|Great|Green|Handy|Happy|Hardy|Hazel|Icy|Ideal|Iron|Ivory|Jade|Jazzy|Jolly|Jumbo|Keen|Kind|Light|Lilac|Loyal|Lucid|Lucky|Lunar|Magic|Major|Mega|Merry|Mint|Misty|Neat|Neon|Nifty|Noble|Olive|Onyx|Opal|Peppy|Polar|Prime|Proud|Quick|Quiet|Rapid|Regal|Rosy|Royal|Ruby|Rusty|Sage|Sandy|Shiny|Sleek|Smart|Snowy|Solar|Solid|Sonic|Spry|Sunny|Super|Swift|Teal|Tidy|Topaz|True|Turbo|Urban|Vast|Vivid|Warm|Wavy|Wild|Windy|Wise|Witty|Zen|Zesty|Zippy)(Acorn|Aspen|Atlas|Bear|Bison|Blaze|Bolt|Brook|Camel|Cedar|Cliff|Cloud|Cobra|Comet|Crane|Creek|Crow|Cub|Daisy|Dawn|Delta|Dingo|Dove|Drake|Drift|Dune|Eagle|Ember|Fern|Finch|Fjord|Flame|Flare|Fox|Frost|Gale|Gecko|Gem|Glade|Glow|Goose|Grove|Gull|Hare|Hawk|Heath|Heron|Hippo|Horse|Ibis|Jet|Kite|Koala|Koi|Lake|Lark|Leaf|Lemur|Llama|Lotus|Lynx|Mango|Maple|Marsh|Mesa|Moon|Moose|Moth|Mouse|Newt|Nova|Oak|Ocean|Orb|Orca|Otter|Owl|Panda|Peak|Pearl|Pilot|Pine|Pixel|Plume|Pony|Prism|Puma|Quail|Quest|Quill|Racer|Raven|Reef|Rhino|Ridge|River|Robin|Rook|Rover|Sable|Shark|Sky|Sloth|Snail|Spark|Squid|Stag|Star|Stone|Stork|Storm|Sun|Swan|Tapir|Tide|Tiger|Torch|Trout|Tulip|Vale|Viper|Vole|Wave|Whale|Wind|Wolf|Wren|Yak|Zebra)$'
+$$;
+
+-- A nickname in the format used BEFORE numbers were dropped
+-- (<first word><second word><1-99>, e.g. 'SwiftComet42'): returns the two
+-- words ('SwiftComet').  Returns null for anything else.
+create or replace function public.ra_old_nickname_words(n text)
+returns text language sql immutable as $$
+    select case when n ~ '^(Agile|Alert|Alpha|Amber|Aqua|Avid|Azure|Blue|Bold|Brave|Brisk|Calm|Chief|Clear|Cool|Coral|Cozy|Crisp|Cyan|Daily|Dandy|Deft|Dusty|Eager|Early|Elite|Epic|Fair|Fancy|Fast|Fiery|Fine|First|Fleet|Fresh|Funny|Giant|Glad|Gold|Grand|Great|Green|Handy|Happy|Hardy|Hazel|Icy|Ideal|Iron|Ivory|Jade|Jazzy|Jolly|Jumbo|Keen|Kind|Light|Lilac|Loyal|Lucid|Lucky|Lunar|Magic|Major|Mega|Merry|Mint|Misty|Neat|Neon|Nifty|Noble|Olive|Onyx|Opal|Peppy|Polar|Prime|Proud|Quick|Quiet|Rapid|Regal|Rosy|Royal|Ruby|Rusty|Sage|Sandy|Shiny|Sleek|Smart|Snowy|Solar|Solid|Sonic|Spry|Sunny|Super|Swift|Teal|Tidy|Topaz|True|Turbo|Urban|Vast|Vivid|Warm|Wavy|Wild|Windy|Wise|Witty|Zen|Zesty|Zippy)(Acorn|Aspen|Atlas|Bear|Bison|Blaze|Bolt|Brook|Camel|Cedar|Cliff|Cloud|Cobra|Comet|Crane|Creek|Crow|Cub|Daisy|Dawn|Delta|Dingo|Dove|Drake|Drift|Dune|Eagle|Ember|Fern|Finch|Fjord|Flame|Flare|Fox|Frost|Gale|Gecko|Gem|Glade|Glow|Goose|Grove|Gull|Hare|Hawk|Heath|Heron|Hippo|Horse|Ibis|Jet|Kite|Koala|Koi|Lake|Lark|Leaf|Lemur|Llama|Lotus|Lynx|Mango|Maple|Marsh|Mesa|Moon|Moose|Moth|Mouse|Newt|Nova|Oak|Ocean|Orb|Orca|Otter|Owl|Panda|Peak|Pearl|Pilot|Pine|Pixel|Plume|Pony|Prism|Puma|Quail|Quest|Quill|Racer|Raven|Reef|Rhino|Ridge|River|Robin|Rook|Rover|Sable|Shark|Sky|Sloth|Snail|Spark|Squid|Stag|Star|Stone|Stork|Storm|Sun|Swan|Tapir|Tide|Tiger|Torch|Trout|Tulip|Vale|Viper|Vole|Wave|Whale|Wind|Wolf|Wren|Yak|Zebra)([1-9][0-9]?)$'
+                 and substring(n from '[0-9]+$')::int not in (69, 88)
+                then regexp_replace(n, '[0-9]+$', '')
+                else null end
 $$;
 
 create or replace function public.ra_is_preset_clan_name(n text)
@@ -69,8 +85,15 @@ drop index if exists public.clans_tag_unique_idx;
 -- ---------------------------------------------------------------------------
 -- 1 · Rewrite existing rows that are not preset-format
 -- ---------------------------------------------------------------------------
+-- Players.  The nickname rule may already be in place from an earlier run of
+-- this file with the old format (two words and a number), so lift it first.
+alter table public.players drop constraint if exists players_display_name_preset;
+
+-- An old-format nickname keeps its two words and loses the number
+-- ('SwiftComet42' -> 'SwiftComet').  Anything else that is not a preset
+-- nickname (free text) becomes 'Roller'.  Valid nicknames are not touched.
 update public.players
-   set display_name = 'Roller'
+   set display_name = coalesce(public.ra_old_nickname_words(display_name), 'Roller')
  where not public.ra_is_preset_nickname(display_name);
 
 -- Clans: give each non-conforming clan the first free 'Swift Comets <n>'.

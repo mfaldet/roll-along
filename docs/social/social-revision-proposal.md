@@ -12,8 +12,11 @@ design.
 
 **Decisions**
 
-- A player's Adventure level is their public standing: a badge next to their
-  name everywhere.
+- A player's Adventure level is their public standing: a badge that is part
+  of their name everywhere. A nickname is two preset words with no number
+  and is not unique; the level sits where the number used to be
+  (`PlayerNameLabel`). In the minigames the computer opponents' tags carry a
+  show level near the player's own, dealt with their name.
 - Friends and clan lists show levels gained this week.
 - A clan holds up to **12** members.
 - Clans compete in a **monthly clan battle** with coin prizes. It ships in

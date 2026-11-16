@@ -1197,10 +1197,14 @@ final class PresetNamesTests: XCTestCase {
                 XCTAssertEqual(String(word.prefix(1)), word.prefix(1).uppercased(), "\(word): capitalized")
             }
         }
-        // A nickname must fit the 12 characters the in-game name tags allow.
+        // Two words of at most 5 letters each: a nickname is at most 10
+        // characters, leaving room for the level badge on in-game name tags.
         for word in PresetNames.adjectives + PresetNames.nouns {
             XCTAssertLessThanOrEqual(word.count, 5, "\(word) is too long for a nickname")
         }
+        XCTAssertLessThanOrEqual(PresetNames.nicknameMaxLength, 10)
+        // 117 × 129 two-word nicknames.  Nicknames are not unique.
+        XCTAssertEqual(PresetNames.adjectives.count * PresetNames.nouns.count, 15_093)
         XCTAssertTrue(Set(PresetNames.adjectives).isDisjoint(with: PresetNames.nouns))
     }
 
@@ -1210,9 +1214,10 @@ final class PresetNamesTests: XCTestCase {
         var seen = Set<String>()
         for a in 0..<PresetNames.adjectives.count {
             for n in 0..<PresetNames.nouns.count {
-                let choice = PresetNames.Choice(adjective: a, noun: n, number: 7)
+                let choice = PresetNames.Choice(adjective: a, noun: n, number: 0)
                 let name = PresetNames.nickname(choice)
-                XCTAssertLessThanOrEqual(name.count, 12, name)
+                XCTAssertLessThanOrEqual(name.count, 10, name)
+                XCTAssertFalse(name.contains(where: { $0.isNumber }), "\(name): a nickname has no number")
                 XCTAssertTrue(seen.insert(name).inserted, "\(name) can be built two ways")
                 XCTAssertEqual(PresetNames.parseNickname(name), choice, name)
             }
@@ -1234,15 +1239,23 @@ final class PresetNamesTests: XCTestCase {
 
     func testFreeTextAndBlockedNumbersAreRejected() {
         XCTAssertNil(PresetNames.parseNickname("Mackenzie"))
-        XCTAssertNil(PresetNames.parseNickname("SwiftComet"))       // no number
-        XCTAssertNil(PresetNames.parseNickname("SwiftComet07"))     // leading zero
-        XCTAssertNil(PresetNames.parseNickname("SwiftComet100"))    // out of range
-        XCTAssertNil(PresetNames.parseNickname("SwiftComet69"))     // blocked number
-        XCTAssertNotNil(PresetNames.parseNickname("SwiftComet42"))
+        XCTAssertNotNil(PresetNames.parseNickname("SwiftComet"))    // two words, no number
+        XCTAssertNil(PresetNames.parseNickname("SwiftComet42"))     // a number is no longer part of a nickname
+        XCTAssertNil(PresetNames.parseNickname("Swift"))            // one word
+        XCTAssertNil(PresetNames.parseNickname("SwiftComets"))      // not a listed second word
+        XCTAssertFalse(PresetNames.isValidNickname("SwiftComet42"))
+        // A name in the old format keeps showing, as its two words.
+        XCTAssertEqual(PresetNames.shownNickname("SwiftComet42"), "SwiftComet")
+        XCTAssertEqual(PresetNames.shownNickname("SwiftComet7"), "SwiftComet")
+        XCTAssertEqual(PresetNames.shownNickname("SwiftComet"), "SwiftComet")
+        XCTAssertEqual(PresetNames.shownNickname("SwiftComet07"), "")    // never a valid old name
+        XCTAssertEqual(PresetNames.shownNickname("SwiftComet100"), "")   // never a valid old name
+        XCTAssertEqual(PresetNames.shownNickname("SwiftComet69"), "")    // blocked number
+        XCTAssertEqual(PresetNames.shownNickname("Mackenzie"), "")
+        XCTAssertEqual(PresetNames.shownNickname(PresetNames.defaultNickname), PresetNames.defaultNickname)
         XCTAssertNil(PresetNames.parseClanName("The Stones"))
         XCTAssertNil(PresetNames.parseClanName("Swift Comets 666")) // blocked number
         XCTAssertNotNil(PresetNames.parseClanName("Swift Comets 1"))
-        XCTAssertFalse(PresetNames.nicknameNumbers.contains(88))
         XCTAssertFalse(PresetNames.clanNumbers.contains(420))
         XCTAssertTrue(PresetNames.isValidNickname(PresetNames.defaultNickname))
         XCTAssertFalse(PresetNames.isValidClanDescription("anything typed"))

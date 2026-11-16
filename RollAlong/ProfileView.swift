@@ -83,9 +83,9 @@ struct ProfileView: View {
             .frame(width: 124, height: 116)
 
             // ── Name ─────────────────────────────────────────────────────
-            Text(gameState.playerName.isEmpty ? "Anonymous Roller" : gameState.playerName)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+            PlayerNameLabel(name: gameState.playerName.isEmpty ? "Anonymous Roller" : gameState.playerName,
+                            level: gameState.highestUnlocked,
+                            font: .system(size: 26, weight: .bold, design: .rounded))
 
             // Lives count and global Rank were removed here — Rank is being
             // replaced by nuanced awards/titles.

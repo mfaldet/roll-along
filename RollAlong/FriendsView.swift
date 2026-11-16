@@ -264,10 +264,14 @@ struct FriendsView: View {
         return HStack(spacing: 14) {
             avatar(name, tint: Color(red: 0.95, green: 0.32, blue: 0.45))
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(name) sent you")
-                    .font(.system(.body, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    PlayerNameLabel(name: name, level: sender?.climbLevel ?? 1, compact: true)
+                    Text("sent you")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                }
                 HStack(spacing: 4) {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 11))
@@ -356,11 +360,7 @@ struct FriendsView: View {
                 HStack(spacing: 14) {
                     avatar(name, tint: world.accent)
                     HStack(spacing: 8) {
-                        Text(name)
-                            .font(.system(.body, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        LevelBadge(level: level)
+                        PlayerNameLabel(name: name, level: level)
                         WeekPaceLabel(levels: profile?.levelsThisWeek ?? 0)
                     }
                 }
@@ -689,21 +689,51 @@ private extension String {
 struct LevelBadge: View {
     let level: Int
     var compact: Bool = false
+    /// The smallest size, for the floating name tags in the minigames.
+    var tiny: Bool = false
 
     var body: some View {
         let world = World.world(for: max(1, level))
         Text("\(max(1, level))")
-            .font(.system(compact ? .caption2 : .caption, design: .rounded).weight(.bold))
+            .font(tiny ? .system(size: 9, weight: .heavy, design: .rounded)
+                       : .system(compact ? .caption2 : .caption, design: .rounded).weight(.bold))
             .monospacedDigit()
             .foregroundStyle(.white)
-            .padding(.horizontal, compact ? 6 : 7)
-            .padding(.vertical, compact ? 1 : 2)
+            .padding(.horizontal, tiny ? 4 : (compact ? 6 : 7))
+            .padding(.vertical, tiny ? 0 : (compact ? 1 : 2))
             .background(
                 Capsule().fill(world.accent.opacity(0.28))
                     .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
             )
             .fixedSize()
             .accessibilityLabel("Level \(max(1, level))")
+    }
+}
+
+/// A player's name and Adventure level as ONE unit: the two-word nickname
+/// immediately followed by the level badge ("SwiftComet [42]"), in the place
+/// a number used to occupy.  Use this wherever a player's name is shown.
+/// When space is short the NAME truncates; the badge never does.  VoiceOver
+/// reads it as one item: "SwiftComet, level 42".
+struct PlayerNameLabel: View {
+    let name: String
+    let level: Int
+    var font: Font = .system(.body, design: .rounded).weight(.semibold)
+    var color: Color = .white
+    var compact: Bool = false
+
+    var body: some View {
+        HStack(spacing: compact ? 4 : 6) {
+            Text(name)
+                .font(font)
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            LevelBadge(level: level, compact: compact)
+                .layoutPriority(1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name), level \(max(1, level))")
     }
 }
 
