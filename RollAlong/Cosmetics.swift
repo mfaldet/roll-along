@@ -3071,7 +3071,8 @@ enum RivalCosmetics {
 
     /// A show level near the player's own: 60% to 140% of it, at least 1.
     static func showLevel(near playerLevel: Int) -> Int {
-        max(1, Int((Double(max(1, playerLevel)) * Double.random(in: 0.6...1.4)).rounded()))
+        let shown = Int((Double(max(1, playerLevel)) * Double.random(in: 0.6...1.4)).rounded())
+        return min(World.maxLevel, max(1, shown))
     }
 
     /// Desirable (skin, trail) pairs — easily edited; add/swap any pair.

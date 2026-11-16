@@ -356,9 +356,9 @@ struct SumoSurvivalView: View {
                     Text(r.isPlayer ? "YOU" : (rivalLooks[r.id]?.name ?? "Rival"))
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(r.isPlayer ? .white : Color(white: 0.8))
+                        .lineLimit(1)
                     LevelBadge(level: r.isPlayer ? gameState.highestUnlocked
                                                  : (rivalLooks[r.id]?.level ?? 1), tiny: true)
-                        .lineLimit(1)
                     Text("\(r.points)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .monospacedDigit()
