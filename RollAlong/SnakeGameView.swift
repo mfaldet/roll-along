@@ -37,16 +37,21 @@ struct SnakeGameView: View {
 
     private let headRadius:  CGFloat = 14         // the rolling comet head
     private let trailWidth:  CGFloat = 16         // drawn thickness of the wall
-    private let accel:       CGFloat = 1_300      // tilt → acceleration
+    // Speeds, the tail and the opponents' look-ahead all come from
+    // `OpponentTuning` (GameState.swift) — change them there.
+    private var accel:       CGFloat { CGFloat(OpponentTuning.cometPlayerPush) }   // tilt → acceleration
     private let friction:    CGFloat = 0.986      // per-tick velocity damping
-    private let maxSpeed:    CGFloat = 540         // velocity clamp (pts/sec)
-    private let minCruise:   CGFloat = 130         // always-forward drift; 0 = pure momentum
+    private var maxSpeed:    CGFloat { CGFloat(OpponentTuning.cometTopSpeed) }     // velocity clamp (pts/sec)
+    private var minCruise:   CGFloat { CGFloat(OpponentTuning.cometCruiseSpeed) }  // always-forward drift
     private let wallBounce:  CGFloat = 0.50        // energy kept on an arena-wall hit (walls are NOT lethal)
-    private let segmentStep: CGFloat = 5           // min head travel per trail node
+    /// Distance between tail points.  Points are laid by DISTANCE travelled,
+    /// so the tail is even at any speed.
+    private var segmentStep: CGFloat { max(2, CGFloat(OpponentTuning.cometTailPointSpacing)) }
 
-    private let safeSkipNodes  = 7                 // newest own-trail nodes ignored for self-hits
-    private let baseTTLTicks   = 150               // wall life at 0 power (2.5s @ 60fps) — mechanic A
-    private let ttlPerPower    = 42                // +ticks of wall life per collect/kill — mechanic B
+    /// Newest own-tail points a comet cannot hit (a wall bounce is survivable).
+    private var safeSkipNodes: Int {
+        Int((OpponentTuning.cometOwnTailIgnoreLength / max(2, OpponentTuning.cometTailPointSpacing)).rounded(.up))
+    }
     private let maxTrailNodes  = 600               // hard safety cap per comet
 
     private let orbRadius:   CGFloat = 11
@@ -58,14 +63,10 @@ struct SnakeGameView: View {
     private let rivalCount     = 3                 // AI rival comets
 
     // Rival AI
-    /// Full opponent push.  Each opponent uses its effort share of this
-    /// (`OpponentTuning`).
-    private let aiAccelBase:   CGFloat = 1_200
-    private let aiLookAhead:   CGFloat = 78         // forward probe distance for avoidance
-    private let aiTurn:        CGFloat = 0.85       // radians to swing when the path ahead is blocked
-    private let aiAvoidRadius: CGFloat = 34         // a probe within this of a wall counts as blocked
-    private let aiSelfSkip      = 14                // own newest nodes the AI ignores as obstacles
-    private let aiForwardBias: CGFloat = 0.6        // keep cruising forward while seeking sparks
+    private let aiAvoidRadius: CGFloat = 34         // a probe within this of a wall or tail counts as blocked
+    /// Own newest tail points the opponent ignores as obstacles (a little
+    /// more than it is immune to, so it never plans a path it cannot survive).
+    private var aiSelfSkip: Int { safeSkipNodes + 2 }
 
     /// Head-to-trail-centerline distance that counts as a fatal hit.
     private var collideDistance: CGFloat { headRadius + trailWidth * 0.35 }
@@ -83,6 +84,8 @@ struct SnakeGameView: View {
         var vel: CGVector = .zero
         var heading: CGFloat                   // radians; last real travel direction
         var trail: [TrailNode] = []
+        /// Distance rolled since the last tail point was laid.
+        var sinceNode: CGFloat = 0
         var collects = 0
         var kills = 0
         let colorIndex: Int
@@ -118,6 +121,9 @@ struct SnakeGameView: View {
     @State private var brains: [Int: OpponentBrain] = [:]
     /// Ticks each opponent has seen its path blocked without reacting yet.
     @State private var blockedFor: [Int: Int] = [:]
+    /// The heading each opponent has decided to steer toward (it turns toward
+    /// it at its own turn rate and re-decides every few ticks).
+    @State private var wantHeading: [Int: CGFloat] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
     @State private var orbs:   [Orb]   = []
@@ -141,7 +147,8 @@ struct SnakeGameView: View {
     private var playerCycle: Cycle? { cycles.first(where: { $0.isPlayer }) }
     private var totalRivals: Int { cycles.filter { !$0.isPlayer }.count }
     private var rivalsAlive: Int { cycles.filter { !$0.isPlayer && $0.alive }.count }
-    private var wallSeconds: Double { Double(ttlTicks(power: playerCycle?.power ?? 0)) / 60.0 }
+    /// The player's current tail length in points (shown in the top bar).
+    private var playerTailLength: Int { Int(tailLength(power: playerCycle?.power ?? 0)) }
 
     // MARK: - Body
 
@@ -218,10 +225,24 @@ struct SnakeGameView: View {
         Canvas { ctx, _ in
             for c in cycles {
                 let t = c.trail
-                guard t.count >= 2 else { continue }
+                guard !t.isEmpty else { continue }
+                // One line through the tail points, in the order they were
+                // laid, ending at the head.  Two points are only ever joined
+                // when they are next to each other in space, so a line can
+                // never sweep across the arena.
+                let joinLimit = segmentStep * 4
                 var path = Path()
                 path.move(to: t[0].pos)
-                for k in 1..<t.count { path.addLine(to: t[k].pos) }
+                var last = t[0].pos
+                for k in 1..<t.count {
+                    let p = t[k].pos
+                    if abs(p.x - last.x) + abs(p.y - last.y) > joinLimit { path.move(to: p) }
+                    else { path.addLine(to: p) }
+                    last = p
+                }
+                if c.alive, abs(c.pos.x - last.x) + abs(c.pos.y - last.y) <= joinLimit {
+                    path.addLine(to: c.pos)
+                }
                 let col = Self.palette[c.colorIndex % Self.palette.count]
                 ctx.stroke(path,
                            with: .color(col.opacity(0.28)),
@@ -229,7 +250,7 @@ struct SnakeGameView: View {
                 ctx.stroke(path,
                            with: .linearGradient(
                                 Gradient(colors: [col.opacity(0.22), col]),
-                                startPoint: t[0].pos, endPoint: t[t.count - 1].pos),
+                                startPoint: t[0].pos, endPoint: c.alive ? c.pos : t[t.count - 1].pos),
                            style: StrokeStyle(lineWidth: trailWidth, lineCap: .round, lineJoin: .round))
             }
         }
@@ -308,7 +329,7 @@ struct SnakeGameView: View {
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .tracking(1)
-                    Text(String(format: "wall %.1fs", wallSeconds))
+                    Text("tail \(playerTailLength)")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(Self.playerColor.opacity(0.9))
                         .monospacedDigit()
@@ -469,26 +490,42 @@ struct SnakeGameView: View {
         brains = [:]
         blockedFor = [:]
 
-        let cx = arena.width / 2, cy = arena.height / 2
-        var fresh: [Cycle] = [
-            Cycle(pos: CGPoint(x: cx, y: arena.height * 0.72),
-                  heading: -.pi / 2, colorIndex: 0, isPlayer: true)
-        ]
-        for i in 0..<rivalCount {
-            let ang = (Double(i) / Double(max(1, rivalCount))) * 2 * .pi
-            let p = CGPoint(x: cx + CGFloat(cos(ang)) * arena.width * 0.28,
-                            y: cy + CGFloat(sin(ang)) * arena.height * 0.20)
-            fresh.append(Cycle(pos: clampInside(p),
-                               heading: CGFloat(ang),
-                               colorIndex: (i % (Self.palette.count - 1)) + 1,
-                               isPlayer: false))
+        wantHeading = [:]
+
+        // The map first: starting places depend on its walls and rocks.
+        loadMap()
+
+        // Every comet starts in open space, in the same connected area, well
+        // apart from the others.  The player gets the place nearest the
+        // bottom middle.
+        let starts = openStarts(count: 1 + rivalCount)
+        var fresh: [Cycle] = []
+        for (n, start) in starts.enumerated() {
+            if n == 0 {
+                fresh.append(Cycle(pos: start.pos, heading: start.heading,
+                                   colorIndex: 0, isPlayer: true))
+            } else {
+                fresh.append(Cycle(pos: start.pos, heading: start.heading,
+                                   colorIndex: ((n - 1) % (Self.palette.count - 1)) + 1,
+                                   isPlayer: false))
+            }
         }
+
+        // Each opponent draws its own skill for the round — one clumsy, one
+        // average, one sharp — and keeps it until the next round.
+        let skills = OpponentTuning.dealSkills(rivalCount)
+        var freshBrains: [Int: OpponentBrain] = [:]
+        for n in 1..<fresh.count {
+            freshBrains[n] = OpponentBrain(difficulty: gameState.minigameDifficulty,
+                                           skill: skills[(n - 1) % max(1, skills.count)])
+        }
+        brains = freshBrains
+
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
             zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         cycles = fresh
 
-        loadMap()
         orbs = []
         for _ in 0..<orbCount { orbs.append(Orb(pos: randomOrbPoint())) }
     }
@@ -555,50 +592,38 @@ struct SnakeGameView: View {
         localTick &+= 1
         let dt: CGFloat = 1.0 / 60.0
 
-        // 1) Steer + integrate every living comet.
+        // 1) Steer + integrate every living comet, laying tail as it goes.
         for i in cycles.indices where cycles[i].alive {
-            var steer = CGVector.zero
+            let before = cycles[i].pos
             if cycles[i].isPlayer {
-                steer = CGVector(dx: CGFloat(motion.gravity.x) * accel,
-                                 dy: CGFloat(motion.gravity.y) * accel)
-            } else {
-                steer = aiSteer(i)
-            }
-            cycles[i].vel.dx += steer.dx * dt
-            cycles[i].vel.dy += steer.dy * dt
-            cycles[i].vel.dx *= friction
-            cycles[i].vel.dy *= friction
+                cycles[i].vel.dx += CGFloat(motion.gravity.x) * accel * dt
+                cycles[i].vel.dy += CGFloat(motion.gravity.y) * accel * dt
+                cycles[i].vel.dx *= friction
+                cycles[i].vel.dy *= friction
 
-            var sp = hypot(cycles[i].vel.dx, cycles[i].vel.dy)
-            if sp > 1 { cycles[i].heading = atan2(cycles[i].vel.dy, cycles[i].vel.dx) }
-            if sp < minCruise {
-                cycles[i].vel.dx = cos(cycles[i].heading) * minCruise
-                cycles[i].vel.dy = sin(cycles[i].heading) * minCruise
-                sp = minCruise
+                var sp = hypot(cycles[i].vel.dx, cycles[i].vel.dy)
+                if sp > 1 { cycles[i].heading = atan2(cycles[i].vel.dy, cycles[i].vel.dx) }
+                if sp < minCruise {
+                    cycles[i].vel.dx = cos(cycles[i].heading) * minCruise
+                    cycles[i].vel.dy = sin(cycles[i].heading) * minCruise
+                    sp = minCruise
+                }
+                if sp > maxSpeed { let k = maxSpeed / sp; cycles[i].vel.dx *= k; cycles[i].vel.dy *= k }
+            } else {
+                aiDrive(i, dt: dt)
             }
-            if sp > maxSpeed { let k = maxSpeed / sp; cycles[i].vel.dx *= k; cycles[i].vel.dy *= k }
 
             cycles[i].pos.x += cycles[i].vel.dx * dt
             cycles[i].pos.y += cycles[i].vel.dy * dt
             bounceWalls(&cycles[i])
             for seg in walls     { resolveWallCollision(&cycles[i], seg: seg) }
             for ast in asteroids { resolveAsteroidCollision(&cycles[i], ast: ast) }
-        }
+            // A bounce changes the direction of travel: keep the heading true.
+            let after = hypot(cycles[i].vel.dx, cycles[i].vel.dy)
+            if after > 1 { cycles[i].heading = atan2(cycles[i].vel.dy, cycles[i].vel.dx) }
 
-        // 2) Lay trail behind every living comet.
-        for i in cycles.indices where cycles[i].alive {
-            if let last = cycles[i].trail.last {
-                let dx = cycles[i].pos.x - last.pos.x, dy = cycles[i].pos.y - last.pos.y
-                if dx * dx + dy * dy >= segmentStep * segmentStep {
-                    cycles[i].trail.append(TrailNode(pos: cycles[i].pos, birthTick: localTick))
-                } else {
-                    let n = cycles[i].trail.count - 1
-                    cycles[i].trail[n].pos = cycles[i].pos
-                    cycles[i].trail[n].birthTick = localTick
-                }
-            } else {
-                cycles[i].trail.append(TrailNode(pos: cycles[i].pos, birthTick: localTick))
-            }
+            // 2) Lay tail along the stretch just rolled.
+            layTail(i, from: before, to: cycles[i].pos)
         }
 
         // 3) Age out old wall (dead comets' walls keep fading too).
@@ -614,18 +639,53 @@ struct SnakeGameView: View {
         evaluateEnd()
     }
 
-    /// Mechanic A + B: drop trail nodes older than the owner's current TTL.
-    private func prune(_ idx: Int) {
-        let maxAge = ttlTicks(power: cycles[idx].power)
-        var cut = 0
-        let trail = cycles[idx].trail
-        while cut < trail.count && localTick - trail[cut].birthTick > maxAge { cut += 1 }
-        if cut > 0 { cycles[idx].trail.removeFirst(cut) }
-        let over = cycles[idx].trail.count - maxTrailNodes
-        if over > 0 { cycles[idx].trail.removeFirst(over) }
+    /// Lay tail points along the straight stretch from `a` to `b`, exactly
+    /// `segmentStep` apart measured along the path — so the tail is the same
+    /// behind a slow comet and a fast one.  A laid point never moves.
+    private func layTail(_ i: Int, from a: CGPoint, to b: CGPoint) {
+        let d = hypot(b.x - a.x, b.y - a.y)
+        guard d > 0 else { return }
+        let step = segmentStep
+        var carried = cycles[i].sinceNode
+        var at: CGFloat = 0
+        var laid = 0
+        while carried + (d - at) >= step && laid < 64 {
+            at += step - carried
+            carried = 0
+            let t = at / d
+            cycles[i].trail.append(TrailNode(pos: CGPoint(x: a.x + (b.x - a.x) * t,
+                                                          y: a.y + (b.y - a.y) * t),
+                                             birthTick: localTick))
+            laid += 1
+        }
+        cycles[i].sinceNode = carried + (d - at)
     }
 
-    private func ttlTicks(power: Int) -> Int { baseTTLTicks + ttlPerPower * power }
+    /// How long a tail may be right now (points): it starts short, grows with
+    /// the round, and grows with charge.
+    private func tailLength(power: Int) -> CGFloat {
+        let seconds = Double(localTick) / 60.0
+        let length = OpponentTuning.cometTailStartLength
+            + OpponentTuning.cometTailGrowthPerSecond * seconds
+            + OpponentTuning.cometTailPerCharge * Double(power)
+        return CGFloat(min(OpponentTuning.cometTailMaxLength, max(0, length)))
+    }
+
+    /// Drop the oldest tail beyond the allowed length, at once.  A knocked-out
+    /// comet's tail is eaten away from the back until it is gone.
+    private func prune(_ idx: Int) {
+        let count = cycles[idx].trail.count
+        guard count > 0 else { return }
+        if cycles[idx].alive {
+            let allowed = min(maxTrailNodes, Int(tailLength(power: cycles[idx].power) / segmentStep))
+            if count > allowed { cycles[idx].trail.removeFirst(count - allowed) }
+        } else {
+            let fadeTicks = max(1.0, OpponentTuning.cometDeadTailFadeSeconds * 60)
+            let longestTail = OpponentTuning.cometTailMaxLength / Double(segmentStep)   // in points of tail
+            let perTick = max(1, Int((longestTail / fadeTicks).rounded(.up)))
+            cycles[idx].trail.removeFirst(min(count, perTick))
+        }
+    }
 
     private func agePoofs() {
         for j in poofs.indices { poofs[j].age += 1 }
@@ -757,46 +817,244 @@ struct SnakeGameView: View {
 
     // MARK: - Rival AI
 
-    /// Steer an opponent: drive toward the nearest spark, but if a wall or
-    /// trail is dead ahead, swing toward whichever side has more open space.
-    /// Human limits (`OpponentTuning`): it notices a blocked path a moment
-    /// late, chases where the spark WAS one reaction delay ago with a held
-    /// aiming error, pushes at its effort share, and during a mistake stops
-    /// checking for obstacles altogether.
-    private func aiSteer(_ i: Int) -> CGVector {
+    /// Drive one opponent for a tick.  It steers like a person: it decides
+    /// on a heading, turns toward it no faster than its turn rate, and rolls
+    /// at its own top speed.  Avoiding trails and walls comes FIRST; going
+    /// for a spark comes second (see `planHeading`).
+    /// Human limits (`OpponentTuning`): it re-decides only every so often
+    /// (reaction delay), aims at the spark with a held error, turns and rolls
+    /// according to its effort, and during a mistake looks only a short way
+    /// ahead.  No mistakes in the opening seconds of a round.
+    private func aiDrive(_ i: Int, dt: CGFloat) {
         let c = cycles[i]
         var brain = brains[i] ?? OpponentBrain(difficulty: gameState.minigameDifficulty)
         brain.advance()
-        defer { brains[i] = brain }
 
-        let aiAccel = aiAccelBase * brain.effort
-        let heading = c.heading
-        let ahead = project(from: c.pos, heading: heading, dist: aiLookAhead)
+        let inGrace = Double(localTick) < OpponentTuning.cometGraceSeconds * 60
+        let mistaking = brain.isMistaking && !inGrace
+        let effort = min(1, max(0, brain.effort))
 
-        if !brain.isMistaking && isBlocked(ahead, for: i) {
-            let waited = (blockedFor[i] ?? 0) + 1
-            blockedFor[i] = waited
-            let noticeAfter = Int((Double(brain.delayTicks) * OpponentTuning.cometObstacleDelayShare).rounded())
-            if waited > noticeAfter {
-                let leftH  = heading - aiTurn
-                let rightH = heading + aiTurn
-                let lc = clearance(project(from: c.pos, heading: leftH,  dist: aiLookAhead), for: i)
-                let rc = clearance(project(from: c.pos, heading: rightH, dist: aiLookAhead), for: i)
-                let chosen = lc >= rc ? leftH : rightH
-                return CGVector(dx: cos(chosen) * aiAccel, dy: sin(chosen) * aiAccel)
+        // Its own top speed and turn rate.
+        let floorShare = CGFloat(OpponentTuning.cometOpponentSpeedFloor)
+        let topSpeed = max(minCruise, maxSpeed * (floorShare + (1 - floorShare) * effort))
+        let slowTurn = CGFloat(OpponentTuning.cometTurnSlowDegrees)
+        let fastTurn = CGFloat(OpponentTuning.cometTurnFastDegrees)
+        let turnRate = (slowTurn + (fastTurn - slowTurn) * effort) * .pi / 180
+
+        var speed = hypot(c.vel.dx, c.vel.dy)
+
+        // How far ahead it looks: further when faster, much less mid-mistake.
+        var look = max(CGFloat(OpponentTuning.cometLookAheadMin),
+                       max(speed, minCruise) * CGFloat(OpponentTuning.cometLookAheadSeconds))
+        if mistaking { look *= CGFloat(OpponentTuning.cometMistakeLookShare) }
+
+        // Where it believes the nearest spark is (one reaction delay ago).
+        var seenSpark: CGPoint? = nil
+        if let spark = nearestOrb(to: c.pos) { seenSpark = brain.perceive(spark) }
+
+        // Re-decide every few ticks; in between keep turning toward the plan.
+        let every = max(2, Int((Double(brain.delayTicks) * OpponentTuning.cometReplanDelayShare).rounded()))
+        var want = wantHeading[i] ?? c.heading
+        if wantHeading[i] == nil || (localTick + i * 3) % every == 0 {
+            want = planHeading(i, brain: brain, spark: seenSpark, look: look)
+        }
+        wantHeading[i] = want
+
+        // Turn toward the plan, no faster than the turn rate.
+        var diff = want - c.heading
+        while diff > .pi { diff -= 2 * .pi }
+        while diff < -.pi { diff += 2 * .pi }
+        let maxStep = turnRate * dt
+        let heading = c.heading + min(maxStep, max(-maxStep, diff))
+
+        // Get up to speed.
+        speed = min(topSpeed, speed + CGFloat(OpponentTuning.cometOpponentSpeedUp) * dt)
+        speed = max(minCruise, speed)
+
+        cycles[i].heading = heading
+        cycles[i].vel = CGVector(dx: cos(heading) * speed, dy: sin(heading) * speed)
+        brains[i] = brain
+    }
+
+    /// Choose a heading.  Thirteen directions fanned around the current
+    /// heading (out to 120° either side) plus the direct line to the spark
+    /// are each scored: how far the way is clear counts most, pointing toward
+    /// the spark counts second, and a small cost discourages needless turns.
+    private func planHeading(_ i: Int, brain: OpponentBrain, spark: CGPoint?, look: CGFloat) -> CGFloat {
+        let c = cycles[i]
+        var goal = c.heading
+        if let spark {
+            let u = brain.aimed(dx: spark.x - c.pos.x, dy: spark.y - c.pos.y)
+            if u.dx != 0 || u.dy != 0 { goal = atan2(u.dy, u.dx) }
+        }
+        var goalOffset = goal - c.heading
+        while goalOffset > .pi { goalOffset -= 2 * .pi }
+        while goalOffset < -.pi { goalOffset += 2 * .pi }
+
+        var offsets: [CGFloat] = []
+        for k in -6...6 { offsets.append(CGFloat(k) * (.pi / 9)) }      // 20° steps
+        if abs(goalOffset) <= 2 * .pi / 3 { offsets.append(goalOffset) }
+
+        var best = c.heading
+        var bestScore = -CGFloat.greatestFiniteMagnitude
+        for offset in offsets {
+            let h = c.heading + offset
+            let free = freeDistance(from: c.pos, heading: h, limit: look, for: i)
+            let clear: CGFloat = look > 0 ? free / look : 0              // 0…1
+            let toward: CGFloat = cos(h - goal)                          // −1…1
+            let score: CGFloat = 2.0 * clear + 0.3 * toward - 0.05 * abs(offset)
+            if score > bestScore { bestScore = score; best = h }
+        }
+        return best
+    }
+
+    /// How far (up to `limit`) the way is clear along a heading: the distance
+    /// to the first point that is on a tail, near a wall or rock, or off the
+    /// arena.
+    private func freeDistance(from p: CGPoint, heading: CGFloat, limit: CGFloat, for i: Int) -> CGFloat {
+        let step: CGFloat = 12
+        let ux = cos(heading), uy = sin(heading)
+        var d = step
+        while d <= limit {
+            if isBlocked(CGPoint(x: p.x + ux * d, y: p.y + uy * d), for: i) { return d - step }
+            d += step
+        }
+        return limit
+    }
+
+    // MARK: - Starting places
+
+    /// Distance from a point to the nearest wall, rock or arena edge.
+    private func staticClearance(_ p: CGPoint) -> CGFloat {
+        var nearest = min(min(p.x, arena.width - p.x), min(p.y, arena.height - p.y))
+        for seg in walls {
+            let p1 = CGPoint(x: seg.x1 * arena.width, y: seg.y1 * arena.height)
+            let p2 = CGPoint(x: seg.x2 * arena.width, y: seg.y2 * arena.height)
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let lenSq = dx * dx + dy * dy
+            guard lenSq > 0 else { continue }
+            let t = max(0, min(1, ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq))
+            nearest = min(nearest, hypot(p.x - (p1.x + t * dx), p.y - (p1.y + t * dy)))
+        }
+        for ast in asteroids {
+            nearest = min(nearest, hypot(p.x - ast.cx * arena.width, p.y - ast.cy * arena.height) - ast.r)
+        }
+        return nearest
+    }
+
+    /// Starting places for `count` comets (the player's first).
+    ///
+    /// The arena is cut into small cells.  A cell is passable when a comet
+    /// fits there.  The largest connected group of passable cells is the
+    /// open play area — so nobody can start sealed inside a closed shape.
+    /// Inside it, the player gets the roomy cell nearest the bottom middle,
+    /// and each opponent in turn gets the roomy cell farthest from everyone
+    /// already placed.  Each comet starts facing the way with the most room.
+    private func openStarts(count: Int) -> [(pos: CGPoint, heading: CGFloat)] {
+        let cell: CGFloat = 16
+        let cols = max(1, Int(arena.width / cell))
+        let rows = max(1, Int(arena.height / cell))
+        let cw = arena.width / CGFloat(cols), ch = arena.height / CGFloat(rows)
+        let fits = headRadius + 6
+        let topReserve: CGFloat = min(110, arena.height * 0.16)          // clear of the top bar
+
+        var room = [CGFloat](repeating: 0, count: cols * rows)
+        var open = [Bool](repeating: false, count: cols * rows)
+        for r in 0..<rows {
+            for col in 0..<cols {
+                let p = CGPoint(x: (CGFloat(col) + 0.5) * cw, y: (CGFloat(r) + 0.5) * ch)
+                let clear = staticClearance(p)
+                room[r * cols + col] = clear
+                open[r * cols + col] = clear >= fits
             }
-        } else {
-            blockedFor[i] = 0
         }
 
-        if let orb = nearestOrb(to: c.pos) {
-            let seen = brain.perceive(orb)
-            let u = brain.aimed(dx: seen.x - c.pos.x, dy: seen.y - c.pos.y)
-            let fx = cos(heading) * aiForwardBias
-            let fy = sin(heading) * aiForwardBias
-            return CGVector(dx: (u.dx + fx) * aiAccel, dy: (u.dy + fy) * aiAccel)
+        // Group the passable cells into connected areas; keep the largest.
+        var area = [Int](repeating: -1, count: cols * rows)
+        var sizes: [Int] = []
+        for startCell in 0..<(cols * rows) where open[startCell] && area[startCell] < 0 {
+            let label = sizes.count
+            var size = 0
+            var stack = [startCell]
+            area[startCell] = label
+            while let cur = stack.popLast() {
+                size += 1
+                let r = cur / cols, col = cur % cols
+                if col > 0        { let n = cur - 1;    if open[n] && area[n] < 0 { area[n] = label; stack.append(n) } }
+                if col < cols - 1 { let n = cur + 1;    if open[n] && area[n] < 0 { area[n] = label; stack.append(n) } }
+                if r > 0          { let n = cur - cols; if open[n] && area[n] < 0 { area[n] = label; stack.append(n) } }
+                if r < rows - 1   { let n = cur + cols; if open[n] && area[n] < 0 { area[n] = label; stack.append(n) } }
+            }
+            sizes.append(size)
         }
-        return CGVector(dx: cos(heading) * aiAccel, dy: sin(heading) * aiAccel)
+
+        func point(_ index: Int) -> CGPoint {
+            CGPoint(x: (CGFloat(index % cols) + 0.5) * cw, y: (CGFloat(index / cols) + 0.5) * ch)
+        }
+
+        var candidates: [Int] = []
+        if let biggest = sizes.indices.max(by: { sizes[$0] < sizes[$1] }) {
+            // Prefer roomy cells; relax the room needed if the map is tight.
+            var need = CGFloat(OpponentTuning.cometStartClearance)
+            while candidates.count < count * 3 && need >= fits {
+                candidates = (0..<(cols * rows)).filter {
+                    area[$0] == biggest && room[$0] >= need && point($0).y >= topReserve
+                }
+                need -= 6
+            }
+        }
+
+        var chosen: [CGPoint] = []
+        if !candidates.isEmpty {
+            // The player: nearest the bottom middle.
+            let home = CGPoint(x: arena.width * 0.5, y: arena.height * 0.80)
+            var firstPoint = point(candidates[0])
+            var firstGap = CGFloat.greatestFiniteMagnitude
+            for index in candidates {
+                let p = point(index)
+                let gap = hypot(p.x - home.x, p.y - home.y)
+                if gap < firstGap { firstGap = gap; firstPoint = p }
+            }
+            chosen.append(firstPoint)
+            // Everyone else: as far as possible from all already placed.
+            while chosen.count < count {
+                var bestPoint = chosen[0]
+                var bestGap: CGFloat = -1
+                for index in candidates {
+                    let p = point(index)
+                    var gap = CGFloat.greatestFiniteMagnitude
+                    for q in chosen { gap = min(gap, hypot(p.x - q.x, p.y - q.y)) }
+                    if gap > bestGap { bestGap = gap; bestPoint = p }
+                }
+                chosen.append(bestPoint)
+            }
+        }
+        // Last resort (an arena with no open cell at all): the old ring.
+        while chosen.count < count {
+            let n = chosen.count
+            let ang = (Double(n) / Double(max(1, count))) * 2 * Double.pi + Double.pi / 2
+            chosen.append(clampInside(CGPoint(x: arena.width / 2 + CGFloat(cos(ang)) * arena.width * 0.3,
+                                              y: arena.height / 2 + CGFloat(sin(ang)) * arena.height * 0.3)))
+        }
+
+        // Face the way with the most room (walls and rocks only: no tails yet).
+        var result: [(pos: CGPoint, heading: CGFloat)] = []
+        for p in chosen {
+            var bestHeading: CGFloat = -.pi / 2
+            var bestFree: CGFloat = -1
+            for k in 0..<8 {
+                let h = CGFloat(k) * (.pi / 4) - .pi / 2
+                var d: CGFloat = 12
+                while d <= 240 {
+                    let q = CGPoint(x: p.x + cos(h) * d, y: p.y + sin(h) * d)
+                    if staticClearance(q) < fits { break }
+                    d += 12
+                }
+                if d > bestFree + 0.5 { bestFree = d; bestHeading = h }
+            }
+            result.append((pos: p, heading: bestHeading))
+        }
+        return result
     }
 
     private func project(from p: CGPoint, heading: CGFloat, dist: CGFloat) -> CGPoint {
