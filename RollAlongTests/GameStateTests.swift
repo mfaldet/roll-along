@@ -1054,8 +1054,9 @@ final class OpponentTuningTests: XCTestCase {
 
     func testPerceiveReturnsThePositionOneReactionDelayAgo() {
         var brain = OpponentBrain(difficulty: .normal, seed: 7)
-        let delay = brain.delayTicks                      // 0.30 s → 18 ticks
-        XCTAssertEqual(delay, 18)
+        let delay = brain.delayTicks
+        XCTAssertEqual(delay, Int((OpponentTuning.normal.reactionDelaySeconds * 60).rounded()))
+        XCTAssertGreaterThan(delay, 0)
         var last = CGPoint.zero
         for t in 0..<60 {
             last = brain.perceive(CGPoint(x: CGFloat(t), y: 0))
@@ -1076,7 +1077,8 @@ final class OpponentTuningTests: XCTestCase {
             if brain.isMistaking { mistakeTicks += 1 }
             XCTAssertLessThanOrEqual(abs(brain.aimError), limit + 0.0001)
         }
-        // About every 4 s (plus the 0.8 s it lasts) → roughly 9 to 20 a minute.
+        // The middle Easy opponent: about every 3.5 s plus the 1.1 s it lasts
+        // → roughly 10 to 19 a minute.
         XCTAssertGreaterThan(mistakes, 6)
         XCTAssertLessThan(mistakes, 26)
         XCTAssertGreaterThan(mistakeTicks, 0)
@@ -1086,7 +1088,51 @@ final class OpponentTuningTests: XCTestCase {
         var brain = OpponentBrain(difficulty: .hard, seed: 3)
         brain.advance()
         let v = brain.push(from: .zero, toward: CGPoint(x: 100, y: 0), fullPush: 1_000)
-        XCTAssertEqual(hypot(v.dx, v.dy), 700, accuracy: 0.5)
+        XCTAssertEqual(hypot(v.dx, v.dy), CGFloat(1_000 * OpponentTuning.hard.effort), accuracy: 0.5)
+    }
+
+    /// The three difficulties must not overlap: the weakest Hard opponent is
+    /// still stronger than the strongest Normal one, and likewise for Easy.
+    func testDifficultyRangesDoNotOverlap() {
+        let bands = [OpponentTuning.easyBand, OpponentTuning.normalBand, OpponentTuning.hardBand]
+        for band in bands {
+            XCTAssertGreaterThan(band.clumsy.reactionDelaySeconds, band.sharp.reactionDelaySeconds)
+            XCTAssertGreaterThan(band.clumsy.aimErrorDegrees, band.sharp.aimErrorDegrees)
+            XCTAssertLessThan(band.clumsy.mistakeEverySeconds, band.sharp.mistakeEverySeconds)
+            XCTAssertLessThan(band.clumsy.effort, band.sharp.effort)
+        }
+        for (weaker, stronger) in zip(bands, bands.dropFirst()) {
+            XCTAssertGreaterThan(weaker.sharp.reactionDelaySeconds, stronger.clumsy.reactionDelaySeconds)
+            XCTAssertGreaterThan(weaker.sharp.aimErrorDegrees, stronger.clumsy.aimErrorDegrees)
+            XCTAssertLessThan(weaker.sharp.mistakeEverySeconds, stronger.clumsy.mistakeEverySeconds)
+            XCTAssertLessThan(weaker.sharp.effort, stronger.clumsy.effort)
+            XCTAssertLessThan(weaker.sharp.smashGrabTopSpeed, stronger.clumsy.smashGrabTopSpeed)
+            XCTAssertLessThan(weaker.sharp.sumoShove, stronger.clumsy.sumoShove)
+        }
+    }
+
+    /// Each opponent draws its own skill: three opponents are one from the
+    /// bottom third, one from the middle, one from the top.
+    func testDealtSkillsAreSpreadAcrossTheRange() {
+        for seed in UInt64(1)...40 {
+            let skills = OpponentTuning.dealSkills(3, seed: seed).sorted()
+            XCTAssertEqual(skills.count, 3)
+            XCTAssertLessThan(skills[0], 1.0 / 3.0)
+            XCTAssertGreaterThanOrEqual(skills[1], 1.0 / 3.0)
+            XCTAssertLessThan(skills[1], 2.0 / 3.0)
+            XCTAssertGreaterThanOrEqual(skills[2], 2.0 / 3.0)
+            XCTAssertLessThanOrEqual(skills[2], 1.0)
+        }
+        XCTAssertEqual(OpponentTuning.dealSkills(3, seed: 5), OpponentTuning.dealSkills(3, seed: 5))
+        XCTAssertTrue(OpponentTuning.dealSkills(0).isEmpty)
+    }
+
+    /// A sharper opponent of the same difficulty reacts sooner and pushes harder.
+    func testSkillMovesAnOpponentInsideItsRange() {
+        let clumsy = OpponentBrain(difficulty: .normal, skill: 0, seed: 1)
+        let sharp  = OpponentBrain(difficulty: .normal, skill: 1, seed: 1)
+        XCTAssertGreaterThan(clumsy.delayTicks, sharp.delayTicks)
+        XCTAssertLessThan(clumsy.effort, sharp.effort)
     }
 
     func testSameSeedGivesTheSameOpponent() {

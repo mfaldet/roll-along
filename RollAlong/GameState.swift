@@ -2991,9 +2991,9 @@ enum OpponentTuning {
     /// Tuning-version number.  Sent with every finished round as `ai_version`
     /// so results before and after a change can be told apart.  RAISE IT BY
     /// ONE whenever any number in this table changes.
-    static let version = 2
+    static let version = 3
 
-    /// The human limits of one difficulty.
+    /// The human limits of one opponent.
     struct Limits {
         /// Seconds between something happening and the opponent acting on it.
         let reactionDelaySeconds: Double
@@ -3011,46 +3011,112 @@ enum OpponentTuning {
         /// tilt is about 0.8 to 1.0).
         let sumoShove: Double
         /// King of the Hill only: how many opponents go for the zone at once.
-        /// The rest hang back and take turns.
+        /// The rest stay close and harass.  Same for every opponent in a round.
         let kothContenders: Int
     }
 
-    static let easy = Limits(
-        reactionDelaySeconds: 0.45,
-        aimErrorDegrees:      25,
-        mistakeEverySeconds:  4,
-        mistakeLengthSeconds: 0.8,
-        effort:               0.40,
-        smashGrabTopSpeed:    0.72,
-        sumoShove:            0.30,
-        kothContenders:       1)
+    /// One difficulty is a RANGE, not a single opponent.  At the start of a
+    /// round every opponent draws its own skill inside the range (see
+    /// `dealSkills`), so a round has one clumsy opponent, one average and one
+    /// sharp.  `clumsy` is the weakest an opponent of this difficulty can be,
+    /// `sharp` the strongest.
+    struct Band {
+        let clumsy: Limits
+        let sharp: Limits
+    }
 
-    static let normal = Limits(
-        reactionDelaySeconds: 0.30,
-        aimErrorDegrees:      14,
-        mistakeEverySeconds:  7,
-        mistakeLengthSeconds: 0.6,
-        effort:               0.55,
-        smashGrabTopSpeed:    0.85,
-        sumoShove:            0.40,
-        kothContenders:       2)
+    // EASY — clumsy, slow to react, often wrong.  Visible errors, including
+    // getting itself knocked out.
+    static let easyBand = Band(
+        clumsy: Limits(reactionDelaySeconds: 0.75, aimErrorDegrees: 48,
+                       mistakeEverySeconds: 2.5,   mistakeLengthSeconds: 1.3,
+                       effort: 0.28, smashGrabTopSpeed: 0.55, sumoShove: 0.20,
+                       kothContenders: 1),
+        sharp:  Limits(reactionDelaySeconds: 0.50, aimErrorDegrees: 30,
+                       mistakeEverySeconds: 4.5,   mistakeLengthSeconds: 0.9,
+                       effort: 0.42, smashGrabTopSpeed: 0.70, sumoShove: 0.32,
+                       kothContenders: 1))
 
-    static let hard = Limits(
-        reactionDelaySeconds: 0.18,
-        aimErrorDegrees:      7,
-        mistakeEverySeconds:  12,
-        mistakeLengthSeconds: 0.4,
-        effort:               0.70,
-        smashGrabTopSpeed:    1.0,
-        sumoShove:            0.50,
-        kothContenders:       3)
+    // NORMAL — a fair match for a typical player.
+    static let normalBand = Band(
+        clumsy: Limits(reactionDelaySeconds: 0.42, aimErrorDegrees: 22,
+                       mistakeEverySeconds: 6,     mistakeLengthSeconds: 0.7,
+                       effort: 0.50, smashGrabTopSpeed: 0.78, sumoShove: 0.42,
+                       kothContenders: 2),
+        sharp:  Limits(reactionDelaySeconds: 0.26, aimErrorDegrees: 12,
+                       mistakeEverySeconds: 10,    mistakeLengthSeconds: 0.5,
+                       effort: 0.66, smashGrabTopSpeed: 0.90, sumoShove: 0.56,
+                       kothContenders: 2))
 
-    static func limits(for difficulty: MinigameDifficulty) -> Limits {
+    // HARD — quick, accurate, rarely wrong, pushing nearly flat out.
+    static let hardBand = Band(
+        clumsy: Limits(reactionDelaySeconds: 0.20, aimErrorDegrees: 8,
+                       mistakeEverySeconds: 14,    mistakeLengthSeconds: 0.35,
+                       effort: 0.80, smashGrabTopSpeed: 0.94, sumoShove: 0.68,
+                       kothContenders: 3),
+        sharp:  Limits(reactionDelaySeconds: 0.10, aimErrorDegrees: 3,
+                       mistakeEverySeconds: 26,    mistakeLengthSeconds: 0.25,
+                       effort: 1.00, smashGrabTopSpeed: 1.00, sumoShove: 0.88,
+                       kothContenders: 3))
+
+    static func band(for difficulty: MinigameDifficulty) -> Band {
         switch difficulty {
-        case .easy:   return easy
-        case .normal: return normal
-        case .hard:   return hard
+        case .easy:   return easyBand
+        case .normal: return normalBand
+        case .hard:   return hardBand
         }
+    }
+
+    /// The limits of one opponent: `skill` 0 is the clumsy end of the
+    /// difficulty's range, 1 the sharp end.
+    static func limits(for difficulty: MinigameDifficulty, skill: Double = 0.5) -> Limits {
+        let b = band(for: difficulty)
+        let t = min(1, max(0, skill))
+        func mix(_ a: Double, _ z: Double) -> Double { a + (z - a) * t }
+        return Limits(
+            reactionDelaySeconds: mix(b.clumsy.reactionDelaySeconds, b.sharp.reactionDelaySeconds),
+            aimErrorDegrees:      mix(b.clumsy.aimErrorDegrees,      b.sharp.aimErrorDegrees),
+            mistakeEverySeconds:  mix(b.clumsy.mistakeEverySeconds,  b.sharp.mistakeEverySeconds),
+            mistakeLengthSeconds: mix(b.clumsy.mistakeLengthSeconds, b.sharp.mistakeLengthSeconds),
+            effort:               mix(b.clumsy.effort,               b.sharp.effort),
+            smashGrabTopSpeed:    mix(b.clumsy.smashGrabTopSpeed,    b.sharp.smashGrabTopSpeed),
+            sumoShove:            mix(b.clumsy.sumoShove,            b.sharp.sumoShove),
+            kothContenders:       b.clumsy.kothContenders)
+    }
+
+    /// The middle opponent of each difficulty (skill 0.5).
+    static var easy:   Limits { limits(for: .easy) }
+    static var normal: Limits { limits(for: .normal) }
+    static var hard:   Limits { limits(for: .hard) }
+
+    /// One skill (0…1) per opponent for a round.  The range is cut into
+    /// `count` equal slices, one value is drawn from each, and they are handed
+    /// out in random order — so three opponents are always one clumsy, one
+    /// average and one sharp, and which is which changes every round.
+    /// Pass a seed for a repeatable deal (the headless simulation).
+    static func dealSkills(_ count: Int, seed: UInt64? = nil) -> [Double] {
+        guard count > 0 else { return [] }
+        var state = seed ?? UInt64.random(in: 1...UInt64.max)
+        func next() -> Double {
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            z ^= z >> 31
+            return Double(z >> 11) / 9_007_199_254_740_992.0
+        }
+        var skills: [Double] = []
+        for slice in 0..<count {
+            skills.append((Double(slice) + next()) / Double(count))
+        }
+        // Fisher–Yates shuffle with the same source.
+        var i = skills.count - 1
+        while i > 0 {
+            let j = Int(next() * Double(i + 1))
+            skills.swapAt(i, min(i, j))
+            i -= 1
+        }
+        return skills
     }
 
     // ---- Shared by every difficulty --------------------------------------
@@ -3062,11 +3128,22 @@ enum OpponentTuning {
     /// `mistakeEverySeconds` stretched or shrunk by up to this share.
     static let mistakeTimingSpread: Double = 0.4
 
-    // ---- Game setup ------------------------------------------------------
+    // ======================================================================
+    // Per-game numbers.  Each game has its own block below; keep a game's
+    // numbers inside its block.
+    // ======================================================================
+
+
+    // ---- COMET CLASH -----------------------------------------------------
 
     /// Comet Clash: obstacles are noticed after this share of the reaction
     /// delay (a full delay would fly every opponent into the first trail).
     static let cometObstacleDelayShare: Double = 0.25
+    // (end Comet Clash)
+
+
+    // ---- SUMO SURVIVAL ---------------------------------------------------
+
     /// Sumo Survival: all four marbles start on a ring this share of the way
     /// out from the center, evenly spaced.  Nobody starts in the middle.
     /// (The ring is turned as needed so no one starts on a pillar.)
@@ -3074,6 +3151,11 @@ enum OpponentTuning {
     /// Sumo Survival: each opponent's first target is another OPPONENT, picked
     /// at random, held this long (seconds) before it goes for whoever is nearest.
     static let sumoFirstTargetSeconds: Double = 4
+    // (end Sumo Survival)
+
+
+    // ---- KING OF THE HILL ------------------------------------------------
+
     /// King of the Hill: all four marbles start this share of the smaller
     /// field side away from the first zone, evenly spaced.
     static let kothStartRing: Double = 0.30
@@ -3086,13 +3168,29 @@ enum OpponentTuning {
     /// King of the Hill: during a mistake an opponent rolls on this far
     /// (points) past the zone.
     static let kothOvershootDistance: Double = 120
+    // (end King of the Hill)
+
+
+    // ---- SMASH AND GRAB --------------------------------------------------
+
     /// Smash and Grab: each opponent prefers a coin no other opponent is
     /// closer to, so the three do not all chase the same one.
     static let smashGrabSpreadOut = true
+    // (end Smash and Grab)
+
+
+    // ---- MARBLE CUP ------------------------------------------------------
+
     /// Marble Cup: a level score at full time goes to sudden death (next goal
     /// wins) for at most this long (seconds).  Still level after that is a
     /// draw: not a win and not a loss.
     static let marbleCupSuddenDeathSeconds = 30
+    // (end Marble Cup)
+
+
+    // ---- PAINT BALL ------------------------------------------------------
+
+    // (end Paint Ball)
 }
 
 // ---------------------------------------------------------------------------
@@ -3125,8 +3223,14 @@ struct OpponentBrain {
     private var mistakeTicksLeft = 0
     private var ticksUntilMistake = 0
 
-    init(difficulty: MinigameDifficulty, seed: UInt64? = nil) {
-        limits = OpponentTuning.limits(for: difficulty)
+    /// This opponent's place in its difficulty's range: 0 clumsy … 1 sharp.
+    let skill: Double
+
+    /// `skill` comes from `OpponentTuning.dealSkills` (one per opponent per
+    /// round); 0.5 is the middle of the range.
+    init(difficulty: MinigameDifficulty, skill: Double = 0.5, seed: UInt64? = nil) {
+        self.skill = min(1, max(0, skill))
+        limits = OpponentTuning.limits(for: difficulty, skill: skill)
         rngState = seed ?? UInt64.random(in: 1...UInt64.max)
         ticksUntilMistake = nextMistakeGap()
     }

@@ -161,7 +161,9 @@ struct PaintBallView: View {
                 .onChange(of: geo.size) { _, newSize in
                     let wasEmpty = painters.isEmpty
                     layout(newSize)
-                    if wasEmpty { reset() }
+                    // Before the round starts a resize simply sets up again;
+                    // mid-round the grid is rebuilt in tick().
+                    if wasEmpty || !started { reset() }
                 }
                 .onTapGesture {
                     if !started && !isOver {
@@ -633,9 +635,30 @@ struct PaintBallView: View {
 
     // MARK: - Simulation
 
+    /// The paint grid must always match the arena's current cell counts.  If
+    /// the arena was resized after the round was set up (the screen settling
+    /// a moment after the view appears), the old grid no longer fits and
+    /// painting would silently stop.  Rebuild it — bare — for the new size and
+    /// keep the round going.
+    private func ensureGridMatchesArena() {
+        guard cols > 0, rows > 0 else { return }
+        let cells = cols * rows
+        if grid.count == cells, paintTick.count == cells, blocked.count == cells,
+           coverage.count == colorCount { return }
+        grid = Array(repeating: -1, count: cells)
+        paintTick = Array(repeating: 0, count: cells)
+        coverage = Array(repeating: 0, count: colorCount)
+        loadMapPits(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count])
+        for i in painters.indices {
+            painters[i].pos.x = min(max(painters[i].pos.x, marbleRadius), arena.width - marbleRadius)
+            painters[i].pos.y = min(max(painters[i].pos.y, marbleRadius), arena.height - marbleRadius)
+        }
+    }
+
     private func tick() {
         localTick &+= 1
         pruneSplashes()
+        ensureGridMatchesArena()
         guard started, !isOver, cols > 0 else { return }
         roundTick += 1
         let dt: CGFloat = 1.0 / 60.0
