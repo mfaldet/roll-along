@@ -1,6 +1,9 @@
 # Coin icon: three flat proposals
 
-**Status: proposal only. Nothing in the app has changed.**
+**Chosen: C, built 2026-11-17.** Every coin in the app (icons, coin-pack
+piles, Gold Rush and Smash and Grab coins, and the spinning coin in levels) is
+now drawn by `CoinFace` in `RollAlong/BallGameView.swift`. The name stays
+"coins"; nothing was renamed. The rest of this page is the original proposal.
 
 ![All three proposals next to today's coin](coin-proposals.png)
 
