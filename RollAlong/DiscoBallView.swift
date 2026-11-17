@@ -35,7 +35,8 @@ struct DiscoBallView: View {
 
     /// Chosen at the start screen each run.  Easy (4×8, big ball) and Normal
     /// (6×10) both loop the reveal + tap-to-cross; Hard (8×14, small ball) shows
-    /// the path ONCE then auto-unlocks with a 10-second countdown.
+    /// the path ONCE, then the crossing begins.  There is no time limit on any
+    /// difficulty: remembering the floor is the challenge.
     @State private var difficulty: Difficulty = .normal
     private var isHard: Bool { difficulty == .hard }
 
@@ -57,7 +58,6 @@ struct DiscoBallView: View {
     private let revealSpeed:  Double = 0.14        // path-reveal head, tiles/tick
     private let celebrateDuration: TimeInterval = 2.6
     private let failDuration:      TimeInterval = 1.4
-    private let hardcoreCrossLimit: TimeInterval = 10
     private static let coinsPerCrossing = 3
 
     // MARK: - Palette
@@ -88,7 +88,11 @@ struct DiscoBallView: View {
     @State private var touched:   Set<GridPos> = []
     @State private var revealHead: Double = 0
     @State private var phaseEndAt: Date? = nil
-    @State private var crossDeadline: Date? = nil      // hardcore 10s timer
+    /// When the current crossing began, and the total time spent crossing in
+    /// this run — for the leaderboard's "average time per crossing".  Only the
+    /// rolling counts: memorizing and the celebration in between do not.
+    @State private var crossingStartedAt: Date? = nil
+    @State private var crossingSecondsTotal: Double = 0
     @State private var blinkFrame = 0
 
     // MARK: - Derived geometry
@@ -140,7 +144,6 @@ struct DiscoBallView: View {
 
             topBar
             HomeQuitButton()
-            if isHard && phase == .crossing { countdownHUD }
             if phase == .memorize { memorizeHint }
             if phase == .choosing { difficultySelect }
             if phase == .gameOver { gameOverOverlay }
@@ -332,7 +335,7 @@ struct DiscoBallView: View {
                     .tracking(1.5)
                     .foregroundStyle(isHard ? Color(red: 1.0, green: 0.4, blue: 0.4) : Self.revealColor)
                 Text(isHard
-                     ? "The path flashes once — then it's a 10s dash across"
+                     ? "The path flashes once — then roll across from memory"
                      : "Roll across without a wrong step")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(white: 0.7))
@@ -343,24 +346,6 @@ struct DiscoBallView: View {
             Spacer()
         }
         .allowsHitTesting(false)
-    }
-
-    private var countdownHUD: some View {
-        let remaining = max(0, crossDeadline?.timeIntervalSinceNow ?? 0)
-        let urgent = remaining <= 3
-        return VStack {
-            Spacer().frame(height: 58)
-            Text(String(format: "%.1f", remaining))
-                .font(.system(size: 30, weight: .black, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(urgent ? Color(red: 1.0, green: 0.30, blue: 0.30) : .white)
-                .padding(.horizontal, 18).padding(.vertical, 5)
-                .background(Capsule().fill(Color.black.opacity(0.55)))
-                .scaleEffect(urgent ? 1.12 : 1.0)
-            Spacer()
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 
     /// Start-screen difficulty selector — pick Easy, Normal or Hardcore before each
@@ -385,7 +370,7 @@ struct DiscoBallView: View {
                                      subtitle: "6×10 floor · study at your own pace, tap to cross")
                     modeChoiceButton(.hard, icon: "bolt.fill",
                                      title: "Hardcore", accent: Color(red: 1.0, green: 0.4, blue: 0.4),
-                                     subtitle: "8×14 floor · one look, then a 10-second dash")
+                                     subtitle: "8×14 floor · one look, then cross from memory")
                 }
                 .padding(.top, 4)
             }
@@ -495,6 +480,8 @@ struct DiscoBallView: View {
 
     private func resetGame() {
         crossings = 0
+        crossingSecondsTotal = 0
+        crossingStartedAt = nil
         atBottom = true
         touched = []
         phase = .choosing          // pick Easy / Normal / Hardcore before each run
@@ -514,7 +501,7 @@ struct DiscoBallView: View {
         touched = []
         revealHead = 0
         phaseEndAt = nil
-        crossDeadline = nil
+        crossingStartedAt = nil
         generatePath()
         spawnBallInSafeZone()
         phase = .memorize
@@ -579,7 +566,7 @@ struct DiscoBallView: View {
     }
 
     private func startCrossing() {
-        crossDeadline = isHard ? Date().addingTimeInterval(hardcoreCrossLimit) : nil
+        crossingStartedAt = Date()
         phase = .crossing
     }
 
@@ -604,7 +591,6 @@ struct DiscoBallView: View {
             stepPhysics(confineToSafeZone: true)
         case .crossing:
             stepPhysics(confineToSafeZone: false)
-            if let dl = crossDeadline, Date() >= dl { failCrossing(); return }
             evaluateCrossing()
         case .celebrate:
             stepPhysics(confineToSafeZone: false)
@@ -680,6 +666,10 @@ struct DiscoBallView: View {
 
     private func succeedCrossing() {
         crossings += 1
+        if let start = crossingStartedAt {
+            crossingSecondsTotal += Date().timeIntervalSince(start)
+        }
+        crossingStartedAt = nil
         if gameState.hapticsEnabled { Haptics.success() }
         AudioManager.shared.playWin(enabled: gameState.soundEnabled)
         phase = .celebrate
@@ -702,10 +692,13 @@ struct DiscoBallView: View {
         // View owns only the per-crossing payout; the record, the new-best
         // bonus, and the Disco trophies now funnel through GameState (S1-T4).
         if runCoins > 0 { gameState.addCoins(runCoins) }
-        gameState.recordDiscoResult(bestKey: bestKey, crossings: crossings)
+        gameState.recordDiscoResult(bestKey: bestKey, crossings: crossings,
+                                    crossingSeconds: crossingSecondsTotal)
         AnalyticsClient.shared.track(
             "disco_game_over",
             properties: ["crossings": .int(crossings),
+                         "avg_crossing_ms": .int(crossings > 0
+                             ? Int((crossingSecondsTotal / Double(crossings) * 1000).rounded()) : 0),
                          "best": .int(max(best, crossings)),
                          "difficulty": .string(difficultyLabel)]
         )

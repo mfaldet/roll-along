@@ -1,6 +1,6 @@
 # Roll Along
 
-A tilt-controlled marble game for iPhone. Tilt the phone to roll a marble through the endless Adventure mode, 11 minigames and 8 challenge tracks; collect cosmetics; earn trophies; compete on leaderboards.
+A tilt-controlled marble game for iPhone. Tilt the phone to roll a marble through the endless Adventure mode, 10 minigames and 8 challenge tracks; collect cosmetics; earn trophies; compete on leaderboards.
 
 **Platform:** iPhone, iOS 18 or later · **Language:** Swift / SwiftUI · **Build:** Xcode 26 or later
 
@@ -20,14 +20,14 @@ The main mode is called **Adventure** in the game. In the code it is still named
 | **Challenge of the Day** | A short date-seeded run with three attempts and a coin reward. |
 | **Challenge Tracks** (8) | Themed 100-level tracks generated from a seed. Finishing one grants a cosmetic collection. |
 | **Competitive minigames** (6, against AI rivals) | Comet Clash, Sumo Survival, Paint Ball, Smash and Grab, Marble Cup, King of the Hill |
-| **Solo minigames** (5) | Zen Garden, Gold Rush, Roll Out, Roll Up, Disco Ball |
+| **Solo minigames** (4) | Zen Garden, Gold Rush, Roll Up, Disco Ball |
 
 All game art is drawn in code with SwiftUI `Canvas`; there are no image assets apart from the app icon.
 
 ### Everything else
 
 - **Cosmetics.** 74 ball skins plus goals, trails, floors, pits, boundaries and music, bought with coins. Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
-- **Trophies.** 92 trophies in v1.0, shown in the Trophy Room as 47 tiles in four sections (Adventure, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 74 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
+- **Trophies.** 90 trophies in v1.0, shown in the Trophy Room as 46 tiles in four sections (Adventure, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 72 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
 - **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Unlimited Lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
 - **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.
 - **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
@@ -54,7 +54,8 @@ Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, J
 ## Known faults
 
 - **Pinball is not in v1.0.** It is unfinished, so it has been removed from the build along with its leaderboard and trophies. The work in progress is kept in `tools/pinball/` (not part of the app).
-- **Roll Out has five mazes**, which repeat.
+- **The Disco Ball leaderboard needs `docs/leaderboard-discoball.sql`.** It ranks the most crossings in one run (any difficulty), with that run's average time per crossing. Until the file is run, the board says "not available yet"; nothing else is affected. Disco Ball has no time limit on any difficulty.
+- **Roll Out is not in v1.0.** Its mazes need rebuilding (maze 4 has no route from start to goal), so it is switched off in the mode registry (`GameModeCatalogue`) like Pinball: in no menu, no leaderboard and no trophies. `RollOutView.swift` and its route stay in the code for later.
 - **Adventure sound effects are system placeholder sounds.**
 - **Five authored levels** (78, 83, 89, 92, 97) have a coin on the rim of a hole. `node scripts/verify-levels.mjs` lists them.
 - **Leaderboard and season scores are only lightly checked by the server.** `docs/social-schema-v5.sql` refuses impossible values (more than three stars per level), caps the stars that count toward a season per day, and adds a switch to exclude a player or clan. It does not stop a determined cheater.
@@ -70,7 +71,7 @@ Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, J
 ## Planned
 
 - Pinball, rebuilt, in a later update, with its own trophies.
-- More Roll Out mazes.
+- Roll Out, with hand-built mazes and its two trophies.
 - Real sound effects.
 - iPad support.
 - iCloud trophy backup and a Game Center mirror for trophies.

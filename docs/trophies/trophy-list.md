@@ -1,14 +1,14 @@
 # Trophies in Roll Along 1.0
 
-**92 trophies, shown as 47 tiles.** Generated from `RollAlong/TrophyCatalog.json` on 2026-11-15; that file is the source of truth.
+**90 trophies, shown as 46 tiles.** Generated from `RollAlong/TrophyCatalog.json` on 2026-11-15 and updated 2026-11-17 (Roll Out held back); that file is the source of truth.
 
 - A **stack** is several trophies that are steps of one measure, drawn as one round tile that takes the color and name of the highest step earned.
 - A **feat** is a one-off trophy with its own hexagon tile.
 - Stacking is display only. Every step is its own trophy with its own id, rarity and unlock date.
 - Platinum is the large badge at the top of the Trophy Room.
-- The three Pinball score trophies and one Pinball secret are held back with Pinball and are not in this list.
+- The three Pinball score trophies and one Pinball secret are held back with Pinball, and the two Roll Out trophies (Out of the Woods, Ten-Maze March) with Roll Out. They are not in this list.
 
-Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
+Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 ## Adventure
 
@@ -103,7 +103,7 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 | Step | Title | What it asks |
 |---|---|---|
 | Bronze I | Taste of the Arcade | Play 5 different minigames. |
-| Bronze II | The Grand Tour | Play 10 different minigames. |
+| Bronze II | The Grand Tour | Play 10 different minigames (all ten in v1.0). |
 
 **Stack: Difficulty** · icon `speedometer` · fallback `chart.bar`
 
@@ -179,15 +179,6 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 |---|---|---|---|---|
 | Squatter's Rights | Silver | Hold the hill for 45 seconds total in a single round. | `hourglass` | `clock.fill` |
 
-### Roll Out
-
-**Stack: Mazes cleared** · icon `arrow.triangle.turn.up.right.diamond.fill` · fallback `square.grid.3x3.fill`
-
-| Step | Title | What it asks |
-|---|---|---|
-| Bronze | Out of the Woods | Reach the goal of your first Roll Out maze. |
-| Silver | Ten-Maze March | Reach maze 10 in Roll Out. |
-
 ### Roll Up
 
 **Stack: Height** · icon `arrow.up.circle.fill` · fallback `arrow.up`
@@ -207,7 +198,7 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
-| Dancing in the Dark | Silver | Make 10 crossings in a single Disco Ball run on Hardcore. | `lightbulb.slash.fill` | `lightbulb.fill` |
+| Dancing in the Dark | Silver | Make 10 crossings in a single Disco Ball run on Hardcore. (Hardcore has no time limit from 2026-11-17.) | `lightbulb.slash.fill` | `lightbulb.fill` |
 
 ### Zen Garden
 
@@ -288,7 +279,7 @@ Tiers: 43 Bronze, 26 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 Icon `trophy.fill` · fallback `star.circle.fill`.
 
-Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends & Clans and Secrets. That is **74 trophies**:
+Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends & Clans and Secrets. That is **72 trophies**:
 
 - **Adventure** (26): Get the Ball Rolling, Training Wheels Off, Gathering Momentum, Beyond the Meadow, Boulder and Bolder, The Long Roll, Unstoppable Force, Altitude Sickness, Halfway to Heaven, Star Search, Stargazer, Rising Star, Star-Studded, Constellation, Star Power, A Thousand Points of Light, Milky Way, Supernova, One Hundred Perfect Rolls, Gone in Ten Seconds, Steady Hands, Clean Sheet, First Try!, Spotless, Untouchable, Nerves of Steel
 - **Challenges** (13): Sidetracked, Deep in the Pack, Track Record, Triple Crown, High Five, Run the Gauntlet, Carpe Rollem, Seven-Day Roller, Ten Brutal Mornings, Month of Marbles, Season Ticket, Fifty Days of Grit, The Brutal Week
@@ -299,7 +290,6 @@ Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends &
 - **Minigames · Smash and Grab** (2): Smash Hit, Serial Smasher
 - **Minigames · Marble Cup** (2): Top Corner, League Regular
 - **Minigames · King of the Hill** (2): Hill, Claimed, Squatter's Rights
-- **Minigames · Roll Out** (2): Out of the Woods, Ten-Maze March
 - **Minigames · Roll Up** (2): The Only Way Is Up, Head in the Clouds
 - **Minigames · Disco Ball** (2): Crossing Guard, Dancing in the Dark
 - **Minigames · Zen Garden** (2): Inner Peace, Garden Sage

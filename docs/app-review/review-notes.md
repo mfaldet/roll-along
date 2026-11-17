@@ -16,7 +16,7 @@ WHERE THINGS ARE (buttons on the Home screen)
 - Leaderboard, Clans, Friends: require sign-in.
 - Shop: cosmetics bought with in-game coins. Catalog is inside the Shop.
 - Profile and Settings.
-- "Games" opens the 11 minigames and the 8 challenge tracks.
+- "Games" opens the 10 minigames and the 8 challenge tracks.
 
 IN-APP PURCHASES (10)
 Lives — tap the lives counter at the top-left of the Home screen:
@@ -48,7 +48,7 @@ RELEASE CALENDAR FOR COSMETICS
 Cosmetic collections are released on a fixed calendar stored in the app: 13 at launch, then a new group every 4 weeks. Upcoming collections are announced by name and date in Shop > Catalog > "Coming soon". Seasonal collections are available during their season each year. Nothing is switched on remotely.
 
 TROPHIES
-92 in-game trophies (Home > Trophies), shown as tiles in four sections. They are earned by playing, are display only, and never grant coins or anything purchasable.
+90 in-game trophies, shown as tiles in four sections. They are earned by playing, are display only, and never grant coins or anything purchasable.
 
 NOTIFICATIONS
 Two optional local notifications (shop restock, lives full), off until the player turns them on in Settings.

@@ -618,7 +618,15 @@ enum GameModeCatalogue {
         (GoldRushMode(),     true),    // self-contained GoldRushView — live
         (MarbleCupMode(),    true),    // self-contained MarbleCupView — live
         (KingOfTheHillMode(),true),    // self-contained KingOfTheHillView — live
-        (RollOutMode(),      true),    // self-contained RollOutView — live
+        // Roll Out is HELD BACK from v1.0: its mazes need rebuilding (maze 4
+        // has no route from start to goal).  The mode, RollOutView and its
+        // route stay in the code so it can come back; with the flag off it is
+        // in no menu, and a saved last-mode of "rollout" falls back to the
+        // climb (`mode(id:)` only resolves enabled modes).  Its trophies are
+        // out of the shipping catalog.  To bring it back: set this to true,
+        // restore its two trophies and tile, add "rollout" back to
+        // `TrophyCategory.minigameModeIDs`, and raise the Grand Tour target.
+        (RollOutMode(),      false),
         (RollUpMode(),       true),    // self-contained RollUpView — live
         (DiscoBallMode(),    true),    // self-contained DiscoBallView — live
         // ── Challenge Tracks ─────────────────────────────────────────────
@@ -644,9 +652,11 @@ enum GameModeCatalogue {
         registry.compactMap { $0.mode as? ChallengeTrackMode }
     }
 
-    /// Look up a mode by id (e.g. to resume the last-played mode).
+    /// Look up an ENABLED mode by id (e.g. to resume the last-played mode).
+    /// A held-back mode (Roll Out in v1.0) resolves to nil, so callers fall
+    /// back to the climb.
     static func mode(id: String) -> GameMode? {
-        registry.first { $0.mode.id == id }?.mode
+        registry.first { $0.mode.id == id && $0.isEnabled }?.mode
     }
 }
 
@@ -719,7 +729,7 @@ struct ModeTutorial {
         case "disco":
             return .init(controls: "Pick Easy, Normal or Hardcore, then tilt to roll. Memorize the lit path before you cross.",
                          goal: "Roll between the safe zones, back and forth, as many times as you can.",
-                         hazard: "Touch a tile that isn't on the lit path and the run is over (Hardcore also adds a 10s timer).",
+                         hazard: "Touch a tile that isn't on the lit path and the run is over. On Hardcore the path shows only once.",
                          reward: "Coins for every crossing, plus a bonus on a new best.")
         default:
             return nil

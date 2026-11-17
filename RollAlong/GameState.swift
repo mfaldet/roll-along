@@ -363,6 +363,15 @@ final class GameState: ObservableObject {
     }
     /// Best Roll Up height in meters (mirrors minigameBests["rollup"]).
     var rollupBest: Int { minigameBests["rollup", default: 0] }
+    /// Disco Ball leaderboard: the most crossings in one run on ANY difficulty,
+    /// and that run's average time per crossing in milliseconds (only the
+    /// rolling counts, not memorizing).  A tie on crossings keeps the faster run.
+    @Published var discoBoardBest: Int {
+        didSet { defaults.set(discoBoardBest, forKey: "ra_discoBoardBest") }
+    }
+    @Published var discoBoardAvgMs: Int {
+        didSet { defaults.set(discoBoardAvgMs, forKey: "ra_discoBoardAvgMs") }
+    }
     // goldrushCoinsTotal — lifetime coins caught across all Gold Rush runs
     // (accumulates; powers the home "coins earned" readout).
     @Published var goldrushCoinsTotal: Int {
@@ -723,7 +732,7 @@ final class GameState: ObservableObject {
         self.defaults = defaults
         self.now = now
         trophyStats = TrophyStats(defaults: defaults)
-        // Load the bundled 92-trophy catalog.  A decode/validation failure is
+        // Load the bundled 90-trophy catalog.  A decode/validation failure is
         // a build-breaking AUTHORING error, never a runtime condition to
         // recover from (TrophyCatalog house rules) — but GameState.init must
         // never trap, so fall back to an empty catalog whose engine simply
@@ -826,6 +835,16 @@ final class GameState: ObservableObject {
         zenSeconds   = max(0, defaults.integer(forKey: "ra_zenSeconds"))
         goldrushBest = max(0, defaults.integer(forKey: "ra_goldrushBest"))
         rollupBestSeconds = max(0, defaults.integer(forKey: "ra_rollupBestSeconds"))
+        // Existing players: until a Disco Ball board best is saved, seed it
+        // from the per-difficulty bests they already hold (average time
+        // unknown → 0, shown as "—" until a longer run or a timed tie records
+        // one).  Read straight from storage: `self` is not ready yet here.
+        let savedDiscoBests = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
+        discoBoardBest  = max(0, defaults.integer(forKey: "ra_discoBoardBest"),
+                              savedDiscoBests["discoeasy", default: 0],
+                              savedDiscoBests["disco", default: 0],
+                              savedDiscoBests["discohard", default: 0])
+        discoBoardAvgMs = max(0, defaults.integer(forKey: "ra_discoBoardAvgMs"))
         goldrushCoinsTotal = max(0, defaults.integer(forKey: "ra_goldrushCoinsTotal"))
         tickets = min(max(0, defaults.integer(forKey: "ra_tickets")),
                       Self.maxTicketBalance)
@@ -1458,7 +1477,7 @@ final class GameState: ObservableObject {
     /// in the set.  Recording unconditionally is safe — a non-minigame id
     /// simply leaves both derivations unchanged.
     private func recordMinigamePlayedTrophies() {
-        // arcade_sampler (≥5) / arcade_grand_tour (all 11).
+        // arcade_sampler (≥5) / arcade_grand_tour (all 10).
         let played = TrophyMetric.minigameModeIDs.filter { playedModeIDs.contains($0) }.count
         fireTrophy(.minigamesPlayed, value: played)
         // coinpit_first_round (≥1 once "coinpit" has been played).
@@ -1529,7 +1548,10 @@ final class GameState: ObservableObject {
 
     /// Push the Roll Out furthest-maze trophy metric (S1-T4).  Called from
     /// `recordRollOutResult` after the highest-maze-reached best is written.
-    /// Mirrors `TrophyBackfill.snapshot`: both `rollout_first_maze` (≥1) and
+    /// (Roll Out is held back from v1.0 and its trophies are out of the
+    /// catalog, so this fires a metric no shipping trophy reads; kept so the
+    /// trophies work again when the mode returns.)  Mirrors
+    /// `TrophyBackfill.snapshot`: both `rollout_first_maze` (≥1) and
     /// `rollout_maze_10` (≥10) ride `minigameBests["rollout"]`.
     private func recordRollOutTrophies() {
         fireTrophy(.rolloutBestMaze, value: minigameBests["rollout", default: 0])
@@ -2147,7 +2169,9 @@ final class GameState: ObservableObject {
             kothWins: minigameWins["koth"],
             goldrushWins: minigameWins["goldrush"],
             rollupBest: minigameBests["rollup"],
-            rollupBestSeconds: rollupBestSeconds > 0 ? rollupBestSeconds : nil
+            rollupBestSeconds: rollupBestSeconds > 0 ? rollupBestSeconds : nil,
+            discoballBest: discoBoardBest > 0 ? discoBoardBest : nil,
+            discoballBestAvgMs: discoBoardAvgMs > 0 ? discoBoardAvgMs : nil
         )
     }
 
@@ -2166,7 +2190,15 @@ final class GameState: ObservableObject {
         let mcB = minigameBests["marblecup", default: 0], mcW = minigameWins["marblecup", default: 0]
         let koB = minigameBests["koth", default: 0],      koW = minigameWins["koth", default: 0]
         let ruB = minigameBests["rollup", default: 0],    ruS = rollupBestSeconds
+        let dB = discoBoardBest, dMs = discoBoardAvgMs
         Task {
+            // Disco Ball goes in its own request: its columns arrive with
+            // docs/leaderboard-discoball.sql, and until then the server refuses
+            // any write naming them.  Kept separate so that refusal can never
+            // block the other minigame stats.
+            if dB > 0 {
+                try? await SocialClient.shared.syncDiscoBallBest(crossings: dB, averageMs: dMs)
+            }
             try? await SocialClient.shared.syncMinigameStats(
                 pinballBest: p, zenSeconds: z,
                 goldrushBest: g, goldrushWins: gw,
@@ -2261,8 +2293,19 @@ final class GameState: ObservableObject {
     /// bonus, publishes it, and fires the Disco trophies.  Returns whether this
     /// run set a new best for its difficulty.
     @discardableResult
-    func recordDiscoResult(bestKey: String, crossings: Int) -> Bool {
+    func recordDiscoResult(bestKey: String, crossings: Int,
+                           crossingSeconds: Double? = nil) -> Bool {
         guard crossings > 0 else { return false }
+        // Leaderboard best (any difficulty): more crossings, or the same number
+        // in less time per crossing.  Runs recorded without a time (older
+        // callers) count as slowest, so they never replace a timed tie.
+        let avgMs = crossingSeconds.map { max(1, Int(($0 / Double(crossings) * 1000).rounded())) } ?? 0
+        let fasterTie = crossings == discoBoardBest && avgMs > 0
+            && (discoBoardAvgMs == 0 || avgMs < discoBoardAvgMs)
+        if crossings > discoBoardBest || fasterTie {
+            discoBoardBest = crossings
+            discoBoardAvgMs = avgMs
+        }
         let isBest = crossings > minigameBests[bestKey, default: 0]
         if isBest {
             minigameBests[bestKey] = crossings

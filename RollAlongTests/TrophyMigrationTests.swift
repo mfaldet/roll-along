@@ -164,7 +164,7 @@ final class TrophyMigrationTests: XCTestCase {
 
     /// A maxed-out save: past every derivable threshold in the catalog.
     /// Backfill must grant every derivable trophy (incl. the derivable
-    /// Diamonds) — but NOT the capstone (several of its 74 base trophies need
+    /// Diamonds) — but NOT the capstone (several of its 72 base trophies need
     /// live play the save can't prove) and NOT any NEW-counter/event/
     /// ownership/social metric.
     func testVeteranGrantsAllDerivableButNotCapstone() {
@@ -182,7 +182,7 @@ final class TrophyMigrationTests: XCTestCase {
             "daily_clears_50", "daily_login_30", "daily_week_streak",
             "arcade_grand_tour", "arcade_all_six", "arcade_wins_100",
             "arcade_hard_all", "snake_wins_10", "koth_hold_45",
-            "rollout_maze_10", "rollup_500m",
+            "rollup_500m",
             "disco_hard_10", "zen_10_hours", "coinpit_first_round",
             "coinpit_catch_90", "econ_pit_boss", "econ_nest_egg",
             "skill_speed_10s", "track_five", "arcade_normal_once",
@@ -193,7 +193,7 @@ final class TrophyMigrationTests: XCTestCase {
 
         // The capstone is NOT grantable from a save: 12 of its base
         // trophies (ownership, NEW counters, run/event flags) have no
-        // historical source, so the derived count can never reach 74.
+        // historical source, so the derived count can never reach 72.
         XCTAssertFalse(ids.contains("capstone_all"),
                        "capstone must not latch from backfill alone")
         XCTAssertFalse(engine.isUnlocked("capstone_all"))
@@ -208,14 +208,14 @@ final class TrophyMigrationTests: XCTestCase {
                            "\(never) needs live play — never backfilled")
         }
 
-        // The veteran holds many of the 74 capstone-base trophies, but never
+        // The veteran holds many of the 72 capstone-base trophies, but never
         // all of them.  (This used to pin an exact count; after the 2026-11
         // revision the exact number depends on how far this canned save's
         // stars, streak and level reach up the new stacks, so it is no longer
         // pinned — the lists above name what must and must not be granted.)
         let capstoneBase = Set(engine.catalog.capstone.criteria.requiredTrophyIDs ?? [])
         let grantedCapstoneBase = capstoneBase.filter { engine.isUnlocked($0) }
-        XCTAssertEqual(capstoneBase.count, 74)
+        XCTAssertEqual(capstoneBase.count, 72)
         XCTAssertGreaterThan(grantedCapstoneBase.count, 30,
                              "veteran should hold most derivable capstone-base trophies")
         XCTAssertLessThan(grantedCapstoneBase.count, capstoneBase.count)
@@ -481,7 +481,7 @@ final class TrophyMigrationTests: XCTestCase {
         writeStringSet(consecutiveDailyKeys(count: 60), key: "ra_dailyChallengeDone")
         defaults.set(45, forKey: "ra_dailyStreak")
 
-        // Minigames: all 11 played; 100+ competitive wins spread across the
+        // Minigames: all 10 played; 100+ competitive wins spread across the
         // 6 modes (≥10 each); Hard wins in all 6; big bests.
         writeStringSet(Set(TrophyMetric.minigameModeIDs), key: "ra_playedModeIDs")
         writeStringDict(["snake": 20, "sumo": 20, "paintball": 20,

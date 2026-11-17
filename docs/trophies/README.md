@@ -1,6 +1,6 @@
 # Roll Along — Trophy System
 
-> **Current list (2026-11-15):** 92 trophies shown as 47 tiles. See
+> **Current list (2026-11-15):** 90 trophies shown as 46 tiles (Pinball and Roll Out held back). See
 > [trophy-list.md](trophy-list.md). The documents below describe the earlier
 > 89-trophy design and how the system works; the system is unchanged, the
 > list is not.

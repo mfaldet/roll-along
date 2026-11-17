@@ -179,6 +179,30 @@ final class SocialClient: @unchecked Sendable {
                            prefer: "return=minimal")
     }
 
+    private struct DiscoPatch: Encodable {
+        let discoball_best: Int
+        let discoball_best_avg_ms: Int
+    }
+
+    /// Publish the Disco Ball leaderboard best (most crossings in one run, any
+    /// difficulty) and that run's average time per crossing.  Separate from
+    /// `syncMinigameStats` because these columns only exist once
+    /// docs/leaderboard-discoball.sql has been run; before that this call fails
+    /// on its own and nothing else is affected.
+    func syncDiscoBallBest(crossings: Int, averageMs: Int) async throws {
+        let me = try requireSession()
+        // Keep inside the server's sanity rule (docs/leaderboard-discoball.sql)
+        // so a real run is never refused: at most 10,000 crossings, and an
+        // average of 0 (unknown) or between 250 ms and 10 minutes.
+        let ms = averageMs <= 0 ? 0 : min(600_000, max(250, averageMs))
+        let body = DiscoPatch(discoball_best: min(10_000, max(0, crossings)),
+                              discoball_best_avg_ms: ms)
+        _ = try await send(method: "PATCH", path: "players",
+                           query: "id=eq.\(me.userId.uuidString)",
+                           bodyData: try encoder.encode(body),
+                           prefer: "return=minimal")
+    }
+
     /// Fetch a single profile by id (e.g. to show a friend's climb level).
     func fetchProfile(id: UUID) async throws -> PlayerProfile? {
         let data = try await send(method: "GET", path: "players",
@@ -190,13 +214,17 @@ final class SocialClient: @unchecked Sendable {
 
     /// Leaderboard rows, ordered by `order` (a PostgREST order clause).  The
     /// default is the climb board; minigame boards pass e.g. "zen_seconds.desc".
+    /// `extraColumns` (starting with ",") adds a board's own columns — only the
+    /// Disco Ball board uses it, so a missing Disco column can only fail that
+    /// board, never the others.
     func fetchLeaderboard(order: String = "climb_level.desc,total_stars.desc",
-                          limit: Int = 100) async throws -> [PlayerProfile] {
+                          limit: Int = 100,
+                          extraColumns: String = "") async throws -> [PlayerProfile] {
         let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
                  + "coins_collected,pinball_best,zen_seconds,goldrush_best,lives,"
                  + "snake_best,sumo_best,paintball_best,marblecup_best,koth_best,"
                  + "snake_wins,sumo_wins,paintball_wins,marblecup_wins,koth_wins,goldrush_wins,"
-                 + "rollup_best,rollup_best_seconds"
+                 + "rollup_best,rollup_best_seconds" + extraColumns
         return try await getPlayers(columns: cols, rest: "&order=\(order)&limit=\(limit)",
                                     hideExcluded: true)
     }
@@ -300,7 +328,8 @@ final class SocialClient: @unchecked Sendable {
         await withTaskGroup(of: (String, Int?).self) { group in
             for board in LeaderboardBoard.allCases {
                 group.addTask {
-                    let rows = (try? await self.fetchLeaderboard(order: board.order, limit: limit)) ?? []
+                    let rows = (try? await self.fetchLeaderboard(order: board.order, limit: limit,
+                                                                extraColumns: board.extraColumns)) ?? []
                     let rank = rows.filter { board.hasPlayed($0) }
                                    .firstIndex { $0.id == playerId }
                                    .map { $0 + 1 }
@@ -1145,6 +1174,12 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     // Roll Up: best height (meters) + the duration (seconds) of that best run.
     var rollupBest: Int?
     var rollupBestSeconds: Int?
+    // Disco Ball: most crossings in one run (any difficulty) and that run's
+    // average time per crossing, in milliseconds.  Absent until
+    // docs/leaderboard-discoball.sql is run, and only selected by the Disco
+    // Ball board.
+    var discoballBest: Int? = nil
+    var discoballBestAvgMs: Int? = nil
     // Server-managed timestamps; present on reads, omitted on writes.
     var createdAt: String?
     var updatedAt: String?
@@ -1193,6 +1228,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
          snakeWins: Int? = nil, sumoWins: Int? = nil, paintballWins: Int? = nil,
          marblecupWins: Int? = nil, kothWins: Int? = nil, goldrushWins: Int? = nil,
          rollupBest: Int? = nil, rollupBestSeconds: Int? = nil,
+         discoballBest: Int? = nil, discoballBestAvgMs: Int? = nil,
          createdAt: String? = nil, updatedAt: String? = nil,
          lastSeenAt: String? = nil, needsLivesAt: String? = nil) {
         self.id = id; self.rawDisplayName = displayName; self.climbLevel = climbLevel
@@ -1206,6 +1242,7 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         self.paintballWins = paintballWins; self.marblecupWins = marblecupWins
         self.kothWins = kothWins; self.goldrushWins = goldrushWins
         self.rollupBest = rollupBest; self.rollupBestSeconds = rollupBestSeconds
+        self.discoballBest = discoballBest; self.discoballBestAvgMs = discoballBestAvgMs
         self.createdAt = createdAt; self.updatedAt = updatedAt
         self.lastSeenAt = lastSeenAt; self.needsLivesAt = needsLivesAt
     }
@@ -1283,6 +1320,8 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case goldrushWins     = "goldrush_wins"
         case rollupBest       = "rollup_best"
         case rollupBestSeconds = "rollup_best_seconds"
+        case discoballBest      = "discoball_best"
+        case discoballBestAvgMs = "discoball_best_avg_ms"
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
@@ -1317,7 +1356,7 @@ enum BoardCategory: Int, CaseIterable {
 }
 
 enum LeaderboardBoard: String, CaseIterable, Identifiable {
-    case rollAlong, zenGarden, rollUp
+    case rollAlong, zenGarden, rollUp, discoBall
     case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
     var id: String { rawValue }
 
@@ -1325,7 +1364,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     var category: BoardCategory {
         switch self {
         case .rollAlong:                    return .adventure
-        case .zenGarden, .rollUp:           return .solo
+        case .zenGarden, .rollUp, .discoBall: return .solo
         default:                            return .competitive   // the six competitive boards
         }
     }
@@ -1336,6 +1375,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong:  return "Roll Along"
         case .zenGarden:  return "Zen Garden"
         case .rollUp:     return "Roll Up"
+        case .discoBall:  return "Disco Ball"
         case .cometClash: return "Comet Clash"
         case .sumo:       return "Sumo Survival"
         case .paintBall:  return "Paint Ball"
@@ -1367,6 +1407,8 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         // Default (Height) order; LeaderboardView swaps in the Time order when
         // the Roll Up board's sort toggle is set to Time.
         case .rollUp:     return "rollup_best.desc,rollup_best_seconds.desc"
+        // Most crossings; a tie goes to the faster average crossing.
+        case .discoBall:  return "discoball_best.desc,discoball_best_avg_ms.asc"
         case .cometClash: return "snake_wins.desc,snake_best.desc"
         case .sumo:       return "sumo_wins.desc,sumo_best.desc"
         case .paintBall:  return "paintball_wins.desc,paintball_best.desc"
@@ -1386,8 +1428,15 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong: return true                       // everyone has a climb level
         case .zenGarden: return (p.zenSeconds ?? 0) > 0
         case .rollUp:    return (p.rollupBest ?? 0) > 0
+        case .discoBall: return (p.discoballBest ?? 0) > 0
         default:         return true
         }
+    }
+
+    /// Extra columns this board needs beyond the shared leaderboard select
+    /// (passed to `fetchLeaderboard(extraColumns:)`).
+    var extraColumns: String {
+        self == .discoBall ? ",discoball_best,discoball_best_avg_ms" : ""
     }
 
     /// A compact one-line summary of the player's stats on this board — every
@@ -1401,6 +1450,9 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollAlong: return "Lv \(p.climbLevel) · \(p.totalStars)★ · \(p.coinsCollected ?? 0) coins"
         case .zenGarden: return Self.zenText(p.zenSeconds ?? 0)
         case .rollUp:    return "\(p.rollupBest ?? 0) m · \(Self.rollUpTime(p.rollupBestSeconds ?? 0))"
+        case .discoBall:
+            let n = p.discoballBest ?? 0
+            return "\(n) crossing\(n == 1 ? "" : "s") · \(Self.crossingTime(p.discoballBestAvgMs ?? 0)) each"
         default:         return ""
         }
     }
@@ -1424,6 +1476,12 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     /// Seconds → "1m 20s" / "45s" (KotH hold time — keeps the seconds).
     static func holdText(_ s: Int) -> String {
         s >= 60 ? "\(s / 60)m \(s % 60)s" : "\(s)s"
+    }
+    /// Milliseconds → "4.3 s" (Disco Ball average time per crossing);
+    /// "—" when unknown.
+    static func crossingTime(_ ms: Int) -> String {
+        guard ms > 0 else { return "—" }
+        return String(format: "%.1f s", Double(ms) / 1000)
     }
     /// Seconds → "m:ss" clock (Roll Up run duration), e.g. 125 → "2:05".
     static func rollUpTime(_ s: Int) -> String {

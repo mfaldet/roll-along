@@ -618,28 +618,6 @@
       "addedInVersion": "1.0"
     },
     {
-      "id": "rollout_first_maze",
-      "title": "Out of the Woods",
-      "tier": "bronze",
-      "category": "minigames_per_game",
-      "secret": false,
-      "lockedDescription": "Reach the goal of your first Roll Out maze.",
-      "unlockedDescription": "First maze solved — you're out of the woods.",
-      "criteria": { "metric": "rollout_best_maze", "threshold": 1 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "rollout_maze_10",
-      "title": "Ten-Maze March",
-      "tier": "silver",
-      "category": "minigames_per_game",
-      "secret": false,
-      "lockedDescription": "Reach maze 10 in Roll Out.",
-      "unlockedDescription": "Ten mazes deep. The ten-maze march is complete.",
-      "criteria": { "metric": "rollout_best_maze", "threshold": 10 },
-      "addedInVersion": "1.0"
-    },
-    {
       "id": "rollup_100m",
       "title": "The Only Way Is Up",
       "tier": "bronze",
@@ -1009,10 +987,10 @@
       "category": "capstone",
       "secret": false,
       "lockedDescription": "Unlock every visible Bronze, Silver, and Gold trophy.",
-      "unlockedDescription": "All 74 visible Bronze, Silver, and Gold trophies. Platinum. The rarest roll of all.",
+      "unlockedDescription": "All 72 visible Bronze, Silver, and Gold trophies. Platinum. The rarest roll of all.",
       "criteria": {
         "metric": "base_trophies_unlocked",
-        "threshold": 74,
+        "threshold": 72,
         "requiredTrophyIDs": [
           "climb_first_clear",
           "climb_level_10",
@@ -1065,8 +1043,6 @@
           "marblecup_wins_10",
           "koth_first_win",
           "koth_hold_45",
-          "rollout_first_maze",
-          "rollout_maze_10",
           "rollup_100m",
           "rollup_500m",
           "disco_cross_25",
@@ -1142,8 +1118,6 @@
       "trophies": ["koth_first_win"] },
     { "id": "koth_hold_45", "kind": "feat", "title": "Squatter's Rights", "section": "minigames", "subsection": "King of the Hill", "icon": "hourglass", "fallbackIcon": "clock.fill",
       "trophies": ["koth_hold_45"] },
-    { "id": "stack_rollout_mazes", "kind": "stack", "title": "Mazes cleared", "section": "minigames", "subsection": "Roll Out", "icon": "arrow.triangle.turn.up.right.diamond.fill", "fallbackIcon": "square.grid.3x3.fill",
-      "trophies": ["rollout_first_maze", "rollout_maze_10"] },
     { "id": "stack_rollup_height", "kind": "stack", "title": "Height", "section": "minigames", "subsection": "Roll Up", "icon": "arrow.up.circle.fill", "fallbackIcon": "arrow.up",
       "trophies": ["rollup_100m", "rollup_500m"] },
     { "id": "stack_disco_crossings", "kind": "stack", "title": "Crossings", "section": "minigames", "subsection": "Disco Ball", "icon": "figure.dance", "fallbackIcon": "music.note",
