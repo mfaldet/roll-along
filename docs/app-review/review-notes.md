@@ -33,7 +33,7 @@ NAMES AND CHAT — NO USER-WRITTEN CONTENT
 Players cannot type any text that other players see. A nickname (Settings > Nickname) is two words chosen from preset lists, shown with the player's level beside it; a clan name is two preset words plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
 
 CLANS AND THE MONTHLY CLAN BATTLE
-A clan holds up to 12 players. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week.
+A clan holds up to 12 players. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week. Each player has a short friend code on their profile (letters and digits only, assigned by our server); another player can type it on the Friends screen to send a friend request. The code is not shown to anyone unless the player shares it.
 
 Clans compete each calendar month. A clan's season score is the number of new stars its members earn in the main game that month; it is counted by our server. Clans > Rankings lists clans by season score (or by total levels or total stars). At the end of the month the server ranks the clans, and members of ranked clans who contributed receive in-game coins (250 to 3,000 depending on the clan's tier), which they claim on the Clans screen. The first season, December 2026, is a warm-up with no prizes. There is no entry fee and nothing to buy to take part; the result depends only on play. Coins are the game's soft currency: they buy cosmetic items only, have no cash value, and cannot be traded, transferred or cashed out.
 

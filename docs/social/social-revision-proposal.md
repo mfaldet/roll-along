@@ -15,9 +15,18 @@ design.
 - A player's Adventure level is their public standing: a badge that is part
   of their name everywhere. A nickname is two preset words with no number
   and is not unique; the level sits where the number used to be
-  (`PlayerNameLabel`). In the minigames the computer opponents' tags carry a
-  show level near the player's own, dealt with their name.
-- Friends and clan lists show levels gained this week.
+  (`PlayerNameLabel`). Computer opponents in the minigames show their name
+  only: the level badge is for real players.
+- Friends and clan lists show levels gained this week (weeks start Monday,
+  Eastern time).
+- **One clock:** everything social runs on Eastern time (America/New_York):
+  seasons, the daily star cap, weekly pace and the one-gift-per-friend-per-day
+  limit.
+- **Friend codes:** every player has an eight-character code on their profile
+  (for example AF3K-7MXY), built from 15 characters that are easy to read
+  aloud: A F H J K M R W X Y 3 4 6 7 9. Friends → Add by code finds that
+  exact player, so duplicate names never get in the way. The invite message
+  includes the code. Database: section 10 of `docs/social-schema-v5.sql`.
 - A clan holds up to **12** members.
 - Clans compete in a **monthly clan battle** with coin prizes. It ships in
   version 1.0.
@@ -93,7 +102,7 @@ member list.
 
 | Column | Holds |
 |---|---|
-| `week_start` | The Monday (UTC) of the week the baseline belongs to |
+| `week_start` | The Monday (Eastern time) of the week the baseline belongs to |
 | `week_start_level` | The player's level when that week began |
 | `week_start_stars` | The player's stars when that week began |
 
