@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // ===========================================================================
 // FriendsView — the social pillar's home: gifts, friend requests, friends,
