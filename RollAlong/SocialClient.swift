@@ -179,30 +179,6 @@ final class SocialClient: @unchecked Sendable {
                            prefer: "return=minimal")
     }
 
-    private struct DiscoPatch: Encodable {
-        let discoball_best: Int
-        let discoball_best_avg_ms: Int
-    }
-
-    /// Publish the Disco Ball leaderboard best (most crossings in one run, any
-    /// difficulty) and that run's average time per crossing.  Separate from
-    /// `syncMinigameStats` because these columns only exist once
-    /// docs/leaderboard-discoball.sql has been run; before that this call fails
-    /// on its own and nothing else is affected.
-    func syncDiscoBallBest(crossings: Int, averageMs: Int) async throws {
-        let me = try requireSession()
-        // Keep inside the server's sanity rule (docs/leaderboard-discoball.sql)
-        // so a real run is never refused: at most 10,000 crossings, and an
-        // average of 0 (unknown) or between 250 ms and 10 minutes.
-        let ms = averageMs <= 0 ? 0 : min(600_000, max(250, averageMs))
-        let body = DiscoPatch(discoball_best: min(10_000, max(0, crossings)),
-                              discoball_best_avg_ms: ms)
-        _ = try await send(method: "PATCH", path: "players",
-                           query: "id=eq.\(me.userId.uuidString)",
-                           bodyData: try encoder.encode(body),
-                           prefer: "return=minimal")
-    }
-
     /// Fetch a single profile by id (e.g. to show a friend's climb level).
     // MARK: - Friend codes (docs/social-schema-v5.sql, section 10)
 
@@ -241,17 +217,14 @@ final class SocialClient: @unchecked Sendable {
 
     /// Leaderboard rows, ordered by `order` (a PostgREST order clause).  The
     /// default is the climb board; minigame boards pass e.g. "zen_seconds.desc".
-    /// `extraColumns` (starting with ",") adds a board's own columns — only the
-    /// Disco Ball board uses it, so a missing Disco column can only fail that
-    /// board, never the others.
+    /// Boards kept per difficulty use `fetchMinigameDifficultyLeaderboard`.
     func fetchLeaderboard(order: String = "climb_level.desc,total_stars.desc",
-                          limit: Int = 100,
-                          extraColumns: String = "") async throws -> [PlayerProfile] {
+                          limit: Int = 100) async throws -> [PlayerProfile] {
         let cols = "id,display_name,climb_level,highest_unlocked,total_stars,"
                  + "coins_collected,pinball_best,zen_seconds,goldrush_best,lives,"
                  + "snake_best,sumo_best,paintball_best,marblecup_best,koth_best,"
                  + "snake_wins,sumo_wins,paintball_wins,marblecup_wins,koth_wins,goldrush_wins,"
-                 + "rollup_best,rollup_best_seconds" + extraColumns
+                 + "rollup_best,rollup_best_seconds"
         return try await getPlayers(columns: cols, rest: "&order=\(order)&limit=\(limit)",
                                     hideExcluded: true)
     }
@@ -286,15 +259,24 @@ final class SocialClient: @unchecked Sendable {
         let difficulty: String
         let wins: Int
         let best: Int
+        /// Disco Ball only: the best run's average time per crossing (ms).
+        /// Left out of the request when nil (the competitive games).
+        let best_avg_ms: Int?
     }
 
-    /// Upsert this player's wins + best for one competitive game at one
-    /// difficulty.  Best-effort; signed-in only (the caller wraps it in try?).
+    /// Upsert this player's wins + best for one game at one difficulty
+    /// (the six competitive games, and Disco Ball as game "disco" with
+    /// `bestAvgMs`).  Best-effort; signed-in only (the caller wraps it in try?).
     func syncMinigameScore(game: String, difficulty: String,
-                           wins: Int, best: Int) async throws {
+                           wins: Int, best: Int, bestAvgMs: Int? = nil) async throws {
         let me = try requireSession()
+        // Keep Disco Ball times inside the server's sanity rule
+        // (docs/leaderboard-discoball.sql) so a real run is never refused.
+        let avg = bestAvgMs.map { min(600_000, max(250, $0)) }
         let body = MinigameScoreUpsert(player_id: me.userId.uuidString, game: game,
-                                       difficulty: difficulty, wins: wins, best: best)
+                                       difficulty: difficulty,
+                                       wins: max(0, wins), best: max(0, best),
+                                       best_avg_ms: avg)
         _ = try await send(method: "POST", path: "minigame_scores",
                            query: "on_conflict=player_id,game,difficulty",
                            bodyData: try encoder.encode(body),
@@ -305,6 +287,7 @@ final class SocialClient: @unchecked Sendable {
         let player_id: UUID
         let wins: Int
         let best: Int
+        let best_avg_ms: Int?
         let players: Embedded?
         struct Embedded: Decodable {
             let display_name: String?
@@ -315,14 +298,19 @@ final class SocialClient: @unchecked Sendable {
         }
     }
 
-    /// Per-(game, difficulty) leaderboard rows, ranked by wins then best.  Mapped
-    /// onto `PlayerProfile` with the chosen game's wins/best fields holding the
+    /// Per-(game, difficulty) leaderboard rows.  Competitive games rank by
+    /// wins, then best; Disco Ball ("disco") by most crossings, then the
+    /// faster average time per crossing (an unknown time last).  Mapped onto
+    /// `PlayerProfile` with the chosen game's fields holding the
     /// per-difficulty values, so the leaderboard renders them like any board.
     func fetchMinigameDifficultyLeaderboard(game: String, difficulty: String,
                                             limit: Int = 100) async throws -> [PlayerProfile] {
-        let sel = "player_id,wins,best,players(display_name,climb_level,total_stars,highest_unlocked,lives)"
+        let isDisco = game == "disco"
+        let sel = "player_id,wins,best" + (isDisco ? ",best_avg_ms" : "")
+                + ",players(display_name,climb_level,total_stars,highest_unlocked,lives)"
+        let order = isDisco ? "best.desc,best_avg_ms.asc.nullslast" : "wins.desc,best.desc"
         let query = "select=\(sel)&game=eq.\(game)&difficulty=eq.\(difficulty)"
-                  + "&order=wins.desc,best.desc&limit=\(limit)"
+                  + "&order=\(order)&limit=\(limit)"
         let data = try await send(method: "GET", path: "minigame_scores", query: query)
         let rows = try decode([MinigameScoreRow].self, from: data)
         return rows.map { row in
@@ -340,6 +328,7 @@ final class SocialClient: @unchecked Sendable {
             case "goldrush":  prof.goldrushWins = row.wins;  prof.goldrushBest = row.best
             case "marblecup": prof.marblecupWins = row.wins; prof.marblecupBest = row.best
             case "koth":      prof.kothWins = row.wins;      prof.kothBest = row.best
+            case "disco":     prof.discoballBest = row.best; prof.discoballBestAvgMs = row.best_avg_ms
             default: break
             }
             return prof
@@ -355,8 +344,10 @@ final class SocialClient: @unchecked Sendable {
         await withTaskGroup(of: (String, Int?).self) { group in
             for board in LeaderboardBoard.allCases {
                 group.addTask {
-                    let rows = (try? await self.fetchLeaderboard(order: board.order, limit: limit,
-                                                                extraColumns: board.extraColumns)) ?? []
+                    // Boards kept per difficulty are ranked by
+                    // `fetchMinigameDifficultyRanks` instead.
+                    if board.difficultyGameID != nil { return (board.rawValue, nil) }
+                    let rows = (try? await self.fetchLeaderboard(order: board.order, limit: limit)) ?? []
                     let rank = rows.filter { board.hasPlayed($0) }
                                    .firstIndex { $0.id == playerId }
                                    .map { $0 + 1 }
@@ -1429,7 +1420,29 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         }
     }
 
-    /// PostgREST order clause.  Competitive boards rank by wins, then best.
+    /// The game id in `minigame_scores` for a board kept PER DIFFICULTY (three
+    /// tabs: Easy / Normal / Hard), or nil for a board with no difficulty
+    /// levels (Adventure, Zen Garden, Roll Up).  The six competitive games and
+    /// Disco Ball.  A run counts only on its own difficulty's board.
+    var difficultyGameID: String? {
+        if let mode = competitiveModeID { return mode }
+        return self == .discoBall ? "disco" : nil
+    }
+
+    /// The tab label for a difficulty ("easy" / "normal" / "hard") on this
+    /// board — the game's own names: Disco Ball's hardest level is "Hardcore".
+    func difficultyLabel(_ key: String) -> String {
+        switch key {
+        case "easy":   return "Easy"
+        case "normal": return "Normal"
+        case "hard":   return self == .discoBall ? "Hardcore" : "Hard"
+        default:       return key.capitalized
+        }
+    }
+
+    /// PostgREST order clause on `players` (boards without difficulty).  The
+    /// per-difficulty boards are ordered by `fetchMinigameDifficultyLeaderboard`;
+    /// their entries here are the old all-difficulty orders, no longer shown.
     var order: String {
         switch self {
         case .rollAlong:  return "climb_level.desc,total_stars.desc"
@@ -1437,8 +1450,8 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         // Default (Height) order; LeaderboardView swaps in the Time order when
         // the Roll Up board's sort toggle is set to Time.
         case .rollUp:     return "rollup_best.desc,rollup_best_seconds.desc"
-        // Most crossings; a tie goes to the faster average crossing.
-        case .discoBall:  return "discoball_best.desc,discoball_best_avg_ms.asc"
+        // Per difficulty only (minigame_scores); never read from `players`.
+        case .discoBall:  return "climb_level.desc"
         case .cometClash: return "snake_wins.desc,snake_best.desc"
         case .sumo:       return "sumo_wins.desc,sumo_best.desc"
         case .paintBall:  return "paintball_wins.desc,paintball_best.desc"
@@ -1461,12 +1474,6 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .discoBall: return (p.discoballBest ?? 0) > 0
         default:         return true
         }
-    }
-
-    /// Extra columns this board needs beyond the shared leaderboard select
-    /// (passed to `fetchLeaderboard(extraColumns:)`).
-    var extraColumns: String {
-        self == .discoBall ? ",discoball_best,discoball_best_avg_ms" : ""
     }
 
     /// A compact one-line summary of the player's stats on this board — every

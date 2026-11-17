@@ -363,15 +363,50 @@ final class GameState: ObservableObject {
     }
     /// Best Roll Up height in meters (mirrors minigameBests["rollup"]).
     var rollupBest: Int { minigameBests["rollup", default: 0] }
-    /// Disco Ball leaderboard: the most crossings in one run on ANY difficulty,
-    /// and that run's average time per crossing in milliseconds (only the
-    /// rolling counts, not memorizing).  A tie on crossings keeps the faster run.
-    @Published var discoBoardBest: Int {
-        didSet { defaults.set(discoBoardBest, forKey: "ra_discoBoardBest") }
+    /// Disco Ball leaderboards are kept PER DIFFICULTY (Easy / Normal /
+    /// Hardcore).  The best crossings for each live in `minigameBests` under
+    /// "discoeasy" / "disco" / "discohard"; this holds the average time per
+    /// crossing (milliseconds, only the rolling counts) of each difficulty's
+    /// best run, keyed "easy" / "normal" / "hard".  0 or missing = unknown
+    /// (a best set before the time was recorded).
+    @Published var discoBestAvgMs: [String: Int] {
+        didSet { save(discoBestAvgMs, trackProgressKey: "ra_discoBestAvgMs") }
     }
-    @Published var discoBoardAvgMs: Int {
-        didSet { defaults.set(discoBoardAvgMs, forKey: "ra_discoBoardAvgMs") }
+    /// The Disco Ball best-crossings key in `minigameBests` for a difficulty.
+    static func discoBestKey(_ difficulty: MinigameDifficulty) -> String {
+        switch difficulty {
+        case .easy:   return "discoeasy"
+        case .normal: return "disco"
+        case .hard:   return "discohard"
+        }
     }
+    /// The difficulty a Disco Ball best key belongs to.
+    static func discoDifficulty(forBestKey key: String) -> MinigameDifficulty {
+        switch key {
+        case "discoeasy": return .easy
+        case "discohard": return .hard
+        default:          return .normal
+        }
+    }
+    /// Most crossings in one Disco Ball run on any difficulty (the profile's
+    /// summary line and the leaderboard picker's "most played" order).
+    var discoBoardBest: Int {
+        MinigameDifficulty.allCases.map { minigameBests[Self.discoBestKey($0), default: 0] }.max() ?? 0
+    }
+    /// The average time per crossing of the run behind `discoBoardBest`
+    /// (the fastest among difficulties tied on crossings); 0 when unknown.
+    var discoBoardAvgMs: Int {
+        let best = discoBoardBest
+        guard best > 0 else { return 0 }
+        let times = MinigameDifficulty.allCases
+            .filter { minigameBests[Self.discoBestKey($0), default: 0] == best }
+            .compactMap { discoBestAvgMs[$0.rawValue] }
+            .filter { $0 > 0 }
+        return times.min() ?? 0
+    }
+    /// Per-difficulty leaderboard rows are uploaded once per launch from what
+    /// this device already knows (see `backfillDifficultyScores`).
+    private var didBackfillDifficultyScores = false
     // goldrushCoinsTotal — lifetime coins caught across all Gold Rush runs
     // (accumulates; powers the home "coins earned" readout).
     @Published var goldrushCoinsTotal: Int {
@@ -835,16 +870,9 @@ final class GameState: ObservableObject {
         zenSeconds   = max(0, defaults.integer(forKey: "ra_zenSeconds"))
         goldrushBest = max(0, defaults.integer(forKey: "ra_goldrushBest"))
         rollupBestSeconds = max(0, defaults.integer(forKey: "ra_rollupBestSeconds"))
-        // Existing players: until a Disco Ball board best is saved, seed it
-        // from the per-difficulty bests they already hold (average time
-        // unknown → 0, shown as "—" until a longer run or a timed tie records
-        // one).  Read straight from storage: `self` is not ready yet here.
-        let savedDiscoBests = Self.loadTrackProgress(key: "ra_minigameBests", defaults)
-        discoBoardBest  = max(0, defaults.integer(forKey: "ra_discoBoardBest"),
-                              savedDiscoBests["discoeasy", default: 0],
-                              savedDiscoBests["disco", default: 0],
-                              savedDiscoBests["discohard", default: 0])
-        discoBoardAvgMs = max(0, defaults.integer(forKey: "ra_discoBoardAvgMs"))
+        // Per-difficulty Disco Ball average times.  Bests set before times
+        // were recorded have none (shown as "—").
+        discoBestAvgMs = Self.loadTrackProgress(key: "ra_discoBestAvgMs", defaults)
         goldrushCoinsTotal = max(0, defaults.integer(forKey: "ra_goldrushCoinsTotal"))
         tickets = min(max(0, defaults.integer(forKey: "ra_tickets")),
                       Self.maxTicketBalance)
@@ -2170,10 +2198,71 @@ final class GameState: ObservableObject {
             goldrushWins: minigameWins["goldrush"],
             rollupBest: minigameBests["rollup"],
             rollupBestSeconds: rollupBestSeconds > 0 ? rollupBestSeconds : nil,
+            // Best of the three Disco Ball difficulties (the profile summary);
+            // the leaderboards themselves are per difficulty.
             discoballBest: discoBoardBest > 0 ? discoBoardBest : nil,
             discoballBestAvgMs: discoBoardAvgMs > 0 ? discoBoardAvgMs : nil
         )
     }
+
+    /// Publish one difficulty's Disco Ball best to its leaderboard
+    /// (`minigame_scores`, game "disco").  Best-effort; a no-op signed out.
+    /// Fails harmlessly until docs/leaderboard-discoball.sql is run.
+    func syncDiscoScore(_ difficulty: MinigameDifficulty) {
+        guard SocialClient.shared.isSignedIn else { return }
+        let best = minigameBests[Self.discoBestKey(difficulty), default: 0]
+        guard best > 0 else { return }
+        let avg = discoBestAvgMs[difficulty.rawValue, default: 0]
+        Task {
+            try? await SocialClient.shared.syncMinigameScore(
+                game: "disco", difficulty: difficulty.rawValue,
+                wins: 0, best: best, bestAvgMs: avg > 0 ? avg : nil)
+        }
+    }
+
+    /// Once per launch, upload every per-difficulty leaderboard row this
+    /// device already knows: the six competitive games' wins and bests for
+    /// each difficulty played, and each Disco Ball difficulty's best.  The
+    /// device has always kept these per difficulty, so nothing is guessed;
+    /// this fills the per-difficulty boards for players whose rows were never
+    /// sent (Disco Ball, and competitive games played before the
+    /// per-difficulty boards existed).
+    private func backfillDifficultyScores() {
+        guard SocialClient.shared.isSignedIn, !didBackfillDifficultyScores else { return }
+        didBackfillDifficultyScores = true
+        var rows: [(game: String, difficulty: String, wins: Int, best: Int, avg: Int?)] = []
+        for mode in Self.competitiveDifficultyModeIDs {
+            for d in MinigameDifficulty.allCases {
+                let key = Self.minigameDifficultyKey(mode, d)
+                let wins = minigameDifficultyWins[key, default: 0]
+                let best = minigameDifficultyBests[key, default: 0]
+                let plays = minigameDifficultyPlays[key, default: 0]
+                if wins > 0 || best > 0 || plays > 0 {
+                    rows.append((game: mode, difficulty: d.rawValue, wins: wins, best: best, avg: nil))
+                }
+            }
+        }
+        for d in MinigameDifficulty.allCases {
+            let best = minigameBests[Self.discoBestKey(d), default: 0]
+            let avg = discoBestAvgMs[d.rawValue, default: 0]
+            if best > 0 {
+                rows.append((game: "disco", difficulty: d.rawValue, wins: 0, best: best,
+                             avg: avg > 0 ? avg : nil))
+            }
+        }
+        guard !rows.isEmpty else { return }
+        Task {
+            for r in rows {
+                try? await SocialClient.shared.syncMinigameScore(
+                    game: r.game, difficulty: r.difficulty,
+                    wins: r.wins, best: r.best, bestAvgMs: r.avg)
+            }
+        }
+    }
+
+    /// The competitive games with per-difficulty leaderboards (mode ids, as
+    /// stored in `minigame_scores.game`).
+    static let competitiveDifficultyModeIDs = ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"]
 
     /// Publish the minigame + competitive personal bests/wins to the leaderboard
     /// (no-op signed out).
@@ -2190,15 +2279,8 @@ final class GameState: ObservableObject {
         let mcB = minigameBests["marblecup", default: 0], mcW = minigameWins["marblecup", default: 0]
         let koB = minigameBests["koth", default: 0],      koW = minigameWins["koth", default: 0]
         let ruB = minigameBests["rollup", default: 0],    ruS = rollupBestSeconds
-        let dB = discoBoardBest, dMs = discoBoardAvgMs
+        backfillDifficultyScores()
         Task {
-            // Disco Ball goes in its own request: its columns arrive with
-            // docs/leaderboard-discoball.sql, and until then the server refuses
-            // any write naming them.  Kept separate so that refusal can never
-            // block the other minigame stats.
-            if dB > 0 {
-                try? await SocialClient.shared.syncDiscoBallBest(crossings: dB, averageMs: dMs)
-            }
             try? await SocialClient.shared.syncMinigameStats(
                 pinballBest: p, zenSeconds: z,
                 goldrushBest: g, goldrushWins: gw,
@@ -2296,15 +2378,18 @@ final class GameState: ObservableObject {
     func recordDiscoResult(bestKey: String, crossings: Int,
                            crossingSeconds: Double? = nil) -> Bool {
         guard crossings > 0 else { return false }
-        // Leaderboard best (any difficulty): more crossings, or the same number
-        // in less time per crossing.  Runs recorded without a time (older
-        // callers) count as slowest, so they never replace a timed tie.
+        // Leaderboards are per difficulty: this run only competes with the
+        // best for ITS difficulty.  More crossings wins; the same number in
+        // less time per crossing keeps the time.  A run recorded without a
+        // time counts as slowest, so it never replaces a timed tie.
+        let difficulty = Self.discoDifficulty(forBestKey: bestKey)
         let avgMs = crossingSeconds.map { max(1, Int(($0 / Double(crossings) * 1000).rounded())) } ?? 0
-        let fasterTie = crossings == discoBoardBest && avgMs > 0
-            && (discoBoardAvgMs == 0 || avgMs < discoBoardAvgMs)
-        if crossings > discoBoardBest || fasterTie {
-            discoBoardBest = crossings
-            discoBoardAvgMs = avgMs
+        let previousBest = minigameBests[bestKey, default: 0]
+        let previousAvg = discoBestAvgMs[difficulty.rawValue, default: 0]
+        let fasterTie = crossings == previousBest && avgMs > 0
+            && (previousAvg == 0 || avgMs < previousAvg)
+        if crossings > previousBest || fasterTie {
+            discoBestAvgMs[difficulty.rawValue] = avgMs
         }
         let isBest = crossings > minigameBests[bestKey, default: 0]
         if isBest {
@@ -2312,6 +2397,8 @@ final class GameState: ObservableObject {
             addCoins(Self.minigameBestBonus)
         }
         syncMinigameStats()
+        // This difficulty's leaderboard row (best crossings + its time).
+        syncDiscoScore(difficulty)
         // disco_cross_25 (max over all 3 difficulty keys) / disco_hard_10
         // (discohard only) ride the just-written bests (S1-T4).
         recordDiscoTrophies()

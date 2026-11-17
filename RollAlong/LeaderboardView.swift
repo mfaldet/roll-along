@@ -28,7 +28,8 @@ struct LeaderboardView: View {
 
     @State private var sortKey:       SortKey         = .level
     @State private var selectedBoard: LeaderboardBoard = .rollAlong
-    @State private var diffFilter:    DiffFilter      = .overall
+    @State private var diffFilter:    DiffFilter      = .normal
+    @State private var pickedStartTab = false
     @State private var rollUpSort:    RollUpSort      = .height
     @State private var showBoardPicker = false
 
@@ -54,21 +55,14 @@ struct LeaderboardView: View {
         var id: String { rawValue }
     }
 
-    /// Difficulty filter for the competitive boards.  `.overall` is the combined
-    /// all-difficulty totals (today's aggregate); the others rank by that
-    /// difficulty's per-(game,difficulty) `minigame_scores` rows.
+    /// The difficulty tab on a board kept per difficulty (the six competitive
+    /// games and Disco Ball).  Each tab ranks that difficulty's own
+    /// `minigame_scores` rows; there is no combined board.
     private enum DiffFilter: String, CaseIterable, Identifiable {
-        case overall = "Overall", easy = "Easy", normal = "Normal", hard = "Hard"
+        case easy, normal, hard
         var id: String { rawValue }
-        /// nil for Overall (aggregate); else the MinigameDifficulty rawValue.
-        var key: String? {
-            switch self {
-            case .overall: return nil
-            case .easy:    return "easy"
-            case .normal:  return "normal"
-            case .hard:    return "hard"
-            }
-        }
+        /// The MinigameDifficulty rawValue stored in `minigame_scores`.
+        var key: String { rawValue }
     }
 
     // The set of boards (identity / ranking order / "has played") lives in the
@@ -122,10 +116,16 @@ struct LeaderboardView: View {
                 }
             }
         }
-        .task { await load() }
-        .onChange(of: selectedBoard) { _, board in
-            // Difficulty only applies to competitive boards; reset it otherwise.
-            if board.competitiveModeID == nil { diffFilter = .overall }
+        .task {
+            // Open the difficulty tabs on the difficulty the player plays.
+            if !pickedStartTab {
+                pickedStartTab = true
+                diffFilter = DiffFilter(rawValue: gameState.minigameDifficulty.rawValue) ?? .normal
+            }
+            await load()
+        }
+        .onChange(of: selectedBoard) { _, _ in
+            // The difficulty tab carries over between boards that have one.
             rows = []
             Task { await load() }
         }
@@ -495,9 +495,10 @@ struct LeaderboardView: View {
                     .presentationDragIndicator(.visible)
             }
 
-            // Difficulty selector — competitive boards only, sits above the sort.
-            // Overall = the combined totals; Easy/Normal/Hard = per-difficulty.
-            if selectedBoard.competitiveModeID != nil {
+            // Difficulty tabs — every board kept per difficulty (the six
+            // competitive games and Disco Ball).  A run counts only on the
+            // board for the difficulty it was played on.
+            if selectedBoard.difficultyGameID != nil {
                 HStack(spacing: 0) {
                     ForEach(DiffFilter.allCases) { d in
                         diffSegment(d)
@@ -583,14 +584,14 @@ struct LeaderboardView: View {
         .buttonStyle(.plain)
     }
 
-    /// One segment of the difficulty selector (Overall / Easy / Normal / Hard),
-    /// full-width so the four share the row.
+    /// One tab of the difficulty selector (Easy / Normal / Hard — "Hardcore"
+    /// on Disco Ball), full-width so the three share the row.
     private func diffSegment(_ d: DiffFilter) -> some View {
         let active = (diffFilter == d)
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) { diffFilter = d }
         } label: {
-            Text(d.rawValue)
+            Text(selectedBoard.difficultyLabel(d.key))
                 .font(.system(.footnote, design: .rounded).weight(.bold))
                 .foregroundStyle(active ? Self.starTint : Color(white: 0.55))
                 .lineLimit(1).minimumScaleFactor(0.8)
@@ -706,19 +707,18 @@ struct LeaderboardView: View {
         isLoading = true
         errorText = nil
         do {
-            if let game = selectedBoard.competitiveModeID, let diff = diffFilter.key {
+            if let game = selectedBoard.difficultyGameID {
                 // Per-(game, difficulty) board from the minigame_scores table.
                 rows = try await SocialClient.shared.fetchMinigameDifficultyLeaderboard(
-                    game: game, difficulty: diff)
+                    game: game, difficulty: diffFilter.key)
             } else {
                 // Roll Up swaps in its Height/Time order; every other board uses
                 // its fixed server order.
                 let order = selectedBoard == .rollUp ? rollUpSort.order : selectedBoard.order
-                rows = try await SocialClient.shared.fetchLeaderboard(
-                    order: order, extraColumns: selectedBoard.extraColumns)
+                rows = try await SocialClient.shared.fetchLeaderboard(order: order)
             }
         } catch SocialError.http(let status, _) where status == 400 && selectedBoard == .discoBall {
-            // The Disco Ball columns arrive with docs/leaderboard-discoball.sql.
+            // The Disco Ball time column arrives with docs/leaderboard-discoball.sql.
             rows = []
             errorText = "Disco Ball rankings are not available yet."
         } catch {
