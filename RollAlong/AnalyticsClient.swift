@@ -133,11 +133,17 @@ final class AnalyticsClient: @unchecked Sendable {
         isFlushing = true
         lock.unlock()
         Task { [weak self] in
-            await self?.send(batch)
-            self?.lock.lock()
-            self?.isFlushing = false
-            self?.lock.unlock()
+            await self?.sendInChunks(batch)
+            self?.endFlushing()
         }
+    }
+
+    /// Releases the in-flight slot.  Synchronous: NSLock's lock()/unlock()
+    /// are unavailable from async contexts (a warning in Swift 5 mode).
+    private func endFlushing() {
+        lock.lock()
+        isFlushing = false
+        lock.unlock()
     }
 
     /// Put a batch that could not be delivered back at the FRONT of the
@@ -172,27 +178,68 @@ final class AnalyticsClient: @unchecked Sendable {
     /// once, so a bad event cannot hold back the rest; an event rejected on
     /// its own is dropped with the reason logged.  Anything that fails for a
     /// network or server reason goes back to the buffer for the next flush.
-    private func send(_ batch: [PendingEvent]) async {
-        guard !batch.isEmpty else { return }
-        switch await post(batch) {
-        case .sent:
-            return
-        case .retryLater(let why):
-            requeue(batch)
-            #if DEBUG
-            print("[Analytics] \(why), re-queued \(batch.count) events")
-            #endif
-        case .rejected(let status, let reason):
-            if batch.count == 1 {
-                #if DEBUG
-                print("[Analytics] dropped event \(batch[0].eventName): HTTP \(status) \(reason)")
-                #endif
+    /// Most events in one POST, and most refused POSTs one flush may make
+    /// while splitting.  Together they bound the requests a flush can make
+    /// even if the server refuses every event (a missing column, say): past
+    /// the budget the rest of the refused events are dropped with one log
+    /// line instead of each being tried on its own.
+    private static let maxEventsPerPost = 50
+    private static let rejectedPostBudget = 24
+
+    /// Send a flushed batch in chunks of `maxEventsPerPost`, in order.  If a
+    /// chunk has to wait (network or server trouble), it and every later
+    /// chunk go back to the buffer together, oldest first.
+    private func sendInChunks(_ batch: [PendingEvent]) async {
+        var budget = Self.rejectedPostBudget
+        var start = 0
+        while start < batch.count {
+            let end = min(start + Self.maxEventsPerPost, batch.count)
+            let waiting = await send(Array(batch[start..<end]), budget: &budget)
+            if !waiting.isEmpty {
+                requeue(waiting + Array(batch[end...]))
                 return
             }
-            let mid = batch.count / 2
-            await send(Array(batch[..<mid]))
-            await send(Array(batch[mid...]))
+            start = end
         }
+    }
+
+    /// Deliver one chunk.  Returns the events that must wait for the next
+    /// flush (network or server trouble), in their original order.
+    private func send(_ batch: [PendingEvent], budget: inout Int) async -> [PendingEvent] {
+        guard !batch.isEmpty else { return [] }
+        switch await post(batch) {
+        case .sent:
+            return []
+        case .retryLater(let why):
+            debugLog("[Analytics] \(why), re-queued \(batch.count) events")
+            return batch
+        case .rejected(let status, let reason):
+            budget -= 1
+            if batch.count == 1 {
+                debugLog("[Analytics] dropped event \(batch[0].eventName): HTTP \(status) \(reason)")
+                return []
+            }
+            if budget <= 0 {
+                debugLog("[Analytics] dropped \(batch.count) events after repeated rejections: HTTP \(status) \(reason)")
+                return []
+            }
+            let mid = batch.count / 2
+            let left = await send(Array(batch[..<mid]), budget: &budget)
+            if !left.isEmpty {
+                // The network went away part-way: keep the rest, in order.
+                return left + Array(batch[mid...])
+            }
+            return await send(Array(batch[mid...]), budget: &budget)
+        }
+    }
+
+    /// Prints in DEBUG builds only.  A function rather than `#if DEBUG` at
+    /// the call site so the values bound for the message (`why`, `status`,
+    /// `reason`) still count as used in Release builds.
+    private func debugLog(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        print(message())
+        #endif
     }
 
     private func post(_ batch: [PendingEvent]) async -> PostOutcome {
