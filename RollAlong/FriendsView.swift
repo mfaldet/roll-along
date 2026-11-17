@@ -943,8 +943,7 @@ struct SeasonStarsLabel: View {
     }
 }
 
-/// The signed-in player's friend code, shown on their own profile, with Copy
-/// and Share.  Draws nothing when signed out or before the server has codes.
+/// The signed-in player's friend code, shown on their own profile, with Copy.  Draws nothing when signed out or before the server has codes.
 struct FriendCodeCard: View {
     @ObservedObject private var auth = AppleAuthManager.shared
     @State private var code: String?

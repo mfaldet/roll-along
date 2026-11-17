@@ -46,6 +46,10 @@ struct RollAlongApp: App {
                     if !CommandLine.arguments.contains("--uitesting") {
                         await AppleAuthManager.shared.restoreSession()
                     }
+                    // A restored session does not go through `onSignedIn`
+                    // (installed below), so send the accent color and ball
+                    // here too.  A no-op when signed out.
+                    gameState.syncMyLook()
                     // From here on, any sign-in — from Settings OR from the
                     // "Sign in to play with friends" prompt — creates/updates
                     // the player's public profile row.  Without this the row

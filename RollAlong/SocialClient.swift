@@ -250,7 +250,9 @@ final class SocialClient: @unchecked Sendable {
 
     /// Columns added by docs/social-schema-v5.sql (the weekly baseline).
     private static let v5PlayerColumns =
-        ",week_start,week_start_level,week_start_stars,lives_request_closed_at,accent_hex,ball_skin"
+        ",week_start,week_start_level,week_start_stars,lives_request_closed_at"
+    /// Columns added by section 11 of docs/social-schema-v5.sql (a player's look).
+    private static let lookColumns = ",accent_hex,ball_skin"
 
     /// Read `players` rows, asking for the v5 columns too.  Until
     /// docs/social-schema-v5.sql has been run the server answers 400 for a
@@ -259,15 +261,26 @@ final class SocialClient: @unchecked Sendable {
     /// `rest` is the remainder of the query string, starting with "&".
     private func getPlayers(columns: String, rest: String,
                             hideExcluded: Bool = false) async throws -> [PlayerProfile] {
-        let v5 = "select=\(columns)\(Self.v5PlayerColumns)"
-               + (hideExcluded ? "&excluded=is.false" : "") + rest
-        let data: Data
-        do {
-            data = try await send(method: "GET", path: "players", query: v5)
-        } catch SocialError.http(let status, _) where status == 400 || status == 404 {
-            data = try await send(method: "GET", path: "players", query: "select=\(columns)" + rest)
+        // Newest first: with a player's look (section 11), then without it
+        // (sections 1–10 only), then the original columns (v5 not run).  A
+        // column the server does not know makes it answer 400 for the whole
+        // request, so each step drops only what may be missing.
+        let filter = hideExcluded ? "&excluded=is.false" : ""
+        let attempts = [
+            "select=\(columns)\(Self.v5PlayerColumns)\(Self.lookColumns)" + filter + rest,
+            "select=\(columns)\(Self.v5PlayerColumns)" + filter + rest,
+            "select=\(columns)" + rest,
+        ]
+        var lastError: Error = SocialError.emptyResponse
+        for query in attempts {
+            do {
+                let data = try await send(method: "GET", path: "players", query: query)
+                return try decode([PlayerProfile].self, from: data)
+            } catch SocialError.http(let status, let body) where status == 400 || status == 404 {
+                lastError = SocialError.http(status: status, body: body)
+            }
         }
-        return try decode([PlayerProfile].self, from: data)
+        throw lastError
     }
 
     // MARK: - Per-difficulty minigame leaderboard (minigame_scores table)

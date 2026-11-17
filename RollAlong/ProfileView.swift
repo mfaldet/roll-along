@@ -43,7 +43,7 @@ struct ProfileView: View {
                     //    Accent Color controls (moved here from Settings).
                     heroCard
                     // 2. Friend code (only when signed in and the server has one).
-                    FriendCodeCard()
+                    if SocialClient.shared.isSignedIn { FriendCodeCard() }
                     // 3. My Loadout — opens the Locker.
                     loadoutCard
                     // 4. Trophies — opens the Trophy Room (Home has no Trophies

@@ -133,9 +133,17 @@ final class GameState: ObservableObject {
     /// so other players see them.  Called when either changes and on sign-in.
     func syncMyLook() {
         guard SocialClient.shared.isSignedIn else { return }
-        let hex = primaryColorHex, ball = activeSkin.rawValue
-        Task { await SocialClient.shared.syncMyLook(accentHex: hex, ballSkin: ball) }
+        // Wait until the player stops changing it (dragging the color picker
+        // fires many changes), then send only the latest.
+        lookSyncTask?.cancel()
+        lookSyncTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard let self, !Task.isCancelled else { return }
+            let hex = self.primaryColorHex, ball = self.activeSkin.rawValue
+            await SocialClient.shared.syncMyLook(accentHex: hex, ballSkin: ball)
+        }
     }
+    private var lookSyncTask: Task<Void, Never>?
     static let defaultPrimaryHex = "#48D188"   // the scoreboard green
     static let defaultPrimaryColor = Color(red: 0.28, green: 0.82, blue: 0.52)
     /// `primaryColorHex` as a SwiftUI Color (for binding to a ColorPicker).
