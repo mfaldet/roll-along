@@ -38,6 +38,7 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
+                    FriendCodeCard()
                     careerCard
                     ProfileTrophyCard(engine: gameState.trophyEngine,
                                       pins: gameState.trophyPins)

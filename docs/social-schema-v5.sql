@@ -22,7 +22,8 @@
 --   8. clan_rankings           the view the app's Rankings tab reads
 --   9. clan leadership         hand over ownership; a clan is never left
 --                              without an owner
---  10. a check query           (expected output is described at the bottom)
+--  10. friend codes            a short code per player, for "Add by code"
+--  11. a check query           (expected output is described at the bottom)
 --
 -- The app works before this file is run (it falls back to the older
 -- queries), but everything listed above needs it.
@@ -259,6 +260,7 @@ begin
         new.stars_day               := old.stars_day;
         new.stars_today             := old.stars_today;
         new.lives_request_closed_at := old.lives_request_closed_at;
+        new.friend_code             := old.friend_code;
     end if;
 
     -- (c) Weekly baseline.  First update in a new week: remember where the
@@ -765,8 +767,68 @@ create trigger players_hand_over
     for each row execute function public.ra_player_hand_over();
 
 -- ---------------------------------------------------------------------------
--- 10 · Check.  Expected: settings = 16, triggers = 6, functions = 15,
---     season_tables = 4, rankings_view = 1, new_columns = 15 and
+-- 10 · Friend codes.  Every player gets a short code, shown on their profile,
+--      that a friend types on the Friends screen to send a request.  Names
+--      are not unique, so the code is how a player is found exactly.
+--      Eight characters from a 15-character alphabet chosen to be easy to read
+--      aloud and to type: A F H J K M R W X Y 3 4 6 7 9.  Left out: letters
+--      that rhyme when spoken (B C D E G P T V Z, and N next to M), letters
+--      that look like digits (I L O S), and digits that look like letters or
+--      sound like words (0 1 2 5 8).  Shown as XXXX-XXXX.  15^8 is about
+--      2.6 billion codes.  The app cannot write it; the database assigns it.
+-- ---------------------------------------------------------------------------
+alter table public.players add column if not exists friend_code text;
+create unique index if not exists players_friend_code_idx on public.players (friend_code);
+
+create or replace function public.ra_new_friend_code()
+returns text
+language plpgsql volatile set search_path = public as $$
+declare
+    alphabet constant text := 'AFHJKMRWXY34679';
+    code text;
+begin
+    loop
+        code := '';
+        for i in 1..8 loop
+            code := code || substr(alphabet, 1 + floor(random() * length(alphabet))::int, 1);
+        end loop;
+        exit when not exists (select 1 from public.players where friend_code = code);
+    end loop;
+    return code;
+end $$;
+revoke all on function public.ra_new_friend_code() from public, anon, authenticated;
+
+-- Assign a code to every new player row (the guard trigger keeps the app
+-- from changing it later).
+create or replace function public.ra_players_friend_code()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+    if new.friend_code is null or coalesce(auth.role(), '') = 'authenticated' then
+        new.friend_code := public.ra_new_friend_code();
+    end if;
+    return new;
+end $$;
+
+drop trigger if exists players_friend_code on public.players;
+create trigger players_friend_code
+    before insert on public.players
+    for each row execute function public.ra_players_friend_code();
+
+-- Give existing players a code (only those without one, so re-running this
+-- file never changes a code).
+do $$
+declare r record;
+begin
+    for r in select id from public.players where friend_code is null loop
+        update public.players set friend_code = public.ra_new_friend_code() where id = r.id;
+    end loop;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 11 · Check.  Expected: settings = 16, triggers = 7, functions = 17,
+--     season_tables = 4, rankings_view = 1, new_columns = 16,
+--     players_without_code = 0 and
 --     clans_over_cap = 0.  (A clan already over the cap keeps its members; it
 --     simply cannot take new ones until it is back under.)
 -- ---------------------------------------------------------------------------
@@ -774,7 +836,7 @@ select
     (select count(*) from public.ra_config)                                              as settings,
     (select count(*) from pg_trigger where not tgisinternal
         and tgname in ('players_guard','clan_members_cap','clans_guard','life_gifts_request',
-                       'clan_members_owner_left','players_hand_over'))                    as triggers,
+                       'clan_members_owner_left','players_hand_over','players_friend_code'))                    as triggers,
     (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
       where ns.nspname = 'public'
         and p.proname in ('ra_config_int','ra_season_now','ra_social_settings','ra_players_guard',
@@ -782,7 +844,8 @@ select
                           'ra_life_gift_request','ra_close_one_season','ra_close_season',
                           'ra_claim_season_prize','ra_hand_over_clan',
                           'ra_transfer_clan_ownership','ra_clan_owner_left',
-                          'ra_player_hand_over'))                                         as functions,
+                          'ra_player_hand_over','ra_new_friend_code',
+                          'ra_players_friend_code'))                                         as functions,
     (select count(*) from information_schema.tables
       where table_schema = 'public'
         and table_name in ('clan_season_scores','clan_seasons',
@@ -792,10 +855,12 @@ select
       where table_schema = 'public'
         and (   (table_name = 'players' and column_name in
                     ('week_start','week_start_level','week_start_stars','stars_peak',
-                     'stars_day','stars_today','lives_request_closed_at','excluded'))
+                     'stars_day','stars_today','lives_request_closed_at','excluded',
+                     'friend_code'))
              or (table_name = 'clans' and column_name in
                     ('excluded','season_wins','last_season','last_season_rank',
                      'last_season_clans','last_season_tier','last_season_score'))))      as new_columns,
+    (select count(*) from public.players where friend_code is null)                      as players_without_code,
     (select count(*) from (select clan_id from public.clan_members
                             group by clan_id
                            having count(*) > public.ra_config_int('clan_member_cap', 12)) t) as clans_over_cap;

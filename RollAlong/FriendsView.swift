@@ -45,6 +45,12 @@ struct FriendsView: View {
     @State private var sentLifeIds:  Set<UUID> = []   // friends gifted this session
     @State private var banner: String?
 
+    // Friend codes.
+    @State private var myFriendCode: String?
+    @State private var codeInput = ""
+    @State private var codeLookupBusy = false
+    @State private var codeResult: PlayerProfile?
+
     private var myId: UUID? { SocialClient.shared.currentUserId }
 
     // MARK: - Derived lists
@@ -104,7 +110,10 @@ struct FriendsView: View {
                 VStack(spacing: 22) {
                     searchField
 
-                    if searchTerm.isEmpty { inviteRow }
+                    if searchTerm.isEmpty {
+                        inviteRow
+                        addByCodeSection
+                    }
 
                     if !searchTerm.isEmpty {
                         searchSection
@@ -170,9 +179,14 @@ struct FriendsView: View {
     private var inviteRow: some View {
         if let me = myId {
             let link = URL(string: "rollalong://player/\(me.uuidString)")!
+            // The message carries the friend code too: the link only opens
+            // where the app is installed, and many messaging apps do not make
+            // a rollalong:// link tappable, but a code can be typed anywhere.
             ShareLink(item: link,
                       subject: Text("Add me on Roll Along"),
-                      message: Text("Come on, Roll Along with me!")) {
+                      message: Text(myFriendCode.map {
+                          "Come on, Roll Along with me! My friend code is \(FriendCode.display($0)) (Friends → Add by code)."
+                      } ?? "Come on, Roll Along with me!")) {
                 HStack(spacing: 10) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 15, weight: .semibold))
@@ -200,6 +214,71 @@ struct FriendsView: View {
                 )
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Add by code
+
+    /// Type a friend's code to find them exactly (names are not unique).
+    @ViewBuilder
+    private var addByCodeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("Add by code", "number")
+            HStack(spacing: 10) {
+                TextField("", text: $codeInput, prompt: Text("Friend code, e.g. AF3K-7MXY"))
+                    .font(.system(.body, design: .monospaced).weight(.semibold))
+                    .foregroundStyle(.white)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.characters)
+                    .submitLabel(.search)
+                    .onChange(of: codeInput) { _, new in
+                        let filtered = FriendCode.filterTyping(new)
+                        if filtered != new { codeInput = filtered }
+                        codeResult = nil
+                    }
+                    .onSubmit { Task { await lookUpCode() } }
+                Button { Task { await lookUpCode() } } label: {
+                    if codeLookupBusy {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Find")
+                            .font(.system(.callout, design: .rounded).weight(.bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .disabled(FriendCode.normalize(codeInput) == nil || codeLookupBusy)
+                .opacity(FriendCode.normalize(codeInput) == nil ? 0.4 : 1)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
+            if let codeResult {
+                searchRow(codeResult)
+            }
+            if let myFriendCode {
+                Text("Your code: \(FriendCode.display(myFriendCode))")
+                    .font(.system(.caption, design: .monospaced).weight(.semibold))
+                    .foregroundStyle(Color(white: 0.55))
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    private func lookUpCode() async {
+        guard let code = FriendCode.normalize(codeInput) else { return }
+        if code == myFriendCode { flash("That's your own code."); return }
+        codeLookupBusy = true
+        defer { codeLookupBusy = false }
+        do {
+            if let found = try await SocialClient.shared.findPlayer(friendCode: code) {
+                profiles[found.id] = profiles[found.id] ?? found
+                codeResult = found
+            } else {
+                codeResult = nil
+                flash("No player has the code \(FriendCode.display(code)).")
+            }
+        } catch {
+            flash("Couldn't look up that code — try again.")
         }
     }
 
@@ -532,6 +611,7 @@ struct FriendsView: View {
         guard auth.isSignedIn, let me = myId else { return }
         isLoading = true
         errorText = nil
+        if myFriendCode == nil { myFriendCode = await SocialClient.shared.fetchMyFriendCode() }
         do {
             async let giftsCall = SocialClient.shared.fetchUnclaimedGifts()
             async let edgesCall = SocialClient.shared.fetchFriendships()
@@ -826,6 +906,63 @@ struct SeasonStarsLabel: View {
             .fixedSize()
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(stars) stars this season")
+        }
+    }
+}
+
+/// The signed-in player's friend code, shown on their own profile, with Copy
+/// and Share.  Draws nothing when signed out or before the server has codes.
+struct FriendCodeCard: View {
+    @ObservedObject private var auth = AppleAuthManager.shared
+    @State private var code: String?
+    @State private var copied = false
+
+    var body: some View {
+        Group {
+            if auth.isSignedIn, let code {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("FRIEND CODE")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .kerning(1.2)
+                            .foregroundStyle(Color(white: 0.5))
+                        Text(FriendCode.display(code))
+                            .font(.system(size: 24, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .textSelection(.enabled)
+                        Text("Friends can add you with it: Friends → Add by code.")
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color(white: 0.5))
+                    }
+                    Spacer(minLength: 8)
+                    Button {
+                        UIPasteboard.general.string = FriendCode.display(code)
+                        copied = true
+                    } label: {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(Color(white: 0.18)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(copied ? "Copied" : "Copy friend code")
+                    ShareLink(item: "Add me on Roll Along! My friend code is \(FriendCode.display(code)) (Friends → Add by code).") {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(Color(white: 0.18)))
+                    }
+                    .accessibilityLabel("Share friend code")
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.11)))
+                .accessibilityElement(children: .contain)
+            }
+        }
+        .task(id: auth.isSignedIn) {
+            code = auth.isSignedIn ? await SocialClient.shared.fetchMyFriendCode() : nil
         }
     }
 }

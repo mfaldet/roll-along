@@ -180,6 +180,33 @@ final class SocialClient: @unchecked Sendable {
     }
 
     /// Fetch a single profile by id (e.g. to show a friend's climb level).
+    // MARK: - Friend codes (docs/social-schema-v5.sql, section 10)
+
+    private struct FriendCodeRow: Decodable {
+        let code: String?
+        enum CodingKeys: String, CodingKey { case code = "friend_code" }
+    }
+
+    /// The signed-in player's friend code ("AF3K7MXY"), or nil when signed
+    /// out, offline, or before the database file that adds codes is run.
+    func fetchMyFriendCode() async -> String? {
+        guard let me = currentUserId,
+              let data = try? await send(method: "GET", path: "players",
+                                         query: "select=friend_code&id=eq.\(me.uuidString)&limit=1"),
+              let rows = try? decode([FriendCodeRow].self, from: data) else { return nil }
+        return rows.first?.code.flatMap(FriendCode.normalize)
+    }
+
+    /// The player with this friend code, or nil when there is none.  `code`
+    /// must already be normalized (`FriendCode.normalize`).
+    func findPlayer(friendCode code: String) async throws -> PlayerProfile? {
+        _ = try requireSession()
+        let found = try await getPlayers(
+            columns: "id,display_name,climb_level,highest_unlocked,total_stars,lives",
+            rest: "&friend_code=eq.\(code)&limit=1")
+        return found.first
+    }
+
     func fetchProfile(id: UUID) async throws -> PlayerProfile? {
         let data = try await send(method: "GET", path: "players",
                                   query: "id=eq.\(id.uuidString)&limit=1")
@@ -1549,6 +1576,39 @@ struct SocialSettings {
     /// Read on the main thread by the views; replaced by
     /// `SocialClient.refreshSocialSettings()`.
     static var current = SocialSettings()
+}
+
+/// Friend codes: eight characters from an alphabet that is easy to read
+/// aloud and to type, shown as "AF3K-7MXY".  The database assigns them
+/// (docs/social-schema-v5.sql, section 10) — keep the alphabet the same.
+enum FriendCode {
+    /// A F H J K M R W X Y 3 4 6 7 9.  Left out: letters that rhyme when
+    /// spoken (B C D E G P T V Z, and N next to M), letters that look like
+    /// digits (I L O S), and digits that look like letters or words (0 1 2 5 8).
+    static let alphabet = Set("AFHJKMRWXY34679")
+    static let length = 8
+
+    /// The code in its stored form (eight characters, upper case), or nil if
+    /// `input` cannot be one.  Spaces and dashes are ignored, lower case is
+    /// accepted, and the common mix-ups are forgiven: O and 0 have no meaning,
+    /// so they are rejected rather than guessed.
+    static func normalize(_ input: String) -> String? {
+        let cleaned = input.uppercased().filter { !$0.isWhitespace && $0 != "-" }
+        guard cleaned.count == length, cleaned.allSatisfy({ alphabet.contains($0) }) else { return nil }
+        return cleaned
+    }
+
+    /// "AF3K7MXY" → "AF3K-7MXY".
+    static func display(_ code: String) -> String {
+        guard code.count == length else { return code }
+        return String(code.prefix(4)) + "-" + String(code.suffix(4))
+    }
+
+    /// Keeps only characters that can be part of a code (for the text field),
+    /// upper-cased, at most eight.
+    static func filterTyping(_ input: String) -> String {
+        String(input.uppercased().filter { alphabet.contains($0) }.prefix(length))
+    }
 }
 
 /// The game's social clock: Eastern time (America/New_York).  Seasons of the
