@@ -185,8 +185,8 @@ final class GameState: ObservableObject {
 
     /// How a level starts.  true = "Tap to Start": the level loads paused and
     /// begins when the player taps.  false = "Auto Start": it begins by itself
-    /// after a short beat.  Default is Tap to Start.  Applies to Adventure,
-    /// Challenge Tracks and Challenge of the Day (see BallGameView).
+    /// after a short beat.  Default is Tap to Start.  Applies to Adventure
+    /// and Challenge Tracks (see `startSettingApplies` in BallGameView).
     @Published var tapToStart: Bool {
         didSet { defaults.set(tapToStart, forKey: "ra_tapToStart") }
     }

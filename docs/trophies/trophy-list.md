@@ -1,6 +1,6 @@
 # Trophies in Roll Along 1.0
 
-**90 trophies, shown as 46 tiles.** Generated from `RollAlong/TrophyCatalog.json` on 2026-11-15 and updated 2026-11-17 (Roll Out held back); that file is the source of truth.
+**86 trophies, shown as 44 tiles.** Generated from `RollAlong/TrophyCatalog.json` on 2026-11-15 and updated 2026-11-17 (Roll Out and the Challenge of the Day held back); that file is the source of truth.
 
 - A **stack** is several trophies that are steps of one measure, drawn as one round tile that takes the color and name of the highest step earned.
 - A **feat** is a one-off trophy with its own hexagon tile.
@@ -72,14 +72,6 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 | Gold | High Five (new) | Complete 5 Challenge Tracks. |
 | Diamond | Full Circuit | Complete all 8 Challenge Tracks. |
 
-**Stack: Daily challenges completed** · icon `sunrise.fill` · fallback `sun.max.fill`
-
-| Step | Title | What it asks |
-|---|---|---|
-| Bronze | Carpe Rollem | Complete your first Challenge of the Day. |
-| Silver | Ten Brutal Mornings | Complete 10 Challenges of the Day. |
-| Gold | Fifty Days of Grit | Complete 50 Challenges of the Day. |
-
 **Stack: Daily reward streak** · icon `calendar` · fallback `calendar.circle.fill`
 
 | Step | Title | What it asks |
@@ -91,7 +83,6 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
-| The Brutal Week | Gold | Complete the Challenge of the Day on 7 consecutive days. | `flame.fill` | `flame` |
 | Run the Gauntlet | Gold | Complete the Golden Gauntlet track. | `bolt.shield.fill` | `shield.fill` |
 
 ## Minigames
@@ -279,10 +270,10 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 Icon `trophy.fill` · fallback `star.circle.fill`.
 
-Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends & Clans and Secrets. That is **72 trophies**:
+Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends & Clans and Secrets. That is **68 trophies**:
 
 - **Adventure** (26): Get the Ball Rolling, Training Wheels Off, Gathering Momentum, Beyond the Meadow, Boulder and Bolder, The Long Roll, Unstoppable Force, Altitude Sickness, Halfway to Heaven, Star Search, Stargazer, Rising Star, Star-Studded, Constellation, Star Power, A Thousand Points of Light, Milky Way, Supernova, One Hundred Perfect Rolls, Gone in Ten Seconds, Steady Hands, Clean Sheet, First Try!, Spotless, Untouchable, Nerves of Steel
-- **Challenges** (13): Sidetracked, Deep in the Pack, Track Record, Triple Crown, High Five, Run the Gauntlet, Carpe Rollem, Seven-Day Roller, Ten Brutal Mornings, Month of Marbles, Season Ticket, Fifty Days of Grit, The Brutal Week
+- **Challenges** (9): Sidetracked, Deep in the Pack, Track Record, Triple Crown, High Five, Run the Gauntlet, Seven-Day Roller, Month of Marbles, Season Ticket
 - **Minigames · All minigames** (7): Taste of the Arcade, The Grand Tour, Opening Night, Perfectly Normal, Six of the Best, Hard Bargain, Hundred-Round Veteran
 - **Minigames · Comet Clash** (2): Last Comet Standing, Ten-Tail Comet
 - **Minigames · Sumo Survival** (2): King of the Ring, Immovable Object
@@ -325,3 +316,7 @@ Not required: the six Diamond trophies, the seven Friends & Clans trophies and t
 
 Every tile has its own SF Symbol and a fallback. The names were written from memory of Apple's symbol catalog; the unit test `TrophyRevisionTests.testEveryTileIconAndFallbackExists` fails by name for any that does not exist on the iOS version it runs on. At run time a missing icon is replaced by its fallback.
 
+
+## Held back from 1.0
+
+The Challenge of the Day is switched off for 1.0, so these four trophies and their two tiles ("Daily challenges completed" stack and "The Brutal Week" feat) are out of the catalog: Carpe Rollem (`daily_first_clear`, Bronze), Ten Brutal Mornings (`daily_clears_10`, Silver), Fifty Days of Grit (`daily_clears_50`, Gold), The Brutal Week (`daily_week_streak`, Gold). The daily reward streak trophies are unaffected.

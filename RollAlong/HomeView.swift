@@ -521,7 +521,11 @@ struct HomeView: View {
                                                        pins: gameState.trophyPins)
                 case .player(let p):    PublicProfileView(player: p)
                 case .clan(let c):      ClanDetailView(clan: c)
-                case .mode("daily"):
+                // The Challenge of the Day only launches while its mode is
+                // enabled (it is held back from v1.0); otherwise "daily"
+                // falls through to the generic case below, which opens the
+                // climb.
+                case .mode("daily") where GameModeCatalogue.mode(id: "daily") != nil:
                     BallGameView(activeMode: GameModeCatalogue.mode(id: "daily")
                                  ?? GameModeCatalogue.climb)
                         .onAppear {
