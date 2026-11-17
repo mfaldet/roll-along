@@ -6863,18 +6863,12 @@ struct BankedCoinView: View {
 }
 
 // ---------------------------------------------------------------------------
-// SpinningCoinView — minted gold coin with real visible thickness.
-//
-// Built from two layered shapes:
-//
-//   • RIM  — a vertical Capsule rendered BEHIND the face.  Wide (~30% of
-//            the coin diameter) so the thickness reads even at moderate
-//            spin angles.  Decorated with prominent milled grooves —
-//            sharp, evenly-spaced horizontal notches that look like the
-//            knurled edge of a real coin.
-//   • FACE — a gold Ellipse on top, scales in X by |sin(t)| from face-on
-//            (full circle) to edge-on (gone).  Decorated with a recessed
-//            inner ring + a 5-pointed minted star at the centre.
+// SpinningCoinView — the in-level coin.  The same flat punched coin as
+// CoinIcon (design C: flat gold disc, dark outline, one bold dark triangle),
+// spinning: the face is squashed horizontally by |sin(t)|.  Behind it sits a
+// thin outline-colored sliver, so at the edge-on moment the coin shows as a
+// thin dark line instead of vanishing.  No gradients, highlights or shading.
+// With Reduce Motion the coin stays still, face-on.
 //
 // Phased per coin so adjacent coins never go edge-on at the same time.
 // ---------------------------------------------------------------------------
@@ -6882,154 +6876,37 @@ struct SpinningCoinView: View {
     let size:  CGFloat
     let phase: Double
 
-    /// Rim width as a fraction of the coin diameter.  ~30% makes the
-    /// thickness visible even at moderate spin angles.
-    private var rimWidth: CGFloat { size * 0.30 }
-
-    /// Face gradients — pulled from CoinIcon so the menu coin icon and
-    /// the in-game spinning coin render the same gold palette.
-    private static let goldenFace     = CoinIcon.goldenFace
-    private static let goldenFaceDeep = CoinIcon.goldenFaceDeep
-    /// Rim gradient: lit at top + bottom, dark in the middle band.
-    /// Mimics the light/shadow on a cylinder side.
-    private static let rimGradient = LinearGradient(
-        stops: [
-            .init(color: Color(red: 0.78, green: 0.55, blue: 0.10), location: 0.00),
-            .init(color: Color(red: 0.40, green: 0.25, blue: 0.03), location: 0.50),
-            .init(color: Color(red: 0.76, green: 0.53, blue: 0.09), location: 1.00),
-        ],
-        startPoint: .top, endPoint: .bottom
-    )
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation) { tl in
-            let t       = tl.date.timeIntervalSinceReferenceDate
-            let spinRaw = abs(sin(t * 2.6 + phase))
-            let bob     = sin(t * 2.2 + phase * 0.7) * 1.6
+        if reduceMotion {
+            CoinFace(size: size)
+                .frame(width: size, height: size)
+        } else {
+            TimelineView(.animation) { tl in
+                let t       = tl.date.timeIntervalSinceReferenceDate
+                let spinRaw = abs(sin(t * 2.6 + phase))
+                let bob     = sin(t * 2.2 + phase * 0.7) * 1.6
 
-            coinBody(spinRaw: spinRaw)
-                .offset(y: bob)
+                coinBody(spinRaw: spinRaw)
+                    .offset(y: bob)
+            }
         }
     }
 
     private func coinBody(spinRaw: Double) -> some View {
         ZStack {
-            // RIM with milled grooves and bevelled outline
-            rimLayer
-                .frame(width: rimWidth, height: size * 0.97)
+            // Edge-on sliver: the coin's thickness as one flat dark line.
+            Capsule()
+                .fill(CoinIcon.outlineColor)
+                .frame(width: CoinFace.outlineWidth(for: size), height: size * 0.96)
 
-            // FACE with minted detail, scaled in X by the spin
-            faceLayer(spinRaw: spinRaw)
+            // The face, squashed by the spin.
+            CoinFace(size: size)
                 .frame(width: size, height: size)
                 .scaleEffect(x: CGFloat(spinRaw), y: 1.0)
         }
-    }
-
-    // MARK: - Rim
-
-    private var rimLayer: some View {
-        Capsule()
-            .fill(Self.rimGradient)
-            .overlay(milledGrooves)
-            .overlay(
-                Capsule().stroke(Color.black.opacity(0.55), lineWidth: 0.9)
-            )
-            // Subtle inner shadow at the top to suggest the recessed
-            // junction between face and rim.
-            .overlay(
-                Capsule()
-                    .stroke(Color.black.opacity(0.30), lineWidth: 0.8)
-                    .blur(radius: 0.6)
-                    .offset(y: 0.5)
-                    .mask(Capsule())
-            )
-    }
-
-    /// Prominent milled (knurled) edge — many short horizontal notches
-    /// evenly spaced down the rim.  This is the most "minted-looking"
-    /// detail on the whole coin.
-    private var milledGrooves: some View {
-        GeometryReader { geo in
-            let notchCount = 22
-            ForEach(0..<notchCount, id: \.self) { i in
-                Rectangle()
-                    .fill(Color.black.opacity(0.45))
-                    .frame(width: geo.size.width * 0.85, height: 0.9)
-                    .offset(x: geo.size.width * 0.075,
-                            y: geo.size.height * CGFloat(i) / CGFloat(notchCount - 1))
-            }
-            // Highlight ridges between notches (every other slot)
-            ForEach(0..<notchCount, id: \.self) { i in
-                Rectangle()
-                    .fill(Color.white.opacity(0.18))
-                    .frame(width: geo.size.width * 0.85, height: 0.5)
-                    .offset(x: geo.size.width * 0.075,
-                            y: geo.size.height * CGFloat(i) / CGFloat(notchCount - 1) + 1.0)
-            }
-        }
-        .clipShape(Capsule())
-        .allowsHitTesting(false)
-    }
-
-    // MARK: - Face
-
-    private func faceLayer(spinRaw: Double) -> some View {
-        ZStack {
-            // Base face
-            Ellipse().fill(Self.goldenFace)
-
-            // Outer face stroke
-            Ellipse().stroke(Color.black.opacity(0.45), lineWidth: 1)
-
-            // Squiggle engraving along the rim — identical to the static
-            // CoinIcon; foreshortens with the spin via the parent's X scale.
-            CoinSquiggle()
-                .stroke(Color(red: 0.58, green: 0.38, blue: 0.05).opacity(0.9),
-                        lineWidth: 0.9)
-
-            // Triangle hole punched out of the middle — the new shared mark.
-            CoinTriangle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.46, green: 0.30, blue: 0.03),
-                                 Color(red: 0.24, green: 0.15, blue: 0.01)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-                .frame(width: size * 0.40, height: size * 0.40)
-                .overlay(
-                    CoinTriangle()
-                        .stroke(Color.white.opacity(0.35 * spinRaw), lineWidth: 0.5)
-                        .frame(width: size * 0.40, height: size * 0.40)
-                        .offset(x: -0.4, y: -0.5)
-                )
-
-            // Inner highlight crescent on the face — catches the "light"
-            Ellipse()
-                .stroke(Color.white.opacity(0.55 * spinRaw), lineWidth: 1.0)
-                .scaleEffect(0.72)
-                .offset(x: -size * 0.10, y: -size * 0.10)
-
-            // Specular sweep — vertical stripe that travels across the face
-            shine(spinRaw: spinRaw)
-        }
-    }
-
-    private func shine(spinRaw: Double) -> some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [.clear,
-                             Color.white.opacity(0.50 * spinRaw),
-                             .clear],
-                    startPoint: .leading, endPoint: .trailing
-                )
-            )
-            .frame(width: size * 0.32, height: size)
-            .offset(x: CGFloat(spinRaw - 0.5) * size * 0.7)
-            .clipShape(Ellipse())
-            .blendMode(.plusLighter)
-            .allowsHitTesting(false)
+        .frame(width: size, height: size)
     }
 }
 
@@ -7038,16 +6915,10 @@ struct SpinningCoinView: View {
 // looks like everywhere outside the gameplay arena (home page lives /
 // coin pill, level-clear summary, level-select stats, cosmetic shop
 // header + per-item price, buy-lives/buy-coins sheets).  The in-game
-// spinning coin (SpinningCoinView) renders the same face when face-on,
-// just with an animated rim.
+// spinning coin (SpinningCoinView) draws the same face, squashed by its spin.
 //
-// Anatomy (all scaled by `size`):
-//   • Outer face gradient (bright top → deep amber bottom; silver for platinum)
-//   • Dark outline stroke
-//   • Squiggle engraving traced along the outer rim (CoinSquiggle)
-//   • Triangle hole punched out of the middle (CoinTriangle), dark + recessed
-//   • Upper-left highlight crescent — catches the light
-//   • Subtle drop shadow
+// Design C, the punched coin (chosen 2026-11-17): a flat gold disc, a dark
+// outline and one bold dark triangle — see CoinFace for the proportions.
 // ---------------------------------------------------------------------------
 /// A wavy ring traced near the coin's outer edge — the "squiggle" engraving
 /// shared by every coin (static icon + in-game spinning coin).
@@ -7089,6 +6960,42 @@ struct CoinTriangle: Shape {
     }
 }
 
+/// Design C, the punched coin: a flat disc with a dark outline and one bold
+/// dark triangle (point up) in the middle.  No gradients, highlights or
+/// shadows.  Proportions (of the coin's diameter `size`):
+///   • outline width 8%, but never thinner than 1 pt;
+///   • triangle: circumradius 25%, centered 3% below the middle, corners
+///     rounded; its frame is never under 4 pt (a side of about 3.5 pt), so it
+///     stays legible on the 9–12 pt coins in the purchase-sheet piles.
+/// Used by CoinIcon (everywhere outside play) and SpinningCoinView (in play).
+struct CoinFace: View {
+    let size: CGFloat
+    var platinum: Bool = false
+
+    /// Outline width for a coin of this diameter (8%, at least 1 pt).
+    static func outlineWidth(for size: CGFloat) -> CGFloat { max(1, size * 0.08) }
+
+    var body: some View {
+        let face = platinum ? CoinIcon.platinumFaceColor : CoinIcon.faceColor
+        let mark = platinum ? CoinIcon.platinumOutlineColor : CoinIcon.outlineColor
+        let outline = Self.outlineWidth(for: size)
+        // Triangle frame = 2 × circumradius (CoinTriangle fills to half the
+        // frame); 0.50 × size gives the design's 25% circumradius.
+        let tri = max(size * 0.50, 4.0)
+        let corner = max(size * 0.04, 0.8)
+        return ZStack {
+            Circle().fill(mark)
+            Circle().fill(face).padding(outline)
+            CoinTriangle()
+                .fill(mark)
+                .overlay(CoinTriangle().stroke(mark, style: StrokeStyle(lineWidth: corner, lineJoin: .round)))
+                .frame(width: tri, height: tri)
+                .offset(y: size * 0.03)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 struct CoinIcon: View {
     let size: CGFloat
     let platinum: Bool
@@ -7099,56 +7006,19 @@ struct CoinIcon: View {
     }
 
     var body: some View {
-        let face = platinum ? Self.platinumFace : Self.goldenFace
-        let engrave: Color = platinum
-            ? Color(red: 0.42, green: 0.50, blue: 0.62)
-            : Color(red: 0.58, green: 0.38, blue: 0.05)
-        let holeColors: [Color] = platinum
-            ? [Color(red: 0.45, green: 0.52, blue: 0.62), Color(red: 0.24, green: 0.30, blue: 0.40)]
-            : [Color(red: 0.46, green: 0.30, blue: 0.03), Color(red: 0.24, green: 0.15, blue: 0.01)]
-        let tri = size * 0.40
-        return ZStack {
-            // Gold (or platinum) body + dark outline.
-            Circle()
-                .fill(face)
-                .overlay(
-                    Circle().stroke(Color.black.opacity(0.45),
-                                    lineWidth: max(0.5, size * 0.04))
-                )
-
-            // Squiggle engraving traced along the outer rim.
-            CoinSquiggle()
-                .stroke(engrave.opacity(0.9), lineWidth: max(0.5, size * 0.04))
-
-            // Triangle hole punched out of the middle (dark + recessed; a
-            // top-left lip sells the "punched" depth).
-            CoinTriangle()
-                .fill(LinearGradient(colors: holeColors, startPoint: .top, endPoint: .bottom))
-                .frame(width: tri, height: tri)
-                .overlay(
-                    CoinTriangle()
-                        .stroke(Color.white.opacity(platinum ? 0.5 : 0.3), lineWidth: 0.6)
-                        .frame(width: tri, height: tri)
-                        .offset(x: -0.4, y: -0.5)
-                )
-
-            // Top-left highlight crescent — brighter on platinum (extra shiny).
-            Circle()
-                .stroke(Color.white.opacity(platinum ? 0.72 : 0.5),
-                        lineWidth: max(0.5, size * 0.05))
-                .scaleEffect(0.78)
-                .offset(x: -size * 0.10, y: -size * 0.10)
-                .clipShape(Circle())
-        }
-        .frame(width: size, height: size)
-        .shadow(color: Color.black.opacity(0.18),
-                radius: max(0.8, size * 0.06),
-                y:      max(0.4, size * 0.04))
+        CoinFace(size: size, platinum: platinum)
     }
 
-    // Exposed so SpinningCoinView (in-game animated coin) renders the
-    // identical face gradient — keeps the visual language consistent
-    // between menus and gameplay.
+    // Design C colors.  Gold face #F5B82E, outline and mark #8A5A0E.
+    static let faceColor    = Color(red: 0xF5 / 255.0, green: 0xB8 / 255.0, blue: 0x2E / 255.0)
+    static let outlineColor = Color(red: 0x8A / 255.0, green: 0x5A / 255.0, blue: 0x0E / 255.0)
+    // Platinum bonus coin (Smash and Grab): the same flat shape in cool
+    // silver.  Face #D9E2EE, outline and mark #5A6B82.
+    static let platinumFaceColor    = Color(red: 0xD9 / 255.0, green: 0xE2 / 255.0, blue: 0xEE / 255.0)
+    static let platinumOutlineColor = Color(red: 0x5A / 255.0, green: 0x6B / 255.0, blue: 0x82 / 255.0)
+
+    // Gradients kept for the purchase-sheet decorations that use them (the
+    // "$" on the coin sack, the hoard ring).  Coins themselves are flat.
     static let goldenFace = LinearGradient(
         stops: [
             .init(color: Color(red: 1.00, green: 0.94, blue: 0.55), location: 0.00),
