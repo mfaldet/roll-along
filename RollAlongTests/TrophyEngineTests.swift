@@ -72,18 +72,19 @@ final class TrophyCatalogTests: XCTestCase {
     // MARK: Bundled catalog shape
 
     /// The bundled catalog loads, validates, and has the ruled v1 shape:
-    /// 92 trophies — 43 Bronze / 26 Silver / 16 Gold / 6 Diamond /
+    /// 90 trophies — 42 Bronze / 25 Silver / 16 Gold / 6 Diamond /
     /// 1 Platinum capstone (the 2026-11 revision: stacks and feats).  The 3
-    /// Pinball score trophies and whimsy_roll_call stay held back from v1.0.
+    /// Pinball score trophies, whimsy_roll_call and the 2 Roll Out trophies
+    /// stay held back from v1.0.
     func testBundledCatalogLoadsWithRuledShape() throws {
         let catalog = try loadCatalog()
-        XCTAssertEqual(catalog.count, 92)
+        XCTAssertEqual(catalog.count, 90)
         XCTAssertEqual(catalog.catalogVersion, 1)
 
         var tierCounts: [TrophyTier: Int] = [:]
         for trophy in catalog.trophies { tierCounts[trophy.tier, default: 0] += 1 }
-        XCTAssertEqual(tierCounts[.bronze], 43)
-        XCTAssertEqual(tierCounts[.silver], 26)
+        XCTAssertEqual(tierCounts[.bronze], 42)
+        XCTAssertEqual(tierCounts[.silver], 25)
         XCTAssertEqual(tierCounts[.gold], 16)
         XCTAssertEqual(tierCounts[.diamond], 6)
         XCTAssertEqual(tierCounts[.platinum], 1)
@@ -170,7 +171,7 @@ final class TrophyCatalogTests: XCTestCase {
     func testEveryCriteriaMetricResolvesToAKnownMetricCase() throws {
         let raw = try JSONSerialization.jsonObject(with: rawCatalogData()) as? [String: Any]
         let trophies = try XCTUnwrap(raw?["trophies"] as? [[String: Any]])
-        XCTAssertEqual(trophies.count, 92)
+        XCTAssertEqual(trophies.count, 90)
         for trophy in trophies {
             let id = trophy["id"] as? String ?? "<missing id>"
             let criteria = try XCTUnwrap(trophy["criteria"] as? [String: Any],
@@ -196,6 +197,29 @@ final class TrophyCatalogTests: XCTestCase {
             $0.criteria.metric != .pinballBestScore && $0.criteria.metric != .pinballRollLaneSweeps
         })
         XCTAssertFalse(TrophyMetric.minigameModeIDs.contains("pinball"))
+    }
+
+    /// Roll Out is held back from v1.0 (its mazes are being rebuilt), so its
+    /// trophies and tile must not ship, it is not a counted minigame, and the
+    /// mode is off in the registry and does not resolve by id.
+    func testHeldBackRollOutIsOutOfCatalogAndMenus() throws {
+        let catalog = try loadCatalog()
+        for id in ["rollout_first_maze", "rollout_maze_10"] {
+            XCTAssertNil(catalog.trophy(withID: id), "\(id) must be held back with Roll Out")
+        }
+        XCTAssertTrue(catalog.trophies.allSatisfy { $0.criteria.metric != .rolloutBestMaze })
+        XCTAssertFalse(catalog.tiles.contains { $0.id == "stack_rollout_mazes" })
+        XCTAssertFalse(TrophyMetric.minigameModeIDs.contains("rollout"))
+        XCTAssertFalse(GameModeCatalogue.enabled.contains { $0.id == "rollout" })
+        XCTAssertNil(GameModeCatalogue.mode(id: "rollout"),
+                     "a saved last-mode of Roll Out must fall back to the climb")
+        // Every counted minigame is a mode the player can actually open, so
+        // the Grand Tour (10 different minigames) stays reachable.
+        for id in TrophyMetric.minigameModeIDs {
+            XCTAssertNotNil(GameModeCatalogue.mode(id: id), "\(id) is counted but not playable")
+        }
+        XCTAssertEqual(TrophyMetric.minigameModeIDs.count, 10)
+        XCTAssertEqual(catalog.trophy(withID: "arcade_grand_tour")?.criteria.threshold, 10)
     }
 
     // MARK: Guardrails — IAP / layout / banned vocabulary
@@ -304,19 +328,19 @@ final class TrophyCatalogTests: XCTestCase {
 
     // MARK: Capstone scope
 
-    /// Acceptance: the capstone requires exactly the 74 visible
+    /// Acceptance: the capstone requires exactly the 72 visible
     /// bronze/silver/gold ids — Social, Secret & Whimsy, and the Diamond
     /// tier quarantined off the capstone path (catalog §3.11).
     func testCapstoneRequiresExactlyThe73VisibleBaseTrophies() throws {
         let catalog = try loadCatalog()
         let capstone = catalog.capstone
         let required = try XCTUnwrap(capstone.criteria.requiredTrophyIDs)
-        XCTAssertEqual(required.count, 74)
-        XCTAssertEqual(capstone.criteria.threshold, 74)
+        XCTAssertEqual(required.count, 72)
+        XCTAssertEqual(capstone.criteria.threshold, 72)
         XCTAssertEqual(capstone.criteria.metric, .baseTrophiesUnlocked)
 
         let requiredSet = Set(required)
-        XCTAssertEqual(requiredSet.count, 74, "capstone list has duplicates")
+        XCTAssertEqual(requiredSet.count, 72, "capstone list has duplicates")
         XCTAssertEqual(requiredSet, TrophyCatalog.expectedCapstoneRequirement(in: catalog.trophies))
 
         for id in required {
@@ -486,7 +510,7 @@ final class TrophyEngineTests: XCTestCase {
         func advance(_ seconds: TimeInterval) { current = current.addingTimeInterval(seconds) }
     }
 
-    /// Engine over the real bundled 92-trophy catalog and the isolated
+    /// Engine over the real bundled 90-trophy catalog and the isolated
     /// suite (or a caller-supplied spy suite).
     private func makeEngine(clock: Clock = Clock(),
                             defaults: UserDefaults? = nil) throws -> TrophyEngine {
@@ -573,7 +597,7 @@ final class TrophyEngineTests: XCTestCase {
     /// Acceptance: a stat bump evaluates ONLY interested trophies —
     /// O(interested), never O(catalog). snake_wins has 2 trophies;
     /// climb_highest_unlocked has the catalog's biggest fan-out (the 10
-    /// steps of the "Levels passed" stack); the catalog is 92.
+    /// steps of the "Levels passed" stack); the catalog is 90.
     func testStatBumpEvaluatesOnlyInterestedTrophies() throws {
         let engine = try makeEngine()
         engine.record(.snakeWins, value: 0)
@@ -768,13 +792,13 @@ final class TrophyEngineTests: XCTestCase {
     }
 
     /// Real-catalog spot check: one capstone-path unlock moves the
-    /// capstone's ledger-derived progress to exactly 1/74.
+    /// capstone's ledger-derived progress to exactly 1/72.
     func testCapstoneProgressDerivesFromLedgerOnRealCatalog() throws {
         let engine = try makeEngine()
         XCTAssertEqual(engine.progressFraction(for: "capstone_all"), 0)
         engine.record(.climbTotalStars, value: 25)           // climb_stars_25 is on the path
         XCTAssertEqual(engine.progressFraction(for: "capstone_all") ?? 0,
-                       1.0 / 74.0, accuracy: 0.000_001)
+                       1.0 / 72.0, accuracy: 0.000_001)
         XCTAssertFalse(engine.isUnlocked("capstone_all"))
     }
 
@@ -994,7 +1018,7 @@ final class TrophyEngineTests: XCTestCase {
 // by reaching into TrophyEngine internals or hand-poking `ra_trophyUnlocks`.
 // This harness is the sanctioned way to do that: it owns an isolated
 // UserDefaults suite, a real `GameState`, and a real `TrophyEngine` over the
-// bundled 92-trophy catalog, and it drives them exactly the way the shipping
+// bundled 90-trophy catalog, and it drives them exactly the way the shipping
 // app will.
 //
 // THE ONE MOVE THE HARNESS MAKES: re-derive-and-record
@@ -1043,7 +1067,7 @@ final class TrophyTestHarness {
     let defaults: UserDefaults
     /// A real GameState decode over `defaults` — driven by its PUBLIC API.
     let gameState: GameState
-    /// A real engine over the bundled 92-trophy catalog and the same suite.
+    /// A real engine over the bundled 90-trophy catalog and the same suite.
     let engine: TrophyEngine
 
     private let suiteName: String
@@ -2161,12 +2185,12 @@ final class TrophyMinigameWiringTests: XCTestCase {
 
     // MARK: Discovery (played-mode set)
 
-    /// arcade_sampler (5 distinct minigames) / arcade_grand_tour (10 of the 11)
-    /// accumulate through `markModePlayed`.
+    /// arcade_sampler (5 distinct minigames) / arcade_grand_tour (all 10 of
+    /// the v1.0 minigames) accumulate through `markModePlayed`.
     func testArcadeDiscoveryTiers() {
         let gs = makeGameState()
         let all = ["zen", "coinpit", "snake", "sumo", "paintball", "goldrush",
-                   "marblecup", "koth", "rollout", "rollup", "disco"]
+                   "marblecup", "koth", "rollup", "disco"]
         for m in all.prefix(4) { gs.markModePlayed(m) }
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"))
 
@@ -2175,23 +2199,24 @@ final class TrophyMinigameWiringTests: XCTestCase {
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
 
         XCTAssertEqual(Set(all), Set(TrophyMetric.minigameModeIDs))
-        for m in all.dropFirst(5).dropLast(2) { gs.markModePlayed(m) }   // 9 of 11
+        for m in all.dropFirst(5).dropLast() { gs.markModePlayed(m) }   // 9 of 10
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
         gs.markModePlayed("pinball")   // held back from v1.0 — must not count
+        gs.markModePlayed("rollout")   // held back from v1.0 — must not count
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
-        gs.markModePlayed(all[all.count - 2])   // the 10th different minigame
+        gs.markModePlayed(all[all.count - 1])   // the 10th different minigame
         XCTAssertTrue(gs.trophyEngine.isUnlocked("arcade_grand_tour"))
     }
 
     /// Playing a non-minigame mode id (or re-playing one already counted) does
-    /// not inflate `minigames_played` — the derivation intersects with the 11
+    /// not inflate `minigames_played` — the derivation intersects with the 10
     /// minigame ids and the set dedupes.
     func testNonMinigameAndRepeatPlaysDoNotInflateDiscovery() {
         let gs = makeGameState()
         gs.markModePlayed("climb")            // not a minigame id
         gs.markModePlayed("snake")
         gs.markModePlayed("snake")            // repeat
-        gs.markModePlayed("challenge.alpha")  // not one of the 11
+        gs.markModePlayed("challenge.alpha")  // not one of the 10
         XCTAssertFalse(gs.trophyEngine.isUnlocked("arcade_sampler"),
                        "only 1 distinct minigame played — must not reach 5")
     }
@@ -2367,46 +2392,21 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
                       "a latched trophy must never revoke")
     }
 
-    // MARK: Roll Out trophies fire from the funnel
+    // MARK: Roll Out is held back from v1.0
 
-    /// rollout_first_maze (≥1) latches on the first cleared maze; rollout_maze_10
-    /// (≥10) at maze 10 and not maze 9.
-    func testRollOutMazeTiers() {
+    /// The Roll Out funnel still keeps the best (so nothing is lost when the
+    /// mode returns), but with its trophies out of the catalog it unlocks
+    /// nothing, and it never touches the Disco trophies.
+    func testRollOutFunnelKeepsBestButUnlocksNothing() {
         let gs = makeGameState()
+        let before = gs.trophyEngine.unlockedIDs
+        _ = gs.recordRollOutResult(reached: 10)
+        XCTAssertEqual(gs.minigameBests["rollout", default: 0], 10)
         XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_first_maze"))
-
-        _ = gs.recordRollOutResult(reached: 1)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_first_maze"))
         XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_maze_10"))
-
-        _ = gs.recordRollOutResult(reached: 9)
-        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_maze_10"))
-        _ = gs.recordRollOutResult(reached: 10)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"))
-    }
-
-    /// A latched Roll Out trophy is never revoked by a later, worse clear.
-    func testRollOutTrophyIsLatched() {
-        let gs = makeGameState()
-        _ = gs.recordRollOutResult(reached: 10)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"))
-        _ = gs.recordRollOutResult(reached: 1)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_maze_10"),
-                      "a latched trophy must never revoke")
-    }
-
-    // MARK: Disco and Roll Out are disjoint
-
-    /// A Disco run never touches Roll Out trophies and vice versa.
-    func testDiscoAndRollOutAreDisjoint() {
-        let gs = makeGameState()
-        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 25)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("disco_cross_25"))
-        XCTAssertFalse(gs.trophyEngine.isUnlocked("rollout_first_maze"),
-                       "a Disco run must not grant a Roll Out trophy")
-
-        _ = gs.recordRollOutResult(reached: 1)
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("rollout_first_maze"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("disco_cross_25"))
+        XCTAssertEqual(gs.trophyEngine.unlockedIDs, before,
+                       "a Roll Out clear must not unlock anything in v1.0")
     }
 
     // MARK: Live funnel ≡ backfill snapshot
@@ -2420,11 +2420,9 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
         let gs = makeGameState()
         _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 25)   // disco_cross_25 via max
         _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 10)   // disco_hard_10
-        _ = gs.recordRollOutResult(reached: 10)                          // rollout_first_maze + _maze_10
 
         let live = gs.trophyEngine.unlockedIDs
-        for id in ["disco_cross_25", "disco_hard_10",
-                   "rollout_first_maze", "rollout_maze_10"] {
+        for id in ["disco_cross_25", "disco_hard_10"] {
             XCTAssertTrue(live.contains(id), "live funnel should unlock \(id)")
         }
 
@@ -2435,8 +2433,7 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
         for metric in TrophyMetric.allCases {
             if let value = backfilled[metric] { _ = engine.record(metric, value: value) }
         }
-        for id in ["disco_cross_25", "disco_hard_10",
-                   "rollout_first_maze", "rollout_maze_10"] {
+        for id in ["disco_cross_25", "disco_hard_10"] {
             XCTAssertTrue(engine.isUnlocked(id),
                           "backfill should also unlock \(id) — live and backfill must agree")
         }
@@ -2722,7 +2719,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 ///  1. Fill the trigger-coverage gaps the per-task suites left (a handful of
 ///     mid-ladder climb thresholds and per-game minigame wins that no earlier
 ///     test asserted by id), each driven through the real GameState funnel.
-///  2. A DURABLE catalog-enumeration gate: every one of the 92 catalog
+///  2. A DURABLE catalog-enumeration gate: every one of the 90 catalog
 ///     trophies must have an explicit trigger test — the sole exception is
 ///     `whimsy_roll_call`, blocked on the unbuilt pinball ROLL lanes. Adding a
 ///     trophy without wiring+testing it makes `testEveryTrophyHasATriggerTest`
@@ -2805,7 +2802,7 @@ final class TrophyTriggerCoverageTests: XCTestCase {
     func testEveryTrophyHasATriggerTest() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
         let catalogIDs = Set(catalog.trophies.map(\.id))
-        XCTAssertEqual(catalogIDs.count, 92, "v1.0 ships 92 trophies")
+        XCTAssertEqual(catalogIDs.count, 90, "v1.0 ships 90 trophies")
 
         // Ids with an explicit trigger test, grouped by the S1 task/suite that
         // owns them. Keep in lockstep with the catalog.
@@ -2830,7 +2827,7 @@ final class TrophyTriggerCoverageTests: XCTestCase {
             "paintball_first_win", "paintball_coverage_60", "goldrush_first_win",
             "goldrush_wins_10", "marblecup_first_win", "marblecup_wins_10", "koth_first_win",
             "koth_hold_45",
-            "rollout_first_maze", "rollout_maze_10", "rollup_100m", "rollup_500m",
+            "rollup_100m", "rollup_500m",
             "disco_cross_25", "disco_hard_10", "zen_hour", "zen_10_hours",
             "coinpit_first_round", "coinpit_catch_90",
             // S1-T5 cosmetics & collection
@@ -2868,7 +2865,7 @@ final class TrophyTriggerCoverageTests: XCTestCase {
 }
 
 // ===========================================================================
-// 2026-11 trophy revision — 92 trophies drawn as 47 tiles (stacks and feats).
+// 2026-11 trophy revision — 90 trophies drawn as 46 tiles (stacks and feats).
 // ===========================================================================
 #if canImport(UIKit)
 import UIKit
@@ -2962,12 +2959,12 @@ final class TrophyRevisionTests: XCTestCase {
 
     // MARK: Tiles
 
-    /// 47 tiles; every trophy is on exactly one; no two tiles share an icon;
+    /// 46 tiles; every trophy is on exactly one; no two tiles share an icon;
     /// a feat holds one trophy; a stack's steps run lowest tier to highest.
     func testTileLayoutCoversEveryTrophyOnce() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
-        XCTAssertEqual(catalog.tiles.count, 47)
-        XCTAssertEqual(Set(catalog.tiles.map(\.icon)).count, 47, "two tiles share an icon")
+        XCTAssertEqual(catalog.tiles.count, 46)
+        XCTAssertEqual(Set(catalog.tiles.map(\.icon)).count, 46, "two tiles share an icon")
 
         var seen: [String: String] = [:]
         for tile in catalog.tiles {
@@ -2982,7 +2979,7 @@ final class TrophyRevisionTests: XCTestCase {
             }
         }
         XCTAssertEqual(Set(seen.keys), Set(catalog.trophies.map(\.id)))
-        XCTAssertEqual(catalog.tiles.filter { $0.kind == .stack }.count, 22)
+        XCTAssertEqual(catalog.tiles.filter { $0.kind == .stack }.count, 21)
         XCTAssertEqual(catalog.tiles.filter { $0.kind == .feat }.count, 25)
     }
 
@@ -3033,12 +3030,12 @@ final class TrophyRevisionTests: XCTestCase {
         let minigames = try XCTUnwrap(model.tileSections.first { $0.section == .minigames })
         XCTAssertEqual(minigames.subsections.map(\.title),
                        ["All minigames", "Comet Clash", "Sumo Survival", "Paint Ball",
-                        "Smash and Grab", "Marble Cup", "King of the Hill", "Roll Out",
+                        "Smash and Grab", "Marble Cup", "King of the Hill",
                         "Roll Up", "Disco Ball", "Zen Garden", "Gold Rush"])
         let personal = try XCTUnwrap(model.tileSections.first { $0.section == .personal })
         XCTAssertEqual(personal.subsections.map(\.title),
                        ["Collection", "Coins and rewards", "Friends & Clans", "Secrets"])
-        XCTAssertEqual(model.tileSections.reduce(0) { $0 + $1.total }, 91,
+        XCTAssertEqual(model.tileSections.reduce(0) { $0 + $1.total }, 89,
                        "every trophy except Platinum is in a section")
     }
 
@@ -3075,13 +3072,13 @@ final class TrophyRevisionTests: XCTestCase {
     }
 
     /// Platinum is the header badge, not a tile in a section, and counts
-    /// progress against its 74 required trophies.
+    /// progress against its 72 required trophies.
     func testPlatinumIsTheHeaderBadge() throws {
         let engine = try makeEngine()
         var model = TrophyRoomModel(engine: engine)
         XCTAssertNil(model.tile(withID: "capstone_all"))
         var platinum = try XCTUnwrap(model.platinum)
-        XCTAssertEqual(platinum.requiredCount, 74)
+        XCTAssertEqual(platinum.requiredCount, 72)
         XCTAssertEqual(platinum.earnedCount, 0)
 
         _ = engine.record(.climbTotalStars, value: 25)        // one required trophy

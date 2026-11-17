@@ -158,7 +158,7 @@ final class TrophyPerformanceTests: XCTestCase {
     /// evaluates ONLY the trophies interested in that metric — never the whole
     /// catalog.  Proves the O(interested) shape the benchmarks assume, using
     /// the engine's DEBUG evaluation counter.  The busiest v1 metric
-    /// (climb_highest_unlocked) has 10 watchers; the whole catalog is 92 — the
+    /// (climb_highest_unlocked) has 10 watchers; the whole catalog is 90 — the
     /// per-bump work must track the former, not the latter.
     func testTrophyRecord_evaluatesOnlyInterestedTrophies() throws {
         let engine = try makeEngine()

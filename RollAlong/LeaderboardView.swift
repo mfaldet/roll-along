@@ -246,6 +246,16 @@ struct LeaderboardView: View {
                     AnyView(self.iconCell(system: "stopwatch.fill", tint: Self.zenTint,
                                           value: LeaderboardBoard.rollUpTime(p.rollupBestSeconds ?? 0))) },
             ]
+        case .discoBall:
+            // Most crossings in one run (ranking), then that run's average
+            // time per crossing (the tie-break).
+            return [
+                StatColumn(id: "CROSSINGS", width: 76, highlighted: true) { p in
+                    AnyView(self.iconCell(system: "arrow.up.arrow.down", tint: Self.zenTint,
+                                          value: "\(p.discoballBest ?? 0)")) },
+                StatColumn(id: "AVG", width: 58, highlighted: false) { p in
+                    AnyView(self.bestCell(LeaderboardBoard.crossingTime(p.discoballBestAvgMs ?? 0))) },
+            ]
         default:
             // Competitive boards: Wins (ranking) + Best.
             let mode = selectedBoard.competitiveModeID ?? ""
@@ -327,6 +337,10 @@ struct LeaderboardView: View {
         case .rollUp:
             parts.append("\(profile.rollupBest ?? 0) meters")
             parts.append("in \(LeaderboardBoard.rollUpTime(profile.rollupBestSeconds ?? 0))")
+        case .discoBall:
+            parts.append("\(profile.discoballBest ?? 0) crossings in one run")
+            let ms = profile.discoballBestAvgMs ?? 0
+            if ms > 0 { parts.append(String(format: "%.1f seconds per crossing", Double(ms) / 1000)) }
         default:
             let mode = selectedBoard.competitiveModeID ?? ""
             parts.append("\(profile.competitiveWins(mode)) wins")
@@ -387,6 +401,7 @@ struct LeaderboardView: View {
         case .rollAlong: return gameState.currentLevel
         case .zenGarden: return gameState.zenSeconds   > 0 ? 1 : 0
         case .rollUp:    return gameState.rollupBest   > 0 ? 1 : 0
+        case .discoBall: return gameState.discoBoardBest
         default:         return 0
         }
     }
@@ -699,8 +714,13 @@ struct LeaderboardView: View {
                 // Roll Up swaps in its Height/Time order; every other board uses
                 // its fixed server order.
                 let order = selectedBoard == .rollUp ? rollUpSort.order : selectedBoard.order
-                rows = try await SocialClient.shared.fetchLeaderboard(order: order)
+                rows = try await SocialClient.shared.fetchLeaderboard(
+                    order: order, extraColumns: selectedBoard.extraColumns)
             }
+        } catch SocialError.http(let status, _) where status == 400 && selectedBoard == .discoBall {
+            // The Disco Ball columns arrive with docs/leaderboard-discoball.sql.
+            rows = []
+            errorText = "Disco Ball rankings are not available yet."
         } catch {
             errorText = "The ranking server is unreachable right now. Pull to refresh or try again."
         }
