@@ -8,7 +8,8 @@ import UIKit
 //
 // LAYOUT (top → bottom)
 //   • ROLL ALONG  — the core climb, always the largest widget, always on top.
-//   • Challenge of the Day — a skinny banner (a short, brutal daily gauntlet).
+//   • Challenge of the Day — a skinny banner (held back for 1.0; shown only
+//     if its mode is switched back on in GameModeCatalogue).
 //   • CHALLENGE PACKS — themed 100-level gauntlets (cosmetic rewards).
 //   • MINIGAMES       — one button that opens `MinigamesGridView`, a
 //                       two-column grid of every available minigame.
@@ -53,7 +54,9 @@ struct GameMenuView: View {
 
                     rollAlongHero
                     levelsLink
-                    challengeOfTheDay
+                    // Challenge of the Day is held back for 1.0 (its mode is
+                    // off in GameModeCatalogue); show it only if it is on.
+                    if GameModeCatalogue.mode(id: "daily") != nil { challengeOfTheDay }
 
                     challengePacksSection
 

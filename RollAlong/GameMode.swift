@@ -712,12 +712,12 @@ struct ModeTutorial {
                          reward: "Coins for your final placing, most for 1st.")
         case "paintball":
             return .init(controls: "Tilt to roll — you paint the floor as you go.",
-                         goal: "Cover the most floor in your colour in 60 seconds.",
+                         goal: "Cover the most floor in your color in 60 seconds.",
                          hazard: "Roll through a puddle and you're frozen for 3 seconds.",
                          reward: "Coins for your coverage, plus a bonus for first place.")
         case "marblecup":
             return .init(controls: "Tilt to roll into the ball.",
-                         goal: "Knock the ball into their net — most goals in 90s wins.",
+                         goal: "Knock the ball into their net — most goals in 60 seconds wins.",
                          hazard: "A defending AI guards the goal and counterattacks.",
                          reward: "Coins for every goal, plus a bonus if you win.")
         case "koth":      // King of the Hill
