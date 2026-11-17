@@ -1462,3 +1462,57 @@ final class DiscoBoardBestTests: XCTestCase {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Analytics wire format: every event in a batch must encode the SAME keys,
+// or PostgREST rejects the whole bulk insert ("All object keys must match").
+// ---------------------------------------------------------------------------
+final class AnalyticsBatchEncodingTests: XCTestCase {
+
+    private func event(_ name: String, level: Int?, props: [String: AnyEncodable] = [:]) -> PendingEvent {
+        PendingEvent(userId: UUID(), sessionId: UUID(), eventName: name,
+                     properties: props, level: level,
+                     appVersion: "1.0", iosVersion: "18.2", deviceModel: "iPhone17,1")
+    }
+
+    func testMixedBatchEncodesIdenticalKeysWithNullLevel() throws {
+        let batch = [event("level_attempt", level: 12),
+                     event("app_launch", level: nil),
+                     event("minigame_result", level: nil, props: ["won": .bool(true)])]
+        let data = try PendingEvent.encodeBatch(batch)
+        let objects = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        XCTAssertEqual(objects.count, 3)
+        let expected: Set<String> = ["user_id", "session_id", "event_name", "properties",
+                                     "level", "app_version", "ios_version", "device_model"]
+        for object in objects {
+            XCTAssertEqual(Set(object.keys), expected, "every event must carry the same keys")
+        }
+        XCTAssertEqual(objects[0]["level"] as? Int, 12)
+        XCTAssertTrue(objects[1]["level"] is NSNull, "a missing level is sent as null, not left out")
+        XCTAssertTrue(objects[2]["level"] is NSNull)
+    }
+
+    func testFieldsAreCutToTheTableLimits() {
+        let long = String(repeating: "x", count: 200)
+        let e = PendingEvent(userId: UUID(), sessionId: UUID(), eventName: long,
+                             properties: [:], level: nil,
+                             appVersion: long, iosVersion: long, deviceModel: long)
+        XCTAssertEqual(e.eventName.unicodeScalars.count,   PendingEvent.maxEventName)
+        XCTAssertEqual(e.appVersion.unicodeScalars.count,  PendingEvent.maxVersion)
+        XCTAssertEqual(e.iosVersion.unicodeScalars.count,  PendingEvent.maxVersion)
+        XCTAssertEqual(e.deviceModel.unicodeScalars.count, PendingEvent.maxDevice)
+        XCTAssertEqual(PendingEvent.clip("é🎱abc", to: 2).unicodeScalars.count, 2)
+    }
+
+    func testNonFiniteNumbersEncodeAsNull() throws {
+        let data = try PendingEvent.encodeBatch([event("x", level: nil,
+                                                       props: ["nan": .double(.nan),
+                                                               "inf": .double(.infinity),
+                                                               "ok":  .double(1.5)])])
+        let objects = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        let props = try XCTUnwrap(objects.first?["properties"] as? [String: Any])
+        XCTAssertTrue(props["nan"] is NSNull)
+        XCTAssertTrue(props["inf"] is NSNull)
+        XCTAssertEqual(props["ok"] as? Double, 1.5)
+    }
+}
