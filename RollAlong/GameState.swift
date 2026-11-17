@@ -112,7 +112,10 @@ final class GameState: ObservableObject {
         didSet { defaults.set(currentLevel, forKey: "ra_level") }
     }
     @Published var activeSkin: BallSkin {
-        didSet { defaults.set(activeSkin.rawValue, forKey: "ra_skin") }
+        didSet {
+            defaults.set(activeSkin.rawValue, forKey: "ra_skin")
+            if activeSkin != oldValue { syncMyLook() }
+        }
     }
     @Published var playerName: String {
         didSet { defaults.set(playerName, forKey: "ra_name") }
@@ -120,7 +123,18 @@ final class GameState: ObservableObject {
     /// Player-chosen accent colour (persisted as "#RRGGBB").  Used for niche
     /// personalisation — e.g. the rim around their nickname in competitive games.
     @Published var primaryColorHex: String {
-        didSet { defaults.set(primaryColorHex, forKey: "ra_primaryColorHex") }
+        didSet {
+            defaults.set(primaryColorHex, forKey: "ra_primaryColorHex")
+            if primaryColorHex != oldValue { syncMyLook() }
+        }
+    }
+
+    /// Send the accent color and equipped ball to the server (signed in only),
+    /// so other players see them.  Called when either changes and on sign-in.
+    func syncMyLook() {
+        guard SocialClient.shared.isSignedIn else { return }
+        let hex = primaryColorHex, ball = activeSkin.rawValue
+        Task { await SocialClient.shared.syncMyLook(accentHex: hex, ballSkin: ball) }
     }
     static let defaultPrimaryHex = "#48D188"   // the scoreboard green
     static let defaultPrimaryColor = Color(red: 0.28, green: 0.82, blue: 0.52)

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // ===========================================================================
 // SocialClient — authenticated calls to the Roll Along social backend.
@@ -131,6 +132,24 @@ final class SocialClient: @unchecked Sendable {
         return row
     }
 
+    private struct LookPatch: Encodable {
+        let accent_hex: String
+        let ball_skin: String
+    }
+
+    /// Send the player's accent color ("#RRGGBB") and equipped ball, so other
+    /// players see them.  Best-effort and silent: before
+    /// docs/social-schema-v5.sql (section 11) is applied the server refuses
+    /// the unknown columns and nothing else is affected.
+    func syncMyLook(accentHex: String, ballSkin: String) async {
+        guard let me = currentUserId else { return }
+        let hex = accentHex.hasPrefix("#") ? accentHex : "#" + accentHex
+        guard let body = try? encoder.encode(LookPatch(accent_hex: hex.uppercased(), ball_skin: ballSkin)) else { return }
+        _ = try? await send(method: "PATCH", path: "players",
+                            query: "id=eq.\(me.uuidString)",
+                            bodyData: body, prefer: "return=minimal")
+    }
+
     /// Sync just the progression counters — the cheap, frequent write made when
     /// the player advances a level.  Patches the player's own row only.
     func syncProgress(climbLevel: Int, highestUnlocked: Int, totalStars: Int, coinsCollected: Int) async throws {
@@ -231,7 +250,7 @@ final class SocialClient: @unchecked Sendable {
 
     /// Columns added by docs/social-schema-v5.sql (the weekly baseline).
     private static let v5PlayerColumns =
-        ",week_start,week_start_level,week_start_stars,lives_request_closed_at"
+        ",week_start,week_start_level,week_start_stars,lives_request_closed_at,accent_hex,ball_skin"
 
     /// Read `players` rows, asking for the v5 columns too.  Until
     /// docs/social-schema-v5.sql has been run the server answers 400 for a
@@ -1217,6 +1236,16 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     /// When this player's last life request closed (filled, expired or
     /// cancelled) — the wait before the next one counts from here.
     var livesRequestClosedAt: String? = nil
+    /// The player's accent color ("#RRGGBB") and equipped ball id, as stored
+    /// by docs/social-schema-v5.sql section 11.  Absent before that is
+    /// applied, or for a player who has not opened the app since.
+    var accentHex: String? = nil
+    var ballSkinID: String? = nil
+
+    /// This player's accent color, if they have one stored.
+    var accentColor: Color? { accentHex.flatMap { Color(hexRGB: $0) } }
+    /// This player's equipped ball, if stored and known to this build.
+    var ballSkin: BallSkin? { ballSkinID.flatMap { BallSkin(rawValue: $0) } }
 
     /// Levels gained since Monday 00:00 Eastern ("+12 this week").  0 when the
     /// stored baseline is from an earlier week (the player has not played
@@ -1351,6 +1380,8 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case weekStartLevel   = "week_start_level"
         case weekStartStars   = "week_start_stars"
         case livesRequestClosedAt = "lives_request_closed_at"
+        case accentHex        = "accent_hex"
+        case ballSkinID       = "ball_skin"
     }
 }
 

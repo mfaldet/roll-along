@@ -23,7 +23,9 @@
 --   9. clan leadership         hand over ownership; a clan is never left
 --                              without an owner
 --  10. friend codes            a short code per player, for "Add by code"
---  11. a check query           (expected output is described at the bottom)
+--  11. a player's look         accent color and equipped ball, so other
+--                              players see them (level badge, clan header)
+--  12. a check query           (expected output is described at the bottom)
 --
 -- The app works before this file is run (it falls back to the older
 -- queries), but everything listed above needs it.
@@ -828,8 +830,27 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 11 · Check.  Expected: settings = 16, triggers = 7, functions = 17,
---     season_tables = 4, rankings_view = 1, new_columns = 16,
+-- 11 · A player's look.  The accent color chosen in Settings and the equipped
+--      ball, so other players see them: the level badge beside a name uses
+--      that player's accent color, and the clan header shows each member's
+--      ball.  The app writes its own row; neither value is text anyone reads.
+--      accent_hex: "#RRGGBB".  ball_skin: the ball's id; the app draws a
+--      default ball for any id it does not know.
+-- ---------------------------------------------------------------------------
+alter table public.players add column if not exists accent_hex text;
+alter table public.players add column if not exists ball_skin  text;
+
+alter table public.players drop constraint if exists players_accent_hex_format;
+alter table public.players add  constraint players_accent_hex_format
+    check (accent_hex is null or accent_hex ~ '^#[0-9A-Fa-f]{6}$');
+
+alter table public.players drop constraint if exists players_ball_skin_format;
+alter table public.players add  constraint players_ball_skin_format
+    check (ball_skin is null or ball_skin ~ '^[A-Za-z0-9 ''&.-]{1,40}$');
+
+-- ---------------------------------------------------------------------------
+-- 12 · Check.  Expected: settings = 16, triggers = 7, functions = 17,
+--     season_tables = 4, rankings_view = 1, new_columns = 18,
 --     players_without_code = 0 and
 --     clans_over_cap = 0.  (A clan already over the cap keeps its members; it
 --     simply cannot take new ones until it is back under.)
@@ -858,7 +879,7 @@ select
         and (   (table_name = 'players' and column_name in
                     ('week_start','week_start_level','week_start_stars','stars_peak',
                      'stars_day','stars_today','lives_request_closed_at','excluded',
-                     'friend_code'))
+                     'friend_code','accent_hex','ball_skin'))
              or (table_name = 'clans' and column_name in
                     ('excluded','season_wins','last_season','last_season_rank',
                      'last_season_clans','last_season_tier','last_season_score'))))      as new_columns,

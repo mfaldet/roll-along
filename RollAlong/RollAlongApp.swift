@@ -71,6 +71,8 @@ struct RollAlongApp: App {
                                 coinsCollected:  coins,
                                 lives:           lives
                             )
+                            // After the row exists: accent color and ball.
+                            await MainActor.run { state.syncMyLook() }
                         }
                     }
                 }
