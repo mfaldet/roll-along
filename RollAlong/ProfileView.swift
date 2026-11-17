@@ -623,6 +623,7 @@ struct PlayerRanksCard: View {
         case .coinPit:    return "dollarsign.circle.fill"
         case .marbleCup:  return "soccerball"
         case .kingOfHill: return "crown.fill"
+        case .discoBall:  return "figure.dance"
         }
     }
     private static func tint(_ b: LeaderboardBoard) -> Color {
@@ -636,6 +637,7 @@ struct PlayerRanksCard: View {
         case .coinPit:    return Color(red: 1.00, green: 0.78, blue: 0.20)
         case .marbleCup:  return Color(red: 0.30, green: 0.80, blue: 0.70)
         case .kingOfHill: return Color(red: 0.95, green: 0.72, blue: 0.15)
+        case .discoBall:  return Color(red: 0.32, green: 0.85, blue: 1.00)
         }
     }
 }
