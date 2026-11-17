@@ -490,9 +490,26 @@ struct ClansView: View {
             if let standing = myStanding { ClanStandingLine(standing: standing) }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .padding(.horizontal, 18)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.13)))
+        .padding(.vertical, 26)
+        .padding(.horizontal, 22)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.13))
+                // Each member's equipped ball rolling slowly around the edge.
+                ClanmatesOrbit(skins: memberSkins)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+        )
+    }
+
+    /// Every current member's equipped ball (yours from this phone; others'
+    /// as stored on the server, else the classic ball), owner first.
+    private var memberSkins: [BallSkin] {
+        sortedRoster.map { member in
+            member.playerId == myId
+                ? gameState.activeSkin
+                : (rosterProfiles[member.playerId]?.ballSkin ?? .red)
+        }
     }
 
     /// Members · combined climb levels · lives shared (a sense of the collective).
@@ -1471,8 +1488,16 @@ struct ClanDetailView: View {
             if let standing { ClanStandingLine(standing: standing, centered: false) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 14).padding(.horizontal, 16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.13)))
+        .padding(.vertical, 22).padding(.horizontal, 22)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.13))
+                ClanmatesOrbit(skins: roster.map { m in
+                    m.playerId == myId ? gameState.activeSkin : (profiles[m.playerId]?.ballSkin ?? .red)
+                })
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        )
     }
 
     @ViewBuilder
@@ -2009,5 +2034,77 @@ private extension String {
     var nonEmpty: String? {
         let t = trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? nil : t
+    }
+}
+
+// ===========================================================================
+// ClanmatesOrbit — each clan member's ball rolling slowly around the inside
+// edge of the clan header tile, evenly spaced.  Drawn behind the clan name
+// (the header's padding keeps the text clear of the track).  With Reduce
+// Motion on, the balls sit still at their spaced positions.
+// ===========================================================================
+struct ClanmatesOrbit: View {
+    let skins: [BallSkin]
+
+    /// Ball size and how far in from the tile's edge the track runs.
+    static let ballSize: CGFloat = 13
+    static let inset: CGFloat = 5
+    /// Seconds for one ball to go once around the tile.
+    static let lapSeconds: Double = 40
+
+    /// Switch to turn the rolling balls off everywhere (set to false and
+    /// rebuild) if they ever slow the Clans screen down.
+    static let isEnabled = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geo in
+            if Self.isEnabled {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+                let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+                orbit(in: geo.size, time: t)
+            }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func orbit(in size: CGSize, time: Double) -> some View {
+        let r = Self.ballSize / 2
+        let track = CGRect(x: Self.inset + r, y: Self.inset + r,
+                           width: max(0, size.width - 2 * (Self.inset + r)),
+                           height: max(0, size.height - 2 * (Self.inset + r)))
+        let perimeter = 2 * (track.width + track.height)
+        let count = max(1, skins.count)
+        return ZStack(alignment: .topLeading) {
+            ForEach(Array(skins.enumerated()), id: \.offset) { index, skin in
+                let progress = (time / Self.lapSeconds + Double(index) / Double(count))
+                    .truncatingRemainder(dividingBy: 1)
+                let distance = CGFloat(progress) * perimeter
+                BallSkinView(skin: skin, diameter: Self.ballSize)
+                    .frame(width: Self.ballSize, height: Self.ballSize)
+                    // Rolling: the ball turns by the distance it has travelled.
+                    .rotationEffect(.radians(Double(distance / max(r, 1))))
+                    .position(Self.point(at: distance, on: track))
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+
+    /// The point `distance` along the rectangle's edge, clockwise from the
+    /// top-left corner.
+    static func point(at distance: CGFloat, on rect: CGRect) -> CGPoint {
+        guard rect.width > 0 || rect.height > 0 else { return CGPoint(x: rect.midX, y: rect.midY) }
+        var d = distance.truncatingRemainder(dividingBy: 2 * (rect.width + rect.height))
+        if d < 0 { d += 2 * (rect.width + rect.height) }
+        if d <= rect.width { return CGPoint(x: rect.minX + d, y: rect.minY) }
+        d -= rect.width
+        if d <= rect.height { return CGPoint(x: rect.maxX, y: rect.minY + d) }
+        d -= rect.height
+        if d <= rect.width { return CGPoint(x: rect.maxX - d, y: rect.maxY) }
+        d -= rect.width
+        return CGPoint(x: rect.minX, y: rect.maxY - d)
     }
 }
