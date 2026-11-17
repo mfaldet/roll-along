@@ -388,7 +388,7 @@ struct GoldRushView: View {
                         .foregroundStyle(playerWon
                             ? Color(red: 1.0, green: 0.82, blue: 0.30)
                             : Color(white: 0.85))
-                    Text("You grabbed \(playerScore) coins — \(ordinal(placement)) place")
+                    Text("You grabbed \(playerScore) — \(ordinal(placement)) place")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
                 }
