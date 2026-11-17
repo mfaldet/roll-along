@@ -107,7 +107,8 @@ struct PublicProfileView: View {
 
             PlayerNameLabel(name: profile.displayName.nonEmptyName,
                             level: profile.climbLevel,
-                            font: .system(size: 24, weight: .bold, design: .rounded))
+                            font: .system(size: 24, weight: .bold, design: .rounded),
+                            tint: isMe ? gameState.primaryColor : profile.accentColor)
 
             HStack(spacing: 8) {
                 pill(text: "Level \(profile.climbLevel)", color: world.accent)

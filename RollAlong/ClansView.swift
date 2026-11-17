@@ -644,7 +644,8 @@ struct ClansView: View {
                         HStack(spacing: 7) {
                             PlayerNameLabel(name: name, level: level,
                                             font: .system(.body, design: .rounded).weight(isMe ? .bold : .semibold),
-                                            compact: true)
+                                            compact: true,
+                                            tint: isMe ? gameState.primaryColor : prof?.accentColor)
                             if member.isOwner && !isMe {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 11))
@@ -673,7 +674,7 @@ struct ClansView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 14)
-            .fill(isMe ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.16)
+            .fill(isMe ? AccentColor.readable(gameState.primaryColor).opacity(0.16)
                        : (asking ? Color(red: 0.95, green: 0.32, blue: 0.45).opacity(0.10) : Color(white: 0.14))))
     }
 
@@ -783,6 +784,10 @@ struct ClansView: View {
         let mine  = e.actorId == myId
         let who   = name(of: e.actorId)
         let world = World.world(for: max(1, rosterProfiles[e.actorId]?.climbLevel ?? 1))
+        // Another member's name and badge use their stored accent color when
+        // there is one, else the world color as before.
+        let theirAccent = rosterProfiles[e.actorId]?.accentColor
+        let nameColor = theirAccent.map(AccentColor.readable) ?? world.accent
         return HStack(alignment: .bottom, spacing: 8) {
             if mine {
                 Spacer(minLength: 44)
@@ -794,7 +799,8 @@ struct ClansView: View {
                     PlayerNameLabel(name: who,
                                     level: rosterProfiles[e.actorId]?.climbLevel ?? 1,
                                     font: .system(.caption2, design: .rounded).weight(.semibold),
-                                    color: world.accent, compact: true)
+                                    color: nameColor, compact: true,
+                                    tint: theirAccent)
                 }
                 Text(bubbleText(e))
                     .font(.system(.subheadline, design: .rounded))
@@ -818,7 +824,7 @@ struct ClansView: View {
                                bottomLeadingRadius: mine ? 14 : 4,
                                bottomTrailingRadius: mine ? 4 : 14,
                                topTrailingRadius: 14)
-            .fill(mine ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.55)
+            .fill(mine ? AccentColor.readable(gameState.primaryColor).opacity(0.55)
                        : Color(white: 0.17))
     }
 
@@ -1536,7 +1542,8 @@ struct ClanDetailView: View {
                     .frame(minWidth: 22, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 7) {
-                        PlayerNameLabel(name: nm, level: lvl, compact: true)
+                        PlayerNameLabel(name: nm, level: lvl, compact: true,
+                                        tint: m.playerId == myId ? gameState.primaryColor : prof?.accentColor)
                         if m.role != "member" {
                             Text(m.role.capitalized).font(.system(.caption2, design: .rounded).weight(.bold))
                                 .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))

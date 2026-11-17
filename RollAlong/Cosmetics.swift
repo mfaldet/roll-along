@@ -3214,7 +3214,7 @@ struct RivalNameTag: View {
                     .font(.system(size: isPlayer ? 11 : 10,
                                   weight: isPlayer ? .heavy : .bold, design: .rounded))
                     .foregroundStyle(isPlayer ? Color.white : color)
-                if let level { LevelBadge(level: level, tiny: true) }
+                if let level { LevelBadge(level: level, tiny: true, tint: isPlayer ? color : nil) }
             }
                 .padding(.horizontal, 6).padding(.vertical, 2)
                 .background(Capsule().fill(Color.black.opacity(isPlayer ? 0.6 : 0.42)))

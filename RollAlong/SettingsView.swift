@@ -14,7 +14,6 @@ struct SettingsView: View {
     @State private var showRestoreResult = false
     @State private var restoreResultMessage = ""
     @State private var isRestoring = false
-    @State private var showNicknamePicker = false
 
     var body: some View {
         ZStack {
@@ -22,7 +21,6 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
-                    personalizationSection
                     gameSection
                     notificationsSection
                     accountSection
@@ -111,56 +109,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
-
-    private var personalizationSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Personalization")
-            // Nicknames are assembled from preset words + a number (see
-            // `PresetNames`) — there is no free-text name anywhere in the app.
-            Button { showNicknamePicker = true } label: {
-                HStack {
-                    Text("Nickname")
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(Color(white: 0.75))
-                    Spacer()
-                    if gameState.playerName.isEmpty {
-                        Text("Choose a nickname")
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(Color(white: 0.45))
-                    } else {
-                        PlayerNameLabel(name: gameState.playerName,
-                                        level: gameState.highestUnlocked,
-                                        font: .system(.body, design: .rounded),
-                                        compact: true)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(white: 0.4))
-                }
-                .padding()
-                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-            }
-            .buttonStyle(.plain)
-            .sheet(isPresented: $showNicknamePicker) {
-                NicknamePickerSheet().environmentObject(gameState)
-            }
-
-            ColorPicker(selection: Binding(get:  { gameState.primaryColor },
-                                           set:  { gameState.primaryColor = $0 }),
-                        supportsOpacity: false) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Accent Color")
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(Color(white: 0.75))
-                    Text("Outlines your nickname in competitive games")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(Color(white: 0.42))
-                }
-            }
-            .padding()
-            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-        }
-    }
 
     // MARK: - Account (Sign in with Apple)
 
@@ -745,7 +693,7 @@ struct PresetNameWheels: View {
     }
 }
 
-/// Settings → Nickname.  Saves a preset-built nickname locally and, when the
+/// Profile → Nickname.  Saves a preset-built nickname locally and, when the
 /// player is signed in, to their public profile.
 struct NicknamePickerSheet: View {
     @EnvironmentObject var gameState: GameState
@@ -761,7 +709,8 @@ struct NicknamePickerSheet: View {
                     // words with the Adventure level beside them.
                     PlayerNameLabel(name: PresetNames.nickname(choice),
                                     level: gameState.highestUnlocked,
-                                    font: .system(size: 28, weight: .bold, design: .rounded))
+                                    font: .system(size: 28, weight: .bold, design: .rounded),
+                                    tint: gameState.primaryColor)
                         .padding(.top, 12)
                     PresetNameWheels(choice: $choice,
                                      adjectives: PresetNames.adjectives,

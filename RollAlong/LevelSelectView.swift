@@ -223,7 +223,8 @@ struct LevelSelectView: View {
                 PlayerNameLabel(name: name.isEmpty ? "Roller" : name,
                                 level: gameState.highestUnlocked,
                                 font: .system(size: 18, weight: .bold, design: .rounded),
-                                compact: true)
+                                compact: true,
+                                tint: gameState.primaryColor)
                 Text("World \(world.index)")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(world.accent)

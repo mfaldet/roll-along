@@ -211,7 +211,8 @@ struct LeaderboardView: View {
     private static let zenTint  = Color(red: 0.40, green: 0.82, blue: 0.55)
     private static let winTint  = Color(red: 1.00, green: 0.81, blue: 0.30)
     /// Highlight for the signed-in player's own row (scoreboard green).
-    private static let meAccent = Color(red: 0.28, green: 0.82, blue: 0.52)
+    /// The player's own accent color (Settings), kept readable.
+    private var meAccent: Color { AccentColor.readable(gameState.primaryColor) }
     private static let panelFill = Color(white: 0.11)
     private static let hairline  = Color(white: 0.16)
     /// Shared surface for the filter pill + sort segmented control.
@@ -302,7 +303,8 @@ struct LeaderboardView: View {
                             level: profile.climbLevel,
                             font: .system(.subheadline, design: .rounded).weight(isMe ? .heavy : .semibold),
                             color: isMe ? .white : Color(white: 0.92),
-                            compact: true)
+                            compact: true,
+                            tint: isMe ? gameState.primaryColor : profile.accentColor)
 
             Spacer(minLength: 0)
 
@@ -312,9 +314,10 @@ struct LeaderboardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(isMe ? Self.meAccent.opacity(0.10) : Color.clear)
+        // The own row is marked in the player's accent color.
+        .background(isMe ? meAccent.opacity(0.10) : Color.clear)
         .overlay(alignment: .leading) {
-            if isMe { Rectangle().fill(Self.meAccent).frame(width: 3) }
+            if isMe { Rectangle().fill(meAccent).frame(width: 3) }
         }
         .overlay(alignment: .bottom) {
             Rectangle().fill(Self.hairline).frame(height: 0.5).padding(.leading, 14)

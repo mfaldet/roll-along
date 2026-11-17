@@ -345,7 +345,8 @@ struct FriendsView: View {
             avatar(name, tint: Color(red: 0.95, green: 0.32, blue: 0.45))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    PlayerNameLabel(name: name, level: sender?.climbLevel ?? 1, compact: true)
+                    PlayerNameLabel(name: name, level: sender?.climbLevel ?? 1, compact: true,
+                                    tint: sender?.accentColor)
                     Text("sent you")
                         .font(.system(.body, design: .rounded).weight(.semibold))
                         .foregroundStyle(.white)
@@ -440,7 +441,8 @@ struct FriendsView: View {
                 HStack(spacing: 14) {
                     avatar(name, tint: world.accent)
                     HStack(spacing: 8) {
-                        PlayerNameLabel(name: name, level: level)
+                        PlayerNameLabel(name: name, level: level,
+                                        tint: profile?.id == myId ? gameState.primaryColor : profile?.accentColor)
                         WeekPaceLabel(levels: profile?.levelsThisWeek ?? 0)
                     }
                 }
@@ -766,15 +768,20 @@ private extension String {
 // ===========================================================================
 
 /// The level badge shown next to a player's name everywhere: the Adventure
-/// level in a capsule tinted with that level's world color.
+/// level in a capsule.  `tint` is the player's accent color (the player's own
+/// from Settings, or another player's stored one); with no tint it uses the
+/// color of the level's world, as before.
 struct LevelBadge: View {
     let level: Int
     var compact: Bool = false
     /// The smallest size, for the floating name tags in the minigames.
     var tiny: Bool = false
+    /// The player's accent color; nil = the world color.
+    var tint: Color? = nil
 
     var body: some View {
         let world = World.world(for: max(1, level))
+        let color = tint.map(AccentColor.readable) ?? world.accent
         Text("\(max(1, level))")
             .font(tiny ? .system(size: 9, weight: .heavy, design: .rounded)
                        : .system(compact ? .caption2 : .caption, design: .rounded).weight(.bold))
@@ -783,8 +790,8 @@ struct LevelBadge: View {
             .padding(.horizontal, tiny ? 4 : (compact ? 6 : 7))
             .padding(.vertical, tiny ? 0 : (compact ? 1 : 2))
             .background(
-                Capsule().fill(world.accent.opacity(0.28))
-                    .overlay(Capsule().stroke(world.accent.opacity(0.6), lineWidth: 1))
+                Capsule().fill(color.opacity(0.28))
+                    .overlay(Capsule().stroke(color.opacity(0.6), lineWidth: 1))
             )
             .fixedSize()
             .accessibilityLabel("Level \(max(1, level))")
@@ -802,6 +809,8 @@ struct PlayerNameLabel: View {
     var font: Font = .system(.body, design: .rounded).weight(.semibold)
     var color: Color = .white
     var compact: Bool = false
+    /// The player's accent color for the badge; nil = the world color.
+    var tint: Color? = nil
 
     var body: some View {
         HStack(spacing: compact ? 4 : 6) {
@@ -810,11 +819,34 @@ struct PlayerNameLabel: View {
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            LevelBadge(level: level, compact: compact)
+            LevelBadge(level: level, compact: compact, tint: tint)
                 .layoutPriority(1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name), level \(max(1, level))")
+    }
+}
+
+/// Keeps an accent color readable on the game's dark backgrounds.  The badge
+/// draws white text over a 28% fill with a 60% outline, so a LIGHT accent
+/// (yellow, pale pink) stays legible as it is; only a very DARK accent (navy,
+/// near-black) would vanish into the background, so it is lifted toward
+/// white until its brightness reaches a floor.
+enum AccentColor {
+    /// Brightness (0 to 1, Rec. 709 luma) below which an accent is lifted.
+    static let minimumLuma: CGFloat = 0.35
+
+    static func readable(_ color: Color) -> Color {
+        let ui = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return color }
+        let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        guard luma < minimumLuma else { return color }
+        // Mix toward white just enough to reach the floor.
+        let t = min(1, (minimumLuma - luma) / max(0.001, 1 - luma))
+        return Color(red: Double(r + (1 - r) * t),
+                     green: Double(g + (1 - g) * t),
+                     blue: Double(b + (1 - b) * t))
     }
 }
 
@@ -918,51 +950,52 @@ struct FriendCodeCard: View {
     @State private var code: String?
     @State private var copied = false
 
+    // One compact line: "Friend code AF3K-7MXY  [Copy]".  Shows only when
+    // signed in AND the server has a code (codes are assigned by the database,
+    // docs/social-schema-v5.sql section 10).  The code is fetched every time
+    // the card appears, so it shows up on the next visit to Profile once the
+    // database step is applied.
+    //
+    // The outer VStack always exists (even when it has nothing to show), so
+    // the fetch below always runs.  An empty Group would never appear, and
+    // its fetch would never run — which is why the code never showed before.
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if auth.isSignedIn, let code {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("FRIEND CODE")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .kerning(1.2)
-                            .foregroundStyle(Color(white: 0.5))
-                        Text(FriendCode.display(code))
-                            .font(.system(size: 24, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white)
-                            .textSelection(.enabled)
-                        Text("Friends can add you with it: Friends → Add by code.")
-                            .font(.system(.caption2, design: .rounded))
-                            .foregroundStyle(Color(white: 0.5))
-                    }
-                    Spacer(minLength: 8)
+                HStack(spacing: 10) {
+                    Text("Friend code")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                    Text(FriendCode.display(code))
+                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .textSelection(.enabled)
+                    Spacer(minLength: 6)
                     Button {
                         UIPasteboard.general.string = FriendCode.display(code)
                         copied = true
                     } label: {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Circle().fill(Color(white: 0.18)))
+                        HStack(spacing: 4) {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(copied ? "Copied" : "Copy")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(Color(white: 0.20)))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(copied ? "Copied" : "Copy friend code")
-                    ShareLink(item: "Add me on Roll Along! My friend code is \(FriendCode.display(code)) (Friends → Add by code).") {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Circle().fill(Color(white: 0.18)))
-                    }
-                    .accessibilityLabel("Share friend code")
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.11)))
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.11)))
                 .accessibilityElement(children: .contain)
             }
         }
+        .frame(maxWidth: .infinity)
         .task(id: auth.isSignedIn) {
+            copied = false
             code = auth.isSignedIn ? await SocialClient.shared.fetchMyFriendCode() : nil
         }
     }

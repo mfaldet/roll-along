@@ -19,6 +19,8 @@ struct ProfileView: View {
     // Measured height of the loadout name-list, so the diorama beside it can
     // match the left column's height for a clean split.
     @State private var loadoutListHeight: CGFloat = 200
+    /// The nickname picker (moved here from Settings).
+    @State private var showNicknamePicker = false
 
     // ── Derived convenience ────────────────────────────────────────────────
     private var levelsCompleted: Int  { max(0, gameState.highestUnlocked - 1) }
@@ -37,14 +39,19 @@ struct ProfileView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
+                    // 1. Header: ball, name, level, with the Nickname and
+                    //    Accent Color controls (moved here from Settings).
                     heroCard
-                    // The Trophy Room's entrance (Home has no Trophies button):
-                    // right under the player's name, with "Trophy Room ›".
+                    // 2. Friend code (only when signed in and the server has one).
+                    FriendCodeCard()
+                    // 3. My Loadout — opens the Locker.
+                    loadoutCard
+                    // 4. Trophies — opens the Trophy Room (Home has no Trophies
+                    //    button).
                     ProfileTrophyCard(engine: gameState.trophyEngine,
                                       pins: gameState.trophyPins)
-                    FriendCodeCard()
+                    // 5. Everything else, as before.
                     careerCard
-                    loadoutCard
                     PlayerRanksCard(profile: gameState.localLeaderboardProfile,
                                     playerId: SocialClient.shared.currentUserId)
                 }
@@ -88,7 +95,47 @@ struct ProfileView: View {
             // ── Name ─────────────────────────────────────────────────────
             PlayerNameLabel(name: gameState.playerName.isEmpty ? "Anonymous Roller" : gameState.playerName,
                             level: gameState.highestUnlocked,
-                            font: .system(size: 26, weight: .bold, design: .rounded))
+                            font: .system(size: 26, weight: .bold, design: .rounded),
+                            tint: gameState.primaryColor)
+
+            // ── Nickname and Accent Color (moved here from Settings) ──────
+            HStack(spacing: 10) {
+                Button { showNicknamePicker = true } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Nickname")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Capsule().fill(Color(white: 0.17))
+                        .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Change nickname")
+                .accessibilityHint("Pick two preset words for your name.")
+
+                HStack(spacing: 8) {
+                    // The system color well: a tap opens the color picker.
+                    ColorPicker("Accent color",
+                                selection: Binding(get: { gameState.primaryColor },
+                                                   set: { gameState.primaryColor = $0 }),
+                                supportsOpacity: false)
+                        .labelsHidden()
+                        .frame(width: 28, height: 28)
+                    Text("Accent Color")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+                .padding(.leading, 8).padding(.trailing, 14).padding(.vertical, 4)
+                .background(Capsule().fill(Color(white: 0.17))
+                    .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)))
+                .accessibilityElement(children: .contain)
+            }
+            .sheet(isPresented: $showNicknamePicker) {
+                NicknamePickerSheet().environmentObject(gameState)
+            }
 
             // Lives count and global Rank were removed here — Rank is being
             // replaced by nuanced awards/titles.
@@ -151,7 +198,20 @@ struct ProfileView: View {
         // reads the route beneath it (.profile) to show a "< Profile" back button.
         NavigationLink(value: HomeRoute.locker) {
         VStack(spacing: 14) {
-            sectionLabel("My Loadout")
+            // "My Locker ›" says the card opens the screen to change what is
+            // equipped.
+            HStack(alignment: .firstTextBaseline) {
+                sectionLabel("My Loadout")
+                HStack(spacing: 3) {
+                    Text("My Locker")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(AccentColor.readable(gameState.primaryColor))
+                .fixedSize()
+                .accessibilityHidden(true)
+            }
 
             // Split down the middle: the equipped items (names) on the left, an
             // animated diorama of them "in action" on the right. The rarity
@@ -737,14 +797,6 @@ struct ProfileTrophyCard: View {
                 }
             }
             Spacer(minLength: 8)
-            Text("\(model.earned) / \(model.total)")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color(white: 0.40))
-            Text("· \(model.completionPercent)%")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color(white: 0.55))
             // Says plainly that the card opens the Trophy Room.
             HStack(spacing: 3) {
                 Text("Trophy Room")
@@ -762,9 +814,7 @@ struct ProfileTrophyCard: View {
     }
 
     private func headerAccessibilityLabel(_ model: TrophyShowcaseModel) -> String {
-        var parts = ["Trophies",
-                     "\(model.earned) of \(model.total) earned",
-                     "\(model.completionPercent) percent complete"]
+        var parts = ["Trophies"]
         if model.capstoneUnlocked { parts.append("Platinum capstone earned") }
         return parts.joined(separator: ", ")
     }
