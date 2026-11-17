@@ -413,6 +413,14 @@ struct LoadoutDiorama: View {
     private let endHold = 0.7
     /// The longest stretch played, in seconds (the end of the run).
     private let maxClip = 6.5
+    /// The ball is never drawn smaller than this share of the preview's
+    /// shorter side.  When framing the whole stretch would make it smaller
+    /// (a wide, short card and a tall path), the camera zooms in to this size
+    /// and follows the ball instead.
+    private let minBallShare: CGFloat = 0.12
+    /// Seconds either side of "now" the follow camera averages the ball's
+    /// position over, so it glides instead of jittering.
+    private let followSmoothing = 0.45
 
     var body: some View {
         GeometryReader { geo in
@@ -469,58 +477,127 @@ struct LoadoutDiorama: View {
         }
     }
 
-    /// Frame the clip's path (plus the goal) with some room around it, at
-    /// the preview's aspect ratio, inside the play area where possible.
-    private func camera(_ r: RunReplay, clip c: Clip, size s: CGSize) -> Camera {
+    /// THE camera — the single source of truth for where everything is drawn.
+    /// Every layer (floor, pits, goal, coins, trail, ball, flourish) maps
+    /// recorded points through the camera returned here for the same `t`.
+    ///
+    /// Framing: fit the stretch's path, the goal, the coins picked up in the
+    /// stretch and the pits it passes near, with a margin, at the preview's
+    /// aspect ratio.  If that would draw the ball smaller than
+    /// `minBallShare` of the preview's shorter side, zoom in to that size and
+    /// follow the ball (smoothed) instead, so the action fills the card.
+    private func camera(_ r: RunReplay, clip c: Clip, size s: CGSize, at t: Double) -> Camera {
         let aw = CGFloat(r.arenaWidth), ah = CGFloat(r.arenaHeight)
         let br = CGFloat(r.ballRadius)
+        let path = r.samples(from: c.start, to: c.end).map { $0.p }
         var minX = CGFloat.infinity, minY = CGFloat.infinity
         var maxX = -CGFloat.infinity, maxY = -CGFloat.infinity
         func include(_ p: CGPoint) {
             minX = min(minX, p.x); maxX = max(maxX, p.x)
             minY = min(minY, p.y); maxY = max(maxY, p.y)
         }
-        for sample in r.samples(from: c.start, to: c.end) { include(sample.p) }
+        for p in path { include(p) }
         if r.endKind == .goal {
             include(CGPoint(x: CGFloat(r.goal.x) * aw, y: CGFloat(r.goal.y) * ah))
         }
+        // Coins picked up during the stretch.
+        for (idx, coin) in r.coins.enumerated() {
+            if let taken = r.events.first(where: { $0.kind == .coin && $0.index == idx })?.t,
+               taken >= c.start, taken <= c.end {
+                include(CGPoint(x: CGFloat(coin.x) * aw, y: CGFloat(coin.y) * ah))
+            }
+        }
+        // Pits the ball passes within two ball widths of (their near edge).
+        let near = br * 4
+        for h in r.holes {
+            let rect = CGRect(x: CGFloat(h.x) * aw, y: CGFloat(h.y) * ah,
+                              width: CGFloat(h.w) * aw, height: CGFloat(h.h) * ah)
+            let grown = rect.insetBy(dx: -near, dy: -near)
+            // The part of the pit the ball comes close to: for each nearby
+            // path point, the nearest point of the pit.
+            for p in path where grown.contains(p) {
+                include(CGPoint(x: min(max(p.x, rect.minX), rect.maxX),
+                                y: min(max(p.y, rect.minY), rect.maxY)))
+            }
+        }
         if !minX.isFinite { include(r.position(at: 0)) }
+
+        let aspect = s.width / max(1, s.height)
         let pad = br * 2.5
         var w = max(maxX - minX + pad * 2, br * 8)
         var h = max(maxY - minY + pad * 2, br * 8)
-        let aspect = s.width / s.height
         if w / h < aspect { w = h * aspect } else { h = w / aspect }
-        var ox = (minX + maxX) / 2 - w / 2
-        var oy = (minY + maxY) / 2 - h / 2
-        ox = w <= aw ? min(max(ox, 0), aw - w) : (aw - w) / 2
-        oy = h <= ah ? min(max(oy, 0), ah - h) : (ah - h) / 2
-        return Camera(origin: CGPoint(x: ox, y: oy), scale: s.width / w,
-                      region: CGSize(width: w, height: h))
+        let fitScale = s.width / w
+
+        let ballDiameter = br * 2 * loadout.ball.radiusScale
+        let minScale = minBallShare * min(s.width, s.height) / max(1, ballDiameter)
+
+        let scale: CGFloat
+        let center: CGPoint
+        if fitScale >= minScale {
+            // Everything fits at a good size: a fixed camera on the stretch.
+            scale = fitScale
+            center = CGPoint(x: (minX + maxX) / 2, y: (minY + maxY) / 2)
+        } else {
+            // Follow the ball, averaged over a short window either side of t.
+            scale = minScale
+            var sx: CGFloat = 0, sy: CGFloat = 0
+            let steps = 8
+            for k in -steps...steps {
+                let u = min(max(t + followSmoothing * Double(k) / Double(steps), c.start), c.end)
+                let p = r.position(at: u)
+                sx += p.x; sy += p.y
+            }
+            let n = CGFloat(steps * 2 + 1)
+            center = CGPoint(x: sx / n, y: sy / n)
+        }
+        let rw = s.width / scale, rh = s.height / scale
+        var ox = center.x - rw / 2
+        var oy = center.y - rh / 2
+        // Stay inside the play area when the view is smaller than it;
+        // otherwise center the play area in that direction.
+        ox = rw <= aw ? min(max(ox, 0), aw - rw) : (aw - rw) / 2
+        oy = rh <= ah ? min(max(oy, 0), ah - rh) : (ah - rh) / 2
+        return Camera(origin: CGPoint(x: ox, y: oy), scale: scale,
+                      region: CGSize(width: rw, height: rh))
     }
 
     // ── The replay ───────────────────────────────────────────────────────
 
+    /// The replay.  Each frame is ONE ZStack the size of the preview, with
+    /// every layer drawn through ONE camera.  (Before, the coins, trail, ball
+    /// and flourish were separate views handed straight to a TimelineView,
+    /// which stacks several children instead of overlaying them — so each
+    /// landed in its own band of the card and the ball drifted away from its
+    /// trail.  Only the Reduce Motion still frame, which sat in a ZStack,
+    /// lined up.)
     @ViewBuilder
     private func replayScene(_ r: RunReplay, size s: CGSize) -> some View {
         let c = clip(r)
-        let cam = camera(r, clip: c, size: s)
-        ZStack {
+        if reduceMotion {
+            frameScene(r, clip: c, size: s, t: max(c.start, c.end - 0.35),
+                       alpha: 1, wallNow: 0)
+        } else {
+            TimelineView(.animation) { tl in
+                let now = tl.date.timeIntervalSinceReferenceDate
+                let raw = now.truncatingRemainder(dividingBy: c.length)
+                let alpha: Double = raw < 0.15 ? raw / 0.15
+                    : (raw > c.length - 0.25 ? max(0, (c.length - raw) / 0.25) : 1)
+                frameScene(r, clip: c, size: s, t: c.start + raw,
+                           alpha: alpha, wallNow: now)
+            }
+        }
+    }
+
+    /// One frame of the replay at run time `t`.
+    private func frameScene(_ r: RunReplay, clip c: Clip, size s: CGSize,
+                            t: Double, alpha: Double, wallNow: Double) -> some View {
+        let cam = camera(r, clip: c, size: s, at: t)
+        return ZStack {
             floorLayer(cam, size: s)
             pitsLayer(r, cam)
             goalLayer(r, cam)
-            if reduceMotion {
-                movingLayer(r, cam, clip: c, size: s, t: max(c.start, c.end - 0.35),
-                            alpha: 1, wallNow: 0)
-            } else {
-                TimelineView(.animation) { tl in
-                    let now = tl.date.timeIntervalSinceReferenceDate
-                    let raw = now.truncatingRemainder(dividingBy: c.length)
-                    let alpha: Double = raw < 0.15 ? raw / 0.15
-                        : (raw > c.length - 0.25 ? max(0, (c.length - raw) / 0.25) : 1)
-                    movingLayer(r, cam, clip: c, size: s, t: c.start + raw,
-                                alpha: alpha, wallNow: now)
-                }
-            }
+            movingLayer(r, cam, clip: c, size: s, t: t, alpha: alpha, wallNow: wallNow)
         }
         .frame(width: s.width, height: s.height)
     }

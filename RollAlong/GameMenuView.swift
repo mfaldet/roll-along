@@ -43,8 +43,6 @@ struct GameMenuView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    header
-
                     // S2-T7: the "what am I chasing?" chase chips — a compact,
                     // horizontal strip of the player's pinned trophies, each
                     // showing live progress read from the engine.  Renders
@@ -110,17 +108,6 @@ struct GameMenuView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        Text("Choose the way you want to roll.")
-            .font(.system(size: 22, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            .frame(maxWidth: .infinity, alignment: .center)
-    }
-
     // MARK: - ROLL ALONG hero (the core game — biggest, on top)
 
     private var rollAlongHero: some View {
@@ -142,18 +129,9 @@ struct GameMenuView: View {
                     .blendMode(.plusLighter)
 
                 HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("CORE GAME")
-                            .font(.system(size: 11, weight: .black, design: .rounded))
-                            .tracking(2)
-                            .foregroundStyle(.white.opacity(0.85))
-                        Text("Roll Along")
-                            .font(.system(size: 34, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                        Text("Endless Adventure · Level \(gameState.currentLevel)")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
+                    GameModeCardTitle(label: "CORE GAME",
+                                      title: "Roll Along",
+                                      line: "Endless Adventure · Level \(gameState.currentLevel)")
                     Spacer()
                     Image(systemName: "play.circle.fill")
                         .font(.system(size: 40))
@@ -323,38 +301,23 @@ struct GameMenuView: View {
     private var minigamesButton: some View {
         let count = MinigamesGridView.available.count
         return NavigationLink(value: HomeRoute.minigames) {
-            HStack(spacing: 14) {
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 27, weight: .bold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("MINIGAMES")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .tracking(1.5)
-                        .foregroundStyle(.white.opacity(0.85))
-                    Text("\(count) games")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text("Race, shove, paint and grab against rivals, or take it easy.")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                }
+            HStack(alignment: .bottom) {
+                // Same lettering as the Roll Along card, without a line.
+                GameModeCardTitle(label: "ARCADE · \(count) GAMES", title: "Minigames")
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity)
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: 26)
                     .fill(LinearGradient(colors: [Self.c(0.36, 0.62, 1.00), Self.c(0.80, 0.30, 0.95)],
-                                         startPoint: .leading, endPoint: .trailing))
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
             )
-            .shadow(color: Self.c(0.36, 0.62, 1.00).opacity(0.40), radius: 8, y: 4)
+            .shadow(color: Self.c(0.36, 0.62, 1.00).opacity(0.45), radius: 16, y: 7)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -363,44 +326,51 @@ struct GameMenuView: View {
         .accessibilityIdentifier("MinigamesButton")
     }
 
-    /// CHALLENGE PACKS — an 8-tile illustrative grid that taps through as a whole
-    /// to the full Challenge Tracks page (replaces the old horizontal shelf + its
-    /// "See all" tail tile).  No per-pack selection here; that lives on the
-    /// Challenge Tracks page.
+    /// CHALLENGE PACKS — one card over the looping gameplay replay, with the
+    /// same lettering as the Roll Along card.  The whole card opens the full
+    /// Challenge Tracks page; a "See all" chip inside it says so.
     private var challengePacksSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("CHALLENGE PACKS")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .tracking(2)
-                        .foregroundStyle(.white)
-                    Text("Themed hundred-level gauntlets — clear one for its cosmetics.")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.5))
-                }
-                Spacer(minLength: 8)
-                HStack(spacing: 2) {
-                    Text("See all")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
-                }
-                .foregroundStyle(Color(white: 0.6))
-            }
-            NavigationLink(value: HomeRoute.challengeTracks) {
+        let cleared = packs.filter { gameState.completedTracks.contains($0.trackID) }.count
+        let line = "\(packs.count) tracks · \(cleared) cleared"
+        return NavigationLink(value: HomeRoute.challengeTracks) {
+            ZStack(alignment: .topLeading) {
                 // A looping "video" that revolves through each pack's reward
                 // collection, shown as a live loadout diorama.
                 ChallengePackShowcase(entries: packShowcaseEntries)
-                    .frame(height: 158)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color(white: 0.20), lineWidth: 1))
-                    .contentShape(RoundedRectangle(cornerRadius: 18))
+
+                // Top scrim so the title reads over any floor color.
+                LinearGradient(colors: [.black.opacity(0.55), .clear],
+                               startPoint: .top, endPoint: .center)
+                    .allowsHitTesting(false)
+
+                GameModeCardTitle(label: "THEMED TRACKS", title: "Challenge Packs", line: line)
+                    .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
+                    .padding(20)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("tracks")
-            .accessibilityLabel("Challenge Packs. Open all challenge tracks.")
+            // "See all" lives inside the card, bottom right.
+            .overlay(alignment: .bottomTrailing) {
+                HStack(spacing: 3) {
+                    Text("See all")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(Capsule().fill(.black.opacity(0.45)))
+                .padding(14)
+            }
+            .frame(height: 184)
+            .clipShape(RoundedRectangle(cornerRadius: 26))
+            .overlay(RoundedRectangle(cornerRadius: 26)
+                .stroke(Color(white: 0.20), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 26))
         }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("tracks")
+        .accessibilityLabel("Challenge Packs. \(packs.count) tracks, \(cleared) cleared. Opens all challenge tracks.")
     }
 
     /// The challenge-pack collections the showcase cycles through: each track
@@ -474,6 +444,33 @@ struct GameMenuView: View {
 // LoadoutDiorama from one collection to the next every few seconds, with the
 // pack's name + glyph in the corner.  One shared clock drives the rotation.
 // ===========================================================================
+/// The lettering every Game Modes card uses (Roll Along, Challenge Packs,
+/// Minigames): a small spaced label, a large title, and an optional short line.
+private struct GameModeCardTitle: View {
+    let label: String
+    let title: String
+    var line: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .tracking(2)
+                .foregroundStyle(.white.opacity(0.85))
+            Text(title)
+                .font(.system(size: 34, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if let line {
+                Text(line)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+        }
+    }
+}
+
 private struct ChallengePackShowcase: View {
     struct Entry: Identifiable {
         let id:      String
