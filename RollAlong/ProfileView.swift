@@ -520,9 +520,12 @@ struct PlayerRanksCard: View {
     }
 
     private func rankRow(_ board: LeaderboardBoard) -> some View {
-        let played = board.hasPlayed(profile)
-        let rank   = ranks[board.rawValue]
         let diffs  = perDifficultyRanks(board)
+        let played = board.hasPlayed(profile) || !diffs.isEmpty
+        // A board kept per difficulty has no single rank: its chip shows the
+        // best of the player's difficulty ranks, listed underneath.
+        let rank   = board.difficultyGameID == nil ? ranks[board.rawValue]
+                                                   : diffs.map { $0.rank }.min()
         return VStack(spacing: 6) {
             HStack(spacing: 12) {
                 Image(systemName: Self.icon(board))
@@ -534,7 +537,9 @@ struct PlayerRanksCard: View {
                     Text(board.title)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(played ? .white : Color(white: 0.45))
-                    Text(played ? board.statText(profile) : "Not played yet")
+                    Text(played ? (board.hasPlayed(profile) ? board.statText(profile)
+                                                            : "Ranked by difficulty")
+                                : "Not played yet")
                         .font(.system(size: 11, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                         .lineLimit(1)
@@ -546,7 +551,8 @@ struct PlayerRanksCard: View {
                 rankChip(rank: rank, played: played)
             }
 
-            // Per-difficulty ranks (competitive boards), where the player is ranked.
+            // Per-difficulty ranks (competitive boards and Disco Ball), where
+            // the player is ranked.
             if !diffs.isEmpty {
                 HStack(spacing: 10) {
                     ForEach(diffs, id: \.label) { d in
@@ -568,12 +574,13 @@ struct PlayerRanksCard: View {
         )
     }
 
-    /// Per-difficulty ranks (Easy/Normal/Hard) for a competitive board, in order,
-    /// only where the player is actually ranked.
+    /// Per-difficulty ranks (Easy / Normal / Hard, or Hardcore on Disco Ball)
+    /// for a board kept per difficulty, in order, only where the player is
+    /// actually ranked.
     private func perDifficultyRanks(_ board: LeaderboardBoard) -> [(label: String, rank: Int)] {
-        guard let mode = board.competitiveModeID else { return [] }
-        return [("easy", "Easy"), ("normal", "Normal"), ("hard", "Hard")].compactMap { (key, label) in
-            diffRanks["\(mode)|\(key)"].map { (label: label, rank: $0) }
+        guard let game = board.difficultyGameID else { return [] }
+        return ["easy", "normal", "hard"].compactMap { key in
+            diffRanks["\(game)|\(key)"].map { (label: board.difficultyLabel(key), rank: $0) }
         }
     }
 

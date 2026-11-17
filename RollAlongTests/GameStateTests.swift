@@ -1275,48 +1275,72 @@ final class DiscoBoardBestTests: XCTestCase {
         return (GameState(defaults: defaults), defaults, suite)
     }
 
-    func testMoreCrossingsOnAnyDifficultyReplacesTheBest() {
+    /// Each difficulty keeps its own best and its own time: a run on one
+    /// difficulty never changes another's.
+    func testEachDifficultyKeepsItsOwnBest() {
         let (gs, defaults, suite) = makeGameState()
         defer { defaults.removePersistentDomain(forName: suite) }
         _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 12, crossingSeconds: 48)
-        XCTAssertEqual(gs.discoBoardBest, 12)
-        XCTAssertEqual(gs.discoBoardAvgMs, 4_000)
-        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 15, crossingSeconds: 90)
-        XCTAssertEqual(gs.discoBoardBest, 15)
-        XCTAssertEqual(gs.discoBoardAvgMs, 6_000)
-        // A shorter run never replaces it, however fast.
-        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 3, crossingSeconds: 3)
-        XCTAssertEqual(gs.discoBoardBest, 15)
-        XCTAssertEqual(gs.discoBoardAvgMs, 6_000)
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 5, crossingSeconds: 30)
+        XCTAssertEqual(gs.minigameBests["discoeasy"], 12)
+        XCTAssertEqual(gs.minigameBests["discohard"], 5)
+        XCTAssertNil(gs.minigameBests["disco"])
+        XCTAssertEqual(gs.discoBestAvgMs["easy"], 4_000)
+        XCTAssertEqual(gs.discoBestAvgMs["hard"], 6_000)
+        XCTAssertNil(gs.discoBestAvgMs["normal"])
+        // A longer Easy run does not touch Hardcore.
+        _ = gs.recordDiscoResult(bestKey: "discoeasy", crossings: 20, crossingSeconds: 60)
+        XCTAssertEqual(gs.minigameBests["discohard"], 5)
+        XCTAssertEqual(gs.discoBestAvgMs["hard"], 6_000)
+        // The profile summary is the best of the three.
+        XCTAssertEqual(gs.discoBoardBest, 20)
+        XCTAssertEqual(gs.discoBoardAvgMs, 3_000)
     }
 
-    func testATieKeepsTheFasterRun() {
+    func testATieKeepsTheFasterRunAndAShorterRunChangesNothing() {
         let (gs, defaults, suite) = makeGameState()
         defer { defaults.removePersistentDomain(forName: suite) }
         _ = gs.recordDiscoResult(bestKey: "disco", crossings: 10, crossingSeconds: 50)
         _ = gs.recordDiscoResult(bestKey: "disco", crossings: 10, crossingSeconds: 60)
-        XCTAssertEqual(gs.discoBoardAvgMs, 5_000, "a slower tie must not replace the best")
+        XCTAssertEqual(gs.discoBestAvgMs["normal"], 5_000, "a slower tie must not replace the best")
         _ = gs.recordDiscoResult(bestKey: "disco", crossings: 10, crossingSeconds: 42)
-        XCTAssertEqual(gs.discoBoardAvgMs, 4_200, "a faster tie replaces the best")
+        XCTAssertEqual(gs.discoBestAvgMs["normal"], 4_200, "a faster tie replaces the time")
+        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 3, crossingSeconds: 3)
+        XCTAssertEqual(gs.minigameBests["disco"], 10)
+        XCTAssertEqual(gs.discoBestAvgMs["normal"], 4_200)
     }
 
     func testTheBestSurvivesARelaunch() {
         let (gs, defaults, suite) = makeGameState()
         defer { defaults.removePersistentDomain(forName: suite) }
-        _ = gs.recordDiscoResult(bestKey: "disco", crossings: 7, crossingSeconds: 35)
+        _ = gs.recordDiscoResult(bestKey: "discohard", crossings: 7, crossingSeconds: 35)
         let reloaded = GameState(defaults: defaults)
-        XCTAssertEqual(reloaded.discoBoardBest, 7)
-        XCTAssertEqual(reloaded.discoBoardAvgMs, 5_000)
+        XCTAssertEqual(reloaded.minigameBests["discohard"], 7)
+        XCTAssertEqual(reloaded.discoBestAvgMs["hard"], 5_000)
         XCTAssertEqual(reloaded.localLeaderboardProfile.discoballBest, 7)
     }
 
-    func testCrossingTimeFormattingAndBoardShape() {
+    func testBoardsKeptPerDifficulty() {
         XCTAssertEqual(LeaderboardBoard.crossingTime(4_300), "4.3 s")
         XCTAssertEqual(LeaderboardBoard.crossingTime(0), "—")
-        XCTAssertEqual(LeaderboardBoard.discoBall.order,
-                       "discoball_best.desc,discoball_best_avg_ms.asc")
         XCTAssertEqual(LeaderboardBoard.discoBall.category, .solo)
-        XCTAssertEqual(LeaderboardBoard.cometClash.extraColumns, "")
+        // Disco Ball and the six competitive games have difficulty tabs.
+        XCTAssertEqual(LeaderboardBoard.discoBall.difficultyGameID, "disco")
+        XCTAssertEqual(LeaderboardBoard.cometClash.difficultyGameID, "snake")
+        XCTAssertEqual(LeaderboardBoard.coinPit.difficultyGameID, "goldrush")
+        XCTAssertNil(LeaderboardBoard.rollAlong.difficultyGameID)
+        XCTAssertNil(LeaderboardBoard.zenGarden.difficultyGameID)
+        XCTAssertNil(LeaderboardBoard.rollUp.difficultyGameID)
+        let withTabs = LeaderboardBoard.allCases.filter { $0.difficultyGameID != nil }
+        XCTAssertEqual(withTabs.count, 7)
+        // The game's own names on the tabs.
+        XCTAssertEqual(LeaderboardBoard.discoBall.difficultyLabel("hard"), "Hardcore")
+        XCTAssertEqual(LeaderboardBoard.sumo.difficultyLabel("hard"), "Hard")
+        XCTAssertEqual(LeaderboardBoard.sumo.difficultyLabel("easy"), "Easy")
+        // The Disco best keys map to and from difficulties.
+        for d in MinigameDifficulty.allCases {
+            XCTAssertEqual(GameState.discoDifficulty(forBestKey: GameState.discoBestKey(d)), d)
+        }
     }
 }
 
