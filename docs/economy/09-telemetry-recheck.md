@@ -16,7 +16,7 @@ matter here:
 
 - `minigame_result` — `game, difficulty, won, base_payout, payout`
 - `level_complete` (climb) / track + daily clear events — carry timing + coins
-- `daily_challenge_level_cleared` — daily sub-level funnel
+- `daily_challenge_level_cleared` — daily sub-level funnel *(the Challenge of the Day is held back from v1.0, so this and the other `daily_challenge_*` events will not appear in 1.0 data)*
 
 ## Step 1 — data sufficiency
 

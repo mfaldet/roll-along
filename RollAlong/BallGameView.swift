@@ -283,12 +283,12 @@ struct BallGameView: View {
         return false
     }
 
-    /// Modes the "Tap to Start / Auto Start" setting applies to: Adventure,
-    /// Challenge Tracks and Challenge of the Day.  To leave Challenge of the
-    /// Day on Auto Start, remove the `.oneShot` case below.
+    /// Modes the "Tap to Start / Auto Start" setting applies to: Adventure
+    /// and Challenge Tracks.  (The Challenge of the Day, `.oneShot`, is held
+    /// back from v1.0; add it here if it comes back.)
     private var startSettingApplies: Bool {
         switch activeMode.progression {
-        case .mainClimb, .challengeTrack, .oneShot: return activeMode.goal == .reachGoal
+        case .mainClimb, .challengeTrack: return activeMode.goal == .reachGoal
         default: return false
         }
     }

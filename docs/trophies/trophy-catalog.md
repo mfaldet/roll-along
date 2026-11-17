@@ -1,7 +1,8 @@
 # Roll Along — v1 Trophy Catalog
 
-> **Superseded for v1.0 (2026-11-15).** The shipping list is 90 trophies drawn
-> as 46 tiles (stacks and feats) in four sections. See
+> **Superseded for v1.0 (2026-11-17).** The shipping list is 86 trophies drawn
+> as 44 tiles (stacks and feats) in four sections; the Challenge of the Day and
+> its trophies (§3.3) are held back from 1.0. See
 > [`trophy-list.md`](trophy-list.md), generated from `TrophyCatalog.json`.
 > Ten trophies described below were removed, seventeen were added, and four
 > changed tier or threshold. The rest of this document is the earlier

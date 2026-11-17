@@ -99,7 +99,7 @@ enum TrophyCategory: String, Codable, CaseIterable {
         switch self {
         case .climb:            return "Adventure"
         case .challengeTracks:  return "Challenge Tracks"
-        case .daily:            return "Daily Challenge & Streaks"
+        case .daily:            return "Daily Reward Streak"
         case .minigamesArcade:  return "Minigames — Arcade-Wide"
         case .minigamesPerGame: return "Minigames — Per Game"
         case .cosmetics:        return "Cosmetics & Collection"

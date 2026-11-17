@@ -310,17 +310,6 @@
       "addedInVersion": "1.0"
     },
     {
-      "id": "daily_first_clear",
-      "title": "Carpe Rollem",
-      "tier": "bronze",
-      "category": "daily",
-      "secret": false,
-      "lockedDescription": "Complete your first Challenge of the Day.",
-      "unlockedDescription": "You seized the day — and cleared it. Carpe rollem.",
-      "criteria": { "metric": "daily_clears", "threshold": 1 },
-      "addedInVersion": "1.0"
-    },
-    {
       "id": "daily_login_7",
       "title": "Seven-Day Roller",
       "tier": "bronze",
@@ -329,17 +318,6 @@
       "lockedDescription": "Reach a 7-day daily reward streak.",
       "unlockedDescription": "Seven days straight. A true seven-day roller.",
       "criteria": { "metric": "daily_reward_streak_best", "threshold": 7 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "daily_clears_10",
-      "title": "Ten Brutal Mornings",
-      "tier": "silver",
-      "category": "daily",
-      "secret": false,
-      "lockedDescription": "Complete 10 Challenges of the Day.",
-      "unlockedDescription": "Ten brutal challenges, ten clears.",
-      "criteria": { "metric": "daily_clears", "threshold": 10 },
       "addedInVersion": "1.0"
     },
     {
@@ -373,28 +351,6 @@
       "lockedDescription": "Reach a 365-day daily reward streak.",
       "unlockedDescription": "A full year without missing a day. Once around the sun.",
       "criteria": { "metric": "daily_reward_streak_best", "threshold": 365 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "daily_clears_50",
-      "title": "Fifty Days of Grit",
-      "tier": "gold",
-      "category": "daily",
-      "secret": false,
-      "lockedDescription": "Complete 50 Challenges of the Day.",
-      "unlockedDescription": "Fifty of the game's hardest days, cleared. Pure grit.",
-      "criteria": { "metric": "daily_clears", "threshold": 50 },
-      "addedInVersion": "1.0"
-    },
-    {
-      "id": "daily_week_streak",
-      "title": "The Brutal Week",
-      "tier": "gold",
-      "category": "daily",
-      "secret": false,
-      "lockedDescription": "Complete the Challenge of the Day on 7 consecutive days.",
-      "unlockedDescription": "Seven consecutive daily clears. The Brutal Week, survived.",
-      "criteria": { "metric": "daily_clear_streak_best", "threshold": 7 },
       "addedInVersion": "1.0"
     },
     {
@@ -987,10 +943,10 @@
       "category": "capstone",
       "secret": false,
       "lockedDescription": "Unlock every visible Bronze, Silver, and Gold trophy.",
-      "unlockedDescription": "All 72 visible Bronze, Silver, and Gold trophies. Platinum. The rarest roll of all.",
+      "unlockedDescription": "All 68 visible Bronze, Silver, and Gold trophies. Platinum. The rarest roll of all.",
       "criteria": {
         "metric": "base_trophies_unlocked",
-        "threshold": 72,
+        "threshold": 68,
         "requiredTrophyIDs": [
           "climb_first_clear",
           "climb_level_10",
@@ -1017,13 +973,9 @@
           "track_triple",
           "track_five",
           "track_gauntlet",
-          "daily_first_clear",
           "daily_login_7",
-          "daily_clears_10",
           "daily_login_30",
           "daily_login_90",
-          "daily_clears_50",
-          "daily_week_streak",
           "arcade_sampler",
           "arcade_grand_tour",
           "arcade_first_win",
@@ -1086,12 +1038,8 @@
       "trophies": ["climb_perfect_world"] },
     { "id": "stack_tracks", "kind": "stack", "title": "Challenge Tracks", "section": "challenges", "subsection": "", "icon": "signpost.right.fill", "fallbackIcon": "map.fill",
       "trophies": ["track_first_level", "track_halfway", "track_first_complete", "track_triple", "track_five", "track_all_eight"] },
-    { "id": "stack_daily_clears", "kind": "stack", "title": "Daily challenges completed", "section": "challenges", "subsection": "", "icon": "sunrise.fill", "fallbackIcon": "sun.max.fill",
-      "trophies": ["daily_first_clear", "daily_clears_10", "daily_clears_50"] },
     { "id": "stack_daily_streak", "kind": "stack", "title": "Daily reward streak", "section": "challenges", "subsection": "", "icon": "calendar", "fallbackIcon": "calendar.circle.fill",
       "trophies": ["daily_login_7", "daily_login_30", "daily_login_90", "daily_login_365"] },
-    { "id": "daily_week_streak", "kind": "feat", "title": "The Brutal Week", "section": "challenges", "subsection": "", "icon": "flame.fill", "fallbackIcon": "flame",
-      "trophies": ["daily_week_streak"] },
     { "id": "track_gauntlet", "kind": "feat", "title": "Run the Gauntlet", "section": "challenges", "subsection": "", "icon": "bolt.shield.fill", "fallbackIcon": "shield.fill",
       "trophies": ["track_gauntlet"] },
     { "id": "stack_variety", "kind": "stack", "title": "Variety", "section": "minigames", "subsection": "All minigames", "icon": "gamecontroller.fill", "fallbackIcon": "gamecontroller",

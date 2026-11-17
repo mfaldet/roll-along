@@ -609,7 +609,16 @@ enum GameModeCatalogue {
     /// behavior is implemented.
     static let registry: [(mode: GameMode, isEnabled: Bool)] = [
         (climb,              true),
-        (DailyChallengeMode(), true),  // section .climb → hidden from shelves; launched via the CotD banner
+        // The Challenge of the Day is HELD BACK from v1.0.  Its mode, game
+        // code, saved completions and trophy funnel stay in the code so it can
+        // come back; with the flag off it resolves to nil in `mode(id:)`, so
+        // its route falls back to the climb and no menu shows it.  Its four
+        // trophies and two tiles are out of the shipping catalog.  The daily
+        // REWARD (streak pill, DailyRewardView) is separate and unaffected.
+        // To bring it back: set this to true, restore the banner in
+        // GameMenuView, its four trophies and two tiles (and Platinum), and
+        // add `.oneShot` back to `startSettingApplies` in BallGameView.
+        (DailyChallengeMode(), false),
         (ZenGardenMode(),    true),    // engine behavior implemented — live
         (CoinPitMode(),      true),    // engine behavior implemented — live
         (SnakeMode(),        true),    // self-contained SnakeGameView — live

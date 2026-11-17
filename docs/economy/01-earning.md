@@ -1,5 +1,11 @@
 # 01 — Every way to earn coins
 
+> **2026-11-17: the Challenge of the Day is held back from v1.0** (switched
+> off in the mode registry; no menu entry). Its flat 30 coins on a clear —
+> row 11 below — no longer reach players. It was the only reward the
+> challenge gave: no tickets, lives or cosmetics, and its four trophies are
+> out of the catalog. The daily login ladder (row 17) is unchanged.
+
 All rates independently verified against source (2026-07-01). "N" = Normal
 difficulty, "H" = Hard. Wall-clock durations include ~5–10s lobby/result
 overhead. Assumed performance baselines are listed at the bottom.
@@ -19,7 +25,7 @@ overhead. Assumed performance baselines are listed at the bottom.
 | 8 | Disco Ball run | ~18 + 100 best | ~45s | **~24** | none | none (harder grid, same pay) |
 | 9 | Challenge Track **replay farm** | 2 + pickups every clear | ~15s (early lvl) | **12–20** | lives on falls | none |
 | 10 | Marble Cup win | ~27 N / ~54 H | ~98s | **~17 N / ~33 H** | none | ×0.5/×1/×2 |
-| 11 | Challenge of the Day | flat 30 | ~180s | **~10, 1×/day** | daily + 3 tries/sub-level | none |
+| 11 | Challenge of the Day *(held back from v1.0)* | flat 30 | ~180s | **~10, 1×/day** | daily + 3 tries/sub-level | none |
 | 12 | Pinball game | ~28 + 100 best | ~180s | **~9.3** | none | none |
 | 13 | Sumo Survival win | 10 N / 20 H (1st) | ~128s | **~5 N / ~10 H** | none | ×0.5/×1/×2 |
 | 14 | Roll Out maze | 4/clear | ~45s | **~5.3** | **1 life/fall** | none |
