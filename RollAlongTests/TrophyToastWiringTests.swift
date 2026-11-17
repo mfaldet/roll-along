@@ -222,19 +222,22 @@ final class TrophyToastWiringTests: XCTestCase {
 
     /// The toast feed is display-only: routing an unlock through `fireTrophy`
     /// and presenting a banner must not change the coin balance beyond the
-    /// funnel's own (non-trophy) payout.  Here a zero-payout win banks no
-    /// coins, yet still unlocks + toasts — proving the toast path itself mints
+    /// funnel's own (non-trophy) payout.  Here a win banks exactly its table
+    /// payout, yet still unlocks + toasts — proving the toast path itself mints
     /// nothing (D1 never-mint; §5 economy invariant).
     func testToastFeedMintsNoCoins() {
         let gs = makeGameState()
         let before = gs.coinBalance
         gs.beginTrophyRun()
-        gs.recordMinigameResult(modeID: "snake", difficulty: .normal,
-                                won: true, score: 0, basePayout: 0)   // zero payout
+        // 2026-11 rebalance: a win always pays the table (Normal win = 4), so
+        // the balance may move by exactly the funnel's own payout and no more.
+        let paid = gs.recordMinigameResult(modeID: "snake", difficulty: .normal,
+                                           won: true, score: 0)
         gs.endTrophyRun()
 
+        XCTAssertEqual(paid, CoinPayouts.competitiveWin(.normal))
         XCTAssertNotNil(gs.trophyToasts.presented, "The win still toasts…")
-        XCTAssertEqual(gs.coinBalance, before,
+        XCTAssertEqual(gs.coinBalance, before + paid,
                        "…but the toast path grants no coins (D1 never-mint).")
     }
 

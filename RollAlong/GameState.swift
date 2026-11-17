@@ -3109,7 +3109,9 @@ enum CoinPayouts {
                             placement: Int?, difficulty: MinigameDifficulty) -> Int {
         if won { return competitiveWin(difficulty) }
         if draw { return competitiveDraw }
-        if let placement, placement > 1, placement < fieldSize(modeID) { return competitiveRunnerUp }
+        // Not a win but not last either — including a non-winning first place,
+        // e.g. King of the Hill when nobody held the zone.
+        if let placement, placement >= 1, placement < fieldSize(modeID) { return competitiveRunnerUp }
         return competitiveLoss
     }
 

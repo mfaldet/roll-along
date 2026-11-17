@@ -381,7 +381,6 @@ struct KingOfTheHillView: View {
     }
 
     private var gameOverOverlay: some View {
-        let holdSec = playerHoldTicks / 60
         let banked = paidCoins
         let title = playerWon ? "You Win!" : "You Lose"
         let titleColor: Color = playerWon ? Color(red: 0.50, green: 0.88, blue: 0.55)

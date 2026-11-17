@@ -607,7 +607,7 @@ struct RollOutView: View {
         phase = .cleared
         gameState.addCoins(coinsPerClear)
         // Best = furthest maze reached (1-based).  The record, the shared
-        // 100-coin new-best bonus, and the Roll Out trophies now funnel
+        // new-best bonus (now 0 coins), and the Roll Out trophies now funnel
         // through GameState (S1-T4); the view keeps only the per-clear payout.
         let reached = mazeIndex + 1
         gameState.recordRollOutResult(reached: reached)
