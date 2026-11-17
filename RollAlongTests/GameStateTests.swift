@@ -1235,10 +1235,10 @@ final class OpponentTuningTests: XCTestCase {
 final class PresetNamesTests: XCTestCase {
 
     func testWordListsAreCleanAndSized() {
-        XCTAssertEqual(PresetNames.adjectives.count, 117)
-        XCTAssertEqual(PresetNames.nouns.count, 129)
-        XCTAssertEqual(PresetNames.clanAdjectives.count, 165)
-        XCTAssertEqual(PresetNames.clanNouns.count, 199)
+        XCTAssertEqual(PresetNames.adjectives.count, 173)
+        XCTAssertEqual(PresetNames.nouns.count, 206)
+        XCTAssertEqual(PresetNames.clanAdjectives.count, 221)
+        XCTAssertEqual(PresetNames.clanNouns.count, 202)
         for list in [PresetNames.adjectives, PresetNames.nouns,
                      PresetNames.clanAdjectives, PresetNames.clanNouns] {
             XCTAssertEqual(Set(list).count, list.count, "a word appears twice in a list")
@@ -1253,9 +1253,75 @@ final class PresetNamesTests: XCTestCase {
             XCTAssertLessThanOrEqual(word.count, 5, "\(word) is too long for a nickname")
         }
         XCTAssertLessThanOrEqual(PresetNames.nicknameMaxLength, 10)
-        // 117 × 129 two-word nicknames.  Nicknames are not unique.
-        XCTAssertEqual(PresetNames.adjectives.count * PresetNames.nouns.count, 15_093)
+        // 173 × 206 two-word nicknames.  Nicknames are not unique.
+        XCTAssertEqual(PresetNames.adjectives.count * PresetNames.nouns.count, 35_638)
         XCTAssertTrue(Set(PresetNames.adjectives).isDisjoint(with: PresetNames.nouns))
+    }
+
+    /// The second words for players and for clans are completely separate:
+    /// no word appears in both lists, in singular or plural form ("Wolf" for
+    /// players means no "Wolves" for clans).  The default nickname "Roller"
+    /// counts as a player word too.
+    func testPlayerAndClanSecondWordsShareNoStem() {
+        let playerWords = Set(PresetNames.nouns.map { $0.lowercased() }
+                              + [PresetNames.defaultNickname.lowercased()])
+        for clanWord in PresetNames.clanNouns {
+            let clash = Self.singularForms(of: clanWord).intersection(playerWords)
+            XCTAssertTrue(clash.isEmpty,
+                          "clan word \(clanWord) is a form of the player word(s) \(clash.sorted())")
+        }
+        // No player word is a plural of another, and no two clan words are
+        // forms of one word.
+        for list in [PresetNames.nouns, PresetNames.clanNouns] {
+            let lowered = Set(list.map { $0.lowercased() })
+            for word in list {
+                let others = Self.singularForms(of: word).subtracting([word.lowercased()])
+                XCTAssertTrue(others.intersection(lowered).isEmpty,
+                              "\(word) is a form of another word in the same list")
+            }
+        }
+    }
+
+    /// Every word is letters only and short enough: nickname words at most 5
+    /// letters (a nickname at most 10, for in-game name tags) and a clan name
+    /// with its longest number within the server's 32 characters.
+    func testEveryWordIsLettersOnlyAndWithinTheLengthLimit() {
+        for word in PresetNames.adjectives + PresetNames.nouns
+                    + PresetNames.clanAdjectives + PresetNames.clanNouns {
+            XCTAssertFalse(word.isEmpty)
+            XCTAssertTrue(word.allSatisfy { $0.isASCII && $0.isLetter }, "\(word): letters only")
+        }
+        for word in PresetNames.adjectives + PresetNames.nouns {
+            XCTAssertLessThanOrEqual(word.count, 5, word)
+        }
+        XCTAssertLessThanOrEqual(PresetNames.nicknameMaxLength, 10)
+        let longestAdjective = PresetNames.clanAdjectives.map(\.count).max() ?? 0
+        let longestNoun = PresetNames.clanNouns.map(\.count).max() ?? 0
+        XCTAssertLessThanOrEqual(longestAdjective + 1 + longestNoun + " 999".count, 32)
+    }
+
+    /// The singulars a plural could come from, lowercased, including the word
+    /// itself: regular endings (-s, -es, -ies to -y, -ves to -f / -fe) plus a
+    /// table of irregular plurals.
+    private static func singularForms(of word: String) -> Set<String> {
+        let w = word.lowercased()
+        let irregular: [String: String] = [
+            "geese": "goose", "mice": "mouse", "leaves": "leaf", "wolves": "wolf",
+            "calves": "calf", "halves": "half", "knives": "knife", "lives": "life",
+            "elves": "elf", "shelves": "shelf", "hooves": "hoof", "oases": "oasis",
+            "cacti": "cactus", "fungi": "fungus", "children": "child", "teeth": "tooth",
+            "feet": "foot", "men": "man", "women": "woman", "oxen": "ox", "people": "person",
+        ]
+        var forms: Set<String> = [w]
+        if let singular = irregular[w] { forms.insert(singular) }
+        if w.hasSuffix("ies"), w.count > 4 { forms.insert(String(w.dropLast(3)) + "y") }
+        if w.hasSuffix("ves") {
+            let base = String(w.dropLast(3))
+            forms.formUnion([base + "f", base + "fe", String(w.dropLast())])
+        }
+        if w.hasSuffix("es") { forms.insert(String(w.dropLast(2))) }
+        if w.hasSuffix("s"), !w.hasSuffix("ss") { forms.insert(String(w.dropLast())) }
+        return forms
     }
 
     /// Every nickname the pickers can build reads back as exactly the same
@@ -1304,8 +1370,10 @@ final class PresetNamesTests: XCTestCase {
         XCTAssertEqual(PresetNames.shownNickname("Mackenzie"), "")
         XCTAssertEqual(PresetNames.shownNickname(PresetNames.defaultNickname), PresetNames.defaultNickname)
         XCTAssertNil(PresetNames.parseClanName("The Stones"))
-        XCTAssertNil(PresetNames.parseClanName("Swift Comets 666")) // blocked number
-        XCTAssertNotNil(PresetNames.parseClanName("Swift Comets 1"))
+        XCTAssertNil(PresetNames.parseClanName("Swift Rockets 666")) // blocked number
+        XCTAssertNotNil(PresetNames.parseClanName("Swift Rockets 1"))
+        // "Comet" is a nickname word, so "Comets" is no longer a clan word.
+        XCTAssertNil(PresetNames.parseClanName("Swift Comets 1"))
         XCTAssertFalse(PresetNames.clanNumbers.contains(420))
         XCTAssertTrue(PresetNames.isValidNickname(PresetNames.defaultNickname))
         XCTAssertFalse(PresetNames.isValidClanDescription("anything typed"))
