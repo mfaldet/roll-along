@@ -17,6 +17,8 @@ enum HomeRoute: Hashable {
     case friends
     case clans
     case games
+    /// The two-column grid of every available minigame (from Game Modes).
+    case minigames
     /// Launch an alternate game mode by its GameModeCatalogue id (e.g. "zen").
     /// The climb uses `.game`; this carries the id so one route serves every
     /// non-climb mode as the modes hub grows.
@@ -315,15 +317,12 @@ struct HomeView: View {
                     // Open roaming space — the ball lives on the layer behind.
                     Spacer()
 
-                    // Bottom control grid — 4 rows, 4 columns wide:
+                    // Bottom control grid — 3 rows, 4 columns wide:
                     //   • Mode indicator (1 col) · Play (3 cols)
                     //   • Leaderboard · Game Modes (2-wide) · Shop
                     //   • Settings · Clans · Friends · Profile
-                    //   • Trophies (full-width) — S2-T3. Its own row so it
-                    //     doesn't overpack the already-full 2×4 arrangement,
-                    //     and it takes a DISTINCT glyph (`rosette`) because
-                    //     the Leaderboard tile already owns `trophy.fill`
-                    //     (design.md §7 Home-grid collision note).
+                    // The Trophy Room is reached from Profile (its Trophies
+                    // card sits right under the player's name there).
                     // The per-mode indicator (Level Select / wins / best …) sits
                     // in the LEFT QUARTER of the Play row so it reads as "what
                     // you're about to launch" right beside the button.
@@ -347,9 +346,6 @@ struct HomeView: View {
                                 squareNavButton("person.3.fill",  "Clans",    HomeRoute.clans,   requiresSignIn: true)
                                 squareNavButton("person.2.fill",  "Friends",  HomeRoute.friends, requiresSignIn: true)
                                 squareNavButton("person.fill",    "Profile",  HomeRoute.profile)
-                            }
-                            GridRow {
-                                trophiesGridButton.gridCellColumns(4)
                             }
                         }
                     }
@@ -482,6 +478,7 @@ struct HomeView: View {
                 case .friends:     FriendsView()
                 case .clans:       ClansView()
                 case .games:       GameMenuView()
+                case .minigames:   MinigamesGridView()
                 case .mode("snake"):
                     SnakeGameView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("snake")]) }
@@ -863,37 +860,6 @@ struct HomeView: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("Game Modes")
         .accessibilityIdentifier("GameModesButton")
-    }
-
-    /// Full-width "Trophies" cell (spans all 4 columns) — the Trophy Room
-    /// entry (S2-T3).  Same surface style as the other grid cells.  Uses the
-    /// `rosette` glyph (NOT `trophy.fill`, which the Leaderboard tile owns) so
-    /// the two are visually distinct (design.md §7 Home-grid collision note).
-    private var trophiesGridButton: some View {
-        NavigationLink(value: HomeRoute.trophies) {
-            HStack(spacing: 8) {
-                Image(systemName: "rosette")
-                    .font(.system(size: 17))
-                Text("Trophies")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-            }
-            .foregroundStyle(Color(white: 0.82))
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(white: 0.14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color(white: 0.28), lineWidth: 0.8)
-                    )
-            )
-        }
-        .homeBallCollider()
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("Trophies")
-        .accessibilityIdentifier("TrophiesButton")
     }
 
     private var background: some View {

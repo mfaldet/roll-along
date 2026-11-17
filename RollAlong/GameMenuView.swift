@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import UIKit
 
 // ===========================================================================
 // GameMenuView — the game hub, styled like a content storefront (Netflix /
@@ -8,16 +10,12 @@ import SwiftUI
 //   • ROLL ALONG  — the core climb, always the largest widget, always on top.
 //   • Challenge of the Day — a skinny banner (a short, brutal daily gauntlet).
 //   • CHALLENGE PACKS — themed 100-level gauntlets (cosmetic rewards).
-//   • COMPETITIVE     — mini-games vs. rivals (tickets, boards, a winner).
-//   • NEW WAYS TO PLAY— a change of pace (Zen Garden, the reward runs).
+//   • MINIGAMES       — one button that opens `MinigamesGridView`, a
+//                       two-column grid of every available minigame.
 //
-// Each category is a horizontal shelf of equal rounded-square widgets — the
-// same fabric the home screen + Apple widgets use — so games can be reordered
-// (popularity, launches, marketing) without changing how players navigate.
-//
-// DATA-DRIVEN: shelves group `GameModeCatalogue.enabled` by `section`, so
-// flagging a new mode on makes it appear in the right shelf automatically.
-// Every widget routes through the existing HomeRoute destinations.
+// DATA-DRIVEN: the grid lists `GameModeCatalogue.enabled` minigames, so a mode
+// switched off in the registry disappears from it automatically.  Their order
+// is `MinigamesGridView.minigameOrder`.
 // ===========================================================================
 
 struct GameMenuView: View {
@@ -25,20 +23,6 @@ struct GameMenuView: View {
     @EnvironmentObject var gameState: GameState
     @Environment(\.dismiss) var dismiss
 
-    private var competitive: [GameMode] {
-        GameModeCatalogue.enabled.filter { $0.section == .competitive }
-    }
-    private var newWays: [GameMode] {
-        // Gold Rush (id "coinpit") is pulled out into its own full-width banner
-        // below the Competitive shelf, so keep it out of this shelf.
-        GameModeCatalogue.enabled.filter { $0.section == .solo && $0.id != Self.goldRushID }
-    }
-
-    /// The reward round shown as a full-width banner.  NB: the tile *displayed*
-    /// as "Gold Rush" is catalogue id "coinpit" — the names were swapped with the
-    /// competitive mode (id "goldrush", now displayed "Smash and Grab") on
-    /// 2026-06-11; ids stayed put through that swap and the later rename.
-    private static let goldRushID = "coinpit"
     private var packs: [ChallengeTrackMode] { GameModeCatalogue.challengeTracks }
 
     /// Arm a mode and return Home — the home Play button then launches it.
@@ -73,17 +57,7 @@ struct GameMenuView: View {
 
                     challengePacksSection
 
-                    shelf("COMPETITIVE",
-                          "Mini-games vs. rivals — climb the boards, earn tickets.") {
-                        ForEach(competitive, id: \.id) { modeWidget($0) }
-                    }
-
-                    goldRushBanner
-
-                    shelf("NEW WAYS TO PLAY",
-                          "A change of pace — different rules, different vibe.") {
-                        ForEach(newWays, id: \.id) { modeWidget($0) }
-                    }
+                    minigamesButton
 
                     Spacer().frame(height: 24)
                 }
@@ -338,117 +312,52 @@ struct GameMenuView: View {
         .accessibilityIdentifier("dailyChallenge")
     }
 
-    // MARK: - Gold Rush (full-width banner)
+    // MARK: - Minigames
 
-    /// Gold Rush gets its own full-width banner — same chrome as Challenge of the
-    /// Day — sitting between the Competitive shelf and New Ways to Play.
-    private var goldRushBanner: some View {
-        let mode = GameModeCatalogue.enabled.first { $0.id == Self.goldRushID }
-        let s = Self.style(for: Self.goldRushID)
-        let tickets = gameState.tickets
-        let noTickets = tickets <= 0
-        return VStack(alignment: .leading, spacing: 6) {
-            // No tickets to spend → say how to earn them, above a greyed card.
-            if noTickets {
-                Text("Win competitive games to earn tickets")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.55))
-                    .padding(.leading, 4)
-            }
-            Button { select(Self.goldRushID) } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: s.icon)
-                        .font(.system(size: 27, weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("REWARD ROUND")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .tracking(1.5)
-                            .foregroundStyle(.white.opacity(0.85))
-                        Text(mode?.displayName ?? "Gold Rush")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                        Text(mode?.tagline ?? "Thirty seconds. Up to a hundred coins. Go.")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    Spacer()
-                    // Ticket balance (spent to play Gold Rush) — replaces the play
-                    // glyph; reads as "N 🎟" in white straight over the gradient.
-                    HStack(spacing: 5) {
-                        Text("\(tickets)")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .monospacedDigit()
-                        Image(systemName: "ticket.fill")
-                            .font(.system(size: 16, weight: .bold))
-                    }
+    /// One full-width button that opens the minigames grid.  Replaces the
+    /// sideways-scrolling shelves (and the Gold Rush banner, which is now a
+    /// tile in the grid).
+    private var minigamesButton: some View {
+        let count = MinigamesGridView.available.count
+        return NavigationLink(value: HomeRoute.minigames) {
+            HStack(spacing: 14) {
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 27, weight: .bold))
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("MINIGAMES")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .tracking(1.5)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text("\(count) games")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("Race, shove, paint and grab against rivals, or take it easy.")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(LinearGradient(colors: s.colors,
-                                             startPoint: .leading, endPoint: .trailing))
-                )
-                .shadow(color: (s.colors.first ?? .black).opacity(0.40), radius: 8, y: 4)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
             }
-            .buttonStyle(.plain)
-            .grayscale(noTickets ? 0.9 : 0)
-            .opacity(noTickets ? 0.6 : 1)
-            .accessibilityIdentifier(Self.goldRushID)
-            .accessibilityLabel("\(mode?.displayName ?? "Gold Rush"). \(mode?.tagline ?? ""). " +
-                                (noTickets ? "No tickets. Win competitive games to earn tickets."
-                                           : "\(tickets) ticket\(tickets == 1 ? "" : "s")."))
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(colors: [Self.c(0.36, 0.62, 1.00), Self.c(0.80, 0.30, 0.95)],
+                                         startPoint: .leading, endPoint: .trailing))
+            )
+            .shadow(color: Self.c(0.36, 0.62, 1.00).opacity(0.40), radius: 8, y: 4)
         }
-    }
-
-    // MARK: - Shelves
-
-    /// A captioned, horizontally-scrolling shelf of equal widgets.
-    @ViewBuilder
-    private func shelf<Content: View>(_ title: String, _ subtitle: String,
-                                      @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .tracking(2)
-                    .foregroundStyle(.white)
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.5))
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) { content() }
-                    .padding(.vertical, 2)
-            }
-        }
-    }
-
-    // MARK: - Widgets
-
-    @ViewBuilder
-    private func modeWidget(_ mode: GameMode) -> some View {
-        let s = Self.style(for: mode.id)
-        let locked = mode.id == "coinpit" && gameState.tickets <= 0
-        if locked {
-            widgetCard(icon: s.icon, colors: s.colors, title: mode.displayName,
-                       locked: true)
-                .accessibilityIdentifier(mode.id)
-                .accessibilityLabel("\(mode.displayName). Locked. Win a competitive game to earn a ticket.")
-        } else {
-            Button { select(mode.id) } label: {
-                widgetCard(icon: s.icon, colors: s.colors, title: mode.displayName,
-                           ticket: mode.id == "coinpit" ? gameState.tickets : nil)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(mode.id)
-        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Minigames. \(count) games.")
+        .accessibilityIdentifier("MinigamesButton")
     }
 
     /// CHALLENGE PACKS — an 8-tile illustrative grid that taps through as a whole
@@ -509,82 +418,9 @@ struct GameMenuView: View {
         }
     }
 
-    /// The shared game tile — a wide, centered, individually-branded card: a big
-    /// logo in a frosted badge floating over an oversized watermark of the same
-    /// glyph, the name centered beneath, all on the game's own gradient with a
-    /// matching colored glow.  Used by every shelf (modes + challenge packs).
-    private func widgetCard(icon: String, colors: [Color], title: String,
-                            locked: Bool = false, ticket: Int? = nil) -> some View {
-        let accent = colors.first ?? .white
-        return ZStack {
-            // Base gradient.
-            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-
-            // Oversized watermark of the game's glyph — a themed, unique backdrop
-            // that keeps each tile from blending into its neighbours.
-            Image(systemName: icon)
-                .font(.system(size: 132, weight: .bold))
-                .foregroundStyle(.white.opacity(0.14))
-                .rotationEffect(.degrees(-15))
-                .offset(x: 74, y: 30)
-
-            // Soft top-left sheen so the card reads glossy.
-            RadialGradient(colors: [.white.opacity(0.38), .clear],
-                           center: .init(x: 0.22, y: 0.12), startRadius: 2, endRadius: 150)
-                .blendMode(.plusLighter)
-
-            // Centered logo + name — the brand.
-            VStack(spacing: 11) {
-                ZStack {
-                    Circle()
-                        .fill(.white.opacity(0.20))
-                        .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
-                        .frame(width: 64, height: 64)
-                    Image(systemName: icon)
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
-                }
-                Text(title)
-                    .font(.system(size: 19, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
-            }
-            .padding(.horizontal, 12)
-        }
-        .frame(width: 228, height: 152)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        // Lock / ticket badge (top-right) — only modes that use it pass it in.
-        .overlay(alignment: .topTrailing) {
-            if locked {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .padding(12)
-            } else if let ticket {
-                HStack(spacing: 2) {
-                    Image(systemName: "ticket.fill").font(.system(size: 10, weight: .bold))
-                    Text("\(ticket)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(Capsule().fill(.black.opacity(0.30)))
-                .padding(10)
-            }
-        }
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.white.opacity(0.18), lineWidth: 1))
-        .opacity(locked ? 0.5 : 1.0)
-        .shadow(color: accent.opacity(0.55), radius: 14, y: 7)
-    }
-
     // MARK: - Per-mode art (icon + saturated gradient), keyed by catalogue id
 
-    private static func style(for id: String) -> (icon: String, colors: [Color]) {
+    static func style(for id: String) -> (icon: String, colors: [Color]) {
         switch id {
         case "zen":      return ("leaf.fill",                [c(0.20, 0.72, 0.52), c(0.10, 0.50, 0.55)])
         case "coinpit":  return ("dollarsign.circle.fill",   [c(1.00, 0.80, 0.28), c(0.95, 0.55, 0.12)])
@@ -616,7 +452,7 @@ struct GameMenuView: View {
         }
     }
 
-    private static func c(_ r: Double, _ g: Double, _ b: Double) -> Color {
+    static func c(_ r: Double, _ g: Double, _ b: Double) -> Color {
         Color(red: r, green: g, blue: b)
     }
 }
@@ -798,5 +634,340 @@ private struct ChaseChipStrip: View {
         .accessibilityLabel(chip.accessibilityLabel)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Opens the Trophy Room.")
+    }
+}
+
+// ===========================================================================
+// MinigamesGridView — every available minigame as a two-column grid, opened
+// from the Minigames button on the game-mode screen.
+//
+// • The list comes from the mode registry (`GameModeCatalogue.enabled`), so a
+//   mode switched off there disappears here too.  `hiddenMinigameIDs` holds
+//   back anything not ready for this release even if the registry lists it.
+// • The order is `minigameOrder` — ONE list, edit it to reorder the grid.
+// • Tap a tile to choose that game (it is armed and the player returns Home,
+//   where Play launches it — the same as the old shelves).
+// • Press and hold a tile to play its preview clip (see `MinigameClip` and
+//   docs/minigame-clips.md).  A game with no clip shows its icon only.
+// ===========================================================================
+struct MinigamesGridView: View {
+    @EnvironmentObject var nav: Navigator
+    @EnvironmentObject var gameState: GameState
+    @Environment(\.dismiss) var dismiss
+
+    /// THE ORDER of the minigames grid, by catalogue id.  Roll Up first and
+    /// Zen Garden last; a minigame not listed here goes just before Zen Garden.
+    static let minigameOrder: [String] = [
+        "rollup",     // Roll Up            — solo, quick arcade climb
+        "disco",      // Disco Ball         — solo, memory puzzle
+        "snake",      // Comet Clash        — vs rivals
+        "sumo",       // Sumo Survival      — vs rivals
+        "paintball",  // Paint Ball         — vs rivals
+        "goldrush",   // Smash and Grab     — vs rivals
+        "marblecup",  // Marble Cup         — vs rivals
+        "koth",       // King of the Hill   — vs rivals
+        "coinpit",    // Gold Rush          — reward round, costs a ticket won above
+        "zen",        // Zen Garden         — calm sandbox, always last
+    ]
+
+    /// Not in this release, even if the registry still lists them.
+    /// Roll Out's mazes are being rebuilt.
+    static let hiddenMinigameIDs: Set<String> = ["rollout"]
+
+    /// The tile DISPLAYED as "Gold Rush" is catalogue id "coinpit" — the names
+    /// were swapped with the competitive mode (id "goldrush", now displayed
+    /// "Smash and Grab") on 2026-06-11; ids stayed put through that swap and
+    /// the later rename.  Gold Rush costs a ticket, won in competitive games.
+    static let goldRushID = "coinpit"
+
+    /// Every minigame the player can see, in grid order.
+    static var available: [GameMode] {
+        let games = GameModeCatalogue.enabled.filter { mode in
+            (mode.section == .competitive || mode.section == .solo)
+                && !(mode is ChallengeTrackMode)
+                && !hiddenMinigameIDs.contains(mode.id)
+        }
+        var ordered: [GameMode] = minigameOrder.compactMap { id in games.first { $0.id == id } }
+        let extras = games.filter { !minigameOrder.contains($0.id) }
+        if let zenIndex = ordered.firstIndex(where: { $0.id == "zen" }) {
+            ordered.insert(contentsOf: extras, at: zenIndex)
+        } else {
+            ordered.append(contentsOf: extras)
+        }
+        return ordered
+    }
+
+    private let columns = [GridItem(.flexible(), spacing: 12),
+                           GridItem(.flexible(), spacing: 12)]
+
+    /// Arm a mode and return Home — the home Play button then launches it.
+    private func select(_ modeID: String) {
+        gameState.currentModeID = modeID
+        nav.goHome()
+    }
+
+    var body: some View {
+        let games = Self.available
+        let anyClip = games.contains { MinigameClip.url(for: $0.id) != nil }
+        let noTickets = gameState.tickets <= 0
+        return ZStack {
+            LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(anyClip
+                         ? "Tap a game to choose it, then press Play. Press and hold a game to watch a preview."
+                         : "Tap a game to choose it, then press Play.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if noTickets {
+                        Text("Gold Rush needs a ticket. Win a competitive game to earn one.")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.50))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(games, id: \.id) { mode in
+                            MinigameTile(mode: mode,
+                                         tickets: gameState.tickets,
+                                         onSelect: { select(mode.id) })
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+        }
+        .navigationTitle("Minigames")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { dismiss() } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+    }
+}
+
+/// Where minigame preview clips live and how big a tile is.
+/// Spec for recording them: docs/minigame-clips.md.
+enum MinigameClip {
+    /// Folder (an Xcode folder reference) the clips are copied from.
+    static let folder = "MinigameClips"
+    /// Tiles are 4:5 portrait (width : height); clips fill them, cropped to fit.
+    static let tileAspect: CGFloat = 4.0 / 5.0
+    /// Accepted file types, in the order they are looked for.
+    static let extensions = ["mp4", "mov", "m4v"]
+
+    /// `clip_<mode id>` in the clips folder (or loose in the app bundle), or
+    /// nil when there is no clip for this game yet.
+    static func url(for modeID: String) -> URL? {
+        let name = "clip_\(modeID)"
+        for ext in extensions {
+            if let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: folder) {
+                return url
+            }
+            if let url = Bundle.main.url(forResource: name, withExtension: ext) {
+                return url
+            }
+        }
+        return nil
+    }
+}
+
+/// One minigame tile: the game's gradient, icon and name.  Tap chooses the
+/// game.  Press and hold plays its preview clip (muted, looping) until the
+/// finger lifts; with no clip, holding does nothing.
+private struct MinigameTile: View {
+    let mode: GameMode
+    let tickets: Int
+    let onSelect: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pressing = false
+    @State private var previewing = false
+    /// Set when a hold started a preview, so the release that ends it is not
+    /// also taken as a tap that opens the game.
+    @State private var didPreview = false
+    @State private var holdTask: Task<Void, Never>?
+
+    /// Seconds a finger must stay down before the preview starts.
+    private static let holdSeconds: Double = 0.35
+
+    private var isGoldRush: Bool { mode.id == MinigamesGridView.goldRushID }
+    private var noTickets: Bool { isGoldRush && tickets <= 0 }
+
+    var body: some View {
+        let style = GameMenuView.style(for: mode.id)
+        let clip = MinigameClip.url(for: mode.id)
+        return ZStack {
+            LinearGradient(colors: style.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+
+            // Watermark of the game's glyph, as on the old shelf tiles.
+            Image(systemName: style.icon)
+                .font(.system(size: 104, weight: .bold))
+                .foregroundStyle(.white.opacity(0.14))
+                .rotationEffect(.degrees(-15))
+                .offset(x: 46, y: 52)
+
+            if previewing, let clip {
+                LoopingClipView(url: clip)
+                    .transition(.opacity)
+            } else {
+                VStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(.white.opacity(0.20))
+                            .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
+                            .frame(width: 58, height: 58)
+                        Image(systemName: style.icon)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+                    }
+                    Text(mode.displayName)
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                        .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
+                }
+                .padding(.horizontal, 10)
+            }
+        }
+        .aspectRatio(MinigameClip.tileAspect, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        // While the clip plays, keep the name readable along the bottom.
+        .overlay(alignment: .bottom) {
+            if previewing {
+                Text(mode.displayName)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black.opacity(0.45))
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 20, bottomTrailingRadius: 20))
+            }
+        }
+        // Gold Rush: ticket balance, top right.
+        .overlay(alignment: .topTrailing) {
+            if isGoldRush {
+                HStack(spacing: 2) {
+                    Image(systemName: "ticket.fill").font(.system(size: 10, weight: .bold))
+                    Text("\(tickets)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(Capsule().fill(.black.opacity(0.30)))
+                .padding(10)
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.18), lineWidth: 1))
+        .grayscale(noTickets ? 0.9 : 0)
+        .opacity(noTickets ? 0.6 : 1)
+        .scaleEffect(pressing && !reduceMotion ? 0.97 : 1)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: pressing)
+        .contentShape(RoundedRectangle(cornerRadius: 20))
+        // A quick tap chooses the game.  (The tap gesture also has to come
+        // BEFORE the long press so the grid still scrolls.)
+        .onTapGesture {
+            if didPreview { didPreview = false; return }
+            onSelect()
+        }
+        // Press and hold: the very long minimum duration means the long press
+        // never completes while held, so `pressing` stays true until the finger
+        // lifts (or moves away to scroll) — that is what stops the clip.
+        .onLongPressGesture(minimumDuration: 600, maximumDistance: 12,
+                            perform: {},
+                            onPressingChanged: { isPressing in
+            pressing = isPressing
+            holdTask?.cancel()
+            if isPressing {
+                didPreview = false
+                guard clip != nil else { return }
+                holdTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(Self.holdSeconds * 1_000_000_000))
+                    guard !Task.isCancelled, pressing else { return }
+                    didPreview = true
+                    withAnimation(.easeOut(duration: 0.2)) { previewing = true }
+                }
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) { previewing = false }
+            }
+        })
+        .onDisappear {
+            holdTask?.cancel()
+            previewing = false
+            pressing = false
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onSelect() }
+        .accessibilityIdentifier(mode.id)
+    }
+
+    private var accessibilityText: String {
+        guard isGoldRush else { return mode.displayName }
+        return noTickets
+            ? "\(mode.displayName). No tickets. Win a competitive game to earn a ticket."
+            : "\(mode.displayName). \(tickets) ticket\(tickets == 1 ? "" : "s")."
+    }
+}
+
+/// A muted clip that loops for as long as it is on screen.  No controls.
+private struct LoopingClipView: UIViewRepresentable {
+    let url: URL
+
+    final class Coordinator {
+        var looper: AVPlayerLooper?
+    }
+
+    final class PlayerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> PlayerView {
+        let view = PlayerView()
+        view.backgroundColor = .clear
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        player.preventsDisplaySleepDuringVideoPlayback = false
+        context.coordinator.looper = AVPlayerLooper(player: player,
+                                                    templateItem: AVPlayerItem(url: url))
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
+        player.play()
+        return view
+    }
+
+    func updateUIView(_ uiView: PlayerView, context: Context) {}
+
+    static func dismantleUIView(_ uiView: PlayerView, coordinator: Coordinator) {
+        uiView.playerLayer.player?.pause()
+        uiView.playerLayer.player = nil
+        coordinator.looper?.disableLooping()
+        coordinator.looper = nil
     }
 }
