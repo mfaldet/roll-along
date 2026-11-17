@@ -64,6 +64,8 @@ struct GoldRushView: View {
     /// The single source of truth for the simulation.  The view feeds it
     /// accelerometer input and renders its state; it owns no game logic.
     @State private var engine = GoldRushEngine(arena: .zero)
+    /// Coins actually paid for the finished game (shown on the result screen).
+    @State private var paidCoins = 0
 
     // Per-tick render mirrors — copied from the engine each frame.  Driving the
     // body off these @State arrays is what schedules SwiftUI redraws, while the
@@ -376,8 +378,7 @@ struct GoldRushView: View {
 
     private var gameOverOverlay: some View {
         let placement = 1 + racers.filter { !$0.isPlayer && $0.score > playerScore }.count
-        let banked = gameState.minigamePayout(base: engine.banked,
-                                              difficulty: gameState.minigameDifficulty)
+        let banked = paidCoins
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
             VStack(spacing: 22) {
@@ -574,8 +575,7 @@ struct GoldRushView: View {
     /// Round-end side effects the headless engine intentionally omits: pay the
     /// banked coins into the real balance, log analytics, and buzz.
     private func finishRound() {
-        let base = engine.banked
-        // Difficulty scales the payout and records the attempt/win for the
+        // The payout table (`CoinPayouts`) sets the coins; this records the attempt/win for the
         // success-rate tracking that calibrates fairness (also banks the coins
         // and, on a win, bumps the tally + ticket).
         let banked = gameState.recordMinigameResult(
@@ -583,10 +583,10 @@ struct GoldRushView: View {
             difficulty: gameState.minigameDifficulty,
             won: engine.playerWon,
             score: engine.playerScore,
-            basePayout: base,
             placement: engine.playerPlacement,
             bestRivalScore: engine.bestRivalScore,
             durationSeconds: engine.roundSecondsPlayed)
+        paidCoins = banked   // what the result screen shows
         // Leaderboard "best" for Smash and Grab = most coins grabbed in one
         // round (win or lose), like every other competitive mode.
         gameState.recordCompetitiveScore("goldrush", engine.playerScore)
@@ -595,7 +595,6 @@ struct GoldRushView: View {
             properties: ["won": .bool(engine.playerWon),
                          "difficulty": .string(gameState.minigameDifficulty.rawValue),
                          "collected": .int(engine.playerScore),
-                         "base_coins": .int(base),
                          "coins": .int(banked),
                          "map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
         )

@@ -53,7 +53,6 @@ struct PaintBallView: View {
     private let pitRadius:    CGFloat = 26
     private let graceTicks         = 36            // immunity after climbing out (~0.6s)
     private let retargetTicks      = 50            // how often a bot picks a new goal
-    private let winBonus           = 20
 
     private var colorCount: Int { 1 + rivalCount }
     private var penaltyTicks: Int { penaltySeconds * 60 }
@@ -100,6 +99,9 @@ struct PaintBallView: View {
     // MARK: - State
 
     @State private var painters: [Painter] = []
+
+    /// Coins actually paid for the finished game (shown on the result screen).
+    @State private var paidCoins = 0
     /// One brain per opponent (human limits from `OpponentTuning`), by color.
     @State private var brains: [Int: OpponentBrain] = [:]
     /// Each opponent's skill for this round (by color), dealt in spawnPainters().
@@ -455,8 +457,7 @@ struct PaintBallView: View {
     private var gameOverOverlay: some View {
         let pct = percent(0)
         let placement = 1 + coverage.enumerated().filter { $0.offset != 0 && $0.element > coverage[0] }.count
-        let banked = gameState.minigamePayout(base: pct + (playerWon ? winBonus : 0),
-                                              difficulty: gameState.minigameDifficulty)
+        let banked = paidCoins
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
             VStack(spacing: 22) {
@@ -618,21 +619,20 @@ struct PaintBallView: View {
         if !awarded {
             awarded = true
             let pct = percent(0)
-            let base = pct + (playerWon ? winBonus : 0)
             gameState.recordCompetitiveScore("paintball", pct)   // leaderboard best (coverage %)
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "paintball", difficulty: gameState.minigameDifficulty,
-                won: playerWon, score: pct, basePayout: base,
+                won: playerWon, score: pct,
                 placement: 1 + (1..<coverage.count).filter { coverage[$0] > coverage[0] }.count,
                 bestRivalScore: (1..<coverage.count).map { percent($0) }.max() ?? 0,
                 durationSeconds: roundTick / 60)
+            paidCoins = banked   // what the result screen shows
             AnalyticsClient.shared.track(
                 "paintball_round_over",
                 properties: ["won": .bool(playerWon),
                              "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "coverage_pct": .int(pct),
-                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count].name)]
             )

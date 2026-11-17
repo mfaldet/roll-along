@@ -56,8 +56,6 @@ struct SnakeGameView: View {
 
     private let orbRadius:   CGFloat = 11
     private let orbCount       = 3                 // sparks live on the field at once
-    private let coinsPerPower  = 3                 // coins banked per point of power
-    private let winBonus       = 20                // coins for last-comet-standing
     private let poofLifeTicks  = 26                // death-burst animation length
 
     private let rivalCount     = 3                 // AI rival comets
@@ -117,6 +115,9 @@ struct SnakeGameView: View {
     // MARK: - State
 
     @State private var cycles: [Cycle] = []
+
+    /// Coins actually paid for the finished game (shown on the result screen).
+    @State private var paidCoins = 0
     /// One brain per opponent (human limits from `OpponentTuning`), by index.
     @State private var brains: [Int: OpponentBrain] = [:]
     /// Ticks each opponent has seen its path blocked without reacting yet.
@@ -392,8 +393,7 @@ struct SnakeGameView: View {
         let power = playerCycle?.power ?? 0
         let kills = playerCycle?.kills ?? 0
         let collects = playerCycle?.collects ?? 0
-        let banked = gameState.minigamePayout(base: power * coinsPerPower + (playerWon ? winBonus : 0),
-                                              difficulty: gameState.minigameDifficulty)
+        let banked = paidCoins
         let title = playerWon ? "You Win!" : "Eliminated"
         let titleColor: Color = playerWon ? Color(red: 0.45, green: 0.88, blue: 0.55)
                                           : Color(red: 1.00, green: 0.45, blue: 0.45)
@@ -547,7 +547,6 @@ struct SnakeGameView: View {
             let power = playerCycle?.power ?? 0
             let kills = playerCycle?.kills ?? 0
             let collects = playerCycle?.collects ?? 0
-            let base = power * coinsPerPower + (didWin ? winBonus : 0)
             gameState.recordCompetitiveScore("snake", power)   // leaderboard best
             // Difficulty scales the payout + records the attempt/win for tracking
             // (also banks the coins and, on a win, bumps the tally + ticket).
@@ -555,10 +554,11 @@ struct SnakeGameView: View {
             // opponent still alive when you fell.
             let banked = gameState.recordMinigameResult(
                 modeID: "snake", difficulty: gameState.minigameDifficulty,
-                won: didWin, score: power, basePayout: base,
+                won: didWin, score: power,
                 placement: didWin ? 1 : 1 + rivalsAlive,
                 bestRivalScore: cycles.filter { !$0.isPlayer }.map(\.power).max() ?? 0,
                 durationSeconds: localTick / 60)
+            paidCoins = banked   // what the result screen shows
             AnalyticsClient.shared.track(
                 "comet_round_over",
                 properties: ["won": .bool(didWin),
@@ -566,7 +566,6 @@ struct SnakeGameView: View {
                              "power": .int(power),
                              "kills": .int(kills),
                              "collects": .int(collects),
-                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(CometClashMaps.maps[mapIndex % CometClashMaps.maps.count].name)]
             )

@@ -43,7 +43,6 @@ final class GoldRushEngine {
     private let spawnEveryTicks    = 20
     private let spillImmunityTicks = 45
     private let ramSeekRange: CGFloat = 220
-    private let winBonus           = 15
     private let topReserve: CGFloat = Layout.topReserve
 
     // Charge / ram-spill mechanic.  A tap launches the player's marble a short
@@ -119,7 +118,7 @@ final class GoldRushEngine {
     private(set) var localTick = 0
     private(set) var roundTick = 0
     private(set) var awarded   = false
-    private(set) var banked    = 0     // coins owed to the player at round end
+    private(set) var banked    = 0     // coins grabbed this round (not the payout — see CoinPayouts)
 
     private var mapIndex = 0
     private var walls: [WallSegFrac] = []
@@ -872,6 +871,8 @@ final class GoldRushEngine {
         isOver = true
         playerWon = !racers.contains { !$0.isPlayer && $0.score > playerScore }
         awarded = true
-        banked = playerScore + (playerWon ? winBonus : 0)
+        // Coins grabbed this round.  Not the payout: the coins a player is
+        // paid come from `CoinPayouts` (GameState.recordMinigameResult).
+        banked = playerScore
     }
 }

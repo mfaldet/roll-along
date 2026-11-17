@@ -41,8 +41,6 @@ struct RollUpView: View {
     private let maxFall:      CGFloat = 1_500
     private let cameraTargetFrac: CGFloat = 0.46  // keep the ball ~46% down the screen
     private let pixelsPerMeter:  CGFloat = 12      // height → "m" score
-    private let coinsPerMeter:   Double  = 0.20    // payout scale
-    private let maxRunCoins      = 250
 
     // MARK: - Model
     private struct Platform: Identifiable {
@@ -411,10 +409,8 @@ struct RollUpView: View {
         phase = .ready
     }
 
-    /// Coins paid for a finished run — scaled by height, capped.
-    private var runCoins: Int {
-        min(maxRunCoins, Int((Double(heightMeters) * coinsPerMeter).rounded()))
-    }
+    /// Coins paid for a finished run (`CoinPayouts.rollUp`: 1–5 by height).
+    private var runCoins: Int { CoinPayouts.rollUp(meters: heightMeters) }
 
     // MARK: - Input
 

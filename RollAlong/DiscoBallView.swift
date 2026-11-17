@@ -58,7 +58,6 @@ struct DiscoBallView: View {
     private let revealSpeed:  Double = 0.14        // path-reveal head, tiles/tick
     private let celebrateDuration: TimeInterval = 2.6
     private let failDuration:      TimeInterval = 1.4
-    private static let coinsPerCrossing = 3
 
     // MARK: - Palette
     private static let tileOff     = Color(white: 0.13)
@@ -123,7 +122,7 @@ struct DiscoBallView: View {
     }
     private var best: Int { gameState.minigameBests[bestKey, default: 0] }
     /// Coins this run would bank right now.
-    private var runCoins: Int { crossings * Self.coinsPerCrossing }
+    private var runCoins: Int { CoinPayouts.disco(crossings: crossings) }
 
     // MARK: - Body
     var body: some View {
@@ -689,8 +688,8 @@ struct DiscoBallView: View {
     }
 
     private func endGame() {
-        // View owns only the per-crossing payout; the record, the new-best
-        // bonus, and the Disco trophies now funnel through GameState (S1-T4).
+        // View owns only the run payout (`CoinPayouts.disco`); the record and
+        // the Disco trophies funnel through GameState (S1-T4).
         if runCoins > 0 { gameState.addCoins(runCoins) }
         gameState.recordDiscoResult(bestKey: bestKey, crossings: crossings,
                                     crossingSeconds: crossingSecondsTotal)

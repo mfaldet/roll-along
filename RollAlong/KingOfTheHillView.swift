@@ -49,8 +49,6 @@ struct KingOfTheHillView: View {
     private let zoneRadius:   CGFloat = CGFloat(OpponentTuning.kothZoneRadius)
     private let zoneDriftSpeed: CGFloat = 42       // points per second the hill wanders
     private let zoneRepickDist: CGFloat = 14       // re-aim when this close to its target
-    private let coinsPerHoldSec    = 2
-    private let winBonus           = 15
     private let topReserve: CGFloat = Layout.topReserve  // HUD breathing room at the top
 
     private var roundTicks: Int { roundSeconds * 60 }
@@ -78,6 +76,9 @@ struct KingOfTheHillView: View {
     // MARK: - State
 
     @State private var racers: [Racer] = []
+
+    /// Coins actually paid for the finished game (shown on the result screen).
+    @State private var paidCoins = 0
     /// One brain per opponent (human limits from `OpponentTuning`), by color.
     @State private var brains: [Int: OpponentBrain] = [:]
     /// Each opponent's skill for this round (by color), dealt in reset().
@@ -381,8 +382,7 @@ struct KingOfTheHillView: View {
 
     private var gameOverOverlay: some View {
         let holdSec = playerHoldTicks / 60
-        let banked = gameState.minigamePayout(base: holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0),
-                                              difficulty: gameState.minigameDifficulty)
+        let banked = paidCoins
         let title = playerWon ? "You Win!" : "You Lose"
         let titleColor: Color = playerWon ? Color(red: 0.50, green: 0.88, blue: 0.55)
                                           : Color(red: 0.98, green: 0.45, blue: 0.40)
@@ -514,21 +514,20 @@ struct KingOfTheHillView: View {
         if !awarded {
             awarded = true
             let holdSec = playerHoldTicks / 60
-            let base = holdSec * coinsPerHoldSec + (playerWon ? winBonus : 0)
             gameState.recordCompetitiveScore("koth", holdSec)   // leaderboard best (hold seconds)
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "koth", difficulty: gameState.minigameDifficulty,
-                won: playerWon, score: holdSec, basePayout: base,
+                won: playerWon, score: holdSec,
                 placement: 1 + racers.filter { !$0.isPlayer && $0.holdTicks > playerHoldTicks }.count,
                 bestRivalScore: bestRivalHoldTicks / 60,
                 durationSeconds: roundTick / 60)
+            paidCoins = banked   // what the result screen shows
             AnalyticsClient.shared.track(
                 "koth_round_over",
                 properties: ["won": .bool(playerWon),
                              "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "hold_sec": .int(holdSec),
-                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
             )

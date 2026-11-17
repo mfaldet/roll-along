@@ -2264,8 +2264,8 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
     /// A new Disco best writes the difficulty-scoped slot and pays exactly the
     /// shared new-best bonus (matching the old in-view `wasBest` branch); the
     /// funnel returns true.  A fresh GameState starts at 0 coins, so the only
-    /// coin movement the funnel owns is the 100-coin bonus (the per-crossing
-    /// payout stays in the view).
+    /// coin movement the funnel owns is the new-best bonus — 0 since the
+    /// 2026-11 rebalance (the run payout stays in the view).
     func testDiscoNewBestWritesSlotAndPaysBonus() {
         let gs = makeGameState()
         XCTAssertEqual(gs.coinBalance, 0)

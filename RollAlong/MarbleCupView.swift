@@ -49,18 +49,7 @@ struct MarbleCupView: View {
     private let ballRestitution:   CGFloat = 0.88
     private let roundSeconds       = OpponentTuning.marbleCupMatchSeconds
     private let celebrateTicks     = 75            // GOAL! freeze (~1.25s, clock paused)
-    private let coinsPerGoal       = 15
-    private let winBonus           = 30
-    /// Base-payout floor — a match can never pay 0, even a goalless loss.
-    private let lossFloor          = 15
 
-    /// Single source of truth for the match's base payout (pre-difficulty):
-    /// goals scored × `coinsPerGoal`, plus `winBonus` on a win, never below
-    /// `lossFloor`.  Used by both the award and the result-screen display so
-    /// they can't disagree.
-    private func matchBasePayout(goals: Int, won: Bool) -> Int {
-        max(lossFloor, goals * coinsPerGoal + (won ? winBonus : 0))
-    }
 
     // Tap-to-dash (speed burst) — mirrored from Smash and Grab, minus the
     // coin-spill: a tap overrides the player marble's velocity to `chargeSpeed`
@@ -100,6 +89,9 @@ struct MarbleCupView: View {
     // MARK: - State
 
     @State private var movers: [Mover] = []
+
+    /// Coins actually paid for the finished game (shown on the result screen).
+    @State private var paidCoins = 0
     /// One brain per computer-controlled marble (human limits from
     /// `OpponentTuning`).  Cleared at every kickoff.
     @State private var brains: [UUID: OpponentBrain] = [:]
@@ -557,8 +549,7 @@ struct MarbleCupView: View {
     }
 
     private var matchOverOverlay: some View {
-        let banked = gameState.minigamePayout(base: matchBasePayout(goals: playerGoals, won: playerWon),
-                                              difficulty: gameState.minigameDifficulty)
+        let banked = paidCoins
         let title = playerWon ? "You Win!" : (playerGoals == aiGoals ? "Draw" : "You Lose")
         let titleColor: Color = playerWon ? Self.playerAccent
             : (playerGoals == aiGoals ? Color(white: 0.85) : Self.aiAccent)
@@ -765,16 +756,16 @@ struct MarbleCupView: View {
         let isDraw = playerGoals == aiGoals
         if !awarded {
             awarded = true
-            let base = matchBasePayout(goals: playerGoals, won: playerWon)
             gameState.recordCompetitiveScore("marblecup", playerGoals)   // leaderboard best (goals)
             // Difficulty scales the payout + records the attempt/win for tracking.
             let banked = gameState.recordMinigameResult(
                 modeID: "marblecup", difficulty: gameState.minigameDifficulty,
-                won: playerWon, score: playerGoals, basePayout: base,
+                won: playerWon, score: playerGoals,
                 draw: isDraw,
                 placement: isDraw ? nil : (playerWon ? 1 : 2),
                 bestRivalScore: aiGoals,
                 durationSeconds: roundTick / 60)
+            paidCoins = banked   // what the result screen shows
             AnalyticsClient.shared.track(
                 "marblecup_match_over",
                 properties: ["won": .bool(playerWon),
@@ -783,7 +774,6 @@ struct MarbleCupView: View {
                              "difficulty": .string(gameState.minigameDifficulty.rawValue),
                              "goals_for": .int(playerGoals),
                              "goals_against": .int(aiGoals),
-                             "base_coins": .int(base),
                              "coins": .int(banked),
                              "map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name)]
             )

@@ -54,7 +54,6 @@ struct SumoSurvivalView: View {
 
     private let roundCount     = 3
     private let winnerPoints   = 5
-    private let placementCoins = [60, 30, 15, 8]  // 1st…4th by total points
 
     /// Points for the `orderIndex`-th marble to fall (0-based): 1, 2, 3.
     private func fallPoints(orderIndex: Int) -> Int { orderIndex + 1 }
@@ -98,6 +97,9 @@ struct SumoSurvivalView: View {
     // MARK: - State
 
     @State private var roster:  [Racer]  = []     // the 4 contestants (stable across rounds)
+
+    /// Coins actually paid for the finished game (shown on the result screen).
+    @State private var paidCoins = 0
     /// One brain per opponent (human limits from `OpponentTuning`).
     @State private var brains: [UUID: OpponentBrain] = [:]
     /// Each opponent's first target of the round: another OPPONENT, never the
@@ -470,9 +472,7 @@ struct SumoSurvivalView: View {
     private var matchOverOverlay: some View {
         let order = rankedRoster
         let playerRank = (order.firstIndex(where: { $0.isPlayer }) ?? 0)
-        let playerCoins = gameState.minigamePayout(
-            base: placementCoins[min(playerRank, placementCoins.count - 1)],
-            difficulty: gameState.minigameDifficulty)
+        let playerCoins = paidCoins
         let won = playerRank == 0
         return ZStack {
             Color.black.opacity(0.78).ignoresSafeArea()
@@ -705,29 +705,28 @@ struct SumoSurvivalView: View {
         if gameState.hapticsEnabled { Haptics.warning() }
     }
 
-    /// Final placement → coins (60/30/15/8) + a competitive win for 1st.  Guarded
+    /// Final placement → coins (`CoinPayouts`) + a competitive win for 1st.  Guarded
     /// so it pays exactly once.
     private func finishMatch() {
         guard !awarded else { return }
         awarded = true
         let order = rankedRoster
         let playerRank = order.firstIndex(where: { $0.isPlayer }) ?? (order.count - 1)
-        let base = placementCoins[min(playerRank, placementCoins.count - 1)]
         let points = order.first(where: { $0.isPlayer })?.points ?? 0
         gameState.recordCompetitiveScore("sumo", points)   // leaderboard best
         // Difficulty scales the payout + records the attempt/win for tracking.
         let coins = gameState.recordMinigameResult(
             modeID: "sumo", difficulty: gameState.minigameDifficulty,
-            won: playerRank == 0, score: points, basePayout: base,
+            won: playerRank == 0, score: points,
             placement: playerRank + 1,
             bestRivalScore: order.filter { !$0.isPlayer }.map(\.points).max() ?? 0,
             durationSeconds: matchTicks / 60)
+        paidCoins = coins   // what the result screen shows
         AnalyticsClient.shared.track(
             "sumo_match_over",
             properties: ["placement": .int(playerRank + 1),
                          "difficulty": .string(gameState.minigameDifficulty.rawValue),
                          "points": .int(points),
-                         "base_coins": .int(base),
                          "coins": .int(coins),
                          "map_name": .string(SumoMaps.maps[mapIndex % SumoMaps.maps.count].name)]
         )

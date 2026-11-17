@@ -2177,8 +2177,9 @@ final class GameState: ObservableObject {
 
     // MARK: - Minigame results (leaderboards + rewards)
 
-    /// Coin bonus paid for a new personal best on a minigame.
-    static let minigameBestBonus = 100
+    /// Coin bonus paid for a new personal best on a minigame — now 0 (see
+    /// `CoinPayouts.personalBestBonus`).
+    static let minigameBestBonus = CoinPayouts.personalBestBonus
 
     /// A snapshot of local stats as a `PlayerProfile`, used by the profile
     /// "Player Ranks" section to render the player's own stats (the global rank
@@ -2440,7 +2441,7 @@ final class GameState: ObservableObject {
     func addZenSeconds(_ s: Int) {
         guard s > 0 else { return }
         zenSeconds += s
-        let reward = min(s / 60, 15)   // ≤ 15 coins per session — recognition, not a grind
+        let reward = CoinPayouts.zen(seconds: s)   // 1 a minute, ≤ 5 a visit
         if reward > 0 { addCoins(reward) }
         syncMinigameStats()
         // zen_hour / zen_10_hours ride the cumulative zenSeconds tally (S1-T3).
@@ -2490,12 +2491,6 @@ final class GameState: ObservableObject {
         recordCompetitiveWinTrophies()
     }
 
-    /// Difficulty-scaled coin payout for a competitive minigame (pure — no side
-    /// effects).  Use it to preview payouts in the start picker and to show the
-    /// banked total on the result screen so display + award always agree.
-    func minigamePayout(base: Int, difficulty: MinigameDifficulty) -> Int {
-        Int((Double(base) * difficulty.payoutMultiplier).rounded())
-    }
 
     /// Record one finished competitive match: count the attempt (always) and the
     /// win (if won) per game+difficulty for success-rate tracking, award the
@@ -2506,7 +2501,7 @@ final class GameState: ObservableObject {
                               difficulty: MinigameDifficulty,
                               won: Bool,
                               score: Int,
-                              basePayout: Int,
+                              basePayout: Int = 0,
                               draw: Bool = false,
                               placement: Int? = nil,
                               bestRivalScore: Int? = nil,
@@ -2531,14 +2526,16 @@ final class GameState: ObservableObject {
                 game: modeID, difficulty: difficulty.rawValue,
                 wins: rowWins, best: rowBest)
         }
-        let payout = minigamePayout(base: basePayout, difficulty: difficulty)
+        // Coins come from the one payout table (1–5 a game); `basePayout` is
+        // no longer used for coins and is kept only so older callers compile.
+        let payout = CoinPayouts.competitive(modeID: modeID, won: won, draw: draw,
+                                             placement: placement, difficulty: difficulty)
         if payout > 0 { addCoins(payout) }
         var properties: [String: AnyEncodable] = [
             "game":        .string(modeID),
             "difficulty":  .string(difficulty.rawValue),
             "won":         .bool(won),
             "draw":        .bool(draw),
-            "base_payout": .int(basePayout),
             "payout":      .int(payout),
             "score":       .int(score),
             "ai_version":  .int(OpponentTuning.version),
@@ -3068,6 +3065,88 @@ final class GameState: ObservableObject {
 // FEEL IS TUNABLE: the two scale tables below are the only knobs.  .hard is
 // the original pre-difficulty AI; .normal is the default.
 // ---------------------------------------------------------------------------
+// ===========================================================================
+// CoinPayouts — EVERY minigame coin payout, in one place (2026-11 rebalance).
+//
+// The rule: a minigame pays 1 to 5 coins per game, about what one Adventure
+// level pays (2–4 for the clear plus up to 3 pickups).  A competitive WIN
+// also earns 1 ticket (`recordCompetitiveWin`, unchanged), and tickets are
+// spent on Gold Rush — the one place to earn a large amount (about 100 coins
+// a round).  Cosmetics cost 750–1,500 coins and are unchanged.
+//
+// To retune: change a number here and rebuild.  Nothing else in the app
+// computes a minigame coin amount.
+// ===========================================================================
+enum CoinPayouts {
+
+    // ---- Competitive minigames (Comet Clash, Sumo Survival, Paint Ball,
+    //      Smash and Grab, Marble Cup, King of the Hill) -------------------
+
+    /// A win (1st place) by difficulty.  Plus 1 ticket.
+    static func competitiveWin(_ difficulty: MinigameDifficulty) -> Int {
+        switch difficulty {
+        case .easy:   return 3
+        case .normal: return 4
+        case .hard:   return 5
+        }
+    }
+    /// Not first, but not last (2nd of 4).  Any difficulty.
+    static let competitiveRunnerUp = 2
+    /// A Marble Cup draw after sudden death.  Any difficulty.
+    static let competitiveDraw = 2
+    /// Last place, or any other loss.  Any difficulty.
+    static let competitiveLoss = 1
+
+    /// How many places a game has: Marble Cup is you against one side;
+    /// the others are you against three.
+    static func fieldSize(_ modeID: String) -> Int {
+        modeID == "marblecup" ? 2 : 4
+    }
+
+    /// Coins for one competitive game.  `placement` is 1-based (nil when the
+    /// game did not report one).
+    static func competitive(modeID: String, won: Bool, draw: Bool = false,
+                            placement: Int?, difficulty: MinigameDifficulty) -> Int {
+        if won { return competitiveWin(difficulty) }
+        if draw { return competitiveDraw }
+        if let placement, placement > 1, placement < fieldSize(modeID) { return competitiveRunnerUp }
+        return competitiveLoss
+    }
+
+    // ---- Solo minigames -------------------------------------------------
+
+    /// Roll Up: 1 coin, plus 1 per `rollUpMetersPerCoin` meters climbed, up to 5.
+    static let rollUpMetersPerCoin = 40
+    static func rollUp(meters: Int) -> Int {
+        guard meters > 0 else { return 0 }
+        return min(5, 1 + meters / rollUpMetersPerCoin)
+    }
+
+    /// Disco Ball: 1 coin, plus 1 per `discoCrossingsPerCoin` crossings, up to 5.
+    static let discoCrossingsPerCoin = 4
+    static func disco(crossings: Int) -> Int {
+        guard crossings > 0 else { return 0 }
+        return min(5, 1 + crossings / discoCrossingsPerCoin)
+    }
+
+    /// Zen Garden: 1 coin per full minute in the garden, up to 5 a visit.
+    static func zen(seconds: Int) -> Int { min(5, max(0, seconds / 60)) }
+
+    /// Roll Out (held back from 1.0): per maze cleared.
+    static let rollOutClear = 3
+
+    /// A new personal best in a minigame no longer pays a bonus (it was 100
+    /// coins, far more than a game).  The best is still recorded and shown.
+    static let personalBestBonus = 0
+
+    // ---- Gold Rush (paid for with tickets) ------------------------------
+
+    /// Each coin caught is worth this much (×2 after the in-round ×2 buy).
+    /// One time ticket drops 100 coins over 30 seconds, so a strong round
+    /// catches 80–100 and an average round about 50–70.
+    static let goldRushPerCoin = 1
+}
+
 enum MinigameDifficulty: String, CaseIterable, Identifiable {
     case easy, normal, hard
 
@@ -3084,27 +3163,11 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
     // Opponent strength per difficulty lives in `OpponentTuning` (below) —
     // one table for all six competitive minigames.
 
-    /// Payout multiplier applied to a competitive minigame's coin winnings.
-    /// Compressed spread (2026-07-01 economy calibration, see
-    /// docs/economy/07-decisions.md): Easy 1× · Normal 1.5× · Hard 2×.
-    /// Easy no longer pays below par — combined with `targetWinRate`, Easy is
-    /// deliberately the EV-optimal per-attempt pick; Hard still pays the most
-    /// per WIN.  See docs/minigame-difficulty.md for the honest EV math.
-    var payoutMultiplier: Double {
-        switch self {
-        case .easy:   return 1.0
-        case .normal: return 1.5
-        case .hard:   return 2.0
-        }
-    }
+    // Coin payouts per difficulty live in `CoinPayouts` (above).
 
-    /// Short payout descriptor for the pre-game picker.
+    /// Short payout descriptor for the pre-game picker: what a WIN pays.
     var payoutLabel: String {
-        switch self {
-        case .easy:   return "1× coins"
-        case .normal: return "1.5× coins"
-        case .hard:   return "2× coins"
-        }
+        "Win: \(CoinPayouts.competitiveWin(self)) coins + 1 ticket"
     }
 
     /// The win rate each difficulty is designed to land near for an average

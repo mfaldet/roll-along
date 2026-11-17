@@ -709,32 +709,32 @@ struct ModeTutorial {
             return .init(controls: "Tilt to roll and chase the coins. Tap to charge forward.",
                          goal: "Grab the most coins of anyone in 60 seconds.",
                          hazard: "Charge into rivals to make them spill — and dodge theirs.",
-                         reward: "Your haul banks as coins — win to earn a ticket.")
+                         reward: "A few coins for playing; win to earn a ticket for Gold Rush.")
         case "snake":     // Comet Clash
             return .init(controls: "Tilt to steer your comet.",
                          goal: "Be the last comet still glowing.",
                          hazard: "Touch ANY glowing wall — yours or theirs — and you're out.",
-                         reward: "Grab sparks to extend your wall and outlast everyone.")
+                         reward: "Outlast everyone to win a ticket for Gold Rush, plus a few coins.")
         case "sumo":
             return .init(controls: "Tilt to charge and ram.",
                          goal: "Outlast three rivals over three rounds — last marble standing scores most.",
                          hazard: "Get shoved off the shrinking ring and you sit out the rest of the round.",
-                         reward: "Coins for your final placing, most for 1st.")
+                         reward: "A few coins for your placing; 1st wins a ticket for Gold Rush.")
         case "paintball":
             return .init(controls: "Tilt to roll — you paint the floor as you go.",
                          goal: "Cover the most floor in your color in 60 seconds.",
                          hazard: "Roll through a puddle and you're frozen for 3 seconds.",
-                         reward: "Coins for your coverage, plus a bonus for first place.")
+                         reward: "A few coins for your placing; 1st wins a ticket for Gold Rush.")
         case "marblecup":
             return .init(controls: "Tilt to roll into the ball.",
                          goal: "Knock the ball into their net — most goals in 60 seconds wins.",
                          hazard: "A defending AI guards the goal and counterattacks.",
-                         reward: "Coins for every goal, plus a bonus if you win.")
+                         reward: "A few coins for playing; a win earns a ticket for Gold Rush.")
         case "koth":      // King of the Hill
             return .init(controls: "Tilt to roll into the glowing zone.",
                          goal: "Hold the moving hill — alone — the longest.",
                          hazard: "A rival in the zone makes it contested: nobody scores.",
-                         reward: "Coins for your hold time, plus a win bonus.")
+                         reward: "A few coins for your placing; 1st wins a ticket for Gold Rush.")
         case "rollout":
             return .init(controls: "Tilt to roll the tiny ball through the maze.",
                          goal: "Reach the flag at the top of each maze.",
@@ -744,12 +744,12 @@ struct ModeTutorial {
             return .init(controls: "Tilt to steer left/right. Tap to jump.",
                          goal: "Climb the floating platforms as high as you can.",
                          hazard: "Fall off the bottom and the run ends — costing a life.",
-                         reward: "Coins for your height, plus a bonus on a new best.")
+                         reward: "Up to 5 coins, more the higher you climb.")
         case "disco":
             return .init(controls: "Pick Easy, Normal or Hardcore, then tilt to roll. Memorize the lit path before you cross.",
                          goal: "Roll between the safe zones, back and forth, as many times as you can.",
                          hazard: "Touch a tile that isn't on the lit path and the run is over. On Hardcore the path shows only once.",
-                         reward: "Coins for every crossing, plus a bonus on a new best.")
+                         reward: "Up to 5 coins, more the more crossings you make.")
         default:
             return nil
         }

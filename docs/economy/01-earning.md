@@ -1,5 +1,14 @@
 # 01 — Every way to earn coins
 
+> **Superseded (2026-11 coin rebalance).** Minigames no longer pay coins by
+> score or by a difficulty multiplier. Every minigame now pays 1 to 5 coins a
+> game from one table, `CoinPayouts` in `RollAlong/GameState.swift`; a
+> competitive win still earns 1 ticket, and Gold Rush (paid with tickets) is
+> the place for larger amounts. The personal-best bonus is gone. See
+> [`docs/2026-11-coin-rebalance.md`](2026-11-coin-rebalance.md).
+> Payout numbers below are historical.
+
+
 > **2026-11-17: the Challenge of the Day is held back from v1.0** (switched
 > off in the mode registry; no menu entry). Its flat 30 coins on a clear —
 > row 11 below — no longer reach players. It was the only reward the

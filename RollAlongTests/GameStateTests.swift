@@ -85,41 +85,66 @@ final class GameStateTests: XCTestCase {
 
     // MARK: - Minigame difficulty (payout scaling + success tracking)
 
-    func testMinigamePayout_scalesByDifficulty() {
-        let gs = makeGameState()
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .easy),   100)
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .normal), 150)
-        XCTAssertEqual(gs.minigamePayout(base: 100, difficulty: .hard),   200)
-        // Rounds to the nearest coin.
-        XCTAssertEqual(gs.minigamePayout(base: 5, difficulty: .normal), 8)   // 7.5 -> 8
+    // 2026-11 rebalance: a minigame pays 1–5 coins (`CoinPayouts`).
+
+    func testCompetitivePayout_winByDifficultyAndPlacements() {
+        XCTAssertEqual(CoinPayouts.competitiveWin(.easy),   3)
+        XCTAssertEqual(CoinPayouts.competitiveWin(.normal), 4)
+        XCTAssertEqual(CoinPayouts.competitiveWin(.hard),   5)
+        // 2nd of 4 (not last) pays 2; last pays 1 — at every difficulty.
+        for d in MinigameDifficulty.allCases {
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "sumo", won: false, placement: 2, difficulty: d), 2)
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "sumo", won: false, placement: 3, difficulty: d), 2)
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "sumo", won: false, placement: 4, difficulty: d), 1)
+            // Marble Cup is two-sided: 2nd is last.  A draw pays 2.
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "marblecup", won: false, placement: 2, difficulty: d), 1)
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "marblecup", won: false, draw: true, placement: nil, difficulty: d), 2)
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "koth", won: false, placement: nil, difficulty: d), 1)
+        }
     }
 
-    func testPayoutMultiplier_spreadIsOneOneHalfTwo() {
-        XCTAssertEqual(MinigameDifficulty.easy.payoutMultiplier,   1.0)
-        XCTAssertEqual(MinigameDifficulty.normal.payoutMultiplier, 1.5)
-        XCTAssertEqual(MinigameDifficulty.hard.payoutMultiplier,   2.0)
+    func testEveryMinigamePayoutStaysWithinOneToFive() {
+        for d in MinigameDifficulty.allCases {
+            for id in ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"] {
+                for place in [nil, 1, 2, 3, 4] as [Int?] {
+                    for won in [true, false] {
+                        let c = CoinPayouts.competitive(modeID: id, won: won, placement: place, difficulty: d)
+                        XCTAssertTrue((1...5).contains(c), "\(id) \(d) \(String(describing: place)) won=\(won) paid \(c)")
+                    }
+                }
+            }
+        }
+        for m in [1, 39, 40, 120, 500, 10_000] { XCTAssertTrue((1...5).contains(CoinPayouts.rollUp(meters: m))) }
+        for c in [1, 4, 15, 300] { XCTAssertTrue((1...5).contains(CoinPayouts.disco(crossings: c))) }
+        XCTAssertEqual(CoinPayouts.rollUp(meters: 0), 0)
+        XCTAssertEqual(CoinPayouts.disco(crossings: 0), 0)
+        XCTAssertEqual(CoinPayouts.zen(seconds: 59), 0)
+        XCTAssertEqual(CoinPayouts.zen(seconds: 60 * 30), 5)
+        XCTAssertEqual(GameState.minigameBestBonus, 0, "a new best no longer pays a bonus")
     }
 
-    func testRecordMinigameResult_loss_countsAttemptAndAwardsScaledPayout() {
+    func testRecordMinigameResult_loss_countsAttemptAndPaysTheTable() {
         let gs = makeGameState()
         gs.coinBalance = 0
         let paid = gs.recordMinigameResult(modeID: "snake", difficulty: .hard,
-                                           won: false, score: 0, basePayout: 30)
-        XCTAssertEqual(paid, 60, "30 base × 2.0 (hard)")
-        XCTAssertEqual(gs.coinBalance, 60)
+                                           won: false, score: 0, placement: 4)
+        XCTAssertEqual(paid, 1, "last place pays 1 at any difficulty")
+        XCTAssertEqual(gs.coinBalance, 1)
         XCTAssertEqual(gs.minigameDifficultyPlays["snake|hard"], 1)
         XCTAssertNil(gs.minigameDifficultyWins["snake|hard"], "a loss is not a win")
         XCTAssertEqual(gs.minigameWins["snake"] ?? 0, 0, "lifetime win tally untouched on a loss")
         XCTAssertEqual(gs.minigameSuccessRate("snake", .hard), 0.0)
     }
 
-    func testRecordMinigameResult_win_countsWinAndBumpsLifetimeTally() {
+    func testRecordMinigameResult_win_countsWinPaysTheTableAndATicket() {
         let gs = makeGameState()
         gs.coinBalance = 0
+        let ticketsBefore = gs.tickets
         let paid = gs.recordMinigameResult(modeID: "sumo", difficulty: .easy,
-                                           won: true, score: 0, basePayout: 10)
-        XCTAssertEqual(paid, 10, "10 base × 1.0 (easy)")
-        XCTAssertEqual(gs.coinBalance, 10)
+                                           won: true, score: 0, placement: 1)
+        XCTAssertEqual(paid, 3, "an Easy win pays 3")
+        XCTAssertEqual(gs.coinBalance, 3)
+        XCTAssertEqual(gs.tickets, ticketsBefore + 1, "a win still earns 1 ticket")
         XCTAssertEqual(gs.minigameDifficultyPlays["sumo|easy"], 1)
         XCTAssertEqual(gs.minigameDifficultyWins["sumo|easy"], 1)
         XCTAssertEqual(gs.minigameWins["sumo"], 1, "win bumps the lifetime tally")

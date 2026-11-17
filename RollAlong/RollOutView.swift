@@ -126,7 +126,7 @@ struct RollOutView: View {
     private let friction:    CGFloat = 0.984
     private let maxSpeed:    CGFloat = 430
     private let wallBounce:  CGFloat = 0.45   // dull bounce so the ball settles
-    private let coinsPerClear      = 10
+    private let coinsPerClear      = CoinPayouts.rollOutClear
 
     // MARK: - Phase
     private enum Phase { case ready, playing, cleared, fell }

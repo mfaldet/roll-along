@@ -1,5 +1,14 @@
 # Minigame difficulty & payout
 
+> **Superseded (2026-11 coin rebalance).** Minigames no longer pay coins by
+> score or by a difficulty multiplier. Every minigame now pays 1 to 5 coins a
+> game from one table, `CoinPayouts` in `RollAlong/GameState.swift`; a
+> competitive win still earns 1 ticket, and Gold Rush (paid with tickets) is
+> the place for larger amounts. The personal-best bonus is gone. See
+> [`docs/economy/2026-11-coin-rebalance.md`](economy/2026-11-coin-rebalance.md).
+> Payout numbers below are historical.
+
+
 > **Updated 2026-11-15.** Opponent strength no longer comes from
 > `aiAccelScale` / `aiSpeedScale` on `MinigameDifficulty`. Every opponent
 > number now lives in one table, `OpponentTuning` in
