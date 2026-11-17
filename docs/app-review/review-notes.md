@@ -18,6 +18,9 @@ WHERE THINGS ARE (buttons on the Home screen)
 - Profile and Settings.
 - "Games" opens the 10 minigames and the 8 challenge tracks.
 
+MINIGAME REWARDS
+Each minigame pays 1 to 3 in-game coins. A win in a competitive minigame also earns 1 ticket. Gold Rush, a 30-second bonus round, costs 5 tickets and pays up to about 100 coins. Tickets are earned only by winning games; they cannot be bought, and they have no other use.
+
 IN-APP PURCHASES (10)
 Lives — tap the lives counter at the top-left of the Home screen:
   10 Lives, 60 Lives, 130 Lives (consumable), Unlimited Lives (non-consumable).
@@ -35,7 +38,7 @@ Players cannot type any text that other players see. A nickname (Settings > Nick
 CLANS AND THE MONTHLY CLAN BATTLE
 A clan holds up to 12 players. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week. Each player has a short friend code on their profile (letters and digits only, assigned by our server); another player can type it on the Friends screen to send a friend request. The code is not shown to anyone unless the player shares it.
 
-Clans compete each calendar month. A clan's season score is the number of new stars its members earn in the main game that month; it is counted by our server. Clans > Rankings lists clans by season score (or by total levels or total stars). At the end of the month the server ranks the clans, and members of ranked clans who contributed receive in-game coins (250 to 3,000 depending on the clan's tier), which they claim on the Clans screen. The first season, December 2026, is a warm-up with no prizes. There is no entry fee and nothing to buy to take part; the result depends only on play. Coins are the game's soft currency: they buy cosmetic items only, have no cash value, and cannot be traded, transferred or cashed out.
+Clans compete each calendar month. A clan's season score is the number of new stars its members earn in the main game that month; it is counted by our server. Clans > Rankings lists clans by season score (or by total levels or total stars). At the end of the month the server ranks the clans, and members of ranked clans who contributed receive in-game coins (100 to 1,000 depending on the clan's tier), which they claim on the Clans screen. The first season, December 2026, is a warm-up with no prizes. There is no entry fee and nothing to buy to take part; the result depends only on play. Coins are the game's soft currency: they buy cosmetic items only, have no cash value, and cannot be traded, transferred or cashed out.
 
 A clan's owner can remove a member from the clan and can hand ownership to another member; if an owner leaves or deletes their account, the clan passes to its longest-standing member. Removal only ends that player's membership; they keep their account and progress and can join any clan.
 

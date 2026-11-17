@@ -212,10 +212,10 @@ saving.
 
    | Tier | Clans | Coins per eligible member |
    |---|---|---|
-   | Diamond | Top 5% | 3,000 |
-   | Gold | Next 15% (to the top 20%) | 1,500 |
-   | Silver | Next 30% (to the top 50%) | 750 |
-   | Bronze | The rest of the ranked clans | 250 |
+   | Diamond | Top 5% | 1,000 |
+   | Gold | Next 15% (to the top 20%) | 500 |
+   | Silver | Next 30% (to the top 50%) | 250 |
+   | Bronze | The rest of the ranked clans | 100 |
 
    With fewer than 20 ranked clans, tiers go by rank: 1st Diamond, 2nd and
    3rd Gold, 4th to 8th Silver, 9th and below Bronze. Diamond also needs a
@@ -227,10 +227,10 @@ saving.
 5. Every ranked clan records its finish, shown as "Last month: 3rd of 40 ·
    Gold" for the following month.
 
-**Prizes are coins only**: no skin, no tickets. For scale: an active player
-earns roughly 600 to 1,000 coins a day; the $0.99 pack is 750 coins and the
-$4.99 pack is 4,500. Diamond is worth about four days of play, or a little
-under $4 at pack prices, once a month.
+**Prizes are coins only**: no skin, no tickets. A first place (Diamond) is
+worth about one cosmetic (1,000 coins), once a month. For scale, after the
+November 2026 rebalance a mixed player earns about 160 coins a day and the
+$0.99 pack is 750 coins (`docs/economy/2026-11-coin-rebalance.md`).
 
 **Claiming.** The job writes one prize record per eligible player. The next
 time the player opens the Clans screen, a card shows the month, the clan's

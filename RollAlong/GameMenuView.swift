@@ -673,7 +673,7 @@ struct MinigamesGridView: View {
         "koth",       // King of the Hill
     ]
     static let rewardOrder: [String] = [
-        "coinpit",    // Gold Rush          — costs a ticket won in the games above
+        "coinpit",    // Gold Rush          — costs 5 tickets won in the games above
     ]
     /// Every listed id, in display order (Solo, Competitive, Reward).
     static var minigameOrder: [String] { soloOrder + competitiveOrder + rewardOrder }
@@ -690,7 +690,8 @@ struct MinigamesGridView: View {
     /// The tile DISPLAYED as "Gold Rush" is catalogue id "coinpit" — the names
     /// were swapped with the competitive mode (id "goldrush", now displayed
     /// "Smash and Grab") on 2026-06-11; ids stayed put through that swap and
-    /// the later rename.  Gold Rush costs a ticket, won in competitive games.
+    /// the later rename.  Gold Rush costs `CoinPayouts.goldRushTicketCost`
+    /// tickets a round, won in competitive games.
     static let goldRushID = "coinpit"
 
     /// The minigames of one section, in order.
@@ -835,7 +836,7 @@ private struct MinigameSectionHeader: View {
         switch section {
         case .solo:        return "Play at your own pace."
         case .competitive: return "Beat the computer players. Every win earns 1 ticket."
-        case .reward:      return "Gold Rush costs a ticket per round."
+        case .reward:      return "Gold Rush costs \(CoinPayouts.goldRushTicketCost) tickets a round."
         }
     }
 
@@ -884,7 +885,7 @@ private struct TicketFlowNote: View {
                 .font(.system(size: 11, weight: .bold))
             Image(systemName: "ticket.fill")
                 .font(.system(size: 11, weight: .bold))
-            Text("Tickets you win here pay for Gold Rush")
+            Text("\(CoinPayouts.goldRushTicketCost) tickets you win here buy a Gold Rush round")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
         }
         .foregroundStyle(Color(red: 1.00, green: 0.78, blue: 0.20).opacity(0.85))
@@ -940,7 +941,8 @@ private struct MinigameTile: View {
     private static let holdSeconds: Double = 0.35
 
     private var isGoldRush: Bool { mode.id == MinigamesGridView.goldRushID }
-    private var noTickets: Bool { isGoldRush && tickets <= 0 }
+    /// Gold Rush cannot be played: fewer tickets than one round costs.
+    private var noTickets: Bool { isGoldRush && tickets < CoinPayouts.goldRushTicketCost }
 
     var body: some View {
         let style = GameMenuView.style(for: mode.id)
@@ -978,7 +980,7 @@ private struct MinigameTile: View {
                         .minimumScaleFactor(0.7)
                         .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
                     if noTickets {
-                        Text("Win a competitive round to earn a ticket")
+                        Text("\(tickets) of \(CoinPayouts.goldRushTicketCost) tickets — win competitive rounds to earn them")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.9))
                             .multilineTextAlignment(.center)
@@ -1068,7 +1070,7 @@ private struct MinigameTile: View {
     private var accessibilityText: String {
         guard isGoldRush else { return mode.displayName }
         return noTickets
-            ? "\(mode.displayName). No tickets. Win a competitive game to earn a ticket."
+            ? "\(mode.displayName). \(tickets) of \(CoinPayouts.goldRushTicketCost) tickets. A round costs \(CoinPayouts.goldRushTicketCost). Win competitive games to earn them."
             : "\(mode.displayName). \(tickets) ticket\(tickets == 1 ? "" : "s")."
     }
 }

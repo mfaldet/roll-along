@@ -1714,16 +1714,17 @@ final class TrophyViewEventWiringTests: XCTestCase {
         XCTAssertEqual(gs.lives, livesBefore, "the fall funnel must never consume a life")
     }
 
-    /// `whimsy_high_roller` (secret): staking ≥5 time-tickets on a single Coin
-    /// Pit round latches it; a 4-ticket stake does not.
+    /// `whimsy_high_roller` (secret): staking ≥15 tickets (three 30-second
+    /// blocks at 5 tickets each) on a single Gold Rush round latches it; a
+    /// 10-ticket stake does not.
     func testHighRollerWiresThroughCoinPitStake() {
         let gs = makeGameState()
         XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
 
-        gs.recordCoinPitRoundStaked(tickets: 4)
+        gs.recordCoinPitRoundStaked(tickets: 2 * CoinPayouts.goldRushTicketCost)
         XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
 
-        gs.recordCoinPitRoundStaked(tickets: 5)
+        gs.recordCoinPitRoundStaked(tickets: 3 * CoinPayouts.goldRushTicketCost)
         XCTAssertTrue(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
     }
 }
@@ -2645,7 +2646,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
     // MARK: - econ_working_capital / econ_nest_egg (source-tagged coins)
 
-    /// `econ_working_capital` (5,000 play-earned) counts .play and .daily
+    /// `econ_working_capital` (2,500 play-earned) counts .play and .daily
     /// coins but NOT .iap / .refund / .giftCompensation; `econ_nest_egg`
     /// latches off the balance high-water.
     func testEconomyTrophiesRespectCoinSourceAndBalanceHighWater() {
@@ -2662,9 +2663,9 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
                       "any coins held ≥1,000 latch nest egg")
 
         // Play income advances working capital.
-        gs.addCoins(4_000, source: .play)
+        gs.addCoins(2_000, source: .play)
         XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_working_capital"))
-        gs.addCoins(1_000, source: .daily)   // 5,000 play-earned total
+        gs.addCoins(500, source: .daily)     // 2,500 play-earned total
         XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_working_capital"))
     }
 

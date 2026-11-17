@@ -233,7 +233,7 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 |---|---|---|---|---|
 | Nest Egg | Bronze | Hold 1,000 coins at once. | `building.columns.fill` | `lock.fill` |
 | Punch Card | Bronze | Claim 30 daily login rewards. | `checkmark.rectangle.fill` | `checkmark.square.fill` |
-| Working Capital | Bronze | Earn 5,000 lifetime coins from play. | `chart.line.uptrend.xyaxis` | `chart.bar.fill` |
+| Working Capital | Bronze | Earn 2,500 lifetime coins from play. | `chart.line.uptrend.xyaxis` | `chart.bar.fill` |
 
 ### Friends & Clans
 
@@ -263,7 +263,7 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 |---|---|---|---|---|
 | Gravity Check (secret) | Bronze | Fall into the pit on Adventure level 1. | `arrow.down.to.line` | `arrow.down` |
 | Night Bloom (secret) | Bronze | Tend the Zen Garden between midnight and 4 AM. | `moon.stars.fill` | `moon.fill` |
-| High Roller (secret) | Silver | Stake 5 or more tickets on a single Gold Rush round. | `dice.fill` | `suit.spade.fill` |
+| High Roller (secret) | Silver | Stake 15 or more tickets on a single Gold Rush round. | `dice.fill` | `suit.spade.fill` |
 | Back to Basics (secret) | Bronze | Equip the full all-starter loadout while owning 20 or more cosmetics. | `arrow.uturn.backward.circle.fill` | `arrow.uturn.backward` |
 
 ## Platinum

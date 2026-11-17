@@ -248,7 +248,7 @@ struct BallGameView: View {
         let size:  CGFloat
         let phase: Double    // spin phase so coins don't pulse in unison
     }
-    private let coinPitPayoutPerCoin = 1
+    private let coinPitPayoutPerCoin = CoinPayouts.goldRushPerCoin
     @State private var fallingCoins:       [FallingCoin] = []
     @State private var coinPitDeadline:    Date? = nil
     @State private var coinPitLastRelease: Date? = nil
@@ -258,15 +258,16 @@ struct BallGameView: View {
     @State private var coinPitOver:        Bool = false
 
     // Ticket staking (Gold Rush economy) — the round is bought up front on the
-    // stake overlay: every TIME ticket buys 30 s on the clock (stake as many
-    // as you hold).  Tickets are consumed on Start; quitting early refunds one
-    // ticket per FULL un-played 30 s block.  The optional ×2-coins boost is
-    // bought DURING the round for a flat 2 tickets (non-refundable) and doubles
-    // the PAYOUT, not the coin count.  Entering with zero tickets is blocked at
-    // the Games hub and again on the stake overlay.
+    // stake overlay: every 30-second block costs `CoinPayouts.goldRushTicketCost`
+    // (5) tickets (buy as many blocks as you can afford).  Tickets are consumed
+    // on Start; quitting early refunds the tickets of every FULL un-played
+    // 30 s block.  The optional ×2-coins boost is bought DURING the round for
+    // `CoinPayouts.goldRushBoostTicketCost` (10, non-refundable) and doubles
+    // the PAYOUT, not the coin count.  Entering with fewer than 5 tickets is
+    // blocked on the stake overlay (the Minigames grid grays the tile).
     @State private var coinPitStaked            = false   // round paid & live
-    @State private var coinPitStakeTime         = 1       // picker: time tickets (≥1)
-    @State private var coinPitTimeTicketsStaked = 0       // frozen at Start (refund math)
+    @State private var coinPitStakeTime         = 1       // picker: 30-second blocks (≥1)
+    @State private var coinPitTimeTicketsStaked = 0       // BLOCKS bought at Start (clock + refund math)
     @State private var coinPitStakedMultiplier  = 1       // 1, or 2 after the in-round buy
 
     /// The catch target if the active mode is a collect-count round, else nil.
@@ -303,7 +304,7 @@ struct BallGameView: View {
         waitsForTapToStart ? .distantFuture : .now.addingTimeInterval(spawnLockDuration)
     }
 
-    /// Round length bought at Start: time-tickets × 30 s.
+    /// Round length bought at Start: 30-second blocks bought (5 tickets each) × 30 s.
     private var coinPitStakedDuration: TimeInterval {
         Double(max(1, coinPitTimeTicketsStaked)) * GameState.goldRushSecondsPerTicket
     }
@@ -752,7 +753,7 @@ struct BallGameView: View {
                     coinPitHUDOverlay(safeTop: geo.safeAreaInsets.top)
                 }
 
-                // Coin Pit: optional in-round ×2-coins boost (flat 2 tickets).
+                // Coin Pit: optional in-round ×2-coins boost (10 tickets, `CoinPayouts.goldRushBoostTicketCost`).
                 if isCoinPit && coinPitStaked && !coinPitOver {
                     coinPitDoubleButton
                 }
@@ -2262,7 +2263,8 @@ struct BallGameView: View {
 
     // MARK: - Gold Rush in-round ×2 boost
 
-    /// The only mid-round upsell: a flat 2 tickets to double your coins for the
+    /// The only mid-round upsell: `CoinPayouts.goldRushBoostTicketCost` (10)
+    /// tickets to double your coins for the
     /// rest of the round.  Buying it retroactively doubles everything caught so
     /// far (one extra payout of the current haul), then `coinPitStakedMultiplier`
     /// makes every later catch worth ×2.  Disappears once bought (the HUD then
@@ -2270,9 +2272,10 @@ struct BallGameView: View {
     @ViewBuilder
     private var coinPitDoubleButton: some View {
         if coinPitStakedMultiplier == 1 {
-            let canAfford = gameState.tickets >= 2
+            let canAfford = gameState.tickets >= CoinPayouts.goldRushBoostTicketCost
             Button {
-                guard coinPitStakedMultiplier == 1, gameState.spendTickets(2) else { return }
+                guard coinPitStakedMultiplier == 1,
+                      gameState.spendTickets(CoinPayouts.goldRushBoostTicketCost) else { return }
                 gameState.addCoins(coinPitScore * coinPitPayoutPerCoin)   // back-pay the haul
                 coinPitStakedMultiplier = 2
                 fireCoinPickup()
@@ -2284,7 +2287,7 @@ struct BallGameView: View {
                     Text("×2 Coins").fontWeight(.heavy)
                     HStack(spacing: 3) {
                         Image(systemName: "ticket.fill").font(.system(size: 11))
-                        Text("2").fontWeight(.bold)
+                        Text("\(CoinPayouts.goldRushBoostTicketCost)").fontWeight(.bold)
                     }
                     .opacity(0.8)
                 }
@@ -2316,7 +2319,10 @@ struct BallGameView: View {
     /// covers deep links and Play Again when broke).
     private var coinPitStakeOverlay: some View {
         let balance = gameState.tickets
-        let total   = coinPitStakeTime          // time tickets only
+        let cost    = CoinPayouts.goldRushTicketCost
+        let blocks  = coinPitStakeTime              // 30-second blocks
+        let total   = blocks * cost                 // tickets this stake spends
+        let maxBlocks = max(1, balance / cost)
 
         return ZStack {
             Color.black.opacity(0.72).ignoresSafeArea()
@@ -2329,40 +2335,40 @@ struct BallGameView: View {
                     Text("Gold Rush")
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Text(balance == 0
-                         ? "You're out of tickets."
+                    Text(balance < cost
+                         ? "\(balance) of \(cost) tickets"
                          : "You have \(balance) ticket\(balance == 1 ? "" : "s")")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
                         .monospacedDigit()
                 }
 
-                if balance == 0 {
-                    Text("Win a competitive game to earn a ticket, then come back for the rush.")
+                if balance < cost {
+                    Text("A round costs \(cost) tickets. Win competitive games to earn them — 1 ticket per win.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
-                } else if balance == 1 {
-                    Text("Your ticket buys 30 seconds of raining coins — everything you catch is yours. Spend more to add time; double your coins mid-round for 2 tickets.")
+                } else if maxBlocks == 1 {
+                    Text("\(cost) tickets buy 30 seconds of raining coins — everything you catch is yours. Double your coins mid-round for \(CoinPayouts.goldRushBoostTicketCost) tickets.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
                 } else {
-                    Text("Add as much time as you like — every ticket is another 30 seconds. You can double your coins mid-round for 2 tickets.")
+                    Text("Every \(cost) tickets buy 30 seconds. You can double your coins mid-round for \(CoinPayouts.goldRushBoostTicketCost) tickets.")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.55))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
 
-                    stakeRow("Time", "+30 s each",
+                    stakeRow("Time", "+30 s for \(cost) tickets",
                              value: $coinPitStakeTime,
-                             lo: 1, hi: max(1, balance))
+                             lo: 1, hi: maxBlocks)
 
                     // What the stake buys, at a glance.
                     HStack(spacing: 14) {
-                        Label("\(coinPitStakeTime * 30) s", systemImage: "clock.fill")
+                        Label("\(blocks * 30) s", systemImage: "clock.fill")
                         Label("\(total)/\(balance) tickets", systemImage: "ticket.fill")
                     }
                     .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -2370,9 +2376,9 @@ struct BallGameView: View {
                     .foregroundStyle(Color(red: 1.00, green: 0.82, blue: 0.28))
                 }
 
-                if balance > 0 {
+                if balance >= cost {
                     Button { startCoinPitRound() } label: {
-                        Text(total == 1 ? "Start — 1 ticket" : "Start — \(total) tickets")
+                        Text("Start — \(total) tickets")
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
                             .frame(maxWidth: .infinity)
@@ -2439,15 +2445,16 @@ struct BallGameView: View {
                 .fill(Color(white: 0.13))
         )
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title): \(value.wrappedValue) tickets. \(detail).")
+        .accessibilityLabel("\(title): \(value.wrappedValue). \(detail).")
     }
 
     /// Consume the staked tickets and arm the round.  The clock itself
     /// starts on the next physics tick (coinPitTick arms the deadline).
     private func startCoinPitRound() {
         clampCoinPitStakes()
-        let time = max(1, coinPitStakeTime)
-        guard gameState.spendTickets(time) else { return }
+        let time = max(1, coinPitStakeTime)                     // 30-second blocks
+        let spent = time * CoinPayouts.goldRushTicketCost       // tickets
+        guard gameState.spendTickets(spent) else { return }
         coinPitTimeTicketsStaked = time
         coinPitStakedMultiplier  = 1          // ×2 is an optional in-round buy
         coinPitStaked = true
@@ -2456,22 +2463,23 @@ struct BallGameView: View {
         // stake — so a big single-round stake (≥5) latches the trophy.  The
         // ×2 in-round buy is a separate ticket spend, not part of the round
         // stake, so it's intentionally NOT funneled here.
-        gameState.recordCoinPitRoundStaked(tickets: time)
+        gameState.recordCoinPitRoundStaked(tickets: spent)
         AnalyticsClient.shared.track(
             "goldrush_round_staked",
-            properties: ["time_tickets": .int(time)]
+            properties: ["time_blocks": .int(time), "tickets": .int(spent)]
         )
     }
 
     /// Keep the pickers inside the live budget — the balance can shrink
     /// between rounds (Play Again after spending), so re-clamp on entry.
     private func clampCoinPitStakes() {
-        // Time tickets are limited only by the player's balance now.
-        coinPitStakeTime = min(max(1, coinPitStakeTime), max(1, gameState.tickets))
+        // Blocks are limited only by what the balance can pay for.
+        let affordable = gameState.tickets / CoinPayouts.goldRushTicketCost
+        coinPitStakeTime = min(max(1, coinPitStakeTime), max(1, affordable))
     }
 
-    /// Early-exit refund: leaving mid-round returns one ticket per FULL
-    /// 30 s block still un-played (coin tickets never refund).  No-op once
+    /// Early-exit refund: leaving mid-round returns the tickets of every FULL
+    /// 30 s block still un-played (boost tickets never refund).  No-op once
     /// the round finished, or before anything was staked.
     private func refundUnplayedCoinPitBlocks() {
         guard isCoinPit, coinPitStaked, !coinPitOver else { return }
@@ -2484,8 +2492,9 @@ struct BallGameView: View {
             unplayed = coinPitTimeTicketsStaked
         }
         coinPitStaked = false
-        let refund = min(unplayed, coinPitTimeTicketsStaked)
-        guard refund > 0 else { return }
+        let refundBlocks = min(unplayed, coinPitTimeTicketsStaked)
+        guard refundBlocks > 0 else { return }
+        let refund = refundBlocks * CoinPayouts.goldRushTicketCost
         gameState.addTickets(refund)
         AnalyticsClient.shared.track(
             "goldrush_ticket_refund",

@@ -711,9 +711,9 @@
       "tier": "bronze",
       "category": "economy_shop",
       "secret": false,
-      "lockedDescription": "Earn 5,000 lifetime coins from play.",
-      "unlockedDescription": "Five thousand coins earned the honest way. Working capital.",
-      "criteria": { "metric": "coins_earned_from_play", "threshold": 5000 },
+      "lockedDescription": "Earn 2,500 lifetime coins from play.",
+      "unlockedDescription": "Twenty-five hundred coins earned the honest way. Working capital.",
+      "criteria": { "metric": "coins_earned_from_play", "threshold": 2500 },
       "addedInVersion": "1.0"
     },
     {
@@ -920,9 +920,9 @@
       "tier": "silver",
       "category": "secret_whimsy",
       "secret": true,
-      "lockedDescription": "Stake 5 or more tickets on a single Gold Rush round.",
-      "unlockedDescription": "Five tickets on one round. A genuine high roller.",
-      "criteria": { "metric": "coinpit_round_stake_best", "threshold": 5 },
+      "lockedDescription": "Stake 15 or more tickets on a single Gold Rush round.",
+      "unlockedDescription": "Fifteen tickets on one round. A genuine high roller.",
+      "criteria": { "metric": "coinpit_round_stake_best", "threshold": 15 },
       "addedInVersion": "1.0"
     },
     {
