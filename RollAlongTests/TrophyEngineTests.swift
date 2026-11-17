@@ -1714,17 +1714,19 @@ final class TrophyViewEventWiringTests: XCTestCase {
         XCTAssertEqual(gs.lives, livesBefore, "the fall funnel must never consume a life")
     }
 
-    /// `whimsy_high_roller` (secret): staking ≥15 tickets (three 30-second
-    /// blocks at 5 tickets each) on a single Gold Rush round latches it; a
-    /// 10-ticket stake does not.
+    /// `whimsy_high_roller` (secret): staking ≥25 tickets on a single Gold
+    /// Rush round latches it — the round's time blocks (5 tickets each) plus
+    /// the ×2 boost (10) if bought.  Four blocks (20) do not; three blocks
+    /// and the boost (25) do.
     func testHighRollerWiresThroughCoinPitStake() {
         let gs = makeGameState()
         XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
 
-        gs.recordCoinPitRoundStaked(tickets: 2 * CoinPayouts.goldRushTicketCost)
+        gs.recordCoinPitRoundStaked(tickets: 4 * CoinPayouts.goldRushTicketCost)
         XCTAssertFalse(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
 
-        gs.recordCoinPitRoundStaked(tickets: 3 * CoinPayouts.goldRushTicketCost)
+        gs.recordCoinPitRoundStaked(tickets: 3 * CoinPayouts.goldRushTicketCost
+                                           + CoinPayouts.goldRushBoostTicketCost)
         XCTAssertTrue(gs.trophyEngine.isUnlocked("whimsy_high_roller"))
     }
 }
@@ -2167,10 +2169,10 @@ final class TrophyMinigameWiringTests: XCTestCase {
         _ = gs.recordGoldRushCoins(90)     // a 90-coin round: best now 90
         XCTAssertTrue(gs.trophyEngine.isUnlocked("coinpit_catch_90"))
 
-        // Grind the lifetime total to 2,500 for econ_pit_boss (89+90 = 179
-        // so far; add 2,321 more across rounds).
+        // Grind the lifetime total to 1,000 for econ_pit_boss (89+90 = 179
+        // so far; add 821 more across rounds).
         XCTAssertFalse(gs.trophyEngine.isUnlocked("econ_pit_boss"))
-        _ = gs.recordGoldRushCoins(2_500 - 179)
+        _ = gs.recordGoldRushCoins(1_000 - 179)
         XCTAssertTrue(gs.trophyEngine.isUnlocked("econ_pit_boss"))
     }
 

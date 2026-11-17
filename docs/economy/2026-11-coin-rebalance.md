@@ -201,6 +201,12 @@ unless noted:
 - **Working Capital**: 2,500 coins earned from play.
 - **High Roller** (secret): 15 tickets on one round (three 30-second blocks);
   at 5 tickets a round, the old "5 tickets" would have latched on every round.
+  **Round 3:** 25 tickets on one round, counting the time blocks plus the ×2
+  boost (10) — five rounds' worth, the same as the original 5 when a round
+  cost 1.  The most one round can take is 995 tickets: the balance is capped at
+  999, so either 199 blocks (995) with no boost, or 197 blocks (985) plus the
+  10-ticket boost.  25 is reachable, for example three blocks and the boost,
+  or five blocks.
 
 ### Assumptions (as before)
 
@@ -256,7 +262,7 @@ through a 14-minute Normal cycle loses nothing.
 - **Pit Boss (2,500 caught in Gold Rush):** about 36 rounds at 70 a round =
   180 tickets = 360 Normal games. That is about 26 days of 20-minute Normal
   ticket-loop play, or about 51 days for the mix. Still reachable, but slow
-  for a Silver. Suggest lowering to **1,000** (about 14 rounds, 10 days on the
-  Normal loop) — not changed.
+  for a Silver. **Lowered to 1,000 in round 3** (about 14 rounds, 10 days on
+  the Normal loop).
 - **Pit Stop** (play one Gold Rush round) now needs 5 wins first; fine.
 - **Cloudburst** (90 in one round) is unaffected.

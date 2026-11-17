@@ -1375,8 +1375,10 @@ final class GameState: ObservableObject {
     /// A Coin Pit round has just been staked (S1-T7).  `tickets` is the count
     /// of time-tickets committed at round START — the view calls this only
     /// after `spendTickets` succeeds, so it never fires on a mid-round refund
-    /// or an aborted stake.  `tickets` is the number of TICKETS spent (5 per
-    /// 30-second block).  `whimsy_high_roller` latches at ≥15 — three blocks.
+    /// or an aborted stake.  `tickets` is the number of TICKETS staked on the
+    /// round so far: 5 per 30-second block, plus 10 for the ×2 boost when it is
+    /// bought.  `whimsy_high_roller` latches at ≥25 — five rounds' worth, the
+    /// same as its original 5 tickets when a round cost 1.
     /// The engine keeps the best observed, so a later smaller stake never
     /// revokes.  Not mode-gated on `recordsClimbResult` (Coin Pit is a `.solo`
     /// unlimited mode); the funnel simply never fires outside the Coin Pit

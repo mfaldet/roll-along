@@ -429,16 +429,20 @@ struct CosmeticShopView: View {
                         .foregroundStyle(Color(white: 0.55))
                         .frame(maxWidth: .infinity, alignment: .trailing)
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                // ── Bundle — one random featured collection ───────────────
-                if let bundle = ShopRotation.featuredBundle() {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionLabel("FEATURED BUNDLE")
-                        collectionCard(bundle, isFeatured: true)
+                    // ── Bundle — one random featured collection ───────────
+                    // Kept in the same block as the title and countdown so it
+                    // sits right under them (12 pt), not a full section gap
+                    // (24 pt) below.
+                    if let bundle = ShopRotation.featuredBundle() {
+                        VStack(alignment: .leading, spacing: 10) {
+                            sectionLabel("FEATURED BUNDLE")
+                            collectionCard(bundle, isFeatured: true)
+                        }
+                        .padding(.top, 7)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 // ── One section per cosmetic category: three picks each
                 //    (two Standard + one better), in the requested order. ───
@@ -521,7 +525,9 @@ struct CosmeticShopView: View {
                                          properties: ["from": .string("shop_pill")])
         } label: {
             HStack(spacing: 6) {
-                CoinIcon(size: 16)
+                // Lives in the nav-bar toolbar, which tints its content one
+                // color — use the full-color image version of the coin.
+                ToolbarCoinIcon(size: 16)
                 Text(GameState.coinPillText(gameState.coinBalance))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
@@ -1979,9 +1985,9 @@ struct CosmeticShopView: View {
             )
     }
 
-    // (Coin glyph rendering moved to the shared CoinIcon view in
-    // BallGameView.swift — every screen uses the same paw-print
-    // minted-coin graphic now.)
+    // (Coin glyph rendering lives in the shared CoinIcon / CoinFace views in
+    // BallGameView.swift — every screen uses the same punched coin.  Inside a
+    // toolbar use ToolbarCoinIcon, which keeps the coin's colors.)
 }
 
 /// The rarity marker used on Shop / Catalog cards: a colored right-triangle in

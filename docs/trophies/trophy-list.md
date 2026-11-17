@@ -212,7 +212,7 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 | Step | Title | What it asks |
 |---|---|---|
-| Silver | Pit Boss | Catch 2,500 lifetime coins in Gold Rush rounds. |
+| Silver | Pit Boss | Catch 1,000 lifetime coins in Gold Rush rounds. |
 
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
@@ -263,7 +263,7 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 |---|---|---|---|---|
 | Gravity Check (secret) | Bronze | Fall into the pit on Adventure level 1. | `arrow.down.to.line` | `arrow.down` |
 | Night Bloom (secret) | Bronze | Tend the Zen Garden between midnight and 4 AM. | `moon.stars.fill` | `moon.fill` |
-| High Roller (secret) | Silver | Stake 15 or more tickets on a single Gold Rush round. | `dice.fill` | `suit.spade.fill` |
+| High Roller (secret) | Silver | Stake 25 or more tickets on a single Gold Rush round (time blocks plus the ×2 boost). | `dice.fill` | `suit.spade.fill` |
 | Back to Basics (secret) | Bronze | Equip the full all-starter loadout while owning 20 or more cosmetics. | `arrow.uturn.backward.circle.fill` | `arrow.uturn.backward` |
 
 ## Platinum

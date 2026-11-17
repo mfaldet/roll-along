@@ -2278,6 +2278,11 @@ struct BallGameView: View {
                       gameState.spendTickets(CoinPayouts.goldRushBoostTicketCost) else { return }
                 gameState.addCoins(coinPitScore * coinPitPayoutPerCoin)   // back-pay the haul
                 coinPitStakedMultiplier = 2
+                // High Roller counts everything staked on this ONE round:
+                // its time blocks plus this boost.
+                gameState.recordCoinPitRoundStaked(
+                    tickets: coinPitTimeTicketsStaked * CoinPayouts.goldRushTicketCost
+                           + CoinPayouts.goldRushBoostTicketCost)
                 fireCoinPickup()
                 AnalyticsClient.shared.track("goldrush_double_bought",
                     properties: ["score_at_buy": .int(coinPitScore)])
@@ -2458,11 +2463,11 @@ struct BallGameView: View {
         coinPitTimeTicketsStaked = time
         coinPitStakedMultiplier  = 1          // ×2 is an optional in-round buy
         coinPitStaked = true
-        // S1-T7 `whimsy_high_roller`: the ROUND-START stake count.  Fired only
-        // after `spendTickets` commits — never on a refund or an aborted
-        // stake — so a big single-round stake (≥15 tickets) latches the trophy.  The
-        // ×2 in-round buy is a separate ticket spend, not part of the round
-        // stake, so it's intentionally NOT funneled here.
+        // S1-T7 `whimsy_high_roller`: tickets staked on this ONE round.  Fired
+        // here with the time blocks (only after `spendTickets` commits — never
+        // on a refund or an aborted stake), and again when the ×2 boost is
+        // bought mid-round with blocks + boost, so the trophy sees the round's
+        // whole stake.  It latches at 25 (see TrophyCatalog.json).
         gameState.recordCoinPitRoundStaked(tickets: spent)
         AnalyticsClient.shared.track(
             "goldrush_round_staked",
@@ -6854,21 +6859,50 @@ struct PitLandingView: View {
 }
 
 // ---------------------------------------------------------------------------
-// BankedCoinView — already-collected coin, static + dimmed.
+// BankedCoinView — an already-collected coin in a level: the shared punched
+// coin, gray and faded, so it reads as "already yours" (it was a plain gray
+// disc with no triangle).
 // ---------------------------------------------------------------------------
 struct BankedCoinView: View {
     let size: CGFloat
     var body: some View {
-        Circle()
-            .fill(Self.dimmed)
-            .frame(width: size, height: size)
-            .overlay(Circle().stroke(Color.black.opacity(0.20), lineWidth: 1))
+        CoinFace(size: size)
+            .saturation(0)
             .opacity(0.45)
     }
-    static let dimmed = LinearGradient(
-        colors: [Color(white: 0.55), Color(white: 0.35)],
-        startPoint: .top, endPoint: .bottom
-    )
+}
+
+// ---------------------------------------------------------------------------
+// ToolbarCoinIcon — the shared coin for use INSIDE a navigation toolbar.
+// iOS draws toolbar content as a single tinted color, which turned the coin
+// into a plain disc with no triangle.  This draws the same CoinFace into a
+// full-color image once per size and shows it with its original colors.
+// ---------------------------------------------------------------------------
+struct ToolbarCoinIcon: View {
+    let size: CGFloat
+
+    var body: some View {
+        if let image = Self.image(size: size) {
+            Image(uiImage: image)
+                .renderingMode(.original)
+                .resizable()
+                .frame(width: size, height: size)
+                .accessibilityHidden(true)
+        } else {
+            CoinIcon(size: size)
+        }
+    }
+
+    @MainActor private static var cache: [CGFloat: UIImage] = [:]
+
+    @MainActor static func image(size: CGFloat) -> UIImage? {
+        if let cached = cache[size] { return cached }
+        let renderer = ImageRenderer(content: CoinFace(size: size))
+        renderer.scale = 3
+        let image = renderer.uiImage?.withRenderingMode(.alwaysOriginal)
+        cache[size] = image
+        return image
+    }
 }
 
 // ---------------------------------------------------------------------------
