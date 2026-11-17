@@ -38,9 +38,11 @@ struct ProfileView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     heroCard
-                    careerCard
+                    // The Trophy Room's entrance (Home has no Trophies button):
+                    // right under the player's name, with "Trophy Room ›".
                     ProfileTrophyCard(engine: gameState.trophyEngine,
                                       pins: gameState.trophyPins)
+                    careerCard
                     loadoutCard
                     PlayerRanksCard(profile: gameState.localLeaderboardProfile,
                                     playerId: SocialClient.shared.currentUserId)
@@ -733,6 +735,16 @@ struct ProfileTrophyCard: View {
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(Color(white: 0.55))
+            // Says plainly that the card opens the Trophy Room.
+            HStack(spacing: 3) {
+                Text("Trophy Room")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(TrophyGradeStyle.forTier(.gold).accent)
+            .padding(.leading, 6)
+            .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

@@ -24,6 +24,8 @@ The main mode is called **Adventure** in the game. In the code it is still named
 
 All game art is drawn in code with SwiftUI `Canvas`; there are no image assets apart from the app icon.
 
+**Where things are.** Home → Game Modes has Adventure, Challenge of the Day, the Challenge Packs and one **Minigames** button, which opens a two-column grid of every minigame (order: `MinigamesGridView.minigameOrder` in `GameMenuView.swift`). Pressing and holding a minigame tile plays its preview clip, if one has been added (`RollAlong/MinigameClips/`, spec in [`docs/minigame-clips.md`](docs/minigame-clips.md)). The Trophy Room opens from the Trophies card on Profile; Home has no Trophies button.
+
 ### Everything else
 
 - **Cosmetics.** 74 ball skins plus goals, trails, floors, pits, boundaries and music, bought with coins. Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
