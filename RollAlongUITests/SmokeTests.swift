@@ -119,7 +119,15 @@ final class SmokeTests: XCTestCase {
         gameModeButton.tap()
         dismissSignInIfPresent()
 
-        // 3. Tap the competitive coin scramble in the mode list (id
+        // 3. Open the Minigames grid (Game Modes has one "Minigames" button
+        // now, not sideways shelves).
+        let minigamesButton = entry("MinigamesButton", labeled: "Minigames")
+        XCTAssertTrue(minigamesButton.waitForExistence(timeout: 5),
+                      "Neither the MinigamesButton identifier nor the 'Minigames' label was found on Game Modes — see the AX-tree attachment")
+        if !minigamesButton.isHittable { app.swipeUp() }
+        minigamesButton.tap()
+
+        // 3b. Tap the competitive coin scramble in the grid (id
         // "goldrush"; DISPLAYED as "Smash and Grab" since the name swap +
         // rename).  It sits a few cards down the hub — scroll once if it's
         // below the fold on small screens.  Selecting a mode now ARMS it and

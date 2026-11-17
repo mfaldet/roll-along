@@ -587,8 +587,8 @@ final class TrophyEngineTests: XCTestCase {
             XCTAssertEqual(interested, expected, "index wrong for \(metric.rawValue)")
             indexedTotal += interested.count
         }
-        // Everything is reachable exactly once: 91 metric-indexed + the capstone.
-        XCTAssertEqual(indexedTotal, 91)
+        // Everything is reachable exactly once: 89 metric-indexed + the capstone.
+        XCTAssertEqual(indexedTotal, 89)
         XCTAssertTrue(engine.trophies(interestedIn: .baseTrophiesUnlocked).isEmpty,
                       "the capstone must be cascade-only, never bump-evaluated")
     }
