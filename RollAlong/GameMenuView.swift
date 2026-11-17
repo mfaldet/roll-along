@@ -15,7 +15,7 @@ import UIKit
 //
 // DATA-DRIVEN: the grid lists `GameModeCatalogue.enabled` minigames, so a mode
 // switched off in the registry disappears from it automatically.  Their order
-// is `MinigamesGridView.minigameOrder`.
+// is `MinigamesGridView.soloOrder` / `competitiveOrder` / `rewardOrder`.
 // ===========================================================================
 
 struct GameMenuView: View {
@@ -644,7 +644,8 @@ private struct ChaseChipStrip: View {
 // • The list comes from the mode registry (`GameModeCatalogue.enabled`), so a
 //   mode switched off there disappears here too.  `hiddenMinigameIDs` holds
 //   back anything not ready for this release even if the registry lists it.
-// • The order is `minigameOrder` — ONE list, edit it to reorder the grid.
+// • Three labeled sections, each with its own order list: `soloOrder`,
+//   `competitiveOrder`, `rewardOrder` — edit those to reorder the grid.
 // • Tap a tile to choose that game (it is armed and the player returns Home,
 //   where Play launches it — the same as the old shelves).
 // • Press and hold a tile to play its preview clip (see `MinigameClip` and
@@ -655,20 +656,32 @@ struct MinigamesGridView: View {
     @EnvironmentObject var gameState: GameState
     @Environment(\.dismiss) var dismiss
 
-    /// THE ORDER of the minigames grid, by catalogue id.  Roll Up first and
-    /// Zen Garden last; a minigame not listed here goes just before Zen Garden.
-    static let minigameOrder: [String] = [
-        "rollup",     // Roll Up            — solo, quick arcade climb
-        "disco",      // Disco Ball         — solo, memory puzzle
-        "snake",      // Comet Clash        — vs rivals
-        "sumo",       // Sumo Survival      — vs rivals
-        "paintball",  // Paint Ball         — vs rivals
-        "goldrush",   // Smash and Grab     — vs rivals
-        "marblecup",  // Marble Cup         — vs rivals
-        "koth",       // King of the Hill   — vs rivals
-        "coinpit",    // Gold Rush          — reward round, costs a ticket won above
-        "zen",        // Zen Garden         — calm sandbox, always last
+    /// THE ORDER of the minigames grid, by catalogue id, in three sections.
+    /// A minigame not listed in any section goes at the end of its own kind
+    /// (competitive → Competitive, anything else → Solo, before Zen Garden).
+    static let soloOrder: [String] = [
+        "rollup",     // Roll Up            — first
+        "disco",      // Disco Ball
+        "zen",        // Zen Garden         — last
     ]
+    static let competitiveOrder: [String] = [
+        "snake",      // Comet Clash
+        "sumo",       // Sumo Survival
+        "paintball",  // Paint Ball
+        "goldrush",   // Smash and Grab
+        "marblecup",  // Marble Cup
+        "koth",       // King of the Hill
+    ]
+    static let rewardOrder: [String] = [
+        "coinpit",    // Gold Rush          — costs a ticket won in the games above
+    ]
+    /// Every listed id, in display order (Solo, Competitive, Reward).
+    static var minigameOrder: [String] { soloOrder + competitiveOrder + rewardOrder }
+
+    /// The three sections of the grid.
+    enum GridSection: CaseIterable {
+        case solo, competitive, reward
+    }
 
     /// Not in this release, even if the registry still lists them.
     /// Roll Out's mazes are being rebuilt.
@@ -679,6 +692,29 @@ struct MinigamesGridView: View {
     /// "Smash and Grab") on 2026-06-11; ids stayed put through that swap and
     /// the later rename.  Gold Rush costs a ticket, won in competitive games.
     static let goldRushID = "coinpit"
+
+    /// The minigames of one section, in order.
+    static func games(in section: GridSection) -> [GameMode] {
+        let all = available
+        func pick(_ ids: [String]) -> [GameMode] { ids.compactMap { id in all.first { $0.id == id } } }
+        let listed = Set(minigameOrder)
+        let extras = all.filter { !listed.contains($0.id) }
+        switch section {
+        case .solo:
+            var solo = pick(soloOrder)
+            let extraSolo = extras.filter { $0.section != .competitive }
+            if let zen = solo.firstIndex(where: { $0.id == "zen" }) {
+                solo.insert(contentsOf: extraSolo, at: zen)
+            } else {
+                solo.append(contentsOf: extraSolo)
+            }
+            return solo
+        case .competitive:
+            return pick(competitiveOrder) + extras.filter { $0.section == .competitive }
+        case .reward:
+            return pick(rewardOrder)
+        }
+    }
 
     /// Every minigame the player can see, in grid order.
     static var available: [GameMode] {
@@ -709,7 +745,6 @@ struct MinigamesGridView: View {
     var body: some View {
         let games = Self.available
         let anyClip = games.contains { MinigameClip.url(for: $0.id) != nil }
-        let noTickets = gameState.tickets <= 0
         return ZStack {
             LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)],
                            startPoint: .top, endPoint: .bottom)
@@ -724,18 +759,23 @@ struct MinigamesGridView: View {
                         .foregroundStyle(Color(white: 0.55))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if noTickets {
-                        Text("Gold Rush needs a ticket. Win a competitive game to earn one.")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(white: 0.50))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(games, id: \.id) { mode in
-                            MinigameTile(mode: mode,
-                                         tickets: gameState.tickets,
-                                         onSelect: { select(mode.id) })
+                    ForEach(GridSection.allCases, id: \.self) { section in
+                        let sectionGames = Self.games(in: section)
+                        if !sectionGames.isEmpty {
+                            MinigameSectionHeader(section: section, tickets: gameState.tickets)
+                                .padding(.top, section == .solo ? 4 : 14)
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(sectionGames, id: \.id) { mode in
+                                    MinigameTile(mode: mode,
+                                                 tickets: gameState.tickets,
+                                                 onSelect: { select(mode.id) })
+                                }
+                            }
+                            // The link between the two: wins above pay for Gold Rush below.
+                            if section == .competitive {
+                                TicketFlowNote()
+                                    .padding(.top, 2)
+                            }
                         }
                     }
                 }
@@ -758,6 +798,99 @@ struct MinigamesGridView: View {
                 }
             }
         }
+    }
+}
+
+/// A section title in the Minigames grid: an icon in the section's color, the
+/// title, and one plain line saying what the section is for.  The Reward
+/// section also shows the player's ticket count.
+private struct MinigameSectionHeader: View {
+    let section: MinigamesGridView.GridSection
+    let tickets: Int
+
+    private static let ticketGold = Color(red: 1.00, green: 0.78, blue: 0.20)
+
+    private var icon: String {
+        switch section {
+        case .solo:        return "person.fill"
+        case .competitive: return "flag.checkered"
+        case .reward:      return "ticket.fill"
+        }
+    }
+    private var tint: Color {
+        switch section {
+        case .solo:        return Color(red: 0.45, green: 0.78, blue: 1.00)
+        case .competitive: return Color(red: 0.98, green: 0.45, blue: 0.40)
+        case .reward:      return Self.ticketGold
+        }
+    }
+    private var title: String {
+        switch section {
+        case .solo:        return "Solo"
+        case .competitive: return "Competitive · win tickets"
+        case .reward:      return "Reward · spend tickets"
+        }
+    }
+    private var subtitle: String {
+        switch section {
+        case .solo:        return "Play at your own pace."
+        case .competitive: return "Beat the computer players. Every win earns 1 ticket."
+        case .reward:      return "Gold Rush costs a ticket per round."
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.black.opacity(0.75))
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(tint))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased())
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .kerning(0.8)
+                    .foregroundStyle(tint)
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            if section == .reward {
+                HStack(spacing: 4) {
+                    Image(systemName: "ticket.fill").font(.system(size: 12, weight: .bold))
+                    Text("\(tickets)")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.black.opacity(0.8))
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Self.ticketGold))
+                .accessibilityLabel("\(tickets) ticket\(tickets == 1 ? "" : "s")")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Between the Competitive and Reward sections: a small arrow line that says
+/// the tickets won above are what Gold Rush spends below.
+private struct TicketFlowNote: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.down")
+                .font(.system(size: 11, weight: .bold))
+            Image(systemName: "ticket.fill")
+                .font(.system(size: 11, weight: .bold))
+            Text("Tickets you win here pay for Gold Rush")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+        }
+        .foregroundStyle(Color(red: 1.00, green: 0.78, blue: 0.20).opacity(0.85))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -844,6 +977,13 @@ private struct MinigameTile: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                         .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
+                    if noTickets {
+                        Text("Win a competitive round to earn a ticket")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(.horizontal, 10)
             }
