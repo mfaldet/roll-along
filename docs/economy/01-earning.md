@@ -5,7 +5,7 @@
 > game from one table, `CoinPayouts` in `RollAlong/GameState.swift`; a
 > competitive win still earns 1 ticket, and Gold Rush (paid with tickets) is
 > the place for larger amounts. The personal-best bonus is gone. See
-> [`docs/2026-11-coin-rebalance.md`](2026-11-coin-rebalance.md).
+> [`2026-11-coin-rebalance.md`](2026-11-coin-rebalance.md).
 > Payout numbers below are historical.
 
 
