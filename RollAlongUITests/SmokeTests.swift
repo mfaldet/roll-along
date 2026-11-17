@@ -132,6 +132,15 @@ final class SmokeTests: XCTestCase {
         // rename).  It sits a few cards down the hub — scroll once if it's
         // below the fold on small screens.  Selecting a mode now ARMS it and
         // returns Home (it no longer launches the game directly).
+        // The grid is now in sections (Solo, then Competitive), so the tile
+        // sits below the fold and, in a LazyVGrid, may not exist in the
+        // accessibility tree until it is scrolled near: scroll until it is.
+        let goldRushTile = element("goldrush")
+        _ = element("rollup").waitForExistence(timeout: 5)   // the grid is up
+        for _ in 0..<4 {
+            if goldRushTile.exists && goldRushTile.isHittable { break }
+            app.swipeUp(velocity: .slow)
+        }
         let goldRushButton = entry("goldrush", labeled: "Smash and Grab")
         XCTAssertTrue(goldRushButton.waitForExistence(timeout: 5),
                       "Neither the goldrush identifier nor the 'Smash and Grab' label was found in the Games hub — see the AX-tree attachment")

@@ -775,7 +775,7 @@ struct MinigamesGridView: View {
                                 }
                             }
                             // The link between the two: wins above pay for Gold Rush below.
-                            if section == .competitive {
+                            if section == .competitive && !Self.games(in: .reward).isEmpty {
                                 TicketFlowNote()
                                     .padding(.top, 2)
                             }
