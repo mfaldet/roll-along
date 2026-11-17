@@ -358,7 +358,7 @@ struct SumoSurvivalView: View {
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(r.isPlayer ? .white : Color(white: 0.8))
                         .lineLimit(1)
-                    if r.isPlayer { LevelBadge(level: gameState.highestUnlocked, tiny: true) }
+                    if r.isPlayer { LevelBadge(level: gameState.highestUnlocked, tiny: true, tint: gameState.primaryColor) }
                     Text("\(r.points)")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .monospacedDigit()
@@ -553,7 +553,7 @@ struct SumoSurvivalView: View {
             Text(r.isPlayer ? "YOU" : (rivalLooks[r.id]?.name ?? "Rival"))
                 .font(.system(size: 16, weight: r.isPlayer ? .black : .semibold, design: .rounded))
                 .foregroundStyle(r.isPlayer ? .white : Color(white: 0.82))
-            if r.isPlayer { LevelBadge(level: gameState.highestUnlocked, compact: true) }
+            if r.isPlayer { LevelBadge(level: gameState.highestUnlocked, compact: true, tint: gameState.primaryColor) }
             Spacer()
             Text(trailing)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
