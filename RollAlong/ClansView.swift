@@ -1060,6 +1060,32 @@ struct ClansView: View {
             .background(Capsule().fill(color.opacity(0.16)))
     }
 
+    /// A banner that stays until the player taps it.
+    private func stickyNoticeView(_ text: String) -> some View {
+        VStack {
+            Spacer()
+            Button {
+                withAnimation { stickyNotice = nil }
+            } label: {
+                VStack(spacing: 4) {
+                    Text(text)
+                        .font(.system(.callout, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Text("Tap to dismiss")
+                        .font(.system(.caption2, design: .rounded))
+                        .foregroundStyle(Color(white: 0.6))
+                }
+                .padding(.horizontal, 20).padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.18)))
+                .padding(.horizontal, 20).padding(.bottom, 28)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Dismisses this message.")
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
     private func bannerView(_ text: String) -> some View {
         VStack {
             Spacer()
