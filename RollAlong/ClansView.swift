@@ -55,6 +55,8 @@ struct ClansView: View {
     @State private var settingsClan: Clan?     // non-nil → clan settings sheet
     @State private var chatSending   = false   // a quick-chat post in flight
     @State private var banner: String?
+    /// A notice that stays until tapped (used for "you are no longer in …").
+    @State private var stickyNotice: String?
 
     // Life requests I have already given to (server-read, see
     // SocialClient.fetchMyRequestGiftKeys) — a request can be given to once.
@@ -115,6 +117,7 @@ struct ClansView: View {
             Color(white: 0.08).ignoresSafeArea()
             if !auth.isSignedIn { signedOutState } else { content }
             if let banner { bannerView(banner) }
+            if let stickyNotice { stickyNoticeView(stickyNotice) }
         }
         .navigationTitle("Clans")
         .navigationBarTitleDisplayMode(.inline)
@@ -1142,7 +1145,9 @@ struct ClansView: View {
                         == myId?.uuidString
                     Self.forgetLastClan()
                     if sameAccount {
-                        flash("You are no longer in \(old ?? "your clan"). You were removed, or the clan was disbanded.")
+                        withAnimation {
+                            stickyNotice = "You are no longer in \(old ?? "your clan"). You were removed, or the clan was disbanded."
+                        }
                     }
                 }
                 givenRequestKeys = []

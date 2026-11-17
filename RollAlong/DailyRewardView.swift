@@ -19,6 +19,7 @@ struct DailyRewardView: View {
 
     @State private var celebrate   = false
     @State private var lastAwarded = 0
+    @State private var fitHeight: CGFloat = 420   // content height; set on first layout
 
     private let cycleLength = GameState.dailyRewardLadder.count
 
@@ -33,15 +34,23 @@ struct DailyRewardView: View {
             VStack(spacing: 22) {
                 header
                 ladder
-                Spacer(minLength: 4)
                 footer
             }
             .padding(.horizontal, 22)
             .padding(.top, 28)
             .padding(.bottom, 22)
+            .fixedSize(horizontal: false, vertical: true)
+            // Measure the content so the sheet can be exactly that tall,
+            // like the Get Lives and Get Coins sheets.
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: SheetFitHeightKey.self, value: geo.size.height)
+            })
+            .frame(maxHeight: .infinity, alignment: .top)
         }
-        .presentationDetents([.medium, .large])
+        // Size the sheet to its content; drag down (or tap above) to close.
+        .presentationDetents([.height(fitHeight)])
         .presentationDragIndicator(.visible)
+        .onPreferenceChange(SheetFitHeightKey.self) { fitHeight = max($0, 200) }
     }
 
     // MARK: - Header

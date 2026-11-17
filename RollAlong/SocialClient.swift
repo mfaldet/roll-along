@@ -413,13 +413,16 @@ final class SocialClient: @unchecked Sendable {
     }
 
     /// The players the signed-in player has already sent an ORDINARY life gift
-    /// to today (UTC) — "Send life" allows one per player per day.  Gifts that
+    /// to today (Eastern time) — "Send life" allows one per player per day.  Gifts that
     /// answered a clan request are not included.
     func fetchMyGiftsToday() async -> Set<UUID> {
         guard let me = currentUserId else { return [] }
-        let today = SeasonCalendar.dayKey()
+        // The timestamp carries a "+" or "-" offset; percent-encode it so a
+        // "+" is not read as a space.
+        let since = SeasonCalendar.dayStartTimestamp()
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
         let query = "select=recipient_id,request_at&sender_id=eq.\(me.uuidString)"
-            + "&request_at=is.null&created_at=gte.\(today)&limit=500"
+            + "&request_at=is.null&created_at=gte.\(since)&limit=500"
         guard let data = try? await send(method: "GET", path: "life_gifts", query: query),
               let rows = try? decode([RequestGiftRow].self, from: data) else { return [] }
         return Set(rows.map { $0.recipient })
@@ -1162,20 +1165,20 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     /// cancelled) — the wait before the next one counts from here.
     var livesRequestClosedAt: String? = nil
 
-    /// Levels gained since Monday 00:00 UTC ("+12 this week").  0 when the
+    /// Levels gained since Monday 00:00 Eastern ("+12 this week").  0 when the
     /// stored baseline is from an earlier week (the player has not played
     /// this week) or is absent.
     var levelsThisWeek: Int {
         guard let weekStart, let base = weekStartLevel,
-              weekStart == Self.currentWeekStartUTC() else { return 0 }
+              weekStart == Self.currentWeekStart() else { return 0 }
         return max(0, climbLevel - base)
     }
 
-    /// This week's Monday in UTC as "yyyy-MM-dd" — the same value the
-    /// database computes with date_trunc('week', now() at time zone 'utc').
-    static func currentWeekStartUTC(now: Date = Date()) -> String {
+    /// This week's Monday in Eastern time as "yyyy-MM-dd" — the same value
+    /// the database computes with date_trunc('week', ra_season_now()).
+    static func currentWeekStart(now: Date = Date()) -> String {
         var cal = Calendar(identifier: .iso8601)          // weeks start Monday
-        cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        cal.timeZone = TimeZone(identifier: SeasonCalendar.seasonTimeZoneName) ?? .gmt
         let monday = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? now
         let c = cal.dateComponents([.year, .month, .day], from: monday)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
@@ -1548,20 +1551,20 @@ struct SocialSettings {
     static var current = SocialSettings()
 }
 
-/// Dates for the monthly clan battle.  A season is a calendar month in
-/// Eastern time (America/New_York), named by its first day ("2026-12-01")
-/// exactly as the database names it.
+/// The game's social clock: Eastern time (America/New_York).  Seasons of the
+/// monthly clan battle (calendar months, named by their first day
+/// "2026-12-01" exactly as the database names them), the daily star cap,
+/// weekly pace and the one-gift-per-friend-per-day limit all use it.
 enum SeasonCalendar {
-    private static var utc: Calendar {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-        return cal
-    }
-
-    /// "yyyy-MM-dd" for a date, in UTC.
-    static func dayKey(_ date: Date = Date()) -> String {
-        let c = utc.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    /// The moment today began in Eastern time (midnight America/New_York), as
+    /// a full timestamp with its offset ("2026-11-17T00:00:00-05:00"), ready
+    /// to compare with server timestamps.
+    static func dayStartTimestamp(_ date: Date = Date()) -> String {
+        let start = eastern.startOfDay(for: date)
+        let f = ISO8601DateFormatter()
+        f.timeZone = eastern.timeZone
+        f.formatOptions = [.withInternetDateTime]
+        return f.string(from: start)
     }
 
     /// The clock the monthly clan battle runs on: Eastern time, by its

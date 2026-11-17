@@ -49,7 +49,7 @@ insert into public.ra_config (key, value, note) values
     ('life_request_size',           6,      'Lives one request collects (one per clanmate) before it closes'),
     ('life_request_hours',          24,     'Hours after which an unfilled request closes by itself'),
     ('life_request_cooldown_hours', 6,      'Hours a player waits after a request closes before opening another'),
-    ('gift_per_friend_per_day',     1,      'Ordinary life gifts (not answering a request) one player can send another per UTC day'),
+    ('gift_per_friend_per_day',     1,      'Ordinary life gifts (not answering a request) one player can send another per day (Eastern time)'),
     ('season_min_clan_score',       25,     'A clan needs this season score to be ranked at month end'),
     ('season_min_member_stars',     10,     'A member needs this many season stars for that clan to get a prize'),
     ('season_diamond_min_score',    150,    'Diamond also needs this season score; below it the clan gets Gold'),
@@ -61,9 +61,10 @@ insert into public.ra_config (key, value, note) values
     ('season_prizes_from',          202701, 'First season (yyyymm) that awards coins and counts wins. Earlier seasons are a rehearsal: ranked and shown, no coins, no win')
 on conflict (key) do nothing;
 
--- The clock the monthly clan battle runs on: the current date and time in
--- America/New_York.  A season starts and ends at midnight Eastern, and the
--- daily star cap resets at midnight Eastern.  Using the NAMED zone means
+-- The game's clock: the current date and time in America/New_York.  A season
+-- starts and ends at midnight Eastern; the daily star cap, the weekly pace
+-- (weeks start Monday) and the one-gift-per-friend-per-day limit all reset at
+-- midnight Eastern.  Using the NAMED zone means
 -- daylight saving is handled by the database.  To move the battle to another
 -- zone, change the name here and in `SeasonCalendar` in the app.
 create or replace function public.ra_season_now()
@@ -200,7 +201,7 @@ returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
     season_now timestamp := public.ra_season_now();                               -- Eastern
-    this_week  date      := date_trunc('week', now() at time zone 'utc')::date;   -- Monday, UTC
+    this_week  date      := date_trunc('week', public.ra_season_now())::date;     -- Monday, Eastern
     today      date      := public.ra_season_now()::date;                         -- Eastern day (star cap)
     -- True for requests from the app; false for you in the SQL editor, the
     -- scheduled jobs and the delete-account function.
@@ -432,7 +433,7 @@ declare
     req_size  integer  := public.ra_config_int('life_request_size', 6);
     req_life  interval := public.ra_config_int('life_request_hours', 24) * interval '1 hour';
     per_day   integer  := public.ra_config_int('gift_per_friend_per_day', 1);
-    day_start timestamptz := date_trunc('day', now() at time zone 'utc') at time zone 'utc';
+    day_start timestamptz := date_trunc('day', public.ra_season_now()) at time zone 'America/New_York';  -- midnight Eastern
     so_far    integer;
 begin
     new.request_at := null;                       -- server-owned
@@ -636,7 +637,7 @@ select
     coalesce(sum(p.climb_level) filter (where not p.excluded), 0)::int   as total_levels,
     coalesce(sum(p.total_stars) filter (where not p.excluded), 0)::int   as total_stars,
     coalesce(sum(
-        case when p.week_start = date_trunc('week', now() at time zone 'utc')::date
+        case when p.week_start = date_trunc('week', public.ra_season_now())::date
              then greatest(p.climb_level - p.week_start_level, 0) else 0 end
     ) filter (where not p.excluded), 0)::int                             as week_levels,
     coalesce((select sum(sc.stars)

@@ -160,8 +160,7 @@ struct PaintBallView: View {
                                              color: p.isPlayer ? gameState.primaryColor : Self.paintColors[p.colorIndex],
                                              isPlayer: p.isPlayer,
                                              isLeader: isLeader(p),
-                                             level: p.isPlayer ? gameState.highestUnlocked
-                                                                : (rivalLooks[p.colorIndex]?.level ?? 1))
+                                             level: p.isPlayer ? gameState.highestUnlocked : nil)
                                     .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(p.pos)
@@ -600,7 +599,7 @@ struct PaintBallView: View {
         }
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
-            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count, near: gameState.highestUnlocked)))
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         // Each opponent draws its own skill for the round: one clumsy, one
         // average, one sharp.  (The brains are built on the first tick, so a
         // difficulty picked on the start screen is the one that is used.)

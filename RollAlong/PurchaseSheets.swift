@@ -16,7 +16,7 @@ import StoreKit
 
 /// Reports the natural height of a sheet's content so the sheet can size itself
 /// to fit exactly (no dead space below the last row).
-private struct SheetFitHeightKey: PreferenceKey {
+struct SheetFitHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

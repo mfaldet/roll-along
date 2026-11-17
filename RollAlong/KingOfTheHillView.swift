@@ -143,8 +143,7 @@ struct KingOfTheHillView: View {
                                              color: r.isPlayer ? gameState.primaryColor : Self.palette[r.colorIndex % Self.palette.count],
                                              isPlayer: r.isPlayer,
                                              isLeader: isLeader(r),
-                                             level: r.isPlayer ? gameState.highestUnlocked
-                                                                : (rivalLooks[r.colorIndex]?.level ?? 1))
+                                             level: r.isPlayer ? gameState.highestUnlocked : nil)
                                     .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(r.pos)
@@ -497,7 +496,7 @@ struct KingOfTheHillView: View {
         }
         let rivals = fresh.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
-            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count, near: gameState.highestUnlocked)))
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
         // Each opponent draws its own skill for the round: one clumsy, one
         // average, one sharp.  (The brains are built on the first tick, so a
         // difficulty picked on the start screen is the one that is used.)

@@ -123,8 +123,7 @@ struct GoldRushView: View {
                                              color: r.isPlayer ? gameState.primaryColor : Self.racerColors[r.colorIndex],
                                              isPlayer: r.isPlayer,
                                              isLeader: isLeader(r),
-                                             level: r.isPlayer ? gameState.highestUnlocked
-                                                                : (rivalLooks[r.colorIndex]?.level ?? 1))
+                                             level: r.isPlayer ? gameState.highestUnlocked : nil)
                                     .offset(y: -15).allowsHitTesting(false)
                             }
                             .position(r.pos)
@@ -540,7 +539,7 @@ struct GoldRushView: View {
     private func dealRivalLooks() {
         let rivals = engine.racers.filter { !$0.isPlayer }
         rivalLooks = Dictionary(uniqueKeysWithValues:
-            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count, near: gameState.highestUnlocked)))
+            zip(rivals.map(\.colorIndex), RivalCosmetics.deal(rivals.count)))
     }
 
     private func loadMap() {
