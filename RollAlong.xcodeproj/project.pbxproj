@@ -10,6 +10,7 @@
 		7A0F0001000000000000AA01 /* TrophyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0001000000000000AA00 /* TrophyCatalog.swift */; };
 		7A0F0002000000000000AA02 /* TrophyCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A0F0002000000000000AA00 /* TrophyCatalog.json */; };
 		C11F0001000000000000C102 /* MinigameClips in Resources */ = {isa = PBXBuildFile; fileRef = C11F0001000000000000C100 /* MinigameClips */; };
+		7B0E0001000000000000BB02 /* PreviewReplay.json in Resources */ = {isa = PBXBuildFile; fileRef = 7B0E0001000000000000BB00 /* PreviewReplay.json */; };
 		7A0F0003000000000000AA01 /* TrophyEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0003000000000000AA00 /* TrophyEngine.swift */; };
 		7A0F0004000000000000AA01 /* TrophyStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0004000000000000AA00 /* TrophyStats.swift */; };
 		7A0F0005000000000000AA01 /* TrophyRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0F0005000000000000AA00 /* TrophyRoomView.swift */; };
@@ -118,6 +119,7 @@
 		7A0F0001000000000000AA00 /* TrophyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyCatalog.swift; sourceTree = "<group>"; };
 		7A0F0002000000000000AA00 /* TrophyCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = TrophyCatalog.json; sourceTree = "<group>"; };
 		C11F0001000000000000C100 /* MinigameClips */ = {isa = PBXFileReference; lastKnownFileType = folder; path = MinigameClips; sourceTree = "<group>"; };
+		7B0E0001000000000000BB00 /* PreviewReplay.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = PreviewReplay.json; sourceTree = "<group>"; };
 		7A0F0003000000000000AA00 /* TrophyEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEngine.swift; sourceTree = "<group>"; };
 		7A0F0004000000000000AA00 /* TrophyStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyStats.swift; sourceTree = "<group>"; };
 		7A0F0005000000000000AA00 /* TrophyRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyRoomView.swift; sourceTree = "<group>"; };
@@ -299,6 +301,7 @@
 				7A0F0001000000000000AA00 /* TrophyCatalog.swift */,
 				7A0F0002000000000000AA00 /* TrophyCatalog.json */,
 				C11F0001000000000000C100 /* MinigameClips */,
+				7B0E0001000000000000BB00 /* PreviewReplay.json */,
 				7A0F0003000000000000AA00 /* TrophyEngine.swift */,
 				7A0F0004000000000000AA00 /* TrophyStats.swift */,
 				7A0F0005000000000000AA00 /* TrophyRoomView.swift */,
@@ -476,6 +479,7 @@
 				D502FED62FD5024E00CA86BD /* LevelOverrides.json in Resources */,
 				7A0F0002000000000000AA02 /* TrophyCatalog.json in Resources */,
 				C11F0001000000000000C102 /* MinigameClips in Resources */,
+				7B0E0001000000000000BB02 /* PreviewReplay.json in Resources */,
 				AA000016000000000000AA02 /* Products.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

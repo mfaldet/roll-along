@@ -711,3 +711,46 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Loadout preview recording
+
+/// The bundled preview recording (PreviewReplay.json) must decode and be
+/// playable, or every loadout preview falls back to a still picture.
+final class PreviewReplayTests: XCTestCase {
+
+    func testBundledReplayDecodesAndIsPlayable() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: ReplayStore.bundledName,
+                                                withExtension: "json"),
+                                "PreviewReplay.json is not in the app bundle")
+        let replay = try XCTUnwrap(ReplayStore.decode(try Data(contentsOf: url)))
+        XCTAssertTrue(replay.isUsable)
+        XCTAssertGreaterThan(replay.duration, 3)
+        XCTAssertNotNil(replay.endEventTime, "the run should end at the goal or a pit")
+        for f in replay.frames {
+            XCTAssertTrue((-0.2...1.2).contains(f[1]) && (-0.2...1.2).contains(f[2]))
+        }
+    }
+
+    func testPositionInterpolatesBetweenFrames() throws {
+        let json = """
+        {"version":1,"fps":60,"arenaWidth":100,"arenaHeight":200,"ballRadius":18,
+         "coinRadius":9,"holes":[],"goal":{"x":0.5,"y":0.1},"coins":[],
+         "frames":[[0,0,0,0],[1,1,1,0]],"events":[]}
+        """
+        let replay = try XCTUnwrap(ReplayStore.decode(Data(json.utf8)))
+        let mid = replay.position(at: 0.5)
+        XCTAssertEqual(mid.x, 50, accuracy: 0.001)
+        XCTAssertEqual(mid.y, 100, accuracy: 0.001)
+        XCTAssertEqual(replay.position(at: 5).x, 100, accuracy: 0.001)
+    }
+
+    func testBadFileIsRejected() {
+        XCTAssertNil(ReplayStore.decode(Data("not json".utf8)))
+        let backwards = """
+        {"version":1,"fps":60,"arenaWidth":100,"arenaHeight":200,"ballRadius":18,
+         "coinRadius":9,"holes":[],"goal":{"x":0.5,"y":0.1},"coins":[],
+         "frames":[[1,0,0,0],[0,1,1,0]],"events":[]}
+        """
+        XCTAssertNil(ReplayStore.decode(Data(backwards.utf8)), "time running backwards")
+    }
+}
