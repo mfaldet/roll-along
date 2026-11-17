@@ -235,7 +235,7 @@ final class TrophyToastWiringTests: XCTestCase {
                                            won: true, score: 0)
         gs.endTrophyRun()
 
-        XCTAssertEqual(paid, CoinPayouts.competitiveWin(.normal))
+        XCTAssertEqual(paid, CoinPayouts.competitiveWin)
         XCTAssertNotNil(gs.trophyToasts.presented, "The win still toasts…")
         XCTAssertEqual(gs.coinBalance, before + paid,
                        "…but the toast path grants no coins (D1 never-mint).")

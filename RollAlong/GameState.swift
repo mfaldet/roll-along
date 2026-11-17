@@ -1361,7 +1361,8 @@ final class GameState: ObservableObject {
     /// A Coin Pit round has just been staked (S1-T7).  `tickets` is the count
     /// of time-tickets committed at round START — the view calls this only
     /// after `spendTickets` succeeds, so it never fires on a mid-round refund
-    /// or an aborted stake.  `whimsy_high_roller` latches at ≥5 (§6 item 13).
+    /// or an aborted stake.  `tickets` is the number of TICKETS spent (5 per
+    /// 30-second block).  `whimsy_high_roller` latches at ≥15 — three blocks.
     /// The engine keeps the best observed, so a later smaller stake never
     /// revokes.  Not mode-gated on `recordsClimbResult` (Coin Pit is a `.solo`
     /// unlimited mode); the funnel simply never fires outside the Coin Pit
@@ -2441,7 +2442,7 @@ final class GameState: ObservableObject {
     func addZenSeconds(_ s: Int) {
         guard s > 0 else { return }
         zenSeconds += s
-        let reward = CoinPayouts.zen(seconds: s)   // 1 a minute, ≤ 5 a visit
+        let reward = CoinPayouts.zen(seconds: s)   // 1 a minute, ≤ 3 a visit
         if reward > 0 { addCoins(reward) }
         syncMinigameStats()
         // zen_hour / zen_10_hours ride the cumulative zenSeconds tally (S1-T3).
@@ -2459,13 +2460,12 @@ final class GameState: ObservableObject {
 
     // ── Gold Rush tickets ───────────────────────────────────────────────
     /// ECONOMY: one ticket per competitive-minigame win.  A Gold Rush round
-    /// is bought up front on the stake overlay: each TIME ticket buys 30 s
-    /// on the clock, and you can stake as many as you hold (no per-round
-    /// cap).  The only in-round upsell is the ×2-coins boost — a flat
-    /// 2 tickets, once per round — which doubles the PAYOUT per catch
-    /// (and back-pays the haul caught so far), never the coin count /
-    /// drop density (scaling density tanked the frame rate).  Quitting
-    /// early refunds one TIME ticket per FULL un-played 30 s block;
+    /// is bought up front on the stake overlay: each 30-second block costs
+    /// `CoinPayouts.goldRushTicketCost` (5) tickets, and you can buy as many
+    /// blocks as you can afford.  The only in-round upsell is the ×2-coins
+    /// boost — `CoinPayouts.goldRushBoostTicketCost` (10), once per round —
+    /// which doubles the PAYOUT per catch (and back-pays the haul so far).
+    /// Quitting early refunds the tickets of every FULL un-played 30 s block;
     /// boost tickets never refund.  See docs/gold-rush-economy.md.
     static let maxTicketBalance = 999
     static let goldRushSecondsPerTicket: TimeInterval = 30
@@ -2480,10 +2480,10 @@ final class GameState: ObservableObject {
 
     /// Record a competitive-minigame win: bump that mode's lifetime win tally
     /// and award the customary Gold Rush ticket.  Called from each competitive
-    /// view's win path (replaces the bare `addTickets(1)`).
+    /// view's win path (replaces a bare ticket award).
     func recordCompetitiveWin(_ modeID: String) {
         minigameWins[modeID, default: 0] += 1
-        addTickets(1)
+        addTickets(CoinPayouts.ticketsPerWin)
         syncMinigameStats()   // publish the bumped win tally to the leaderboard
         // The single win choke point — arcade + per-game win trophies (and
         // the Hard high-waters, which read the just-bumped per-difficulty
@@ -3068,34 +3068,40 @@ final class GameState: ObservableObject {
 // ===========================================================================
 // CoinPayouts — EVERY minigame coin payout, in one place (2026-11 rebalance).
 //
-// The rule: a minigame pays 1 to 5 coins per game, about what one Adventure
-// level pays (2–4 for the clear plus up to 3 pickups).  A competitive WIN
-// also earns 1 ticket (`recordCompetitiveWin`, unchanged), and tickets are
-// spent on Gold Rush — the one place to earn a large amount (about 100 coins
-// a round).  Cosmetics cost 750–1,500 coins and are unchanged.
+// The rule (round 2): a minigame pays 1 to 3 coins per game, matching one
+// Adventure level's floor pickups.  A competitive WIN also earns 1 ticket,
+// and 5 tickets buy a Gold Rush round — the one place to earn a large amount
+// (about 100 coins a round).  Cosmetics cost 750–1,500 coins and are
+// unchanged.
 //
 // To retune: change a number here and rebuild.  Nothing else in the app
 // computes a minigame coin amount.
 // ===========================================================================
 enum CoinPayouts {
 
+    // Every minigame pays AT MOST 3 coins — about what one Adventure level
+    // pays from its floor pickups.  Gold Rush (paid for with tickets) is the
+    // one place to earn more.  Change a number here and rebuild; nothing else
+    // computes a minigame payout.
+
+    /// The most any one minigame game pays.
+    static let minigameMax = 3
+
     // ---- Competitive minigames (Comet Clash, Sumo Survival, Paint Ball,
     //      Smash and Grab, Marble Cup, King of the Hill) -------------------
+    //      The same on every difficulty.
 
-    /// A win (1st place) by difficulty.  Plus 1 ticket.
-    static func competitiveWin(_ difficulty: MinigameDifficulty) -> Int {
-        switch difficulty {
-        case .easy:   return 3
-        case .normal: return 4
-        case .hard:   return 5
-        }
-    }
-    /// Not first, but not last (2nd of 4).  Any difficulty.
+    /// A win (1st place).  Plus `ticketsPerWin` ticket.
+    static let competitiveWin = 3
+    /// Not a win and not last — any middle place, and a non-winning first
+    /// place (e.g. King of the Hill when nobody held the zone).
     static let competitiveRunnerUp = 2
-    /// A Marble Cup draw after sudden death.  Any difficulty.
+    /// A Marble Cup draw after sudden death.
     static let competitiveDraw = 2
-    /// Last place, or any other loss.  Any difficulty.
+    /// Last place, or any other loss.
     static let competitiveLoss = 1
+    /// Tickets for a competitive win.
+    static let ticketsPerWin = 1
 
     /// How many places a game has: Marble Cup is you against one side;
     /// the others are you against three.
@@ -3104,48 +3110,63 @@ enum CoinPayouts {
     }
 
     /// Coins for one competitive game.  `placement` is 1-based (nil when the
-    /// game did not report one).
+    /// game did not report one).  `difficulty` no longer changes the amount;
+    /// it is kept so callers need not change.
     static func competitive(modeID: String, won: Bool, draw: Bool = false,
                             placement: Int?, difficulty: MinigameDifficulty) -> Int {
-        if won { return competitiveWin(difficulty) }
+        if won { return competitiveWin }
         if draw { return competitiveDraw }
-        // Not a win but not last either — including a non-winning first place,
-        // e.g. King of the Hill when nobody held the zone.
         if let placement, placement >= 1, placement < fieldSize(modeID) { return competitiveRunnerUp }
         return competitiveLoss
     }
 
-    // ---- Solo minigames -------------------------------------------------
+    // ---- Solo minigames (1 to 3 coins) ----------------------------------
 
-    /// Roll Up: 1 coin, plus 1 per `rollUpMetersPerCoin` meters climbed, up to 5.
-    static let rollUpMetersPerCoin = 40
+    /// Roll Up: 1 coin for any climb, 2 from `rollUpMetersForTwo` meters,
+    /// 3 from `rollUpMetersForThree`.  (0 m pays nothing.)
+    static let rollUpMetersForTwo = 60
+    static let rollUpMetersForThree = 150
     static func rollUp(meters: Int) -> Int {
         guard meters > 0 else { return 0 }
-        return min(5, 1 + meters / rollUpMetersPerCoin)
+        if meters >= rollUpMetersForThree { return 3 }
+        if meters >= rollUpMetersForTwo { return 2 }
+        return 1
     }
 
-    /// Disco Ball: 1 coin, plus 1 per `discoCrossingsPerCoin` crossings, up to 5.
-    static let discoCrossingsPerCoin = 4
+    /// Disco Ball: 1 coin for any crossing, 2 from `discoCrossingsForTwo`,
+    /// 3 from `discoCrossingsForThree`.
+    static let discoCrossingsForTwo = 5
+    static let discoCrossingsForThree = 12
     static func disco(crossings: Int) -> Int {
         guard crossings > 0 else { return 0 }
-        return min(5, 1 + crossings / discoCrossingsPerCoin)
+        if crossings >= discoCrossingsForThree { return 3 }
+        if crossings >= discoCrossingsForTwo { return 2 }
+        return 1
     }
 
-    /// Zen Garden: 1 coin per full minute in the garden, up to 5 a visit.
-    static func zen(seconds: Int) -> Int { min(5, max(0, seconds / 60)) }
+    /// Zen Garden: 1 coin per full `zenSecondsPerCoin` in the garden, up to 3
+    /// a visit.
+    static let zenSecondsPerCoin = 60
+    static func zen(seconds: Int) -> Int { min(minigameMax, max(0, seconds / zenSecondsPerCoin)) }
 
     /// Roll Out (held back from 1.0): per maze cleared.
     static let rollOutClear = 3
 
-    /// A new personal best in a minigame no longer pays a bonus (it was 100
-    /// coins, far more than a game).  The best is still recorded and shown.
+    /// A new personal best in a minigame no longer pays a bonus.  The best is
+    /// still recorded and shown.
     static let personalBestBonus = 0
 
     // ---- Gold Rush (paid for with tickets) ------------------------------
 
-    /// Each coin caught is worth this much (×2 after the in-round ×2 buy).
-    /// One time ticket drops 100 coins over 30 seconds, so a strong round
-    /// catches 80–100 and an average round about 50–70.
+    /// Tickets for one Gold Rush round (30 seconds of falling coins).  Five
+    /// competitive wins buy one round.  Each extra 30 seconds costs the same.
+    static let goldRushTicketCost = 5
+    /// Tickets for the in-round ×2-coins boost: two rounds' worth, as before
+    /// (it was 2 tickets when a round cost 1).
+    static let goldRushBoostTicketCost = 2 * goldRushTicketCost
+    /// Each coin caught is worth this much (×2 after the boost).  One round
+    /// drops 100 coins over 30 seconds, so a strong round catches 80–100 and
+    /// an average round about 50–70.  (BallGameView's `coinPitPayoutPerCoin`.)
     static let goldRushPerCoin = 1
 }
 
@@ -3169,7 +3190,7 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
 
     /// Short payout descriptor for the pre-game picker: what a WIN pays.
     var payoutLabel: String {
-        "Win: \(CoinPayouts.competitiveWin(self)) coins + 1 ticket"
+        "Win: \(CoinPayouts.competitiveWin) coins + 1 ticket"
     }
 
     /// The win rate each difficulty is designed to land near for an average

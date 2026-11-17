@@ -178,3 +178,85 @@ pack now stands for about twice as many days of mixed play, so packs look
 better value against grinding minigames. The two largest packs now equal
 more than three months of mixed play; consider whether they are still
 needed at 1.0.
+
+---
+
+## Round 2 (built, 2026-11-17)
+
+The ticket route was still far faster than Adventure (about 1,300 coins an
+hour against 280). Changes, all in `CoinPayouts` (`RollAlong/GameState.swift`)
+unless noted:
+
+- **Every minigame pays at most 3 coins.** Competitive, on every difficulty:
+  win 3 (+1 ticket), any middle place 2 (including a non-winning first place),
+  last 1, Marble Cup draw 2. Solo: Roll Up 1 / 2 from 60 m / 3 from 150 m;
+  Disco Ball 1 / 2 from 5 crossings / 3 from 12; Zen Garden 1 a minute, up
+  to 3 a visit. A new best pays no bonus.
+- **Gold Rush costs 5 tickets a round** (each extra 30 seconds also 5; the
+  ×2 boost 10; an early quit refunds 5 per full un-played block). Payout
+  unchanged: 1 per coin caught, up to about 100 a round. "Can't play" now
+  means fewer than 5 tickets.
+- **Clan battle prizes** (defaults in `docs/social-schema-v5.sql`): Diamond
+  1,000, Gold 500, Silver 250, Bronze 100.
+- **Working Capital**: 2,500 coins earned from play.
+- **High Roller** (secret): 15 tickets on one round (three 30-second blocks);
+  at 5 tickets a round, the old "5 tickets" would have latched on every round.
+
+### Assumptions (as before)
+
+Adventure level 45 s, 3.5 coins. Competitive game 80 s. Gold Rush round
+about 60 s including the stake screen, about 70 coins. Daily reward 15 a
+day. Win rates are the targets in `MinigameDifficulty.targetWinRate`: Easy
+70%, Normal 50%, Hard 30%. A loss is a middle place two times in three
+(2 coins) and last one time in three (1 coin): 1.67 coins on average.
+
+### Coins per competitive game
+
+| | Win rate | Coins per game |
+|---|---|---|
+| Easy | 70% | 0.7 × 3 + 0.3 × 1.67 = 2.60 |
+| Normal | 50% | 0.5 × 3 + 0.5 × 1.67 = 2.33 |
+| Hard | 30% | 0.3 × 3 + 0.7 × 1.67 = 2.07 |
+
+### Tickets per hour (competitive games only)
+
+3,600 ÷ 80 = 45 games an hour. Easy 45 × 0.7 = **31.5**, Normal 45 × 0.5 =
+**22.5**, Hard 45 × 0.3 = **13.5** tickets an hour.
+
+### Coins per hour
+
+| Player | Cycle | Coins per cycle | Per hour, after | Before |
+|---|---|---|---|---|
+| Adventure only | 1 level = 45 s | 3.5 | 3,600 ÷ 45 × 3.5 = **280** | 280 |
+| Ticket loop, Easy | 5 ÷ 0.7 = 7.1 games (571 s) + 1 Gold Rush (60 s) = 631 s | 7.1 × 2.60 + 70 = 88.6 | 88.6 × 3,600 ÷ 631 = **505** | about 1,300 |
+| Ticket loop, Normal | 10 games (800 s) + 60 s = 860 s | 10 × 2.33 + 70 = 93.3 | **391** | about 1,300 |
+| Ticket loop, Hard | 16.7 games (1,333 s) + 60 s = 1,393 s | 16.7 × 2.07 + 70 = 104.5 | **270** | about 1,300 |
+| Mix: half Adventure, half Normal loop | | | (280 + 391) ÷ 2 = **335** | about 790 |
+
+The ticket loop on Normal is now about 1.4 times Adventure, not 4.6 times;
+on Hard it is slightly below Adventure.
+
+### Days to a 1,000-coin cosmetic at 20 minutes a day (daily reward included)
+
+| Player | Coins a day | Days, after | Days, before |
+|---|---|---|---|
+| Adventure only | 280 ÷ 3 + 15 = 108 | **9.2** | 9.2 |
+| Ticket loop, Easy | 505 ÷ 3 + 15 = 183 | **5.5** | about 1.3 to 2.5 |
+| Ticket loop, Normal | 391 ÷ 3 + 15 = 145 | **6.9** | about 2.5 |
+| Ticket loop, Hard | 270 ÷ 3 + 15 = 105 | **9.5** | |
+| Mix (10 min Adventure + 10 min Normal loop) | 46.7 + 65.2 + 15 = 127 | **7.9** | 4.6 |
+
+Tickets carry over between days, so a 20-minute session that ends partway
+through a 14-minute Normal cycle loses nothing.
+
+### Trophies under round 2
+
+- **Working Capital (2,500 from play):** about 23 days Adventure only, 20 for
+  the mix, 17 on the Normal loop.
+- **Pit Boss (2,500 caught in Gold Rush):** about 36 rounds at 70 a round =
+  180 tickets = 360 Normal games. That is about 26 days of 20-minute Normal
+  ticket-loop play, or about 51 days for the mix. Still reachable, but slow
+  for a Silver. Suggest lowering to **1,000** (about 14 rounds, 10 days on the
+  Normal loop) — not changed.
+- **Pit Stop** (play one Gold Rush round) now needs 5 wins first; fine.
+- **Cloudburst** (90 in one round) is unaffected.

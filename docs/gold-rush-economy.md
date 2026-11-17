@@ -1,3 +1,10 @@
+> **Updated 2026-11-17 (rebalance round 2):** a Gold Rush round now costs
+> **5 tickets** per 30-second block (`CoinPayouts.goldRushTicketCost`), the
+> ×2 boost costs **10** (`CoinPayouts.goldRushBoostTicketCost`), an early
+> quit refunds 5 tickets per full un-played block, and the round needs at
+> least 5 tickets to start. Older figures below that say "1 ticket per
+> 30 s" or "2 tickets for ×2" are superseded.
+
 # Gold Rush — Ticket Economy
 
 Gold Rush (internally the **Coin Pit**, a `.collectCount` mode) is the

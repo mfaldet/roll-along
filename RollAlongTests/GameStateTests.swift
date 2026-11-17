@@ -85,12 +85,31 @@ final class GameStateTests: XCTestCase {
 
     // MARK: - Minigame difficulty (payout scaling + success tracking)
 
-    // 2026-11 rebalance: a minigame pays 1–5 coins (`CoinPayouts`).
+    // 2026-11 rebalance, round 2: a minigame pays 1–3 coins and Gold Rush costs 5 tickets (`CoinPayouts`).
+
+    func testGoldRushCostsFiveTicketsAndTheBoostTwoRounds() {
+        XCTAssertEqual(CoinPayouts.goldRushTicketCost, 5)
+        XCTAssertEqual(CoinPayouts.goldRushBoostTicketCost, 10)
+        XCTAssertEqual(CoinPayouts.ticketsPerWin, 1)
+        XCTAssertEqual(CoinPayouts.minigameMax, 3)
+        // Five wins buy exactly one round.
+        let gs = makeGameState()
+        let start = gs.tickets
+        _ = gs.spendTickets(start)
+        for _ in 0..<5 {
+            gs.recordMinigameResult(modeID: "sumo", difficulty: .normal, won: true, score: 0, placement: 1)
+        }
+        XCTAssertEqual(gs.tickets, CoinPayouts.goldRushTicketCost)
+        XCTAssertTrue(gs.spendTickets(CoinPayouts.goldRushTicketCost))
+        XCTAssertEqual(gs.tickets, 0)
+    }
 
     func testCompetitivePayout_winByDifficultyAndPlacements() {
-        XCTAssertEqual(CoinPayouts.competitiveWin(.easy),   3)
-        XCTAssertEqual(CoinPayouts.competitiveWin(.normal), 4)
-        XCTAssertEqual(CoinPayouts.competitiveWin(.hard),   5)
+        XCTAssertEqual(CoinPayouts.competitiveWin, 3)
+        for d in MinigameDifficulty.allCases {
+            XCTAssertEqual(CoinPayouts.competitive(modeID: "sumo", won: true, placement: 1, difficulty: d), 3,
+                           "a win pays 3 on every difficulty")
+        }
         // 2nd of 4 (not last) pays 2; last pays 1 — at every difficulty.
         for d in MinigameDifficulty.allCases {
             XCTAssertEqual(CoinPayouts.competitive(modeID: "sumo", won: false, placement: 2, difficulty: d), 2)
@@ -103,23 +122,29 @@ final class GameStateTests: XCTestCase {
         }
     }
 
-    func testEveryMinigamePayoutStaysWithinOneToFive() {
+    func testEveryMinigamePayoutStaysWithinOneToThree() {
         for d in MinigameDifficulty.allCases {
             for id in ["snake", "sumo", "paintball", "goldrush", "marblecup", "koth"] {
                 for place in [nil, 1, 2, 3, 4] as [Int?] {
                     for won in [true, false] {
                         let c = CoinPayouts.competitive(modeID: id, won: won, placement: place, difficulty: d)
-                        XCTAssertTrue((1...5).contains(c), "\(id) \(d) \(String(describing: place)) won=\(won) paid \(c)")
+                        XCTAssertTrue((1...3).contains(c), "\(id) \(d) \(String(describing: place)) won=\(won) paid \(c)")
                     }
                 }
             }
         }
-        for m in [1, 39, 40, 120, 500, 10_000] { XCTAssertTrue((1...5).contains(CoinPayouts.rollUp(meters: m))) }
-        for c in [1, 4, 15, 300] { XCTAssertTrue((1...5).contains(CoinPayouts.disco(crossings: c))) }
+        for m in [1, 59, 60, 149, 150, 10_000] { XCTAssertTrue((1...3).contains(CoinPayouts.rollUp(meters: m))) }
+        for c in [1, 4, 5, 11, 12, 300] { XCTAssertTrue((1...3).contains(CoinPayouts.disco(crossings: c))) }
+        XCTAssertEqual(CoinPayouts.rollUp(meters: 59), 1)
+        XCTAssertEqual(CoinPayouts.rollUp(meters: 60), 2)
+        XCTAssertEqual(CoinPayouts.rollUp(meters: 150), 3)
+        XCTAssertEqual(CoinPayouts.disco(crossings: 4), 1)
+        XCTAssertEqual(CoinPayouts.disco(crossings: 5), 2)
+        XCTAssertEqual(CoinPayouts.disco(crossings: 12), 3)
         XCTAssertEqual(CoinPayouts.rollUp(meters: 0), 0)
         XCTAssertEqual(CoinPayouts.disco(crossings: 0), 0)
         XCTAssertEqual(CoinPayouts.zen(seconds: 59), 0)
-        XCTAssertEqual(CoinPayouts.zen(seconds: 60 * 30), 5)
+        XCTAssertEqual(CoinPayouts.zen(seconds: 60 * 30), 3)
         XCTAssertEqual(GameState.minigameBestBonus, 0, "a new best no longer pays a bonus")
     }
 

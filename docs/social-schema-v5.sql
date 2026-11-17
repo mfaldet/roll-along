@@ -55,11 +55,13 @@ insert into public.ra_config (key, value, note) values
     ('season_min_member_stars',     10,     'A member needs this many season stars for that clan to get a prize'),
     ('season_diamond_min_score',    150,    'Diamond also needs this season score; below it the clan gets Gold'),
     ('season_small_field',          20,     'With fewer ranked clans than this, tiers go by rank (1 / 2-3 / 4-8 / rest), not percentile'),
-    ('season_coins_diamond',        3000,   'Prize per eligible member'),
-    ('season_coins_gold',           1500,   'Prize per eligible member'),
-    ('season_coins_silver',         750,    'Prize per eligible member'),
-    ('season_coins_bronze',         250,    'Prize per eligible member'),
+    ('season_coins_diamond',        1000,   'Prize per eligible member (about one cosmetic)'),
+    ('season_coins_gold',           500,    'Prize per eligible member'),
+    ('season_coins_silver',         250,    'Prize per eligible member'),
+    ('season_coins_bronze',         100,    'Prize per eligible member'),
     ('season_prizes_from',          202701, 'First season (yyyymm) that awards coins and counts wins. Earlier seasons are a rehearsal: ranked and shown, no coins, no win')
+-- NOTE: "do nothing" keeps a value already in the table.  On a database where
+-- this file was run before, change the four season_coins_* rows by hand.
 on conflict (key) do nothing;
 
 -- The game's clock: the current date and time in America/New_York.  A season
@@ -502,10 +504,10 @@ declare
     min_member  integer := public.ra_config_int('season_min_member_stars', 10);
     diamond_min integer := public.ra_config_int('season_diamond_min_score', 150);
     small_field integer := public.ra_config_int('season_small_field', 20);
-    c_diamond   integer := public.ra_config_int('season_coins_diamond', 3000);
-    c_gold      integer := public.ra_config_int('season_coins_gold', 1500);
-    c_silver    integer := public.ra_config_int('season_coins_silver', 750);
-    c_bronze    integer := public.ra_config_int('season_coins_bronze', 250);
+    c_diamond   integer := public.ra_config_int('season_coins_diamond', 1000);
+    c_gold      integer := public.ra_config_int('season_coins_gold', 500);
+    c_silver    integer := public.ra_config_int('season_coins_silver', 250);
+    c_bronze    integer := public.ra_config_int('season_coins_bronze', 100);
     prizes_from integer := public.ra_config_int('season_prizes_from', 202701);
     with_prizes boolean := (extract(year from s)::int * 100 + extract(month from s)::int) >= prizes_from;
     n           integer;

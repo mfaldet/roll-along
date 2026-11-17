@@ -702,39 +702,39 @@ struct ModeTutorial {
                          reward: "A calm, perfect line carved in the sand.")
         case "coinpit":   // displayed "Gold Rush" — the 30s reward run
             return .init(controls: "Tilt to roll around the floor.",
-                         goal: "Scoop up as many coins as you can in 30 seconds.",
+                         goal: "Scoop up as many coins as you can in 30 seconds. A round costs 5 tickets.",
                          hazard: "Only the clock — nothing can hurt you.",
-                         reward: "Every coin you grab banks straight to your balance.")
+                         reward: "Every coin you grab banks straight to your balance — up to about 100 a round.")
         case "goldrush":  // displayed "Smash and Grab" — the 60s competitive scramble
             return .init(controls: "Tilt to roll and chase the coins. Tap to charge forward.",
                          goal: "Grab the most coins of anyone in 60 seconds.",
                          hazard: "Charge into rivals to make them spill — and dodge theirs.",
-                         reward: "A few coins for playing; win to earn a ticket for Gold Rush.")
+                         reward: "1 to 3 coins; a win earns a ticket (5 tickets buy a Gold Rush round).")
         case "snake":     // Comet Clash
             return .init(controls: "Tilt to steer your comet.",
                          goal: "Be the last comet still glowing.",
                          hazard: "Touch ANY glowing wall — yours or theirs — and you're out.",
-                         reward: "Outlast everyone to win a ticket for Gold Rush, plus a few coins.")
+                         reward: "1 to 3 coins; outlast everyone to win a ticket (5 tickets buy a Gold Rush round).")
         case "sumo":
             return .init(controls: "Tilt to charge and ram.",
                          goal: "Outlast three rivals over three rounds — last marble standing scores most.",
                          hazard: "Get shoved off the shrinking ring and you sit out the rest of the round.",
-                         reward: "A few coins for your placing; 1st wins a ticket for Gold Rush.")
+                         reward: "1 to 3 coins by placing; 1st wins a ticket (5 tickets buy a Gold Rush round).")
         case "paintball":
             return .init(controls: "Tilt to roll — you paint the floor as you go.",
                          goal: "Cover the most floor in your color in 60 seconds.",
                          hazard: "Roll through a puddle and you're frozen for 3 seconds.",
-                         reward: "A few coins for your placing; 1st wins a ticket for Gold Rush.")
+                         reward: "1 to 3 coins by placing; 1st wins a ticket (5 tickets buy a Gold Rush round).")
         case "marblecup":
             return .init(controls: "Tilt to roll into the ball.",
                          goal: "Knock the ball into their net — most goals in 60 seconds wins.",
                          hazard: "A defending AI guards the goal and counterattacks.",
-                         reward: "A few coins for playing; a win earns a ticket for Gold Rush.")
+                         reward: "1 to 3 coins; a win earns a ticket (5 tickets buy a Gold Rush round).")
         case "koth":      // King of the Hill
             return .init(controls: "Tilt to roll into the glowing zone.",
                          goal: "Hold the moving hill — alone — the longest.",
                          hazard: "A rival in the zone makes it contested: nobody scores.",
-                         reward: "A few coins for your placing; 1st wins a ticket for Gold Rush.")
+                         reward: "1 to 3 coins by placing; 1st wins a ticket (5 tickets buy a Gold Rush round).")
         case "rollout":
             return .init(controls: "Tilt to roll the tiny ball through the maze.",
                          goal: "Reach the flag at the top of each maze.",
@@ -744,12 +744,12 @@ struct ModeTutorial {
             return .init(controls: "Tilt to steer left/right. Tap to jump.",
                          goal: "Climb the floating platforms as high as you can.",
                          hazard: "Fall off the bottom and the run ends — costing a life.",
-                         reward: "Up to 5 coins, more the higher you climb.")
+                         reward: "1 to 3 coins, more the higher you climb.")
         case "disco":
             return .init(controls: "Pick Easy, Normal or Hardcore, then tilt to roll. Memorize the lit path before you cross.",
                          goal: "Roll between the safe zones, back and forth, as many times as you can.",
                          hazard: "Touch a tile that isn't on the lit path and the run is over. On Hardcore the path shows only once.",
-                         reward: "Up to 5 coins, more the more crossings you make.")
+                         reward: "1 to 3 coins, more the more crossings you make.")
         default:
             return nil
         }
