@@ -172,22 +172,17 @@ struct FriendsView: View {
         )
     }
 
-    // MARK: - Invite (share a deep link so a friend can add you)
+    // MARK: - Invite (share the invite message so a friend can add you)
 
-    /// A `rollalong://player/<my id>` link a friend taps to open your profile
-    /// and add you back.  Only shown when signed in (so there's an id to share).
+    /// Shares `InviteMessage`: your friend code and the download link.  Only
+    /// shown when signed in.
     @ViewBuilder
     private var inviteRow: some View {
-        if let me = myId {
-            let link = URL(string: "rollalong://player/\(me.uuidString)")!
-            // The message carries the friend code too: the link only opens
-            // where the app is installed, and many messaging apps do not make
-            // a rollalong:// link tappable, but a code can be typed anywhere.
-            ShareLink(item: link,
-                      subject: Text("Add me on Roll Along"),
-                      message: Text(myFriendCode.map {
-                          "Come on, Roll Along with me! My friend code is \(FriendCode.display($0)) (Friends → Add by code)."
-                      } ?? "Come on, Roll Along with me!")) {
+        if myId != nil {
+            // One shared message (`InviteMessage`), the same as Profile →
+            // Share Profile: the friend code (typed on Friends → Add by code)
+            // and the download link.
+            ShareLink(item: InviteMessage.text(friendCode: myFriendCode)) {
                 HStack(spacing: 10) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 15, weight: .semibold))
@@ -195,7 +190,7 @@ struct FriendsView: View {
                         Text("Invite a friend")
                             .font(.system(.body, design: .rounded).weight(.semibold))
                             .foregroundStyle(.white)
-                        Text("Share a link so they can add you")
+                        Text("Send your friend code and a download link")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.6))
                     }
@@ -961,34 +956,38 @@ struct FriendCodeCard: View {
     var body: some View {
         VStack(spacing: 0) {
             if auth.isSignedIn, let code {
-                HStack(spacing: 10) {
-                    Text("Friend code")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(white: 0.55))
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline) {
+                        // Same title style as "My Loadout" and "Trophies".
+                        Text("Friend Code")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Spacer(minLength: 8)
+                        Button {
+                            UIPasteboard.general.string = FriendCode.display(code)
+                            copied = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(copied ? "Copied" : "Copy")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Capsule().fill(Color(white: 0.20)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(copied ? "Copied" : "Copy friend code")
+                    }
                     Text(FriendCode.display(code))
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white)
                         .textSelection(.enabled)
-                    Spacer(minLength: 6)
-                    Button {
-                        UIPasteboard.general.string = FriendCode.display(code)
-                        copied = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 12, weight: .semibold))
-                            Text(copied ? "Copied" : "Copy")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(Capsule().fill(Color(white: 0.20)))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(copied ? "Copied" : "Copy friend code")
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.11)))
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .profileCard()          // the same rim as the other Profile cards
                 .accessibilityElement(children: .contain)
             }
         }
@@ -997,5 +996,29 @@ struct FriendCodeCard: View {
             copied = false
             code = auth.isSignedIn ? await SocialClient.shared.fetchMyFriendCode() : nil
         }
+    }
+}
+
+/// The invite message, shared by Friends → Invite a friend and Profile →
+/// Share Profile, so the two never differ.
+enum InviteMessage {
+    /// Where "Download Roll Along" points: the app's page on the project
+    /// website.  Before launch that page must be changed to send visitors to
+    /// the App Store listing (see docs/site/index.html).
+    static let downloadURL = "https://mfaldet.github.io/roll-along/"
+
+    /// The exact text sent.  With a friend code:
+    ///   Come, Roll Along with me!
+    ///   My Friend Code is AF3K-7MXY (Friends → Add by code).
+    ///   Download Roll Along: https://mfaldet.github.io/roll-along/
+    /// Without one (signed out, or before the server has codes), the middle
+    /// line is left out.
+    static func text(friendCode: String?) -> String {
+        var lines = ["Come, Roll Along with me!"]
+        if let code = friendCode, !code.isEmpty {
+            lines.append("My Friend Code is \(FriendCode.display(code)) (Friends → Add by code).")
+        }
+        lines.append("Download Roll Along: \(downloadURL)")
+        return lines.joined(separator: "\n")
     }
 }

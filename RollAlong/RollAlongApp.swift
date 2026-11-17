@@ -67,14 +67,19 @@ struct RollAlongApp: App {
                         let coins = state.totalCoins
                         let lives = state.totalLives
                         Task {
-                            try? await SocialClient.shared.upsertMyProfile(
-                                displayName:     name,
-                                climbLevel:      level,
-                                highestUnlocked: level,
-                                totalStars:      stars,
-                                coinsCollected:  coins,
-                                lives:           lives
-                            )
+                            // Logged, not silently dropped, if the save fails.
+                            do {
+                                _ = try await SocialClient.shared.upsertMyProfile(
+                                    displayName:     name,
+                                    climbLevel:      level,
+                                    highestUnlocked: level,
+                                    totalStars:      stars,
+                                    coinsCollected:  coins,
+                                    lives:           lives
+                                )
+                            } catch {
+                                print("[RollAlong] Profile save after sign-in failed: \(error)")
+                            }
                             // After the row exists: accent color and ball.
                             await MainActor.run { state.syncMyLook() }
                         }

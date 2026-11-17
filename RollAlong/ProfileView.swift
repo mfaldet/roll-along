@@ -21,6 +21,10 @@ struct ProfileView: View {
     @State private var loadoutListHeight: CGFloat = 200
     /// The nickname picker (moved here from Settings).
     @State private var showNicknamePicker = false
+    @ObservedObject private var auth = AppleAuthManager.shared
+    /// The player's friend code, for the share message (nil until the server
+    /// has one).
+    @State private var myFriendCode: String?
 
     // ── Derived convenience ────────────────────────────────────────────────
     private var levelsCompleted: Int  { max(0, gameState.highestUnlocked - 1) }
@@ -67,6 +71,10 @@ struct ProfileView: View {
             for: .navigationBar
         )
         .toolbarColorScheme(.dark, for: .navigationBar)
+        // The friend code, for the share message.
+        .task(id: auth.isSignedIn) {
+            myFriendCode = auth.isSignedIn ? await SocialClient.shared.fetchMyFriendCode() : nil
+        }
     }
 
     // =========================================================================
@@ -98,74 +106,26 @@ struct ProfileView: View {
                             font: .system(size: 26, weight: .bold, design: .rounded),
                             tint: gameState.primaryColor)
 
-            // ── Nickname and Accent Color (moved here from Settings) ──────
-            HStack(spacing: 10) {
-                Button { showNicknamePicker = true } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Nickname")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(Capsule().fill(Color(white: 0.17))
-                        .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Change nickname")
-                .accessibilityHint("Pick two preset words for your name.")
-
-                HStack(spacing: 8) {
-                    // The system color well: a tap opens the color picker.
-                    ColorPicker("Accent color",
-                                selection: Binding(get: { gameState.primaryColor },
-                                                   set: { gameState.primaryColor = $0 }),
-                                supportsOpacity: false)
-                        .labelsHidden()
-                        .frame(width: 28, height: 28)
-                    Text("Accent Color")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                }
-                .padding(.leading, 8).padding(.trailing, 14).padding(.vertical, 4)
-                .background(Capsule().fill(Color(white: 0.17))
-                    .overlay(Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)))
-                .accessibilityElement(children: .contain)
-            }
-            .sheet(isPresented: $showNicknamePicker) {
-                NicknamePickerSheet().environmentObject(gameState)
-            }
-
             // Lives count and global Rank were removed here — Rank is being
-            // replaced by nuanced awards/titles.
+            // replaced by nuanced awards/titles.  Above the line the header is
+            // static (ball, name, level); the controls sit below it.
 
             Divider()
                 .background(Color(white: 0.22))
                 .padding(.horizontal, 4)
 
-            // ── Share button ─────────────────────────────────────────────
-            ShareLink(
-                item: shareText,
-                preview: SharePreview(
-                    "My Roll Along Profile",
-                    icon: Image(systemName: "circle.fill")
-                )
-            ) {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Share Profile")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+            // ── Nickname · Accent Color · Share Profile ───────────────────
+            // One row when it fits, else Nickname and Accent Color on one line
+            // with Share Profile under them.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { nicknameButton; accentControl; shareButton }
+                VStack(spacing: 10) {
+                    HStack(spacing: 8) { nicknameButton; accentControl }
+                    shareButton
                 }
-                .foregroundStyle(Color(white: 0.75))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 9)
-                .background(
-                    Capsule()
-                        .fill(Color(white: 0.15))
-                        .overlay(Capsule().stroke(Color(white: 0.26), lineWidth: 0.8))
-                )
+            }
+            .sheet(isPresented: $showNicknamePicker) {
+                NicknamePickerSheet().environmentObject(gameState)
             }
         }
         .frame(maxWidth: .infinity)
@@ -174,14 +134,66 @@ struct ProfileView: View {
         .profileCard()
     }
 
-    private var shareText: String {
-        """
-        My Roll Along stats 🎱
-        Top level \(gameState.currentLevel)
-        ⭐ \(gameState.totalStars) stars earned
-        🔥 \(gameState.liveStreak)-day streak
-        🎨 \(gameState.completedBundleIDs.count) bundle\(gameState.completedBundleIDs.count == 1 ? "" : "s") complete
-        """
+    /// The same message as Friends → Invite a friend (`InviteMessage`).
+    private var shareText: String { InviteMessage.text(friendCode: myFriendCode) }
+
+    private var nicknameButton: some View {
+        Button { showNicknamePicker = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 12, weight: .bold))
+                Text("Nickname")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(Color(white: 0.75))
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(Capsule().fill(Color(white: 0.15))
+                .overlay(Capsule().stroke(Color(white: 0.26), lineWidth: 0.8)))
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel("Change nickname")
+        .accessibilityHint("Pick two preset words for your name.")
+    }
+
+    private var accentControl: some View {
+        HStack(spacing: 6) {
+            // The system color well: a tap opens the color picker.
+            ColorPicker("Accent color",
+                        selection: Binding(get: { gameState.primaryColor },
+                                           set: { gameState.primaryColor = $0 }),
+                        supportsOpacity: false)
+                .labelsHidden()
+                .frame(width: 24, height: 24)
+            Text("Accent Color")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(white: 0.75))
+        }
+        .padding(.leading, 6).padding(.trailing, 14).padding(.vertical, 5)
+        .background(Capsule().fill(Color(white: 0.15))
+            .overlay(Capsule().stroke(Color(white: 0.26), lineWidth: 0.8)))
+        .fixedSize()
+        .accessibilityElement(children: .contain)
+    }
+
+    private var shareButton: some View {
+        ShareLink(item: shareText) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Share Profile")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(Color(white: 0.75))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(
+                Capsule()
+                    .fill(Color(white: 0.15))
+                    .overlay(Capsule().stroke(Color(white: 0.26), lineWidth: 0.8))
+            )
+        }
+        .fixedSize()
     }
 
     // =========================================================================
@@ -208,7 +220,7 @@ struct ProfileView: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
                 }
-                .foregroundStyle(AccentColor.readable(gameState.primaryColor))
+                .foregroundStyle(TrophyGradeStyle.forTier(.gold).accent)
                 .fixedSize()
                 .accessibilityHidden(true)
             }
@@ -500,7 +512,7 @@ struct ProfileView: View {
 // ProfileCard — the dark rounded-rect backdrop shared by every card.
 // Applied as a ViewModifier so the call sites are clean.
 // ---------------------------------------------------------------------------
-private struct ProfileCardModifier: ViewModifier {
+struct ProfileCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
@@ -514,7 +526,8 @@ private struct ProfileCardModifier: ViewModifier {
     }
 }
 
-private extension View {
+extension View {
+    /// The Profile section card: dark fill with a faint light rim.
     func profileCard() -> some View { modifier(ProfileCardModifier()) }
 }
 
