@@ -1113,7 +1113,7 @@ final class GameState: ObservableObject {
         // climb advances its unlock ladder — CotD and tracks never reach
         // this funnel (advanceFromLevelClear routes them away), and the
         // guard is defense-in-depth against a future mode that does.
-        if currentMode.progression.recordsClimbResult {
+        if playedMode.progression.recordsClimbResult {
             fireTrophy(.climbHighestUnlocked, value: highestUnlocked)
         }
     }
@@ -1300,7 +1300,7 @@ final class GameState: ObservableObject {
         // `consumeLife`.  Mode-gated defense-in-depth: only the main climb
         // may grow the streak (the CotD `.oneShot` fast-path returns before
         // ever reaching this funnel; tracks never call it).
-        if currentMode.progression.recordsClimbResult {
+        if playedMode.progression.recordsClimbResult {
             trophyStats.recordNoFallClimbClear()
             recordClimbTrophies()
             recordRunLifecycleTrophies(stars: stars,
@@ -1349,7 +1349,7 @@ final class GameState: ObservableObject {
     /// Mode-gated on `recordsClimbResult`: Roll Out / Roll Up / Coin Pit / Zen
     /// / CotD falls never reset the climb streak or fire the whimsy latch.
     func recordClimbFall(level: Int) {
-        guard currentMode.progression.recordsClimbResult else { return }
+        guard playedMode.progression.recordsClimbResult else { return }
         trophyStats.resetNoFallClearStreak()
         // whimsy_gravity_check keys to climb LEVEL 1 (a number, never a
         // layout) — level 1 is a fixed rung, not swappable content.
@@ -1860,6 +1860,15 @@ final class GameState: ObservableObject {
         GameModeCatalogue.mode(id: currentModeID) ?? GameModeCatalogue.climb
     }
 
+    /// The mode actually being PLAYED, even if it is held back from this
+    /// release.  Trophy counters and Adventure-only progress must ask this,
+    /// not `currentMode`: a held-back mode is not Adventure, and treating it
+    /// as Adventure would let it reset or feed Adventure counters.  An
+    /// unknown id still means Adventure.
+    var playedMode: GameMode {
+        GameModeCatalogue.registeredMode(id: currentModeID) ?? GameModeCatalogue.climb
+    }
+
     // MARK: - Challenge of the Day
 
     /// Today's deterministic challenge.
@@ -2024,7 +2033,7 @@ final class GameState: ObservableObject {
         // or unlimited lives would farm `skill_clean_sheet_*`.  Tutorial
         // falls (L1–10) never reach consumeLife — their reset rides
         // S1-T7's direct fall funnel.
-        if currentMode.progression.recordsClimbResult {
+        if playedMode.progression.recordsClimbResult {
             trophyStats.resetNoFallClearStreak()
         }
         if unlimitedLives { return true }

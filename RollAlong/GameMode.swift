@@ -667,6 +667,16 @@ enum GameModeCatalogue {
     static func mode(id: String) -> GameMode? {
         registry.first { $0.mode.id == id && $0.isEnabled }?.mode
     }
+
+    /// Any registered mode with this id, INCLUDING ones held back from this
+    /// release (Roll Out, the Challenge of the Day).  Use this to ask what a
+    /// mode IS (its progression kind, its rules) — never to decide whether a
+    /// player may open it; that is `mode(id:)`.  Without this, a held-back
+    /// mode looked like "not found" and was treated as Adventure, so a life
+    /// lost in Roll Out broke the Adventure no-fall streak.
+    static func registeredMode(id: String) -> GameMode? {
+        registry.first { $0.mode.id == id }?.mode
+    }
 }
 
 // ===========================================================================
