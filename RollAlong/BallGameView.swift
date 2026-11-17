@@ -2460,7 +2460,7 @@ struct BallGameView: View {
         coinPitStaked = true
         // S1-T7 `whimsy_high_roller`: the ROUND-START stake count.  Fired only
         // after `spendTickets` commits — never on a refund or an aborted
-        // stake — so a big single-round stake (≥5) latches the trophy.  The
+        // stake — so a big single-round stake (≥15 tickets) latches the trophy.  The
         // ×2 in-round buy is a separate ticket spend, not part of the round
         // stake, so it's intentionally NOT funneled here.
         gameState.recordCoinPitRoundStaked(tickets: spent)

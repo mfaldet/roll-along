@@ -409,7 +409,7 @@ struct RollUpView: View {
         phase = .ready
     }
 
-    /// Coins paid for a finished run (`CoinPayouts.rollUp`: 1–5 by height).
+    /// Coins paid for a finished run (`CoinPayouts.rollUp`: 1–3 by height).
     private var runCoins: Int { CoinPayouts.rollUp(meters: heightMeters) }
 
     // MARK: - Input

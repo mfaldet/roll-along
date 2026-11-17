@@ -1724,7 +1724,7 @@ final class GameState: ObservableObject {
     /// high-water (the engine keeps the best, so spending later never
     /// revokes).
     private func recordEconomyTrophies() {
-        // econ_working_capital — 5,000 lifetime coins earned from play.
+        // econ_working_capital — 2,500 lifetime coins earned from play.
         fireTrophy(.coinsEarnedFromPlay, value: trophyStats.coinsEarnedFromPlay)
         // econ_nest_egg — hold 1,000 coins at once (latched high-water).
         fireTrophy(.coinBalancePeak, value: coinBalance)
@@ -2526,7 +2526,7 @@ final class GameState: ObservableObject {
                 game: modeID, difficulty: difficulty.rawValue,
                 wins: rowWins, best: rowBest)
         }
-        // Coins come from the one payout table (1–5 a game); `basePayout` is
+        // Coins come from the one payout table (1–3 a game); `basePayout` is
         // no longer used for coins and is kept only so older callers compile.
         let payout = CoinPayouts.competitive(modeID: modeID, won: won, draw: draw,
                                              placement: placement, difficulty: difficulty)
