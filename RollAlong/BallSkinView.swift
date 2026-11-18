@@ -4844,7 +4844,7 @@ struct BallSkinView: View {
     }
 
     // =========================================================================
-    // MARK: - Golden Dragon  (Year of the Dragon seasonal · Legendary)
+    // MARK: - Golden Dragon  (Lunar New Year seasonal · Legendary)
     // A deep-red lacquer sphere with a gold dragon-scale field, gilt filigree
     // arcs, and a regal sheen.  A MeshGradient supplies the lustrous lacquer
     // base; a Canvas paints the overlapping gold scales, filigree, and a roving

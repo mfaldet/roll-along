@@ -251,7 +251,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case harvest     = "Harvest Moon"
     //   • lunarDragon — deep-red lacquer sphere with gold dragon-scale texture
     //     and filigree; a regal sheen with a subtle Reduce-Motion-safe shimmer.
-    //     Year of the Dragon bundle (Legendary).
+    //     Lunar New Year bundle (Legendary).
     case lunarDragon = "Golden Dragon"
     //   • mardiGras — festive harlequin-diamond pattern in royal purple,
     //     emerald green, and gold with a jeweled bead-like sheen.  Static.

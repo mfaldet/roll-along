@@ -157,6 +157,8 @@ struct CosmeticShopView: View {
     @Environment(\.dismiss) private var dismiss
     /// Observed for purchase-in-progress state on seasonal IAP buttons (S8).
     @ObservedObject private var store = StoreKitManager.shared
+    /// Redraws the Catalog when new release dates arrive from the server.
+    @ObservedObject private var releaseCalendar = CosmeticCalendarStore.shared
 
     @State private var category: ShopCategory = .collections
     @State private var alertMessage: String = ""
@@ -1124,7 +1126,7 @@ struct CosmeticShopView: View {
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .kerning(1.4)
                     Spacer()
-                    Text(next.date.formatted(date: .abbreviated, time: .omitted))
+                    Text(CosmeticSchedule.dayLabel(next.date))
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
@@ -1133,7 +1135,9 @@ struct CosmeticShopView: View {
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(next.laterCount > 0
-                     ? "New collections arrive every 4 weeks — \(next.laterCount) more after these. Seasonal collections return each year."
+                     ? (next.laterCount == 1
+                        ? "1 more collection is on the calendar after these. Seasonal collections return each year."
+                        : "\(next.laterCount) more collections are on the calendar after these. Seasonal collections return each year.")
                      : "The last scheduled collections. Seasonal collections return each year.")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(white: 0.5))

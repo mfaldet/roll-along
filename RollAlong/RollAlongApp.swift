@@ -108,6 +108,12 @@ struct RollAlongApp: App {
                     // 4. Send any feedback written while offline.
                     await FeedbackOutbox.shared.flush()
                 }
+                .task {
+                    // Cosmetic release dates from the server table (cached;
+                    // built-in dates when offline; never in tests).  Its own
+                    // task so it doesn't wait behind trophy sync.
+                    await CosmeticCalendarStore.shared.refreshIfDue()
+                }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared
                     // initialises the persistent user_id + session_id on
@@ -170,6 +176,8 @@ struct RollAlongApp: App {
                     _ = TrophyCloudMirror.shared.reconcile(engine: gameState.trophyEngine)
                     await TrophySyncService.shared.sync(engine: gameState.trophyEngine)
                     await FeedbackOutbox.shared.flush()
+                    // Cosmetic release dates (at most every 6 h; never in tests).
+                    await CosmeticCalendarStore.shared.refreshIfDue()
                 }
             @unknown default:
                 break

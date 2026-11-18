@@ -1,6 +1,6 @@
 # Cosmetic calendar on fixed dates (proposal, not built)
 
-Status: **proposal for approval.** No Swift or SQL has changed yet.
+Status: **approved and built** (November 18, 2026). Decisions: dates and groups as below; seasonal changes as below with "Year of the Dragon" renamed "Lunar New Year"; releases at midnight Eastern (America/New_York); a collection already released on a phone stays released if its date is later moved back. Built in `CosmeticSchedule` / `CosmeticCalendarStore` (`RollAlong/Cosmetics.swift`) and database step 11 (`docs/cosmetics/cosmetic-calendar.sql`). Section (a) below describes the old schedule. Note: Marble Baron (section d) is not in the shipped trophy catalog; no trophy depends on the calendar.
 
 ## (a) How the schedule works today
 

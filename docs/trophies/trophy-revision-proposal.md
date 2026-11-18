@@ -75,8 +75,9 @@ What that changes for a player chasing Platinum:
 
 - Still required: climb level 1,000, a perfect world, the seven-day daily
   streak, a Hard win in all six competitive games, the Golden Gauntlet track,
-  25 levels without a fall, and 40 ball skins (reachable from March 9, 2027
-  under the release calendar).
+  25 levels without a fall, and 40 ball skins.  (Later superseded: the
+  40-ball trophy is not in the shipped catalog, and no trophy or Platinum
+  depends on the cosmetic release calendar.)
 - No longer required: 10 hours in the Zen Garden, 100 competitive wins, 50
   daily challenges, 2,500 lifetime Gold Rush coins, and 50 owned cosmetics.
 

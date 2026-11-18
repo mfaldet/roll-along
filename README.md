@@ -41,14 +41,14 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 
 ### Release calendar
 
-Most cosmetics are held back at launch and released on a schedule stored in the app (`CosmeticSchedule` in `Cosmetics.swift`):
+Most cosmetics are held back at launch and released on fixed calendar dates (`CosmeticSchedule` in `Cosmetics.swift`). There is no launch date.
 
-- 13 collections are available on day one, including everything the game gives away.
-- 37 more arrive in 12 drops, one every 28 days, counted from a single `launchDate`.
-- The Catalog shows the next drop and its date in a "Coming soon" row.
-- 16 seasonal collections open for their window each year.
-
-Launch date: **December 15, 2026**. Drops: Jan 12, Feb 9, Mar 9, Apr 6, May 4, Jun 1, Jun 29, Jul 27, Aug 24, Sep 21, Oct 19 and Nov 16, 2027. If the release day moves, change `CosmeticSchedule.launchDate` and every drop moves with it.
+- 13 collections are available from the first time the app is opened, including everything the game gives away.
+- 37 more arrive in 12 drops on fixed days at midnight Eastern: Dec 17, 2026, then Jan 14, Feb 11, Mar 11, Apr 1, May 6, Jun 3, Jul 1, Jul 29, Sep 2, Oct 7 and Nov 11, 2027 (`docs/proposals/cosmetic-calendar.md`).
+- 16 seasonal collections open for their window each year; Lunar New Year, Mardi Gras and Oktoberfest have per-year windows.
+- The dates live in the server table `cosmetic_calendar` (`docs/cosmetics/cosmetic-calendar.sql`, database step 11). The app reads it at launch and on return (at most every 6 hours), caches it, and falls back to the same dates built into the app. Change a date in the table, no app update needed. A collection a phone has already seen released stays released there.
+- The Catalog shows the next release day and its collections in a "Coming soon" row.
+- `python3 tools/cosmetic-calendar/check_calendar.py` confirms the built-in dates match the SQL rows.
 
 ---
 

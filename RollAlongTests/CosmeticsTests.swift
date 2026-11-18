@@ -641,7 +641,7 @@ final class CosmeticsTests: XCTestCase {
     /// Every permanent collection is scheduled exactly once — at launch or in
     /// one drop — and nothing is scheduled that isn't a permanent collection.
     func testSchedule_everyPermanentBundleScheduledExactlyOnce() {
-        let scheduled = CosmeticSchedule.launchBundleIDs + CosmeticSchedule.drops.flatMap { $0 }
+        let scheduled = CosmeticSchedule.launchBundleIDs + CosmeticSchedule.drops.flatMap { $0.ids }
         XCTAssertEqual(scheduled.count, Set(scheduled).count, "a collection is scheduled twice")
         let permanent = Set(CosmeticBundle.catalogue.filter { !$0.isLimitedTime }.map(\.id))
         XCTAssertEqual(Set(scheduled), permanent,
@@ -663,39 +663,140 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
-    /// Drops unlock on their date, counted from the launch date, 28 days apart.
-    func testSchedule_dropsUnlockOnTheirDates() {
-        let launch = CosmeticSchedule.launchDate
-        let dayBefore = launch.addingTimeInterval(-86_400)
-        XCTAssertTrue(CosmeticSchedule.isReleased(drop: 0, at: dayBefore), "launch content is always available")
-        XCTAssertFalse(CosmeticSchedule.isReleased(drop: 1, at: launch))
-        let firstDrop = CosmeticSchedule.releaseDate(forDrop: 1)
-        XCTAssertEqual(firstDrop.timeIntervalSince(launch), 28 * 86_400, accuracy: 2 * 3_600)
-        XCTAssertFalse(CosmeticSchedule.isReleased(drop: 1, at: firstDrop.addingTimeInterval(-60)))
-        XCTAssertTrue(CosmeticSchedule.isReleased(drop: 1, at: firstDrop))
-        XCTAssertNotNil(CosmeticSchedule.nextDrop(at: launch))
-        let afterAll = CosmeticSchedule.releaseDate(forDrop: CosmeticSchedule.drops.count)
-        XCTAssertNil(CosmeticSchedule.nextDrop(at: afterAll), "nothing is left to announce after the last drop")
-        for b in CosmeticBundle.catalogue {
-            XCTAssertTrue(CosmeticSchedule.isReleased(b, at: afterAll), "\(b.id) never releases")
+    // A private store per test: no phone storage, no server copy, and (unless a
+    // test turns it on) no "already released" memory.
+    private func calendarStore(remembers: Bool = false) -> CosmeticCalendarStore {
+        CosmeticCalendarStore(defaults: nil, remembersReleases: remembers)
+    }
+
+    /// One second before / at midnight Eastern on a day.
+    private func eastern(_ y: Int, _ m: Int, _ d: Int, plus seconds: TimeInterval = 0) -> Date {
+        CosmeticSchedule.easternMidnight(y, m, d).addingTimeInterval(seconds)
+    }
+
+    /// The approved built-in calendar (docs/proposals/cosmetic-calendar.md,
+    /// identical to the rows in docs/cosmetics/cosmetic-calendar.sql).
+    func testSchedule_builtInDatesMatchTheApprovedCalendar() {
+        let expected: [(String, CalendarDay)] = [
+            ("cathedral", CalendarDay(2026, 12, 17)), ("zen-garden", CalendarDay(2027, 1, 14)),
+            ("candyland", CalendarDay(2027, 2, 11)),  ("planets", CalendarDay(2027, 3, 11)),
+            ("diamond", CalendarDay(2027, 4, 1)),     ("tempest", CalendarDay(2027, 5, 6)),
+            ("soccer", CalendarDay(2027, 6, 3)),      ("paper-world", CalendarDay(2027, 7, 1)),
+            ("eclipse", CalendarDay(2027, 7, 29)),    ("geode", CalendarDay(2027, 9, 2)),
+            ("oracle", CalendarDay(2027, 10, 7)),     ("quicksilver", CalendarDay(2027, 11, 11)),
+            ("_loose-1", CalendarDay(2027, 2, 11)),   ("_loose-2", CalendarDay(2027, 5, 6)),
+            ("_loose-3", CalendarDay(2027, 7, 29)),
+        ]
+        for (id, day) in expected {
+            XCTAssertEqual(CosmeticSchedule.builtInReleaseDays[id], day, id)
         }
+        XCTAssertEqual(CosmeticSchedule.drops.count, 12)
+        XCTAssertEqual(CosmeticSchedule.drops.flatMap { $0.ids }.count, 37)
+        let days = CosmeticSchedule.drops.map { $0.day }
+        XCTAssertEqual(days, days.sorted(), "drops are in date order")
+        XCTAssertNil(CosmeticSchedule.releaseDate(of: "aurora"), "launch collections have no date")
+        XCTAssertEqual(CosmeticBundle.catalogue.first { $0.id == "lunar-2027" }?.displayName,
+                       "Lunar New Year")
+    }
+
+    /// A drop opens at midnight EASTERN on its day, not the phone's midnight.
+    func testSchedule_dropOpensAtMidnightEastern() {
+        let store = calendarStore()
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "aurora",
+                                                  at: eastern(2020, 1, 1), store: store),
+                      "launch content is available from the first open, whenever that is")
+        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "cathedral",
+                                                   at: eastern(2026, 12, 17, plus: -1), store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "cathedral",
+                                                  at: eastern(2026, 12, 17), store: store))
+        // Midnight Eastern on Dec 17 is 05:00 UTC.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let parts = utc.dateComponents([.year, .month, .day, .hour], from: eastern(2026, 12, 17))
+        XCTAssertEqual([parts.year, parts.month, parts.day, parts.hour], [2026, 12, 17, 5])
+        XCTAssertEqual(CosmeticSchedule.dayLabel(eastern(2026, 12, 17)).contains("17"), true)
+    }
+
+    /// Every collection releases eventually; "Coming soon" names the next real
+    /// day and everything on it.
+    func testSchedule_comingSoonShowsTheNextRealDate() {
+        let store = calendarStore()
+        let first = CosmeticSchedule.nextDrop(at: eastern(2026, 12, 1), store: store)
+        XCTAssertEqual(first?.date, eastern(2026, 12, 17))
+        XCTAssertEqual(Set(first?.bundles.map(\.id) ?? []),
+                       ["cathedral", "velvet-night", "crystal-cavern"])
+        XCTAssertEqual(first?.laterCount, 34)
+        let march = CosmeticSchedule.nextDrop(at: eastern(2027, 3, 11, plus: -1), store: store)
+        XCTAssertEqual(march?.date, eastern(2027, 3, 11))
+        let afterAll = eastern(2027, 11, 11)
+        XCTAssertNil(CosmeticSchedule.nextDrop(at: afterAll, store: store),
+                     "nothing is left to announce after the last drop")
+        for b in CosmeticBundle.catalogue {
+            XCTAssertTrue(CosmeticSchedule.isReleased(b, at: afterAll, store: store), "\(b.id) never releases")
+        }
+    }
+
+    /// A date in the server table overrides the built-in one, earlier or later;
+    /// unknown ids and broken rows are ignored; deleting a row restores the
+    /// built-in date.
+    func testSchedule_serverDatesOverrideBuiltIn() {
+        let store = calendarStore()
+        typealias Row = CosmeticCalendarStore.Row
+        store.apply([
+            Row(collection_id: "planets", starts_on: "2027-01-07", ends_on: nil),     // earlier
+            Row(collection_id: "cathedral", starts_on: "2027-01-21", ends_on: nil),   // later
+            Row(collection_id: "not-a-collection", starts_on: "2027-01-01", ends_on: nil),
+            Row(collection_id: "noir", starts_on: "garbage", ends_on: nil),
+        ])
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "planets",
+                                                  at: eastern(2027, 1, 7), store: store))
+        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "cathedral",
+                                                   at: eastern(2026, 12, 20), store: store))
+        XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 12, 18), store: store)?.date,
+                       eastern(2027, 1, 7), "Coming soon follows the server date")
+        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "noir", store: store),
+                       eastern(2027, 1, 14), "a broken row falls back to the built-in date")
+        store.apply([])
+        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "cathedral", store: store), eastern(2026, 12, 17))
+    }
+
+    /// Sticky: a collection this phone has seen released stays released when
+    /// its date is later moved back.
+    func testSchedule_releasedCollectionStaysReleasedWhenMovedLater() {
+        let store = calendarStore(remembers: true)
+        // Seen released "now" under a date that has already passed…
+        store.apply([CosmeticCalendarStore.Row(collection_id: "golf", starts_on: "2020-01-02", ends_on: nil)])
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "golf", store: store))
+        // …then the server moves it far into the future.
+        store.apply([CosmeticCalendarStore.Row(collection_id: "golf", starts_on: "2099-01-01", ends_on: nil)])
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "golf", store: store),
+                      "a released collection is never taken away")
+        // A phone that never saw it released waits for the new date.
+        let fresh = calendarStore(remembers: true)
+        fresh.apply([CosmeticCalendarStore.Row(collection_id: "golf", starts_on: "2099-01-01", ends_on: nil)])
+        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "golf", store: fresh))
+        // Questions about other moments never mark anything released.
+        let probe = calendarStore(remembers: true)
+        _ = CosmeticSchedule.isReleased(collectionID: "oracle", at: eastern(2030, 1, 1), store: probe)
+        XCTAssertFalse(probe.hasSeenReleased("oracle"))
     }
 
     /// An unreleased collection's items are held back with it; starter items
     /// never are.
     func testSchedule_itemsFollowTheirCollections() {
-        let launch = CosmeticSchedule.launchDate
-        XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.starter, at: launch))
+        let store = calendarStore()
+        XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.starter, at: eastern(2020, 1, 1), store: store))
         for b in CosmeticBundle.catalogue where !b.isLimitedTime {
-            let drop = CosmeticSchedule.drop(of: b)
+            guard let date = CosmeticSchedule.releaseDate(of: b.id, store: store) else { continue }
             for ball in b.balls where ball.tier != .starter {
-                XCTAssertLessThanOrEqual(CosmeticSchedule.drop(of: ball), drop,
-                                         "\(ball.rawValue) must be out no later than \(b.id)")
+                XCTAssertTrue(CosmeticSchedule.isReleased(ball, at: date, store: store),
+                              "\(ball.rawValue) must be out no later than \(b.id)")
             }
         }
     }
 
-    /// Seasonal windows repeat every year instead of expiring for good.
+    /// Seasonal windows repeat every year; holidays that move use their
+    /// per-year rows.
     func testSeasonalWindowsRepeatYearly() {
         for b in CosmeticBundle.catalogue where b.isLimitedTime {
             guard let from = b.availableFrom, let until = b.availableUntil else {
@@ -705,10 +806,37 @@ final class CosmeticsTests: XCTestCase {
             XCTAssertTrue(b.isOpen(at: mid), "\(b.id) open mid-window")
             XCTAssertFalse(b.isOpen(at: until.addingTimeInterval(86_400)),
                            "\(b.id) closed the day after its window")
-            let nextYear = Calendar(identifier: .gregorian).date(byAdding: .year, value: 1, to: mid)!
-            XCTAssertTrue(b.isOpen(at: nextYear), "\(b.id) returns the following year")
             XCTAssertFalse(b.isExpired)
+            if let rows = CosmeticSchedule.builtInSeasonalWindows[b.id] {
+                for (year, w) in rows {
+                    let open = w.from.easternMidnight
+                    let close = w.until.easternMidnight
+                    XCTAssertTrue(b.isOpen(at: open), "\(b.id) \(year) opens on its day")
+                    XCTAssertFalse(b.isOpen(at: open.addingTimeInterval(-1)), "\(b.id) \(year) not before")
+                    XCTAssertFalse(b.isOpen(at: close), "\(b.id) \(year) closed on its end day")
+                }
+            } else {
+                let nextYear = CosmeticSchedule.eastern.date(byAdding: .year, value: 1, to: mid)!
+                XCTAssertTrue(b.isOpen(at: nextYear), "\(b.id) returns the following year")
+            }
         }
+        // Approved window changes.
+        let countdown = CosmeticBundle.catalogue.first { $0.id == "newyear-2027" }!
+        XCTAssertTrue(countdown.isOpen(at: eastern(2027, 12, 26)))
+        XCTAssertFalse(countdown.isOpen(at: eastern(2027, 12, 26, plus: -1)))
+        let lunar = CosmeticBundle.catalogue.first { $0.id == "lunar-2027" }!
+        XCTAssertTrue(lunar.isOpen(at: eastern(2028, 1, 26)), "Lunar New Year 2028 is Jan 26")
+    }
+
+    /// A server row for one year of a seasonal collection replaces that year.
+    func testSeasonalWindow_serverRowOverridesOneYear() {
+        let store = calendarStore()
+        store.apply([CosmeticCalendarStore.Row(collection_id: "mardigras-2027",
+                                               starts_on: "2027-02-01", ends_on: "2027-02-12")])
+        let mardi = CosmeticBundle.catalogue.first { $0.id == "mardigras-2027" }!
+        let w = CosmeticSchedule.seasonalWindow(for: mardi, at: eastern(2027, 1, 20), store: store)
+        XCTAssertEqual(w?.from, eastern(2027, 2, 1))
+        XCTAssertEqual(w?.until, eastern(2027, 2, 12))
     }
 }
 

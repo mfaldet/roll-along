@@ -37,7 +37,7 @@ ACCOUNT DELETION
 Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
 COSMETIC RELEASE CALENDAR
-Collections release on a fixed calendar built into the app; upcoming ones are listed by name and date in Shop > Catalog > "Coming soon". Seasonal collections return each year.
+Cosmetic collections release on fixed dates. The dates are kept on our server, with the same dates built into the app, so we can adjust a date without an app update. This only changes when a cosmetic collection appears in the Shop; nothing else is switched on remotely. Upcoming collections are listed by name and date in Shop > Catalog > "Coming soon". Seasonal collections return each year.
 
 TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.
@@ -59,6 +59,9 @@ Contact: rollalongsupport@gmail.com
 
 - [ ] `docs/feedback/feedback-schema.sql` (step 10) has been applied, or
       Send Feedback messages will wait on the phone and never arrive.
+- [ ] `docs/cosmetics/cosmetic-calendar.sql` (step 11) has been applied. Until
+      it is, the app uses its built-in dates, which are the same, so nothing
+      breaks; but dates can only be changed from the server after it is applied.
 - [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
       not built from these lists" is only true after that).
 - [ ] The Supabase project is running and not paused during review.
