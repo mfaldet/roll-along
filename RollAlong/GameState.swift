@@ -924,19 +924,6 @@ final class GameState: ObservableObject {
         minigameDifficultyPlays = Self.loadTrackProgress(key: "ra_minigameDiffPlays", defaults)
         minigameDifficultyWins  = Self.loadTrackProgress(key: "ra_minigameDiffWins", defaults)
         minigameDifficultyBests = Self.loadTrackProgress(key: "ra_minigameDiffBests", defaults)
-        // Comet Clash became Snacky under the same id ("snake").  Its old bests
-        // measured something else (sparks and knockouts, not orbs eaten), so
-        // they are cleared once; wins are kept (a win still means last one
-        // left).  Not through didSet (init), so save explicitly.
-        if !defaults.bool(forKey: "ra_snackyBestsReset_v1") {
-            minigameBests["snake"] = nil
-            for key in minigameDifficultyBests.keys where key.hasPrefix("snake|") {
-                minigameDifficultyBests[key] = nil
-            }
-            defaults.set(try? JSONEncoder().encode(minigameBests), forKey: "ra_minigameBests")
-            defaults.set(try? JSONEncoder().encode(minigameDifficultyBests), forKey: "ra_minigameDiffBests")
-            defaults.set(true, forKey: "ra_snackyBestsReset_v1")
-        }
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         // A saved "last mode" that no longer exists in this build (e.g. Pinball,
@@ -970,6 +957,22 @@ final class GameState: ObservableObject {
         // above) stays in effect.
         let savedPack  = defaults.string(forKey: "ra_equippedPack")
         equippedPackID = savedPack.flatMap { loadedOwnedPacks.contains($0) ? $0 : nil }
+
+        // Comet Clash became Snacky under the same id ("snake").  This runs
+        // LAST in init, after every stored property has a value (it reads and
+        // writes `minigameBests` / `minigameDifficultyBests`).  Its old bests
+        // measured something else (sparks and knockouts, not orbs eaten), so
+        // they are cleared once; wins are kept (a win still means last one
+        // left).  Not through didSet (init), so save explicitly.
+        if !defaults.bool(forKey: "ra_snackyBestsReset_v1") {
+            minigameBests["snake"] = nil
+            for key in minigameDifficultyBests.keys where key.hasPrefix("snake|") {
+                minigameDifficultyBests[key] = nil
+            }
+            defaults.set(try? JSONEncoder().encode(minigameBests), forKey: "ra_minigameBests")
+            defaults.set(try? JSONEncoder().encode(minigameDifficultyBests), forKey: "ra_minigameDiffBests")
+            defaults.set(true, forKey: "ra_snackyBestsReset_v1")
+        }
     }
 
     // MARK: - Trophy activation (first-launch backfill)
