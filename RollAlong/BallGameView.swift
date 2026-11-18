@@ -5193,7 +5193,7 @@ struct BoundaryOverlayView: View {
     /// Molten — dark crust with two slow glowing lava seams creeping around
     /// the rim and a brighter orange crack that flares now and then.
     private var moltenBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let seamA: Double = (t * 0.030).truncatingRemainder(dividingBy: 1.0)
             let seamB: Double = seamA + 0.52
@@ -5219,7 +5219,7 @@ struct BoundaryOverlayView: View {
     /// Starlight — a night-blue rim scattered with tiny stars that twinkle
     /// out of phase, plus a slow shooting star.
     private var starlightBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let star: Color = Color(red: 0.92, green: 0.94, blue: 1.00)
             let shootPos: Double = (t * 0.07).truncatingRemainder(dividingBy: 1.0)
@@ -5242,7 +5242,7 @@ struct BoundaryOverlayView: View {
     /// Aurora — soft green and violet curtains drifting in opposite
     /// directions around the rim.
     private var auroraBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let green: Color = Color(red: 0.30, green: 1.00, blue: 0.62)
             let violet: Color = Color(red: 0.66, green: 0.42, blue: 1.00)
@@ -5264,7 +5264,7 @@ struct BoundaryOverlayView: View {
     /// Corona — the eclipse: a black rim with a thin gold halo and one
     /// bright flare travelling slowly around it.
     private var coronaBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let gold: Color = Color(red: 1.00, green: 0.82, blue: 0.42)
             let flarePos: Double = (t * 0.045).truncatingRemainder(dividingBy: 1.0)
@@ -5284,7 +5284,7 @@ struct BoundaryOverlayView: View {
     /// Storm — a slate rim with drifting rain streaks and an occasional
     /// lightning flash that lights a long stretch of the border.
     private var stormBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let rain: Color = Color(red: 0.70, green: 0.80, blue: 0.95)
             let bolt: Color = Color(red: 0.86, green: 0.90, blue: 1.00)
@@ -5303,7 +5303,7 @@ struct BoundaryOverlayView: View {
 
     /// Confetti — bright dashes in four colors scrolling around the rim.
     private var confettiBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let scroll: CGFloat = CGFloat((t * 18.0).truncatingRemainder(dividingBy: 40.0))
             let colors: [Color] = [Color(red: 1.00, green: 0.82, blue: 0.24),
@@ -5324,7 +5324,7 @@ struct BoundaryOverlayView: View {
     /// Star-Spangled — red and white bunting stripes scrolling over the
     /// navy base, with a twinkling white star now and then.
     private var starSpangledBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let scroll: CGFloat = CGFloat((t * 12.0).truncatingRemainder(dividingBy: 36.0))
             let red: Color = Color(red: 0.86, green: 0.16, blue: 0.22)
@@ -5345,7 +5345,7 @@ struct BoundaryOverlayView: View {
 
     /// Rainbow — the full spectrum laid around the rim, slowly rotating.
     private var rainbowBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let spin: Double = (t * 30.0).truncatingRemainder(dividingBy: 360.0)
             borderRing()
@@ -5361,7 +5361,7 @@ struct BoundaryOverlayView: View {
 
     /// Marquee — a row of carnival bulbs chasing around the rim.
     private var marqueeBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             // Bulbs step forward (not slide), like a real chaser.
             let step: CGFloat = CGFloat(floor(t * 6.0).truncatingRemainder(dividingBy: 3.0)) * 8.0
@@ -5382,7 +5382,7 @@ struct BoundaryOverlayView: View {
     /// Stained Glass — panes of jewel color along the rim that brighten and
     /// dim one after another, as if light were passing behind them.
     private var stainedGlassBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let panes: [Color] = [Color(red: 0.86, green: 0.18, blue: 0.24),
                                   Color(red: 0.20, green: 0.40, blue: 0.92),
