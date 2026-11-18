@@ -35,12 +35,7 @@ struct ProfileView: View {
         ZStack {
             // Background — the app's dark tone, tinted with the player's own
             // accent color (it used to be a fixed dark blue for everyone).
-            LinearGradient(
-                colors: [Self.baseTop.mix(with: accent, by: 0.22),
-                         Self.baseBottom.mix(with: accent, by: 0.10)],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            AccentBackground(accent: gameState.primaryColor)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -67,10 +62,7 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(
-            Self.baseTop.mix(with: accent, by: 0.22).opacity(0.95),
-            for: .navigationBar
-        )
+        .toolbarBackground(AccentBackground.bar(gameState.primaryColor), for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         // The friend code, for the share message.
         .task(id: auth.isSignedIn) {
@@ -482,8 +474,6 @@ struct ProfileView: View {
 
     /// The player's own accent color, made readable on the dark background.
     private var accent: Color { AccentColor.readable(gameState.primaryColor) }
-    private static let baseTop    = Color(red: 0.06, green: 0.06, blue: 0.10)
-    private static let baseBottom = Color(red: 0.09, green: 0.09, blue: 0.14)
 
     /// The level marker badge that sits on the marble's top-right corner —
     /// a small "LVL" eyebrow over a large level number.

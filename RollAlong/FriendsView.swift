@@ -845,6 +845,39 @@ enum AccentColor {
     }
 }
 
+/// The deep page background tinted with an accent color: the app's dark
+/// navy tone with a little of the accent mixed in, dark enough that white
+/// text stays readable whatever color the player picked (a pale yellow or
+/// pink only reaches about a quarter brightness at the top).  Used by the
+/// Profile tab and the player's own public profile; pass `nil` for the
+/// plain dark tone.
+struct AccentBackground: View {
+    var accent: Color?
+
+    static let baseTop    = Color(red: 0.06, green: 0.06, blue: 0.10)
+    static let baseBottom = Color(red: 0.09, green: 0.09, blue: 0.14)
+    /// How much accent goes into the top and bottom of the page.
+    static let topMix: Double = 0.22
+    static let bottomMix: Double = 0.10
+
+    static func top(_ accent: Color?) -> Color {
+        guard let accent else { return baseTop }
+        return baseTop.mix(with: accent, by: topMix)
+    }
+    static func bottom(_ accent: Color?) -> Color {
+        guard let accent else { return baseBottom }
+        return baseBottom.mix(with: accent, by: bottomMix)
+    }
+    /// The navigation bar color that matches the top of the page.
+    static func bar(_ accent: Color?) -> Color { top(accent).opacity(0.95) }
+
+    var body: some View {
+        LinearGradient(colors: [Self.top(accent), Self.bottom(accent)],
+                       startPoint: .top, endPoint: .bottom)
+            .ignoresSafeArea()
+    }
+}
+
 /// Weekly pace: "+12 this week" (levels gained since Monday 00:00 UTC).
 /// Draws nothing when the player has gained no levels this week.
 struct WeekPaceLabel: View {

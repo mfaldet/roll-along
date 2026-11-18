@@ -49,11 +49,9 @@ struct PublicProfileView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(red: 0.06, green: 0.06, blue: 0.10),
-                         Color(red: 0.09, green: 0.09, blue: 0.14)],
-                startPoint: .top, endPoint: .bottom
-            ).ignoresSafeArea()
+            // Your own public profile follows your accent color, the same as
+            // the Profile tab; other players' pages keep the plain dark tone.
+            AccentBackground(accent: isMe ? gameState.primaryColor : nil)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -73,7 +71,7 @@ struct PublicProfileView: View {
         .navigationTitle(profile.displayName.nonEmptyName)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .toolbarBackground(Color(red: 0.06, green: 0.06, blue: 0.10).opacity(0.95), for: .navigationBar)
+        .toolbarBackground(AccentBackground.bar(isMe ? gameState.primaryColor : nil), for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
