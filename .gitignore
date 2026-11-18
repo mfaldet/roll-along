@@ -28,3 +28,4 @@ Pods/
 fastlane/report.xml
 fastlane/screenshots/
 fastlane/test_output/
+__pycache__/
