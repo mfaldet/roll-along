@@ -42,21 +42,31 @@ the Google Mobile Ads SDK.
 | Location → **Coarse Location** | Google: approximate location derived from the IP address | No | Third-Party Advertising |
 | Diagnostics → **Crash Data** | Google: SDK crash logs | No | Analytics; Third-Party Advertising |
 | Diagnostics → **Performance Data** | Google: launch time, hang rate, energy use | No | Analytics; Third-Party Advertising |
-| Diagnostics → **Other Diagnostic Data** | App: phone model, iOS version and app version on each analytics event | No | Analytics |
+| Diagnostics → **Other Diagnostic Data** | App: phone model, iOS version and app version on each analytics event, and on each feedback message | No (analytics); Yes when feedback is sent signed in | Analytics; App Functionality |
+| User Content → **Customer Support** | App: the Bug / Idea / Complaint message a player writes in Settings → Send Feedback, with the screen it came from; linked to the account ID only when signed in | Yes | App Functionality |
 
 App Store Connect asks about each data type once. Where a type appears twice
 above (Gameplay Content), give the combined answer: **linked: yes**, purposes
-**App Functionality and Analytics**.
+**App Functionality and Analytics**. For Other Diagnostic Data, give
+**linked: yes** (feedback sent while signed in carries the account ID), purposes
+**Analytics and App Functionality**.
+
+Send Feedback also sends a one-way hash of the random install ID, used only to
+limit how many messages one phone can send. It is not stored with the raw ID
+and cannot be matched to analytics, so it adds no new Device ID purpose; Device
+ID stays declared for analytics as above.
 
 ## Data types to answer "not collected"
 
 Name, phone number, physical address, health and fitness, financial info,
 precise location, sensitive info, contacts, emails or text messages, photos or
-videos, audio, customer support, other user content, browsing history, search
-history, surroundings, body data.
+videos, audio, other user content, browsing history, search history,
+surroundings, body data.
 
-There is no player-written content: names are built from preset lists and clan
-chat is fixed phrases.
+The only player-written text is Send Feedback, which goes privately to the
+developer (declared above as Customer Support). Nothing a player writes is shown
+to other players: names are built from preset lists and clan chat is fixed
+phrases.
 
 ## Open points
 

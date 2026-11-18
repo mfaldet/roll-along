@@ -94,6 +94,9 @@ final class AnalyticsClient: @unchecked Sendable {
     // MARK: - Identity
 
     private let userId:    UUID
+    /// The random per-install ID (not the account, not the advertising ID).
+    /// Feedback sends a one-way hash of it, only for rate limiting.
+    var installID: UUID { userId }
     private(set) var sessionId: UUID
 
     private static let userIdKey = "ra_analytics_user_id"
@@ -368,7 +371,8 @@ final class AnalyticsClient: @unchecked Sendable {
     /// Returns a string like "iPhone17,1" for the host device, or a
     /// simulator name when running under the simulator.  Useful for
     /// segmenting analytics by hardware.
-    private static func deviceIdentifier() -> String {
+    /// The phone's model identifier, e.g. "iPhone17,1" (also used by feedback).
+    static func deviceIdentifier() -> String {
         var sys = utsname()
         uname(&sys)
         let raw = withUnsafePointer(to: &sys.machine) {

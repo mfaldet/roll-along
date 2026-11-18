@@ -105,6 +105,8 @@ struct RollAlongApp: App {
                     //    ~100% of players who never sign in.  A no-op when the
                     //    sync-dirty flag is clean.
                     await TrophySyncService.shared.sync(engine: gameState.trophyEngine)
+                    // 4. Send any feedback written while offline.
+                    await FeedbackOutbox.shared.flush()
                 }
                 .onAppear {
                     // Cold-start analytics ping.  AnalyticsClient.shared
@@ -167,6 +169,7 @@ struct RollAlongApp: App {
                 Task {
                     _ = TrophyCloudMirror.shared.reconcile(engine: gameState.trophyEngine)
                     await TrophySyncService.shared.sync(engine: gameState.trophyEngine)
+                    await FeedbackOutbox.shared.flush()
                 }
             @unknown default:
                 break

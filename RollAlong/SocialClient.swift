@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import CryptoKit
+import UIKit
 
 // ===========================================================================
 // SocialClient — authenticated calls to the Roll Along social backend.
@@ -2093,5 +2095,299 @@ private struct NeedsLivesPatch: Encodable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         if let v = needs_lives_at { try c.encode(v, forKey: .needs_lives_at) }
         else { try c.encodeNil(forKey: .needs_lives_at) }
+    }
+}
+
+// ===========================================================================
+// Send Feedback (Settings → Send Feedback)
+//
+// A player picks Bug, Idea or Complaint and writes up to 1,000 characters.
+// The app quietly adds the app version, iOS version, phone model, the screen
+// they came from and — only when signed in — their player id (taken by the
+// SERVER from the sign-in token, never from the request body). For rate
+// limiting it also sends a one-way SHA-256 hash of the random install ID, so
+// feedback cannot be matched to analytics events by that ID.
+//
+// Stored through the `submit_feedback` function (docs/feedback/feedback-schema.sql).
+// The `feedback` table is write-only for players: nobody can read it from the
+// app, including their own messages. Only the dashboard can.
+//
+// Offline or on a server/network error, the message stays in a small queue in
+// UserDefaults and is retried at launch and whenever the app comes back.
+// Limits: 5 per phone per rolling 24 hours here, and the same on the server.
+// Never sends during unit or UI tests (RuntimeEnvironment).
+// ===========================================================================
+
+enum FeedbackKind: String, Codable, CaseIterable, Identifiable {
+    case bug, idea, complaint
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .bug:       return "Bug"
+        case .idea:      return "Idea"
+        case .complaint: return "Complaint"
+        }
+    }
+}
+
+/// One queued message, exactly as it will be sent (minus the player id,
+/// which the server reads from the sign-in token).
+struct FeedbackItem: Codable, Equatable {
+    var clientID: UUID          // makes a retried send land only once
+    var kind: FeedbackKind
+    var message: String
+    var appVersion: String
+    var iosVersion: String
+    var deviceModel: String
+    var source: String
+    var createdAt: Date
+}
+
+/// Transport, swappable in tests.
+protocol FeedbackSending {
+    /// Throws `FeedbackSendError.permanent` when the server refused the item
+    /// for good (bad input, rate limited): it is dropped, not retried.
+    func send(_ item: FeedbackItem, installHash: String) async throws
+}
+
+enum FeedbackSendError: Error {
+    case permanent(status: Int, body: String)
+    case retryLater(String)
+}
+
+final class FeedbackOutbox: @unchecked Sendable {
+    static let shared = FeedbackOutbox()
+
+    static let maxLength       = 1_000
+    static let maxPerDay       = 5
+    static let maxQueued       = 10
+    static let window: TimeInterval = 24 * 60 * 60
+
+    private static let queueKey = "ra_feedback_queue_v1"
+    private static let sentKey  = "ra_feedback_sent_times_v1"
+
+    private let defaults: UserDefaults
+    private let sender: FeedbackSending
+    private let installHash: String
+    private let liveAllowed: Bool
+    private let now: () -> Date
+    /// Try to send right after `submit` (off in unit tests, which flush by hand).
+    private let autoFlush: Bool
+    private let lock = NSLock()
+    private var isFlushing = false
+
+    init(defaults: UserDefaults = .standard,
+         sender: FeedbackSending = SupabaseFeedbackSender(),
+         installID: UUID = AnalyticsClient.shared.installID,
+         liveAllowed: Bool = !RuntimeEnvironment.isRunningTests,
+         now: @escaping () -> Date = Date.init,
+         autoFlush: Bool = true) {
+        self.defaults = defaults
+        self.autoFlush = autoFlush
+        self.sender = sender
+        self.installHash = Self.hash(installID)
+        self.liveAllowed = liveAllowed
+        self.now = now
+    }
+
+    /// One-way hash of the install ID ("feedback:" salt), 64 hex characters.
+    static func hash(_ id: UUID) -> String {
+        let digest = SHA256.hash(data: Data("feedback:\(id.uuidString)".utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    // MARK: Limits
+
+    /// Messages accepted on this phone in the last 24 hours (sent or queued).
+    var usedToday: Int {
+        lock.lock(); defer { lock.unlock() }
+        return recentTimesLocked().count
+    }
+
+    var canSubmit: Bool { usedToday < Self.maxPerDay }
+
+    var pendingCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return loadQueueLocked().count
+    }
+
+    enum SubmitResult: Equatable { case queued, limitReached, empty }
+
+    /// Validates, counts against the daily limit, queues, then tries to send.
+    @discardableResult
+    func submit(kind: FeedbackKind, message: String, source: String) -> SubmitResult {
+        let text = String(message.trimmingCharacters(in: .whitespacesAndNewlines)
+            .prefix(Self.maxLength))
+        guard !text.isEmpty else { return .empty }
+
+        let info = Bundle.main.infoDictionary
+        let version = (info?["CFBundleShortVersionString"] as? String) ?? "?"
+        let build = (info?["CFBundleVersion"] as? String) ?? "?"
+        let item = FeedbackItem(clientID: UUID(),
+                                kind: kind,
+                                message: text,
+                                appVersion: "\(version) (\(build))",
+                                iosVersion: UIDevice.current.systemVersion,
+                                deviceModel: AnalyticsClient.deviceIdentifier(),
+                                source: String(source.prefix(60)),
+                                createdAt: now())
+
+        lock.lock()
+        var times = recentTimesLocked()
+        guard times.count < Self.maxPerDay else {
+            lock.unlock()
+            return .limitReached
+        }
+        var queue = loadQueueLocked()
+        queue.append(item)
+        if queue.count > Self.maxQueued { queue.removeFirst(queue.count - Self.maxQueued) }
+        saveQueueLocked(queue)
+        times.append(now())
+        defaults.set(times.map(\.timeIntervalSince1970), forKey: Self.sentKey)
+        lock.unlock()
+
+        if autoFlush { Task { await self.flush() } }
+        return .queued
+    }
+
+    // MARK: Sending
+
+    /// Sends everything queued, oldest first. Stops at the first network or
+    /// server error and keeps the rest for next time. Safe to call often.
+    func flush() async {
+        guard liveAllowed else { return }
+        guard let queue = beginFlush() else { return }
+        defer { endFlush() }
+
+        for item in queue {
+            do {
+                try await sender.send(item, installHash: installHash)
+                remove(item.clientID)
+            } catch FeedbackSendError.permanent(let status, let body) {
+                #if DEBUG
+                print("[Feedback] refused (\(status)), dropped: \(body)")
+                #endif
+                remove(item.clientID)
+            } catch {
+                #if DEBUG
+                print("[Feedback] send failed, kept for later: \(error)")
+                #endif
+                return
+            }
+        }
+    }
+
+    /// Returns the queue to send, or nil when a flush is already running.
+    private func beginFlush() -> [FeedbackItem]? {
+        lock.lock(); defer { lock.unlock() }
+        if isFlushing { return nil }
+        isFlushing = true
+        return loadQueueLocked()
+    }
+
+    private func endFlush() {
+        lock.lock(); defer { lock.unlock() }
+        isFlushing = false
+    }
+
+    private func remove(_ id: UUID) {
+        lock.lock(); defer { lock.unlock() }
+        saveQueueLocked(loadQueueLocked().filter { $0.clientID != id })
+    }
+
+    // MARK: Storage (call with lock held)
+
+    private func recentTimesLocked() -> [Date] {
+        let raw = defaults.array(forKey: Self.sentKey) as? [Double] ?? []
+        let cutoff = now().addingTimeInterval(-Self.window)
+        return raw.map(Date.init(timeIntervalSince1970:)).filter { $0 > cutoff }
+    }
+
+    private func loadQueueLocked() -> [FeedbackItem] {
+        guard let data = defaults.data(forKey: Self.queueKey),
+              let items = try? JSONDecoder().decode([FeedbackItem].self, from: data)
+        else { return [] }
+        return items
+    }
+
+    private func saveQueueLocked(_ items: [FeedbackItem]) {
+        if items.isEmpty { defaults.removeObject(forKey: Self.queueKey); return }
+        if let data = try? JSONEncoder().encode(items) {
+            defaults.set(data, forKey: Self.queueKey)
+        }
+    }
+}
+
+/// Live transport: POST /rest/v1/rpc/submit_feedback. Signed-in players send
+/// their sign-in token so the server can record their player id; everyone
+/// else sends the public anon key.
+struct SupabaseFeedbackSender: FeedbackSending {
+    private static let projectURL = "https://mhwpcwauzvmtmuphtajs.supabase.co"
+    /// Anon (public) JWT, the same one analytics uses. The function is the
+    /// only way in; the table itself cannot be read or written directly.
+    private static let anonKey =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
+        "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1od3Bjd2F1enZtdG11cGh0YWpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMDI1MzMsImV4cCI6MjA5NTU3ODUzM30." +
+        "dKtYkbLF43vLYiCMaxhurBT8rTqAMxuKuJ2z5mkXKsM"
+
+    private struct Body: Encodable {
+        let p_client_id: String
+        let p_kind: String
+        let p_message: String
+        let p_app_version: String
+        let p_os_version: String
+        let p_device_model: String
+        let p_source: String
+        let p_install_hash: String
+    }
+
+    func send(_ item: FeedbackItem, installHash: String) async throws {
+        if RuntimeEnvironment.isRunningTests {
+            throw FeedbackSendError.retryLater("live server disabled during tests")
+        }
+        guard let url = URL(string: "\(Self.projectURL)/rest/v1/rpc/submit_feedback") else {
+            throw FeedbackSendError.permanent(status: 0, body: "bad URL")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 20
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
+        let token = try? SocialClient.shared.trophyAccessToken()
+        req.setValue("Bearer \(token ?? Self.anonKey)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONEncoder().encode(Body(
+            p_client_id: item.clientID.uuidString,
+            p_kind: item.kind.rawValue,
+            p_message: item.message,
+            p_app_version: item.appVersion,
+            p_os_version: item.iosVersion,
+            p_device_model: item.deviceModel,
+            p_source: item.source,
+            p_install_hash: installHash))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw FeedbackSendError.retryLater(error.localizedDescription)
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw FeedbackSendError.retryLater("no HTTP response")
+        }
+        let body = String(data: data, encoding: .utf8) ?? ""
+        switch http.statusCode {
+        case 200...299:
+            return
+        case 401 where token != nil:
+            // Expired sign-in token: keep it and retry after the token
+            // refreshes, rather than drop the message.
+            throw FeedbackSendError.retryLater("sign-in token refused")
+        case 400...499:
+            throw FeedbackSendError.permanent(status: http.statusCode, body: body)
+        default:
+            throw FeedbackSendError.retryLater("HTTP \(http.statusCode)")
+        }
     }
 }
