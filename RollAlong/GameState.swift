@@ -69,7 +69,7 @@ import SwiftUI
 //     DO count toward collection criteria.
 //   • `seasonalExclusiveBalls` — the 7 `isBundleExclusive` seasonal balls
 //     whose bundle windows are hard-coded one-shot 2026–27 ranges.  Excluded
-//     from `collection_complete` ONLY (scoping it to the 207-item evergreen
+//     from `collection_complete` ONLY (scoping it to the 242-item evergreen
 //     set), so the trophy never becomes permanently unearnable once a window
 //     lapses.  (NOT excluded from `balls_own_*`/`items_own_50`, which count
 //     seasonal balls per catalog §3.6.)  BallSkin.isBundleExclusive is a
@@ -1671,12 +1671,12 @@ final class GameState: ObservableObject {
     }
 
     /// Count of owned EVERGREEN cosmetics — the `collection_complete`
-    /// metric, capped at the 207-item evergreen set (218 total − 4 IAP
+    /// metric, capped at the 242-item evergreen set (253 total − 4 IAP
     /// secrets − 7 seasonal balls).  Iterates every case per slot, keeps the
     /// evergreen ones (not an IAP secret, not a seasonal-exclusive ball —
     /// starters ARE evergreen and always owned), and counts those `isOwned`.
-    /// Reaches exactly 207 iff every evergreen cosmetic is owned; owning a
-    /// seasonal or IAP-secret item can never push it past 207.
+    /// Reaches exactly 242 iff every evergreen cosmetic is owned; owning a
+    /// seasonal or IAP-secret item can never push it past 242.
     var trophyEvergreenCosmeticsOwnedCount: Int {
         var count = 0
         for b in BallSkin.allCases
@@ -1726,7 +1726,7 @@ final class GameState: ObservableObject {
         fireTrophy(.ballsOwned, value: trophyBallsOwnedCount)
         // items_own_50 — total owned across 7 slots minus the 4 IAP secrets.
         fireTrophy(.cosmeticsOwned, value: trophyCosmeticsOwnedCount)
-        // collection_complete — owned evergreen items toward the 207 set.
+        // collection_complete — owned evergreen items toward the 242 set.
         fireTrophy(.evergreenCosmeticsOwned,
                             value: trophyEvergreenCosmeticsOwnedCount)
         // bundle_first / bundle_5 — completed bundles (IAP-secret-free by
@@ -2807,6 +2807,7 @@ final class GameState: ObservableObject {
         }
         compensate(bundle.balls); compensate(bundle.goals); compensate(bundle.trails)
         compensate(bundle.floors); compensate(bundle.pits); compensate(bundle.music)
+        compensate(bundle.boundaries)
         // Refund-shaped credit (PR #114), not income — gift compensation
         // never counts toward the play-earned trophy counter (§6 item 4).
         if compensation > 0 { addCoins(compensation, source: .giftCompensation) }
@@ -2817,6 +2818,7 @@ final class GameState: ObservableObject {
         freeGrantedItems.formUnion(bundle.floors.map(\.rawValue))
         freeGrantedItems.formUnion(bundle.pits.map(\.rawValue))
         freeGrantedItems.formUnion(bundle.music.map(\.rawValue))
+        freeGrantedItems.formUnion(bundle.boundaries.map(\.rawValue))
         ownedBundles.insert(bundle.id)
     }
 
@@ -2840,7 +2842,8 @@ final class GameState: ObservableObject {
                 bundle.trails.allSatisfy { isOwned($0) } &&
                 bundle.floors.allSatisfy { isOwned($0) } &&
                 bundle.pits.allSatisfy   { isOwned($0) } &&
-                bundle.music.allSatisfy  { isOwned($0) }
+                bundle.music.allSatisfy  { isOwned($0) } &&
+                bundle.boundaries.allSatisfy { isOwned($0) }
             if allOwned { completed.insert(bundle.id) }
         }
         return completed
@@ -2931,6 +2934,7 @@ final class GameState: ObservableObject {
             recordPaidPrices(bundle.floors.filter { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.pits.filter   { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.music.filter  { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.boundaries.filter { !isOwned($0) }, ratio: ratio)
         }
         bundle.grantContents(to: self)   // each member's grant records ownership
         ownedBundles.insert(bundle.id)

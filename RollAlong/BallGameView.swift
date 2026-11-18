@@ -962,8 +962,8 @@ struct BallGameView: View {
 
     // MARK: - Legendary boundary textures
     //
-    // Bespoke animated strokes for the three Legendary boundaries
-    // (obsidian / candy / circuit).  Each layers TimelineView-driven motion
+    // Bespoke animated strokes for the Legendary boundaries (see
+    // `BoundaryOverlayView`).  Each layers TimelineView-driven motion
     // onto the same screen-tracing RoundedRectangle geometry as the base
     // stroke; Standard/Rare boundaries and Classic stay plain flat strokes.
 
@@ -2614,6 +2614,7 @@ struct BallGameView: View {
                     if let t = bundle.trails.first { bundleSlotTile(t) }
                     if let f = bundle.floors.first { bundleSlotTile(f) }
                     if let p = bundle.pits.first   { bundleSlotTile(p) }
+                    if let w = bundle.boundaries.first { bundleSlotTile(w) }
                     if let m = bundle.music.first  { bundleSlotTile(m) }
                     Spacer(minLength: 0)
                 }
@@ -2683,6 +2684,12 @@ struct BallGameView: View {
                 RoundedRectangle(cornerRadius: 2).fill(p.color).frame(width: 22, height: 12)
             }
             .padding(4)
+        case let w as Boundary:
+            RoundedRectangle(cornerRadius: 7)
+                .strokeBorder(LinearGradient(colors: [w.edgeColor, w.color, w.deepColor],
+                                             startPoint: .top, endPoint: .bottom),
+                              lineWidth: 5)
+                .padding(5)
         case _ as MusicTrack:
             Image(systemName: "music.note")
                 .font(.system(size: 22, weight: .semibold))
@@ -2888,6 +2895,7 @@ struct BallGameView: View {
         if let t = bundle.trails.first { gameState.equippedTrail = t }
         if let f = bundle.floors.first { gameState.equippedFloor = f }
         if let p = bundle.pits.first   { gameState.equippedPit   = p }
+        if let w = bundle.boundaries.first { gameState.equippedBoundary = w }
         if let m = bundle.music.first  { gameState.equippedMusic = m }
 
         gameState.seenTutorialReward = true
@@ -5029,10 +5037,10 @@ struct PaperFloorOverlayView: View {
     }
 }
 
-/// The animated texture a Legendary boundary wears over its base stroke
-/// (obsidian / candy / circuit); nothing for the others.  `cornerRadius` is
-/// the ring's corner: the screen curve in the game, the card corner in a
-/// preview.
+/// The animated texture a Legendary boundary wears over its base stroke;
+/// nothing for the others.  `cornerRadius` is the ring's corner: the screen
+/// curve in the game, the card corner in a preview.  Callers leave it out
+/// entirely under Reduce Motion (the plain base stroke remains).
 struct BoundaryOverlayView: View {
     let boundary: Boundary
     let cornerRadius: CGFloat
@@ -5040,10 +5048,20 @@ struct BoundaryOverlayView: View {
     @ViewBuilder
     var body: some View {
         switch boundary {
-        case .obsidian: obsidianBorderOverlay
-        case .candy:    candyBorderOverlay
-        case .circuit:  circuitBorderOverlay
-        default:        EmptyView()
+        case .obsidian:     obsidianBorderOverlay
+        case .candy:        candyBorderOverlay
+        case .circuit:      circuitBorderOverlay
+        case .molten:       moltenBorderOverlay
+        case .starlight:    starlightBorderOverlay
+        case .aurora:       auroraBorderOverlay
+        case .corona:       coronaBorderOverlay
+        case .storm:        stormBorderOverlay
+        case .confetti:     confettiBorderOverlay
+        case .starSpangled: starSpangledBorderOverlay
+        case .rainbow:      rainbowBorderOverlay
+        case .marquee:      marqueeBorderOverlay
+        case .stainedGlass: stainedGlassBorderOverlay
+        default:            EmptyView()
         }
     }
 
@@ -5159,6 +5177,222 @@ struct BoundaryOverlayView: View {
                                   color: node.opacity(0.90 * blinkB), lineWidth: 5, blur: 1.0)
                 borderTrimSegment(at: 0.82, length: 0.012,
                                   color: node.opacity(0.90 * blinkC), lineWidth: 5, blur: 1.0)
+            }
+        }
+    }
+
+    // MARK: Collection boundaries (animated)
+    //
+    // Same toolkit as the originals: dashes scrolled by `dashPhase` and glowing
+    // trims travelling the ring, all driven by one 30 fps TimelineView each.
+
+    /// Molten — dark crust with two slow glowing lava seams creeping around
+    /// the rim and a brighter orange crack that flares now and then.
+    private var moltenBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let seamA: Double = (t * 0.030).truncatingRemainder(dividingBy: 1.0)
+            let seamB: Double = seamA + 0.52
+            let flarePos: Double = (t * 0.018 + 0.2).truncatingRemainder(dividingBy: 1.0)
+            let flare: Double = pow(max(0.0, sin(t * 0.8)), 4.0)
+            let lava: Color = Color(red: 1.00, green: 0.38, blue: 0.08)
+            let hot: Color = Color(red: 1.00, green: 0.78, blue: 0.30)
+            ZStack {
+                borderRing()
+                    .stroke(lava.opacity(0.35),
+                            style: StrokeStyle(lineWidth: 2, dash: [3, 11],
+                                               dashPhase: CGFloat((t * 4.0).truncatingRemainder(dividingBy: 14.0))))
+                borderTrimSegment(at: seamA, length: 0.18,
+                                  color: lava.opacity(0.70), lineWidth: 4, blur: 2.0)
+                borderTrimSegment(at: seamB, length: 0.12,
+                                  color: lava.opacity(0.55), lineWidth: 4, blur: 2.5)
+                borderTrimSegment(at: flarePos, length: 0.04,
+                                  color: hot.opacity(0.90 * flare), lineWidth: 5, blur: 3.0)
+            }
+        }
+    }
+
+    /// Starlight — a night-blue rim scattered with tiny stars that twinkle
+    /// out of phase, plus a slow shooting star.
+    private var starlightBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let star: Color = Color(red: 0.92, green: 0.94, blue: 1.00)
+            let shootPos: Double = (t * 0.07).truncatingRemainder(dividingBy: 1.0)
+            let shootGate: Double = pow(max(0.0, sin(t * 0.45)), 3.0)
+            ZStack {
+                ForEach(0..<14, id: \.self) { i in
+                    let k: Double = Double(i)
+                    let pos: Double = k / 14.0 + 0.031 * Double(i % 3)
+                    let wave: Double = sin(t * (1.1 + 0.17 * k) + k * 1.7)
+                    let twinkle: Double = 0.25 + 0.75 * pow(max(0.0, wave), 3.0)
+                    borderTrimSegment(at: pos, length: 0.006,
+                                      color: star.opacity(twinkle), lineWidth: 3, blur: 0.6)
+                }
+                borderTrimSegment(at: shootPos, length: 0.05,
+                                  color: star.opacity(0.85 * shootGate), lineWidth: 2, blur: 1.2)
+            }
+        }
+    }
+
+    /// Aurora — soft green and violet curtains drifting in opposite
+    /// directions around the rim.
+    private var auroraBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let green: Color = Color(red: 0.30, green: 1.00, blue: 0.62)
+            let violet: Color = Color(red: 0.66, green: 0.42, blue: 1.00)
+            let teal: Color = Color(red: 0.30, green: 0.86, blue: 0.96)
+            let a: Double = (t * 0.035).truncatingRemainder(dividingBy: 1.0)
+            let b: Double = 1.0 - (t * 0.027).truncatingRemainder(dividingBy: 1.0)
+            let breathe: Double = 0.55 + 0.45 * sin(t * 0.9)
+            ZStack {
+                borderTrimSegment(at: a, length: 0.28,
+                                  color: green.opacity(0.55 * breathe), lineWidth: 5, blur: 3.5)
+                borderTrimSegment(at: a + 0.5, length: 0.20,
+                                  color: teal.opacity(0.45), lineWidth: 4, blur: 3.0)
+                borderTrimSegment(at: b, length: 0.24,
+                                  color: violet.opacity(0.50 * (1.4 - breathe)), lineWidth: 5, blur: 3.5)
+            }
+        }
+    }
+
+    /// Corona — the eclipse: a black rim with a thin gold halo and one
+    /// bright flare travelling slowly around it.
+    private var coronaBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let gold: Color = Color(red: 1.00, green: 0.82, blue: 0.42)
+            let flarePos: Double = (t * 0.045).truncatingRemainder(dividingBy: 1.0)
+            let halo: Double = 0.40 + 0.20 * sin(t * 1.3)
+            ZStack {
+                borderRing()
+                    .stroke(gold.opacity(halo), lineWidth: 1)
+                    .blur(radius: 1.0)
+                borderTrimSegment(at: flarePos, length: 0.08,
+                                  color: gold.opacity(0.90), lineWidth: 4, blur: 2.5)
+                borderTrimSegment(at: flarePos + 0.5, length: 0.03,
+                                  color: gold.opacity(0.45), lineWidth: 3, blur: 2.0)
+            }
+        }
+    }
+
+    /// Storm — a slate rim with drifting rain streaks and an occasional
+    /// lightning flash that lights a long stretch of the border.
+    private var stormBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let rain: Color = Color(red: 0.70, green: 0.80, blue: 0.95)
+            let bolt: Color = Color(red: 0.86, green: 0.90, blue: 1.00)
+            let flash: Double = pow(max(0.0, sin(t * 1.9)), 24.0)   // short, sharp
+            let boltPos: Double = (floor(t * 0.30) * 0.37).truncatingRemainder(dividingBy: 1.0)
+            ZStack {
+                borderRing()
+                    .stroke(rain.opacity(0.40),
+                            style: StrokeStyle(lineWidth: 2, dash: [6, 12],
+                                               dashPhase: CGFloat((t * 30.0).truncatingRemainder(dividingBy: 18.0))))
+                borderTrimSegment(at: boltPos, length: 0.22,
+                                  color: bolt.opacity(0.95 * flash), lineWidth: 5, blur: 2.5)
+            }
+        }
+    }
+
+    /// Confetti — bright dashes in four colors scrolling around the rim.
+    private var confettiBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let scroll: CGFloat = CGFloat((t * 18.0).truncatingRemainder(dividingBy: 40.0))
+            let colors: [Color] = [Color(red: 1.00, green: 0.82, blue: 0.24),
+                                   Color(red: 1.00, green: 0.36, blue: 0.56),
+                                   Color(red: 0.36, green: 0.82, blue: 1.00),
+                                   Color(red: 0.56, green: 1.00, blue: 0.48)]
+            ZStack {
+                ForEach(0..<4, id: \.self) { i in
+                    borderRing()
+                        .stroke(colors[i].opacity(0.90),
+                                style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [4, 36],
+                                                   dashPhase: scroll - CGFloat(i) * 10.0))
+                }
+            }
+        }
+    }
+
+    /// Star-Spangled — red and white bunting stripes scrolling over the
+    /// navy base, with a twinkling white star now and then.
+    private var starSpangledBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let scroll: CGFloat = CGFloat((t * 12.0).truncatingRemainder(dividingBy: 36.0))
+            let red: Color = Color(red: 0.86, green: 0.16, blue: 0.22)
+            let starPos: Double = (t * 0.05).truncatingRemainder(dividingBy: 1.0)
+            ZStack {
+                borderRing()
+                    .stroke(red.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 4, dash: [9, 27], dashPhase: scroll))
+                borderRing()
+                    .stroke(Color.white.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 4, dash: [9, 27], dashPhase: scroll - 18.0))
+                borderTrimSegment(at: starPos, length: 0.01,
+                                  color: Color.white.opacity(0.6 + 0.4 * sin(t * 4.0)),
+                                  lineWidth: 6, blur: 1.5)
+            }
+        }
+    }
+
+    /// Rainbow — the full spectrum laid around the rim, slowly rotating.
+    private var rainbowBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let spin: Double = (t * 30.0).truncatingRemainder(dividingBy: 360.0)
+            borderRing()
+                .stroke(AngularGradient(
+                            gradient: Gradient(colors: [.red, .orange, .yellow, .green,
+                                                        .cyan, .blue, .purple, .red]),
+                            center: .center,
+                            angle: .degrees(spin)),
+                        lineWidth: 4)
+                .opacity(0.90)
+        }
+    }
+
+    /// Marquee — a row of carnival bulbs chasing around the rim.
+    private var marqueeBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            // Bulbs step forward (not slide), like a real chaser.
+            let step: CGFloat = CGFloat(floor(t * 6.0).truncatingRemainder(dividingBy: 3.0)) * 8.0
+            let bulb: Color = Color(red: 1.00, green: 0.86, blue: 0.46)
+            ZStack {
+                borderRing()
+                    .stroke(bulb.opacity(0.30),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [0.1, 7.9]))
+                borderRing()
+                    .stroke(bulb.opacity(0.95),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [0.1, 23.9],
+                                               dashPhase: -step))
+                    .shadow(color: bulb.opacity(0.7), radius: 2)
+            }
+        }
+    }
+
+    /// Stained Glass — panes of jewel color along the rim that brighten and
+    /// dim one after another, as if light were passing behind them.
+    private var stainedGlassBorderOverlay: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+            let t: Double = tl.date.timeIntervalSinceReferenceDate
+            let panes: [Color] = [Color(red: 0.86, green: 0.18, blue: 0.24),
+                                  Color(red: 0.20, green: 0.40, blue: 0.92),
+                                  Color(red: 0.98, green: 0.76, blue: 0.20),
+                                  Color(red: 0.20, green: 0.68, blue: 0.40),
+                                  Color(red: 0.56, green: 0.26, blue: 0.80)]
+            ZStack {
+                ForEach(0..<20, id: \.self) { i in
+                    let k: Double = Double(i)
+                    let glow: Double = 0.35 + 0.55 * max(0.0, sin(t * 0.8 - k * 0.45))
+                    borderTrimSegment(at: Double(i) / 20.0 + 0.004, length: 0.042,
+                                      color: panes[i % panes.count].opacity(glow),
+                                      lineWidth: 4, blur: 0.4)
+                }
             }
         }
     }

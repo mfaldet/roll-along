@@ -1478,6 +1478,15 @@ struct CosmeticShopView: View {
                                       owned: gameState.isOwned(x),
                                       preview: AnyView(pitSwatch(x))))
         }
+        for x in b.boundaries {
+            rows.append(BundleItemRow(category: "Boundary", name: x.displayName,
+                                      owned: gameState.isOwned(x),
+                                      preview: AnyView(RoundedRectangle(cornerRadius: 6)
+                                        .strokeBorder(LinearGradient(colors: [x.edgeColor, x.color, x.deepColor],
+                                                                     startPoint: .top, endPoint: .bottom),
+                                                      lineWidth: 4)
+                                        .frame(width: 30, height: 24))))
+        }
         for x in b.music {
             rows.append(BundleItemRow(category: "Music", name: x.displayName,
                                       owned: gameState.isOwned(x),
@@ -1609,7 +1618,7 @@ struct CosmeticShopView: View {
         .accessibilityLabel("\(discount.percent) percent off")
     }
 
-    // ── 6-slot item row ──────────────────────────────────────────────────────
+    // ── 7-slot item row ──────────────────────────────────────────────────────
 
     private func collectionSlotRow(_ bundle: CosmeticBundle) -> some View {
         HStack(spacing: 6) {
@@ -1678,6 +1687,18 @@ struct CosmeticShopView: View {
                             .frame(width: 18, height: 10)
                     }
                     .frame(width: 38, height: 26)
+                }
+            }
+            // Boundary
+            collectionSlot(label: "Boundary",
+                           isOwned: bundle.boundaries.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.boundaries.first.map { isEquipped($0) } ?? false) {
+                if let wall = bundle.boundaries.first {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(LinearGradient(colors: [wall.edgeColor, wall.color, wall.deepColor],
+                                                     startPoint: .top, endPoint: .bottom),
+                                      lineWidth: 4)
+                        .frame(width: 34, height: 26)
                 }
             }
             // Music
@@ -1749,10 +1770,12 @@ struct CosmeticShopView: View {
                     }
                 }
             }
-            .frame(width: 52, height: 52)
+            .frame(minWidth: 40, maxWidth: 52, minHeight: 52, maxHeight: 52)
 
             Text(label)
                 .font(.system(size: 8, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .foregroundStyle(isEmpty ? Color(white: 0.22) : Color(white: 0.40))
         }
         .frame(maxWidth: .infinity)
@@ -1768,6 +1791,7 @@ struct CosmeticShopView: View {
         n += bundle.floors.filter { gameState.isOwned($0) }.count
         n += bundle.pits.filter   { gameState.isOwned($0) }.count
         n += bundle.music.filter  { gameState.isOwned($0) }.count
+        n += bundle.boundaries.filter { gameState.isOwned($0) }.count
         return n
     }
 
@@ -1826,6 +1850,7 @@ struct CosmeticShopView: View {
         if let t = bundle.trails.first { gameState.equippedTrail = t }
         if let f = bundle.floors.first { gameState.equippedFloor = f }
         if let p = bundle.pits.first   { gameState.equippedPit   = p }
+        if let w = bundle.boundaries.first { gameState.equippedBoundary = w }
         if let m = bundle.music.first  { gameState.equippedMusic = m }
         AnalyticsClient.shared.track(
             "bundle_purchased",

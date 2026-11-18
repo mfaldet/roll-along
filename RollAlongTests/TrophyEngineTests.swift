@@ -2456,7 +2456,7 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
 /// assert the right trophies latch on `gs.trophyEngine`.  The load-bearing
 /// claims: the 4 IAP secrets are excluded from every collection criterion;
 /// the earned Trophy ball / coin-buyable Aurora / free starters DO count;
-/// `collection_complete` uses the 207-item evergreen denominator; no trophy
+/// `collection_complete` uses the 242-item evergreen denominator; no trophy
 /// keys to a purchase/IAP count.
 final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
@@ -2559,22 +2559,22 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
     // MARK: - items_own_50
 
-    // MARK: - collection_complete (207 evergreen denominator)
+    // MARK: - collection_complete (242 evergreen denominator)
 
-    /// Grant EVERY evergreen cosmetic (the 207-item set) and prove
+    /// Grant EVERY evergreen cosmetic (the 242-item set) and prove
     /// `collection_complete` latches — while owning Money/Diamond neither
     /// helps nor is required, and the 7 seasonal balls are NOT required.
     func testCollectionCompleteUsesEvergreenDenominatorAndExcludesSecretsAndSeasonal() {
         let gs = makeGameState()
 
         // Own the 4 IAP secrets + all 7 seasonal balls — none should be
-        // needed, and they must not push the count past 207 either.
+        // needed, and they must not push the count past 242 either.
         gs.grant(BallSkin.diamond); gs.grant(BallSkin.moneyBall)
         gs.grant(TrailColor.moneyRoll); gs.grant(Floor.moneyFull)
         for b in TrophyCosmeticExclusions.seasonalExclusiveBalls { gs.grant(b) }
 
         // Not yet complete: evergreen items still missing.
-        XCTAssertLessThan(gs.trophyEvergreenCosmeticsOwnedCount, 207)
+        XCTAssertLessThan(gs.trophyEvergreenCosmeticsOwnedCount, 242)
 
         // Grant every EVERGREEN item (skip IAP secrets + seasonal balls;
         // starters are already implicitly owned).
@@ -2592,13 +2592,13 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         for bnd in Boundary.allCases { gs.grant(bnd) }
         for m in MusicTrack.allCases { gs.grant(m) }
 
-        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 207,
-                       "the evergreen denominator must be exactly 207")
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 242,
+                       "the evergreen denominator must be exactly 242")
     }
 
-    /// The evergreen count NEVER exceeds 207 even when every IAP secret and
+    /// The evergreen count NEVER exceeds 242 even when every IAP secret and
     /// seasonal ball is also owned — proving they can't help/pad the metric.
-    func testEvergreenCountCannotExceed207() {
+    func testEvergreenCountCannotExceedEvergreenTotal() {
         let gs = makeGameState()
         // Own literally everything the game defines.
         for b in BallSkin.allCases  { gs.grant(b) }
@@ -2608,8 +2608,8 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         for p in Pit.allCases       { gs.grant(p) }
         for bnd in Boundary.allCases { gs.grant(bnd) }
         for m in MusicTrack.allCases { gs.grant(m) }
-        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 207,
-                       "owning secrets + seasonal must not push evergreen past 207")
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 242,
+                       "owning secrets + seasonal must not push evergreen past 242")
     }
 
     /// Coin-buyable Aurora counts toward evergreen (it is NOT iconic-excluded).

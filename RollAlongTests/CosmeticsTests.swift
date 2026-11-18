@@ -244,13 +244,16 @@ final class CosmeticsTests: XCTestCase {
 
     func testBundle_fullPrice_equalsSumOfItemCosts() {
         for bundle in CosmeticBundle.catalogue {
-            let ballSum  = bundle.balls.reduce(0)  { $0 + $1.coinCost }
-            let goalSum  = bundle.goals.reduce(0)  { $0 + $1.coinCost }
-            let trailSum = bundle.trails.reduce(0) { $0 + $1.coinCost }
-            let floorSum = bundle.floors.reduce(0) { $0 + $1.coinCost }
-            let pitSum   = bundle.pits.reduce(0)   { $0 + $1.coinCost }
-            let musicSum = bundle.music.reduce(0)  { $0 + $1.coinCost }
-            let manual = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
+            // A slot's default item (Paper World's Graphite trail) is owned by
+            // everyone and adds nothing.
+            let ballSum  = bundle.balls.filter  { $0 != BallSkin.starter }.reduce(0)   { $0 + $1.coinCost }
+            let goalSum  = bundle.goals.filter  { $0 != GoalSkin.starter }.reduce(0)   { $0 + $1.coinCost }
+            let trailSum = bundle.trails.filter { $0 != TrailColor.starter }.reduce(0) { $0 + $1.coinCost }
+            let floorSum = bundle.floors.filter { $0 != Floor.starter }.reduce(0)      { $0 + $1.coinCost }
+            let pitSum   = bundle.pits.filter   { $0 != Pit.starter }.reduce(0)        { $0 + $1.coinCost }
+            let musicSum = bundle.music.filter  { $0 != MusicTrack.starter }.reduce(0) { $0 + $1.coinCost }
+            let wallSum  = bundle.boundaries.filter { $0 != Boundary.starter }.reduce(0) { $0 + $1.coinCost }
+            let manual = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum + wallSum
             XCTAssertEqual(bundle.fullPrice(), manual, "fullPrice mismatch for '\(bundle.id)'")
         }
     }
@@ -448,7 +451,7 @@ final class CosmeticsTests: XCTestCase {
 
     /// StoreKitManager.grantAuroraCollection looks the bundle up by the string
     /// id "aurora" — renaming or removing it would silently turn the Starter
-    /// Pack IAP's cosmetic grant into a no-op.  Pin the id and the six-slot
+    /// Pack IAP's cosmetic grant into a no-op.  Pin the id and the seven-slot
     /// shape of the collection.
     func testAuroraBundle_existsWithOneItemPerCategory() {
         guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
@@ -460,11 +463,47 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(aurora.floors, [.aurora])
         XCTAssertEqual(aurora.pits,   [.aurora])
         XCTAssertEqual(aurora.music,  [.aurora])
+        XCTAssertEqual(aurora.boundaries, [.aurora])
+    }
+
+    /// Every collection is a complete set: at least one item in each of the
+    /// seven slots (ball, goal, trail, floor, pit, boundary, music).
+    func testEveryCollection_isACompleteSevenSlotSet() {
+        for b in CosmeticBundle.catalogue {
+            XCTAssertFalse(b.balls.isEmpty,      "\(b.id) has no ball")
+            XCTAssertFalse(b.goals.isEmpty,      "\(b.id) has no goal")
+            XCTAssertFalse(b.trails.isEmpty,     "\(b.id) has no trail")
+            XCTAssertFalse(b.floors.isEmpty,     "\(b.id) has no floor")
+            XCTAssertFalse(b.pits.isEmpty,       "\(b.id) has no pit")
+            XCTAssertFalse(b.boundaries.isEmpty, "\(b.id) has no boundary")
+            XCTAssertFalse(b.music.isEmpty,      "\(b.id) has no music")
+        }
+    }
+
+    /// Every boundary added for a collection belongs to at least one
+    /// collection, and the animated (Legendary) ones only sit in collections
+    /// that are already Legendary — so adding them moved no rarity band.
+    func testCollectionBoundaries_areUsedAndKeepRarityBands() {
+        let used = Set(CosmeticBundle.catalogue.flatMap(\.boundaries))
+        let added: [Boundary] = [.notebook, .fairway, .sunset, .rose, .ink, .citrus, .pastel,
+                                 .pumpkin, .holly, .shamrock, .marigold, .autumn, .lantern,
+                                 .hardwood, .cloud, .tide, .velvet, .marble, .phantom, .mahogany,
+                                 .sandstone, .abyss, .amethyst, .chrome, .brass, .molten,
+                                 .starlight, .aurora, .corona, .storm, .confetti, .starSpangled,
+                                 .rainbow, .marquee, .stainedGlass]
+        XCTAssertEqual(added.count, 35)
+        for w in added { XCTAssertTrue(used.contains(w), "\(w) is in no collection") }
+        for b in CosmeticBundle.catalogue {
+            for w in b.boundaries where w.tier == .exclusive {
+                XCTAssertEqual(b.rarity, .legendary,
+                               "animated boundary \(w) put in non-Legendary collection \(b.id)")
+            }
+        }
     }
 
     /// The Starter Pack grants the Aurora bundle free-granted; Sell Back must
-    /// refund none of it.  The bundle's items would sell back for 4,125 coins
-    /// (half of 8,250 under the 2026-07 reprice), so a sellable grant would
+    /// refund none of it.  The bundle's items would sell back for 4,875 coins
+    /// (half of 9,750 with the Aurora boundary), so a sellable grant would
     /// let the $1.99 pack rival the $4.99 coin pack.
     func testAuroraBundleGrantedFree_isNotACoinFaucet() {
         let gs = makeCleanState()
@@ -480,6 +519,7 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(gs.isOwned(Floor.aurora))
         XCTAssertTrue(gs.isOwned(Pit.aurora))
         XCTAssertTrue(gs.isOwned(MusicTrack.aurora))
+        XCTAssertTrue(gs.isOwned(Boundary.aurora))
         XCTAssertTrue(gs.completedBundleIDs.contains("aurora"))
 
         let preview = gs.coinLiquidationPreview()

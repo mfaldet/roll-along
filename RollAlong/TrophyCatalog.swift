@@ -252,7 +252,7 @@ enum TrophyMetric: String, Codable, CaseIterable {
     case packsOwned             = "packs_owned"
     /// Owned count within the evergreen coin-or-skill-reachable set:
     /// full catalogue − 4 IAP secrets − 7 seasonal bundle-exclusive balls
-    /// (207 at v1 — re-derived at §6 item 16, pending open Q10).
+    /// (242 since every collection got a boundary; was 207 at v1).
     case evergreenCosmeticsOwned = "evergreen_cosmetics_owned"
 
     // Economy (play-sourced only — no coins-spent metric exists, ever)

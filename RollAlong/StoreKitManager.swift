@@ -434,7 +434,7 @@ final class StoreKitManager: ObservableObject {
     /// cosmetic bundle (ball, goal, trail, floor, pit, music) — via
     /// `grantBundleFree`, which marks the items free-granted so Sell Back keeps
     /// them but never refunds them.  That marking is load-bearing: the bundle's
-    /// items would sell back for 4,125 coins (half their 8,250 catalogue value
+    /// items would sell back for 4,875 coins (half their 9,750 catalogue value
     /// under the 2026-07 reprice), so a plain grant would hand a $1.99 pack
     /// nearly the $4.99 coin pack's worth.  Players who already coin-bought part of
     /// the collection are refunded those items' full coinCost by

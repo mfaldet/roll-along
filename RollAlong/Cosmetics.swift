@@ -1297,6 +1297,51 @@ enum Boundary: String, CosmeticItem {
     case candy
     case circuit
 
+    // ── Collection boundaries (every collection is a complete set) ──
+    // Added so every collection carries a boundary that fits its theme.
+    // Solid walls are Standard / Rare like the originals; the animated ones
+    // are Legendary with a bespoke border renderer in `BoundaryOverlayView`,
+    // and only go to collections that are already Legendary, so no
+    // collection's rarity band changes.
+    // Standard (750 coins)
+    case notebook       // Paper World, Back to School — ruled-paper blue
+    case fairway        // Golf, Soccer, Diamond — fresh pitch green
+    case sunset         // Golden Hour — warm amber-coral
+    case rose           // Bloom, Sweetheart — rose pink
+    case ink            // Noir — inky charcoal
+    case citrus         // Citrus — lemon-lime
+    case pastel         // Pastel, Spring Fling — soft lilac
+    case pumpkin        // Halloween — pumpkin orange
+    case holly          // Winter Wonderland — holly green
+    case shamrock       // St. Patrick's — clover green
+    case marigold       // Día de los Muertos — marigold orange
+    case autumn         // Harvest Moon, Oktoberfest — russet
+    case lantern        // Lunar New Year — lacquer red
+    case hardwood       // Full Court — court maple
+    // Rare (1,000 coins)
+    case cloud          // Heavens — pale cloud white-blue
+    case tide           // Ocean, Aquarium — sea teal
+    case velvet         // Velvet Night — deep plum
+    case marble         // Realistic Marble — polished white stone
+    case phantom        // Haunted — ghostly pale green
+    case mahogany       // Billiards Hall, High Roller — table-rail wood
+    case sandstone      // Ancient Temple — carved terracotta
+    case abyss          // Abyssal Depths — deep-sea navy
+    case amethyst       // Crystal Cavern, Geode — crystal violet
+    case chrome         // Quicksilver — mirror silver
+    case brass          // Clockwork — polished brass
+    // Exclusive / Legendary (1,500 coins) — animated border renderers
+    case molten         // Hellfire, Lava Flow, Magma Core — creeping lava glow
+    case starlight      // Planets, Space Travel, Cosmos, Oracle — twinkling stars
+    case aurora         // Aurora — drifting green / violet curtains
+    case corona         // Eclipse — black rim with a travelling golden flare
+    case storm          // Tempest, Plasma Globe — lightning flicker
+    case confetti       // Countdown (New Year) — scrolling confetti dashes
+    case starSpangled   // Star-Spangled — red / white / blue bunting
+    case rainbow        // Pride — the full spectrum cycling around the rim
+    case marquee        // Midnight Carnival — chasing marquee bulbs
+    case stainedGlass   // Cathedral — slowly glowing colored panes
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -1313,6 +1358,41 @@ enum Boundary: String, CosmeticItem {
         case .obsidian: return "Obsidian"
         case .candy:    return "Candy"
         case .circuit:  return "Circuit"
+        case .notebook:      return "Notebook"
+        case .fairway:       return "Fairway"
+        case .sunset:        return "Sunset"
+        case .rose:          return "Rose"
+        case .ink:           return "Ink"
+        case .citrus:        return "Citrus"
+        case .pastel:        return "Pastel"
+        case .pumpkin:       return "Pumpkin"
+        case .holly:         return "Holly"
+        case .shamrock:      return "Shamrock"
+        case .marigold:      return "Marigold"
+        case .autumn:        return "Autumn"
+        case .lantern:       return "Lantern"
+        case .hardwood:      return "Hardwood"
+        case .cloud:         return "Cloud"
+        case .tide:          return "Tide"
+        case .velvet:        return "Velvet"
+        case .marble:        return "Marble"
+        case .phantom:       return "Phantom"
+        case .mahogany:      return "Mahogany"
+        case .sandstone:     return "Sandstone"
+        case .abyss:         return "Abyss"
+        case .amethyst:      return "Amethyst"
+        case .chrome:        return "Chrome"
+        case .brass:         return "Brass"
+        case .molten:        return "Molten"
+        case .starlight:     return "Starlight"
+        case .aurora:        return "Aurora"
+        case .corona:        return "Corona"
+        case .storm:         return "Storm"
+        case .confetti:      return "Confetti"
+        case .starSpangled:  return "Star-Spangled"
+        case .rainbow:       return "Rainbow"
+        case .marquee:       return "Marquee"
+        case .stainedGlass:  return "Stained Glass"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -1328,15 +1408,24 @@ enum Boundary: String, CosmeticItem {
             return .rare       // 1,000 coins
         case .obsidian, .candy, .circuit:
             return .exclusive  // 1,500 coins
+        case .notebook, .fairway, .sunset, .rose, .ink, .citrus, .pastel,
+             .pumpkin, .holly, .shamrock, .marigold, .autumn, .lantern, .hardwood:
+            return .standard   //  750 coins — solid themed walls
+        case .cloud, .tide, .velvet, .marble, .phantom, .mahogany,
+             .sandstone, .abyss, .amethyst, .chrome, .brass:
+            return .rare       // 1,000 coins — richer / material hues
+        case .molten, .starlight, .aurora, .corona, .storm, .confetti,
+             .starSpangled, .rainbow, .marquee, .stainedGlass:
+            return .exclusive  // 1,500 coins — animated border renderer
         }
     }
 
     /// Base fill for the wall / platform / border.
     ///
-    /// For the Legendary trio (obsidian / candy / circuit) this is the base
-    /// coat only: BallGameView layers a bespoke animated texture on the
-    /// screen border (see `legendaryBorderOverlay`), and this flat colour is
-    /// the static fallback under Reduce Motion and in non-animated contexts.
+    /// For the Legendary (animated) boundaries this is the base coat only:
+    /// `BoundaryOverlayView` layers a bespoke animated texture on the screen
+    /// border, and this flat colour is the static fallback under Reduce
+    /// Motion and in non-animated contexts.
     var color: Color {
         switch self {
         case .classic:  return Color(white: 0.34)
@@ -1352,6 +1441,41 @@ enum Boundary: String, CosmeticItem {
         case .obsidian: return Color(red: 0.16, green: 0.16, blue: 0.22)
         case .candy:    return Color(red: 0.98, green: 0.46, blue: 0.70)
         case .circuit:  return Color(red: 0.20, green: 0.70, blue: 0.55)
+        case .notebook:      return Color(red: 0.56, green: 0.70, blue: 0.90)
+        case .fairway:       return Color(red: 0.30, green: 0.66, blue: 0.32)
+        case .sunset:        return Color(red: 0.96, green: 0.56, blue: 0.34)
+        case .rose:          return Color(red: 0.90, green: 0.42, blue: 0.56)
+        case .ink:           return Color(red: 0.20, green: 0.21, blue: 0.25)
+        case .citrus:        return Color(red: 0.84, green: 0.86, blue: 0.26)
+        case .pastel:        return Color(red: 0.84, green: 0.70, blue: 0.90)
+        case .pumpkin:       return Color(red: 0.95, green: 0.52, blue: 0.14)
+        case .holly:         return Color(red: 0.14, green: 0.48, blue: 0.30)
+        case .shamrock:      return Color(red: 0.20, green: 0.70, blue: 0.36)
+        case .marigold:      return Color(red: 0.98, green: 0.66, blue: 0.12)
+        case .autumn:        return Color(red: 0.70, green: 0.36, blue: 0.18)
+        case .lantern:       return Color(red: 0.82, green: 0.16, blue: 0.16)
+        case .hardwood:      return Color(red: 0.80, green: 0.56, blue: 0.32)
+        case .cloud:         return Color(red: 0.84, green: 0.90, blue: 0.98)
+        case .tide:          return Color(red: 0.12, green: 0.56, blue: 0.66)
+        case .velvet:        return Color(red: 0.42, green: 0.16, blue: 0.42)
+        case .marble:        return Color(red: 0.88, green: 0.87, blue: 0.84)
+        case .phantom:       return Color(red: 0.66, green: 0.80, blue: 0.74)
+        case .mahogany:      return Color(red: 0.44, green: 0.18, blue: 0.12)
+        case .sandstone:     return Color(red: 0.78, green: 0.48, blue: 0.32)
+        case .abyss:         return Color(red: 0.06, green: 0.20, blue: 0.36)
+        case .amethyst:      return Color(red: 0.56, green: 0.36, blue: 0.82)
+        case .chrome:        return Color(red: 0.76, green: 0.79, blue: 0.84)
+        case .brass:         return Color(red: 0.78, green: 0.62, blue: 0.28)
+        case .molten:        return Color(red: 0.36, green: 0.08, blue: 0.04)
+        case .starlight:     return Color(red: 0.08, green: 0.10, blue: 0.26)
+        case .aurora:        return Color(red: 0.10, green: 0.42, blue: 0.40)
+        case .corona:        return Color(red: 0.10, green: 0.08, blue: 0.06)
+        case .storm:         return Color(red: 0.22, green: 0.26, blue: 0.36)
+        case .confetti:      return Color(red: 0.30, green: 0.22, blue: 0.46)
+        case .starSpangled:  return Color(red: 0.12, green: 0.20, blue: 0.52)
+        case .rainbow:       return Color(red: 0.60, green: 0.30, blue: 0.90)
+        case .marquee:       return Color(red: 0.40, green: 0.06, blue: 0.10)
+        case .stainedGlass:  return Color(red: 0.10, green: 0.12, blue: 0.24)
         }
     }
 
@@ -1721,6 +1845,7 @@ enum CosmeticSchedule {
             note(String(describing: Floor.self),      bundle.floors.map(\.rawValue), bundle.id)
             note(String(describing: Pit.self),        bundle.pits.map(\.rawValue),   bundle.id)
             note(String(describing: MusicTrack.self), bundle.music.map(\.rawValue),  bundle.id)
+            note(String(describing: Boundary.self),   bundle.boundaries.map(\.rawValue), bundle.id)
         }
         return map
     }()
@@ -1738,7 +1863,7 @@ enum CosmeticSchedule {
     /// The release keys an item waits on: it is released once ANY of them is.
     /// Empty = available from launch.
     static func releaseKeys<Item: CosmeticItem>(of item: Item) -> [String] {
-        if item.tier == .starter { return [] }
+        if item.tier == .starter || item == Item.starter { return [] }   // defaults (e.g. Graphite) are always out
         if let ids = itemCollections[key(String(describing: Item.self), item.rawValue)] { return ids }
         return looseSlot(item.rawValue).map { [$0] } ?? []
     }
@@ -2200,6 +2325,10 @@ struct CosmeticBundle: Identifiable {
     let floors: [Floor]
     let pits:   [Pit]
     let music:  [MusicTrack]
+    /// The collection's boundary (walls / platforms / screen border).  Every
+    /// collection carries exactly one.  Declared after `music` with a default
+    /// so the memberwise initializer keeps its existing argument order.
+    var boundaries: [Boundary] = []
 
     // ── Seasonal availability window ───────────────────────────────
     // Both nil = always available (permanent bundle).
@@ -2280,7 +2409,8 @@ struct CosmeticBundle: Identifiable {
     }
 
     var itemCount: Int {
-        balls.count + goals.count + trails.count + floors.count + pits.count + music.count
+        balls.count + goals.count + trails.count + floors.count + pits.count
+            + boundaries.count + music.count
     }
 
     /// The full price of the bundle — the sum of every contained item's
@@ -2288,13 +2418,21 @@ struct CosmeticBundle: Identifiable {
     func fullPrice() -> Int {
         // Per-category locals so the Swift type-checker doesn't choke on one
         // giant chained-generic expression.
-        let ballSum:  Int = balls.reduce(0)  { $0 + $1.coinCost }
-        let goalSum:  Int = goals.reduce(0)  { $0 + $1.coinCost }
-        let trailSum: Int = trails.reduce(0) { $0 + $1.coinCost }
-        let floorSum: Int = floors.reduce(0) { $0 + $1.coinCost }
-        let pitSum:   Int = pits.reduce(0)   { $0 + $1.coinCost }
-        let musicSum: Int = music.reduce(0)  { $0 + $1.coinCost }
-        return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
+        let ballSum:  Int = balls.reduce(0)  { $0 + Self.listPrice($1) }
+        let goalSum:  Int = goals.reduce(0)  { $0 + Self.listPrice($1) }
+        let trailSum: Int = trails.reduce(0) { $0 + Self.listPrice($1) }
+        let floorSum: Int = floors.reduce(0) { $0 + Self.listPrice($1) }
+        let pitSum:   Int = pits.reduce(0)   { $0 + Self.listPrice($1) }
+        let musicSum: Int = music.reduce(0)  { $0 + Self.listPrice($1) }
+        let wallSum:  Int = boundaries.reduce(0) { $0 + Self.listPrice($1) }
+        return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum + wallSum
+    }
+
+    /// An item's price inside a collection: its coin cost, except a slot's
+    /// default item (e.g. the Graphite trail in Paper World), which every
+    /// player already owns and so never costs anything.
+    static func listPrice<Item: CosmeticItem>(_ item: Item) -> Int {
+        item == Item.starter ? 0 : item.coinCost
     }
 
     /// Count of contained items per cosmetic tier (starter items included —
@@ -2308,6 +2446,7 @@ struct CosmeticBundle: Identifiable {
         for f in floors { counts[f.tier, default: 0] += 1 }
         for p in pits   { counts[p.tier, default: 0] += 1 }
         for m in music  { counts[m.tier, default: 0] += 1 }
+        for w in boundaries { counts[w.tier, default: 0] += 1 }
         return counts
     }
 
@@ -2335,7 +2474,8 @@ struct CosmeticBundle: Identifiable {
         let floorSum: Int = floors.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
         let pitSum:   Int = pits.reduce(0)   { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
         let musicSum: Int = music.reduce(0)  { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
-        return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum
+        let wallSum:  Int = boundaries.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum + wallSum
     }
 
     /// The Shop's featured-bundle price: the prorated price with the given
@@ -2359,6 +2499,7 @@ struct CosmeticBundle: Identifiable {
         case let f as Floor:      return floors.contains(f)
         case let p as Pit:        return pits.contains(p)
         case let m as MusicTrack: return music.contains(m)
+        case let w as Boundary:   return boundaries.contains(w)
         default:                  return false
         }
     }
@@ -2380,6 +2521,7 @@ struct CosmeticBundle: Identifiable {
         floors.forEach { state.grant($0) }
         pits.forEach   { state.grant($0) }
         music.forEach  { state.grant($0) }
+        boundaries.forEach { state.grant($0) }
     }
 
     // ── Catalogue ──────────────────────────────────────────────────
@@ -2394,343 +2536,370 @@ struct CosmeticBundle: Identifiable {
             id:             "hellfire",
             displayName:    "Hellfire",
             tagline:        "Roll a ruby through the inferno.",
-            contentSummary: "Ruby ball · Inferno goal · Ember floor · Evil pit · Fire trail · Synthwave music",
+            contentSummary: "Ruby ball · Inferno goal · Ember floor · Evil pit · Fire trail · Synthwave music · Molten boundary",
             balls:  [.ruby],
             goals:  [.inferno],
             trails: [.fire],
             floors: [.ember],
             pits:   [.evil],
-            music:  [.synthwave]
+            music:  [.synthwave],
+            boundaries: [.molten]
         ),
         CosmeticBundle(
             id:             "heavens",
             displayName:    "Heavens",
             tagline:        "Drift the sky on opal lustre.",
-            contentSummary: "Opal ball · Halo goal · Classic floor · Sky pit · Stardust trail · Celestial music",
+            contentSummary: "Opal ball · Halo goal · Classic floor · Sky pit · Stardust trail · Celestial music · Cloud boundary",
             balls:  [.opal],
             goals:  [.halo],
             trails: [.stardust],
             floors: [.classic],
             pits:   [.sky],
-            music:  [.celestial]
+            music:  [.celestial],
+            boundaries: [.cloud]
         ),
         CosmeticBundle(
             id:             "nightclub",
             displayName:    "Nightclub",
             tagline:        "Disco lights, neon goal, bubblegum streak.",
-            contentSummary: "Disco Ball · Disco floor · Nightclub pit · Neon goal · Bubblegum trail · Retrowave music",
+            contentSummary: "Disco Ball · Disco floor · Nightclub pit · Neon goal · Bubblegum trail · Retrowave music · Neon boundary",
             balls:  [.disco],
             goals:  [.neon],
             trails: [.bubblegum],
             floors: [.disco],
             pits:   [.nightclub],
-            music:  [.retrowave]
+            music:  [.retrowave],
+            boundaries: [.neon]
         ),
         CosmeticBundle(
             id:             "paper-world",
             displayName:    "Paper World",
             tagline:        "The full Notebook + Graphite-trail pack.",
-            contentSummary: "Paper ball · Doodle goal · Notebook floor · Notebook pit · Graphite trail (starter) · Lo-fi music",
+            contentSummary: "Paper ball · Doodle goal · Notebook floor · Notebook pit · Graphite trail · Lo-fi music · Notebook boundary",
             balls:  [.paper],
             goals:  [.doodle],
-            trails: [],   // graphite is starter; included by default
+            trails: [.graphite],   // the default trail everyone owns — adds nothing to the price paid
             floors: [.notebook],
             pits:   [.notebook],
-            music:  [.lofi]
+            music:  [.lofi],
+            boundaries: [.notebook]
         ),
         CosmeticBundle(
             id:             "golf",
             displayName:    "Golf",
             tagline:        "Dimpled ball, fairway green, lily-pad pond, hole-in-one flag.",
-            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal · Jazz music",
+            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal · Jazz music · Fairway boundary",
             balls:  [.golfBall],
             goals:  [.holeInOne],
             trails: [.air],
             floors: [.grass],
             pits:   [.pond],
-            music:  [.jazz]
+            music:  [.jazz],
+            boundaries: [.fairway]
         ),
 
         CosmeticBundle(
             id:             "planets",
             displayName:    "Planets",
             tagline:        "Roll the whole solar system — plus a tiny Pluto.",
-            contentSummary: "Earth · Mars · Saturn · Mercury · Neptune · Jupiter · Venus · Uranus + exclusive half-size Pluto",
+            contentSummary: "Earth · Mars · Saturn · Mercury · Neptune · Jupiter · Venus · Uranus + exclusive half-size Pluto · Galaxy goal · Stardust trail · Midnight floor · Space pit · Celestial music · Starlight boundary",
             balls:  [.earth, .mars, .saturn, .mercury,
                      .neptune, .jupiter, .venus, .uranus, .pluto],
-            goals:  [],
-            trails: [],
-            floors: [],
-            pits:   [],
-            music:  []
+            goals:  [.galaxy],
+            trails: [.stardust],
+            floors: [.midnight],
+            pits:   [.space],
+            music:  [.celestial],
+            boundaries: [.starlight]
         ),
 
         CosmeticBundle(
             id:             "space-travel",
             displayName:    "Space Travel",
             tagline:        "Pilot a saucer across the moon and into the void.",
-            contentSummary: "UFO ball · Moon floor · Space pit · Tractor Beam goal · Raybeam trail · Retrowave music",
+            contentSummary: "UFO ball · Moon floor · Space pit · Tractor Beam goal · Raybeam trail · Retrowave music · Starlight boundary",
             balls:  [.ufo],
             goals:  [.tractorBeam],
             trails: [.raybeam],
             floors: [.moon],
             pits:   [.space],
-            music:  [.retrowave]
+            music:  [.retrowave],
+            boundaries: [.starlight]
         ),
 
         CosmeticBundle(
             id:             "winter",
             displayName:    "Winter",
             tagline:        "A snowglobe marble through crystal frost.",
-            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Classical music",
+            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Classical music · Ice boundary",
             balls:  [.snowglobe],
             goals:  [.crystal],
             trails: [.ice],
             floors: [.twilight],
             pits:   [.twilight],
-            music:  [.classical]
+            music:  [.classical],
+            boundaries: [.ice]
         ),
 
         CosmeticBundle(
             id:             "cosmos",
             displayName:    "Cosmos",
             tagline:        "Drift the deep with a nebula in hand.",
-            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Celestial music",
+            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Celestial music · Starlight boundary",
             balls:  [.nebula],
             goals:  [.galaxy],
             trails: [.stardust],
             floors: [.midnight],
             pits:   [.midnight],
-            music:  [.celestial]
+            music:  [.celestial],
+            boundaries: [.starlight]
         ),
 
         CosmeticBundle(
             id:             "nature",
             displayName:    "Nature",
             tagline:        "Jade and blossoms over a meadow green.",
-            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Acoustic music",
+            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
             balls:  [.jade],
             goals:  [.blossom],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],
-            music:  [.acoustic]
+            music:  [.acoustic],
+            boundaries: [.mint]
         ),
 
         CosmeticBundle(
             id:             "ocean",
             displayName:    "Ocean",
             tagline:        "Ride the tide on a wave of mint.",
-            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music",
+            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music · Tide boundary",
             balls:  [.mint],
             goals:  [.ripple],
             trails: [.sky],
             floors: [.blueprint],
             pits:   [.blueprint],
-            music:  [.lofi]
+            music:  [.lofi],
+            boundaries: [.tide]
         ),
 
         CosmeticBundle(
             id:             "velvet-night",
             displayName:    "Velvet Night",
             tagline:        "Plasma and rainbow over deep velvet.",
-            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit · Downtempo music",
+            contentSummary: "Purple ball · Plasma goal · Rainbow trail · Velvet floor · Velvet pit · Downtempo music · Velvet boundary",
             balls:  [.purple],
             goals:  [.plasma],
             trails: [.rainbow],
             floors: [.velvet],
             pits:   [.velvet],
-            music:  [.downtempo]
+            music:  [.downtempo],
+            boundaries: [.velvet]
         ),
 
         CosmeticBundle(
             id:             "golden-hour",
             displayName:    "Golden Hour",
             tagline:        "Chase the last warm light of the day.",
-            contentSummary: "Coral ball · Mirage goal · Fire trail · Sunset floor · Dusk pit · Acoustic music",
+            contentSummary: "Coral ball · Mirage goal · Fire trail · Sunset floor · Dusk pit · Acoustic music · Sunset boundary",
             balls:  [.coral],
             goals:  [.mirage],
             trails: [.fire],
             floors: [.sunset],
             pits:   [.dusk],
-            music:  [.acoustic]
+            music:  [.acoustic],
+            boundaries: [.sunset]
         ),
 
         CosmeticBundle(
             id:             "arcade",
             displayName:    "Arcade",
             tagline:        "Pixel-perfect retro on a grid.",
-            contentSummary: "Copper ball · Comet goal · Comet trail · Graph floor · Graph pit · Chiptune music",
+            contentSummary: "Copper ball · Comet goal · Comet trail · Graph floor · Graph pit · Chiptune music · Neon boundary",
             balls:  [.copper],
             goals:  [.comet],
             trails: [.cometTrail],
             floors: [.graph],
             pits:   [.graph],
-            music:  [.chiptune]
+            music:  [.chiptune],
+            boundaries: [.neon]
         ),
 
         CosmeticBundle(
             id:             "bloom",
             displayName:    "Bloom",
             tagline:        "Soft petals on warm parchment.",
-            contentSummary: "Rose ball · Mosaic goal · Rose trail · Parchment floor · Parchment pit · Piano music",
+            contentSummary: "Rose ball · Mosaic goal · Rose trail · Parchment floor · Parchment pit · Piano music · Rose boundary",
             balls:  [.rose],
             goals:  [.mosaic],
             trails: [.roseTrail],
             floors: [.parchment],
             pits:   [.parchment],
-            music:  [.piano]
+            music:  [.piano],
+            boundaries: [.rose]
         ),
 
         CosmeticBundle(
             id:             "noir",
             displayName:    "Noir",
             tagline:        "Black, white, and everything stark.",
-            contentSummary: "Slate ball · Obsidian goal · Ink trail · Inverted floor · Inverted pit · Cinematic music",
+            contentSummary: "Slate ball · Obsidian goal · Ink trail · Inverted floor · Inverted pit · Cinematic music · Ink boundary",
             balls:  [.slate],
             goals:  [.obsidian],
             trails: [.ink],
             floors: [.inverted],
             pits:   [.inverted],
-            music:  [.cinematic]
+            music:  [.cinematic],
+            boundaries: [.ink]
         ),
 
         CosmeticBundle(
             id:             "aurora",
             displayName:    "Aurora",
             tagline:        "Chase the northern lights.",
-            contentSummary: "Aurora ball · Aurora goal · Aurora trail · Aurora floor · Aurora pit · Aurora music",
+            contentSummary: "Aurora ball · Aurora goal · Aurora trail · Aurora floor · Aurora pit · Aurora music · Aurora boundary",
             balls:  [.aurora],
             goals:  [.aurora],
             trails: [.aurora],
             floors: [.aurora],
             pits:   [.aurora],
-            music:  [.aurora]
+            music:  [.aurora],
+            boundaries: [.aurora]
         ),
 
         CosmeticBundle(
             id:             "citrus",
             displayName:    "Citrus",
             tagline:        "Zest and warmth from dawn to dusk.",
-            contentSummary: "Lemon ball · Flame goal · Ember trail · Dusk floor · Sunset pit · Jazz music",
+            contentSummary: "Lemon ball · Flame goal · Ember trail · Dusk floor · Sunset pit · Jazz music · Citrus boundary",
             balls:  [.lemon],
             goals:  [.flame],
             trails: [.ember],
             floors: [.dusk],
             pits:   [.sunset],
-            music:  [.jazz]
+            music:  [.jazz],
+            boundaries: [.citrus]
         ),
 
         CosmeticBundle(
             id:             "midas",
             displayName:    "Midas",
             tagline:        "Everything you touch turns to gold.",
-            contentSummary: "Gold ball · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music",
+            contentSummary: "Gold ball · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music · Gold boundary",
             balls:  [.gold],
             goals:  [.quasar],
             trails: [.gilded],
             floors: [.mirage],
             pits:   [.mirage],
-            music:  [.orchestral]
+            music:  [.orchestral],
+            boundaries: [.gold]
         ),
 
         CosmeticBundle(
             id:             "sketchbook",
             displayName:    "Sketchbook",
             tagline:        "Pencil, graphite, and a steady hand.",
-            contentSummary: "Silver ball · Archery goal · Smoke trail · Sketch floor · Sketch pit · Classical music",
+            contentSummary: "Silver ball · Archery goal · Smoke trail · Sketch floor · Sketch pit · Classical music · Slate boundary",
             balls:  [.silver],
             goals:  [.archery],
             trails: [.smoke],
             floors: [.sketch],
             pits:   [.sketch],
-            music:  [.classical]
+            music:  [.classical],
+            boundaries: [.slate]
         ),
 
         CosmeticBundle(
             id:             "zen-garden",
             displayName:    "Zen Garden",
             tagline:        "A folded-paper serpent in a calm green world.",
-            contentSummary: "Green ball · Rainbow goal · Snake trail · Origami floor · Origami pit · Dreamscape music",
+            contentSummary: "Green ball · Rainbow goal · Snake trail · Origami floor · Origami pit · Dreamscape music · Sand boundary",
             balls:  [.green],
             goals:  [.rainbow],
             trails: [.snake],
             floors: [.origami],
             pits:   [.origami],
-            music:  [.dreamscape]
+            music:  [.dreamscape],
+            boundaries: [.sand]
         ),
 
         CosmeticBundle(
             id:             "eclipse",
             displayName:    "Eclipse",
             tagline:        "A golden corona around the dark.",
-            contentSummary: "Blue ball · Eclipse goal · Eclipse floor · Eclipse pit · Gilded trail · Mysterium music",
+            contentSummary: "Blue ball · Eclipse goal · Eclipse floor · Eclipse pit · Gilded trail · Mysterium music · Corona boundary",
             balls:  [.blue],
             goals:  [.eclipse],
             trails: [.gilded],
             floors: [.eclipse],
             pits:   [.eclipse],
-            music:  [.mysterium]
+            music:  [.mysterium],
+            boundaries: [.corona]
         ),
         CosmeticBundle(
             id:             "pastel",
             displayName:    "Pastel",
             tagline:        "Soft candy hues and a gentle piano.",
-            contentSummary: "Pastel ball · Blossom goal · Rose trail · Twilight floor · Parchment pit · Piano music",
+            contentSummary: "Pastel ball · Blossom goal · Rose trail · Twilight floor · Parchment pit · Piano music · Pastel boundary",
             balls:  [.pastel],
             goals:  [.blossom],
             trails: [.roseTrail],
             floors: [.twilight],
             pits:   [.parchment],
-            music:  [.piano]
+            music:  [.piano],
+            boundaries: [.pastel]
         ),
         CosmeticBundle(
             id:             "neon",
             displayName:    "Neon",
             tagline:        "Electric pink on a pulsing dance floor.",
-            contentSummary: "Neon ball · Neon goal · Bubblegum trail · Disco floor · Midnight pit · Electronic music",
+            contentSummary: "Neon ball · Neon goal · Bubblegum trail · Disco floor · Midnight pit · Electronic music · Neon boundary",
             balls:  [.neon],
             goals:  [.neon],
             trails: [.bubblegum],
             floors: [.disco],
             pits:   [.midnight],
-            music:  [.electronic]
+            music:  [.electronic],
+            boundaries: [.neon]
         ),
         CosmeticBundle(
             id:             "soccer",
             displayName:    "Soccer",
             tagline:        "Hit the pitch — hex-stitched ball on fresh turf.",
-            contentSummary: "Soccer Ball · Soccer Net goal · Smoke trail · Grass floor · Meadow pit · Synthwave music",
+            contentSummary: "Soccer Ball · Soccer Net goal · Smoke trail · Grass floor · Meadow pit · Synthwave music · Fairway boundary",
             balls:  [.soccer],
             goals:  [.soccerNet],
             trails: [.smoke],
             floors: [.grass],
             pits:   [.meadow],
-            music:  [.synthwave]
+            music:  [.synthwave],
+            boundaries: [.fairway]
         ),
         CosmeticBundle(
             id:             "aquarium",
             displayName:    "Aquarium",
             tagline:        "A glass orb of bubbles over a rippling pond.",
-            contentSummary: "Aquarium ball · Ripple goal · Ice trail · Mirage floor · Pond pit · Dreamscape music",
+            contentSummary: "Aquarium ball · Ripple goal · Ice trail · Mirage floor · Pond pit · Dreamscape music · Tide boundary",
             balls:  [.aquarium],
             goals:  [.ripple],
             trails: [.ice],
             floors: [.mirage],
             pits:   [.pond],
-            music:  [.dreamscape]
+            music:  [.dreamscape],
+            boundaries: [.tide]
         ),
         CosmeticBundle(
             id:             "realistic-marble",
             displayName:    "Realistic Marble",
             tagline:        "A genuine glass cat's-eye, swirled in cobalt.",
-            contentSummary: "Marble ball · Crystal goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music",
+            contentSummary: "Marble ball · Crystal goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music · Marble boundary",
             balls:  [.marble],
             goals:  [.crystal],
             trails: [.gilded],
             floors: [.velvet],
             pits:   [.velvet],
-            music:  [.cinematic]
+            music:  [.cinematic],
+            boundaries: [.marble]
         ),
 
         // ── Round 5 ──
@@ -2738,49 +2907,53 @@ struct CosmeticBundle: Identifiable {
             id:             "dune",
             displayName:    "Dune",
             tagline:        "Drift the desert as the sun sinks low.",
-            contentSummary: "Dune ball · Mirage goal · Air trail · Desert floor · Canyon pit · Ambient music",
+            contentSummary: "Dune ball · Mirage goal · Air trail · Desert floor · Canyon pit · Ambient music · Sand boundary",
             balls:  [.dune],
             goals:  [.mirage],
             trails: [.air],
             floors: [.desert],
             pits:   [.canyon],
-            music:  [.ambient]
+            music:  [.ambient],
+            boundaries: [.sand]
         ),
         CosmeticBundle(
             id:             "tempest",
             displayName:    "Tempest",
             tagline:        "Lightning sealed inside a marble.",
-            contentSummary: "Storm ball · Plasma goal · Smoke trail · Stormcloud floor · Downpour pit · Retrowave music",
+            contentSummary: "Storm ball · Plasma goal · Smoke trail · Stormcloud floor · Downpour pit · Retrowave music · Storm boundary",
             balls:  [.storm],
             goals:  [.plasma],
             trails: [.smoke],
             floors: [.stormcloud],
             pits:   [.downpour],
-            music:  [.retrowave]
+            music:  [.retrowave],
+            boundaries: [.storm]
         ),
         CosmeticBundle(
             id:             "candyland",
             displayName:    "Candyland",
             tagline:        "A peppermint swirl through a sugar-dusted world.",
-            contentSummary: "Candy ball · Mosaic goal · Bubblegum trail · Sugar floor · Syrup pit · Lo-fi music",
+            contentSummary: "Candy ball · Mosaic goal · Bubblegum trail · Sugar floor · Syrup pit · Lo-fi music · Candy boundary",
             balls:  [.candy],
             goals:  [.mosaic],
             trails: [.bubblegum],
             floors: [.sugar],
             pits:   [.syrup],
-            music:  [.lofi]
+            music:  [.lofi],
+            boundaries: [.candy]
         ),
         CosmeticBundle(
             id:             "haunted",
             displayName:    "Haunted",
             tagline:        "A restless spirit drifting through the dark.",
-            contentSummary: "Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music",
+            contentSummary: "Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music · Phantom boundary",
             balls:  [.ghost],
             goals:  [.obsidian],
             trails: [.smoke],
             floors: [.fog],
             pits:   [.graveyard],
-            music:  [.downtempo]
+            music:  [.downtempo],
+            boundaries: [.phantom]
         ),
 
         // ── Seasonal bundles (limited-time, return annually) ───────────
@@ -2798,13 +2971,14 @@ struct CosmeticBundle: Identifiable {
             id:             "summer-2026",
             displayName:    "Summer Vibes",
             tagline:        "Sun, sea, and rolling waves.",
-            contentSummary: "Beach Ball · Ripple goal · Sky trail · Blueprint floor · Pond pit · Acoustic music",
+            contentSummary: "Beach Ball · Ripple goal · Sky trail · Blueprint floor · Pond pit · Acoustic music · Sky boundary",
             balls:  [.beachBall],
             goals:  [.ripple],
             trails: [.sky],
             floors: [.blueprint],
             pits:   [.pond],
             music:  [.acoustic],
+            boundaries: [.sky],
             availableFrom:  CosmeticBundle.date(2026, 6,  1),
             availableUntil: CosmeticBundle.date(2026, 9,  1)
         ),
@@ -2812,13 +2986,14 @@ struct CosmeticBundle: Identifiable {
             id:             "halloween-2026",
             displayName:    "Trick or Roll",
             tagline:        "A restless spirit through the dark.",
-            contentSummary: "Pumpkin ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music",
+            contentSummary: "Pumpkin ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music · Pumpkin boundary",
             balls:  [.pumpkin],
             goals:  [.obsidian],
             trails: [.smoke],
             floors: [.fog],
             pits:   [.graveyard],
             music:  [.downtempo],
+            boundaries: [.pumpkin],
             availableFrom:  CosmeticBundle.date(2026, 10,  1),
             availableUntil: CosmeticBundle.date(2026, 11,  1)
         ),
@@ -2826,13 +3001,14 @@ struct CosmeticBundle: Identifiable {
             id:             "winter-2026",
             displayName:    "Winter Wonderland",
             tagline:        "A mirror-bright ornament through crystal frost.",
-            contentSummary: "Ornament ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Dreamscape music",
+            contentSummary: "Ornament ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Dreamscape music · Holly boundary",
             balls:  [.ornament],
             goals:  [.crystal],
             trails: [.ice],
             floors: [.twilight],
             pits:   [.twilight],
             music:  [.dreamscape],
+            boundaries: [.holly],
             availableFrom:  CosmeticBundle.date(2026, 12,  1),
             availableUntil: CosmeticBundle.date(2027,  1,  6)
         ),
@@ -2840,13 +3016,14 @@ struct CosmeticBundle: Identifiable {
             id:             "valentines-2027",
             displayName:    "Sweetheart",
             tagline:        "All heart, no brakes.",
-            contentSummary: "Heartstone ball · Blossom goal · Rose trail · Velvet floor · Dusk pit · Piano music",
+            contentSummary: "Heartstone ball · Blossom goal · Rose trail · Velvet floor · Dusk pit · Piano music · Rose boundary",
             balls:  [.heartstone],
             goals:  [.blossom],
             trails: [.roseTrail],
             floors: [.velvet],
             pits:   [.dusk],
             music:  [.piano],
+            boundaries: [.rose],
             availableFrom:  CosmeticBundle.date(2027, 2,  1),
             availableUntil: CosmeticBundle.date(2027, 2, 15)
         ),
@@ -2854,13 +3031,14 @@ struct CosmeticBundle: Identifiable {
             id:             "stpatricks-2027",
             displayName:    "Luck of the Roll",
             tagline:        "Find your four-leaf marble.",
-            contentSummary: "Shamrock ball · Mirage goal · Gilded trail · Meadow floor · Pond pit · Lofi music",
+            contentSummary: "Shamrock ball · Mirage goal · Gilded trail · Meadow floor · Pond pit · Lofi music · Shamrock boundary",
             balls:  [.shamrock],
             goals:  [.mirage],
             trails: [.gilded],
             floors: [.meadow],
             pits:   [.pond],
             music:  [.lofi],
+            boundaries: [.shamrock],
             availableFrom:  CosmeticBundle.date(2027, 3,  1),
             availableUntil: CosmeticBundle.date(2027, 3, 18)
         ),
@@ -2868,13 +3046,14 @@ struct CosmeticBundle: Identifiable {
             id:             "newyear-2027",
             displayName:    "Countdown",
             tagline:        "Three, two, one — roll.",
-            contentSummary: "Confetti ball · Rainbow goal · Gilded trail · Disco floor · Midnight pit · Electronic music",
+            contentSummary: "Confetti ball · Rainbow goal · Gilded trail · Disco floor · Midnight pit · Electronic music · Confetti boundary",
             balls:  [.confetti],
             goals:  [.rainbow],
             trails: [.gilded],
             floors: [.disco],
             pits:   [.midnight],
             music:  [.electronic],
+            boundaries: [.confetti],
             availableFrom:  CosmeticBundle.date(2026, 12, 26),
             availableUntil: CosmeticBundle.date(2027,  1,  5)
         ),
@@ -2882,13 +3061,14 @@ struct CosmeticBundle: Identifiable {
             id:             "spring-2027",
             displayName:    "Spring Fling",
             tagline:        "Speckled. Bright. Unstoppable.",
-            contentSummary: "Speckled Egg ball · Mosaic goal · Forest trail · Meadow floor · Sky pit · Acoustic music",
+            contentSummary: "Speckled Egg ball · Mosaic goal · Forest trail · Meadow floor · Sky pit · Acoustic music · Pastel boundary",
             balls:  [.speckledEgg],
             goals:  [.mosaic],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.sky],
             music:  [.acoustic],
+            boundaries: [.pastel],
             availableFrom:  CosmeticBundle.date(2027, 3, 20),
             availableUntil: CosmeticBundle.date(2027, 5,  1)
         ),
@@ -2896,13 +3076,14 @@ struct CosmeticBundle: Identifiable {
             id:             "july4-2026",
             displayName:    "Star-Spangled",
             tagline:        "Light up the night sky.",
-            contentSummary: "Fireworks ball · Rainbow goal · Stardust trail · Midnight floor · Midnight pit · Orchestral music",
+            contentSummary: "Fireworks ball · Rainbow goal · Stardust trail · Midnight floor · Midnight pit · Orchestral music · Star-Spangled boundary",
             balls:  [.fireworks],
             goals:  [.rainbow],
             trails: [.stardust],
             floors: [.midnight],
             pits:   [.midnight],
             music:  [.orchestral],
+            boundaries: [.starSpangled],
             availableFrom:  CosmeticBundle.date(2026, 6, 21),
             availableUntil: CosmeticBundle.date(2026, 7,  6)
         ),
@@ -2910,13 +3091,14 @@ struct CosmeticBundle: Identifiable {
             id:             "muertos-2026",
             displayName:    "Día de los Muertos",
             tagline:        "Roll bright, remember well.",
-            contentSummary: "Sugar Skull ball · Blossom goal · Rose trail · Velvet floor · Graveyard pit · Downtempo music",
+            contentSummary: "Sugar Skull ball · Blossom goal · Rose trail · Velvet floor · Graveyard pit · Downtempo music · Marigold boundary",
             balls:  [.sugarSkull],
             goals:  [.blossom],
             trails: [.roseTrail],
             floors: [.velvet],
             pits:   [.graveyard],
             music:  [.downtempo],
+            boundaries: [.marigold],
             availableFrom:  CosmeticBundle.date(2026, 10, 21),
             availableUntil: CosmeticBundle.date(2026, 11,  3)
         ),
@@ -2924,13 +3106,14 @@ struct CosmeticBundle: Identifiable {
             id:             "harvest-2026",
             displayName:    "Harvest Moon",
             tagline:        "Gather the golden hour in.",
-            contentSummary: "Harvest Moon ball · Flame goal · Ember trail · Desert floor · Canyon pit · Lo-fi music",
+            contentSummary: "Harvest Moon ball · Flame goal · Ember trail · Desert floor · Canyon pit · Lo-fi music · Autumn boundary",
             balls:  [.harvest],
             goals:  [.flame],
             trails: [.ember],
             floors: [.desert],
             pits:   [.canyon],
             music:  [.lofi],
+            boundaries: [.autumn],
             availableFrom:  CosmeticBundle.date(2026, 11, 1),
             availableUntil: CosmeticBundle.date(2026, 11, 30)
         ),
@@ -2938,13 +3121,14 @@ struct CosmeticBundle: Identifiable {
             id:             "lunar-2027",
             displayName:    "Lunar New Year",
             tagline:        "Fortune favors the fast.",
-            contentSummary: "Golden Dragon ball · Flame goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music",
+            contentSummary: "Golden Dragon ball · Flame goal · Gilded trail · Velvet floor · Velvet pit · Cinematic music · Lantern boundary",
             balls:  [.lunarDragon],
             goals:  [.flame],
             trails: [.gilded],
             floors: [.velvet],
             pits:   [.velvet],
             music:  [.cinematic],
+            boundaries: [.lantern],
             availableFrom:  CosmeticBundle.date(2027, 1, 27),
             availableUntil: CosmeticBundle.date(2027, 2, 20)
         ),
@@ -2952,13 +3136,14 @@ struct CosmeticBundle: Identifiable {
             id:             "mardigras-2027",
             displayName:    "Mardi Gras",
             tagline:        "Purple, green, and gold — let the good times roll.",
-            contentSummary: "Mardi Gras ball · Plasma goal · Bubblegum trail · Disco floor · Midnight pit · Jazz music",
+            contentSummary: "Mardi Gras ball · Plasma goal · Bubblegum trail · Disco floor · Midnight pit · Jazz music · Orchid boundary",
             balls:  [.mardiGras],
             goals:  [.plasma],
             trails: [.bubblegum],
             floors: [.disco],
             pits:   [.midnight],
             music:  [.jazz],
+            boundaries: [.orchid],
             availableFrom:  CosmeticBundle.date(2027, 1, 28),
             availableUntil: CosmeticBundle.date(2027, 2, 10)
         ),
@@ -2966,13 +3151,14 @@ struct CosmeticBundle: Identifiable {
             id:             "pride-2027",
             displayName:    "Spectrum",
             tagline:        "Roll proud, roll loud.",
-            contentSummary: "Spectrum ball · Rainbow goal · Rainbow trail · Aurora floor · Aurora pit · Electronic music",
+            contentSummary: "Spectrum ball · Rainbow goal · Rainbow trail · Aurora floor · Aurora pit · Electronic music · Rainbow boundary",
             balls:  [.spectrum],
             goals:  [.rainbow],
             trails: [.rainbow],
             floors: [.aurora],
             pits:   [.aurora],
             music:  [.electronic],
+            boundaries: [.rainbow],
             availableFrom:  CosmeticBundle.date(2027, 6, 1),
             availableUntil: CosmeticBundle.date(2027, 6, 30)
         ),
@@ -2980,13 +3166,14 @@ struct CosmeticBundle: Identifiable {
             id:             "oktoberfest-2026",
             displayName:    "Oktoberfest",
             tagline:        "Prost! Raise a stein and roll.",
-            contentSummary: "Oktoberfest ball · Mirage goal · Ember trail · Meadow floor · Canyon pit · Acoustic music",
+            contentSummary: "Oktoberfest ball · Mirage goal · Ember trail · Meadow floor · Canyon pit · Acoustic music · Autumn boundary",
             balls:  [.oktoberfest],
             goals:  [.mirage],
             trails: [.ember],
             floors: [.meadow],
             pits:   [.canyon],
             music:  [.acoustic],
+            boundaries: [.autumn],
             availableFrom:  CosmeticBundle.date(2026, 9, 16),
             availableUntil: CosmeticBundle.date(2026, 10, 4)
         ),
@@ -2994,13 +3181,14 @@ struct CosmeticBundle: Identifiable {
             id:             "earthday-2027",
             displayName:    "Earth Day",
             tagline:        "One small planet, one perfect roll.",
-            contentSummary: "Earth ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Ambient music",
+            contentSummary: "Earth ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Ambient music · Mint boundary",
             balls:  [.earth],
             goals:  [.blossom],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],
             music:  [.ambient],
+            boundaries: [.mint],
             availableFrom:  CosmeticBundle.date(2027, 4, 12),
             availableUntil: CosmeticBundle.date(2027, 4, 26)
         ),
@@ -3008,13 +3196,14 @@ struct CosmeticBundle: Identifiable {
             id:             "backtoschool-2026",
             displayName:    "Back to School",
             tagline:        "Sharpen up. Class is rolling.",
-            contentSummary: "Teacher's Apple ball · Target goal · Ink trail · Notebook floor · Notebook pit · Piano music",
+            contentSummary: "Teacher's Apple ball · Target goal · Ink trail · Notebook floor · Notebook pit · Piano music · Notebook boundary",
             balls:  [.apple],
             goals:  [.target],
             trails: [.ink],
             floors: [.notebook],
             pits:   [.notebook],
             music:  [.piano],
+            boundaries: [.notebook],
             availableFrom:  CosmeticBundle.date(2026, 8, 1),
             availableUntil: CosmeticBundle.date(2026, 9, 8)
         ),
@@ -3024,37 +3213,40 @@ struct CosmeticBundle: Identifiable {
             id:             "full-court",
             displayName:    "Full Court",
             tagline:        "Hardwood, orange leather, and the buzz of the arena.",
-            contentSummary: "Basketball · Eclipse goal · Fire trail · Court floor · Sideline pit · Jazz music",
+            contentSummary: "Basketball · Eclipse goal · Fire trail · Court floor · Sideline pit · Jazz music · Hardwood boundary",
             balls:  [.basketball],
             goals:  [.eclipse],
             trails: [.fire],
             floors: [.court],
             pits:   [.sideline],
-            music:  [.jazz]
+            music:  [.jazz],
+            boundaries: [.hardwood]
         ),
         CosmeticBundle(
             id:             "billiards-hall",
             displayName:    "Billiards Hall",
             tagline:        "Eight ball, corner pocket. The felt is perfect.",
-            contentSummary: "8-Ball · Crystal goal · Smoke trail · Felt floor · Pocket pit · Jazz music",
+            contentSummary: "8-Ball · Crystal goal · Smoke trail · Felt floor · Pocket pit · Jazz music · Mahogany boundary",
             balls:  [.eightBall],
             goals:  [.crystal],
             trails: [.smoke],
             floors: [.felt],
             pits:   [.pocket],
-            music:  [.jazz]
+            music:  [.jazz],
+            boundaries: [.mahogany]
         ),
         CosmeticBundle(
             id:             "diamond",
             displayName:    "Diamond",
             tagline:        "Step up to the plate. The crowd is watching.",
-            contentSummary: "Baseball · Target goal · Rose trail · Meadow floor · Sketch pit · Orchestral music",
+            contentSummary: "Baseball · Target goal · Rose trail · Meadow floor · Sketch pit · Orchestral music · Fairway boundary",
             balls:  [.baseball],
             goals:  [.target],
             trails: [.roseTrail],
             floors: [.meadow],
             pits:   [.sketch],
-            music:  [.orchestral]
+            music:  [.orchestral],
+            boundaries: [.fairway]
         ),
 
         // ── Challenge Track reward bundles ───────────────────────────────
@@ -3073,13 +3265,14 @@ struct CosmeticBundle: Identifiable {
             id:             "ancient-temple",
             displayName:    "Ancient Temple",
             tagline:        "Every stone carries the weight of centuries.",
-            contentSummary: "Dune ball · Eclipse goal · Gilded trail · Desert floor · Canyon pit · Orchestral music",
+            contentSummary: "Dune ball · Eclipse goal · Gilded trail · Desert floor · Canyon pit · Orchestral music · Sandstone boundary",
             balls:  [.dune],
             goals:  [.eclipse],
             trails: [.gilded],
             floors: [.desert],
             pits:   [.canyon],
-            music:  [.orchestral]
+            music:  [.orchestral],
+            boundaries: [.sandstone]
         ),
         //
         // S21 ─────────────────────────────────────────────────────────────
@@ -3087,13 +3280,14 @@ struct CosmeticBundle: Identifiable {
             id:             "abyssal-depths",
             displayName:    "Abyssal Depths",
             tagline:        "Light doesn't reach here. Roll by feel.",
-            contentSummary: "Trench ball · Comet goal · Ice trail · Blueprint floor · Space pit · Dreamscape music",
+            contentSummary: "Trench ball · Comet goal · Ice trail · Blueprint floor · Space pit · Dreamscape music · Abyss boundary",
             balls:  [.trench],
             goals:  [.comet],
             trails: [.ice],
             floors: [.blueprint],
             pits:   [.space],
-            music:  [.dreamscape]
+            music:  [.dreamscape],
+            boundaries: [.abyss]
         ),
         // S22 ─────────────────────────────────────────────────────────────
         // Trophy ball is isBundleExclusive = true — hidden from shop grid,
@@ -3102,13 +3296,14 @@ struct CosmeticBundle: Identifiable {
             id:             "champion",
             displayName:    "Champion",
             tagline:        "No tutorial. No mercy. A hundred flawless rooms.",
-            contentSummary: "Trophy ball (exclusive) · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music",
+            contentSummary: "Trophy ball (exclusive) · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music · Gold boundary",
             balls:  [.trophy],
             goals:  [.quasar],
             trails: [.gilded],
             floors: [.mirage],
             pits:   [.mirage],
-            music:  [.orchestral]
+            music:  [.orchestral],
+            boundaries: [.gold]
         ),
 
         // ── S15 ──────────────────────────────────────────────────────────
@@ -3116,13 +3311,14 @@ struct CosmeticBundle: Identifiable {
             id:             "crystal-cavern",
             displayName:    "Crystal Cavern",
             tagline:        "Deep underground, the crystals glow.",
-            contentSummary: "Opal ball · Prism goal · Comet trail · Midnight floor · Aurora pit · Mysterium music",
+            contentSummary: "Opal ball · Prism goal · Comet trail · Midnight floor · Aurora pit · Mysterium music · Amethyst boundary",
             balls:  [.opal],
             goals:  [.prism],
             trails: [.cometTrail],
             floors: [.midnight],
             pits:   [.aurora],
-            music:  [.mysterium]
+            music:  [.mysterium],
+            boundaries: [.amethyst]
         ),
 
         // ── S16 ──────────────────────────────────────────────────────────
@@ -3130,13 +3326,14 @@ struct CosmeticBundle: Identifiable {
             id:             "midnight-carnival",
             displayName:    "Midnight Carnival",
             tagline:        "The rides never stop when the sun goes down.",
-            contentSummary: "Copper ball · Neon goal · Fire trail · Midnight floor · Velvet pit · Retrowave music",
+            contentSummary: "Copper ball · Neon goal · Fire trail · Midnight floor · Velvet pit · Retrowave music · Marquee boundary",
             balls:  [.copper],
             goals:  [.neon],
             trails: [.fire],
             floors: [.midnight],
             pits:   [.velvet],
-            music:  [.retrowave]
+            music:  [.retrowave],
+            boundaries: [.marquee]
         ),
 
         // ── S17 ──────────────────────────────────────────────────────────
@@ -3144,13 +3341,14 @@ struct CosmeticBundle: Identifiable {
             id:             "lava-flow",
             displayName:    "Lava Flow",
             tagline:        "Slow, relentless, unstoppable.",
-            contentSummary: "Lava ball · Eclipse goal · Fire trail · Sunset floor · Evil pit · Downtempo music",
+            contentSummary: "Lava ball · Eclipse goal · Fire trail · Sunset floor · Evil pit · Downtempo music · Molten boundary",
             balls:  [.lava],
             goals:  [.eclipse],
             trails: [.fire],
             floors: [.sunset],
             pits:   [.evil],
-            music:  [.downtempo]
+            music:  [.downtempo],
+            boundaries: [.molten]
         ),
 
         // ── Premium bundles (permanent — no availability window) ─────────
@@ -3158,121 +3356,131 @@ struct CosmeticBundle: Identifiable {
             id:             "high-roller",
             displayName:    "High Roller",
             tagline:        "The house always remembers your name.",
-            contentSummary: "High Roller ball · Quasar goal · Gilded trail · Felt floor · Pocket pit · Jazz music",
+            contentSummary: "High Roller ball · Quasar goal · Gilded trail · Felt floor · Pocket pit · Jazz music · Mahogany boundary",
             balls:  [.highRoller],
             goals:  [.quasar],
             trails: [.gilded],
             floors: [.felt],
             pits:   [.pocket],
-            music:  [.jazz]
+            music:  [.jazz],
+            boundaries: [.mahogany]
         ),
         CosmeticBundle(
             id:             "quicksilver",
             displayName:    "Quicksilver",
             tagline:        "Liquid metal with a mind of its own.",
-            contentSummary: "Quicksilver ball · Prism goal · Smoke trail · Inverted floor · Inverted pit · Cinematic music",
+            contentSummary: "Quicksilver ball · Prism goal · Smoke trail · Inverted floor · Inverted pit · Cinematic music · Chrome boundary",
             balls:  [.quicksilver],
             goals:  [.prism],
             trails: [.smoke],
             floors: [.inverted],
             pits:   [.inverted],
-            music:  [.cinematic]
+            music:  [.cinematic],
+            boundaries: [.chrome]
         ),
         CosmeticBundle(
             id:             "oracle",
             displayName:    "Oracle",
             tagline:        "Gaze in. Roll forward.",
-            contentSummary: "Oracle ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Mysterium music",
+            contentSummary: "Oracle ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Mysterium music · Starlight boundary",
             balls:  [.oracle],
             goals:  [.galaxy],
             trails: [.stardust],
             floors: [.midnight],
             pits:   [.midnight],
-            music:  [.mysterium]
+            music:  [.mysterium],
+            boundaries: [.starlight]
         ),
         CosmeticBundle(
             id:             "geode",
             displayName:    "Geode",
             tagline:        "Cracked open, brilliant inside.",
-            contentSummary: "Geode ball · Crystal goal · Ice trail · Velvet floor · Velvet pit · Classical music",
+            contentSummary: "Geode ball · Crystal goal · Ice trail · Velvet floor · Velvet pit · Classical music · Amethyst boundary",
             balls:  [.geode],
             goals:  [.crystal],
             trails: [.ice],
             floors: [.velvet],
             pits:   [.velvet],
-            music:  [.classical]
+            music:  [.classical],
+            boundaries: [.amethyst]
         ),
         CosmeticBundle(
             id:             "lava-lamp",
             displayName:    "Lava Lamp",
             tagline:        "Slow, warm, and a little groovy.",
-            contentSummary: "Lava Lamp ball · Plasma goal · Ember trail · Disco floor · Midnight pit · Retrowave music",
+            contentSummary: "Lava Lamp ball · Plasma goal · Ember trail · Disco floor · Midnight pit · Retrowave music · Orchid boundary",
             balls:  [.lavaLamp],
             goals:  [.plasma],
             trails: [.ember],
             floors: [.disco],
             pits:   [.midnight],
-            music:  [.retrowave]
+            music:  [.retrowave],
+            boundaries: [.orchid]
         ),
         CosmeticBundle(
             id:             "plasma-globe",
             displayName:    "Plasma Globe",
             tagline:        "Touch the glass. Feel the charge.",
-            contentSummary: "Plasma Globe ball · Neon goal · Raybeam trail · Midnight floor · Space pit · Synthwave music",
+            contentSummary: "Plasma Globe ball · Neon goal · Raybeam trail · Midnight floor · Space pit · Synthwave music · Storm boundary",
             balls:  [.plasmaGlobe],
             goals:  [.neon],
             trails: [.raybeam],
             floors: [.midnight],
             pits:   [.space],
-            music:  [.synthwave]
+            music:  [.synthwave],
+            boundaries: [.storm]
         ),
         CosmeticBundle(
             id:             "cathedral",
             displayName:    "Cathedral",
             tagline:        "Light through a thousand panes.",
-            contentSummary: "Cathedral ball · Prism goal · Smoke trail · Velvet floor · Velvet pit · Orchestral music",
+            contentSummary: "Cathedral ball · Prism goal · Smoke trail · Velvet floor · Velvet pit · Orchestral music · Stained Glass boundary",
             balls:  [.cathedral],
             goals:  [.prism],
             trails: [.smoke],
             floors: [.velvet],
             pits:   [.velvet],
-            music:  [.orchestral]
+            music:  [.orchestral],
+            boundaries: [.stainedGlass]
         ),
         CosmeticBundle(
             id:             "magma-core",
             displayName:    "Magma Core",
             tagline:        "A cracked shell over a molten heart.",
-            contentSummary: "Magma Core ball · Eclipse goal · Fire trail · Stormcloud floor · Downpour pit · Cinematic music",
+            contentSummary: "Magma Core ball · Eclipse goal · Fire trail · Stormcloud floor · Downpour pit · Cinematic music · Molten boundary",
             balls:  [.magmaCore],
             goals:  [.eclipse],
             trails: [.fire],
             floors: [.stormcloud],
             pits:   [.downpour],
-            music:  [.cinematic]
+            music:  [.cinematic],
+            boundaries: [.molten]
         ),
         CosmeticBundle(
             id:             "neon-city",
             displayName:    "Neon City",
             tagline:        "Jack in. Roll out.",
-            contentSummary: "Hologram ball · Neon goal · Raybeam trail · Grid City floor · Space pit · Synthwave music",
+            contentSummary: "Hologram ball · Neon goal · Raybeam trail · Grid City floor · Space pit · Synthwave music · Circuit boundary",
             balls:  [.hologram],
             goals:  [.neon],
             trails: [.raybeam],
             floors: [.gridCity],
             pits:   [.space],
-            music:  [.synthwave]
+            music:  [.synthwave],
+            boundaries: [.circuit]
         ),
         CosmeticBundle(
             id:             "clockwork",
             displayName:    "Clockwork",
             tagline:        "Every tooth in its place.",
-            contentSummary: "Clockwork ball · Eclipse goal · Smoke trail · Brass Works floor · Canyon pit · Classical music",
+            contentSummary: "Clockwork ball · Eclipse goal · Smoke trail · Brass Works floor · Canyon pit · Classical music · Brass boundary",
             balls:  [.clockwork],
             goals:  [.eclipse],
             trails: [.smoke],
             floors: [.brass],
             pits:   [.canyon],
-            music:  [.classical]
+            music:  [.classical],
+            boundaries: [.brass]
         ),
     ]
 }
