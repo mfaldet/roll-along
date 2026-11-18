@@ -81,6 +81,17 @@ struct KingOfTheHillView: View {
     @State private var paidCoins = 0
     /// One brain per opponent (human limits from `OpponentTuning`), by color.
     @State private var brains: [Int: OpponentBrain] = [:]
+    /// Each opponent's movement state (heading, hesitation, push ramp).
+    @State private var motors: [Int: KothMotor] = [:]
+
+    /// How an opponent is currently moving: the direction it has committed
+    /// to, any hesitation still to wait out, and how long it has been pushing
+    /// that way (its push builds up gradually).
+    private struct KothMotor {
+        var heading: CGVector = .zero
+        var hesitateTicks = 0
+        var pushTicks = 0
+    }
     /// Each opponent's skill for this round (by color), dealt in reset().
     @State private var rivalSkills: [Int: Double] = [:]
     /// The round tick at which the current holder started holding alone.
@@ -481,6 +492,7 @@ struct KingOfTheHillView: View {
         // (the field center), evenly spaced, the player at the bottom — so
         // the player is exactly as far from the zone as every opponent.
         brains = [:]
+        motors = [:]
         let startR = min(field.width, field.height) * CGFloat(OpponentTuning.kothStartRing)
         let total = Double(rivalCount + 1)
         var fresh: [Racer] = [Racer(pos: clampToField(CGPoint(x: field.midX, y: field.midY + startR)),
@@ -634,7 +646,73 @@ struct KingOfTheHillView: View {
 
         let seen = brain.perceive(goal)
         brains[r.colorIndex] = brain
-        return brain.push(from: r.pos, toward: seen, fullPush: aiAccelBase)
+        let raw = brain.push(from: r.pos, toward: seen, fullPush: aiAccelBase)
+        return humanMotion(r, raw: raw, goal: seen, skill: brain.skill)
+    }
+
+    /// Turns an opponent's ideal push into a clumsy human one
+    /// (`OpponentTuning.kothMotion`):
+    ///   • it uses only part of its push, and the push builds up over a
+    ///     moment after it picks a direction — no instant full-power starts;
+    ///   • when the way it wants to go swings sharply, it hesitates first,
+    ///     drifting with no push, then sets off the new way;
+    ///   • it never brakes: it stops pushing and coasts, and it misjudges how
+    ///     far it will coast, so it lets go late and rolls past its target.
+    private func humanMotion(_ r: Racer, raw: CGVector, goal: CGPoint, skill: Double) -> CGVector {
+        let m = OpponentTuning.kothMotion(for: gameState.minigameDifficulty, skill: skill)
+        var motor = motors[r.colorIndex] ?? KothMotor()
+        defer { motors[r.colorIndex] = motor }
+
+        let mag = hypot(raw.dx, raw.dy)
+        guard mag > 0 else {
+            motor.pushTicks = 0
+            return .zero
+        }
+        let want = CGVector(dx: raw.dx / mag, dy: raw.dy / mag)
+
+        // Hesitation before a sharp turn: drift, then commit to the new way.
+        if motor.hesitateTicks > 0 {
+            motor.hesitateTicks -= 1
+            if motor.hesitateTicks == 0 {
+                motor.heading = want
+                motor.pushTicks = 0
+            }
+            return .zero
+        }
+        if motor.heading == .zero {
+            motor.heading = want
+            motor.pushTicks = 0
+        } else {
+            let cosTurn = want.dx * motor.heading.dx + want.dy * motor.heading.dy
+            let limit = CGFloat(cos(OpponentTuning.kothTurnAngleDegrees * Double.pi / 180))
+            if cosTurn < limit {
+                motor.hesitateTicks = max(1, Int((m.hesitationSeconds * 60).rounded()))
+                return .zero
+            }
+            motor.heading = want          // small corrections follow at once
+        }
+
+        // Late letting-go: coast once inside its (underestimated) stopping
+        // distance while rolling toward the target.  Coasting distance with
+        // per-tick friction f is speed × f / (1 − f) / 60.
+        let toGoal = CGVector(dx: goal.x - r.pos.x, dy: goal.y - r.pos.y)
+        let dist = hypot(toGoal.dx, toGoal.dy)
+        let speed = hypot(r.vel.dx, r.vel.dy)
+        let closing = dist > 0 ? (r.vel.dx * toGoal.dx + r.vel.dy * toGoal.dy) / dist : 0
+        if closing > 0 {
+            let coast = speed * friction / max(0.0001, 1 - friction) / 60
+            if dist < coast * CGFloat(m.stopJudge) {
+                motor.pushTicks = 0
+                return .zero
+            }
+        }
+
+        // The push builds up after a new start.
+        motor.pushTicks += 1
+        let rampTicks = max(1, m.rampSeconds * 60)
+        let ramp = CGFloat(min(1, Double(motor.pushTicks) / rampTicks))
+        let scale = CGFloat(m.pushScale) * ramp
+        return CGVector(dx: want.dx * mag * scale, dy: want.dy * mag * scale)
     }
 
     /// The hill wanders toward a waypoint, picking a fresh one when it arrives.

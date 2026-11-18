@@ -104,6 +104,9 @@ struct PaintBallView: View {
     @State private var paidCoins = 0
     /// One brain per opponent (human limits from `OpponentTuning`), by color.
     @State private var brains: [Int: OpponentBrain] = [:]
+    /// The player's last real tilt direction (unit), for leaving a puddle
+    /// while holding the phone flat.
+    @State private var lastPlayerTilt: CGVector = .zero
     /// Each opponent's skill for this round (by color), dealt in spawnPainters().
     @State private var rivalSkills: [Int: Double] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
@@ -697,6 +700,11 @@ struct PaintBallView: View {
 
             // Accelerate.
             if painters[i].isPlayer {
+                let gx = CGFloat(motion.gravity.x), gy = CGFloat(motion.gravity.y)
+                let tilt = hypot(gx, gy)
+                if tilt >= CGFloat(OpponentTuning.paintBallExitTiltThreshold) {
+                    lastPlayerTilt = CGVector(dx: gx / tilt, dy: gy / tilt)
+                }
                 painters[i].vel.dx += CGFloat(motion.gravity.x) * playerAccel * dt
                 painters[i].vel.dy += CGFloat(motion.gravity.y) * playerAccel * dt
             } else {
@@ -736,15 +744,75 @@ struct PaintBallView: View {
         return maxSpeed * min(1, floor + (1 - floor) * effort)
     }
 
+    /// Climbing out of a puddle after the penalty.  The marble leaves in the
+    /// direction it is GOING: the player's tilt (or their last real tilt when
+    /// the phone is held flat), an opponent's steering target.  It is placed
+    /// just outside the rim that way — turned a little at a time if that spot
+    /// is off the floor or in another puddle — with a small push so the exit
+    /// reads as intentional, and the usual brief immunity.
     private func releaseFromPit(_ p: inout Painter) {
+        guard p.stuckPit >= 0, p.stuckPit < pits.count else { p.stuckPit = -1; return }
         let pit = pits[p.stuckPit]
-        var dir = unit(dx: center.x - pit.pos.x, dy: center.y - pit.pos.y, scale: 1)
-        if dir.dx == 0 && dir.dy == 0 { dir = CGVector(dx: 1, dy: 0) }
-        p.pos = CGPoint(x: pit.pos.x + dir.dx * (pit.radius + marbleRadius + 3),
-                        y: pit.pos.y + dir.dy * (pit.radius + marbleRadius + 3))
-        p.vel = .zero
+
+        // 1. Which way it wants to go.
+        var dir = CGVector.zero
+        if p.isPlayer {
+            let gx = CGFloat(motion.gravity.x), gy = CGFloat(motion.gravity.y)
+            let tilt = hypot(gx, gy)
+            if tilt >= CGFloat(OpponentTuning.paintBallExitTiltThreshold) {
+                dir = CGVector(dx: gx / tilt, dy: gy / tilt)
+            } else {
+                dir = lastPlayerTilt
+            }
+        } else {
+            dir = unit(dx: p.target.x - pit.pos.x, dy: p.target.y - pit.pos.y, scale: 1)
+        }
+        if dir.dx == 0 && dir.dy == 0 {
+            // No direction at all: the old rule, toward the middle.
+            dir = unit(dx: center.x - pit.pos.x, dy: center.y - pit.pos.y, scale: 1)
+        }
+        if dir.dx == 0 && dir.dy == 0 { dir = CGVector(dx: 0, dy: -1) }
+
+        // 2. A clear spot just outside the rim, turning a little at a time.
+        let reach = pit.radius + marbleRadius + 3
+        let step = OpponentTuning.paintBallExitTurnStepDegrees * Double.pi / 180
+        let base = atan2(Double(dir.dy), Double(dir.dx))
+        var chosen = CGPoint(x: pit.pos.x + dir.dx * reach, y: pit.pos.y + dir.dy * reach)
+        var chosenDir = dir
+        let tries = max(1, Int((Double.pi / max(step, 0.01)).rounded()))
+        search: for k in 0...tries {
+            for sign in (k == 0 ? [1.0] : [1.0, -1.0]) {
+                let a = base + sign * Double(k) * step
+                let d = CGVector(dx: CGFloat(cos(a)), dy: CGFloat(sin(a)))
+                let spot = CGPoint(x: pit.pos.x + d.dx * reach, y: pit.pos.y + d.dy * reach)
+                if isClearExit(spot, leaving: p.stuckPit) {
+                    chosen = spot
+                    chosenDir = d
+                    break search
+                }
+            }
+        }
+        p.pos = CGPoint(x: min(max(chosen.x, marbleRadius), arena.width - marbleRadius),
+                        y: min(max(chosen.y, marbleRadius), arena.height - marbleRadius))
+
+        // 3. A small push that way, and the brief immunity.
+        let speed = CGFloat(OpponentTuning.paintBallExitSpeed)
+        p.vel = CGVector(dx: chosenDir.dx * speed, dy: chosenDir.dy * speed)
         p.immuneUntil = localTick + graceTicks
         p.stuckPit = -1
+    }
+
+    /// True when a marble centered here is fully on the floor and clear of
+    /// every puddle (other than the one it is leaving).
+    private func isClearExit(_ spot: CGPoint, leaving pitIndex: Int) -> Bool {
+        guard spot.x >= marbleRadius, spot.x <= arena.width - marbleRadius,
+              spot.y >= marbleRadius, spot.y <= arena.height - marbleRadius else { return false }
+        for (i, other) in pits.enumerated() where i != pitIndex {
+            if hypot(spot.x - other.pos.x, spot.y - other.pos.y) < other.radius + marbleRadius + 2 {
+                return false
+            }
+        }
+        return true
     }
 
     /// Opponent steering.  Human limits (`OpponentTuning`): it heads for

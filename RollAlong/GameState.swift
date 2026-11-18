@@ -3562,6 +3562,53 @@ enum OpponentTuning {
     /// King of the Hill: during a mistake an opponent rolls on this far
     /// (points) past the zone.
     static let kothOvershootDistance: Double = 120
+
+    /// King of the Hill: how an opponent moves — the human clumsiness that
+    /// stops it speeding up and stopping with machine precision.
+    struct KothMotion {
+        /// Share of its normal push it actually uses (lower = slower to get
+        /// going and a lower top speed).
+        let pushScale: Double
+        /// Seconds for its push to build from nothing to full after it picks a
+        /// new direction (no instant full-power starts).
+        let rampSeconds: Double
+        /// Seconds it pauses — drifting, no push — before turning when the
+        /// way it wants to go swings by more than `kothTurnAngleDegrees`.
+        let hesitationSeconds: Double
+        /// It never brakes; it stops pushing and coasts.  It judges its
+        /// coasting distance as this share of the real one, so it lets go
+        /// too late and rolls past the target (1.0 = perfect, lower = bigger
+        /// overshoot).
+        let stopJudge: Double
+    }
+
+    /// A swing in wanted direction bigger than this (degrees) makes an
+    /// opponent hesitate before turning.  Smaller corrections are followed at
+    /// once.
+    static let kothTurnAngleDegrees: Double = 60
+
+    /// Per difficulty, clumsy → sharp opponent.
+    static let kothMotionEasy   = (clumsy: KothMotion(pushScale: 0.42, rampSeconds: 0.65, hesitationSeconds: 0.60, stopJudge: 0.15),
+                                   sharp:  KothMotion(pushScale: 0.52, rampSeconds: 0.55, hesitationSeconds: 0.45, stopJudge: 0.22))
+    static let kothMotionNormal = (clumsy: KothMotion(pushScale: 0.58, rampSeconds: 0.50, hesitationSeconds: 0.40, stopJudge: 0.28),
+                                   sharp:  KothMotion(pushScale: 0.68, rampSeconds: 0.42, hesitationSeconds: 0.30, stopJudge: 0.38))
+    static let kothMotionHard   = (clumsy: KothMotion(pushScale: 0.74, rampSeconds: 0.38, hesitationSeconds: 0.26, stopJudge: 0.45),
+                                   sharp:  KothMotion(pushScale: 0.84, rampSeconds: 0.30, hesitationSeconds: 0.16, stopJudge: 0.58))
+
+    static func kothMotion(for difficulty: MinigameDifficulty, skill: Double) -> KothMotion {
+        let band: (clumsy: KothMotion, sharp: KothMotion)
+        switch difficulty {
+        case .easy:   band = kothMotionEasy
+        case .normal: band = kothMotionNormal
+        case .hard:   band = kothMotionHard
+        }
+        let t = min(1, max(0, skill))
+        func mix(_ a: Double, _ z: Double) -> Double { a + (z - a) * t }
+        return KothMotion(pushScale:         mix(band.clumsy.pushScale, band.sharp.pushScale),
+                          rampSeconds:       mix(band.clumsy.rampSeconds, band.sharp.rampSeconds),
+                          hesitationSeconds: mix(band.clumsy.hesitationSeconds, band.sharp.hesitationSeconds),
+                          stopJudge:         mix(band.clumsy.stopJudge, band.sharp.stopJudge))
+    }
     // (end King of the Hill)
 
 
@@ -3695,6 +3742,17 @@ enum OpponentTuning {
     /// Paint Ball: when a mistake begins, the chance the opponent heads
     /// straight for a puddle (otherwise it heads for floor it already painted).
     static let paintBallMistakePuddleChance: Double = 0.5
+    /// Paint Ball: a marble climbing out of a puddle after its penalty leaves
+    /// at this speed (points per second) in the direction it is going — the
+    /// player's tilt, an opponent's steering.
+    static let paintBallExitSpeed: Double = 170
+    /// Paint Ball: a tilt weaker than this (0…1 of a full tilt) counts as "not
+    /// tilting"; the last real tilt direction is used instead.
+    static let paintBallExitTiltThreshold: Double = 0.12
+    /// Paint Ball: if the spot just outside the puddle in that direction is
+    /// off the floor or in another puddle, the direction is turned by this
+    /// many degrees at a time (both ways) until a clear spot is found.
+    static let paintBallExitTurnStepDegrees: Double = 20
     // (end Paint Ball)
 }
 
