@@ -130,8 +130,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //   • aurora — deep midnight sphere with animated teal-green and violet
     //     Northern Lights bands and twinkling stars.  A regular coin-buyable
     //     Legendary ball and the centerpiece of the Aurora bundle; the
-    //     Starter Pack welcome offer grants the entire Aurora collection
-    //     free-granted (see StoreKitManager.grantAuroraCollection).
+    //     Starter Pack welcome offer grants the Aurora ball, trail and
+    //     boundary free-granted (see StoreKitManager.grantStarterPackItems).
     case aurora = "Aurora"
 
     // ── Summer 2026 seasonal exclusive ──────────────────────────────────

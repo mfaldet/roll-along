@@ -649,7 +649,7 @@ final class GameStateTests: XCTestCase {
         XCTAssertFalse(gs.shouldTriggerStarterPack, "one-shot: shownAt disarms it")
     }
 
-    func testStarterPackTrigger_suppressedWhenClaimedDismissedOrCollectionOwned() {
+    func testStarterPackTrigger_suppressedWhenClaimedDismissedOrItemsOwned() {
         let gs = makeGameState()
         gs.coinBalance = GameState.starterPackTriggerCoins
 
@@ -663,12 +663,45 @@ final class GameStateTests: XCTestCase {
         gs.starterPackDismissed = false
         XCTAssertTrue(gs.shouldTriggerStarterPack)
 
-        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
-            return XCTFail("expected the \"aurora\" bundle in the catalogue")
-        }
-        aurora.grantContents(to: gs)
+        // Owning only some of the three pack items keeps the offer …
+        gs.grant(BallSkin.aurora)
+        gs.grant(TrailColor.aurora)
+        XCTAssertTrue(gs.shouldTriggerStarterPack, "two of three items: still offered")
+        // … owning all three (ball, trail, boundary) suppresses it.
+        gs.grant(Boundary.aurora)
         XCTAssertFalse(gs.shouldTriggerStarterPack,
-                       "owning the complete collection suppresses the offer")
+                       "owning the Aurora ball, trail and boundary suppresses the offer")
+    }
+
+    /// Starter Pack (Option B): the Aurora ball, trail and boundary plus 500
+    /// coins.  The items are free-granted (Sell Back refunds nothing), the
+    /// grant is NOT recorded as an owned collection (Aurora stays on sale and
+    /// "collections completed" is not inflated), and the coin reward is 500.
+    func testStarterPack_contentsAndPartialGrant() {
+        let p = GameState.starterPackContents
+        XCTAssertEqual(p.balls, [.aurora])
+        XCTAssertEqual(p.trails, [.aurora])
+        XCTAssertEqual(p.boundaries, [.aurora])
+        XCTAssertTrue(p.goals.isEmpty && p.floors.isEmpty && p.pits.isEmpty && p.music.isEmpty)
+        XCTAssertNil(CosmeticBundle.catalogue.first(where: { $0.id == p.id }),
+                     "the Starter Pack's contents are not a catalogue collection")
+        XCTAssertEqual(StoreKitManager.ProductID.starterPack.rewardCoins, 500)
+        XCTAssertEqual(StarterPackSheet.itemsShopValue, 4_500,
+                       "the offer sheet and the docs say the three items are worth 4,500 coins")
+
+        let gs = makeGameState()
+        gs.coinBalance = 0
+        let completedBefore = gs.completedBundleIDs
+        gs.grantBundleFree(p, recordAsOwnedBundle: false)
+        XCTAssertTrue(gs.ownsStarterPackItems)
+        XCTAssertFalse(gs.ownedBundles.contains(p.id), "partial grant is not an owned bundle")
+        XCTAssertEqual(gs.completedBundleIDs, completedBefore,
+                       "three Aurora items do not complete the Aurora collection")
+        XCTAssertEqual(gs.coinLiquidationPreview().coins, 0,
+                       "Starter Pack items are never refundable by Sell Back")
+        gs.liquidateCoinCosmetics()
+        XCTAssertTrue(gs.isOwned(BallSkin.aurora), "kept after Sell Back")
+        XCTAssertEqual(gs.coinBalance, 0, "Sell Back minted coins from the $1.99 pack")
     }
 
     /// The load-bearing split behind the Ask-to-Buy flow: "No thanks" sets
@@ -703,7 +736,7 @@ final class GameStateTests: XCTestCase {
         XCTAssertEqual(gs.starterPackSecondsRemaining, 0, "remaining clamps at 0")
     }
 
-    func testStarterPackWindow_closesOnClaimOrCollectionCompletion() {
+    func testStarterPackWindow_closesOnClaimOrItemsOwned() {
         let gs = makeGameState()
         gs.starterPackShownAt = Date()   // window just opened
         XCTAssertTrue(gs.starterPackOfferActive)
@@ -720,13 +753,10 @@ final class GameStateTests: XCTestCase {
         gs.starterPackDismissed = false
         XCTAssertTrue(gs.starterPackOfferActive, "re-armed for the completion check")
 
-        // … and so does coin-completing the Aurora collection mid-window.
-        guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
-            return XCTFail("expected the \"aurora\" bundle in the catalogue")
-        }
-        aurora.grantContents(to: gs)
+        // … and so does coin-buying all three pack items mid-window.
+        GameState.starterPackContents.grantContents(to: gs)
         XCTAssertFalse(gs.starterPackOfferActive,
-                       "mid-window collection completion suppresses the offer")
+                       "owning the ball, trail and boundary mid-window suppresses the offer")
     }
 }
 

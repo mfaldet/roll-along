@@ -1289,7 +1289,7 @@ final class GameState: ObservableObject {
     /// live price at sell time, never more than was paid) — coin-bought items
     /// plus seasonal / limited-time specials — KEEPING the starter look, the
     /// permanent Iconic specials (Trophy, Diamond, Money), and free-granted
-    /// gifts (the tutorial bundle, the Starter Pack's Aurora collection).
+    /// gifts (the tutorial bundle, the Starter Pack's Aurora items).
     /// Re-equips the starter for any slot whose item was liquidated.  Returns
     /// what was liquidated.  Level progress is untouched.
     @discardableResult
@@ -2747,13 +2747,13 @@ final class GameState: ObservableObject {
 
     // MARK: - Starter Pack offer
 
-    // The one-time $1.99 welcome offer: 3,750 coins + the complete Aurora
-    // collection (the "aurora" bundle, free-granted so Sell Back keeps but
-    // never refunds it).  `starterPackClaimed` = rewards delivered (gates the
-    // once-only coins in StoreKitManager); `starterPackDismissed` = "No
-    // thanks" opt-out of the offer UI.  Past buyers are re-granted the
-    // collection (never the coins) on restore.  Aurora itself remains a
-    // coin-buyable bundle.
+    // The one-time $1.99 welcome offer: 500 coins + the Aurora ball, trail
+    // and boundary (`starterPackContents`, free-granted so Sell Back keeps
+    // but never refunds them).  `starterPackClaimed` = rewards delivered
+    // (gates the once-only coins in StoreKitManager); `starterPackDismissed`
+    // = "No thanks" opt-out of the offer UI.  Past buyers are re-granted the
+    // items (never the coins) on restore.  The Aurora collection itself
+    // remains a coin-buyable bundle.
 
     /// Coin balance that first arms the welcome offer.  Set past the tutorial's
     /// natural take (~30–50 coins from L1–10 clears) plus a chunk of free play
@@ -2763,26 +2763,53 @@ final class GameState: ObservableObject {
     /// 48-hour window stays meaningful.
     static let starterPackTriggerCoins = 250
 
+    /// What the Starter Pack grants besides its 500 coins: the Aurora ball,
+    /// trail and boundary.  Not a catalogue collection (the full Aurora
+    /// collection stays on sale for coins); granted free via
+    /// `grantBundleFree(_:recordAsOwnedBundle: false)`.
+    static let starterPackContents = CosmeticBundle(
+        id:             "starterpack-aurora",
+        displayName:    "Aurora",
+        tagline:        "Starter Pack",
+        contentSummary: "Aurora ball · Aurora trail · Aurora boundary",
+        balls:  [.aurora],
+        goals:  [],
+        trails: [.aurora],
+        floors: [],
+        pits:   [],
+        music:  [],
+        boundaries: [.aurora]
+    )
+
+    /// True when the player already owns every Starter Pack item — the
+    /// offer is then suppressed (nothing left to give but coins).
+    var ownsStarterPackItems: Bool {
+        let p = Self.starterPackContents
+        return p.balls.allSatisfy { isOwned($0) }
+            && p.trails.allSatisfy { isOwned($0) }
+            && p.boundaries.allSatisfy { isOwned($0) }
+    }
+
     /// Fires once: true the first time `coinBalance` reaches
     /// `starterPackTriggerCoins` AND the player hasn't claimed or permanently
     /// dismissed the offer yet.  HomeView observes `coinBalance` and checks
     /// this to auto-present the sheet.  Suppressed when the player already owns
-    /// the complete Aurora collection — the offer's headline item is theirs.
+    /// all three Starter Pack items (Aurora ball, trail and boundary).
     var shouldTriggerStarterPack: Bool {
         !starterPackClaimed && !starterPackDismissed
             && starterPackShownAt == nil && coinBalance >= Self.starterPackTriggerCoins
-            && !completedBundleIDs.contains("aurora")
+            && !ownsStarterPackItems
     }
 
     /// True while the 48-hour countdown is still ticking — the offer sheet
     /// is still worth showing (e.g., player re-opens the app mid-window).
-    /// Goes false early if the player coin-completes the Aurora collection
+    /// Goes false early if the player coin-buys all three Starter Pack items
     /// mid-window.
     var starterPackOfferActive: Bool {
         guard !starterPackClaimed, !starterPackDismissed,
               let shownAt = starterPackShownAt else { return false }
         return Date().timeIntervalSince(shownAt) < 48 * 3_600
-            && !completedBundleIDs.contains("aurora")
+            && !ownsStarterPackItems
     }
 
     /// Seconds remaining in the 48-hour offer window (0 when expired/unclaimed).
@@ -2848,7 +2875,7 @@ final class GameState: ObservableObject {
     }
 
     /// Gift an entire bundle for free (the post-tutorial Standard-bundle reward,
-    /// the Starter Pack's Aurora collection).  Grants every item, marks them all
+    /// the Starter Pack's three Aurora items).  Grants every item, marks them all
     /// as `freeGrantedItems` so Sell Back keeps them and never refunds them
     /// (un-redeemable), and records the bundle as owned.  Does NOT charge coins.
     ///
@@ -2861,7 +2888,7 @@ final class GameState: ObservableObject {
     /// deliberate: a gift must never leave a player poorer than Sell Back
     /// would have.  (`freeGrantedItems` is keyed by each item's unique id, so
     /// marking one item never touches a same-named item in another slot.)
-    func grantBundleFree(_ bundle: CosmeticBundle) {
+    func grantBundleFree(_ bundle: CosmeticBundle, recordAsOwnedBundle: Bool = true) {
         var compensation = 0
         func compensate<Item: CosmeticItem>(_ items: [Item]) {
             for item in items
@@ -2883,7 +2910,10 @@ final class GameState: ObservableObject {
         markFreeGranted(bundle.trails); markFreeGranted(bundle.floors)
         markFreeGranted(bundle.pits);   markFreeGranted(bundle.offeredMusic)
         markFreeGranted(bundle.boundaries)
-        ownedBundles.insert(bundle.id)
+        // A partial grant (the Starter Pack's three Aurora items) is not a
+        // catalogue bundle, so it must not be recorded as an owned bundle —
+        // that would count toward "collections completed".
+        if recordAsOwnedBundle { ownedBundles.insert(bundle.id) }
     }
 
     // MARK: - Completionist tracking

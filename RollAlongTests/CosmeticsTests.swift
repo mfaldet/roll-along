@@ -49,7 +49,7 @@ final class CosmeticsTests: XCTestCase {
     func testBundleExclusiveSkins_flagIsConsistent() {
         let expected: Set<String> = [
             // Aurora is intentionally absent — it's a regular coin-buyable ball.
-            // The Starter Pack offer GIFTS the collection; it doesn't lock it.
+            // The Starter Pack GIFTS the Aurora ball (with its trail and boundary); it doesn't lock it.
             "Pluto", "Beach Ball", "Pumpkin", "Ornament",
             "Heartstone", "Shamrock", "Confetti", "Speckled Egg", "Trophy",
             "Diamond",     // Diamond Balls IAP exclusive
@@ -448,15 +448,13 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(gs.coinBalance, 0, "no coins handed out for the gift")
     }
 
-    // MARK: - Starter Pack → Aurora collection (StoreKitManager contract)
+    // MARK: - Aurora collection shape
 
-    /// StoreKitManager.grantAuroraCollection looks the bundle up by the string
-    /// id "aurora" — renaming or removing it would silently turn the Starter
-    /// Pack IAP's cosmetic grant into a no-op.  Pin the id and the seven-slot
-    /// shape of the collection.
+    /// The Aurora collection (sold for coins; the Starter Pack grants only its
+    /// ball, trail and boundary — see GameStateTests) keeps one item per slot.
     func testAuroraBundle_existsWithOneItemPerCategory() {
         guard let aurora = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }) else {
-            return XCTFail("the \"aurora\" bundle must exist — the Starter Pack IAP grants it by id")
+            return XCTFail("the \"aurora\" bundle must exist")
         }
         XCTAssertEqual(aurora.balls,  [.aurora])
         XCTAssertEqual(aurora.goals,  [.aurora])
@@ -503,10 +501,8 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
-    /// The Starter Pack grants the Aurora bundle free-granted; Sell Back must
-    /// refund none of it.  The bundle's items would sell back for 4,875 coins
-    /// (half of 9,750 with the Aurora boundary), so a sellable grant would
-    /// let the $1.99 pack rival the $4.99 coin pack.
+    /// A free-granted bundle (the post-tutorial gift path) must refund
+    /// nothing through Sell Back, or a gift becomes a coin faucet.
     func testAuroraBundleGrantedFree_isNotACoinFaucet() {
         let gs = makeCleanState()
         gs.coinBalance = 0

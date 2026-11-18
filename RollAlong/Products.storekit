@@ -8,7 +8,7 @@
       "internalID": "11000001",
       "localizations": [
         {
-          "description": "20 lives.",
+          "description": "20 extra lives, used when your free lives run out.",
           "displayName": "20 Lives",
           "locale": "en_US"
         }
@@ -23,7 +23,7 @@
       "internalID": "11000002",
       "localizations": [
         {
-          "description": "120 lives.",
+          "description": "120 extra lives, used when your free lives run out.",
           "displayName": "120 Lives",
           "locale": "en_US"
         }
@@ -38,7 +38,7 @@
       "internalID": "11000003",
       "localizations": [
         {
-          "description": "300 lives.",
+          "description": "300 extra lives, used when your free lives run out.",
           "displayName": "300 Lives",
           "locale": "en_US"
         }
@@ -53,7 +53,7 @@
       "internalID": "11000004",
       "localizations": [
         {
-          "description": "Unlimited lives, forever. Includes the exclusive Diamond ball skin.",
+          "description": "Unlimited lives forever, plus the Diamond ball skin.",
           "displayName": "Diamond Balls",
           "locale": "en_US"
         }
@@ -68,8 +68,8 @@
       "internalID": "11000005",
       "localizations": [
         {
-          "description": "100 coins added to your balance.",
-          "displayName": "100 coins",
+          "description": "100 coins to spend on cosmetics in the Shop.",
+          "displayName": "100 Coins",
           "locale": "en_US"
         }
       ],
@@ -83,8 +83,8 @@
       "internalID": "11000006",
       "localizations": [
         {
-          "description": "600 coins added to your balance.",
-          "displayName": "600 coins",
+          "description": "600 coins to spend on cosmetics in the Shop.",
+          "displayName": "600 Coins",
           "locale": "en_US"
         }
       ],
@@ -98,8 +98,8 @@
       "internalID": "11000007",
       "localizations": [
         {
-          "description": "1,300 coins added to your balance.",
-          "displayName": "1,300 coins",
+          "description": "1,300 coins to spend on cosmetics in the Shop.",
+          "displayName": "1,300 Coins",
           "locale": "en_US"
         }
       ],
@@ -113,8 +113,8 @@
       "internalID": "11000008",
       "localizations": [
         {
-          "description": "3,000 coins added to your balance.",
-          "displayName": "3,000 coins",
+          "description": "3,000 coins to spend on cosmetics in the Shop.",
+          "displayName": "3,000 Coins",
           "locale": "en_US"
         }
       ],
@@ -128,13 +128,13 @@
       "internalID": "11000009",
       "localizations": [
         {
-          "description": "One-time offer: 3,750 coins + the complete Aurora collection — ball, goal, trail, floor, pit, boundary and music.",
+          "description": "One-time: Aurora ball, trail, boundary and 500 coins.",
           "displayName": "Starter Pack",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.starterpack",
-      "referenceName": "Starter Pack (3,750 coins + Aurora collection) $1.99",
+      "referenceName": "Starter Pack (500 coins + Aurora ball, trail, boundary) $1.99",
       "type": "NonConsumable"
     },
     {
@@ -144,7 +144,7 @@
       "localizations": [
         {
           "description": "10,000 coins, plus the Money Ball skin the first time.",
-          "displayName": "10,000 coins",
+          "displayName": "10,000 Coins",
           "locale": "en_US"
         }
       ],
