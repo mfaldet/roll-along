@@ -30,7 +30,15 @@ struct BallSkinView: View {
     /// context and scale automatically with the caller's frame.
     let diameter: CGFloat
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
+    /// The frozen (Reduce Motion) art is also what grids and lists show.
+    private var reduceMotion: Bool { systemReduceMotion || cosmeticMotion == .still }
+    /// Timelines stop ticking where nothing moves: frozen art, or a shop
+    /// preview that is held (see CosmeticMotion).
+    private var timelinePaused: Bool {
+        reduceMotion || cosmeticMotion.isPaused(reduceMotion: systemReduceMotion)
+    }
 
     var body: some View {
         switch skin {
@@ -327,7 +335,7 @@ struct BallSkinView: View {
     // circle by the body switch caller.
     // =========================================================================
     private var discoCanvas: some View {
-        TimelineView(.animation) { timeline in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width, h = size.height
@@ -508,7 +516,7 @@ struct BallSkinView: View {
     // TimelineView; under Reduce Motion the lights hold steady.
     // =========================================================================
     private var ufoCanvas: some View {
-        TimelineView(.animation) { timeline in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width
@@ -707,7 +715,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var aquariumCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -798,7 +806,7 @@ struct BallSkinView: View {
     // original pose — exactly the original static marble.
     // =========================================================================
     private var glassMarbleCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Cat's-eye rotation — zero under Reduce Motion → original pose.
@@ -916,7 +924,7 @@ struct BallSkinView: View {
     // holds perfectly still — exactly the original static ghost.
     // =========================================================================
     private var ghostCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -1027,7 +1035,7 @@ struct BallSkinView: View {
     // in its original pose — exactly the original static candy.
     // =========================================================================
     private var candyCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Pinwheel spin — zero under Reduce Motion → original swirl pose.
@@ -1120,7 +1128,7 @@ struct BallSkinView: View {
     // Motion the storm freezes mid-strike — exactly the original static art.
     // =========================================================================
     private var stormCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -1218,7 +1226,7 @@ struct BallSkinView: View {
     // turbulence), like a hard-shaken globe.  Pure Canvas + TimelineView.
     // =========================================================================
     private var snowglobeCanvas: some View {
-        TimelineView(.animation) { timeline in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
             Canvas { ctx, size in
                 let t  = timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width, h = size.height
@@ -1567,7 +1575,7 @@ struct BallSkinView: View {
     ]
 
     private var auroraCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
             // Each patch fades fully in and out (clamped sine → off about half
@@ -1912,7 +1920,7 @@ struct BallSkinView: View {
     // =========================================================================
 
     private var galaxyCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -1946,7 +1954,7 @@ struct BallSkinView: View {
     }
 
     private var nebulaCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -1986,7 +1994,7 @@ struct BallSkinView: View {
     }
 
     private var opalCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2017,7 +2025,7 @@ struct BallSkinView: View {
     }
 
     private var neonCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2057,7 +2065,7 @@ struct BallSkinView: View {
     // freezes all three.
     // =========================================================================
     private var diamondCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2227,7 +2235,7 @@ struct BallSkinView: View {
     // switch caller.
     // =========================================================================
     private var highRollerCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Spin-and-settle: a cubic ease-out over the first 62% of each
@@ -2358,7 +2366,7 @@ struct BallSkinView: View {
         [0, 1],   [0.5, 1],   [1, 1],
     ]
     private var quicksilverCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
             // Cool chrome palette; the interior nodes brighten/darken slightly
@@ -2426,7 +2434,7 @@ struct BallSkinView: View {
     // circle by the body switch caller.
     // =========================================================================
     private var oracleCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2492,7 +2500,7 @@ struct BallSkinView: View {
     // glints.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var geodeCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2573,7 +2581,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var lavaLampCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
             // Magenta-violet fluid base — gently shifting MeshGradient so the
@@ -2660,7 +2668,7 @@ struct BallSkinView: View {
     // body switch caller.
     // =========================================================================
     private var plasmaGlobeCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2745,7 +2753,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var cathedralCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2852,7 +2860,7 @@ struct BallSkinView: View {
     // a circle by the body switch caller.
     // =========================================================================
     private var magmaCoreCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -2938,7 +2946,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var hologramCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -3017,7 +3025,7 @@ struct BallSkinView: View {
     // circle by the body switch caller.
     // =========================================================================
     private var clockworkCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -3118,7 +3126,7 @@ struct BallSkinView: View {
     // original static ball.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var beachBallCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Lazy spin — zero under Reduce Motion → original panel pose.
@@ -3227,7 +3235,7 @@ struct BallSkinView: View {
     // carving.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var pumpkinCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Candle flicker — 1.0 means "original steady glow", so the
@@ -3420,7 +3428,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var ornamentCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -3578,7 +3586,7 @@ struct BallSkinView: View {
     // emboss.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var heartstoneCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Lub-dub heartbeat: two exponentially-decaying thumps per
@@ -3698,7 +3706,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var shamrockCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Breeze sway — petals rotate about the clover centre.
@@ -3813,7 +3821,7 @@ struct BallSkinView: View {
     // static scatter.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var confettiCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -3939,7 +3947,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var speckledEggCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -4052,7 +4060,7 @@ struct BallSkinView: View {
     //
     // Animation is frozen (t = 0) when reduceMotion is on.
     private var lavaCanvas: some View {
-        return TimelineView(.animation) { timeline in
+        return SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
 
@@ -4152,7 +4160,7 @@ struct BallSkinView: View {
     //
     // Animation freezes at t = 0 when reduceMotion is on.
     private var trenchCanvas: some View {
-        return TimelineView(.animation) { timeline in
+        return SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
 
@@ -4268,7 +4276,7 @@ struct BallSkinView: View {
     // Freezes at t = 0 when reduceMotion is on (halo at mid-breath, light fixed
     // upper-left, sparkles held at a steady gleam).
     private var trophyCanvas: some View {
-        return TimelineView(.animation) { timeline in
+        return SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
 
@@ -4442,7 +4450,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var fireworksCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
             Canvas { ctx, size in
@@ -4555,7 +4563,7 @@ struct BallSkinView: View {
     // calavera.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var sugarSkullCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
 
@@ -4721,7 +4729,7 @@ struct BallSkinView: View {
     // original static pose.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var harvestCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Per-leaf sway (zero under Reduce Motion → original pose).
@@ -4853,7 +4861,7 @@ struct BallSkinView: View {
     // by the body switch caller.
     // =========================================================================
     private var lunarDragonCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
             // Slow shimmer phase — 0…1, used to drift one bright band.
             let shimmer = reduceMotion ? 0.30 : (sin(t * 0.7) * 0.5 + 0.5)
@@ -4972,7 +4980,7 @@ struct BallSkinView: View {
     // holds at the original static look.
     // =========================================================================
     private var mardiGrasCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Lattice shimmer — 0.45 is the original static stroke opacity.
@@ -5085,7 +5093,7 @@ struct BallSkinView: View {
     // Clipped to a circle by the body switch caller.
     // =========================================================================
     private var spectrumCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Band flow — fraction of one full six-band cycle scrolled so
@@ -5169,7 +5177,7 @@ struct BallSkinView: View {
     // pattern.
     // =========================================================================
     private var oktoberfestCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Lozenge-grid shimmer — 0.55 is the original static opacity.
@@ -5308,7 +5316,7 @@ struct BallSkinView: View {
     // static apple.  Clipped to a circle by the body switch caller.
     // =========================================================================
     private var appleCanvas: some View {
-        TimelineView(.animation) { tl in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Leaf sway — zero reproduces the static leaf exactly.
@@ -5423,6 +5431,30 @@ struct BallSkinView: View {
                         Gradient(colors: [.white.opacity(specGlow), .white.opacity(0.3), .clear]),
                         center: CGPoint(x: cx - r * 0.38 + specDX, y: cy - r * 0.50 + specDY),
                         startRadius: 0, endRadius: r * 0.34))
+            }
+        }
+    }
+}
+
+/// The clock an animated skin reads: `date` only.
+struct SkinTick {
+    let date: Date
+}
+
+/// A TimelineView that is not created at all when the skin is still (Reduce
+/// Motion, or a grid or list — see CosmeticMotion): the content is drawn
+/// once instead, so a grid of animated balls holds no timelines.
+struct SkinTimeline<Content: View>: View {
+    let interval: Double?
+    let paused: Bool
+    @ViewBuilder let content: (SkinTick) -> Content
+
+    var body: some View {
+        if paused {
+            content(SkinTick(date: Date()))
+        } else {
+            TimelineView(.animation(minimumInterval: interval)) { tl in
+                content(SkinTick(date: tl.date))
             }
         }
     }
