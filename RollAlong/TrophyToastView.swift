@@ -15,7 +15,7 @@
 //    BINDING Diamond riders (design.md §2 R2, RULED 2026-07-02): the
 //    Diamond trophy *grade* gets its OWN glyph + color, sharing NO
 //    iconography with the Diamond *ball* / Iconic cosmetic gating tier
-//    (the $19.99 paid exclusive). The cosmetic rarity gem is a cyan-blue
+//    (the $49.99 paid exclusive). The cosmetic rarity gem is a cyan-blue
 //    `diamond.fill` (Cosmetics.swift `RarityGem`); the Diamond GRADE here
 //    is a violet `laurel.leading` wreath — different symbol, different
 //    hue. `TrophyGradeStyle.cosmeticDiamondTreatment` records the cosmetic

@@ -921,3 +921,39 @@ final class PreviewReplayTests: XCTestCase {
         XCTAssertNil(ReplayStore.decode(Data(backwards.utf8)), "time running backwards")
     }
 }
+
+/// Where animated cosmetics may move (shop grids stay still; previews move at
+/// most 30 fps; Reduce Motion stops every preview; play is unchanged).
+final class CosmeticMotionTests: XCTestCase {
+
+    func testGridsAndListsNeverAnimate() {
+        XCTAssertFalse(CosmeticMotion.still.showsAnimatedRenderers(reduceMotion: false))
+        XCTAssertTrue(CosmeticMotion.still.isPaused(reduceMotion: false))
+    }
+
+    func testPreviewAnimatesAtMostThirtyFPS() {
+        XCTAssertTrue(CosmeticMotion.preview.showsAnimatedRenderers(reduceMotion: false))
+        XCTAssertFalse(CosmeticMotion.preview.isPaused(reduceMotion: false))
+        XCTAssertEqual(CosmeticMotion.preview.frameInterval(nil) ?? 0, 1.0 / 30.0, accuracy: 1e-9)
+        // A renderer already slower than 30 fps keeps its own rate.
+        XCTAssertEqual(CosmeticMotion.preview.frameInterval(0.1) ?? 0, 0.1, accuracy: 1e-9)
+    }
+
+    func testReduceMotionStopsEveryPreview() {
+        XCTAssertFalse(CosmeticMotion.preview.showsAnimatedRenderers(reduceMotion: true))
+        XCTAssertTrue(CosmeticMotion.preview.isPaused(reduceMotion: true))
+        XCTAssertFalse(CosmeticMotion.held.showsAnimatedRenderers(reduceMotion: true))
+    }
+
+    func testHeldPreviewKeepsItsRenderersButStopsTicking() {
+        XCTAssertTrue(CosmeticMotion.held.showsAnimatedRenderers(reduceMotion: false))
+        XCTAssertTrue(CosmeticMotion.held.isPaused(reduceMotion: false))
+    }
+
+    func testPlayIsUnchanged() {
+        XCTAssertFalse(CosmeticMotion.live.isPaused(reduceMotion: true))
+        XCTAssertNil(CosmeticMotion.live.frameInterval(nil))
+        XCTAssertEqual(CosmeticMotion.live.frameInterval(1.0 / 30.0) ?? 0, 1.0 / 30.0, accuracy: 1e-9)
+        XCTAssertEqual(EnvironmentValues().cosmeticMotion, .live)
+    }
+}

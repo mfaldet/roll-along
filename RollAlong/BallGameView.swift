@@ -3767,6 +3767,7 @@ struct BallGameView: View {
 struct FloorOverlayView: View {
     let floor: Floor
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
 
     @ViewBuilder
     var body: some View {
@@ -3800,7 +3801,7 @@ struct FloorOverlayView: View {
     /// frames; sway phase derives from position so the RNG call
     /// sequence (and thus the layout) is unchanged.
     private var grassFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 // Zero amplitude under Reduce Motion — static fallback.
@@ -3885,7 +3886,7 @@ struct FloorOverlayView: View {
     /// exactly the old static crater field.  Deterministic seeded
     /// placement so craters don't shift between frames.
     private var moonFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 var rng = SeededRNG(seed: 0x5EED_0C24)
@@ -3961,7 +3962,7 @@ struct FloorOverlayView: View {
     /// so adjacent cells differ slightly, giving the dance-floor
     /// ripple.  30Hz cap keeps CPU modest at this density.
     private var discoFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let cellSize: CGFloat = 62
@@ -4000,7 +4001,7 @@ struct FloorOverlayView: View {
     /// glowing gridlines on near-black.  Under Reduce Motion the scroll
     /// freezes (the grid stays put) so it's safe and still textured.
     private var gridCityFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -4134,7 +4135,7 @@ struct FloorOverlayView: View {
     /// so the frozen frame is exactly the old static plating.
     /// Deterministic seeded placement so it doesn't shift between frames.
     private var brassFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -4245,7 +4246,7 @@ struct FloorOverlayView: View {
     /// moon disc occluding a glowing golden corona ring, hung in the upper sky.
     /// The corona slowly pulses.  Full-screen overlay.
     private var eclipseFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width * 0.5
@@ -4294,7 +4295,7 @@ struct FloorOverlayView: View {
     // and slide (the signature aurora ribbons), and a twinkling starfield.  All
     // additive over the deep-night floor base so the colours luminesce.
     private var auroraShimmerOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 let w = size.width, h = size.height
@@ -4387,6 +4388,7 @@ struct FloorOverlayView: View {
 struct PitOverlayView: View {
     let pit: Pit
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
 
     @ViewBuilder
     var body: some View {
@@ -4408,7 +4410,7 @@ struct PitOverlayView: View {
     /// sine offsets.  Each flame's height + width pulse so the fire
     /// breathes.
     private var evilPitOverlay: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
 
@@ -4489,7 +4491,7 @@ struct PitOverlayView: View {
     /// read against the darker pit context while remaining clearly a
     /// "look down at the sky" effect.
     private var skyPitOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
 
@@ -4542,7 +4544,7 @@ struct PitOverlayView: View {
     /// Golf bundle's pond pit.  Subtler motion than Evil/Sky so it
     /// doesn't distract from gameplay.
     private var pondPitOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
 
@@ -4642,7 +4644,7 @@ struct PitOverlayView: View {
     /// stars are larger "bright" stars with a cross-glint.  Star
     /// positions are seeded so they stay put; only brightness animates.
     private var spacePitOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
 
@@ -4734,7 +4736,7 @@ struct PitOverlayView: View {
     /// flare arc that erupts along the rim and dies away.  (This overlay is
     /// already suppressed entirely under Reduce Motion at the call site.)
     private var eclipsePitOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width * 0.5, cy = size.height * 0.5
@@ -4814,7 +4816,7 @@ struct PitOverlayView: View {
     /// Nightclub pit (Nightclub bundle) — a dark dancefloor void with drifting,
     /// twinkling coloured spotlights (additive) spilling across it.
     private var nightclubPitOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ctx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
@@ -5044,6 +5046,8 @@ struct PaperFloorOverlayView: View {
 struct BoundaryOverlayView: View {
     let boundary: Boundary
     let cornerRadius: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
 
     @ViewBuilder
     var body: some View {
@@ -5100,7 +5104,7 @@ struct BoundaryOverlayView: View {
     /// purple-tinted sheen (plus a fainter trailing echo) and an occasional
     /// ember-glow pulse that creeps along the rim.
     private var obsidianBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let sheenPos: Double = (t * 0.040).truncatingRemainder(dividingBy: 1.0)
             let echoPos: Double = sheenPos + 0.47
@@ -5125,7 +5129,7 @@ struct BoundaryOverlayView: View {
     /// dashes phase-shifted over the pink base stroke, plus a soft drifting
     /// sugar-glint highlight.
     private var candyBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let scroll: CGFloat = CGFloat((t * 16.0).truncatingRemainder(dividingBy: 28.0))
             let glintPos: Double = (t * 0.055).truncatingRemainder(dividingBy: 1.0)
@@ -5149,7 +5153,7 @@ struct BoundaryOverlayView: View {
     /// around the ring like signals, plus three fixed nodes that blink
     /// intermittently.
     private var circuitBorderOverlay: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             let t: Double = tl.date.timeIntervalSinceReferenceDate
             let tracePhase: CGFloat = CGFloat((-t * 26.0).truncatingRemainder(dividingBy: 46.0))
             let signalPos: Double = (t * 0.09).truncatingRemainder(dividingBy: 1.0)
@@ -5402,6 +5406,7 @@ struct BoundaryOverlayView: View {
 struct GoalSkinView: View {
     let goal: GoalSkin
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
 
     @ViewBuilder
     var body: some View {
@@ -5449,7 +5454,7 @@ struct GoalSkinView: View {
     /// target.  Reads instantly even at small sizes — the simplest
     /// possible "shoot for this" cue for new players.
     private var simpleBullseyeTarget: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t       = timeline.date.timeIntervalSinceReferenceDate
                 let breathe = 1.0 + sin(t * 1.3) * 0.025
@@ -5513,7 +5518,7 @@ struct GoalSkinView: View {
     /// breathe keeps it alive.
     private func bandedTargetGoal(_ colors: [Color]) -> some View {
         let ramp = colors.isEmpty ? [Color.gray] : colors
-        return TimelineView(.animation) { timeline in
+        return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t       = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let breathe = 1.0 + sin(t * 1.3) * 0.025
@@ -5551,7 +5556,7 @@ struct GoalSkinView: View {
     /// and a bright inner core.  The signature animated centerpiece of the
     /// Aurora bundle.  Freezes gracefully under Reduce Motion.
     private var auroraGoal: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let w = size.width, h = size.height
@@ -5625,7 +5630,7 @@ struct GoalSkinView: View {
     private func ringPortalGoal(_ colors: [Color]) -> some View {
         let ramp  = colors.isEmpty ? [Color.black, Color.white] : colors
         let inner = Array(ramp.reversed())             // bright centre first
-        return TimelineView(.animation) { timeline in
+        return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t       = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let breathe = 1.0 + sin(t * 1.3) * 0.03
@@ -5731,7 +5736,7 @@ struct GoalSkinView: View {
     /// (the actual win zone).  Animated via TimelineView; Reduce Motion
     /// freezes the descending pulses but keeps the beam + pad.
     private var tractorBeamGoal: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width
@@ -5827,7 +5832,7 @@ struct GoalSkinView: View {
     /// with flame tongues licking outward.  Animated flicker; Reduce Motion
     /// freezes the flames.
     private var infernoGoal: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width, h = size.height
@@ -5877,7 +5882,7 @@ struct GoalSkinView: View {
     /// Halo goal (Heavens bundle) — a radiant golden halo with slowly rotating
     /// light rays over a soft heavenly glow.  Reduce Motion freezes the rays.
     private var heavensHaloGoal: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width, h = size.height
@@ -6010,7 +6015,7 @@ struct GoalSkinView: View {
     }
 
     private var archeryTargetGoal: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t      = timeline.date.timeIntervalSinceReferenceDate
                 let breathe = 1.0 + sin(t * 1.3) * 0.025   // gentle ±2.5%
@@ -6088,7 +6093,7 @@ struct GoalSkinView: View {
 
     /// Galaxy — two spiral arms of stars winding around a bright core.
     private var galaxyGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6122,7 +6127,7 @@ struct GoalSkinView: View {
 
     /// Crystal — radiating angular facets that shimmer in icy blue.
     private var crystalGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6154,7 +6159,7 @@ struct GoalSkinView: View {
 
     /// Flame — a ring of dancing flames around a dark mouth.
     private var flameGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6190,7 +6195,7 @@ struct GoalSkinView: View {
 
     /// Blossom — a soft cherry-blossom flower with drifting petals.
     private var blossomGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6225,7 +6230,7 @@ struct GoalSkinView: View {
 
     /// Mosaic — a ring of small multi-coloured tiles around a dark centre.
     private var mosaicGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6253,7 +6258,7 @@ struct GoalSkinView: View {
 
     /// Ripple — concentric water rings expanding outward over a calm pool.
     private var rippleGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6280,7 +6285,7 @@ struct GoalSkinView: View {
 
     /// Comet — white-blue streaks whirling around a glowing core.
     private var cometGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6322,7 +6327,7 @@ struct GoalSkinView: View {
     /// on the classic magenta/cyan pair and the orbiting highlight is
     /// skipped, so the frozen frame matches the original two-hue sign.
     private var neonGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6363,7 +6368,7 @@ struct GoalSkinView: View {
 
     /// Eclipse — a black disc ringed by a slowly-pulsing golden corona.
     private var eclipseGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6390,7 +6395,7 @@ struct GoalSkinView: View {
 
     /// Plasma — jagged electric arcs writhing out of a white-hot core.
     private var plasmaGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6424,7 +6429,7 @@ struct GoalSkinView: View {
 
     /// Mirage — shimmering wavy heat-haze bands over warm desert gold.
     private var mirageGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6453,7 +6458,7 @@ struct GoalSkinView: View {
 
     /// Prism — a glass triangle fanning a white beam into a spectrum.
     private var prismGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6483,7 +6488,7 @@ struct GoalSkinView: View {
 
     /// Obsidian — dark volcanic glass with faint facets and a gliding sheen.
     private var obsidianGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6518,7 +6523,7 @@ struct GoalSkinView: View {
     /// and shimmer are motion-only; at t=0 (Reduce Motion) the frozen frame
     /// is the original core + jets + plain ring.
     private var quasarGoal: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate
                 let cx = size.width / 2, cy = size.height / 2
@@ -6584,7 +6589,7 @@ struct GoalSkinView: View {
         // Style derived from the currently-equipped goal so each variant
         // looks visually distinct without needing its own renderer.
         let style = goal.holeStyle
-        return TimelineView(.animation) { timeline in
+        return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t    = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
                 let cx   = size.width  / 2

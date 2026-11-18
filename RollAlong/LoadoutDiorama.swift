@@ -405,7 +405,10 @@ struct LoadoutDiorama: View {
     /// showcase card, radius 18) so the two clips don't fight.
     var cornerRadius: CGFloat? = 12
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
+    /// Still frame under Reduce Motion, and in a grid or list.
+    private var reduceMotion: Bool { systemReduceMotion || cosmeticMotion == .still }
     @ObservedObject private var recorder = ReplayRecorder.shared
 
     /// Seconds kept after the goal or fall so the ending reads.
@@ -577,7 +580,8 @@ struct LoadoutDiorama: View {
             frameScene(r, clip: c, size: s, t: max(c.start, c.end - 0.35),
                        alpha: 1, wallNow: 0)
         } else {
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil),
+                                    paused: cosmeticMotion.isPaused(reduceMotion: systemReduceMotion))) { tl in
                 let now = tl.date.timeIntervalSinceReferenceDate
                 let raw = now.truncatingRemainder(dividingBy: c.length)
                 let alpha: Double = raw < 0.15 ? raw / 0.15
@@ -776,5 +780,63 @@ private struct ReplayRecorderMenu: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+// ===========================================================================
+// CosmeticMotion — where an animated cosmetic is allowed to move.
+//
+// Every cosmetic renderer (BallSkinView, FloorOverlayView, PitOverlayView,
+// GoalSkinView, BoundaryOverlayView, LoadoutDiorama) reads this from the
+// environment:
+//   • .live    — in play and anywhere not set otherwise.  Each renderer runs
+//                at its own rate as before.
+//   • .preview — the Shop's Featured Bundle, a tapped cosmetic's detail view
+//                and the loadout preview.  Animates at most 30 fps; with
+//                Reduce Motion on, nothing moves.
+//   • .held    — a preview that is momentarily covered or scrolling: the
+//                same views, paused on their current frame.
+//   • .still   — Shop / Catalog / Locker grids and lists: never animates.
+//                Balls show their frozen (Reduce Motion) art; the shop draws
+//                its static swatches instead of the animated renderers.
+// ===========================================================================
+enum CosmeticMotion: Equatable {
+    case live, preview, held, still
+
+    /// Minimum seconds between frames: the renderer's own interval in play,
+    /// at most 30 fps in a shop preview.
+    func frameInterval(_ liveInterval: Double?) -> Double? {
+        switch self {
+        case .live, .still: return liveInterval
+        case .preview, .held: return max(liveInterval ?? 0, 1.0 / 30.0)
+        }
+    }
+
+    /// Whether a renderer's timeline should stop ticking.  Never in play
+    /// (renderers keep their own Reduce Motion handling there).
+    func isPaused(reduceMotion: Bool) -> Bool {
+        switch self {
+        case .live:         return false
+        case .preview:      return reduceMotion
+        case .held, .still: return true
+        }
+    }
+
+    /// True where the shop may show an animated renderer at all (a preview
+    /// that is running or momentarily held); false in grids and lists and
+    /// under Reduce Motion.
+    func showsAnimatedRenderers(reduceMotion: Bool) -> Bool {
+        (self == .preview || self == .held) && !reduceMotion
+    }
+}
+
+private struct CosmeticMotionKey: EnvironmentKey {
+    static let defaultValue: CosmeticMotion = .live
+}
+
+extension EnvironmentValues {
+    var cosmeticMotion: CosmeticMotion {
+        get { self[CosmeticMotionKey.self] }
+        set { self[CosmeticMotionKey.self] = newValue }
     }
 }
