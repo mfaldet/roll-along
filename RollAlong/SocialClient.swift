@@ -2230,7 +2230,7 @@ final class FeedbackOutbox: @unchecked Sendable {
                                 kind: kind,
                                 message: text,
                                 appVersion: "\(version) (\(build))",
-                                iosVersion: UIDevice.current.systemVersion,
+                                iosVersion: { let v = ProcessInfo.processInfo.operatingSystemVersion; return "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)" }(),
                                 deviceModel: AnalyticsClient.deviceIdentifier(),
                                 source: String(source.prefix(60)),
                                 createdAt: now())

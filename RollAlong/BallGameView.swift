@@ -29,8 +29,6 @@ private var screenCornerRadius: CGFloat {
     guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene }).first else { return 55 }
     let screen = scene.screen
-    let window = scene.windows.first
-    if (window?.safeAreaInsets.bottom ?? 1) == 0 { return 0 }   // Touch ID iPhone: square screen
     let base = DisplayCorner.radius(nativeHeight: max(screen.nativeBounds.height,
                                                       screen.nativeBounds.width))
     let zoom = screen.nativeScale > 0 ? screen.scale / screen.nativeScale : 1
