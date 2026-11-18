@@ -3966,7 +3966,7 @@ struct FloorOverlayView: View {
     private var discoFloorOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
                 let cellSize: CGFloat = 62
                 let cols = Int(ceil(size.width  / cellSize))
                 let rows = Int(ceil(size.height / cellSize))
@@ -4005,7 +4005,7 @@ struct FloorOverlayView: View {
     private var gridCityFloorOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
                 let w = size.width, h = size.height
                 let horizonY = h * 0.38
                 let vpX = w / 2                       // vanishing point x
@@ -4250,7 +4250,7 @@ struct FloorOverlayView: View {
     private var eclipseFloorOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width * 0.5
                 let cy = size.height * 0.30
                 let r  = min(size.width, size.height) * 0.16
@@ -4299,7 +4299,7 @@ struct FloorOverlayView: View {
     private var auroraShimmerOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
                 let w = size.width, h = size.height
 
                 // ── 1. Soft aurora glow wash ───────────────────────────────
@@ -4416,7 +4416,7 @@ struct PitOverlayView: View {
     private var evilPitOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
 
                 // Back gradient — coal → ember → flame tip.
                 ctx.fill(
@@ -4497,7 +4497,7 @@ struct PitOverlayView: View {
     private var skyPitOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
 
                 // Sky gradient — deeper blue at top, paler at bottom.
                 ctx.fill(
@@ -4550,7 +4550,7 @@ struct PitOverlayView: View {
     private var pondPitOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
 
                 // Water gradient — deeper teal at top, lighter cyan
                 // toward the bottom for depth.
@@ -4650,7 +4650,7 @@ struct PitOverlayView: View {
     private var spacePitOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
 
                 // Void background — near-black with a faint purple/blue
                 // nebula wash diagonally across.
@@ -4742,7 +4742,7 @@ struct PitOverlayView: View {
     private var eclipsePitOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width * 0.5, cy = size.height * 0.5
                 let r  = min(size.width, size.height) * 0.32
                 let pulse = 1.0 + 0.08 * sin(t * 1.6)
@@ -4822,7 +4822,7 @@ struct PitOverlayView: View {
     private var nightclubPitOverlay: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
+                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
                 ctx.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
                          with: .color(Color(red: 0.05, green: 0.03, blue: 0.09)))
 
@@ -5464,7 +5464,7 @@ struct GoalSkinView: View {
     private var simpleBullseyeTarget: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t       = (heroTime ?? timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double       = (heroTime ?? timeline.date.timeIntervalSinceReferenceDate)
                 let breathe = 1.0 + sin(t * 1.3) * 0.025
                 let cx      = size.width  / 2
                 let cy      = size.height / 2
@@ -5528,7 +5528,7 @@ struct GoalSkinView: View {
         let ramp = colors.isEmpty ? [Color.gray] : colors
         return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t       = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double       = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
                 let breathe = 1.0 + sin(t * 1.3) * 0.025
                 let cx = size.width / 2, cy = size.height / 2
                 let maxR = min(size.width, size.height) / 2 * 0.95 * breathe
@@ -5565,7 +5565,7 @@ struct GoalSkinView: View {
     /// Aurora bundle.  Freezes gracefully under Reduce Motion.
     private var auroraGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
-            let t = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+            let t: Double = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
             Canvas { ctx, size in
                 let w = size.width, h = size.height
                 let cx = w / 2, cy = h / 2
@@ -5640,7 +5640,7 @@ struct GoalSkinView: View {
         let inner = Array(ramp.reversed())             // bright centre first
         return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t       = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double       = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
                 let breathe = 1.0 + sin(t * 1.3) * 0.03
                 let cx = size.width / 2, cy = size.height / 2
                 let maxR = min(size.width, size.height) / 2 * 0.95 * breathe
@@ -5746,7 +5746,7 @@ struct GoalSkinView: View {
     private var tractorBeamGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
                 let w  = size.width
                 let h  = size.height
                 let cx = w / 2
@@ -5842,7 +5842,7 @@ struct GoalSkinView: View {
     private var infernoGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
                 let w  = size.width, h = size.height
                 let cx = w / 2, cy = h / 2
                 let r  = min(w, h) / 2 * 0.95
@@ -5892,7 +5892,7 @@ struct GoalSkinView: View {
     private var heavensHaloGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
                 let w  = size.width, h = size.height
                 let cx = w / 2, cy = h / 2
                 let r  = min(w, h) / 2 * 0.95
@@ -6025,7 +6025,7 @@ struct GoalSkinView: View {
     private var archeryTargetGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t      = (heroTime ?? timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double      = (heroTime ?? timeline.date.timeIntervalSinceReferenceDate)
                 let breathe = 1.0 + sin(t * 1.3) * 0.025   // gentle ±2.5%
                 let cx      = size.width  / 2
                 let cy      = size.height / 2
@@ -6103,7 +6103,7 @@ struct GoalSkinView: View {
     private var galaxyGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6137,7 +6137,7 @@ struct GoalSkinView: View {
     private var crystalGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6169,7 +6169,7 @@ struct GoalSkinView: View {
     private var flameGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6205,7 +6205,7 @@ struct GoalSkinView: View {
     private var blossomGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6240,7 +6240,7 @@ struct GoalSkinView: View {
     private var mosaicGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6268,7 +6268,7 @@ struct GoalSkinView: View {
     private var rippleGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6295,7 +6295,7 @@ struct GoalSkinView: View {
     private var cometGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6337,7 +6337,7 @@ struct GoalSkinView: View {
     private var neonGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(.black))
@@ -6378,7 +6378,7 @@ struct GoalSkinView: View {
     private var eclipseGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 let pulse = 1.0 + 0.06 * sin(t * 1.6)
@@ -6405,7 +6405,7 @@ struct GoalSkinView: View {
     private var plasmaGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6439,7 +6439,7 @@ struct GoalSkinView: View {
     private var mirageGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6468,7 +6468,7 @@ struct GoalSkinView: View {
     private var prismGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(Color(red:0.06,green:0.06,blue:0.09)))
@@ -6498,7 +6498,7 @@ struct GoalSkinView: View {
     private var obsidianGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)),
@@ -6533,7 +6533,7 @@ struct GoalSkinView: View {
     private var quasarGoal: some View {
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(Color(red:0.02,green:0.0,blue:0.05)))
@@ -6599,7 +6599,7 @@ struct GoalSkinView: View {
         let style = goal.holeStyle
         return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
-                let t    = heroTime ?? (reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate)
+                let t: Double    = heroTime ?? (reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate)
                 let cx   = size.width  / 2
                 let cy   = size.height / 2
                 let maxR = (size.width / 2) * 0.90
