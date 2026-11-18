@@ -3370,7 +3370,10 @@ struct BallGameView: View {
         // If that was the player's last life, go straight to Out of Lives;
         // otherwise show the Oops screen.  Tutorial levels (lives not
         // consumed) keep totalLives > 0 and always take the Oops path.
-        if !gameState.isTutorialLevel(gameState.currentLevel),
+        // Only modes that spend lives can run out — a free mode (Zen Garden,
+        // the Gold Rush coin pit) must never show Out of Lives.
+        if activeMode.lives == .consume,
+           !gameState.isTutorialLevel(gameState.currentLevel),
            !gameState.unlimitedLives,
            gameState.totalLives <= 0 {
             withAnimation(.easeInOut(duration: 0.28)) { showOutOfLives = true }

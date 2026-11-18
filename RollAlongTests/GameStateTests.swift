@@ -1515,4 +1515,20 @@ final class AnalyticsBatchEncodingTests: XCTestCase {
         XCTAssertTrue(props["inf"] is NSNull)
         XCTAssertEqual(props["ok"] as? Double, 1.5)
     }
+
+    // MARK: - Minigames never cost lives
+
+    /// Only the Adventure climb and its Challenge Tracks spend lives.  Every
+    /// minigame (competitive or solo, shipped or held back like Roll Out) and
+    /// the Challenge of the Day must be `.unlimited`.
+    func testOnlyTheClimbSpendsLives() {
+        for entry in GameModeCatalogue.registry {
+            let mode = entry.mode
+            if mode.id == "climb" || mode is ChallengeTrackMode {
+                XCTAssertEqual(mode.lives, .consume, "\(mode.id) should spend lives")
+            } else {
+                XCTAssertEqual(mode.lives, .unlimited, "minigame \(mode.id) must never cost a life")
+            }
+        }
+    }
 }
