@@ -14,6 +14,9 @@ struct SettingsView: View {
     @State private var showRestoreResult = false
     @State private var restoreResultMessage = ""
     @State private var isRestoring = false
+    @State private var showFeedback = false
+    /// The screen Settings was opened from, recorded with feedback.
+    var openedFrom: String = "Home"
 
     var body: some View {
         ZStack {
@@ -62,6 +65,9 @@ struct SettingsView: View {
                 Button("Done") { dismiss() }
                     .foregroundStyle(.white)
             }
+        }
+        .sheet(isPresented: $showFeedback) {
+            FeedbackSheet(source: "Settings (from \(openedFrom))")
         }
         .sheet(isPresented: $showResetConfirm) {
             ResetProgressConfirmSheet(currentLevel: gameState.currentLevel) {
@@ -480,6 +486,13 @@ struct SettingsView: View {
                 Link(destination: Self.contactURL) {
                     aboutRow(icon: "envelope.fill", title: "Contact Us")
                 }
+                Divider().background(Color(white: 0.22)).padding(.leading, 16)
+                Button { showFeedback = true } label: {
+                    aboutRow(icon: "bubble.left.and.exclamationmark.bubble.right.fill",
+                             title: "Send Feedback", trailing: "chevron.right")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Report a bug, share an idea or make a complaint")
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
 
@@ -489,7 +502,8 @@ struct SettingsView: View {
         }
     }
 
-    private func aboutRow(icon: String, title: String) -> some View {
+    private func aboutRow(icon: String, title: String,
+                          trailing: String = "arrow.up.right") -> some View {
         HStack {
             Label {
                 Text(title)
@@ -500,7 +514,7 @@ struct SettingsView: View {
                     .foregroundStyle(Color(white: 0.55))
             }
             Spacer()
-            Image(systemName: "arrow.up.right")
+            Image(systemName: trailing)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color(white: 0.4))
         }
@@ -779,5 +793,158 @@ struct NicknamePickerSheet: View {
         SettingsView()
             .environmentObject(GameState())
             .environmentObject(StoreKitManager.shared)
+    }
+}
+
+/// Settings → Send Feedback. The player picks a kind and writes a message
+/// (up to 1,000 characters). App version, iOS version, phone model, the
+/// screen they came from and — if signed in — their player id are added
+/// quietly; see `FeedbackOutbox` in SocialClient.swift. Nothing they write
+/// is shown to other players.
+struct FeedbackSheet: View {
+    let source: String
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var kind: FeedbackKind = .bug
+    @State private var message = ""
+    @State private var sent = false
+    @State private var limitReached = !FeedbackOutbox.shared.canSubmit
+    @FocusState private var editorFocused: Bool
+
+    private var trimmed: String {
+        message.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private var canSend: Bool { !trimmed.isEmpty && !limitReached }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(white: 0.09).ignoresSafeArea()
+                if sent {
+                    thankYou
+                } else {
+                    form
+                }
+            }
+            .navigationTitle("Send Feedback")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(sent ? "Done" : "Cancel") { dismiss() }
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .preferredColorScheme(.dark)
+    }
+
+    private var form: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Picker("Kind", selection: $kind) {
+                    ForEach(FeedbackKind.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+
+                Text(prompt)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $message)
+                        .focused($editorFocused)
+                        .scrollContentBackground(.hidden)
+                        .font(.system(.body, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(minHeight: 180)
+                        .padding(8)
+                        .onChange(of: message) { _, new in
+                            if new.count > FeedbackOutbox.maxLength {
+                                message = String(new.prefix(FeedbackOutbox.maxLength))
+                            }
+                        }
+                    if message.isEmpty {
+                        Text("Write your message here")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(Color(white: 0.4))
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 16)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 12)))
+
+                HStack(alignment: .top) {
+                    Text("Your app version, iOS version and phone model are included. Nothing you write is shown to other players.")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
+                    Spacer(minLength: 8)
+                    Text("\(message.count)/\(FeedbackOutbox.maxLength)")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(message.count >= FeedbackOutbox.maxLength
+                                         ? Color.orange : Color(white: 0.45))
+                }
+
+                if limitReached {
+                    Text("You've sent \(FeedbackOutbox.maxPerDay) messages in the last day. Please try again tomorrow.")
+                        .font(.system(.footnote, design: .rounded))
+                        .foregroundStyle(Color.orange)
+                }
+
+                Button(action: send) {
+                    Text("Send")
+                        .font(.system(.body, design: .rounded).weight(.bold))
+                        .foregroundStyle(canSend ? .white : Color(white: 0.5))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background((canSend ? Color.blue : Color(white: 0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 12)))
+                }
+                .disabled(!canSend)
+            }
+            .padding(20)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .onAppear { editorFocused = true }
+    }
+
+    private var prompt: String {
+        switch kind {
+        case .bug:       return "What happened, and what were you doing just before?"
+        case .idea:      return "What would make Roll Along better?"
+        case .complaint: return "Tell us what went wrong. We read every message."
+        }
+    }
+
+    private var thankYou: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(.green)
+            Text("Thank you!")
+                .font(.system(.title2, design: .rounded).weight(.bold))
+                .foregroundStyle(.white)
+            Text("We got your message. If you're offline, it will be sent the next time you're connected.")
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(Color(white: 0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+    }
+
+    private func send() {
+        switch FeedbackOutbox.shared.submit(kind: kind, message: message, source: source) {
+        case .queued:
+            editorFocused = false
+            withAnimation { sent = true }
+            AnalyticsClient.shared.track("feedback_sent",
+                                         properties: ["kind": .string(kind.rawValue)])
+        case .limitReached:
+            limitReached = true
+        case .empty:
+            break
+        }
     }
 }

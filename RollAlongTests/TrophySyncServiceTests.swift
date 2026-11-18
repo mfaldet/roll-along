@@ -336,3 +336,116 @@ final class TestRunNetworkIsolationTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Send Feedback outbox (queue, daily limit, retry rules)
+
+private final class MockFeedbackSender: FeedbackSending, @unchecked Sendable {
+    enum Mode { case ok, offline, refused }
+    var mode: Mode = .ok
+    private(set) var sent: [FeedbackItem] = []
+    private(set) var hashes: [String] = []
+
+    func send(_ item: FeedbackItem, installHash: String) async throws {
+        switch mode {
+        case .ok:
+            sent.append(item)
+            hashes.append(installHash)
+        case .offline:
+            throw FeedbackSendError.retryLater("offline")
+        case .refused:
+            throw FeedbackSendError.permanent(status: 400, body: "bad")
+        }
+    }
+}
+
+final class FeedbackOutboxTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var suite: String!
+
+    override func setUp() {
+        super.setUp()
+        suite = "FeedbackOutboxTests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suite)
+        super.tearDown()
+    }
+
+    private func outbox(_ sender: MockFeedbackSender,
+                        clock: @escaping () -> Date = Date.init) -> FeedbackOutbox {
+        FeedbackOutbox(defaults: defaults, sender: sender,
+                       installID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+                       liveAllowed: true, now: clock, autoFlush: false)
+    }
+
+    func testEmptyMessageIsNotQueued() {
+        let box = outbox(MockFeedbackSender())
+        XCTAssertEqual(box.submit(kind: .bug, message: "   \n ", source: "t"), .empty)
+        XCTAssertEqual(box.pendingCount, 0)
+        XCTAssertEqual(box.usedToday, 0)
+    }
+
+    func testMessageIsCappedAt1000AndOnlyAHashIsSent() async {
+        let sender = MockFeedbackSender()
+        let box = outbox(sender)
+        box.submit(kind: .idea, message: String(repeating: "a", count: 1_500), source: "t")
+        await box.flush()
+        XCTAssertEqual(sender.sent.first?.message.count, 1_000)
+        XCTAssertEqual(sender.hashes.first?.count, 64, "a SHA-256 hex hash, never the raw install ID")
+        XCTAssertFalse(sender.hashes.first?.contains("00000000-0000") ?? true)
+    }
+
+    func testOfflineKeepsTheMessageAndSendsItLater() async {
+        let sender = MockFeedbackSender()
+        sender.mode = .offline
+        let box = outbox(sender)
+        XCTAssertEqual(box.submit(kind: .bug, message: "It froze", source: "t"), .queued)
+        await box.flush()
+        XCTAssertEqual(box.pendingCount, 1)
+        XCTAssertTrue(sender.sent.isEmpty)
+
+        sender.mode = .ok
+        await box.flush()
+        XCTAssertEqual(box.pendingCount, 0)
+        XCTAssertEqual(sender.sent.map(\.message), ["It froze"])
+    }
+
+    func testRefusedMessageIsDroppedNotRetriedForever() async {
+        let sender = MockFeedbackSender()
+        sender.mode = .refused
+        let box = outbox(sender)
+        box.submit(kind: .complaint, message: "x", source: "t")
+        await box.flush()
+        XCTAssertEqual(box.pendingCount, 0)
+    }
+
+    func testFivePerRollingDayThenLimited() {
+        var now = Date(timeIntervalSince1970: 1_800_000_000)
+        let box = outbox(MockFeedbackSender(), clock: { now })
+        for i in 0..<FeedbackOutbox.maxPerDay {
+            XCTAssertEqual(box.submit(kind: .bug, message: "m\(i)", source: "t"), .queued)
+        }
+        XCTAssertEqual(box.submit(kind: .bug, message: "one too many", source: "t"), .limitReached)
+        XCTAssertFalse(box.canSubmit)
+
+        now = now.addingTimeInterval(FeedbackOutbox.window + 1)
+        XCTAssertTrue(box.canSubmit)
+        XCTAssertEqual(box.submit(kind: .bug, message: "next day", source: "t"), .queued)
+    }
+
+    func testNothingIsSentDuringTestRuns() async {
+        // The shared outbox is built with liveAllowed = !isRunningTests.
+        XCTAssertTrue(RuntimeEnvironment.isRunningTests)
+        let sender = MockFeedbackSender()
+        let box = FeedbackOutbox(defaults: defaults, sender: sender,
+                                 installID: UUID(),
+                                 liveAllowed: !RuntimeEnvironment.isRunningTests,
+                                 autoFlush: false)
+        box.submit(kind: .bug, message: "test", source: "t")
+        await box.flush()
+        XCTAssertTrue(sender.sent.isEmpty)
+        XCTAssertEqual(box.pendingCount, 1)
+    }
+}

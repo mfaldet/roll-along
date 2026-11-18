@@ -33,7 +33,7 @@ ADS
 One rewarded video (Google AdMob), shown only when the player chooses "Watch ad" for an extra life. Ads are non-personalized, limited to Google's "Teen" content rating, and the app does not track (no ATT prompt, no IDFA).
 
 NAMES AND CHAT — NO USER-WRITTEN CONTENT
-Players cannot type any text that other players see. A nickname (Profile > Nickname) is two words chosen from preset lists, shown with the player's level beside it; a clan name is two preset words plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
+Players cannot type any text that other players see (the only free-text field is Send Feedback, which goes privately to the developer). A nickname (Profile > Nickname) is two words chosen from preset lists, shown with the player's level beside it; a clan name is two preset words plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
 
 CLANS AND THE MONTHLY CLAN BATTLE
 A clan holds up to 12 players. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week. Each player has a short friend code on their profile (letters and digits only, assigned by our server); another player can type it on the Friends screen to send a friend request. The code is not shown to anyone unless the player shares it.
@@ -53,6 +53,9 @@ Cosmetic collections are released on a fixed calendar stored in the app: 13 at l
 TROPHIES
 86 in-game trophies, shown as tiles in four sections. They are earned by playing, are display only, and never grant coins or anything purchasable.
 
+SEND FEEDBACK
+Settings > About > Send Feedback. The player picks Bug, Idea or Complaint and writes up to 1,000 characters. It goes privately to the developer only: it is never shown to other players, and players cannot read it back. The app adds the app version, iOS version, phone model and the screen it came from, plus the account ID if signed in. Limited to 5 messages per phone per day; offline messages are sent later.
+
 NOTIFICATIONS
 Two optional local notifications (shop restock, lives full), off until the player turns them on in Settings.
 
@@ -65,6 +68,8 @@ Contact: rollalongsupport@gmail.com
 
 ## Before pasting, check these are true
 
+- [ ] `docs/feedback/feedback-schema.sql` (step 10) has been applied, or
+      Send Feedback messages will wait on the phone and never arrive.
 - [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
       not built from these lists" is only true after that).
 - [ ] The Supabase project is running and not paused during review.
