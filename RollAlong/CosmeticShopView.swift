@@ -61,13 +61,29 @@ private struct DetailListHeightKey: PreferenceKey {
     }
 }
 
-/// Payload for the Catalog "where to buy" popup — shown when the player taps an
-/// unowned individual cosmetic (which isn't sold directly in the Catalog).
-private struct CatalogPurchaseInfo: Identifiable {
+/// Payload for the item "try it on" popup — shown when the player taps any
+/// individual cosmetic in the Shop or Catalog.  The popup plays the gameplay
+/// replay with this item swapped into the player's current loadout, above a
+/// pinned action row (Buy / Equip / Equipped, or the Catalog's routes).
+/// Owned / equipped are read live (closures) so the button updates after a buy.
+private struct ItemTryOn: Identifiable {
     let id = UUID()
     let name: String
-    let bundles: [String]     // collections that include this item (may be empty)
-    let preview: AnyView      // the cosmetic's own preview, used as the card hero
+    let slot: String          // "Ball", "Trail", …
+    let tierLabel: String
+    let tierColor: Color
+    let coinCost: Int
+    /// Collections that include this item (Catalog routes).
+    let bundles: [CosmeticBundle]
+    /// Catalog only: buying this set would complete it, so the popup offers it.
+    let completingBundle: CosmeticBundle?
+    /// The player's current equipped loadout with this item swapped in.
+    let loadout: Loadout
+    let isOwned: () -> Bool
+    let isEquipped: () -> Bool
+    /// Runs the existing tap logic: buy + equip in the Shop, equip if owned,
+    /// buy the completing set in the Catalog.
+    let act: () -> Void
 }
 
 /// Catalog "Collections" filter — derived from each bundle's existing data (its
@@ -174,7 +190,7 @@ struct CosmeticShopView: View {
     @State private var completionToastBundle: String? = nil
     /// Non-nil while the Catalog "where to buy" popup is showing (tap an unowned
     /// individual cosmetic).  Replaces the old coin-shortfall "Heads up" alert.
-    @State private var catalogInfo: CatalogPurchaseInfo? = nil
+    @State private var tryOn: ItemTryOn? = nil
     /// Catalog → Collections type filter (the dropdown that replaced the
     /// "ALL COLLECTIONS" header).
     @State private var bundleFilter: BundleFilter = .all
@@ -194,7 +210,7 @@ struct CosmeticShopView: View {
     /// sheet, or under another screen.  Then it holds its current frame.
     private var featuredMotion: CosmeticMotion {
         let covered = shopScrolling || !shopOnScreen || showBuyCoinsSheet
-            || catalogInfo != nil || detailBundle != nil
+            || tryOn != nil || detailBundle != nil
         return covered ? .held : .preview
     }
 
@@ -260,10 +276,9 @@ struct CosmeticShopView: View {
                 .allowsHitTesting(false)
             }
 
-            // Catalog "where to buy" popup — replaces the old Heads-up alert for
-            // tapping an unowned individual cosmetic.  Tap anywhere to close.
-            if let info = catalogInfo {
-                catalogPurchasePopup(info)
+            // Item "try it on" popup — opened by tapping any cosmetic tile.
+            if let info = tryOn {
+                itemTryOnPopup(info)
                     .environment(\.cosmeticMotion, .preview)
             }
 
@@ -326,66 +341,196 @@ struct CosmeticShopView: View {
         .onDisappear { shopOnScreen = false }
     }
 
-    // MARK: - Catalog "where to buy" popup
+    // MARK: - Item "try it on" popup
 
-    /// Tapping an unowned individual cosmetic in the Catalog can't buy it (they're
-    /// only sold in the Shop, or by buying a Collection).  This card makes that
-    /// obvious at a glance and points to the two routes.  Tap anywhere to close.
-    private func catalogPurchasePopup(_ info: CatalogPurchaseInfo) -> some View {
-        ZStack {
-            Color.black.opacity(0.62).ignoresSafeArea()
+    private func dismissTryOn() {
+        withAnimation(.easeOut(duration: 0.2)) { tryOn = nil }
+    }
 
-            VStack(spacing: 16) {
-                // Hero — the cosmetic itself.
-                info.preview
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 92)
-                    .background(RoundedRectangle(cornerRadius: 18).fill(Color(white: 0.10)))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.10), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+    /// Tapping a cosmetic opens this card: the gameplay replay played with the
+    /// item swapped into the player's own loadout, its name and tier, and an
+    /// action row pinned at the bottom.  The card is never taller than the
+    /// space it has: the header, caption and action row keep their size and
+    /// the replay shrinks (down to 120 pt) to make room, so the Buy button is
+    /// always on screen, even on the smallest iPhone.
+    private func itemTryOnPopup(_ info: ItemTryOn) -> some View {
+        GeometryReader { geo in
+            ZStack {
+                Color.black.opacity(0.64).ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissTryOn() }
 
-                VStack(spacing: 5) {
-                    Text(info.name)
-                        .font(.system(size: 21, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                    Text("Not sold individually in the Catalog —\nhere's where to unlock it:")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.62))
-                        .multilineTextAlignment(.center)
-                }
-
-                VStack(spacing: 10) {
-                    purchaseRouteRow(icon: "bag.fill",
-                                     tint: Color(red: 0.34, green: 0.66, blue: 1.00),
-                                     title: "Buy it in the Shop",
-                                     subtitle: "Cosmetics rotate through the Shop's picks")
-                    if !info.bundles.isEmpty {
-                        purchaseRouteRow(icon: "square.stack.3d.up.fill",
-                                         tint: Color(red: 1.00, green: 0.80, blue: 0.34),
-                                         title: "Or unlock the Collection",
-                                         subtitle: collectionRouteSubtitle(info.bundles))
+                VStack(spacing: 12) {
+                    // Header — name, slot and tier, with an X to close.
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(info.name)
+                                .font(.system(size: 21, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            HStack(spacing: 6) {
+                                Text(info.slot.uppercased())
+                                    .foregroundStyle(Color(white: 0.55))
+                                Text(info.tierLabel.uppercased())
+                                    .foregroundStyle(info.tierColor)
+                            }
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                            .kerning(1.0)
+                        }
+                        Spacer(minLength: 0)
+                        Button { dismissTryOn() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color(white: 0.72))
+                                .frame(width: 30, height: 30)
+                                .background(Circle().fill(Color(white: 0.18)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close")
                     }
-                }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
 
-                Text("Tap anywhere to close")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.45))
+                    // The replay with this item on the player's own setup.
+                    LoadoutDiorama(loadout: info.loadout)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 120, maxHeight: 300)
+
+                    Text("Shown with the rest of your current setup")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.5))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
+
+                    tryOnActions(info)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
+                }
+                .padding(20)
+                .frame(maxWidth: 360)
+                .frame(maxHeight: min(560, max(300, geo.size.height - 32)))
+                .background(
+                    RoundedRectangle(cornerRadius: 26)
+                        .fill(Color(white: 0.12))
+                        .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                )
+                .shadow(color: .black.opacity(0.55), radius: 28, y: 14)
+                .padding(.horizontal, 22)
             }
-            .padding(24)
-            .frame(maxWidth: 330)
-            .background(
-                RoundedRectangle(cornerRadius: 26)
-                    .fill(Color(white: 0.13))
-                    .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.12), lineWidth: 1))
-            )
-            .shadow(color: .black.opacity(0.55), radius: 26, y: 12)
-            .padding(.horizontal, 28)
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        // Tap anywhere — dim OR card — closes the popup.
-        .contentShape(Rectangle())
-        .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { catalogInfo = nil } }
         .transition(.opacity)
+    }
+
+    /// The pinned action row: Equipped, Equip, Buy (Shop), or the Catalog's
+    /// ways to get it (complete the set, open its collection, or the Shop).
+    @ViewBuilder
+    private func tryOnActions(_ info: ItemTryOn) -> some View {
+        if info.isEquipped() {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 15, weight: .bold))
+                Text("Equipped").font(.system(size: 15, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.10)))
+        } else if info.isOwned() {
+            Button {
+                info.act()
+                dismissTryOn()
+            } label: {
+                Text("Equip")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(red: 0.30, green: 0.86, blue: 0.56)))
+            }
+            .buttonStyle(.plain)
+        } else if mode == .shop {
+            tryOnBuyButton(title: "Buy", cost: info.coinCost,
+                           fill: .white,
+                           accessibility: "Buy \(info.name) for \(info.coinCost) coins") {
+                info.act()
+                // Close on a successful buy; a shortfall keeps it open (the
+                // shortfall alert shows over the popup).
+                if info.isOwned() { dismissTryOn() }
+            }
+        } else if let set = info.completingBundle {
+            // Catalog: the last missing piece of a set — buying the set
+            // completes it (the existing Catalog rule).
+            let cost = bundleCost(set)
+            tryOnBuyButton(title: "Complete the Set", cost: cost,
+                           fill: Color(red: 0.30, green: 0.86, blue: 0.56),
+                           accessibility: "Complete the \(set.displayName) set for \(cost) coins") {
+                info.act()
+                if info.isOwned() { dismissTryOn() }
+            }
+        } else if let set = info.bundles.first {
+            // Catalog: individual cosmetics aren't sold here — open the
+            // collection that includes it (its popup has the Buy button).
+            VStack(spacing: 8) {
+                Text("Sold in the Shop's picks. \(collectionRouteSubtitle(info.bundles.map(\.displayName))).")
+                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                        tryOn = nil
+                        detailBundle = set
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.stack.3d.up.fill")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("View \(set.displayName)")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white))
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            purchaseRouteRow(icon: "bag.fill",
+                             tint: Color(red: 0.34, green: 0.66, blue: 1.00),
+                             title: "Buy it in the Shop",
+                             subtitle: "Cosmetics rotate through the Shop's picks")
+        }
+    }
+
+    /// A full-width buy button: title on the left, coin price on the right;
+    /// greyed when the player can't afford it (tapping still shows the
+    /// shortfall alert, as before).
+    private func tryOnBuyButton(title: String, cost: Int, fill: Color,
+                                accessibility: String,
+                                action: @escaping () -> Void) -> some View {
+        let affordable = gameState.coinBalance >= cost
+        return Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(affordable ? .black : Color(white: 0.5))
+                Spacer()
+                CoinIcon(size: 14)
+                Text("\(cost)")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(affordable ? .black : Color(white: 0.45))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 13)
+            .background(RoundedRectangle(cornerRadius: 14)
+                .fill(affordable ? fill : Color(white: 0.20)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibility)
     }
 
     private func purchaseRouteRow(icon: String, tint: Color,
@@ -855,16 +1000,53 @@ struct CosmeticShopView: View {
         let category = String(describing: type(of: item))
         let rarity = item.showsRarityBadge ? ", \(item.rarityLabel)" : ""
         if equipped { return "\(item.displayName) \(category)\(rarity), equipped." }
-        if owned    { return "\(item.displayName) \(category)\(rarity), owned. Double-tap to equip." }
+        if owned    { return "\(item.displayName) \(category)\(rarity), owned. Double-tap to try it on and equip." }
         if mode == .catalog {
-            return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Sold as part of a bundle — double-tap for details."
+            return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Sold as part of a bundle — double-tap to try it on."
         }
-        return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Double-tap to buy."
+        return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Double-tap to try it on and buy."
     }
 
     // MARK: - Tap handling
 
+    /// Tapping a tile opens the "try it on" popup: the replay with this item
+    /// on the player's own loadout, and the Buy / Equip button.  The popup's
+    /// button runs `performTap`, the purchase and equip logic unchanged.
     private func handleTap<Item: CosmeticItem>(item: Item, owned: Bool, equipped: Bool) {
+        let gs = gameState
+        let info = ItemTryOn(
+            name: item.displayName,
+            slot: slotName(item),
+            tierLabel: item.tier.label,
+            tierColor: item.tier.color,
+            coinCost: item.coinCost,
+            bundles: CosmeticBundle.bundles(containing: item),
+            completingBundle: mode == .catalog ? lastItemBundle(for: item) : nil,
+            loadout: Loadout(equippedIn: gs).trying(item),
+            isOwned: { gs.isOwned(item) },
+            isEquipped: { [self] in isEquipped(item) },
+            act: { [self] in
+                performTap(item: item, owned: gs.isOwned(item), equipped: isEquipped(item))
+            })
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) { tryOn = info }
+    }
+
+    private func slotName<Item: CosmeticItem>(_ item: Item) -> String {
+        switch item {
+        case is BallSkin:   return "Ball"
+        case is GoalSkin:   return "Goal"
+        case is TrailColor: return "Trail"
+        case is Floor:      return "Floor"
+        case is Pit:        return "Pit"
+        case is Boundary:   return "Boundary"
+        case is MusicTrack: return "Music"
+        default:            return "Cosmetic"
+        }
+    }
+
+    /// The purchase / equip logic a tap used to run directly; now run by the
+    /// popup's action button.
+    private func performTap<Item: CosmeticItem>(item: Item, owned: Bool, equipped: Bool) {
         if equipped { return }
         if owned {
             equip(item)
@@ -882,18 +1064,9 @@ struct CosmeticShopView: View {
         // EXCEPTION: when this is the last unowned item of a set, buying it
         // completes that set, so route straight to that bundle purchase.
         if mode == .catalog {
+            // The popup shows the "where to buy" routes when no set completes.
             if let bundle = lastItemBundle(for: item) {
                 handleBundleTap(bundle, owned: false)
-            } else {
-                // Individual cosmetics aren't bought in the Catalog — show a
-                // custom "where to buy" card (Shop / Collections) instead of the
-                // coin-shortfall alert.
-                let names = CosmeticBundle.bundles(containing: item).map(\.displayName)
-                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
-                    catalogInfo = CatalogPurchaseInfo(name: item.displayName,
-                                                      bundles: names,
-                                                      preview: AnyView(preview(for: item)))
-                }
             }
             return
         }
@@ -1328,10 +1501,16 @@ struct CosmeticShopView: View {
         }
 
         // Catalog: the whole card is a button that opens the detail popup.  Shop:
-        // the card stays a plain container so its inline button owns the taps.
+        // the inline Buy button keeps its own taps; a tap anywhere else on the
+        // card (the Featured Bundle included) opens the same "try it on" popup.
         return Group {
             if isShop {
                 card
+                    .contentShape(RoundedRectangle(cornerRadius: 18))
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) { detailBundle = bundle }
+                    }
+                    .accessibilityAction(named: "Try it on") { detailBundle = bundle }
             } else {
                 Button {
                     withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) { detailBundle = bundle }
@@ -1370,7 +1549,8 @@ struct CosmeticShopView: View {
         let discounted  = mode == .shop && cost < prorated
         let canAfford   = gameState.coinBalance >= cost
 
-        return ZStack {
+        return GeometryReader { geo in
+          ZStack {
             Color.black.opacity(0.64).ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { dismissDetail() }
@@ -1397,27 +1577,37 @@ struct CosmeticShopView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
 
-                // Every cosmetic in the set (left) beside a live diorama of the
-                // whole loadout in action (right) — the same "list + illustrate"
-                // format as the profile's My Loadout.  The list shows the full
-                // set with no inner scroll; the diorama matches its height.
-                HStack(alignment: .top, spacing: 12) {
+                // Try it on: the gameplay replay with the whole set equipped
+                // together on the player's own setup (slots the set doesn't
+                // fill keep the player's pieces).  It shrinks — down to
+                // 120 pt — before the purchase button would leave the screen.
+                LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(bundle: bundle))
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 120, maxHeight: 230)
+
+                // Every cosmetic in the set.  Scrolls when it can't all fit
+                // (a set with many balls, or a small phone); never taller
+                // than its contents.
+                ScrollView {
                     VStack(spacing: 8) {
                         ForEach(bundleDetailRows(bundle)) { collectionItemRow($0) }
                     }
-                    .frame(maxWidth: .infinity)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: DetailListHeightKey.self,
                                                value: g.size.height)
                     })
-
-                    LoadoutDiorama(loadout: Loadout(bundle: bundle))
-                        .frame(width: 126, height: max(180, detailListHeight))
                 }
+                .frame(minHeight: min(detailListHeight, 96), maxHeight: max(1, detailListHeight))
+                .scrollBounceBehavior(.basedOnSize)
                 .onPreferenceChange(DetailListHeightKey.self) { detailListHeight = $0 }
 
                 // Footer — purchase, or a complete badge if already owned.
+                // Keeps its full height (layout priority) so it is always on
+                // screen; the replay and list give way first.
+                Group {
                 if bundleOwned {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill").font(.system(size: 15, weight: .bold))
@@ -1463,9 +1653,15 @@ struct CosmeticShopView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
             }
             .padding(20)
             .frame(maxWidth: 360)
+            // Never taller than the space available, so the footer stays on
+            // screen on the smallest iPhone.
+            .frame(maxHeight: max(300, geo.size.height - 32))
             .background(
                 RoundedRectangle(cornerRadius: 26)
                     .fill(Color(white: 0.12))
@@ -1473,6 +1669,8 @@ struct CosmeticShopView: View {
             )
             .shadow(color: .black.opacity(0.55), radius: 28, y: 14)
             .padding(.horizontal, 22)
+          }
+          .frame(width: geo.size.width, height: geo.size.height)
         }
         .transition(.opacity)
     }

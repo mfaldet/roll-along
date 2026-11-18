@@ -37,6 +37,48 @@ extension Loadout {
             boundary: bundle.boundaries.first ?? .classic
         )
     }
+
+    /// The player's current look: what they have equipped right now.
+    init(equippedIn gameState: GameState) {
+        self.init(
+            ball:     gameState.activeSkin,
+            trail:    gameState.equippedTrail,
+            goal:     gameState.equippedGoal,
+            floor:    gameState.equippedFloor,
+            pit:      gameState.equippedPit,
+            boundary: gameState.equippedBoundary
+        )
+    }
+
+    /// "Try it on": this loadout with one cosmetic swapped into its slot.
+    /// Music is heard, not drawn, so it changes nothing here.
+    func trying<Item: CosmeticItem>(_ item: Item) -> Loadout {
+        var l = self
+        switch item {
+        case let s as BallSkin:   l.ball = s
+        case let t as TrailColor: l.trail = t
+        case let g as GoalSkin:   l.goal = g
+        case let f as Floor:      l.floor = f
+        case let p as Pit:        l.pit = p
+        case let b as Boundary:   l.boundary = b
+        default: break
+        }
+        return l
+    }
+
+    /// "Try it on" for a whole set: every slot the set fills is swapped in
+    /// together (its first item per slot, as buying it equips); slots it
+    /// leaves empty keep the player's own pieces.
+    func trying(bundle: CosmeticBundle) -> Loadout {
+        var l = self
+        if let x = bundle.balls.first      { l.ball = x }
+        if let x = bundle.trails.first     { l.trail = x }
+        if let x = bundle.goals.first      { l.goal = x }
+        if let x = bundle.floors.first     { l.floor = x }
+        if let x = bundle.pits.first       { l.pit = x }
+        if let x = bundle.boundaries.first { l.boundary = x }
+        return l
+    }
 }
 
 // ===========================================================================
