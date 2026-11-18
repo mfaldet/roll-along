@@ -216,6 +216,12 @@ struct CosmeticShopView: View {
         return covered ? .held : .preview
     }
 
+    /// Grid and picks tiles hold their frames while the list scrolls, while a
+    /// popup or sheet covers them, or while another screen covers the Shop.
+    private var tilesHeld: Bool {
+        !shopOnScreen || showBuyCoinsSheet || tryOn != nil || detailBundle != nil
+    }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
     var body: some View {
@@ -237,7 +243,7 @@ struct CosmeticShopView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.top, 16)
                                 .padding(.bottom, 36)
-                                .environment(\.cosmeticTilesScrolling, gridScrolling)
+                                .environment(\.cosmeticTilesScrolling, gridScrolling || tilesHeld)
                         }
                         .cosmeticTileScrollTracking($gridScrolling)
                     }
@@ -643,7 +649,7 @@ struct CosmeticShopView: View {
             .padding(.top, 14)
             .padding(.bottom, 36)
             // The picks tiles hold their frames while the Shop scrolls.
-            .environment(\.cosmeticTilesScrolling, shopScrolling)
+            .environment(\.cosmeticTilesScrolling, shopScrolling || tilesHeld)
         }
         .cosmeticTileScrollTracking($shopScrolling)
     }
