@@ -1790,8 +1790,6 @@ enum CosmeticSchedule {
     struct Upcoming {
         let date: Date
         let bundles: [CosmeticBundle]
-        /// Collections scheduled after these.
-        let laterCount: Int
     }
 
     /// The next release day that has not arrived yet, with every collection
@@ -1806,7 +1804,7 @@ enum CosmeticSchedule {
         }
         guard let first = pending.map({ $0.date }).min() else { return nil }
         let bundles = pending.filter { $0.date == first }.map { $0.bundle }
-        return Upcoming(date: first, bundles: bundles, laterCount: pending.count - bundles.count)
+        return Upcoming(date: first, bundles: bundles)
     }
 }
 

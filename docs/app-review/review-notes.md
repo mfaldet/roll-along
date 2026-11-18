@@ -37,7 +37,7 @@ ACCOUNT DELETION
 Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
 COSMETIC RELEASE CALENDAR
-Cosmetic collections release on fixed dates. The dates are kept on our server, with the same dates built into the app, so we can adjust a date without an app update. This only changes when a cosmetic collection appears in the Shop; nothing else is switched on remotely. Upcoming collections are listed by name and date in Shop > Catalog > "Coming soon". Seasonal collections return each year.
+Cosmetic collections release on fixed dates. The dates are kept on our server, with the same dates built into the app, so we can adjust a date without an app update. This only changes when a cosmetic collection appears in the Shop; nothing else is switched on remotely. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal collections return each year.
 
 TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.

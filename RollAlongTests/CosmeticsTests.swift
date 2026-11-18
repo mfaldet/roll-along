@@ -725,7 +725,6 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(first?.date, eastern(2026, 12, 17))
         XCTAssertEqual(Set(first?.bundles.map(\.id) ?? []),
                        ["cathedral", "velvet-night", "crystal-cavern"])
-        XCTAssertEqual(first?.laterCount, 34)
         let march = CosmeticSchedule.nextDrop(at: eastern(2027, 3, 11, plus: -1), store: store)
         XCTAssertEqual(march?.date, eastern(2027, 3, 11))
         let afterAll = eastern(2027, 11, 11)
