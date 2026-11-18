@@ -179,6 +179,20 @@ struct CosmeticShopView: View {
     /// Measured height of the popup's cosmetic list, so the diorama beside it
     /// can match — the whole set stays visible with no inner scroll.
     @State private var detailListHeight: CGFloat = 0
+    /// True while the Shop's scroll view is moving — the Featured Bundle
+    /// holds its animation so scrolling stays smooth.
+    @State private var shopScrolling = false
+    /// False while another screen (Catalog, Locker) covers the Shop.
+    @State private var shopOnScreen = true
+
+    /// The Featured Bundle animates (CosmeticMotion.preview) only while it is
+    /// the thing being looked at: not while scrolling, behind a popup or
+    /// sheet, or under another screen.  Then it holds its current frame.
+    private var featuredMotion: CosmeticMotion {
+        let covered = shopScrolling || !shopOnScreen || showBuyCoinsSheet
+            || catalogInfo != nil || detailBundle != nil
+        return covered ? .held : .preview
+    }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 2)
 
@@ -186,19 +200,24 @@ struct CosmeticShopView: View {
         ZStack {
             Color(white: 0.08).ignoresSafeArea()
 
-            if mode == .shop {
-                shopFront
-            } else {
-                VStack(spacing: 0) {
-                    tabBar
-                    ScrollView {
-                        grid
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                            .padding(.bottom, 36)
+            // Grids and lists never animate (CosmeticMotion.still); only the
+            // Featured Bundle (inside shopFront) and the popups below do.
+            Group {
+                if mode == .shop {
+                    shopFront
+                } else {
+                    VStack(spacing: 0) {
+                        tabBar
+                        ScrollView {
+                            grid
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                                .padding(.bottom, 36)
+                        }
                     }
                 }
             }
+            .environment(\.cosmeticMotion, .still)
 
             // ── Collection-complete toast (S7) ────────────────────────────
             // Floats above the scroll view and slides in from the bottom
@@ -241,11 +260,13 @@ struct CosmeticShopView: View {
             // tapping an unowned individual cosmetic.  Tap anywhere to close.
             if let info = catalogInfo {
                 catalogPurchasePopup(info)
+                    .environment(\.cosmeticMotion, .preview)
             }
 
             // Collection detail popup — opened by tapping a collection card.
             if let bundle = detailBundle {
                 collectionDetailPopup(bundle)
+                    .environment(\.cosmeticMotion, .preview)
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.72), value: completionToastBundle)
@@ -291,10 +312,14 @@ struct CosmeticShopView: View {
         ), actions: { Button("OK", role: .cancel) {} },
         message: { Text(purchaseError ?? "") })
         .onAppear {
+            shopOnScreen = true
             // Viewing the Shop (not the Catalog) resets the "shop fresh" alert:
             // re-arm it for the next rotation boundary.
             if mode == .shop { gameState.recordShopViewed() }
         }
+        // Covered by the Catalog / Locker pushed on top: hold the Featured
+        // Bundle's animation until the Shop is back.
+        .onDisappear { shopOnScreen = false }
     }
 
     // MARK: - Catalog "where to buy" popup
@@ -440,6 +465,7 @@ struct CosmeticShopView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             sectionLabel("FEATURED BUNDLE")
                             collectionCard(bundle, isFeatured: true)
+                                .environment(\.cosmeticMotion, featuredMotion)
                         }
                         .padding(.top, 7)
                     }
@@ -459,6 +485,10 @@ struct CosmeticShopView: View {
             .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 36)
+        }
+        .onScrollPhaseChange { _, phase in
+            let moving = phase != .idle
+            if moving != shopScrolling { shopScrolling = moving }
         }
     }
 
@@ -957,6 +987,10 @@ struct CosmeticShopView: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(boundary.edgeColor.opacity(0.9), lineWidth: 1.5)
             )
+            // The Legendary border texture, in a preview only.
+            .liveCosmetic {
+                BoundaryOverlayView(boundary: boundary, cornerRadius: 6)
+            }
             .shadow(color: Color.black.opacity(0.4), radius: 5, x: 0, y: 3)
     }
 
@@ -967,16 +1001,7 @@ struct CosmeticShopView: View {
     }
 
     private func goalPreview(_ goal: GoalSkin) -> some View {
-        Circle()
-            .fill(GoalSkin.previewGradient(for: goal))
-            .overlay(
-                Circle()
-                    .stroke(LinearGradient(
-                        colors: [.white.opacity(0.4), .clear],
-                        startPoint: .top, endPoint: .bottom
-                    ), lineWidth: 1.5)
-            )
-            .frame(width: 56, height: 56)
+        ShopGoalSwatch(goal: goal, diameter: 56, rim: true)
             .shadow(color: Color.black.opacity(0.40), radius: 6, x: 0, y: 4)
     }
 
@@ -992,23 +1017,11 @@ struct CosmeticShopView: View {
             }
             .padding(8)
         } else {
-            // Render the actual trail effect along a gentle sample curve so the
-            // cell sells what the trail really does.  Animated like in-game.
-            TimelineView(.animation) { tl in
-                let t = tl.date.timeIntervalSinceReferenceDate
-                Canvas { ctx, size in
-                    let n = 18
-                    var pts: [CGPoint] = []
-                    for i in 0..<n {
-                        let f = Double(i) / Double(n - 1)
-                        let x = size.width  * CGFloat(0.14 + f * 0.72)
-                        let y = size.height * CGFloat(0.50 + 0.30 * sin(f * .pi * 1.4))
-                        pts.append(CGPoint(x: x, y: y))
-                    }
-                    drawRichTrail(ctx, points: pts, trail: trail, t: t, baseWidth: 5)
-                }
-            }
-            .padding(8)
+            // The actual trail effect along a gentle sample curve, so the cell
+            // sells what the trail really does.  Still in grids; animated only
+            // in a preview (see ShopTrailCurve).
+            ShopTrailCurve(trail: trail, baseWidth: 5)
+                .padding(8)
         }
     }
 
@@ -1033,6 +1046,11 @@ struct CosmeticShopView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
+            // The floor's animated texture, in a preview only.
+            .liveCosmetic {
+                FloorOverlayView(floor: floor)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.black.opacity(0.25), lineWidth: 0.6)
@@ -1052,6 +1070,11 @@ struct CosmeticShopView: View {
                             .blendMode(.plusLighter)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
+                }
+                // The pit's animated texture, in a preview only.
+                .liveCosmetic {
+                    PitOverlayView(pit: pit)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
         }
         .frame(width: 90, height: 60)
@@ -1457,9 +1480,8 @@ struct CosmeticShopView: View {
         for x in b.goals {
             rows.append(BundleItemRow(category: "Goal", name: x.displayName,
                                       owned: gameState.isOwned(x),
-                                      preview: AnyView(Circle().fill(GoalSkin.previewGradient(for: x))
-                                        .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
-                                        .frame(width: 28, height: 28))))
+                                      preview: AnyView(ShopGoalSwatch(goal: x, diameter: 28, rim: false)
+                                        .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1)))))
         }
         for x in b.trails {
             rows.append(BundleItemRow(category: "Trail", name: x.displayName,
@@ -1470,6 +1492,7 @@ struct CosmeticShopView: View {
             rows.append(BundleItemRow(category: "Floor", name: x.displayName,
                                       owned: gameState.isOwned(x),
                                       preview: AnyView(RoundedRectangle(cornerRadius: 6).fill(x.color)
+                                        .liveCosmetic { FloorOverlayView(floor: x).clipShape(RoundedRectangle(cornerRadius: 6)) }
                                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.black.opacity(0.2), lineWidth: 0.6))
                                         .frame(width: 30, height: 24))))
         }
@@ -1511,19 +1534,26 @@ struct CosmeticShopView: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.09)))
     }
 
+    /// A small trail swatch: a plain stroke in the trail's color in grids and
+    /// lists; the real trail effect, moving, in a preview.
     @ViewBuilder private func trailSwatch(_ trail: TrailColor) -> some View {
-        Canvas { ctx, size in
-            var p = Path()
-            p.move(to: CGPoint(x: size.width * 0.12, y: size.height * 0.85))
-            p.addLine(to: CGPoint(x: size.width * 0.88, y: size.height * 0.15))
-            ctx.stroke(p, with: .color(trail == .none ? Color(white: 0.30) : trail.color),
-                       style: StrokeStyle(lineWidth: 4, lineCap: .round))
+        ShopMotionSwitch {
+            Canvas { ctx, size in
+                var p = Path()
+                p.move(to: CGPoint(x: size.width * 0.12, y: size.height * 0.85))
+                p.addLine(to: CGPoint(x: size.width * 0.88, y: size.height * 0.15))
+                ctx.stroke(p, with: .color(trail == .none ? Color(white: 0.30) : trail.color),
+                           style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            }
+        } live: {
+            ShopTrailCurve(trail: trail, baseWidth: 3.5)
         }
     }
     @ViewBuilder private func pitSwatch(_ pit: Pit) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.20))
             RoundedRectangle(cornerRadius: 3).fill(pit.color).frame(width: 16, height: 9)
+                .liveCosmetic { PitOverlayView(pit: pit).clipShape(RoundedRectangle(cornerRadius: 3)) }
         }
     }
     @ViewBuilder private func musicSwatch(_ track: MusicTrack) -> some View {
@@ -1635,9 +1665,7 @@ struct CosmeticShopView: View {
                            isOwned: bundle.goals.first.map { gameState.isOwned($0) },
                            isEquipped: bundle.goals.first.map { isEquipped($0) } ?? false) {
                 if let goal = bundle.goals.first {
-                    Circle()
-                        .fill(GoalSkin.previewGradient(for: goal))
-                        .frame(width: 34, height: 34)
+                    ShopGoalSwatch(goal: goal, diameter: 34, rim: false)
                 }
             }
             // Trail
@@ -1645,14 +1673,8 @@ struct CosmeticShopView: View {
                            isOwned: bundle.trails.first.map { gameState.isOwned($0) },
                            isEquipped: bundle.trails.first.map { isEquipped($0) } ?? false) {
                 if let trail = bundle.trails.first {
-                    Canvas { ctx, size in
-                        var p = Path()
-                        p.move(to: CGPoint(x: size.width * 0.12, y: size.height * 0.88))
-                        p.addLine(to: CGPoint(x: size.width * 0.88, y: size.height * 0.12))
-                        ctx.stroke(p, with: .color(trail == .none ? Color(white: 0.30) : trail.color),
-                                   style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    }
-                    .frame(width: 38, height: 38)
+                    trailSwatch(trail)
+                        .frame(width: 38, height: 38)
                 }
             }
             // Floor
@@ -1662,6 +1684,10 @@ struct CosmeticShopView: View {
                 if let floor = bundle.floors.first {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(floor.color)
+                        .liveCosmetic {
+                            FloorOverlayView(floor: floor)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
                         .frame(width: 38, height: 26)
                 }
             }
@@ -1676,6 +1702,10 @@ struct CosmeticShopView: View {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(pit.color)
                             .frame(width: 18, height: 10)
+                            .liveCosmetic {
+                                PitOverlayView(pit: pit)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                            }
                     }
                     .frame(width: 38, height: 26)
                 }
@@ -2015,6 +2045,131 @@ struct RarityCornerTab: View {
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
                                           bottomTrailingRadius: 0, topTrailingRadius: corner))
         .allowsHitTesting(false)
+    }
+}
+
+// ===========================================================================
+// Shop previews that move only where they may (see CosmeticMotion in
+// LoadoutDiorama.swift).  In grids and lists — and under Reduce Motion —
+// these build only their still art, so no TimelineView is ever created
+// there; in the Featured Bundle, a detail popup or the loadout preview they
+// add the game's own animated renderer on top.
+// ===========================================================================
+
+/// True when this place in the view tree may show an animated renderer.
+private struct ShopMotionGate {
+    let motion: CosmeticMotion
+    let reduceMotion: Bool
+    var animates: Bool { motion.showsAnimatedRenderers(reduceMotion: reduceMotion) }
+}
+
+/// Shows `still` in grids and lists, `live` in a preview.  `live` is built
+/// only when it is shown.
+private struct ShopMotionSwitch<Still: View, Live: View>: View {
+    @Environment(\.cosmeticMotion) private var motion
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let still: Still
+    private let live: () -> Live
+
+    init(@ViewBuilder still: () -> Still, @ViewBuilder live: @escaping () -> Live) {
+        self.still = still()
+        self.live = live
+    }
+
+    var body: some View {
+        if ShopMotionGate(motion: motion, reduceMotion: reduceMotion).animates {
+            live()
+        } else {
+            still
+        }
+    }
+}
+
+/// Adds an animated overlay (a floor, pit or boundary texture) only in a
+/// preview.
+private struct LiveCosmeticOverlay<Overlay: View>: ViewModifier {
+    @Environment(\.cosmeticMotion) private var motion
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let overlay: () -> Overlay
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if ShopMotionGate(motion: motion, reduceMotion: reduceMotion).animates {
+                overlay().allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+extension View {
+    /// Overlay the game's animated renderer for a cosmetic, in a preview only.
+    fileprivate func liveCosmetic<Overlay: View>(
+        @ViewBuilder _ overlay: @escaping () -> Overlay
+    ) -> some View {
+        modifier(LiveCosmeticOverlay(overlay: overlay))
+    }
+}
+
+/// A goal: its preview gradient in grids and lists, the game's own goal
+/// renderer (animated) in a preview.
+private struct ShopGoalSwatch: View {
+    let goal: GoalSkin
+    let diameter: CGFloat
+    /// The soft top-lit rim the big shop tile uses.
+    var rim: Bool = false
+
+    var body: some View {
+        ShopMotionSwitch {
+            Circle()
+                .fill(GoalSkin.previewGradient(for: goal))
+                .overlay {
+                    if rim {
+                        Circle().stroke(LinearGradient(colors: [.white.opacity(0.4), .clear],
+                                                       startPoint: .top, endPoint: .bottom),
+                                        lineWidth: 1.5)
+                    }
+                }
+        } live: {
+            GoalSkinView(goal: goal)
+        }
+        .frame(width: diameter, height: diameter)
+    }
+}
+
+/// The real trail effect along a gentle curve.  Drawn once (at t = 0, the
+/// game's own Reduce Motion frame) in grids and lists; moving, at most
+/// 30 fps, in a preview.
+struct ShopTrailCurve: View {
+    let trail: TrailColor
+    var baseWidth: CGFloat = 5
+
+    @Environment(\.cosmeticMotion) private var motion
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if motion.showsAnimatedRenderers(reduceMotion: reduceMotion) {
+            TimelineView(.animation(minimumInterval: motion.frameInterval(nil),
+                                    paused: motion.isPaused(reduceMotion: reduceMotion))) { tl in
+                Self.curve(trail: trail, t: tl.date.timeIntervalSinceReferenceDate,
+                           baseWidth: baseWidth)
+            }
+        } else {
+            Self.curve(trail: trail, t: 0, baseWidth: baseWidth)
+        }
+    }
+
+    private static func curve(trail: TrailColor, t: Double, baseWidth: CGFloat) -> some View {
+        Canvas { ctx, size in
+            let n = 18
+            var pts: [CGPoint] = []
+            for i in 0..<n {
+                let f = Double(i) / Double(n - 1)
+                let x = size.width  * CGFloat(0.14 + f * 0.72)
+                let y = size.height * CGFloat(0.50 + 0.30 * sin(f * .pi * 1.4))
+                pts.append(CGPoint(x: x, y: y))
+            }
+            drawRichTrail(ctx, points: pts, trail: trail, t: t, baseWidth: baseWidth)
+        }
     }
 }
 

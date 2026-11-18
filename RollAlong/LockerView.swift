@@ -82,6 +82,8 @@ struct LockerView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 48)
             }
+            // A grid: animated cosmetics stay still here (CosmeticMotion).
+            .environment(\.cosmeticMotion, .still)
         }
         .navigationTitle("Locker")
         .navigationBarTitleDisplayMode(.inline)
