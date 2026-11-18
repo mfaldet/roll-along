@@ -677,6 +677,8 @@ final class GameStateTests: XCTestCase {
     /// coins.  The items are free-granted (Sell Back refunds nothing), the
     /// grant is NOT recorded as an owned collection (Aurora stays on sale and
     /// "collections completed" is not inflated), and the coin reward is 500.
+    /// @MainActor: `StarterPackSheet` is a View, so its statics are main-actor.
+    @MainActor
     func testStarterPack_contentsAndPartialGrant() {
         let p = GameState.starterPackContents
         XCTAssertEqual(p.balls, [.aurora])
