@@ -33,10 +33,11 @@ struct ProfileView: View {
 
     var body: some View {
         ZStack {
-            // Background — same dark tone as the rest of the app.
+            // Background — the app's dark tone, tinted with the player's own
+            // accent color (it used to be a fixed dark blue for everyone).
             LinearGradient(
-                colors: [Color(red: 0.06, green: 0.06, blue: 0.10),
-                         Color(red: 0.09, green: 0.09, blue: 0.14)],
+                colors: [Self.baseTop.mix(with: accent, by: 0.22),
+                         Self.baseBottom.mix(with: accent, by: 0.10)],
                 startPoint: .top, endPoint: .bottom
             )
             .ignoresSafeArea()
@@ -67,7 +68,7 @@ struct ProfileView: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(
-            Color(red: 0.06, green: 0.06, blue: 0.10).opacity(0.95),
+            Self.baseTop.mix(with: accent, by: 0.22).opacity(0.95),
             for: .navigationBar
         )
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -481,13 +482,19 @@ struct ProfileView: View {
 
     /// The level marker badge that sits on the marble's top-right corner —
     /// a small "LVL" eyebrow over a large level number.
+    /// The player's own accent color, made readable on the dark background.
+    private var accent: Color { AccentColor.readable(gameState.primaryColor) }
+    private static let baseTop    = Color(red: 0.06, green: 0.06, blue: 0.10)
+    private static let baseBottom = Color(red: 0.09, green: 0.09, blue: 0.14)
+
     private var levelMarker: some View {
         VStack(spacing: -2) {
             Text("LVL")
                 .font(.system(size: 8, weight: .heavy, design: .rounded))
                 .tracking(0.8)
                 .foregroundStyle(.white.opacity(0.85))
-            Text("\(gameState.currentLevel)")
+            // The Adventure level, the same number as the badge by the name.
+            Text("\(gameState.highestUnlocked)")
                 .font(.system(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -497,10 +504,12 @@ struct ProfileView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
+            // The player's accent (was a fixed purple for everyone): a
+            // darkened fill so the white digits read, and a brighter rim.
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(red: 0.26, green: 0.16, blue: 0.58))
+                .fill(accent.mix(with: .black, by: 0.45))
                 .overlay(RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(red: 0.50, green: 0.38, blue: 0.90).opacity(0.75), lineWidth: 1.5))
+                    .stroke(accent.opacity(0.85), lineWidth: 1.5))
                 .shadow(color: .black.opacity(0.45), radius: 4, y: 2)
         )
     }
