@@ -140,6 +140,9 @@ final class AppleAuthManager: NSObject, ObservableObject {
 
     private func exchangeWithSupabase(idToken: String, rawNonce: String) async {
         do {
+            if RuntimeEnvironment.isRunningTests {
+                throw AuthError.message("Sign-in is disabled during test runs.")
+            }
             let url = URL(string: "\(Self.projectURL)/auth/v1/token?grant_type=id_token")!
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
@@ -175,6 +178,10 @@ final class AppleAuthManager: NSObject, ObservableObject {
     /// token for a fresh access token.  No-op (stays signed out) when there's
     /// no stored token or it has expired / been revoked.  Call once at launch.
     func restoreSession() async {
+        // Test runs never call the live auth server — and must not reach the
+        // catch below, which would DELETE the real player's saved refresh
+        // token (unit tests run inside the app on the same phone/keychain).
+        guard !RuntimeEnvironment.isRunningTests else { return }
         guard !isSignedIn, let token = Keychain.read(Self.refreshTokenKey) else { return }
         do {
             let session = try await refreshSession(refreshToken: token)
@@ -189,6 +196,9 @@ final class AppleAuthManager: NSObject, ObservableObject {
     /// Exchange a refresh token for a fresh Supabase session.  Supabase rotates
     /// the refresh token on each use, so `install` persists the new one.
     private func refreshSession(refreshToken: String) async throws -> SupabaseSession {
+        if RuntimeEnvironment.isRunningTests {
+            throw AuthError.message("Token refresh is disabled during test runs.")
+        }
         let url = URL(string: "\(Self.projectURL)/auth/v1/token?grant_type=refresh_token")!
         var req = URLRequest(url: url)
         req.httpMethod = "POST"

@@ -32,6 +32,10 @@ final class SmokeTests: XCTestCase {
         // starter pack) whose 0.5s-after-launch pop hides the home screen's
         // accessibility elements right when the test is querying them.
         app.launchArguments = ["--uitesting", "--skip-onboarding"]
+        // The app under UI test is a separate process that does not inherit
+        // XCTest's environment: this key (plus --uitesting) switches off every
+        // call to the live Supabase server (RuntimeEnvironment in the app).
+        app.launchEnvironment["RA_NO_LIVE_SERVER"] = "1"
         app.launch()
     }
 

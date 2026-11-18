@@ -214,7 +214,7 @@ final class TrophySyncServiceTests: XCTestCase {
 
     func testAnonFailureKeepsFlagArmed() async throws {
         let engine = try makeEngine()
-        unlockSnake(engine)
+        let ids = unlockSnake(engine)
         let mock = MockBackend()
         mock.failAnon = true
         let svc = makeService(backend: mock, signedInAs: UUID())
@@ -222,7 +222,10 @@ final class TrophySyncServiceTests: XCTestCase {
         let didSync = await svc.sync(engine: engine)
         XCTAssertFalse(didSync, "anon push failed → not a full sync")
         XCTAssertTrue(engine.isSyncDirty, "flag stays armed for the next retry")
-        XCTAssertEqual(mock.playerPushCount, 0, "player rail not reached after anon throw")
+        // The rails are independent: a refused anon push must not stop the
+        // signed-in push (it used to, so neither table ever got a row).
+        XCTAssertEqual(mock.playerPushes.first?.ids, ids,
+                       "player rail still pushed after the anon rail failed")
     }
 
     func testPlayerFailureKeepsFlagArmed() async throws {
@@ -274,5 +277,62 @@ final class TrophySyncServiceTests: XCTestCase {
         let second = TrophySyncService.resolveInstallID(defaults)
         XCTAssertEqual(first, second, "generated install id must persist across reads")
         XCTAssertEqual(defaults.string(forKey: "ra_analytics_user_id"), first.uuidString)
+    }
+}
+
+// MARK: - Test runs never touch the live server
+
+/// Proves the shared test-run switch (`RuntimeEnvironment`, AnalyticsClient.swift)
+/// is on inside the test host, and that the LIVE clients send nothing while it
+/// is: analytics tracks/buffers/sends nothing and the real trophy backend
+/// refuses before any request. Mock backends (above) are unaffected.
+final class TestRunNetworkIsolationTests: XCTestCase {
+
+    func testTestRunIsDetectedInsideTheTestHost() {
+        XCTAssertTrue(RuntimeEnvironment.isRunningTests)
+    }
+
+    func testDetectionRules() {
+        // A normal launch: none of the signals present.
+        XCTAssertFalse(RuntimeEnvironment.detect(environment: [:],
+                                                 arguments: ["RollAlong"],
+                                                 xcTestLoaded: false))
+        // Unit tests: XCTest loaded into the host, or Xcode's env keys.
+        XCTAssertTrue(RuntimeEnvironment.detect(environment: [:], arguments: [],
+                                                xcTestLoaded: true))
+        for key in ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"] {
+            XCTAssertTrue(RuntimeEnvironment.detect(environment: [key: "x"], arguments: [],
+                                                    xcTestLoaded: false), key)
+        }
+        // UI tests: the launch argument or the launch-environment key.
+        XCTAssertTrue(RuntimeEnvironment.detect(environment: [:], arguments: ["--uitesting"],
+                                                xcTestLoaded: false))
+        XCTAssertTrue(RuntimeEnvironment.detect(environment: [RuntimeEnvironment.noLiveServerKey: "1"],
+                                                arguments: [], xcTestLoaded: false))
+    }
+
+    func testAnalyticsSendsNothingDuringTests() async throws {
+        let client = AnalyticsClient.shared
+        // Well past the 8-event flush threshold, then an explicit flush.
+        for i in 0..<25 {
+            client.track("test_isolation_probe", properties: ["i": .int(i)], level: i)
+        }
+        client.flush()
+        // Give any (wrongly) started flush task time to reach the network.
+        try await Task.sleep(nanoseconds: 500_000_000)
+
+        XCTAssertEqual(client.bufferedEventCount, 0, "nothing is even queued during tests")
+        XCTAssertEqual(client.requestCount, 0,
+                       "analytics must start ZERO requests in a test run (incl. app launch events)")
+    }
+
+    func testLiveTrophyBackendRefusesDuringTests() async {
+        do {
+            try await SocialTrophyBackend().upsertAnonUnlocks(installID: UUID(),
+                                                               trophyIDs: ["test_probe"])
+            XCTFail("the live trophy backend must refuse during tests")
+        } catch {
+            // Expected: refused before any request was built or sent.
+        }
     }
 }

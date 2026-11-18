@@ -181,20 +181,35 @@ final class TrophySyncService: @unchecked Sendable {
             return true
         }
 
-        do {
-            // Path 1 — anonymous rail, EVERY player. Must succeed.
-            try await backend.upsertAnonUnlocks(installID: installID(), trophyIDs: ids)
+        // The two paths run INDEPENDENTLY: a refusal on one must not stop the
+        // other (before this, a refused anon push skipped the signed-in push
+        // too, so neither table got a row). Each is replay-safe on the server,
+        // so re-sending a path that already succeeded on the next retry is a
+        // harmless no-op.
+        var allSucceeded = true
 
-            // Path 2 — signed-in showcase rail. Only when signed in; a
-            // signed-out player's flag still drains on path 1 alone.
-            if let playerID = currentPlayerID() {
-                try await backend.upsertPlayerTrophies(playerID: playerID, trophyIDs: ids)
-            }
+        // Path 1 — anonymous rail, EVERY player.
+        do {
+            try await backend.upsertAnonUnlocks(installID: installID(), trophyIDs: ids)
         } catch {
-            // Partial or total failure → leave the flag ARMED for next time.
-            // Deliberately silent: trophy sync never surfaces into the UI.
-            return false
+            allSucceeded = false
+            Self.debugLog("anon trophy_unlocks push failed (\(ids.count) ids): \(error)")
         }
+
+        // Path 2 — signed-in showcase rail. Only when signed in; a
+        // signed-out player's flag drains on path 1 alone.
+        if let playerID = currentPlayerID() {
+            do {
+                try await backend.upsertPlayerTrophies(playerID: playerID, trophyIDs: ids)
+            } catch {
+                allSucceeded = false
+                Self.debugLog("player_trophies push failed (\(ids.count) ids): \(error)")
+            }
+        }
+
+        // Partial or total failure → leave the flag ARMED for the next
+        // launch/foreground. Never surfaced in the UI; logged above (DEBUG).
+        guard allSucceeded else { return false }
 
         // Full success across every applicable path → drain the flag. The
         // engine sends its own objectWillChange for this (clearSyncDirty),
@@ -361,6 +376,15 @@ final class TrophySyncService: @unchecked Sendable {
         lock.lock(); isSyncing = false; lock.unlock()
     }
 
+    /// DEBUG-only console line for a refused/failed push (never in Release,
+    /// never surfaced in the UI). Request bodies never contain secrets; the
+    /// error text carries the HTTP status + PostgREST's error body.
+    static func debugLog(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        print("[TrophySync] \(message())")
+        #endif
+    }
+
     // MARK: - Install UUID (anonymous rail key)
 
     private static let installIDKey = "ra_analytics_user_id"
@@ -387,7 +411,8 @@ final class TrophySyncService: @unchecked Sendable {
 // Mirrors SocialClient / AnalyticsClient: talks to PostgREST directly, no
 // Supabase SDK. The anon push uses the ANON key (like AnalyticsClient); the
 // signed-in push uses the player's Bearer token (like SocialClient). Server
-// schema: docs/trophies/trophy-schema.sql.
+// schema: docs/trophies/trophy-schema.sql, then trophy-schema-fix-1.sql (the
+// record_trophy_unlocks function the anon push calls).
 // ===========================================================================
 
 struct SocialTrophyBackend: TrophyBackend {
@@ -396,7 +421,8 @@ struct SocialTrophyBackend: TrophyBackend {
     private static let projectURL = "https://mhwpcwauzvmtmuphtajs.supabase.co"
 
     /// Anon (public) JWT — safe to embed; RLS allows only INSERT on
-    /// `trophy_unlocks` and never SELECT (docs/trophies/trophy-schema.sql).
+    /// `trophy_unlocks` (written through the record_trophy_unlocks function)
+    /// and never SELECT (docs/trophies/trophy-schema.sql + trophy-schema-fix-1.sql).
     /// Identical to AnalyticsClient.anonKey (the anonymous events rail).
     private static let anonKey =
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
@@ -408,27 +434,55 @@ struct SocialTrophyBackend: TrophyBackend {
     // MARK: - Path 1: anonymous trophy_unlocks (all players)
 
     func upsertAnonUnlocks(installID: UUID, trophyIDs: [String]) async throws {
-        guard !trophyIDs.isEmpty else { return }
-        let rows = trophyIDs.map {
-            AnonUnlockRow(install_id: installID.uuidString, trophy_id: $0)
+        let ids = Self.wireSafe(trophyIDs)
+        guard !ids.isEmpty else { return }
+        // Calls the SECURITY DEFINER function from
+        // docs/trophies/trophy-schema-fix-1.sql. A direct upsert
+        // (?on_conflict=… + resolution=ignore-duplicates) is ALWAYS refused
+        // for the anon role: Postgres needs SELECT on the conflict columns for
+        // INSERT … ON CONFLICT, and trophy_unlocks is deliberately
+        // insert-only (42501 "permission denied", HTTP 401) — which is why the
+        // table stayed empty. The function does the duplicate-safe insert as
+        // the owner (a replay is a no-op; unlocked_at stays server-side) and
+        // the table stays unreadable. Chunked to the function's 500-id cap.
+        for start in stride(from: 0, to: ids.count, by: Self.anonChunkSize) {
+            let chunk = Array(ids[start ..< min(start + Self.anonChunkSize, ids.count)])
+            let body = AnonUnlockCall(p_install_id: installID.uuidString,
+                                      p_trophy_ids: chunk)
+            try await postAnon(
+                path: "rpc/record_trophy_unlocks",
+                query: "",
+                body: try encoder.encode(body),
+                prefer: "return=minimal"
+            )
         }
-        // on_conflict ignore-duplicates → the UNIQUE (install_id, trophy_id)
-        // constraint makes a replay a no-op and preserves the server-side
-        // unlocked_at (client clocks ignored). return=minimal keeps it cheap.
-        try await postAnon(
-            path: "trophy_unlocks",
-            query: "on_conflict=install_id,trophy_id",
-            body: try encoder.encode(rows),
-            prefer: "resolution=ignore-duplicates,return=minimal"
-        )
+    }
+
+    /// Server-side cap in record_trophy_unlocks is 500 ids per call.
+    private static let anonChunkSize = 500
+
+    /// Drops ids the server would refuse outright (blank or > 100 chars —
+    /// the tables' length CHECK), so one bad id can never make the whole
+    /// batch fail with a 400 forever.
+    private static func wireSafe(_ ids: [String]) -> [String] {
+        ids.filter { (1...100).contains($0.count) }
+    }
+
+    /// Tests must never touch the live server (RuntimeEnvironment). Only this
+    /// LIVE backend is gated — test doubles of `TrophyBackend` are unaffected.
+    private static func requireLiveServerAllowed() throws {
+        if RuntimeEnvironment.isRunningTests {
+            throw SocialError.http(status: 0, body: "live server disabled during tests")
+        }
     }
 
     // MARK: - Path 2: signed-in player_trophies (showcase rail)
 
     func upsertPlayerTrophies(playerID: UUID, trophyIDs: [String]) async throws {
-        guard !trophyIDs.isEmpty else { return }
+        let ids = Self.wireSafe(trophyIDs)
+        guard !ids.isEmpty else { return }
         let token = try SocialClient.shared.trophyAccessToken()
-        let rows = trophyIDs.map {
+        let rows = ids.map {
             PlayerTrophyRow(player_id: playerID.uuidString, trophy_id: $0)
         }
         // PK (player_id, trophy_id); ignore-duplicates → own-row idempotent
@@ -529,15 +583,7 @@ struct SocialTrophyBackend: TrophyBackend {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw SocialError.http(status: -1, body: "no HTTP response")
-        }
-        guard (200...299).contains(http.statusCode) else {
-            throw SocialError.http(status: http.statusCode,
-                                   body: String(data: data, encoding: .utf8) ?? "")
-        }
-        return data
+        return try await send(req)
     }
 
     /// Anonymous GET returning the response body (the signed-out showcase read).
@@ -552,15 +598,7 @@ struct SocialTrophyBackend: TrophyBackend {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
         req.setValue("Bearer \(Self.anonKey)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw SocialError.http(status: -1, body: "no HTTP response")
-        }
-        guard (200...299).contains(http.statusCode) else {
-            throw SocialError.http(status: http.statusCode,
-                                   body: String(data: data, encoding: .utf8) ?? "")
-        }
-        return data
+        return try await send(req)
     }
 
     /// Authenticated DELETE (the showcase toggle-off). Mirrors the authed shape:
@@ -592,21 +630,41 @@ struct SocialTrophyBackend: TrophyBackend {
     }
 
     private func run(_ req: URLRequest) async throws {
-        let (data, response) = try await URLSession.shared.data(for: req)
+        _ = try await send(req)
+    }
+
+    /// The single network exit for this backend: refuses during test runs,
+    /// and logs (DEBUG) every refused request with its status + server body
+    /// before throwing, so a refusal is never silent.
+    private func send(_ req: URLRequest) async throws -> Data {
+        try Self.requireLiveServerAllowed()
+        let label = "\(req.httpMethod ?? "?") \(req.url?.path ?? "?")"
+        let result: (Data, URLResponse)
+        do {
+            result = try await URLSession.shared.data(for: req)
+        } catch {
+            TrophySyncService.debugLog("\(label) network error: \(error.localizedDescription)")
+            throw error
+        }
+        let (data, response) = result
         guard let http = response as? HTTPURLResponse else {
+            TrophySyncService.debugLog("\(label) no HTTP response")
             throw SocialError.http(status: -1, body: "no HTTP response")
         }
         guard (200...299).contains(http.statusCode) else {
-            throw SocialError.http(status: http.statusCode,
-                                   body: String(data: data, encoding: .utf8) ?? "")
+            let body = String(data: data, encoding: .utf8) ?? ""
+            TrophySyncService.debugLog("\(label) refused: HTTP \(http.statusCode) \(body)")
+            throw SocialError.http(status: http.statusCode, body: body)
         }
+        return data
     }
 
     // MARK: - Wire rows (keys match docs/trophies/trophy-schema.sql columns)
 
-    private struct AnonUnlockRow: Encodable {
-        let install_id: String
-        let trophy_id: String
+    /// Arguments of public.record_trophy_unlocks (trophy-schema-fix-1.sql).
+    private struct AnonUnlockCall: Encodable {
+        let p_install_id: String
+        let p_trophy_ids: [String]
     }
 
     private struct PlayerTrophyRow: Encodable {
