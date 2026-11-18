@@ -47,11 +47,11 @@ final class StoreKitManager: ObservableObject {
         case coins1300    = "com.macfaldet.RollAlong.coins.1300"
         case coins3000    = "com.macfaldet.RollAlong.coins.3000"
         case coins10000   = "com.macfaldet.RollAlong.coins.10000"
-        /// One-time welcome offer: 3,750 coins + the complete Aurora collection
-        /// (the "aurora" bundle — ball, goal, trail, floor, pit, boundary and music).
-        /// Non-consumable so it can be restored on a new device; delivery
-        /// is idempotent (the collection grant is set-insertion and addCoins
-        /// only runs when `starterPackClaimed` is still false).
+        /// One-time welcome offer: 500 coins + the Aurora ball, trail and
+        /// boundary (`GameState.starterPackContents`).  Non-consumable so it
+        /// can be restored on a new device; delivery is idempotent (the item
+        /// grant is set-insertion and addCoins only runs when
+        /// `starterPackClaimed` is still false).
         case starterPack  = "com.macfaldet.RollAlong.starterpack"
 
         var id: String { rawValue }
@@ -60,7 +60,7 @@ final class StoreKitManager: ObservableObject {
             case lifePack           // grants N lives
             case coinPack           // grants N coins
             case unlimitedUnlock    // non-consumable; flips unlimitedLives true
-            case starterPackUnlock  // non-consumable; grants 3,750 coins + the Aurora collection
+            case starterPackUnlock  // non-consumable; grants 500 coins + the Aurora ball, trail and boundary
         }
 
         var category: Category {
@@ -103,7 +103,7 @@ final class StoreKitManager: ObservableObject {
             case .coins1300:   return 1_300
             case .coins3000:   return 3_000
             case .coins10000:  return 10_000
-            case .starterPack: return 3_750  // welcome-offer coins — unchanged; see docs/economy/2026-11-iap-coin-rates.md for the proposal
+            case .starterPack: return 500    // welcome-offer coins (Option B, docs/economy/2026-11-iap-coin-rates.md)
             default:           return 0
             }
         }
@@ -262,13 +262,11 @@ final class StoreKitManager: ObservableObject {
         // Diamond ball when entitled — never revoke a cosmetic already owned.
         gameState?.unlimitedLives = unlimitedSeen
         if unlimitedSeen { gameState?.grant(BallSkin.diamond) }
-        // Starter Pack (one-time welcome offer): owners get the complete
-        // Aurora collection back on restore — including original buyers who
-        // only ever received the ball, who are upgraded to the full
-        // collection here — but NOT the coins, which are a one-time
-        // consumable delivered only by the purchase path.
+        // Starter Pack (one-time welcome offer): owners get the Aurora ball,
+        // trail and boundary back on restore — but NOT the coins, which are a
+        // one-time consumable delivered only by the purchase path.
         if starterPackSeen, let gs = gameState {
-            grantAuroraCollection(to: gs)
+            grantStarterPackItems(to: gs)
             gs.starterPackClaimed = true
         }
     }
@@ -407,13 +405,12 @@ final class StoreKitManager: ObservableObject {
 
         case .starterPackUnlock:
             // Coins deliver exactly once (the claimed flag makes restores and
-            // re-deliveries idempotent); the collection grant is set-insertion,
-            // so it safely tops up a ball-only legacy buyer too.
+            // re-deliveries idempotent); the item grant is set-insertion.
             if !gameState.starterPackClaimed {
                 // IAP grant — excluded from play-earned coins (§6 item 4).
                 gameState.addCoins(productID.rewardCoins, source: .iap)
             }
-            grantedCosmetic = grantAuroraCollection(to: gameState)
+            grantedCosmetic = grantStarterPackItems(to: gameState)
             gameState.starterPackClaimed = true
         }
         lastDelivery = DeliveryReceipt(
@@ -427,26 +424,20 @@ final class StoreKitManager: ObservableObject {
         return true
     }
 
-    /// Grant the complete Aurora collection — every item in the "aurora"
-    /// cosmetic bundle (ball, goal, trail, floor, pit, boundary, music) — via
-    /// `grantBundleFree`, which marks the items free-granted so Sell Back keeps
-    /// them but never refunds them.  That marking is load-bearing: the bundle's
-    /// items would sell back for 4,875 coins (half their 9,750 catalogue value
-    /// under the 2026-07 reprice), so a plain grant would hand a $1.99 pack
-    /// nearly the $4.99 coin pack's worth.  Players who already coin-bought part of
-    /// the collection are refunded those items' full coinCost by
-    /// `grantBundleFree` before the marking, so no paid Sell Back value is
-    /// confiscated.  No-ops when the player already owns all six items (a
-    /// coin-bought complete bundle keeps its sellability, and the per-launch
-    /// restore path avoids churn).  Returns the collection's display name (for
-    /// the purchase celebration) when anything new was granted, else nil.
+    /// Grant the Starter Pack's items — the Aurora ball, trail and boundary
+    /// (`GameState.starterPackContents`) — via `grantBundleFree`, which marks
+    /// them free-granted so Sell Back keeps them but never refunds them (a
+    /// $1.99 pack must not be resellable for coins).  Items the player
+    /// already coin-bought are compensated at their Sell Back value first, so
+    /// no paid value is lost.  Not recorded as an owned collection: the full
+    /// Aurora collection stays on sale.  No-ops when the player already owns
+    /// all three.  Returns a name for the purchase celebration when anything
+    /// new was granted, else nil.
     @discardableResult
-    private func grantAuroraCollection(to gs: GameState) -> String? {
-        guard let bundle = CosmeticBundle.catalogue.first(where: { $0.id == "aurora" }),
-              !gs.completedBundleIDs.contains(bundle.id)
-        else { return nil }
-        gs.grantBundleFree(bundle)
-        return "the \(bundle.displayName) Collection"
+    private func grantStarterPackItems(to gs: GameState) -> String? {
+        guard !gs.ownsStarterPackItems else { return nil }
+        gs.grantBundleFree(GameState.starterPackContents, recordAsOwnedBundle: false)
+        return "the Aurora ball, trail and boundary"
     }
 
     /// Grant the top coin pack's fixed bonus item: the Money Ball skin.

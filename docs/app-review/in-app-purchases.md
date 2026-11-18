@@ -11,12 +11,12 @@ find them.
 | 2 | `com.macfaldet.RollAlong.lives.pack120` | Consumable | 120 Lives | $9.99 | 120 lives | Get Lives sheet |
 | 3 | `com.macfaldet.RollAlong.lives.pack300` | Consumable | 300 Lives | $19.99 | 300 lives | Get Lives sheet |
 | 4 | `com.macfaldet.RollAlong.unlimited` | Non-consumable | Diamond Balls | $49.99 | Unlimited lives forever, plus the Diamond ball skin | Get Lives sheet, scrolled so Diamond Balls is visible |
-| 5 | `com.macfaldet.RollAlong.coins.100` | Consumable | 100 coins | $0.99 | 100 coins | Get Coins sheet |
-| 6 | `com.macfaldet.RollAlong.coins.600` | Consumable | 600 coins | $4.99 | 600 coins | Get Coins sheet |
-| 7 | `com.macfaldet.RollAlong.coins.1300` | Consumable | 1,300 coins | $9.99 | 1,300 coins | Get Coins sheet |
-| 8 | `com.macfaldet.RollAlong.coins.3000` | Consumable | 3,000 coins | $19.99 | 3,000 coins | Get Coins sheet |
-| 9 | `com.macfaldet.RollAlong.coins.10000` | Consumable | 10,000 coins | $49.99 | 10,000 coins, plus the Money Ball skin the first time | Get Coins sheet, with the line "Includes the Money Ball skin" visible |
-| 10 | `com.macfaldet.RollAlong.starterpack` | Non-consumable | Starter Pack | $1.99 | 3,750 coins and the Aurora collection (ball, goal, trail, floor, pit, boundary, music) | Starter Pack offer sheet |
+| 5 | `com.macfaldet.RollAlong.coins.100` | Consumable | 100 Coins | $0.99 | 100 coins | Get Coins sheet |
+| 6 | `com.macfaldet.RollAlong.coins.600` | Consumable | 600 Coins | $4.99 | 600 coins | Get Coins sheet |
+| 7 | `com.macfaldet.RollAlong.coins.1300` | Consumable | 1,300 Coins | $9.99 | 1,300 coins | Get Coins sheet |
+| 8 | `com.macfaldet.RollAlong.coins.3000` | Consumable | 3,000 Coins | $19.99 | 3,000 coins | Get Coins sheet |
+| 9 | `com.macfaldet.RollAlong.coins.10000` | Consumable | 10,000 Coins | $49.99 | 10,000 coins, plus the Money Ball skin the first time | Get Coins sheet, with the line "Includes the Money Ball skin" visible |
+| 10 | `com.macfaldet.RollAlong.starterpack` | Non-consumable | Starter Pack | $1.99 | 500 coins and the Aurora ball, trail and boundary (one time only) | Starter Pack offer sheet |
 
 The number in each lives product ID is the number of lives it grants
 (`lives.pack20`, `lives.pack120`, `lives.pack300`). They replace the earlier
@@ -38,6 +38,30 @@ whole percent. Base rate: 100 ÷ $0.99 = 101.01 coins per dollar.
 
 The 100-coin pack shows no bonus label.
 
+**Top-up line.** The 100- and 600-coin packs can't buy a cosmetic on their own
+(the cheapest is 750 coins), so their cards also show a gray line under the
+amount: **"Top up your balance"**. The 600-coin card shows both "+19% coins"
+and that line. The other three packs show no top-up line.
+
+## Paste into App Store Connect
+
+Display Name limit: 30 characters. Description limit: 55 characters. Counts
+include spaces and punctuation. `RollAlong/Products.storekit` uses exactly the
+same text.
+
+| # | Product ID | Display Name (chars) | Description (chars) |
+|---|---|---|---|
+| 1 | `com.macfaldet.RollAlong.lives.pack20` | 20 Lives (8) | 20 extra lives, used when your free lives run out. (50) |
+| 2 | `com.macfaldet.RollAlong.lives.pack120` | 120 Lives (9) | 120 extra lives, used when your free lives run out. (51) |
+| 3 | `com.macfaldet.RollAlong.lives.pack300` | 300 Lives (9) | 300 extra lives, used when your free lives run out. (51) |
+| 4 | `com.macfaldet.RollAlong.unlimited` | Diamond Balls (13) | Unlimited lives forever, plus the Diamond ball skin. (52) |
+| 5 | `com.macfaldet.RollAlong.coins.100` | 100 Coins (9) | 100 coins to spend on cosmetics in the Shop. (44) |
+| 6 | `com.macfaldet.RollAlong.coins.600` | 600 Coins (9) | 600 coins to spend on cosmetics in the Shop. (44) |
+| 7 | `com.macfaldet.RollAlong.coins.1300` | 1,300 Coins (11) | 1,300 coins to spend on cosmetics in the Shop. (46) |
+| 8 | `com.macfaldet.RollAlong.coins.3000` | 3,000 Coins (11) | 3,000 coins to spend on cosmetics in the Shop. (46) |
+| 9 | `com.macfaldet.RollAlong.coins.10000` | 10,000 Coins (12) | 10,000 coins, plus the Money Ball skin the first time. (54) |
+| 10 | `com.macfaldet.RollAlong.starterpack` | Starter Pack (12) | One-time: Aurora ball, trail, boundary and 500 coins. (53) |
+
 ## How to reach each screen
 
 - **Get Lives sheet:** Home screen → tap the lives counter at the top-left.
@@ -46,6 +70,23 @@ The 100-coin pack shows no bonus label.
   time the coin balance reaches 250, and can be reopened for 48 hours. On a
   fresh install, the quickest route is to buy the 600-coin pack with the local
   StoreKit test configuration and go back to Home.
+
+## What the Starter Pack sheet shows
+
+A "WELCOME GIFT" badge, the Aurora ball, the title "Aurora" and the line "Ball ·
+Trail · Boundary — plus 500 coins". Two rows list what is included: "Aurora
+ball, trail and boundary — Worth 4,500 coins in the shop" (the figure is the
+three items' shop prices added up by the app) and "500 coins — Spend in the
+cosmetics shop". Then the 48-hour countdown, the price button "$1.99 — Claim
+Offer", and "No thanks".
+
+When it appears and stops appearing is unchanged: on Home, the first time the
+coin balance reaches 250, open for 48 hours. It never appears again once
+bought or after "No thanks", and it is not offered to a player who already owns
+the Aurora ball, trail and boundary. The three items are gifts: Sell Back keeps
+them and never refunds them. The rest of the Aurora collection stays on sale
+for coins. Changed on 2026-11-18 from 3,750 coins and the full Aurora
+collection; retake its review screenshot.
 
 ## What the Get Lives sheet shows
 
@@ -92,7 +133,8 @@ not be shown.
   For product 9, say in the description that the Money Ball skin is included,
   so the store text matches the in-app card.
 - Product 4's description should mention the Diamond ball skin for the same
-  reason, and product 10's should list the coins and the Aurora collection.
+  reason, and product 10's should list the coins and the three Aurora items.
+  Use the "Paste into App Store Connect" table above.
 - Non-consumables (4 and 10) are restored by Settings → Purchases → Restore
   Purchases.
 

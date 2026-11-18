@@ -717,6 +717,14 @@ struct BuyCoinsSheet: View {
         return whole > 0 ? "+\(whole)% coins" : nil
     }
 
+    /// "Top up your balance" on the 100- and 600-coin packs; nil otherwise.
+    static func topUpLine(for pid: StoreKitManager.ProductID) -> String? {
+        switch pid {
+        case .coins100, .coins600: return "Top up your balance"
+        default:                   return nil
+        }
+    }
+
     private func coinCard(
         pid: StoreKitManager.ProductID,
         amount: Int
@@ -749,6 +757,13 @@ struct BuyCoinsSheet: View {
                     Text(bonus)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(red: 0.40, green: 0.82, blue: 0.52))
+                }
+                // The two small packs can't buy a cosmetic on their own
+                // (the cheapest is 750 coins), so they say what they are for.
+                if let topUp = Self.topUpLine(for: pid) {
+                    Text(topUp)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.60))
                 }
             }
             Spacer()
@@ -1280,9 +1295,8 @@ private struct DiamondBonusLabel: View {
 
 // MARK: - Starter Pack Sheet
 
-/// One-time welcome offer: $1.99 → 3,750 coins + the complete Aurora collection
-/// (ball · goal · trail · floor · pit · boundary · music, free-granted so Sell Back keeps
-/// but never refunds it).  Presented automatically the first time the player's
+/// One-time welcome offer: $1.99 → 500 coins + the Aurora ball, trail and
+/// boundary (free-granted so Sell Back keeps but never refunds them).  Presented automatically the first time the player's
 /// coin balance reaches `GameState.starterPackTriggerCoins`, and again on
 /// re-launch while the 48-hour window is open.  Purchase sets
 /// `starterPackClaimed` (via reward delivery);
@@ -1337,16 +1351,16 @@ struct StarterPackSheet: View {
                         Text("Aurora")
                             .font(.system(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("The complete collection — all seven cosmetics")
+                        Text("Ball · Trail · Boundary — plus 500 coins")
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(Color(red: 0.62, green: 0.45, blue: 0.98))
                             .padding(.bottom, 28)
 
                         // ── What you get ────────────────────────────────────
                         VStack(spacing: 10) {
-                            rewardRow(icon: "sparkles", label: "The Aurora collection",
-                                      detail: "Ball · Goal · Trail · Floor · Pit · Boundary · Music")
-                            rewardRow(icon: "circle.grid.cross.fill", label: "3,750 coins",
+                            rewardRow(icon: "sparkles", label: "Aurora ball, trail and boundary",
+                                      detail: "Worth \(Self.itemsShopValue.formatted()) coins in the shop")
+                            rewardRow(icon: "circle.grid.cross.fill", label: "500 coins",
                                       detail: "Spend in the cosmetics shop")
                         }
                         .padding(.horizontal, 24)
@@ -1441,6 +1455,15 @@ struct StarterPackSheet: View {
             set: { _ in purchaseError = nil; store.clearLastError() }
         ), actions: { Button("OK", role: .cancel) {} },
         message: { Text(purchaseError ?? "") })
+    }
+
+    /// Shop price of the three Starter Pack items, summed from their own
+    /// `coinCost` so the figure can never drift from the catalogue.
+    static var itemsShopValue: Int {
+        let p = GameState.starterPackContents
+        return p.balls.map(\.coinCost).reduce(0, +)
+             + p.trails.map(\.coinCost).reduce(0, +)
+             + p.boundaries.map(\.coinCost).reduce(0, +)
     }
 
     // ── Reward row helper ────────────────────────────────────────────────

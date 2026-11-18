@@ -92,8 +92,8 @@ extension BallSkin {
     /// reset keeps them.
     // Aurora is no longer here — it is a regular coin-buyable Legendary ball
     // anchoring the Aurora bundle, sellable when coin-bought.  The Starter
-    // Pack welcome offer instead grants the whole Aurora collection
-    // free-granted (see StoreKitManager.grantAuroraCollection), which Sell
+    // Pack welcome offer grants the Aurora ball, trail and boundary
+    // free-granted (see StoreKitManager.grantStarterPackItems), which Sell
     // Back keeps but never refunds.
     static let coinExclusiveBalls: Set<BallSkin> =
         [.trophy, .beachBall, .pumpkin, .ornament, .heartstone,

@@ -67,6 +67,17 @@ final class StoreKitManagerTests: XCTestCase {
         }
     }
 
+    /// The 100- and 600-coin packs can't buy a cosmetic alone (the cheapest
+    /// is 750), so the Get Coins sheet labels them as top-ups; the rest don't.
+    @MainActor
+    func testSmallCoinPacks_areLabeledTopUps() {
+        XCTAssertEqual(BuyCoinsSheet.topUpLine(for: .coins100), "Top up your balance")
+        XCTAssertEqual(BuyCoinsSheet.topUpLine(for: .coins600), "Top up your balance")
+        XCTAssertNil(BuyCoinsSheet.topUpLine(for: .coins1300))
+        XCTAssertNil(BuyCoinsSheet.topUpLine(for: .coins3000))
+        XCTAssertNil(BuyCoinsSheet.topUpLine(for: .coins10000))
+    }
+
     /// Coins-per-dollar must rise strictly with pack size — a bigger pack is
     /// never a worse deal (101 / 120 / 130 / 150 / 200 per $ at the
     /// intended $0.99/$4.99/$9.99/$19.99/$49.99 price points).

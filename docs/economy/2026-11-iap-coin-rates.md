@@ -138,7 +138,9 @@ migrate.
 
 ## Recommendations (not built)
 
-- Pick a Starter Pack option (B recommended).
-- Decide on item 1: at least add "Tops up your coins" style text, or lower
-  cosmetic prices.
+- **Decided and built (2026-11-18):** Starter Pack Option B (Aurora ball,
+  trail and boundary + 500 coins, $1.99; granted by
+  `StoreKitManager.grantStarterPackItems`). Cosmetic prices stay; the 100- and
+  600-coin packs show "Top up your balance" on the Get Coins sheet. The
+  Money Ball stays in the 10,000-coin pack.
 - Keep clan prizes, the daily reward, Gold Rush and trophies as they are.
