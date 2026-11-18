@@ -33,9 +33,11 @@ final class StoreKitManager: ObservableObject {
     // MARK: - Product catalogue
 
     enum ProductID: String, CaseIterable, Identifiable {
-        case livesPack1   = "com.macfaldet.RollAlong.lives.pack1"
-        case livesPack5   = "com.macfaldet.RollAlong.lives.pack5"
-        case livesPack10  = "com.macfaldet.RollAlong.lives.pack10"
+        // Lives packs.  The number in each ID is the lives it grants (20 /
+        // 120 / 300).  "unlimited" is Diamond Balls (unlimited lives).
+        case lives20      = "com.macfaldet.RollAlong.lives.20"
+        case lives120     = "com.macfaldet.RollAlong.lives.120"
+        case lives300     = "com.macfaldet.RollAlong.lives.300"
         case unlimited    = "com.macfaldet.RollAlong.unlimited"
         // Coin packs.  The numeric suffixes in the case names / product IDs
         // are HISTORICAL — App Store Connect product IDs are immutable, so
@@ -65,7 +67,7 @@ final class StoreKitManager: ObservableObject {
 
         var category: Category {
             switch self {
-            case .livesPack1, .livesPack5, .livesPack10: return .lifePack
+            case .lives20, .lives120, .lives300:          return .lifePack
             case .unlimited:                              return .unlimitedUnlock
             case .coins100, .coins600, .coins1300, .coins3000, .coins10000: return .coinPack
             case .starterPack:                            return .starterPackUnlock
@@ -76,9 +78,9 @@ final class StoreKitManager: ObservableObject {
         /// for non-life products.
         var rewardLives: Int {
             switch self {
-            case .livesPack1:  return 10
-            case .livesPack5:  return 60
-            case .livesPack10: return 130
+            case .lives20:  return 20
+            case .lives120: return 120
+            case .lives300: return 300
             default:           return 0
             }
         }

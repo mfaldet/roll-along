@@ -29,6 +29,7 @@ struct BuyLivesSheet: View {
     @State private var purchaseError: String? = nil
     @State private var fitHeight: CGFloat = 560   // content height; set on first layout
     @State private var celebrate = false          // drives the Diamond Balls victory loop
+    @State private var showReserveInfo = false    // popover on the gold reserve jar
 
     var body: some View {
         ZStack {
@@ -50,6 +51,14 @@ struct BuyLivesSheet: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 12)
+                        // The standing rule, centered under the title and
+                        // directly above the row of life balls it describes.
+                        Text("You earn 1 life every 6 minutes, up to \(GameState.livesMax).")
+                            .font(.system(size: 12, weight: .regular, design: .rounded))
+                            .foregroundStyle(Color(white: 0.55))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, -8)
                         header
                         statusBlock
                         lifePackCards
@@ -111,9 +120,57 @@ struct BuyLivesSheet: View {
                 Text("\(gameState.displayedLives) / \(GameState.livesMax)")
                     .font(.system(size: 17, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color(white: 0.75))
+                    .lineLimit(1)
+                    .fixedSize()
+                if gameState.purchasedLives > 0 {
+                    reserveJar
+                        .padding(.leading, 4)
+                }
             }
         }
         .padding(.bottom, 6)
+    }
+
+    /// The purchased reserve as a small gold jar with "+N" on it, beside the
+    /// row of life balls.  Tapping it explains the reserve in a short popover.
+    /// Hidden (by the caller) when the reserve is zero.
+    private var reserveJar: some View {
+        let reserve = gameState.purchasedLives
+        let explanation = "\(reserve) \(reserve == 1 ? "life" : "lives") in reserve. They're used when your free lives run out."
+        return Button {
+            showReserveInfo = true
+        } label: {
+            ZStack(alignment: .bottom) {
+                MarbleJarIcon(tier: 2, gold: true)
+                    .frame(width: 30, height: 32)
+                Text("+\(reserve)")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color(red: 0.25, green: 0.16, blue: 0.0))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color(red: 1.00, green: 0.85, blue: 0.32)))
+                    .overlay(Capsule().stroke(Color(red: 0.55, green: 0.38, blue: 0.05), lineWidth: 0.6))
+                    .offset(y: 4)
+            }
+            .frame(minWidth: 34, minHeight: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(explanation)
+        .accessibilityHint("Shows what the reserve is.")
+        .popover(isPresented: $showReserveInfo, arrowEdge: .top) {
+            Text(explanation)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 240, alignment: .leading)
+                .padding(14)
+                .presentationCompactAdaptation(.popover)
+        }
     }
 
     /// One life as a glossy marble — the same highlight-dot-and-rim recipe as
@@ -145,11 +202,9 @@ struct BuyLivesSheet: View {
         .frame(width: size, height: size)
     }
 
-    /// Live status + explanation block under the marble-row header.  Shows
-    /// the next-life countdown when regen is active, the purchased-reserve
-    /// count when one exists, and the standing rule (1 life every 6 min, up
-    /// to 10).  Hidden for unlimited subscribers — we tell them they're set
-    /// instead.
+    /// Live status under the marble-row header: the next-life countdown while
+    /// regen is active.  (The reserve is the gold jar in the header; the earn
+    /// rule sits under the title.)
     private var statusBlock: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
             VStack(alignment: .leading, spacing: 6) {
@@ -173,15 +228,9 @@ struct BuyLivesSheet: View {
                         }
                         .foregroundStyle(Color(white: 0.78))
                     }
-                    if gameState.purchasedLives > 0 {
-                        // Same yellow as the pill's running-on-reserve state.
-                        Text("+\(gameState.purchasedLives) in reserve — used when your free lives run out.")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(red: 1.00, green: 0.83, blue: 0.25))
-                    }
-                    Text("You earn 1 life every 6 minutes, up to \(GameState.livesMax).")
-                        .font(.system(size: 12, weight: .regular, design: .rounded))
-                        .foregroundStyle(Color(white: 0.55))
+                    // The reserve is the gold jar beside the life balls, and
+                    // the earn rule sits under the title — only the countdown
+                    // is left here.
                 }
             }
         }
@@ -352,7 +401,7 @@ struct BuyLivesSheet: View {
                             .frame(width: 56, height: 30)
                             .background(Capsule().fill(Color.white))
                     } else {
-                        Text(isOwned ? "Owned" : store.displayPrice(for: pid, fallback: "$19.99"))
+                        Text(isOwned ? "Owned" : store.displayPrice(for: pid, fallback: "$49.99"))
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(isOwned ? Color(white: 0.45) : .black)
                             .padding(.horizontal, 16).padding(.vertical, 9)
@@ -426,9 +475,9 @@ struct BuyLivesSheet: View {
 
     private var lifePackCards: some View {
         VStack(spacing: 10) {
-            lifePackCard(pid: .livesPack1)
-            lifePackCard(pid: .livesPack5)
-            lifePackCard(pid: .livesPack10)
+            lifePackCard(pid: .lives20)
+            lifePackCard(pid: .lives120)
+            lifePackCard(pid: .lives300)
         }
     }
 
@@ -439,9 +488,9 @@ struct BuyLivesSheet: View {
             return NSDecimalNumber(decimal: product.price).doubleValue
         }
         switch pid {
-        case .livesPack1:  return 0.99
-        case .livesPack5:  return 4.99
-        case .livesPack10: return 9.99
+        case .lives20:  return 1.99
+        case .lives120: return 9.99
+        case .lives300: return 19.99
         default:           return 0
         }
     }
@@ -450,9 +499,12 @@ struct BuyLivesSheet: View {
     ///   1 − (this pack's price ÷ its lives) ÷ (smallest pack's price ÷ its lives)
     /// rounded to a whole percent.  Nil for the smallest pack (it IS the base
     /// price) and whenever a pack is not actually cheaper per life.
-    /// With today's prices: 60 lives → 16%, 130 lives → 22%.
+    /// With today's prices ($1.99 / 20 = $0.0995 a life):
+    ///   120 lives: $9.99 / 120  = $0.08325 → 1 − 0.08325 / 0.0995 = 16.3% → 16%
+    ///   300 lives: $19.99 / 300 = $0.06663 → 1 − 0.06663 / 0.0995 = 33.0% → 33%
+    /// Diamond Balls (unlimited) has no per-life price, so no savings figure.
     private func percentSaved(_ pid: StoreKitManager.ProductID) -> Int? {
-        let smallest = StoreKitManager.ProductID.livesPack1
+        let smallest = StoreKitManager.ProductID.lives20
         guard pid != smallest, pid.rewardLives > 0, smallest.rewardLives > 0 else { return nil }
         let basePerLife = livesPackPrice(smallest) / Double(smallest.rewardLives)
         let thisPerLife = livesPackPrice(pid) / Double(pid.rewardLives)
@@ -472,8 +524,9 @@ struct BuyLivesSheet: View {
         let spoken: String = saved.map { "Buy \(lives) lives for \(priceText). Save \($0) percent." }
             ?? "Buy \(lives) lives for \(priceText)."
         return HStack(alignment: .center, spacing: 12) {
+            // Same frame for every pack; the jar inside grows with the pack.
             MarbleJarIcon(tier: Self.jarTier(pid))
-                .frame(width: 40, height: 36)
+                .frame(width: 60, height: 64)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -510,7 +563,8 @@ struct BuyLivesSheet: View {
             .disabled(inProgress)
             .accessibilityLabel(spoken)
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color(white: 0.13))
@@ -520,17 +574,17 @@ struct BuyLivesSheet: View {
     /// 0 = smallest jar … 2 = largest.
     private static func jarTier(_ pid: StoreKitManager.ProductID) -> Int {
         switch pid {
-        case .livesPack5:  return 1
-        case .livesPack10: return 2
+        case .lives120: return 1
+        case .lives300: return 2
         default:           return 0
         }
     }
 
     private static func fallbackPrice(_ pid: StoreKitManager.ProductID) -> String {
         switch pid {
-        case .livesPack5:  return "$4.99"
-        case .livesPack10: return "$9.99"
-        default:           return "$0.99"
+        case .lives120: return "$9.99"
+        case .lives300: return "$19.99"
+        default:        return "$1.99"
         }
     }
 
@@ -747,11 +801,12 @@ struct BuyCoinsSheet: View {
 
     private func defaultPrice(for pid: StoreKitManager.ProductID) -> String {
         switch pid {
-        case .coins100, .livesPack1:   return "$0.99"
-        case .coins600, .livesPack5:   return "$4.99"
-        case .coins1300, .livesPack10: return "$9.99"
-        case .coins3000, .unlimited:   return "$19.99"
-        case .coins10000:              return "$49.99"
+        case .coins100:                return "$0.99"
+        case .lives20:                 return "$1.99"
+        case .coins600:                return "$4.99"
+        case .coins1300, .lives120:    return "$9.99"
+        case .coins3000, .lives300:    return "$19.99"
+        case .coins10000, .unlimited:  return "$49.99"
         case .starterPack:             return "$1.99"
         }
     }
@@ -769,67 +824,153 @@ struct BuyCoinsSheet: View {
 // pack.  All drawn in pure SwiftUI shapes so they scale crisply and reuse the
 // shared CoinIcon gold so the coins match the rest of the app.
 
-/// Lives-pack art for the Get Lives sheet: a glass jar of red marbles.  The
-/// jar and the number of marbles in it grow with the pack (tier 0 smallest,
-/// 2 largest), so the packs read at a glance like the coin hoards below.
-/// Drawn in a Canvas — no image assets and no SF Symbols.
-private struct MarbleJarIcon: View {
+/// Lives-pack art for the Get Lives sheet: a "guess how many marbles" glass
+/// jar.  Every pack card gives it the same frame; the JAR itself grows with
+/// the pack while the marbles stay the same size, so a bigger pack is a
+/// visibly bigger jar holding many more marbles:
+///   tier 0 (20 lives)  — a little jar with a handful of marbles at the bottom
+///   tier 1 (120 lives) — a medium jar, most of the way full
+///   tier 2 (300 lives) — a big jar packed to the brim
+/// `gold` draws the same jar as gold glass full of gold marbles with a gold
+/// lid — the purchased-reserve jar in the sheet header.
+/// Drawn in a Canvas from a fixed layout (no randomness, no image assets).
+struct MarbleJarIcon: View {
     let tier: Int
+    var gold: Bool = false
+
+    /// Jar height as a share of the frame, per tier.
+    private static let jarScale: [CGFloat] = [0.50, 0.76, 1.0]
+    /// Share of the jar's marble slots that are filled, per tier.
+    private static let fillShare: [CGFloat] = [0.0, 0.70, 1.0]
+    /// Marbles in the smallest jar (a handful, not a share).
+    private static let smallJarMarbles = 5
+
+    private static let palette: [(Color, Color)] = [
+        (Color(red: 1.00, green: 0.42, blue: 0.40), Color(red: 0.72, green: 0.10, blue: 0.12)), // red
+        (Color(red: 0.45, green: 0.70, blue: 1.00), Color(red: 0.10, green: 0.30, blue: 0.78)), // blue
+        (Color(red: 0.50, green: 0.92, blue: 0.52), Color(red: 0.10, green: 0.52, blue: 0.22)), // green
+        (Color(red: 1.00, green: 0.88, blue: 0.40), Color(red: 0.86, green: 0.56, blue: 0.05)), // yellow
+        (Color(red: 0.82, green: 0.58, blue: 1.00), Color(red: 0.44, green: 0.18, blue: 0.74)), // purple
+        (Color(red: 1.00, green: 0.66, blue: 0.34), Color(red: 0.84, green: 0.34, blue: 0.06)), // orange
+        (Color(red: 0.50, green: 0.95, blue: 0.95), Color(red: 0.06, green: 0.56, blue: 0.62)), // teal
+    ]
+    private static let goldShades: [(Color, Color)] = [
+        (Color(red: 1.00, green: 0.92, blue: 0.55), Color(red: 0.80, green: 0.55, blue: 0.08)),
+        (Color(red: 1.00, green: 0.84, blue: 0.40), Color(red: 0.70, green: 0.45, blue: 0.04)),
+        (Color(red: 0.98, green: 0.95, blue: 0.70), Color(red: 0.86, green: 0.64, blue: 0.16)),
+    ]
 
     var body: some View {
         Canvas { ctx, size in
             let t = min(2, max(0, tier))
-            let scales: [CGFloat] = [0.62, 0.80, 1.0]
-            let scale = scales[t]
-            let columns = [2, 3, 4][t]
-            let marbleCount = [3, 6, 10][t]
+            let s = min(size.width, size.height)
 
-            // Jar body, sitting on the bottom edge, centered.
-            let bodyW = size.width * 0.80 * scale
-            let bodyH = size.height * 0.84 * scale
-            let bodyX = (size.width - bodyW) / 2
-            let bodyY = size.height - bodyH
-            let jar = CGRect(x: bodyX, y: bodyY, width: bodyW, height: bodyH)
-            let jarPath = Path(roundedRect: jar, cornerRadius: bodyW * 0.20)
+            // ---- Jar geometry: bottom-centered, scaled per tier ----
+            let jarH = size.height * Self.jarScale[t]
+            let jarW = min(size.width, jarH * 0.80)
+            let left = (size.width - jarW) / 2
+            let bottom = size.height
+            let lidH = max(2.5, jarH * 0.13)
+            let lidW = jarW * 0.80
+            let neckH = max(1.5, jarH * 0.05)
+            let bodyTop = bottom - jarH + lidH + neckH
+            let body = CGRect(x: left, y: bodyTop, width: jarW, height: bottom - bodyTop)
+            let bodyPath = Path(roundedRect: body, cornerRadius: jarW * 0.24, style: .continuous)
+            let neck = CGRect(x: (size.width - lidW * 0.92) / 2, y: bodyTop - neckH,
+                              width: lidW * 0.92, height: neckH + jarW * 0.10)
+            let neckPath = Path(roundedRect: neck, cornerRadius: neckH * 0.6)
+            let lid = CGRect(x: (size.width - lidW) / 2, y: bottom - jarH,
+                             width: lidW, height: lidH)
+            let lidPath = Path(roundedRect: lid, cornerRadius: lidH * 0.30, style: .continuous)
 
-            // Marbles: rows of `columns`, filled from the bottom up.
-            let pad = bodyW * 0.09
-            let d = (bodyW - pad * 2) / CGFloat(columns)
-            var drawn = 0
+            // ---- Glass back (a faint tint behind the marbles) ----
+            let glassTint: Color = gold ? Color(red: 1.0, green: 0.80, blue: 0.30) : Color(red: 0.70, green: 0.88, blue: 1.0)
+            ctx.fill(bodyPath, with: .color(glassTint.opacity(gold ? 0.22 : 0.10)))
+
+            // ---- Marbles: hexagonal packing, bottom up, clipped to the glass ----
+            // Marble size follows the FRAME, not the jar, so a bigger jar
+            // holds visibly more of them.
+            let d = s * 0.118
+            let wall = max(1.0, jarW * 0.06)
+            let inner = body.insetBy(dx: wall, dy: wall)
+            var slots: [CGPoint] = []
             var row = 0
-            while drawn < marbleCount {
-                let inRow = min(columns, marbleCount - drawn)
-                // Center a short top row.
-                let rowInset = (CGFloat(columns - inRow) * d) / 2
-                for col in 0..<inRow {
-                    let x = bodyX + pad + rowInset + CGFloat(col) * d
-                    let y = jar.maxY - pad - CGFloat(row + 1) * d
-                    let marble = CGRect(x: x + d * 0.06, y: y + d * 0.06,
-                                        width: d * 0.88, height: d * 0.88)
-                    ctx.fill(Path(ellipseIn: marble),
-                             with: .linearGradient(
-                                Gradient(colors: [Color(red: 1.00, green: 0.36, blue: 0.36),
-                                                  Color(red: 0.76, green: 0.13, blue: 0.13)]),
-                                startPoint: CGPoint(x: marble.midX, y: marble.minY),
-                                endPoint: CGPoint(x: marble.midX, y: marble.maxY)))
-                    let shine = CGRect(x: marble.minX + marble.width * 0.20,
-                                       y: marble.minY + marble.height * 0.18,
-                                       width: marble.width * 0.26, height: marble.height * 0.26)
-                    ctx.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.6)))
+            var cy = inner.maxY - d / 2
+            let topLimit = (t == 2 ? neck.minY + neckH * 0.4 : inner.minY) + d * 0.35
+            while cy >= topLimit {
+                let offset: CGFloat = row % 2 == 0 ? 0 : d / 2
+                var cx = inner.minX + d / 2 + offset
+                while cx <= inner.maxX - d / 2 + 0.01 {
+                    // Above the shoulders only the neck holds marbles.
+                    let inNeck = cx - d / 2 >= neck.minX && cx + d / 2 <= neck.maxX
+                    if cy >= inner.minY + d / 2 || inNeck {
+                        slots.append(CGPoint(x: cx, y: cy))
+                    }
+                    cx += d
                 }
-                drawn += inRow
                 row += 1
+                cy -= d * 0.87
+            }
+            let count: Int = {
+                switch t {
+                case 0:  return min(slots.count, Self.smallJarMarbles)
+                default: return min(slots.count, max(1, Int((CGFloat(slots.count) * Self.fillShare[t]).rounded())))
+                }
+            }()
+            ctx.drawLayer { layer in
+                layer.clip(to: bodyPath.union(neckPath))
+                for i in 0..<count {
+                    let c = slots[i]
+                    let colors = gold ? Self.goldShades[(i * 2 + i / 3) % Self.goldShades.count]
+                                      : Self.palette[(i * 3 + i / 4) % Self.palette.count]
+                    let r = CGRect(x: c.x - d / 2, y: c.y - d / 2, width: d, height: d)
+                    let marble = Path(ellipseIn: r)
+                    layer.fill(marble, with: .radialGradient(
+                        Gradient(colors: [colors.0, colors.1]),
+                        center: CGPoint(x: r.minX + d * 0.35, y: r.minY + d * 0.32),
+                        startRadius: 0, endRadius: d * 0.72))
+                    layer.stroke(marble, with: .color(.black.opacity(0.28)), lineWidth: max(0.4, d * 0.05))
+                    let shine = CGRect(x: r.minX + d * 0.20, y: r.minY + d * 0.16,
+                                       width: d * 0.30, height: d * 0.26)
+                    layer.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.75)))
+                }
             }
 
-            // Glass over the marbles, then the rim and the lid.
-            ctx.fill(jarPath, with: .color(.white.opacity(0.10)))
-            ctx.stroke(jarPath, with: .color(Color(white: 0.85).opacity(0.9)), lineWidth: 1.3)
-            let lidW = bodyW * 0.72
-            let lidH = max(3, bodyH * 0.13)
-            let lid = CGRect(x: (size.width - lidW) / 2, y: bodyY - lidH * 0.75,
-                             width: lidW, height: lidH)
-            ctx.fill(Path(roundedRect: lid, cornerRadius: lidH * 0.35),
-                     with: .color(Color(white: 0.72)))
+            // ---- Glass front: rim, neck, and shine ----
+            let rim: Color = gold ? Color(red: 1.0, green: 0.86, blue: 0.45) : Color(white: 0.90)
+            ctx.stroke(bodyPath, with: .color(rim.opacity(0.95)), lineWidth: max(1.0, jarW * 0.045))
+            ctx.fill(neckPath, with: .color(glassTint.opacity(0.18)))
+            ctx.stroke(neckPath, with: .color(rim.opacity(0.85)), lineWidth: max(0.8, jarW * 0.035))
+            // A tall streak and a dot of light down the left of the glass.
+            let streak = CGRect(x: body.minX + jarW * 0.13, y: body.minY + body.height * 0.14,
+                                width: max(1.2, jarW * 0.09), height: body.height * 0.58)
+            ctx.fill(Path(roundedRect: streak, cornerRadius: streak.width / 2),
+                     with: .color(.white.opacity(0.42)))
+            let dot = CGRect(x: streak.minX, y: streak.maxY + body.height * 0.06,
+                             width: streak.width, height: streak.width)
+            ctx.fill(Path(ellipseIn: dot), with: .color(.white.opacity(0.38)))
+
+            // ---- Lid: metal band with ridges ----
+            let lidColors: [Color] = gold
+                ? [Color(red: 1.00, green: 0.88, blue: 0.42), Color(red: 0.74, green: 0.50, blue: 0.06)]
+                : [Color(red: 0.95, green: 0.38, blue: 0.36), Color(red: 0.62, green: 0.12, blue: 0.14)]
+            ctx.fill(lidPath, with: .linearGradient(
+                Gradient(colors: lidColors),
+                startPoint: CGPoint(x: lid.midX, y: lid.minY),
+                endPoint: CGPoint(x: lid.midX, y: lid.maxY)))
+            ctx.stroke(lidPath, with: .color(.black.opacity(0.30)), lineWidth: 0.6)
+            let ridges = max(3, Int(lidW / max(3, s * 0.07)))
+            for k in 1..<ridges {
+                let x = lid.minX + lid.width * CGFloat(k) / CGFloat(ridges)
+                var ridge = Path()
+                ridge.move(to: CGPoint(x: x, y: lid.minY + lidH * 0.22))
+                ridge.addLine(to: CGPoint(x: x, y: lid.maxY - lidH * 0.22))
+                ctx.stroke(ridge, with: .color(.black.opacity(0.22)), lineWidth: 0.6)
+            }
+            let lidShine = CGRect(x: lid.minX + lidW * 0.08, y: lid.minY + lidH * 0.18,
+                                  width: lidW * 0.84, height: max(0.8, lidH * 0.22))
+            ctx.fill(Path(roundedRect: lidShine, cornerRadius: lidShine.height / 2),
+                     with: .color(.white.opacity(0.45)))
         }
     }
 }

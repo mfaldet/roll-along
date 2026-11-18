@@ -3,63 +3,63 @@
   "nonRenewingSubscriptions": [],
   "products": [
     {
-      "displayPrice": "0.99",
+      "displayPrice": "1.99",
       "familyShareable": false,
       "internalID": "11000001",
       "localizations": [
         {
-          "description": "10 lives.",
-          "displayName": "10 Lives",
+          "description": "20 lives.",
+          "displayName": "20 Lives",
           "locale": "en_US"
         }
       ],
-      "productID": "com.macfaldet.RollAlong.lives.pack1",
-      "referenceName": "10 Lives $0.99",
-      "type": "Consumable"
-    },
-    {
-      "displayPrice": "4.99",
-      "familyShareable": false,
-      "internalID": "11000002",
-      "localizations": [
-        {
-          "description": "60 lives.",
-          "displayName": "60 Lives",
-          "locale": "en_US"
-        }
-      ],
-      "productID": "com.macfaldet.RollAlong.lives.pack5",
-      "referenceName": "60 Lives $4.99",
+      "productID": "com.macfaldet.RollAlong.lives.20",
+      "referenceName": "20 Lives $1.99",
       "type": "Consumable"
     },
     {
       "displayPrice": "9.99",
       "familyShareable": false,
-      "internalID": "11000003",
+      "internalID": "11000002",
       "localizations": [
         {
-          "description": "130 lives.",
-          "displayName": "130 Lives",
+          "description": "120 lives.",
+          "displayName": "120 Lives",
           "locale": "en_US"
         }
       ],
-      "productID": "com.macfaldet.RollAlong.lives.pack10",
-      "referenceName": "130 Lives $9.99",
+      "productID": "com.macfaldet.RollAlong.lives.120",
+      "referenceName": "120 Lives $9.99",
       "type": "Consumable"
     },
     {
       "displayPrice": "19.99",
       "familyShareable": false,
+      "internalID": "11000003",
+      "localizations": [
+        {
+          "description": "300 lives.",
+          "displayName": "300 Lives",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.macfaldet.RollAlong.lives.300",
+      "referenceName": "300 Lives $19.99",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "49.99",
+      "familyShareable": false,
       "internalID": "11000004",
       "localizations": [
         {
-          "description": "Never run out of lives again. Unlocks the Diamond ball skin + exclusive cosmetic packs as we release them.",
-          "displayName": "Unlimited Lives",
+          "description": "Unlimited lives, forever. Includes the exclusive Diamond ball skin.",
+          "displayName": "Diamond Balls",
           "locale": "en_US"
         }
       ],
       "productID": "com.macfaldet.RollAlong.unlimited",
-      "referenceName": "Unlimited Lives",
+      "referenceName": "Diamond Balls (Unlimited Lives) $49.99",
       "type": "NonConsumable"
     },
     {

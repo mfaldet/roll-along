@@ -19,7 +19,7 @@ MINIGAME REWARDS
 Solo minigames pay no coins. Competitive minigames pay 1, 2 or 3 coins on Easy, Normal or Hard whatever the result; a win also earns 1 ticket. Gold Rush, a 30-second bonus round, costs 5 tickets and pays up to about 100 coins. Tickets come only from wins, cannot be bought and have no other use.
 
 IN-APP PURCHASES (10)
-Lives (tap the lives counter, top-left of Home): 10, 60, 130 Lives (consumable), Unlimited Lives (non-consumable).
+Lives (tap the lives counter, top-left of Home): 20, 120, 300 Lives (consumable); Diamond Balls, unlimited lives (non-consumable).
 Coins (Shop, tap the coin balance): 750, 4,500, 10,000, 22,500, 60,000 (consumable); the 60,000 pack includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
 Starter Pack (non-consumable): offered on Home once the coin balance first reaches 250, for 48 hours. Quickest way: buy 750 coins, return to Home.
 Restore: Settings > Purchases > Restore Purchases.

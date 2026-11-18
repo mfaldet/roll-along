@@ -14,6 +14,26 @@ import XCTest
 
 final class StoreKitManagerTests: XCTestCase {
 
+    // MARK: - Lives products
+
+    /// The lives packs grant 20 / 120 / 300, and each product ID carries the
+    /// number of lives it grants.  Diamond Balls is the unlimited unlock.
+    func testLivesProductsMatchTheirIDs() {
+        let packs: [(StoreKitManager.ProductID, Int, String)] = [
+            (.lives20,  20,  "com.macfaldet.RollAlong.lives.20"),
+            (.lives120, 120, "com.macfaldet.RollAlong.lives.120"),
+            (.lives300, 300, "com.macfaldet.RollAlong.lives.300"),
+        ]
+        for (pid, lives, id) in packs {
+            XCTAssertEqual(pid.rawValue, id)
+            XCTAssertEqual(pid.rewardLives, lives)
+            XCTAssertEqual(pid.category, .lifePack)
+        }
+        XCTAssertEqual(StoreKitManager.ProductID.unlimited.rawValue, "com.macfaldet.RollAlong.unlimited")
+        XCTAssertEqual(StoreKitManager.ProductID.unlimited.category, .unlimitedUnlock)
+        XCTAssertEqual(StoreKitManager.ProductID.unlimited.rewardLives, 0)
+    }
+
     // MARK: - Delivery (happy path)
 
     /// Every catalogue product delivers when the transaction isn't revoked.
@@ -187,7 +207,7 @@ final class StoreKitManagerTests: XCTestCase {
     func testAlreadyDeliveredBeatsDefer() {
         XCTAssertEqual(
             StoreKitManager.verifiedUpdateAction(
-                productID: StoreKitManager.ProductID.livesPack10.rawValue,
+                productID: StoreKitManager.ProductID.lives300.rawValue,
                 revocationDate: nil,
                 hasGameState: false,
                 alreadyDelivered: true),

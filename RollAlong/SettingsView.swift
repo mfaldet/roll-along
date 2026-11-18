@@ -455,9 +455,9 @@ struct SettingsView: View {
             restoreResultMessage = store.lastError
                 ?? "Restore failed. Check your connection and try again."
         } else if gameState.unlimitedLives || gameState.starterPackClaimed {
-            // Both restorable purchases count: Unlimited Lives and the Starter Pack.
+            // Both restorable purchases count: Diamond Balls and the Starter Pack.
             var restored: [String] = []
-            if gameState.unlimitedLives     { restored.append("Unlimited Lives") }
+            if gameState.unlimitedLives     { restored.append("Diamond Balls (unlimited lives)") }
             if gameState.starterPackClaimed { restored.append("Starter Pack") }
             restoreResultMessage = "Restore complete — active on this device: "
                 + restored.joined(separator: " and ") + "."

@@ -258,8 +258,8 @@ final class GameState: ObservableObject {
     //                     and only drains once the regen bar is empty.
     // lastLifeLostAt    : timestamp of the most recent life consumption.
     //                     Drives regen.  nil when lives == max.
-    // unlimitedLives    : true if the $20 unlimited subscription is active.
-    //                     Set by the StoreKit layer in a later PR.
+    // unlimitedLives    : true once the one-time Diamond Balls purchase
+    //                     ($49.99, unlimited lives) is owned.  Set by StoreKit.
     // ECONOMY: flipped 2026-06-11 from 1-per-10-min / cap 6 to a friendlier
     // 1-per-6-min / cap 10 — faster comebacks, bigger passive bank.
     static let livesMax: Int = 10
