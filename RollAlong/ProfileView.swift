@@ -480,13 +480,13 @@ struct ProfileView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The level marker badge that sits on the marble's top-right corner —
-    /// a small "LVL" eyebrow over a large level number.
     /// The player's own accent color, made readable on the dark background.
     private var accent: Color { AccentColor.readable(gameState.primaryColor) }
     private static let baseTop    = Color(red: 0.06, green: 0.06, blue: 0.10)
     private static let baseBottom = Color(red: 0.09, green: 0.09, blue: 0.14)
 
+    /// The level marker badge that sits on the marble's top-right corner —
+    /// a small "LVL" eyebrow over a large level number.
     private var levelMarker: some View {
         VStack(spacing: -2) {
             Text("LVL")

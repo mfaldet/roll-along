@@ -95,7 +95,7 @@ struct RollUpView: View {
     /// back down mid-run, and resets with a new run.
     private var skyMeters: Double {
         guard arena.height > 0 else { return 0 }
-        return max(0, Double(maxBallY - groundY - ballRadius) / Double(pixelsPerMeter))
+        return max(0, Double(maxBallY - groundY) / Double(pixelsPerMeter))
     }
     /// 0 when the sky behind the HUD is light (dark text), 1 when it is dark
     /// (white text); eased so the swap is gradual, not a flip.
