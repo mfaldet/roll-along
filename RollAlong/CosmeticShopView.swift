@@ -1116,6 +1116,15 @@ struct CosmeticShopView: View {
     /// "Coming soon" — the next scheduled drop, by name and date.  Everything
     /// the release calendar is holding back is announced here.
     @ViewBuilder
+    private static func comingSoonFootnote(laterCount: Int) -> String {
+        let seasonal = "Seasonal collections return each year."
+        switch laterCount {
+        case 0:  return "The last scheduled collections. " + seasonal
+        case 1:  return "1 more collection is on the calendar after these. " + seasonal
+        default: return "\(laterCount) more collections are on the calendar after these. " + seasonal
+        }
+    }
+
     private var comingSoonRow: some View {
         if let next = CosmeticSchedule.nextDrop() {
             VStack(alignment: .leading, spacing: 8) {
@@ -1134,11 +1143,7 @@ struct CosmeticShopView: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(next.laterCount > 0
-                     ? (next.laterCount == 1
-                        ? "1 more collection is on the calendar after these. Seasonal collections return each year."
-                        : "\(next.laterCount) more collections are on the calendar after these. Seasonal collections return each year.")
-                     : "The last scheduled collections. Seasonal collections return each year.")
+                Text(Self.comingSoonFootnote(laterCount: next.laterCount))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(white: 0.5))
                     .fixedSize(horizontal: false, vertical: true)

@@ -1565,6 +1565,11 @@ struct CalendarDay: Hashable, Comparable, Codable {
         let parts = iso.prefix(10).split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3, (1...12).contains(parts[1]), (1...31).contains(parts[2]),
               parts[0] >= 2000, parts[0] < 3000 else { return nil }
+        // Reject impossible days such as Feb 30 instead of rolling them over.
+        var greg = Calendar(identifier: .gregorian)
+        greg.timeZone = TimeZone(identifier: "UTC")!
+        let comps = DateComponents(year: parts[0], month: parts[1], day: parts[2])
+        guard comps.isValidDate(in: greg) else { return nil }
         self.init(parts[0], parts[1], parts[2])
     }
     static func < (a: CalendarDay, b: CalendarDay) -> Bool {
@@ -1936,7 +1941,7 @@ final class CosmeticCalendarStore: ObservableObject, @unchecked Sendable {
     private func beginFetchIfDue(now: Date) -> Bool {
         lock.lock(); defer { lock.unlock() }
         let due = !fetching
-            && (lastFetch.map { now.timeIntervalSince($0) >= Self.refreshInterval } ?? true)
+            && (lastFetch.map { let age = now.timeIntervalSince($0); return age >= Self.refreshInterval || age < 0 } ?? true)
         if due { fetching = true }
         return due
     }
