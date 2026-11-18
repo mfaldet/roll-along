@@ -9,13 +9,12 @@ import SwiftUI
 // RELATION TO THE CLIMB
 //   It's the climb's DNA — tilt-to-roll, walls, holes, a goal — but tuned for
 //   precision: a tiny ball, low restitution, dense interior walls, and a
-//   "mind the holes" hazard layout.  Per Mac's call it shares the climb's life
-//   economy: each fall in a hole costs a real life (Diamond Balls = no cost),
-//   and running out surfaces the Get Lives sheet.
+//   "mind the holes" hazard layout.  Minigames never cost lives, so a fall in
+//   a hole spends nothing — just retry the maze.
 //
 // SAFE BY CONSTRUCTION: a brand-new, isolated file.  It reuses only the shared
 // physics primitives (BallMotion / PhysicsClock / bounceEdges /
-// resolveWallSegment), the lives + coin economy on GameState, BallSkinView,
+// resolveWallSegment), the coin economy on GameState, BallSkinView,
 // CoinIcon, and ResultShareButton.  It touches nothing in the climb engine.
 // Reached only when HomeView routes `.mode("rollout")` here.
 // ===========================================================================
@@ -139,13 +138,11 @@ struct RollOutView: View {
     @State private var phase: Phase = .ready
     @State private var trail: [CGPoint] = []
     @State private var goalPulse = false
-    @State private var showBuyLivesSheet = false
     private let trailMaxLen = 16
     private let trailMinStep: CGFloat = 3
 
     private var maze: RollOutMaze { RollOutMazes.all[mazeIndex % RollOutMazes.all.count] }
     private var boundary: Boundary { gameState.equippedBoundary }
-    private var outOfLives: Bool { !gameState.unlimitedLives && gameState.displayedLives <= 0 }
 
     // MARK: - Body
 
@@ -166,7 +163,7 @@ struct RollOutView: View {
                 .onAppear { layout(geo.size) }
                 .onChange(of: geo.size) { _, s in layout(s) }
                 .onTapGesture {
-                    if phase == .ready && !outOfLives {
+                    if phase == .ready {
                         phase = .playing
                         // S2-T2: a maze run begins — arm the toast queue so any
                         // trophy earned this run coalesces and surfaces only at
@@ -183,10 +180,9 @@ struct RollOutView: View {
             tableBorder.allowsHitTesting(false)
             topBar
             HomeQuitButton()
-            if phase == .ready && !outOfLives { startPrompt }
+            if phase == .ready { startPrompt }
             if phase == .cleared { clearedOverlay }
-            if phase == .fell && !outOfLives { fellOverlay }
-            if outOfLives && phase != .cleared { outOfLivesOverlay }
+            if phase == .fell { fellOverlay }
 
             // S2-T2: trophy-unlock banner host — inert until a result overlay
             // drains the queue (never mid-run; §6).
@@ -202,9 +198,6 @@ struct RollOutView: View {
         .onChange(of: scenePhase) { _, ph in
             if ph == .background { clock.stop(); motion.stop() }
             else if ph == .active { clock.start(); motion.start() }
-        }
-        .sheet(isPresented: $showBuyLivesSheet) {
-            BuyLivesSheet().environmentObject(gameState)
         }
     }
 
@@ -327,38 +320,14 @@ struct RollOutView: View {
                         .accessibilityIdentifier("RollOutView")
                 }
                 Spacer()
-                livesPill
+                // No lives pill — minigames are free; keep the slot so the
+                // maze number stays centered.
+                Color.clear.frame(width: 36, height: 36)
             }
             Spacer()
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
-    }
-
-    private var livesPill: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.42, blue: 0.42),
-                                              Color(red: 0.85, green: 0.18, blue: 0.22)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: 14, height: 14)
-                .overlay(Circle().fill(.white.opacity(0.5))
-                    .frame(width: 4, height: 4).offset(x: -2.5, y: -2.5))
-            if gameState.unlimitedLives {
-                Image(systemName: "infinity")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-            } else {
-                Text("\(gameState.displayedLives)")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
-            }
-        }
-        .padding(.horizontal, 9).padding(.vertical, 6)
-        .background(Capsule().fill(Color(white: 0.16)))
-        .accessibilityLabel(gameState.unlimitedLives ? "Unlimited lives"
-                            : "\(gameState.displayedLives) lives")
     }
 
     private var startPrompt: some View {
@@ -369,7 +338,7 @@ struct RollOutView: View {
             Text("Tilt to roll")
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
-            Text("Reach the flag — don't fall in a hole.\nEach fall costs a life.")
+            Text("Reach the flag — don't fall in a hole.")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
@@ -377,7 +346,7 @@ struct RollOutView: View {
         .padding(28)
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Roll Out. Tilt to roll the ball to the flag without falling in a hole. Each fall costs a life. Tap to begin.")
+        .accessibilityLabel("Roll Out. Tilt to roll the ball to the flag without falling in a hole. Tap to begin.")
     }
 
     private var clearedOverlay: some View {
@@ -436,7 +405,7 @@ struct RollOutView: View {
                     Text("Down the Hole!")
                         .font(.system(size: 38, weight: .black, design: .rounded))
                         .foregroundStyle(Color(white: 0.9))
-                    Text("\(livesWord) left")
+                    Text("Free to retry")
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.6))
                 }
@@ -464,53 +433,6 @@ struct RollOutView: View {
         // S2-T2: run ended in a fall — surface any trophies earned this run
         // at the result screen (design.md §6 lists "fell" as a run-end
         // surface).  A retry re-arms via the tap-to-start handler.
-        .onAppear { gameState.endTrophyRun() }
-    }
-
-    private var livesWord: String {
-        gameState.unlimitedLives ? "Unlimited lives"
-            : "\(gameState.displayedLives) " + (gameState.displayedLives == 1 ? "life" : "lives")
-    }
-
-    private var outOfLivesOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.82).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Image(systemName: "heart.slash.fill")
-                    .font(.system(size: 44, weight: .bold))
-                    .foregroundStyle(Color(red: 0.95, green: 0.4, blue: 0.4))
-                Text("Out of Lives")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("Get more lives to keep rolling.")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.6))
-                    .multilineTextAlignment(.center)
-                VStack(spacing: 12) {
-                    Button { showBuyLivesSheet = true } label: {
-                        Text("Get Lives")
-                            .font(.system(size: 21, weight: .bold, design: .rounded))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 15)
-                            .background(RoundedRectangle(cornerRadius: 18)
-                                .fill(Color(red: 1.0, green: 0.45, blue: 0.45)))
-                    }
-                    Button { nav.goHome() } label: {
-                        Text("Home")
-                            .font(.system(size: 17, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(white: 0.85))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                    }
-                }
-                .padding(.horizontal, 40)
-            }
-            .padding(.horizontal, 28)
-        }
-        // S2-T2: a last-life fall suppresses the fell overlay and shows this
-        // instead — drain the run's trophies here too (design.md §6
-        // "out-of-lives").
         .onAppear { gameState.endTrophyRun() }
     }
 
@@ -621,12 +543,11 @@ struct RollOutView: View {
     }
 
     private func fall() {
-        // Mirrors the climb's fall feedback + life cost (Diamond Balls exempt).
+        // Mirrors the climb's fall feedback.  No life cost — minigames are free.
         if gameState.hapticsEnabled {
             Haptics.medium()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) { Haptics.medium() }
         }
-        gameState.consumeLife()
         phase = .fell
         AnalyticsClient.shared.track(
             "minigame_round_over",

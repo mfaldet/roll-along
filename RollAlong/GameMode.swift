@@ -430,13 +430,13 @@ struct RollOutMode: GameMode {
     let goal:        GoalKind        = .reachGoal
     let onFail:      FailKind        = .loseLifeAndRetry
     let progression: ProgressionKind = .none
-    let lives:       LivesPolicy     = .consume
+    let lives:       LivesPolicy     = .unlimited   // minigames never cost lives
     let hasHoles                     = true
 }
 
 /// Roll Up — a vertical jump-platformer.  Gravity pulls the ball down; tilt to
 /// steer left/right and tap to pop it up onto floating platforms, climbing as
-/// high as possible.  Each run (a fall off the bottom) costs a real life.
+/// high as possible.  Free to play: a run ending costs no life.
 /// Self-contained RollUpView; listed under "New ways to play".
 struct RollUpMode: GameMode {
     let id          = "rollup"
@@ -447,7 +447,7 @@ struct RollUpMode: GameMode {
     let goal:        GoalKind        = .score
     let onFail:      FailKind        = .endRun
     let progression: ProgressionKind = .none
-    let lives:       LivesPolicy     = .consume
+    let lives:       LivesPolicy     = .unlimited   // minigames never cost lives
     let hasHoles                     = false
     let showsScore                   = true
 }
@@ -711,12 +711,12 @@ struct ModeTutorial {
         case "rollout":
             return .init(controls: "Tilt to roll the tiny ball through the maze.",
                          goal: "Reach the flag at the top of each maze.",
-                         hazard: "Fall in a hole and it costs a life.",
+                         hazard: "Fall in a hole and you start the maze again. It never costs a life.",
                          reward: "Clear as many mazes as you can — solo games pay no coins.")
         case "rollup":
             return .init(controls: "Tilt to steer left/right. Tap to jump.",
                          goal: "Climb the floating platforms as high as you can.",
-                         hazard: "Fall off the bottom and the run ends — costing a life.",
+                         hazard: "Fall off the bottom and the run ends. It never costs a life.",
                          reward: "Play for your best height — solo games pay no coins.")
         case "disco":
             return .init(controls: "Pick Easy, Normal or Hardcore, then tilt to roll. Memorize the lit path before you cross.",
