@@ -19,11 +19,60 @@ import UIKit
 //   none): PostgREST refuses a bulk insert whose objects have different keys.
 // • The buffer lives in memory only: events still waiting when the app is
 //   closed are lost.
+// • During unit and UI test runs (RuntimeEnvironment.isRunningTests) nothing
+//   is tracked, buffered or sent: test runs must never reach the live table.
 //
 // Server schema: see docs/supabase-schema.sql.  Single `events` table with
 // columns user_id, session_id, event_name, properties, level, app_version,
 // ios_version, device_model.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// RuntimeEnvironment — "is this process a test run?"
+//
+// One shared switch that every Supabase entry point checks so unit and UI
+// test runs never send anything to the LIVE server (analytics, trophy sync,
+// profile/social/leaderboard reads and writes, auth token calls, the
+// delete-account function).  Test doubles injected by unit tests are not
+// affected: only the real network clients consult it.
+//
+// Detected when ANY of these is true:
+//   • Unit tests (the app is the test host): Xcode sets
+//     XCTestConfigurationFilePath / XCTestBundlePath / XCTestSessionIdentifier
+//     in the host process's environment, and the XCTest framework is loaded
+//     into it (NSClassFromString("XCTestCase") != nil).
+//   • UI tests (the app is a SEPARATE process that does NOT inherit XCTest's
+//     environment): the runner launches it with the `--uitesting` argument
+//     and the RA_NO_LIVE_SERVER=1 launch-environment key
+//     (RollAlongUITests/SmokeTests.swift).
+// Computed once per process; a normal launch from the Home Screen or from
+// Xcode's Run (Cmd-R) has none of these.
+// ---------------------------------------------------------------------------
+
+enum RuntimeEnvironment {
+    /// Launch-environment key UI tests set to switch the live server off.
+    static let noLiveServerKey = "RA_NO_LIVE_SERVER"
+
+    static let isRunningTests: Bool = detect(
+        environment: ProcessInfo.processInfo.environment,
+        arguments: ProcessInfo.processInfo.arguments,
+        xcTestLoaded: NSClassFromString("XCTestCase") != nil
+    )
+
+    /// Pure detection rule (unit-testable without faking the process).
+    static func detect(environment: [String: String],
+                       arguments: [String],
+                       xcTestLoaded: Bool) -> Bool {
+        if xcTestLoaded { return true }
+        let xcTestKeys = ["XCTestConfigurationFilePath",
+                          "XCTestBundlePath",
+                          "XCTestSessionIdentifier"]
+        if xcTestKeys.contains(where: { environment[$0] != nil }) { return true }
+        if environment[noLiveServerKey] == "1" { return true }
+        if arguments.contains("--uitesting") { return true }
+        return false
+    }
+}
 
 final class AnalyticsClient: @unchecked Sendable {
     static let shared = AnalyticsClient()
@@ -64,6 +113,9 @@ final class AnalyticsClient: @unchecked Sendable {
     private var buffer: [PendingEvent] = []
     private var isFlushing = false
     private var flushTimer: Timer?
+    /// How many HTTP requests this client has started (guarded by `lock`).
+    /// Read by the unit test proving a test run sends nothing.
+    private var requestsStarted = 0
 
     // MARK: - Init
 
@@ -87,6 +139,8 @@ final class AnalyticsClient: @unchecked Sendable {
 
         // Periodic flush timer — Timer.scheduledTimer fires on the main
         // runloop, so calling flush() here is safe.
+        // No timer at all during test runs (nothing is ever sent then).
+        guard !RuntimeEnvironment.isRunningTests else { return }
         flushTimer = Timer.scheduledTimer(withTimeInterval: Self.flushInterval,
                                           repeats: true) { [weak self] _ in
             self?.flush()
@@ -100,6 +154,8 @@ final class AnalyticsClient: @unchecked Sendable {
     func track(_ name: String,
                properties: [String: AnyEncodable] = [:],
                level: Int? = nil) {
+        // Test runs never reach the live events table: drop at the door.
+        guard !RuntimeEnvironment.isRunningTests else { return }
         let event = PendingEvent(
             userId:       userId,
             sessionId:    sessionId,
@@ -126,6 +182,7 @@ final class AnalyticsClient: @unchecked Sendable {
 
     /// Force a flush (e.g. when the app moves to background).
     func flush() {
+        guard !RuntimeEnvironment.isRunningTests else { return }
         lock.lock()
         guard !isFlushing, !buffer.isEmpty else { lock.unlock(); return }
         let batch = buffer
@@ -136,6 +193,25 @@ final class AnalyticsClient: @unchecked Sendable {
             await self?.sendInChunks(batch)
             self?.endFlushing()
         }
+    }
+
+    /// Number of HTTP requests started since launch (test observability).
+    var requestCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return requestsStarted
+    }
+
+    /// Number of events waiting in the buffer (test observability).
+    var bufferedEventCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return buffer.count
+    }
+
+    /// Counts one started request.  Synchronous (see `endFlushing`).
+    private func noteRequestStarted() {
+        lock.lock()
+        requestsStarted += 1
+        lock.unlock()
     }
 
     /// Releases the in-flight slot.  Synchronous: NSLock's lock()/unlock()
@@ -243,6 +319,11 @@ final class AnalyticsClient: @unchecked Sendable {
     }
 
     private func post(_ batch: [PendingEvent]) async -> PostOutcome {
+        // Belt and braces: nothing reaches here during tests (track/flush
+        // already refuse), but never let a test run touch the live server.
+        if RuntimeEnvironment.isRunningTests {
+            return .rejected(status: 0, reason: "live server disabled during tests")
+        }
         guard let url = URL(string: "\(Self.projectURL)/rest/v1/events") else {
             return .rejected(status: 0, reason: "bad URL")
         }
@@ -262,6 +343,7 @@ final class AnalyticsClient: @unchecked Sendable {
         }
 
         do {
+            noteRequestStarted()
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else { return .retryLater("no HTTP response") }
             switch http.statusCode {

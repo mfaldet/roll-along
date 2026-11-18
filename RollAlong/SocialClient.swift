@@ -71,6 +71,7 @@ final class SocialClient: @unchecked Sendable {
     /// it is sent to the function so the server can revoke the player's Apple
     /// token; the account is deleted either way.
     func deleteMyAccount(appleAuthorizationCode: String? = nil) async throws {
+        try Self.requireLiveServerAllowed()
         let session = try requireSession()
         guard let url = URL(string: "\(Self.projectURL)/functions/v1/delete-account") else {
             throw SocialError.badURL
@@ -876,11 +877,20 @@ final class SocialClient: @unchecked Sendable {
         try requireSession().token
     }
 
+    /// Unit and UI test runs never touch the live server (RuntimeEnvironment
+    /// in AnalyticsClient.swift): every request here fails fast instead.
+    private static func requireLiveServerAllowed() throws {
+        if RuntimeEnvironment.isRunningTests {
+            throw SocialError.http(status: 0, body: "live server disabled during tests")
+        }
+    }
+
     private func send(method: String,
                       path: String,
                       query: String = "",
                       bodyData: Data? = nil,
                       prefer: String? = nil) async throws -> Data {
+        try Self.requireLiveServerAllowed()
         let session = try requireSession()
         let urlString = "\(Self.projectURL)/rest/v1/\(path)"
             + (query.isEmpty ? "" : "?\(query)")

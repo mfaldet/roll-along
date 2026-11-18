@@ -306,6 +306,11 @@ struct SocialTrophyStatsBackend: TrophyStatsBackend {
     private let decoder = JSONDecoder()
 
     func fetchStats() async throws -> [TrophyStatRow] {
+        // Test runs never touch the live server (RuntimeEnvironment); only
+        // this LIVE backend is gated, test doubles are unaffected.
+        if RuntimeEnvironment.isRunningTests {
+            throw SocialError.http(status: 0, body: "live server disabled during tests")
+        }
         // Select only the columns the client renders (aggregates); never the
         // (nonexistent) raw unlock rows. `updated_at` is intentionally omitted
         // — the client renders from a snapshot and doesn't show staleness.
