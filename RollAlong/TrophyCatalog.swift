@@ -239,8 +239,9 @@ enum TrophyMetric: String, Codable, CaseIterable {
     /// `purchase`/`purchaseBundle`/`purchasePack` funnels (NEW latch,
     /// S1-T5). Coin spends only — free grants and IAP never count.
     case cosmeticCoinBuys       = "cosmetic_coin_buys"
-    /// 1 once a non-starter cosmetic is equipped in all 7 slots
-    /// (Ball/Goal/Trail/Floor/Pit/Boundary/Music) simultaneously.
+    /// 1 once a non-starter cosmetic is equipped in every offered slot
+    /// (Ball/Goal/Trail/Floor/Pit/Boundary, plus Music when
+    /// `CosmeticFeatures.musicEnabled`) simultaneously.
     case fullNonstarterLoadouts = "full_nonstarter_loadouts"
     /// `completedBundleIDs.count`.
     case bundlesCompleted       = "bundles_completed"
@@ -252,7 +253,9 @@ enum TrophyMetric: String, Codable, CaseIterable {
     case packsOwned             = "packs_owned"
     /// Owned count within the evergreen coin-or-skill-reachable set:
     /// full catalogue − 4 IAP secrets − 7 seasonal bundle-exclusive balls
-    /// (242 since every collection got a boundary; was 207 at v1).
+    /// (242 since every collection got a boundary; was 207 at v1).  While
+    /// music is off (`CosmeticFeatures.musicEnabled`, 1.0) the 19 music tracks
+    /// don't count, so the set is 223.
     case evergreenCosmeticsOwned = "evergreen_cosmetics_owned"
 
     // Economy (play-sourced only — no coins-spent metric exists, ever)

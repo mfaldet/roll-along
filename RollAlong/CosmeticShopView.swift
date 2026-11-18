@@ -15,6 +15,10 @@ import SwiftUI
 private enum ShopCategory: String, CaseIterable, Identifiable {
     case collections, ball, goal, trail, floor, pit, boundary, music
     var id: String { rawValue }
+    /// The tabs shown: no Music tab while music is off (not in 1.0).
+    static var visibleCases: [ShopCategory] {
+        allCases.filter { $0 != .music || CosmeticFeatures.musicEnabled }
+    }
     var icon: String {
         switch self {
         case .collections: return "square.stack.3d.up.fill"
@@ -480,7 +484,9 @@ struct CosmeticShopView: View {
                 shopPicksSection("PITS",       items: ShopRotation.featuredPits())
                 shopPicksSection("BOUNDARIES", items: ShopRotation.featuredBoundaries())
                 shopPicksSection("GOALS",      items: ShopRotation.featuredGoals())
-                shopPicksSection("MUSIC",      items: ShopRotation.featuredMusicSet())
+                if CosmeticFeatures.musicEnabled {
+                    shopPicksSection("MUSIC",  items: ShopRotation.featuredMusicSet())
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
@@ -592,7 +598,7 @@ struct CosmeticShopView: View {
         // and easier to read.  Still no scrolling; same filter behaviour.
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4),
                   spacing: 6) {
-            ForEach(ShopCategory.allCases) { cat in
+            ForEach(ShopCategory.visibleCases) { cat in
                 tabButton(cat)
             }
         }
@@ -657,7 +663,9 @@ struct CosmeticShopView: View {
         case .boundary:
             categoryGrid(items: Boundary.allCases.filter { isListed($0) })
         case .music:
-            categoryGrid(items: MusicTrack.allCases.filter { isListed($0) })
+            if CosmeticFeatures.musicEnabled {
+                categoryGrid(items: MusicTrack.allCases.filter { isListed($0) })
+            }
         }
     }
 
@@ -1510,7 +1518,7 @@ struct CosmeticShopView: View {
                                                       lineWidth: 4)
                                         .frame(width: 30, height: 24))))
         }
-        for x in b.music {
+        for x in b.offeredMusic {
             rows.append(BundleItemRow(category: "Music", name: x.displayName,
                                       owned: gameState.isOwned(x),
                                       preview: AnyView(musicSwatch(x))))
@@ -1731,11 +1739,12 @@ struct CosmeticShopView: View {
                         .frame(width: 34, height: 26)
                 }
             }
-            // Music
+            // Music (not offered in 1.0 — no slot while music is off)
+            if CosmeticFeatures.musicEnabled {
             collectionSlot(label: "Music",
-                           isOwned: bundle.music.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.music.first.map { isEquipped($0) } ?? false) {
-                if let track = bundle.music.first {
+                           isOwned: bundle.offeredMusic.first.map { gameState.isOwned($0) },
+                           isEquipped: bundle.offeredMusic.first.map { isEquipped($0) } ?? false) {
+                if let track = bundle.offeredMusic.first {
                     Image(systemName: track == .none ? "speaker.slash.fill" : "music.note")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(
@@ -1746,6 +1755,7 @@ struct CosmeticShopView: View {
                             )
                         )
                 }
+            }
             }
         }
     }
@@ -1820,7 +1830,7 @@ struct CosmeticShopView: View {
         n += bundle.trails.filter { gameState.isOwned($0) }.count
         n += bundle.floors.filter { gameState.isOwned($0) }.count
         n += bundle.pits.filter   { gameState.isOwned($0) }.count
-        n += bundle.music.filter  { gameState.isOwned($0) }.count
+        n += bundle.offeredMusic.filter  { gameState.isOwned($0) }.count
         n += bundle.boundaries.filter { gameState.isOwned($0) }.count
         return n
     }
@@ -1881,7 +1891,7 @@ struct CosmeticShopView: View {
         if let f = bundle.floors.first { gameState.equippedFloor = f }
         if let p = bundle.pits.first   { gameState.equippedPit   = p }
         if let w = bundle.boundaries.first { gameState.equippedBoundary = w }
-        if let m = bundle.music.first  { gameState.equippedMusic = m }
+        if let m = bundle.offeredMusic.first  { gameState.equippedMusic = m }
         AnalyticsClient.shared.track(
             "bundle_purchased",
             properties: [

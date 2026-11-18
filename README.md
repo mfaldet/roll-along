@@ -27,7 +27,7 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 
 ### Everything else
 
-- **Cosmetics.** 74 ball skins plus goals, trails, floors, pits, boundaries and music, bought with coins. Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
+- **Cosmetics.** 74 ball skins plus goals, trails, floors, pits and boundaries, bought with coins. (Music tracks exist in the code but are switched off for 1.0: none plays yet.) Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
 - **Trophies.** 86 trophies in v1.0, shown in the Trophy Room as 44 tiles in four sections (Adventure, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 68 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
 - **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Diamond Balls for unlimited lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
 - **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Teen" rating.

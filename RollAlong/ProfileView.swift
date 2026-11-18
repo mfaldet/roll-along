@@ -273,12 +273,14 @@ struct ProfileView: View {
                                 .stroke(gameState.equippedBoundary.edgeColor, lineWidth: 1))
                             .frame(width: 10, height: 22)
                     }
-                    loadoutRow(category: "Music",
-                               name: gameState.equippedMusic.displayName) {
-                        Image(systemName: gameState.equippedMusic == .none
-                              ? "speaker.slash.fill" : "music.note")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(gameState.equippedMusic.tier.color)
+                    if CosmeticFeatures.musicEnabled {
+                        loadoutRow(category: "Music",
+                                   name: gameState.equippedMusic.displayName) {
+                            Image(systemName: gameState.equippedMusic == .none
+                                  ? "speaker.slash.fill" : "music.note")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(gameState.equippedMusic.tier.color)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

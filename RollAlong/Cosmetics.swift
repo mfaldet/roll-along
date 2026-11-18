@@ -1497,6 +1497,20 @@ fileprivate extension Color {
     }
 }
 
+// MARK: - Feature switches
+
+/// Switches for cosmetic slots that are not offered yet.
+enum CosmeticFeatures {
+    /// Music is NOT in 1.0: no track plays in the game, so nothing a player
+    /// sees may offer music as something to own or buy.  The music data,
+    /// owned sets and code stay in place so it can return in an update by
+    /// flipping this to true.  While false: collections show six slots and
+    /// never price, grant or require their music; the Shop has no Music
+    /// section or category; the Locker, Profile and loadout hide music; and
+    /// the Full Fit trophy needs six slots, not seven.
+    static let musicEnabled = false
+}
+
 // MARK: - Music tracks
 //
 // Pure identifiers — actual `.m4a` audio + AVAudioPlayer wiring arrive
@@ -2242,7 +2256,8 @@ enum ShopRotation {
         case let f  as Floor:      if featuredFloors(at: date).contains(f)      { return true }
         case let p  as Pit:        if featuredPits(at: date).contains(p)        { return true }
         case let bd as Boundary:   if featuredBoundaries(at: date).contains(bd) { return true }
-        case let m  as MusicTrack: if featuredMusicSet(at: date).contains(m)    { return true }
+        case let m  as MusicTrack:
+            if CosmeticFeatures.musicEnabled, featuredMusicSet(at: date).contains(m) { return true }
         default: break
         }
         return featuredBundle(at: date)?.contains(item) ?? false
@@ -2330,6 +2345,20 @@ struct CosmeticBundle: Identifiable {
     /// so the memberwise initializer keeps its existing argument order.
     var boundaries: [Boundary] = []
 
+    /// The collection's music as offered to players: its tracks when music is
+    /// on, otherwise none.  Everything a player sees, pays for or is granted
+    /// goes through this; `music` itself is kept for when music returns.
+    var offeredMusic: [MusicTrack] { CosmeticFeatures.musicEnabled ? music : [] }
+
+    /// `contentSummary` without its music entry while music is off.
+    var displaySummary: String {
+        guard !CosmeticFeatures.musicEnabled else { return contentSummary }
+        return contentSummary
+            .components(separatedBy: " · ")
+            .filter { !$0.hasSuffix(" music") }
+            .joined(separator: " · ")
+    }
+
     // ── Seasonal availability window ───────────────────────────────
     // Both nil = always available (permanent bundle).
     // Non-nil `availableUntil` marks the bundle as limited-time.
@@ -2410,7 +2439,7 @@ struct CosmeticBundle: Identifiable {
 
     var itemCount: Int {
         balls.count + goals.count + trails.count + floors.count + pits.count
-            + boundaries.count + music.count
+            + boundaries.count + offeredMusic.count
     }
 
     /// The full price of the bundle — the sum of every contained item's
@@ -2423,7 +2452,7 @@ struct CosmeticBundle: Identifiable {
         let trailSum: Int = trails.reduce(0) { $0 + Self.listPrice($1) }
         let floorSum: Int = floors.reduce(0) { $0 + Self.listPrice($1) }
         let pitSum:   Int = pits.reduce(0)   { $0 + Self.listPrice($1) }
-        let musicSum: Int = music.reduce(0)  { $0 + Self.listPrice($1) }
+        let musicSum: Int = offeredMusic.reduce(0)  { $0 + Self.listPrice($1) }
         let wallSum:  Int = boundaries.reduce(0) { $0 + Self.listPrice($1) }
         return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum + wallSum
     }
@@ -2445,6 +2474,8 @@ struct CosmeticBundle: Identifiable {
         for t in trails { counts[t.tier, default: 0] += 1 }
         for f in floors { counts[f.tier, default: 0] += 1 }
         for p in pits   { counts[p.tier, default: 0] += 1 }
+        // Rarity counts the music track even while music is off, so no
+        // collection changes band (and the Standard gift pool stays the same).
         for m in music  { counts[m.tier, default: 0] += 1 }
         for w in boundaries { counts[w.tier, default: 0] += 1 }
         return counts
@@ -2473,7 +2504,7 @@ struct CosmeticBundle: Identifiable {
         let trailSum: Int = trails.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
         let floorSum: Int = floors.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
         let pitSum:   Int = pits.reduce(0)   { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
-        let musicSum: Int = music.reduce(0)  { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
+        let musicSum: Int = offeredMusic.reduce(0)  { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
         let wallSum:  Int = boundaries.reduce(0) { $0 + (state.isOwned($1) ? 0 : $1.coinCost) }
         return ballSum + goalSum + trailSum + floorSum + pitSum + musicSum + wallSum
     }
@@ -2498,7 +2529,7 @@ struct CosmeticBundle: Identifiable {
         case let t as TrailColor: return trails.contains(t)
         case let f as Floor:      return floors.contains(f)
         case let p as Pit:        return pits.contains(p)
-        case let m as MusicTrack: return music.contains(m)
+        case let m as MusicTrack: return offeredMusic.contains(m)
         case let w as Boundary:   return boundaries.contains(w)
         default:                  return false
         }
@@ -2520,7 +2551,7 @@ struct CosmeticBundle: Identifiable {
         trails.forEach { state.grant($0) }
         floors.forEach { state.grant($0) }
         pits.forEach   { state.grant($0) }
-        music.forEach  { state.grant($0) }
+        offeredMusic.forEach  { state.grant($0) }
         boundaries.forEach { state.grant($0) }
     }
 

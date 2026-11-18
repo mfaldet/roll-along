@@ -472,9 +472,14 @@ final class GameState: ObservableObject {
     @Published var ownedBundles: Set<String> {
         didSet { saveStringSet(ownedBundles, forKey: "ra_ownedBundles") }
     }
-    /// rawValues of cosmetics that were GIFTED (e.g. the post-tutorial Standard
-    /// bundle) rather than bought with coins.  Sell Back keeps these and never
-    /// refunds them — they're un-redeemable.  Persisted.
+    /// Cosmetics that were GIFTED (e.g. the post-tutorial Standard bundle, the
+    /// Starter Pack) rather than bought with coins.  Sell Back keeps these and
+    /// never refunds them — they're un-redeemable.  Keyed by each item's unique
+    /// id, `cosmeticKey` ("<Type>:<rawValue>"), so a gift can never be confused
+    /// with a same-named item in another slot (the Aurora ball, goal, trail,
+    /// floor, pit and boundary all share the name "aurora").  Saves from before
+    /// this change held bare rawValues; init qualifies them once
+    /// (`qualifyFreeGrants`).  Persisted.
     @Published var freeGrantedItems: Set<String> {
         didSet { saveStringSet(freeGrantedItems, forKey: "ra_freeGrantedItems") }
     }
@@ -973,6 +978,19 @@ final class GameState: ObservableObject {
             defaults.set(try? JSONEncoder().encode(minigameDifficultyBests), forKey: "ra_minigameDiffBests")
             defaults.set(true, forKey: "ra_snackyBestsReset_v1")
         }
+
+        // Free gifts used to be keyed by bare rawValue, which confused
+        // same-named items in different slots.  Qualify old entries once to
+        // unique ids (see `qualifyFreeGrants`).  Runs after every stored
+        // property is set; not through didSet (init), so save explicitly.
+        if freeGrantedItems.contains(where: { !$0.contains(":") }) {
+            freeGrantedItems = Self.qualifyFreeGrants(
+                freeGrantedItems,
+                balls: ownedBallSkins, goals: ownedGoals, trails: ownedTrails,
+                floors: ownedFloors, pits: ownedPits, boundaries: ownedBoundaries,
+                music: ownedMusic)
+            defaults.set(Array(freeGrantedItems), forKey: "ra_freeGrantedItems")
+        }
     }
 
     // MARK: - Trophy activation (first-launch backfill)
@@ -1196,6 +1214,49 @@ final class GameState: ObservableObject {
         "\(Item.self):\(item.rawValue)"
     }
 
+    /// A cosmetic's unique id across every slot ("<Type>:<rawValue>") — the
+    /// key for `freeGrantedItems` (and, as `paidPriceKey`, for `paidPrices`).
+    static func cosmeticKey<Item: CosmeticItem>(_ item: Item) -> String {
+        paidPriceKey(item)
+    }
+
+    /// True if `item` was a free gift (never refunded by Sell Back).
+    func isFreeGranted<Item: CosmeticItem>(_ item: Item) -> Bool {
+        freeGrantedItems.contains(Self.cosmeticKey(item))
+    }
+
+    /// Mark `items` as free gifts, each by its unique id.
+    func markFreeGranted<Item: CosmeticItem>(_ items: [Item]) {
+        freeGrantedItems.formUnion(items.map { Self.cosmeticKey($0) })
+    }
+
+    /// One-time upgrade of a save's free-gift set from bare rawValues (the old
+    /// format) to unique ids.  A bare name can't say which slot it meant, so it
+    /// is expanded CONSERVATIVELY to every slot whose item has that name AND is
+    /// owned: a same-named item the player had paid for may become unsellable,
+    /// but a gift can never become sellable (which would mint coins).  Bare
+    /// names that match nothing owned are dropped (nothing left to protect).
+    /// Entries already in the new format pass through unchanged.
+    static func qualifyFreeGrants(_ old: Set<String>,
+                                  balls: Set<String>, goals: Set<String>,
+                                  trails: Set<String>, floors: Set<String>,
+                                  pits: Set<String>, boundaries: Set<String>,
+                                  music: Set<String>) -> Set<String> {
+        var out = old.filter { $0.contains(":") }
+        let bare = old.filter { !$0.contains(":") }
+        guard !bare.isEmpty else { return out }
+        func expand<Item: CosmeticItem>(_ type: Item.Type, _ owned: Set<String>) {
+            for item in Item.allCases where bare.contains(item.rawValue) && owned.contains(item.rawValue) {
+                out.insert(cosmeticKey(item))
+            }
+        }
+        expand(BallSkin.self, balls);    expand(GoalSkin.self, goals)
+        expand(TrailColor.self, trails); expand(Floor.self, floors)
+        expand(Pit.self, pits);          expand(Boundary.self, boundaries)
+        expand(MusicTrack.self, music)
+        return out
+    }
+
     /// What Sell Back pays for `item`: HALF its CURRENT `coinCost` (all tier
     /// prices are even, so the halving is exact — and the refund deliberately
     /// reads the live price, per Mac's calibration ruling), capped at the
@@ -1213,7 +1274,7 @@ final class GameState: ObservableObject {
     func coinLiquidationPreview() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func tally<Item: CosmeticItem>(_ owned: Set<String>, _ type: Item.Type) {
-            for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
+            for item in Item.allCases where item.isSellable && !isFreeGranted(item) && owned.contains(item.rawValue) {
                 count += 1; coins += sellBackValue(item)
             }
         }
@@ -1235,7 +1296,7 @@ final class GameState: ObservableObject {
     func liquidateCoinCosmetics() -> (count: Int, coins: Int) {
         var count = 0, coins = 0
         func strip<Item: CosmeticItem>(_ owned: inout Set<String>, _ type: Item.Type) {
-            for item in Item.allCases where item.isSellable && !freeGrantedItems.contains(item.rawValue) && owned.contains(item.rawValue) {
+            for item in Item.allCases where item.isSellable && !isFreeGranted(item) && owned.contains(item.rawValue) {
                 count += 1; coins += sellBackValue(item)
                 owned.remove(item.rawValue)
                 // Relocked — a future re-purchase pays its own price fresh.
@@ -1667,7 +1728,7 @@ final class GameState: ObservableObject {
             + owned(ownedGoals, GoalSkin.self)
             + owned(ownedPits, Pit.self)
             + owned(ownedBoundaries, Boundary.self)
-            + owned(ownedMusic, MusicTrack.self)
+            + (CosmeticFeatures.musicEnabled ? owned(ownedMusic, MusicTrack.self) : 0)
     }
 
     /// Count of owned EVERGREEN cosmetics — the `collection_complete`
@@ -1676,7 +1737,8 @@ final class GameState: ObservableObject {
     /// evergreen ones (not an IAP secret, not a seasonal-exclusive ball —
     /// starters ARE evergreen and always owned), and counts those `isOwned`.
     /// Reaches exactly 242 iff every evergreen cosmetic is owned; owning a
-    /// seasonal or IAP-secret item can never push it past 242.
+    /// seasonal or IAP-secret item can never push it past 242.  While music
+    /// is off (1.0) the 19 music tracks don't count, so the set is 223.
     var trophyEvergreenCosmeticsOwnedCount: Int {
         var count = 0
         for b in BallSkin.allCases
@@ -1692,12 +1754,16 @@ final class GameState: ObservableObject {
             && isOwned(f) { count += 1 }
         for p in Pit.allCases where isOwned(p) { count += 1 }
         for bnd in Boundary.allCases where isOwned(bnd) { count += 1 }
-        for m in MusicTrack.allCases where isOwned(m) { count += 1 }
+        // Music is not offered in 1.0 and doesn't count toward the set then.
+        if CosmeticFeatures.musicEnabled {
+            for m in MusicTrack.allCases where isOwned(m) { count += 1 }
+        }
         return count
     }
 
-    /// True when a non-starter cosmetic is equipped in ALL 7 loadout slots
-    /// (Ball/Goal/Trail/Floor/Pit/Boundary/Music) at once — the
+    /// True when a non-starter cosmetic is equipped in EVERY offered loadout
+    /// slot (Ball/Goal/Trail/Floor/Pit/Boundary, plus Music only when
+    /// `CosmeticFeatures.musicEnabled` — six slots in 1.0) at once — the
     /// `cosmetic_full_kit` metric.  The Ball slot counts as non-starter when
     /// either a non-starter individual skin OR any equipped Pack is worn.
     /// Exact inverse of `isLoadoutDefault`, per slot.
@@ -1709,7 +1775,8 @@ final class GameState: ObservableObject {
             && equippedFloor   != Floor.starter
             && equippedPit     != Pit.starter
             && equippedBoundary != Boundary.starter
-            && equippedMusic   != MusicTrack.starter
+            // Music is not offered in 1.0, so the kit is six slots then.
+            && (!CosmeticFeatures.musicEnabled || equippedMusic != MusicTrack.starter)
     }
 
     /// Push the ownership-based cosmetic trophy metrics (S1-T5).  Called
@@ -2791,15 +2858,14 @@ final class GameState: ObservableObject {
     /// rest: the gift must never confiscate Sell Back value the player paid
     /// for, and must never pay MORE than Sell Back would (else gifting becomes
     /// its own mint).  Refunding (rather than leaving paid items unmarked) is
-    /// deliberate: `freeGrantedItems` is keyed by rawValue and a bundle's items
-    /// can share one rawValue across categories (the five lowercase "aurora"
-    /// items, say), so a per-item carve-out would also unmark the same-named
-    /// gifted items and let Sell Back mint coins from them.
+    /// deliberate: a gift must never leave a player poorer than Sell Back
+    /// would have.  (`freeGrantedItems` is keyed by each item's unique id, so
+    /// marking one item never touches a same-named item in another slot.)
     func grantBundleFree(_ bundle: CosmeticBundle) {
         var compensation = 0
         func compensate<Item: CosmeticItem>(_ items: [Item]) {
             for item in items
-            where isOwned(item) && item.isSellable && !freeGrantedItems.contains(item.rawValue) {
+            where isOwned(item) && item.isSellable && !isFreeGranted(item) {
                 compensation += sellBackValue(item)
                 // Compensated + about to be free-marked — the item can never
                 // be sold again, so its paid-price record is done.
@@ -2807,19 +2873,16 @@ final class GameState: ObservableObject {
             }
         }
         compensate(bundle.balls); compensate(bundle.goals); compensate(bundle.trails)
-        compensate(bundle.floors); compensate(bundle.pits); compensate(bundle.music)
+        compensate(bundle.floors); compensate(bundle.pits); compensate(bundle.offeredMusic)
         compensate(bundle.boundaries)
         // Refund-shaped credit (PR #114), not income — gift compensation
         // never counts toward the play-earned trophy counter (§6 item 4).
         if compensation > 0 { addCoins(compensation, source: .giftCompensation) }
         bundle.grantContents(to: self)
-        freeGrantedItems.formUnion(bundle.balls.map(\.rawValue))
-        freeGrantedItems.formUnion(bundle.goals.map(\.rawValue))
-        freeGrantedItems.formUnion(bundle.trails.map(\.rawValue))
-        freeGrantedItems.formUnion(bundle.floors.map(\.rawValue))
-        freeGrantedItems.formUnion(bundle.pits.map(\.rawValue))
-        freeGrantedItems.formUnion(bundle.music.map(\.rawValue))
-        freeGrantedItems.formUnion(bundle.boundaries.map(\.rawValue))
+        markFreeGranted(bundle.balls);  markFreeGranted(bundle.goals)
+        markFreeGranted(bundle.trails); markFreeGranted(bundle.floors)
+        markFreeGranted(bundle.pits);   markFreeGranted(bundle.offeredMusic)
+        markFreeGranted(bundle.boundaries)
         ownedBundles.insert(bundle.id)
     }
 
@@ -2843,7 +2906,7 @@ final class GameState: ObservableObject {
                 bundle.trails.allSatisfy { isOwned($0) } &&
                 bundle.floors.allSatisfy { isOwned($0) } &&
                 bundle.pits.allSatisfy   { isOwned($0) } &&
-                bundle.music.allSatisfy  { isOwned($0) } &&
+                bundle.offeredMusic.allSatisfy  { isOwned($0) } &&
                 bundle.boundaries.allSatisfy { isOwned($0) }
             if allOwned { completed.insert(bundle.id) }
         }
@@ -2934,7 +2997,7 @@ final class GameState: ObservableObject {
             recordPaidPrices(bundle.trails.filter { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.floors.filter { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.pits.filter   { !isOwned($0) }, ratio: ratio)
-            recordPaidPrices(bundle.music.filter  { !isOwned($0) }, ratio: ratio)
+            recordPaidPrices(bundle.offeredMusic.filter  { !isOwned($0) }, ratio: ratio)
             recordPaidPrices(bundle.boundaries.filter { !isOwned($0) }, ratio: ratio)
         }
         bundle.grantContents(to: self)   // each member's grant records ownership

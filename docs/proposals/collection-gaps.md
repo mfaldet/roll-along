@@ -118,7 +118,7 @@ that are already Legendary.
 
 **Collection prices** rise by the boundary's price. Planets also rises by its
 five new pieces, from 13,500 to 21,500 coins full price. Aurora's full value
-is now 9,750 coins.
+is 9,750 coins with music, 8,250 for 1.0 (music is off; see below).
 
 ## Release calendar
 
@@ -138,3 +138,86 @@ is now 9,750 coins.
   - **Circuit moves from launch to Nov 11, 2027 (Neon City).** This is the
     one existing boundary that becomes later.
   - Ember and Obsidian are in no collection and stay available at launch.
+
+## Music removed for 1.0
+
+No music track plays in the game, so music is switched off for 1.0
+(`CosmeticFeatures.musicEnabled = false` in `Cosmetics.swift`). The music
+data stays in every collection so it can return in an update; nothing
+player-facing offers it. A collection's price no longer includes its music
+track. Rarity still counts the track, so no collection changes band and the
+Standard gift pool is unchanged (without it, Ocean and Zen Garden would have
+dropped from Rare to Standard).
+
+Price drops: 33 collections by 750 (a Standard track), 24 by 1,250 (Epic),
+7 by 1,500 (Legendary), and 2 by nothing (Dune and Earth Day, whose Ambient
+track is a free default).
+
+| Collection | Full price with music | Full price for 1.0 | Change |
+|---|---:|---:|---:|
+| hellfire | 8,250 | 7,500 | -750 |
+| heavens | 8,250 | 6,750 | -1,500 |
+| nightclub | 9,000 | 7,750 | -1,250 |
+| paper-world | 6,500 | 5,250 | -1,250 |
+| golf | 8,750 | 8,000 | -750 |
+| planets | 21,500 | 20,000 | -1,500 |
+| space-travel | 9,750 | 8,500 | -1,250 |
+| winter | 7,500 | 6,750 | -750 |
+| cosmos | 8,750 | 7,250 | -1,500 |
+| nature | 5,750 | 5,000 | -750 |
+| ocean | 6,500 | 5,250 | -1,250 |
+| velvet-night | 7,250 | 6,000 | -1,250 |
+| golden-hour | 6,500 | 5,750 | -750 |
+| arcade | 7,000 | 6,250 | -750 |
+| bloom | 7,000 | 6,250 | -750 |
+| noir | 7,000 | 5,750 | -1,250 |
+| aurora | 9,750 | 8,250 | -1,500 |
+| citrus | 6,000 | 5,250 | -750 |
+| midas | 6,500 | 5,750 | -750 |
+| sketchbook | 6,250 | 5,500 | -750 |
+| zen-garden | 7,000 | 5,750 | -1,250 |
+| eclipse | 9,000 | 7,500 | -1,500 |
+| pastel | 7,000 | 6,250 | -750 |
+| neon | 7,500 | 6,750 | -750 |
+| soccer | 8,000 | 7,250 | -750 |
+| aquarium | 8,750 | 7,500 | -1,250 |
+| realistic-marble | 7,500 | 6,250 | -1,250 |
+| dune | 6,250 | 6,250 | 0 |
+| tempest | 8,500 | 7,250 | -1,250 |
+| candyland | 8,000 | 6,750 | -1,250 |
+| haunted | 8,000 | 6,750 | -1,250 |
+| summer-2026 | 7,250 | 6,500 | -750 |
+| halloween-2026 | 7,750 | 6,500 | -1,250 |
+| winter-2026 | 7,750 | 6,500 | -1,250 |
+| valentines-2027 | 7,250 | 6,500 | -750 |
+| stpatricks-2027 | 8,000 | 6,750 | -1,250 |
+| newyear-2027 | 8,500 | 7,750 | -750 |
+| spring-2027 | 7,500 | 6,750 | -750 |
+| july4-2026 | 8,250 | 7,500 | -750 |
+| muertos-2026 | 7,750 | 6,500 | -1,250 |
+| harvest-2026 | 7,250 | 6,000 | -1,250 |
+| lunar-2027 | 7,250 | 6,000 | -1,250 |
+| mardigras-2027 | 7,250 | 6,500 | -750 |
+| pride-2027 | 9,000 | 8,250 | -750 |
+| oktoberfest-2026 | 6,750 | 6,000 | -750 |
+| earthday-2027 | 5,750 | 5,750 | 0 |
+| backtoschool-2026 | 6,250 | 5,500 | -750 |
+| full-court | 7,000 | 6,250 | -750 |
+| billiards-hall | 7,250 | 6,500 | -750 |
+| diamond | 5,750 | 5,000 | -750 |
+| ancient-temple | 6,750 | 6,000 | -750 |
+| abyssal-depths | 8,750 | 7,500 | -1,250 |
+| champion | 7,250 | 6,500 | -750 |
+| crystal-cavern | 8,250 | 6,750 | -1,500 |
+| midnight-carnival | 8,000 | 6,750 | -1,250 |
+| lava-flow | 9,250 | 8,000 | -1,250 |
+| high-roller | 7,250 | 6,500 | -750 |
+| quicksilver | 8,250 | 7,000 | -1,250 |
+| oracle | 8,750 | 7,250 | -1,500 |
+| geode | 7,250 | 6,500 | -750 |
+| lava-lamp | 8,000 | 6,750 | -1,250 |
+| plasma-globe | 8,500 | 7,750 | -750 |
+| cathedral | 8,000 | 7,250 | -750 |
+| magma-core | 8,500 | 7,250 | -1,250 |
+| neon-city | 9,250 | 8,500 | -750 |
+| clockwork | 8,250 | 7,500 | -750 |

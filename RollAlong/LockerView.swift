@@ -71,12 +71,15 @@ struct LockerView: View {
                         isEquipped: { $0 == gameState.equippedBoundary },
                         onTap:      { gameState.equippedBoundary = $0 }
                     )
-                    cosmeticRow(
-                        label: "Music",
-                        items: MusicTrack.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.equippedMusic },
-                        onTap:      { gameState.equippedMusic = $0 }
-                    )
+                    // Music is not in 1.0 (no track plays): no Music row.
+                    if CosmeticFeatures.musicEnabled {
+                        cosmeticRow(
+                            label: "Music",
+                            items: MusicTrack.allCases.filter { gameState.isOwned($0) },
+                            isEquipped: { $0 == gameState.equippedMusic },
+                            onTap:      { gameState.equippedMusic = $0 }
+                        )
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)

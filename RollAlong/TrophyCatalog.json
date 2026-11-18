@@ -678,8 +678,8 @@
       "tier": "bronze",
       "category": "cosmetics_collection",
       "secret": false,
-      "lockedDescription": "Have a non-starter cosmetic equipped in all 7 slots at once.",
-      "unlockedDescription": "All seven slots, fully customized. That's the full fit.",
+      "lockedDescription": "Have a non-starter cosmetic equipped in every slot at once.",
+      "unlockedDescription": "Every slot, fully customized. That's the full fit.",
       "criteria": { "metric": "full_nonstarter_loadouts", "threshold": 1 },
       "addedInVersion": "1.0"
     },

@@ -2566,6 +2566,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
     /// helps nor is required, and the 7 seasonal balls are NOT required.
     func testCollectionCompleteUsesEvergreenDenominatorAndExcludesSecretsAndSeasonal() {
         let gs = makeGameState()
+        let evergreenTotal = Self.evergreenTotal
 
         // Own the 4 IAP secrets + all 7 seasonal balls — none should be
         // needed, and they must not push the count past 242 either.
@@ -2574,7 +2575,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         for b in TrophyCosmeticExclusions.seasonalExclusiveBalls { gs.grant(b) }
 
         // Not yet complete: evergreen items still missing.
-        XCTAssertLessThan(gs.trophyEvergreenCosmeticsOwnedCount, 242)
+        XCTAssertLessThan(gs.trophyEvergreenCosmeticsOwnedCount, evergreenTotal)
 
         // Grant every EVERGREEN item (skip IAP secrets + seasonal balls;
         // starters are already implicitly owned).
@@ -2592,8 +2593,14 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         for bnd in Boundary.allCases { gs.grant(bnd) }
         for m in MusicTrack.allCases { gs.grant(m) }
 
-        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 242,
-                       "the evergreen denominator must be exactly 242")
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, evergreenTotal,
+                       "the evergreen denominator must be exactly \(evergreenTotal)")
+    }
+
+    /// The evergreen set: 242 items with music, 223 while music is off
+    /// (1.0 — the 19 music tracks aren't offered, so they don't count).
+    static var evergreenTotal: Int {
+        242 - (CosmeticFeatures.musicEnabled ? 0 : MusicTrack.allCases.count)
     }
 
     /// The evergreen count NEVER exceeds 242 even when every IAP secret and
@@ -2608,8 +2615,8 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         for p in Pit.allCases       { gs.grant(p) }
         for bnd in Boundary.allCases { gs.grant(bnd) }
         for m in MusicTrack.allCases { gs.grant(m) }
-        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, 242,
-                       "owning secrets + seasonal must not push evergreen past 242")
+        XCTAssertEqual(gs.trophyEvergreenCosmeticsOwnedCount, Self.evergreenTotal,
+                       "owning secrets + seasonal must not push evergreen past the evergreen total")
     }
 
     /// Coin-buyable Aurora counts toward evergreen (it is NOT iconic-excluded).
@@ -2644,6 +2651,22 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         // Equip a non-starter ball → all 7 slots non-starter.
         gs.equipBall(BallSkin.blue)
         XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_full_kit"))
+    }
+
+    /// Music is not offered in 1.0, so The Full Fit needs only the six
+    /// offered slots — the music slot left on its default must not block it.
+    func testFullKitNeedsOnlySixSlotsWhileMusicIsOff() throws {
+        try XCTSkipIf(CosmeticFeatures.musicEnabled, "music is offered — seven slots apply")
+        let gs = makeGameState()
+        gs.equippedGoal = GoalSkin.allCases.first { $0 != .target }!
+        gs.equippedTrail = TrailColor.allCases.first { $0 != .graphite && $0 != .moneyRoll }!
+        gs.equippedFloor = Floor.allCases.first { $0 != .classic && $0 != .moneyFull }!
+        gs.equippedPit = Pit.allCases.first { $0 != .classic }!
+        gs.equippedBoundary = Boundary.allCases.first { $0 != .classic }!
+        XCTAssertEqual(gs.equippedMusic, MusicTrack.starter)
+        gs.equipBall(BallSkin.blue)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_full_kit"),
+                      "six offered slots customized → The Full Fit")
     }
 
     // MARK: - econ_working_capital / econ_nest_egg (source-tagged coins)

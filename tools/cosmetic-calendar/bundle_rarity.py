@@ -16,6 +16,11 @@ SRC = os.environ.get("SRC", "RollAlong/Cosmetics.swift")
 SLOTS = {"balls": "BallSkin", "goals": "GoalSkin", "trails": "TrailColor",
          "floors": "Floor", "pits": "Pit", "boundaries": "Boundary",
          "music": "MusicTrack"}
+# Music is not offered in 1.0 (CosmeticFeatures.musicEnabled = false), so it
+# adds nothing to a collection's price and is not a missing slot.  Rarity
+# still counts it, so no collection changes band (and the Standard gift pool
+# stays the same).  Set WITH_MUSIC=1 to price music in as before.
+MUSIC_OFFERED = bool(os.environ.get("WITH_MUSIC"))
 # Each slot's default item: owned by everyone, so it adds nothing to a
 # collection's price (CosmeticBundle.listPrice).
 STARTER = {"BallSkin": "red", "GoalSkin": "target", "TrailColor": "graphite",
@@ -64,7 +69,8 @@ def main():
         for slot, enum in SLOTS.items():
             m = re.search(r"\b" + slot + r":\s*\[([^\]]*)\]", b)
             items = re.findall(r"\.(\w+)", m.group(1)) if m else []
-            if not items:
+            offered = slot != "music" or MUSIC_OFFERED
+            if not items and offered:
                 missing.append(slot)
             for it in items:
                 t = tiers.get(enum, {}).get(it)
@@ -72,7 +78,8 @@ def main():
                     print(f"UNKNOWN {enum}.{it} in {bid}")
                     bad += 1
                     continue
-                full += 0 if it == STARTER[enum] else PRICE[t]
+                if offered:
+                    full += 0 if it == STARTER[enum] else PRICE[t]
                 leg += t == "exclusive"
                 hi += t in ("premium", "exclusive")
         rarity = "legendary" if leg >= 2 else "rare" if hi >= 2 else "standard"

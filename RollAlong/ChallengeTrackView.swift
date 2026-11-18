@@ -177,7 +177,7 @@ struct ChallengeTrackView: View {
                     .foregroundStyle(.white)
             }
 
-            Text(bundle.contentSummary)
+            Text(bundle.displaySummary)
                 .font(.system(size: 11, design: .rounded))
                 .foregroundStyle(Color(white: 0.38))
                 .lineLimit(2)

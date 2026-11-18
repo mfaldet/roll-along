@@ -2615,7 +2615,7 @@ struct BallGameView: View {
                     if let f = bundle.floors.first { bundleSlotTile(f) }
                     if let p = bundle.pits.first   { bundleSlotTile(p) }
                     if let w = bundle.boundaries.first { bundleSlotTile(w) }
-                    if let m = bundle.music.first  { bundleSlotTile(m) }
+                    if let m = bundle.offeredMusic.first  { bundleSlotTile(m) }
                     Spacer(minLength: 0)
                 }
                 Text(bundle.tagline)
@@ -2896,7 +2896,7 @@ struct BallGameView: View {
         if let f = bundle.floors.first { gameState.equippedFloor = f }
         if let p = bundle.pits.first   { gameState.equippedPit   = p }
         if let w = bundle.boundaries.first { gameState.equippedBoundary = w }
-        if let m = bundle.music.first  { gameState.equippedMusic = m }
+        if let m = bundle.offeredMusic.first  { gameState.equippedMusic = m }
 
         gameState.seenTutorialReward = true
         AnalyticsClient.shared.track(

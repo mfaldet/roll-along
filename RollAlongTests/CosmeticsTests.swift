@@ -251,7 +251,8 @@ final class CosmeticsTests: XCTestCase {
             let trailSum = bundle.trails.filter { $0 != TrailColor.starter }.reduce(0) { $0 + $1.coinCost }
             let floorSum = bundle.floors.filter { $0 != Floor.starter }.reduce(0)      { $0 + $1.coinCost }
             let pitSum   = bundle.pits.filter   { $0 != Pit.starter }.reduce(0)        { $0 + $1.coinCost }
-            let musicSum = bundle.music.filter  { $0 != MusicTrack.starter }.reduce(0) { $0 + $1.coinCost }
+            // Music is priced in only while it is offered (not in 1.0).
+            let musicSum = bundle.offeredMusic.filter  { $0 != MusicTrack.starter }.reduce(0) { $0 + $1.coinCost }
             let wallSum  = bundle.boundaries.filter { $0 != Boundary.starter }.reduce(0) { $0 + $1.coinCost }
             let manual = ballSum + goalSum + trailSum + floorSum + pitSum + musicSum + wallSum
             XCTAssertEqual(bundle.fullPrice(), manual, "fullPrice mismatch for '\(bundle.id)'")
@@ -432,7 +433,7 @@ final class CosmeticsTests: XCTestCase {
 
         gs.grantBundleFree(bundle)
         // Every member is now owned and recorded as free-granted.
-        for b in bundle.balls  { XCTAssertTrue(gs.isOwned(b)); XCTAssertTrue(gs.freeGrantedItems.contains(b.rawValue)) }
+        for b in bundle.balls  { XCTAssertTrue(gs.isOwned(b)); XCTAssertTrue(gs.isFreeGranted(b)) }
         for g in bundle.goals  { XCTAssertTrue(gs.isOwned(g)) }
         XCTAssertTrue(gs.ownedBundles.contains(bundle.id))
 
@@ -467,7 +468,8 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// Every collection is a complete set: at least one item in each of the
-    /// seven slots (ball, goal, trail, floor, pit, boundary, music).
+    /// seven slots (ball, goal, trail, floor, pit, boundary, music).  The
+    /// music data stays even while music is off, so it can return later.
     func testEveryCollection_isACompleteSevenSlotSet() {
         for b in CosmeticBundle.catalogue {
             XCTAssertFalse(b.balls.isEmpty,      "\(b.id) has no ball")
@@ -518,7 +520,8 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(gs.isOwned(TrailColor.aurora))
         XCTAssertTrue(gs.isOwned(Floor.aurora))
         XCTAssertTrue(gs.isOwned(Pit.aurora))
-        XCTAssertTrue(gs.isOwned(MusicTrack.aurora))
+        // Music isn't offered in 1.0, so the gift doesn't grant it.
+        XCTAssertEqual(gs.isOwned(MusicTrack.aurora), CosmeticFeatures.musicEnabled)
         XCTAssertTrue(gs.isOwned(Boundary.aurora))
         XCTAssertTrue(gs.completedBundleIDs.contains("aurora"))
 
@@ -877,6 +880,97 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(w?.from, eastern(2027, 2, 1))
         XCTAssertEqual(w?.until, eastern(2027, 2, 12))
     }
+
+    // MARK: - Music is not in 1.0
+
+    /// While music is off, no collection offers, prices, grants or requires a
+    /// music track, and no player-facing summary names one — but the music
+    /// data stays in place so it can return in an update.
+    func testMusicOff_collectionsNeitherOfferNorPriceMusic() throws {
+        try XCTSkipIf(CosmeticFeatures.musicEnabled, "music is offered")
+        let gs = makeCleanState()
+        for b in CosmeticBundle.catalogue {
+            XCTAssertTrue(b.offeredMusic.isEmpty, "\(b.id) offers music")
+            XCTAssertFalse(b.music.isEmpty, "\(b.id) lost its music data")
+            XCTAssertFalse(b.displaySummary.lowercased().contains(" music"),
+                           "\(b.id) summary still names music: \(b.displaySummary)")
+            XCTAssertEqual(b.itemCount, b.balls.count + b.goals.count + b.trails.count
+                           + b.floors.count + b.pits.count + b.boundaries.count)
+            XCTAssertEqual(b.proratedPrice(in: gs), b.fullPrice(),
+                           "\(b.id): a clean state pays the full (music-free) price")
+        }
+        // Aurora: 9,750 with its 1,500-coin music track, 8,250 without.
+        let aurora = CosmeticBundle.catalogue.first { $0.id == "aurora" }!
+        XCTAssertEqual(aurora.fullPrice(), 8_250)
+        // Owning every offered item completes a collection; music isn't needed.
+        aurora.balls.forEach { gs.grant($0) }; aurora.goals.forEach { gs.grant($0) }
+        aurora.trails.forEach { gs.grant($0) }; aurora.floors.forEach { gs.grant($0) }
+        aurora.pits.forEach { gs.grant($0) }; aurora.boundaries.forEach { gs.grant($0) }
+        XCTAssertFalse(gs.isOwned(MusicTrack.aurora))
+        XCTAssertTrue(gs.completedBundleIDs.contains("aurora"))
+    }
+
+    /// Buying a collection while music is off charges nothing for music and
+    /// grants no music track.
+    func testMusicOff_bundlePurchaseGrantsNoMusic() throws {
+        try XCTSkipIf(CosmeticFeatures.musicEnabled, "music is offered")
+        let gs = makeCleanState()
+        let aurora = CosmeticBundle.catalogue.first { $0.id == "aurora" }!
+        gs.coinBalance = aurora.fullPrice()
+        XCTAssertTrue(gs.purchaseBundle(aurora, price: aurora.fullPrice()))
+        XCTAssertEqual(gs.coinBalance, 0)
+        XCTAssertFalse(gs.isOwned(MusicTrack.aurora), "no music is granted while music is off")
+    }
+
+    // MARK: - Sell Back: free gifts keyed by unique id
+
+    /// Two items share the name "aurora" (the goal and the trail).  Gifting the
+    /// goal must leave the coin-bought trail sellable, and Sell Back must keep
+    /// the gifted goal.
+    func testFreeGift_doesNotMarkSameNamedItemInAnotherSlot() {
+        XCTAssertEqual(GoalSkin.aurora.rawValue, TrailColor.aurora.rawValue,
+                       "the test needs two same-named items in different slots")
+        let gs = makeCleanState()
+        gs.coinBalance = TrailColor.aurora.coinCost
+        XCTAssertTrue(gs.purchase(TrailColor.aurora))   // bought with coins
+        XCTAssertEqual(gs.coinBalance, 0)
+
+        let gift = CosmeticBundle(id: "test-gift", displayName: "Gift", tagline: "", contentSummary: "",
+                                  balls: [], goals: [.aurora], trails: [], floors: [], pits: [], music: [])
+        gs.grantBundleFree(gift)
+
+        XCTAssertTrue(gs.isFreeGranted(GoalSkin.aurora))
+        XCTAssertFalse(gs.isFreeGranted(TrailColor.aurora), "the same-named trail is not a gift")
+
+        let preview = gs.coinLiquidationPreview()
+        XCTAssertEqual(preview.count, 1, "only the coin-bought trail is sellable")
+        XCTAssertEqual(preview.coins, gs.sellBackValue(TrailColor.aurora))
+        gs.liquidateCoinCosmetics()
+        XCTAssertTrue(gs.isOwned(GoalSkin.aurora), "the gifted goal is kept")
+        XCTAssertFalse(gs.isOwned(TrailColor.aurora), "the bought trail was sold back")
+        XCTAssertEqual(gs.coinBalance, TrailColor.aurora.coinCost / 2)
+    }
+
+    /// Old saves held bare names.  Each is expanded once, conservatively, to
+    /// every owned item with that name (a gift can never become sellable);
+    /// names matching nothing owned are dropped; new-format ids pass through.
+    func testFreeGift_oldBareNamesAreQualifiedOnLoad() {
+        let qualified = GameState.qualifyFreeGrants(
+            ["aurora", "nothing-owned", "Floor:aurora"],
+            balls: [], goals: ["aurora"], trails: ["aurora"], floors: [],
+            pits: [], boundaries: [], music: [])
+        XCTAssertEqual(qualified, ["GoalSkin:aurora", "TrailColor:aurora", "Floor:aurora"])
+
+        let defaults = UserDefaults(suiteName: "test.\(UUID().uuidString)")!
+        defaults.set(["aurora"], forKey: "ra_freeGrantedItems")
+        defaults.set(["aurora"], forKey: "ra_ownedGoals")
+        let gs = GameState(defaults: defaults)
+        XCTAssertTrue(gs.isFreeGranted(GoalSkin.aurora))
+        XCTAssertFalse(gs.isFreeGranted(TrailColor.aurora), "not owned → not marked")
+        XCTAssertEqual(defaults.stringArray(forKey: "ra_freeGrantedItems"), ["GoalSkin:aurora"],
+                       "the upgraded set is saved")
+    }
+
 }
 
 // MARK: - Loadout preview recording

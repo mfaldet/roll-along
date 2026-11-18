@@ -225,7 +225,7 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|
 | Retail Therapy | Bronze | Buy any cosmetic, bundle, or ball pack with coins. | `cart.fill` | `cart` |
-| The Full Fit | Bronze | Have a non-starter cosmetic equipped in all 7 slots at once. | `tshirt.fill` | `tshirt` |
+| The Full Fit | Bronze | Have a non-starter cosmetic equipped in every slot at once (six slots in 1.0: music is not offered). | `tshirt.fill` | `tshirt` |
 
 ### Coins and rewards
 
