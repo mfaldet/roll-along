@@ -2167,10 +2167,11 @@ final class GameState: ObservableObject {
     }
 
     /// Maximum coins grantable in a single `addCoins` call.
-    /// Highest legitimate single award is 60 000 — the top coin pack
-    /// (the historical coins.10000 product ID) after the 2026-07 IAP
-    /// re-anchor.  This MUST track the biggest `rewardCoins` grant or the
-    /// $49.99 purchase would be silently clamped and short-deliver.
+    /// The biggest coin-pack grant is 10,000 (the $49.99 top pack, since the
+    /// 2026-11 return to App Store Connect amounts).  The cap stays at 60,000
+    /// as headroom for large refunds (Sell Back, collection gift
+    /// compensation).  It MUST stay at or above the biggest `rewardCoins`
+    /// grant or a purchase would be silently clamped and short-deliver.
     /// Values exceeding this are clamped and printed in DEBUG so any
     /// runaway-reward bug surfaces during development.
     private static let maxSingleAward: Int = 60_000

@@ -7,25 +7,36 @@ find them.
 
 | # | Product ID | Type | Name | Price (USD) | What it gives | Screen to screenshot |
 |---|---|---|---|---|---|---|
-| 1 | `com.macfaldet.RollAlong.lives.20` | Consumable | 20 Lives | $1.99 | 20 lives | Get Lives sheet |
-| 2 | `com.macfaldet.RollAlong.lives.120` | Consumable | 120 Lives | $9.99 | 120 lives | Get Lives sheet |
-| 3 | `com.macfaldet.RollAlong.lives.300` | Consumable | 300 Lives | $19.99 | 300 lives | Get Lives sheet |
+| 1 | `com.macfaldet.RollAlong.lives.pack20` | Consumable | 20 Lives | $1.99 | 20 lives | Get Lives sheet |
+| 2 | `com.macfaldet.RollAlong.lives.pack120` | Consumable | 120 Lives | $9.99 | 120 lives | Get Lives sheet |
+| 3 | `com.macfaldet.RollAlong.lives.pack300` | Consumable | 300 Lives | $19.99 | 300 lives | Get Lives sheet |
 | 4 | `com.macfaldet.RollAlong.unlimited` | Non-consumable | Diamond Balls | $49.99 | Unlimited lives forever, plus the Diamond ball skin | Get Lives sheet, scrolled so Diamond Balls is visible |
-| 5 | `com.macfaldet.RollAlong.coins.100` | Consumable | 750 coins | $0.99 | 750 coins | Get Coins sheet |
-| 6 | `com.macfaldet.RollAlong.coins.600` | Consumable | 4,500 coins | $4.99 | 4,500 coins | Get Coins sheet |
-| 7 | `com.macfaldet.RollAlong.coins.1300` | Consumable | 10,000 coins | $9.99 | 10,000 coins | Get Coins sheet |
-| 8 | `com.macfaldet.RollAlong.coins.3000` | Consumable | 22,500 coins | $19.99 | 22,500 coins | Get Coins sheet |
-| 9 | `com.macfaldet.RollAlong.coins.10000` | Consumable | 60,000 coins | $49.99 | 60,000 coins, plus the Money Ball skin the first time | Get Coins sheet, with the line "Includes the Money Ball skin" visible |
-| 10 | `com.macfaldet.RollAlong.starterpack` | Non-consumable | Starter Pack | $1.99 | 3,750 coins and the Aurora collection (ball, goal, trail, floor, pit, music) | Starter Pack offer sheet |
+| 5 | `com.macfaldet.RollAlong.coins.100` | Consumable | 100 coins | $0.99 | 100 coins | Get Coins sheet |
+| 6 | `com.macfaldet.RollAlong.coins.600` | Consumable | 600 coins | $4.99 | 600 coins | Get Coins sheet |
+| 7 | `com.macfaldet.RollAlong.coins.1300` | Consumable | 1,300 coins | $9.99 | 1,300 coins | Get Coins sheet |
+| 8 | `com.macfaldet.RollAlong.coins.3000` | Consumable | 3,000 coins | $19.99 | 3,000 coins | Get Coins sheet |
+| 9 | `com.macfaldet.RollAlong.coins.10000` | Consumable | 10,000 coins | $49.99 | 10,000 coins, plus the Money Ball skin the first time | Get Coins sheet, with the line "Includes the Money Ball skin" visible |
+| 10 | `com.macfaldet.RollAlong.starterpack` | Non-consumable | Starter Pack | $1.99 | 3,750 coins and the Aurora collection (ball, goal, trail, floor, pit, boundary, music) | Starter Pack offer sheet |
 
 The number in each lives product ID is the number of lives it grants
-(`lives.20`, `lives.120`, `lives.300`). These IDs were renamed on 2026-11-18,
-before any lives product was created in App Store Connect; create them with
-these exact IDs. Once created, a product ID can never change.
+(`lives.pack20`, `lives.pack120`, `lives.pack300`). They replace the earlier
+draft lives products, which are to be deleted in App Store Connect. Once created, a product ID can never change.
 
-The numbers in the coin product IDs (`coins.100`, `coins.600` and so on) are
-historical and do not match the coin amounts. That is fine: players never see
-the ID.
+The number in each coin product ID is the number of coins it grants
+(`coins.100` gives 100 coins, and so on), matching App Store Connect.
+
+**Get Coins sheet bonus labels.** Each pack after the first shows how many
+more coins per dollar it gives than the 100-coin pack, rounded down to a
+whole percent. Base rate: 100 ÷ $0.99 = 101.01 coins per dollar.
+
+| Pack | Same money in 100-coin packs | Bonus | Label |
+|---|---|---|---|
+| 600 for $4.99 | 101.01 × 4.99 = 504.0 | 600 ÷ 504.0 = 1.190 | +19% coins |
+| 1,300 for $9.99 | 101.01 × 9.99 = 1,009.1 | 1,300 ÷ 1,009.1 = 1.288 | +28% coins |
+| 3,000 for $19.99 | 101.01 × 19.99 = 2,019.2 | 3,000 ÷ 2,019.2 = 1.486 | +48% coins |
+| 10,000 for $49.99 | 101.01 × 49.99 = 5,049.5 | 10,000 ÷ 5,049.5 = 1.980 | +98% coins |
+
+The 100-coin pack shows no bonus label.
 
 ## How to reach each screen
 
@@ -33,7 +44,7 @@ the ID.
 - **Get Coins sheet:** Home → Shop → tap the coin balance at the top-right.
 - **Starter Pack offer sheet:** appears by itself on the Home screen the first
   time the coin balance reaches 250, and can be reopened for 48 hours. On a
-  fresh install, the quickest route is to buy the 750-coin pack with the local
+  fresh install, the quickest route is to buy the 600-coin pack with the local
   StoreKit test configuration and go back to Home.
 
 ## What the Get Lives sheet shows

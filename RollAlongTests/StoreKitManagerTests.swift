@@ -20,9 +20,9 @@ final class StoreKitManagerTests: XCTestCase {
     /// number of lives it grants.  Diamond Balls is the unlimited unlock.
     func testLivesProductsMatchTheirIDs() {
         let packs: [(StoreKitManager.ProductID, Int, String)] = [
-            (.lives20,  20,  "com.macfaldet.RollAlong.lives.20"),
-            (.lives120, 120, "com.macfaldet.RollAlong.lives.120"),
-            (.lives300, 300, "com.macfaldet.RollAlong.lives.300"),
+            (.lives20,  20,  "com.macfaldet.RollAlong.lives.pack20"),
+            (.lives120, 120, "com.macfaldet.RollAlong.lives.pack120"),
+            (.lives300, 300, "com.macfaldet.RollAlong.lives.pack300"),
         ]
         for (pid, lives, id) in packs {
             XCTAssertEqual(pid.rawValue, id)
@@ -48,20 +48,27 @@ final class StoreKitManagerTests: XCTestCase {
         }
     }
 
-    // MARK: - Coin pack rewards (2026-07 reprice)
+    // MARK: - Coin pack rewards (2026-11: App Store Connect amounts)
 
-    /// Pins the re-anchored coin amounts (product IDs are immutable in App
-    /// Store Connect, so the case names keep their historical numbers).
-    func testCoinPackRewardCoins_matchRepricedAmounts() {
-        XCTAssertEqual(StoreKitManager.ProductID.coins100.rewardCoins,      750)
-        XCTAssertEqual(StoreKitManager.ProductID.coins600.rewardCoins,    4_500)
-        XCTAssertEqual(StoreKitManager.ProductID.coins1300.rewardCoins,  10_000)
-        XCTAssertEqual(StoreKitManager.ProductID.coins3000.rewardCoins,  22_500)
-        XCTAssertEqual(StoreKitManager.ProductID.coins10000.rewardCoins, 60_000)
+    /// Each coin pack grants exactly the number in its product ID, which is
+    /// what App Store Connect sells.
+    func testCoinPackRewardCoins_matchProductIDs() {
+        let packs: [(StoreKitManager.ProductID, Int, String)] = [
+            (.coins100,      100, "com.macfaldet.RollAlong.coins.100"),
+            (.coins600,      600, "com.macfaldet.RollAlong.coins.600"),
+            (.coins1300,   1_300, "com.macfaldet.RollAlong.coins.1300"),
+            (.coins3000,   3_000, "com.macfaldet.RollAlong.coins.3000"),
+            (.coins10000, 10_000, "com.macfaldet.RollAlong.coins.10000"),
+        ]
+        for (pid, coins, id) in packs {
+            XCTAssertEqual(pid.rawValue, id)
+            XCTAssertEqual(pid.rewardCoins, coins)
+            XCTAssertEqual(pid.category, .coinPack)
+        }
     }
 
     /// Coins-per-dollar must rise strictly with pack size — a bigger pack is
-    /// never a worse deal (758 / 902 / 1,001 / 1,126 / 1,200 per $ at the
+    /// never a worse deal (101 / 120 / 130 / 150 / 200 per $ at the
     /// intended $0.99/$4.99/$9.99/$19.99/$49.99 price points).
     func testCoinPacks_coinsPerDollarRiseMonotonically() {
         let ladder: [(StoreKitManager.ProductID, Double)] = [
@@ -83,7 +90,7 @@ final class StoreKitManagerTests: XCTestCase {
     // MARK: - Refund / revocation
 
     /// The refund exploit: buy the top ($49.99) coin pack, request an Apple refund,
-    /// and the revocation update must NOT mint another 60,000 coins (plus a
+    /// and the revocation update must NOT mint another 10,000 coins (plus a
     /// Money cosmetic) on top of the money back.
     func testRevokedCoinPackDoesNotDeliver() {
         XCTAssertEqual(

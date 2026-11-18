@@ -407,13 +407,13 @@ final class GameStateTests: XCTestCase {
     }
 
     /// The single-award clamp must clear the biggest legitimate grant — the
-    /// top coin pack's 60,000 (2026-07 IAP re-anchor).  If maxSingleAward
+    /// top coin pack's 10,000 (App Store Connect amount).  If maxSingleAward
     /// falls behind rewardCoins, a $49.99 purchase silently short-delivers.
     func testAddCoins_topCoinPackGrant_isNotClamped() {
         let gs = makeGameState()
         gs.coinBalance = 0
         let topGrant = StoreKitManager.ProductID.coins10000.rewardCoins
-        XCTAssertEqual(topGrant, 60_000, "top pack grants 60,000 coins post-reprice")
+        XCTAssertEqual(topGrant, 10_000, "top pack grants 10,000 coins")
         gs.addCoins(topGrant)
         XCTAssertEqual(gs.coinBalance, topGrant,
                        "the top coin pack grant must never be clamped by maxSingleAward")

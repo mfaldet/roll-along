@@ -3,6 +3,11 @@
 **Status:** Part A is built (minigame payouts). Everything under "Proposals"
 is a proposal only; nothing there is changed yet.
 
+**Update 2026-11-18:** the coin packs now grant what App Store Connect sells
+(100 / 600 / 1,300 / 3,000 / 10,000 coins), not the 750 to 60,000 below.
+See `2026-11-iap-coin-rates.md` for dollar values and the Starter Pack
+proposal. Pack figures further down this page are the old amounts.
+
 ## The rule
 
 - Every minigame pays **1 to 5 coins a game**, about what one Adventure level
@@ -88,7 +93,7 @@ can no longer pay about 200.
 | Collection gift compensation | Coins back for pieces already bought when a collection is given free (a refund) | Same |
 | Challenge of the Day (held back) | 30 per clear | Not in 1.0 |
 | Starter Pack ($1.99) | 3,750 coins + the Aurora collection | Same |
-| Coin packs | 750 ($0.99), 4,500 ($4.99), 10,000 ($9.99), 22,500 ($19.99), 60,000 ($49.99, plus the Money Ball skin the first time) | Same |
+| Coin packs | 750 ($0.99), 4,500 ($4.99), 10,000 ($9.99), 22,500 ($19.99), 60,000 ($49.99, plus the Money Ball skin the first time) | **Changed 2026-11-18:** 100, 600, 1,300, 3,000, 10,000 (App Store Connect amounts) |
 
 ### 2. Days to one 1,000-coin cosmetic for a free player at about 20 minutes a day
 

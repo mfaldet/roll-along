@@ -683,8 +683,8 @@ struct BuyCoinsSheet: View {
     private var coinPackCards: some View {
         VStack(spacing: 10) {
             // Amounts read from ProductID.rewardCoins — the single source of
-            // truth for what each pack actually grants (2026-07 reprice:
-            // 750 / 4,500 / 10,000 / 22,500 / 60,000).
+            // truth for what each pack actually grants (100 / 600 / 1,300 /
+            // 3,000 / 10,000, matching App Store Connect).
             coinCard(pid: .coins100,   amount: StoreKitManager.ProductID.coins100.rewardCoins)
             coinCard(pid: .coins600,   amount: StoreKitManager.ProductID.coins600.rewardCoins)
             coinCard(pid: .coins1300,  amount: StoreKitManager.ProductID.coins1300.rewardCoins)
@@ -693,10 +693,14 @@ struct BuyCoinsSheet: View {
         }
     }
 
-    /// % more coins than buying the same spend as base 750-coin ($0.99) packs,
-    /// rounded to the nearest 10%.  Nil for the base pack (it IS the base rate).
-    /// Post-reprice rates (758/902/1,001/1,126/1,200 coins per $) round to
-    /// +20% / +30% / +50% / +60%.
+    /// % more coins than buying the same spend as base 100-coin ($0.99) packs,
+    /// rounded DOWN to a whole percent so the label never overstates the deal.
+    /// Nil for the base pack (it IS the base rate).  Base rate 100 / 0.99 =
+    /// 101.01 coins per $:
+    ///   600 / (101.01 × 4.99)    = 600 / 504.0     = 1.190 → +19%
+    ///   1,300 / (101.01 × 9.99)  = 1,300 / 1,009.1 = 1.288 → +28%
+    ///   3,000 / (101.01 × 19.99) = 3,000 / 2,019.2 = 1.486 → +48%
+    ///   10,000 / (101.01 × 49.99) = 10,000 / 5,049.5 = 1.980 → +98%
     private func coinBonus(_ pid: StoreKitManager.ProductID, amount: Int) -> String? {
         let baseRate = Double(StoreKitManager.ProductID.coins100.rewardCoins) / 0.99   // coins per dollar at the base pack
         let price: Double
@@ -709,8 +713,8 @@ struct BuyCoinsSheet: View {
         }
         let coinsIfBoughtAsBase = baseRate * price
         let pct = (Double(amount) / coinsIfBoughtAsBase - 1.0) * 100.0
-        let rounded = Int((pct / 10.0).rounded()) * 10
-        return rounded > 0 ? "+\(rounded)% coins" : nil
+        let whole = Int((pct + 1e-9).rounded(.down))
+        return whole > 0 ? "+\(whole)% coins" : nil
     }
 
     private func coinCard(
@@ -733,8 +737,7 @@ struct BuyCoinsSheet: View {
                 if isTopTier {
                     // Top pack: shimmery-diamond bonus label instead of the
                     // plain green one.  Same honest math as the other packs
-                    // (+60% under the 2026-07 reprice — the old "×2 coins"
-                    // claim no longer holds).
+                    // (+98% at 10,000 coins for $49.99).
                     DiamondBonusLabel(text: bonus ?? "Best value")
                     // The pack's fixed bonus item, stated before purchase.
                     if !gameState.isOwned(BallSkin.moneyBall) {
@@ -1222,7 +1225,7 @@ private enum CoinPackArt {
 
 // MARK: - Shimmery-diamond bonus label
 
-/// The bonus subtitle on the top coin pack (+60% under the 2026-07 reprice):
+/// The bonus subtitle on the top coin pack (+98% at 10,000 coins for $49.99):
 /// a cool diamond gradient with a highlight that sweeps across the glyphs.
 /// Shown instead of the plain green bonus text so the best-value pack reads
 /// as premium.
@@ -1278,7 +1281,7 @@ private struct DiamondBonusLabel: View {
 // MARK: - Starter Pack Sheet
 
 /// One-time welcome offer: $1.99 → 3,750 coins + the complete Aurora collection
-/// (ball · goal · trail · floor · pit · music, free-granted so Sell Back keeps
+/// (ball · goal · trail · floor · pit · boundary · music, free-granted so Sell Back keeps
 /// but never refunds it).  Presented automatically the first time the player's
 /// coin balance reaches `GameState.starterPackTriggerCoins`, and again on
 /// re-launch while the 48-hour window is open.  Purchase sets
@@ -1334,7 +1337,7 @@ struct StarterPackSheet: View {
                         Text("Aurora")
                             .font(.system(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("The complete collection — all six cosmetics")
+                        Text("The complete collection — all seven cosmetics")
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(Color(red: 0.62, green: 0.45, blue: 0.98))
                             .padding(.bottom, 28)
@@ -1342,7 +1345,7 @@ struct StarterPackSheet: View {
                         // ── What you get ────────────────────────────────────
                         VStack(spacing: 10) {
                             rewardRow(icon: "sparkles", label: "The Aurora collection",
-                                      detail: "Ball · Goal · Trail · Floor · Pit · Music")
+                                      detail: "Ball · Goal · Trail · Floor · Pit · Boundary · Music")
                             rewardRow(icon: "circle.grid.cross.fill", label: "3,750 coins",
                                       detail: "Spend in the cosmetics shop")
                         }

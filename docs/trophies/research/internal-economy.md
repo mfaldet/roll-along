@@ -114,9 +114,9 @@ gate cosmetic rewards and UI flourishes (home aura ring, collection toast).
 
 | Product | Price | Grants | Notes |
 |---|---|---|---|
-| lives.pack1 | $0.99 | 10 lives | copy fixed to match grant (PR #111) |
-| lives.pack5 | $4.99 | 60 lives | |
-| lives.pack10 | $9.99 | 130 lives | stockpiles unbounded; clears regen timer |
+| lives.pack20 | $1.99 | 20 lives | (2026-11 lives packs) |
+| lives.pack120 | $9.99 | 120 lives | |
+| lives.pack300 | $19.99 | 300 lives | stockpiles unbounded |
 | unlimited ("Diamond Balls") | $19.99 | unlimited lives forever + exclusive **Diamond** ball (only source) | entitlement mirrored on every launch; refund revokes lives but never the skin (StoreKitManager.swift:241-246, 541-549) |
 | coins.100 | $0.99 | 750 coins (was 100 — re-anchored, MERGED #124; ids keep historical names) | exactly one Standard item; ~30 min of play at ~25/min |
 | coins.600 | $4.99 | 4,500 coins (was 600) | |

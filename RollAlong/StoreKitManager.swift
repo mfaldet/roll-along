@@ -35,22 +35,20 @@ final class StoreKitManager: ObservableObject {
     enum ProductID: String, CaseIterable, Identifiable {
         // Lives packs.  The number in each ID is the lives it grants (20 /
         // 120 / 300).  "unlimited" is Diamond Balls (unlimited lives).
-        case lives20      = "com.macfaldet.RollAlong.lives.20"
-        case lives120     = "com.macfaldet.RollAlong.lives.120"
-        case lives300     = "com.macfaldet.RollAlong.lives.300"
+        case lives20      = "com.macfaldet.RollAlong.lives.pack20"
+        case lives120     = "com.macfaldet.RollAlong.lives.pack120"
+        case lives300     = "com.macfaldet.RollAlong.lives.pack300"
         case unlimited    = "com.macfaldet.RollAlong.unlimited"
-        // Coin packs.  The numeric suffixes in the case names / product IDs
-        // are HISTORICAL — App Store Connect product IDs are immutable, so
-        // they still carry the pre-2026-07-reprice amounts.  The actual
-        // grant is `rewardCoins` below (750 / 4,500 / 10,000 / 22,500 /
-        // 60,000); display names come from ASC / Products.storekit.
+        // Coin packs.  The number in each ID is the coins it grants, matching
+        // App Store Connect (100 / 600 / 1,300 / 3,000 / 10,000 — see
+        // `rewardCoins`).  Display names come from ASC / Products.storekit.
         case coins100     = "com.macfaldet.RollAlong.coins.100"
         case coins600     = "com.macfaldet.RollAlong.coins.600"
         case coins1300    = "com.macfaldet.RollAlong.coins.1300"
         case coins3000    = "com.macfaldet.RollAlong.coins.3000"
         case coins10000   = "com.macfaldet.RollAlong.coins.10000"
         /// One-time welcome offer: 3,750 coins + the complete Aurora collection
-        /// (the "aurora" bundle — ball, goal, trail, floor, pit, and music).
+        /// (the "aurora" bundle — ball, goal, trail, floor, pit, boundary and music).
         /// Non-consumable so it can be restored on a new device; delivery
         /// is idempotent (the collection grant is set-insertion and addCoins
         /// only runs when `starterPackClaimed` is still false).
@@ -87,27 +85,25 @@ final class StoreKitManager: ObservableObject {
 
         /// Coins granted by this purchase.  Zero for non-coin products.
         ///
-        /// 2026-07 reprice (docs/economy/08-reprice.md): amounts re-anchored
-        /// to the 750/1,000/1,250/1,500 tier ladder so the smallest pack buys
-        /// one Standard item.  Coins-per-dollar must rise MONOTONICALLY up
-        /// the ladder (bigger pack = strictly better rate):
+        /// 2026-11: exactly what App Store Connect sells (the 2026-07 7.5×
+        /// re-anchor is reverted; docs/economy/2026-11-iap-coin-rates.md).
+        /// Coins-per-dollar must rise MONOTONICALLY up the ladder (bigger
+        /// pack = strictly better rate):
         ///
         ///   product     $ price   coins    coins/$
-        ///   coins100      0.99       750     758
-        ///   coins600      4.99     4,500     902
-        ///   coins1300     9.99    10,000   1,001
-        ///   coins3000    19.99    22,500   1,126
-        ///   coins10000   49.99    60,000   1,200
-        ///
-        /// (Case names keep their historical amounts — see ProductID note.)
+        ///   coins100      0.99       100     101
+        ///   coins600      4.99       600     120
+        ///   coins1300     9.99     1,300     130
+        ///   coins3000    19.99     3,000     150
+        ///   coins10000   49.99    10,000     200
         var rewardCoins: Int {
             switch self {
-            case .coins100:    return 750
-            case .coins600:    return 4500
-            case .coins1300:   return 10000
-            case .coins3000:   return 22500
-            case .coins10000:  return 60000
-            case .starterPack: return 3_750  // welcome-offer coins (7.5× the pre-reprice 500)
+            case .coins100:    return 100
+            case .coins600:    return 600
+            case .coins1300:   return 1_300
+            case .coins3000:   return 3_000
+            case .coins10000:  return 10_000
+            case .starterPack: return 3_750  // welcome-offer coins — unchanged; see docs/economy/2026-11-iap-coin-rates.md for the proposal
             default:           return 0
             }
         }
@@ -398,8 +394,7 @@ final class StoreKitManager: ObservableObject {
             // IAP grant — purchased, not earned: never counts toward the
             // play-earned trophy counter (trophy-catalog.md §6 item 4).
             gameState.addCoins(productID.rewardCoins, source: .iap)
-            // The top coin pack (the historical coins.10000 product, now a
-            // 60,000-coin grant) also drops ONE random not-yet-owned "Money"
+            // The top coin pack (coins.10000, 10,000 coins) also drops ONE random not-yet-owned "Money"
             // cosmetic — up to three unlock across repeat purchases.
             if productID == .coins10000 {
                 grantedCosmetic = grantMoneyBall(gameState)
@@ -433,7 +428,7 @@ final class StoreKitManager: ObservableObject {
     }
 
     /// Grant the complete Aurora collection — every item in the "aurora"
-    /// cosmetic bundle (ball, goal, trail, floor, pit, music) — via
+    /// cosmetic bundle (ball, goal, trail, floor, pit, boundary, music) — via
     /// `grantBundleFree`, which marks the items free-granted so Sell Back keeps
     /// them but never refunds them.  That marking is load-bearing: the bundle's
     /// items would sell back for 4,875 coins (half their 9,750 catalogue value
@@ -500,7 +495,7 @@ final class StoreKitManager: ObservableObject {
         // Family Sharing revocations through Transaction.updates as *verified*
         // transactions with revocationDate set.  Delivering here would mint
         // the reward a second time on top of the money back (e.g., refund the
-        // top coin pack → another 60,000 coins + a Money cosmetic, forever
+        // top coin pack → another 10,000 coins + a Money cosmetic, forever
         // repeatable).  Revoked and unknown-product updates finish even
         // pre-bootstrap: there is nothing to deliver, so deferring would
         // just leave them unfinished forever (a revoked unlimited unlock is

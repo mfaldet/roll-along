@@ -20,8 +20,8 @@ Solo minigames pay no coins. Competitive minigames pay 1, 2 or 3 coins on Easy, 
 
 IN-APP PURCHASES (10)
 Lives (tap the lives counter, top-left of Home): 20, 120, 300 Lives (consumable); Diamond Balls, unlimited lives (non-consumable).
-Coins (Shop, tap the coin balance): 750, 4,500, 10,000, 22,500, 60,000 (consumable); the 60,000 pack includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
-Starter Pack (non-consumable): offered on Home once the coin balance first reaches 250, for 48 hours. Quickest way: buy 750 coins, return to Home.
+Coins (Shop, tap the coin balance): 100, 600, 1,300, 3,000, 10,000 (consumable); the 10,000 pack includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
+Starter Pack (non-consumable): offered on Home once the coin balance first reaches 250, for 48 hours. Quickest way: buy 600 coins, return to Home.
 Restore: Settings > Purchases > Restore Purchases.
 
 ADS
