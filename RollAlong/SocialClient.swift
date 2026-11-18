@@ -2216,8 +2216,11 @@ final class FeedbackOutbox: @unchecked Sendable {
     /// Validates, counts against the daily limit, queues, then tries to send.
     @discardableResult
     func submit(kind: FeedbackKind, message: String, source: String) -> SubmitResult {
-        let text = String(message.trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = String(message.trimmingCharacters(in: .whitespacesAndNewlines)
             .prefix(Self.maxLength))
+        // The server counts code points (char_length), not Characters: one
+        // emoji (flag, family) is several. Trim so it is never refused.
+        while text.unicodeScalars.count > Self.maxLength { text.removeLast() }
         guard !text.isEmpty else { return .empty }
 
         let info = Bundle.main.infoDictionary
