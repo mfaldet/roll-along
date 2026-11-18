@@ -385,7 +385,9 @@ struct FriendsView: View {
                 actionButton("Accept", filled: true, busy: busyIds.contains(edge.id)) {
                     await accept(edge)
                 }
-                actionButton("Decline", filled: false, busy: busyIds.contains(edge.id)) {
+                // Decline is a compact round "×" so the row keeps room for
+                // the name on the smallest iPhones.
+                declineButton(busy: busyIds.contains(edge.id)) {
                     await remove(edge)
                 }
             }
@@ -421,30 +423,23 @@ struct FriendsView: View {
 
     // MARK: - Reusable person card
 
-    /// Card with avatar + name + world, and a caller-supplied trailing control.
+    /// Card with avatar, name and level badge, and a caller-supplied trailing
+    /// control — the shared `SocialPersonRow` layout.
     private func personCard<Trailing: View>(
         _ profile: PlayerProfile?,
-        @ViewBuilder trailing: () -> Trailing
+        @ViewBuilder trailing: @escaping () -> Trailing
     ) -> some View {
         let name  = profile?.displayName.nonEmpty ?? "Roller"
         let level = profile?.climbLevel ?? 1
         let world = World.world(for: max(1, level))
-        return HStack(spacing: 14) {
-            Button {
-                if let profile { nav.goToPlayer(profile) }
-            } label: {
-                HStack(spacing: 14) {
-                    avatar(name, tint: world.accent)
-                    HStack(spacing: 8) {
-                        PlayerNameLabel(name: name, level: level,
-                                        tint: profile?.id == myId ? gameState.primaryColor : profile?.accentColor)
-                        WeekPaceLabel(levels: profile?.levelsThisWeek ?? 0)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(profile == nil)
-            Spacer(minLength: 8)
+        let open: (() -> Void)? = profile.map { p -> () -> Void in { nav.goToPlayer(p) } }
+        return SocialPersonRow(
+            name: name, level: level,
+            tint: profile?.id == myId ? gameState.primaryColor : profile?.accentColor,
+            onTap: open
+        ) {
+            avatar(name, tint: world.accent)
+        } trailing: {
             trailing()
         }
         .cardBackground()
@@ -501,6 +496,30 @@ struct FriendsView: View {
         }
         .disabled(busy)
         .buttonStyle(.plain)
+    }
+
+    /// A round "×" button for declining a request (VoiceOver: "Decline").
+    private func declineButton(busy: Bool,
+                               action: @escaping () async -> Void) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            ZStack {
+                Circle().fill(Color(white: 0.20))
+                if busy {
+                    ProgressView().tint(Color(white: 0.7)).scaleEffect(0.7)
+                } else {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color(white: 0.75))
+                }
+            }
+            .frame(width: 36, height: 36)
+            .contentShape(Circle())
+        }
+        .disabled(busy)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Decline")
     }
 
     private func tag(_ text: String, _ color: Color) -> some View {
@@ -878,20 +897,145 @@ struct AccentBackground: View {
     }
 }
 
-/// Weekly pace: "+12 this week" (levels gained since Monday 00:00 UTC).
-/// Draws nothing when the player has gained no levels this week.
-struct WeekPaceLabel: View {
-    let levels: Int
+/// One player row, shared by the friends list, friend requests, friend
+/// search, the clan roster and the clan page's member list, so they all read
+/// the same on every iPhone from the smallest up.
+///
+/// Layout, left to right: an optional leading view (avatar or rank), then the
+/// player's name with the level badge right after it, an optional small
+/// accessory (owner crown, role), and at most ONE detail line below; the
+/// trailing control (Send life, Give life, Accept…) sits on the right at its
+/// natural size and never wraps.
+///
+/// When space is short:
+///   • the trailing control keeps its shape (`fixedSize`);
+///   • the name takes all the remaining width and only a LONG name is
+///     shortened, at the end — the level badge is never squeezed;
+///   • the detail line drops its less important items first, then disappears
+///     entirely, rather than squeezing the name or the button;
+///   • at accessibility text sizes the trailing control moves below the name
+///     instead of fighting it for width.
+struct SocialPersonRow<Leading: View, Trailing: View>: View {
+    let name: String
+    let level: Int
+    let tint: Color?
+    let nameFont: Font
+    let nameAccessory: AnyView?
+    /// Detail items, most important first.  Shown on one line; when the line
+    /// cannot fit, only the first item is shown; failing that, none.
+    let details: [AnyView]
+    /// Replaces the identity part's VoiceOver label when set.
+    let spokenLabel: String?
+    let onTap: (() -> Void)?
+    let leading: () -> Leading
+    let trailing: () -> Trailing
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    init(name: String,
+         level: Int,
+         tint: Color? = nil,
+         nameFont: Font = .system(.body, design: .rounded).weight(.semibold),
+         nameAccessory: AnyView? = nil,
+         details: [AnyView] = [],
+         spokenLabel: String? = nil,
+         onTap: (() -> Void)? = nil,
+         @ViewBuilder leading: @escaping () -> Leading,
+         @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.name = name
+        self.level = level
+        self.tint = tint
+        self.nameFont = nameFont
+        self.nameAccessory = nameAccessory
+        self.details = details
+        self.spokenLabel = spokenLabel
+        self.onTap = onTap
+        self.leading = leading
+        self.trailing = trailing
+    }
 
     var body: some View {
-        if levels > 0 {
-            Text("+\(levels) this week")
-                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color(red: 0.30, green: 0.75, blue: 0.42))
-                .lineLimit(1)
-                .fixedSize()
-                .accessibilityLabel("\(levels) levels this week")
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                identity
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    trailing()
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+        } else {
+            HStack(spacing: 10) {
+                identity
+                    .layoutPriority(1)
+                Spacer(minLength: 6)
+                trailing()
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var identity: some View {
+        if let onTap {
+            Button(action: onTap) {
+                identityContent.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .modifier(OptionalSpokenLabel(text: spokenLabel))
+        } else {
+            identityContent
+                .modifier(OptionalSpokenLabel(text: spokenLabel))
+        }
+    }
+
+    private var identityContent: some View {
+        HStack(spacing: 10) {
+            leading()
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    PlayerNameLabel(name: name, level: level, font: nameFont,
+                                    compact: true, tint: tint)
+                        .layoutPriority(1)
+                    if let nameAccessory {
+                        nameAccessory.fixedSize()
+                    }
+                }
+                if !details.isEmpty {
+                    ViewThatFits(in: .horizontal) {
+                        detailLine(details)
+                        detailLine(Array(details.prefix(1)))
+                        Color.clear.frame(width: 0, height: 0)
+                    }
+                }
+            }
+        }
+    }
+
+    private func detailLine(_ items: [AnyView]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(items.indices, id: \.self) { i in items[i] }
+        }
+        .lineLimit(1)
+        .fixedSize()
+    }
+}
+
+/// Replaces a view's VoiceOver label (combining its children) when `text`
+/// is set; leaves it alone otherwise.
+private struct OptionalSpokenLabel: ViewModifier {
+    let text: String?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let text {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(text)
+        } else {
+            content
         }
     }
 }

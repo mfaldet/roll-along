@@ -251,16 +251,16 @@ final class SocialClient: @unchecked Sendable {
                                     hideExcluded: true)
     }
 
-    /// Columns added by docs/social-schema-v5.sql (the weekly baseline).
-    private static let v5PlayerColumns =
-        ",week_start,week_start_level,week_start_stars,lives_request_closed_at"
+    /// Columns added by docs/social-schema-v5.sql.  (The weekly-pace columns
+    /// are no longer read; database step 12 removes them.)
+    private static let v5PlayerColumns = ",lives_request_closed_at"
     /// Columns added by section 11 of docs/social-schema-v5.sql (a player's look).
     private static let lookColumns = ",accent_hex,ball_skin"
 
     /// Read `players` rows, asking for the v5 columns too.  Until
     /// docs/social-schema-v5.sql has been run the server answers 400 for a
     /// column it does not know, so this falls back to the older query — the
-    /// lists keep working, just without weekly pace or the exclusion filter.
+    /// lists keep working, just without the exclusion filter.
     /// `rest` is the remainder of the query string, starting with "&".
     private func getPlayers(columns: String, rest: String,
                             hideExcluded: Bool = false) async throws -> [PlayerProfile] {
@@ -701,7 +701,7 @@ final class SocialClient: @unchecked Sendable {
 
     private static let rankingColumns =
         "id,name,tag,description,owner_id,created_at,updated_at,"
-        + "member_count,total_levels,total_stars,week_levels,season_score,"
+        + "member_count,total_levels,total_stars,season_score,"
         + "season_wins,last_season,last_season_rank,last_season_clans,last_season_tier"
 
     /// Clans ranked by this season's score, total levels or total stars (the
@@ -1264,12 +1264,6 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     // When the player last tapped "Ask for a life" (null = not asking). Optional
     // + decode-resilient like the stats above.
     var needsLivesAt: String?
-    // Weekly baseline (docs/social-schema-v5.sql), kept by the server: the
-    // Monday (UTC) the baseline belongs to, and the level / stars the player
-    // had when that week began.  Absent before v5 → no weekly pace shown.
-    var weekStart: String? = nil
-    var weekStartLevel: Int? = nil
-    var weekStartStars: Int? = nil
     /// When this player's last life request closed (filled, expired or
     /// cancelled) — the wait before the next one counts from here.
     var livesRequestClosedAt: String? = nil
@@ -1283,25 +1277,6 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
     var accentColor: Color? { accentHex.flatMap { Color(hexRGB: $0) } }
     /// This player's equipped ball, if stored and known to this build.
     var ballSkin: BallSkin? { ballSkinID.flatMap { BallSkin(rawValue: $0) } }
-
-    /// Levels gained since Monday 00:00 Eastern ("+12 this week").  0 when the
-    /// stored baseline is from an earlier week (the player has not played
-    /// this week) or is absent.
-    var levelsThisWeek: Int {
-        guard let weekStart, let base = weekStartLevel,
-              weekStart == Self.currentWeekStart() else { return 0 }
-        return max(0, climbLevel - base)
-    }
-
-    /// This week's Monday in Eastern time as "yyyy-MM-dd" — the same value
-    /// the database computes with date_trunc('week', ra_season_now()).
-    static func currentWeekStart(now: Date = Date()) -> String {
-        var cal = Calendar(identifier: .iso8601)          // weeks start Monday
-        cal.timeZone = TimeZone(identifier: SeasonCalendar.seasonTimeZoneName) ?? .gmt
-        let monday = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? now
-        let c = cal.dateComponents([.year, .month, .day], from: monday)
-        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
-    }
 
     /// Memberwise init with defaults — lets local code build a profile from
     /// GameState values for the profile "Player Ranks" readout.  (Codable's
@@ -1413,9 +1388,6 @@ struct PlayerProfile: Codable, Identifiable, Hashable {
         case updatedAt        = "updated_at"
         case lastSeenAt       = "last_seen_at"
         case needsLivesAt     = "needs_lives_at"
-        case weekStart        = "week_start"
-        case weekStartLevel   = "week_start_level"
-        case weekStartStars   = "week_start_stars"
         case livesRequestClosedAt = "lives_request_closed_at"
         case accentHex        = "accent_hex"
         case ballSkinID       = "ball_skin"
@@ -1753,7 +1725,7 @@ enum FriendCode {
 /// The game's social clock: Eastern time (America/New_York).  Seasons of the
 /// monthly clan battle (calendar months, named by their first day
 /// "2026-12-01" exactly as the database names them), the daily star cap,
-/// weekly pace and the one-gift-per-friend-per-day limit all use it.
+/// the cosmetic calendar and the one-gift-per-friend-per-day limit all use it.
 enum SeasonCalendar {
     /// The moment today began in Eastern time (midnight America/New_York), as
     /// a full timestamp with its offset ("2026-11-17T00:00:00-05:00"), ready
@@ -1878,7 +1850,6 @@ struct ClanRanking: Decodable, Identifiable {
     let memberCount: Int
     let totalLevels: Int
     let totalStars: Int
-    let weekLevels: Int
     /// New Adventure stars earned for this clan this month.
     let seasonScore: Int
     /// Months this clan finished first.
@@ -1912,7 +1883,6 @@ struct ClanRanking: Decodable, Identifiable {
         case memberCount = "member_count"
         case totalLevels = "total_levels"
         case totalStars  = "total_stars"
-        case weekLevels  = "week_levels"
         case seasonScore = "season_score"
         case seasonWins  = "season_wins"
         case lastSeason  = "last_season"
@@ -1927,7 +1897,6 @@ struct ClanRanking: Decodable, Identifiable {
         memberCount = try c.decodeIfPresent(Int.self, forKey: .memberCount) ?? 0
         totalLevels = try c.decodeIfPresent(Int.self, forKey: .totalLevels) ?? 0
         totalStars  = try c.decodeIfPresent(Int.self, forKey: .totalStars)  ?? 0
-        weekLevels  = try c.decodeIfPresent(Int.self, forKey: .weekLevels)  ?? 0
         seasonScore = try c.decodeIfPresent(Int.self, forKey: .seasonScore) ?? 0
         seasonWins  = try c.decodeIfPresent(Int.self, forKey: .seasonWins)  ?? 0
         lastSeason      = try c.decodeIfPresent(String.self, forKey: .lastSeason)

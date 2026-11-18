@@ -648,46 +648,48 @@ struct ClansView: View {
         let isMe  = member.playerId == myId
         let asking = prof?.isAskingForLives ?? false
         let waitingOnMe = needsMyLife(member.playerId)
-        return HStack(spacing: 12) {
-            Button { if let prof { nav.goToPlayer(prof) } } label: {
-                HStack(spacing: 12) {
-                    avatar(name, tint: world.accent)
-                        // Red badge on the request itself; clears when I give,
-                        // or when the request is filled or cancelled.
-                        .overlay(alignment: .topTrailing) {
-                            CountBadge(count: waitingOnMe ? 1 : 0).offset(x: 6, y: -6)
-                        }
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 7) {
-                            PlayerNameLabel(name: name, level: level,
-                                            font: .system(.body, design: .rounded).weight(isMe ? .bold : .semibold),
-                                            compact: true,
-                                            tint: isMe ? gameState.primaryColor : prof?.accentColor)
-                            if member.isOwner && !isMe {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
-                                    .accessibilityLabel("Owner")
-                            }
-                        }
-                        HStack(spacing: 8) {
-                            SeasonStarsLabel(stars: seasonStars[member.playerId] ?? 0)
-                            WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
-                        }
-                        if asking {
-                            Text("needs a life ♥")
-                                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                                .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.55))
-                        }
-                    }
+        let stars = seasonStars[member.playerId] ?? 0
+        // One detail line, most important first: an open life request, then
+        // this season's stars.  The row drops the stars, then the line, if
+        // space runs out — never the name or the button.
+        var details: [AnyView] = []
+        if asking {
+            details.append(AnyView(
+                Text("needs a life ♥")
+                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.55))))
+        }
+        if stars > 0 { details.append(AnyView(SeasonStarsLabel(stars: stars))) }
+        let crown: AnyView? = (member.isOwner && !isMe)
+            ? AnyView(Image(systemName: "crown.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                        .accessibilityLabel("Owner"))
+            : nil
+        let open: (() -> Void)? = prof.map { p -> () -> Void in { nav.goToPlayer(p) } }
+        return SocialPersonRow(
+            name: name, level: level,
+            tint: isMe ? gameState.primaryColor : prof?.accentColor,
+            nameFont: .system(.body, design: .rounded).weight(isMe ? .bold : .semibold),
+            nameAccessory: crown,
+            details: details,
+            onTap: open
+        ) {
+            avatar(name, tint: world.accent)
+                // Red badge on the request itself; clears when I give,
+                // or when the request is filled or cancelled.
+                .overlay(alignment: .topTrailing) {
+                    CountBadge(count: waitingOnMe ? 1 : 0).offset(x: 6, y: -6)
                 }
-            }
-            .buttonStyle(.plain).disabled(prof == nil)
-            Spacer(minLength: 8)
+        } trailing: {
             if !isMe {
-                sendLifeControl(member.playerId)
-                if iAmOwner { ownerMenu(member) }
-            } else { roleBadge(member.role) }
+                HStack(spacing: 6) {
+                    sendLifeControl(member.playerId)
+                    if iAmOwner { ownerMenu(member) }
+                }
+            } else {
+                roleBadge(member.role)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 14)
@@ -1550,8 +1552,8 @@ struct ClanDetailView: View {
         }
     }
 
-    /// One ranked member: rank, name, level badge, role, stars and this
-    /// week's levels.
+    /// One ranked member: rank, name, level badge, role, this season's stars
+    /// and total stars.
     private func rosterRow(_ m: ClanMember, rank: Int) -> some View {
         let prof = profiles[m.playerId]
         let nm = prof?.displayName.nonEmpty ?? "Roller"
@@ -1559,39 +1561,36 @@ struct ClanDetailView: View {
         let stars = prof?.totalStars ?? 0
         let roleText: String = m.role != "member" ? ", \(m.role)" : ""
         let spoken: String = "Rank \(rank). \(nm), level \(lvl), \(stars) stars\(roleText)."
-        return Button { if let prof { nav.goToPlayer(prof) } } label: {
-            HStack(spacing: 12) {
-                Text("\(rank)")
-                    .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Color(white: 0.6))
-                    .frame(minWidth: 22, alignment: .leading)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 7) {
-                        PlayerNameLabel(name: nm, level: lvl, compact: true,
-                                        tint: m.playerId == myId ? gameState.primaryColor : prof?.accentColor)
-                        if m.role != "member" {
-                            Text(m.role.capitalized).font(.system(.caption2, design: .rounded).weight(.bold))
-                                .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
-                        }
-                    }
-                    HStack(spacing: 8) {
-                        SeasonStarsLabel(stars: seasonStars[m.playerId] ?? 0)
-                        WeekPaceLabel(levels: prof?.levelsThisWeek ?? 0)
-                    }
-                }
-                Spacer(minLength: 8)
-                HStack(spacing: 4) {
-                    Image(systemName: "star.fill").font(.system(size: 11))
-                        .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
-                    Text("\(stars)").font(.system(.subheadline, design: .rounded).weight(.bold))
-                        .monospacedDigit().foregroundStyle(.white)
-                }
+        let season = seasonStars[m.playerId] ?? 0
+        let role: AnyView? = m.role != "member"
+            ? AnyView(Text(m.role.capitalized)
+                        .font(.system(.caption2, design: .rounded).weight(.bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30)))
+            : nil
+        let open: (() -> Void)? = prof.map { p -> () -> Void in { nav.goToPlayer(p) } }
+        return SocialPersonRow(
+            name: nm, level: lvl,
+            tint: m.playerId == myId ? gameState.primaryColor : prof?.accentColor,
+            nameAccessory: role,
+            details: season > 0 ? [AnyView(SeasonStarsLabel(stars: season))] : [],
+            spokenLabel: spoken,
+            onTap: open
+        ) {
+            Text("\(rank)")
+                .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
+                .foregroundStyle(Color(white: 0.6))
+                .frame(minWidth: 22, alignment: .leading)
+        } trailing: {
+            HStack(spacing: 4) {
+                Image(systemName: "star.fill").font(.system(size: 11))
+                    .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
+                Text("\(stars)").font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .monospacedDigit().foregroundStyle(.white)
             }
-            .padding(.horizontal, 14).padding(.vertical, 11)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
+            .accessibilityHidden(true)
         }
-        .buttonStyle(.plain).disabled(prof == nil)
-        .accessibilityLabel(spoken)
+        .padding(.horizontal, 14).padding(.vertical, 11)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
     }
 
     /// Ranked by level, then stars.
