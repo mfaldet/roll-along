@@ -19,7 +19,7 @@ WHERE THINGS ARE (buttons on the Home screen)
 - "Games" opens the 10 minigames and the 8 challenge tracks.
 
 MINIGAME REWARDS
-Each minigame pays 1 to 3 in-game coins. A win in a competitive minigame also earns 1 ticket. Gold Rush, a 30-second bonus round, costs 5 tickets and pays up to about 100 coins. Tickets are earned only by winning games; they cannot be bought, and they have no other use.
+Solo minigames (Roll Up, Disco Ball, Zen Garden and Snacky's Solo option) pay no coins. A competitive minigame pays 1, 2 or 3 in-game coins on Easy, Normal or Hard, whatever the result, and a win also earns 1 ticket; a loss or draw earns none. Gold Rush, a 30-second bonus round, costs 5 tickets and pays up to about 100 coins. Tickets are earned only by winning games; they cannot be bought, and they have no other use.
 
 IN-APP PURCHASES (10)
 Lives — tap the lives counter at the top-left of the Home screen:

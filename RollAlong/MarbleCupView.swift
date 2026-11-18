@@ -151,6 +151,10 @@ struct MarbleCupView: View {
                     Color.clear
                     pitch
                     trailsLayer.allowsHitTesting(false)
+                    // Before the match: a pulsing ring marks your marble.
+                    if !started && !isOver, let me = movers.first(where: { $0.role == .player }) {
+                        StartSpotRing(color: gameState.primaryColor).position(me.pos)
+                    }
                     if let ball = movers.first(where: { $0.role == .ball }) {
                         moverView(ball).position(ball.pos)
                     }
@@ -175,9 +179,13 @@ struct MarbleCupView: View {
                     if wasEmpty { reset() }
                 }
                 .onTapGesture {
-                    // Tap during play = dash.  Before the match, the start
-                    // overlay's 1v1 / 2v2 buttons handle the tap instead.
-                    if started && !isOver && !celebrating { firePlayerCharge() }
+                    // Before the match a tap starts it (in the chosen format);
+                    // during play a tap is a dash.
+                    if !started && !isOver {
+                        startMatch(mode)
+                    } else if started && !isOver && !celebrating {
+                        firePlayerCharge()
+                    }
                 }
             }
 
@@ -455,61 +463,31 @@ struct MarbleCupView: View {
     }
 
     private var startPrompt: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "soccerball")
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(.white)
-            Text("Marble Cup")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Knock the ball into the top goal.\nMost goals in \(roundSeconds) seconds wins.")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .multilineTextAlignment(.center)
-
-            // Choose the match format — this also starts the match.
-            HStack(spacing: 12) {
-                modeButton(.oneVone, title: "1 v 1", subtitle: "You vs CPU")
-                modeButton(.twoVtwo, title: "2 v 2", subtitle: "You + ally vs 2")
+        CompetitiveStartPanel(title: "Marble Cup",
+                              icon: "soccerball",
+                              tint: .white,
+                              bullets: ["Tilt to push the ball, tap to dash",
+                                        "Score in the top goal",
+                                        "Most goals in \(roundSeconds) seconds wins"],
+                              difficulty: $gameState.minigameDifficulty,
+                              onStart: { startMatch(mode) }) {
+            // The format: choosing one only changes it (the pitch updates).
+            HStack(spacing: 8) {
+                formatButton(.oneVone, title: "1 v 1")
+                formatButton(.twoVtwo, title: "2 v 2")
             }
-
-            HStack(spacing: 5) {
-                Image(systemName: "bolt.fill").font(.system(size: 11, weight: .bold))
-                Text("Tap anywhere during play to dash")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-            }
-            .foregroundStyle(Self.playerAccent)
-
-            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
-                .padding(.top, 2)
         }
-        .padding(26)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.62)))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Marble Cup. Choose 1 v 1 or 2 v 2 to start. Tilt to knock the ball into the top goal; tap to dash. Most goals in \(roundSeconds) seconds wins.")
     }
 
-    private func modeButton(_ m: MatchMode, title: String, subtitle: String) -> some View {
-        Button { startMatch(m) } label: {
-            VStack(spacing: 3) {
-                Text(title)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                Text(subtitle)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(white: 0.66))
-            }
-            .frame(width: 132)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(white: 0.16))
-                    .overlay(RoundedRectangle(cornerRadius: 16)
-                        .stroke(Self.playerAccent.opacity(0.5), lineWidth: 1.5))
-            )
+    /// 1 v 1 / 2 v 2 choice on the start panel.  Re-places the pitch so the
+    /// player sees the format they picked; does not start the match.
+    private func formatButton(_ m: MatchMode, title: String) -> some View {
+        StartPanelOptionButton(title: title, selected: mode == m,
+                               accent: Self.playerAccent) {
+            guard m != mode else { return }
+            mode = m
+            placeForKickoff()
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title), \(subtitle)")
     }
 
     // MARK: - Dash HUD
@@ -741,6 +719,7 @@ struct MarbleCupView: View {
         mode = m
         if needsNewDeal { placeForKickoff() }
         started = true
+        gameState.markModePlayed("marblecup")
         AnalyticsClient.shared.track(
             "marblecup_match_started",
             properties: ["map_name": .string(MarbleCupMaps.maps[mapIndex % MarbleCupMaps.maps.count].name),

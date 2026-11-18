@@ -3152,44 +3152,186 @@ struct HomeQuitButton: View {
     }
 }
 
-/// Shared pre-game difficulty selector for the competitive minigames.  Each
-/// option shows its coin-payout multiplier so the player sees the reward for
-/// the risk before committing.  Binds straight to the remembered
-/// `minigameDifficulty`; harder rivals → lower win odds → bigger payout.
+/// Shared pre-game difficulty selector for the competitive minigames: three
+/// buttons, Easy / Normal / Hard, and nothing else.  Custom Buttons (not a
+/// segmented Picker) so an arena's tap-to-start gesture can't steal the
+/// selection.  Binds straight to the remembered `minigameDifficulty`.
 struct MinigameDifficultyPicker: View {
     @Binding var selection: MinigameDifficulty
     var accent: Color = Color(red: 1.0, green: 0.82, blue: 0.30)
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text("Difficulty · payout")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(white: 0.5))
-            HStack(spacing: 8) {
-                ForEach(MinigameDifficulty.allCases) { d in
-                    let selected = selection == d
-                    Button { selection = d } label: {
-                        VStack(spacing: 3) {
-                            Text(d.displayName)
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                            Text(d.payoutLabel)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .opacity(0.85)
-                        }
-                        .foregroundStyle(selected ? .black : Color(white: 0.82))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(selected ? accent : Color(white: 0.18))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(d.displayName), \(d.payoutLabel)")
-                    .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
-                }
+        HStack(spacing: 8) {
+            ForEach(MinigameDifficulty.allCases) { d in
+                StartPanelOptionButton(title: d.displayName,
+                                       selected: selection == d,
+                                       accent: accent) { selection = d }
             }
         }
+    }
+}
+
+/// One option button in the start panel's row (Easy, Normal, Hard, Solo…).
+struct StartPanelOptionButton: View {
+    let title: String
+    let selected: Bool
+    var accent: Color = Color(red: 1.0, green: 0.82, blue: 0.30)
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(selected ? .black : Color(white: 0.85))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(RoundedRectangle(cornerRadius: 10)
+                    .fill(selected ? accent : Color(white: 0.20)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+    }
+}
+
+// ===========================================================================
+// CompetitiveStartPanel — the start screen of every competitive minigame.
+//
+// A compact panel pinned near the BOTTOM of the screen, so the arena, the
+// opponents and the player's own marble stay visible above it (pair it with
+// `StartSpotRing` at the player's position).  It holds the game's title, a
+// few short bullets, the option row (Easy / Normal / Hard, optionally a
+// leading "Solo"), any extra controls the game needs (`accessory`, e.g.
+// Marble Cup's 1 v 1 / 2 v 2), and "Tap anywhere to start".
+//
+// It stays up as long as the player wants.  Tapping an option only changes
+// the option; tapping anywhere else on the panel calls `onStart` (each game
+// also starts on a tap on the arena).  Usage:
+//
+//     CompetitiveStartPanel(title: "Paint Ball", icon: "paintbrush.pointed.fill",
+//                           bullets: ["Tilt to roll", "Paint the most floor in 60 s"],
+//                           difficulty: $gameState.minigameDifficulty,
+//                           onStart: beginRound)
+//
+// A game with a Solo mode (Snacky) passes `solo: $isSolo`: a "Solo" option
+// then leads the row, and choosing a difficulty turns Solo off.
+// ===========================================================================
+struct CompetitiveStartPanel<Accessory: View>: View {
+    let title: String
+    var icon: String = "flag.checkered"
+    var tint: Color = .white
+    let bullets: [String]
+    @Binding var difficulty: MinigameDifficulty
+    /// When set, a leading "Solo" option is shown and bound to this.
+    var solo: Binding<Bool>? = nil
+    /// Hide the option row (e.g. Sumo rounds 2 and 3: difficulty is locked).
+    var showsOptions: Bool = true
+    var startLabel: String = "Tap anywhere to start"
+    let onStart: () -> Void
+    @ViewBuilder var accessory: () -> Accessory
+
+    private let accent = Color(red: 1.0, green: 0.82, blue: 0.30)
+
+    var body: some View {
+        VStack {
+            Spacer(minLength: 0)
+            panel
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+        }
+    }
+
+    private var panel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(bullets, id: \.self) { line in
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text("•").foregroundStyle(accent)
+                        Text(line).foregroundStyle(Color(white: 0.85))
+                    }
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            accessory()
+
+            if showsOptions {
+                HStack(spacing: 8) {
+                    if let solo {
+                        StartPanelOptionButton(title: "Solo", selected: solo.wrappedValue,
+                                               accent: accent) { solo.wrappedValue = true }
+                    }
+                    ForEach(MinigameDifficulty.allCases) { d in
+                        StartPanelOptionButton(title: d.displayName,
+                                               selected: difficulty == d && solo?.wrappedValue != true,
+                                               accent: accent) {
+                            difficulty = d
+                            solo?.wrappedValue = false
+                        }
+                    }
+                }
+            }
+
+            Text(startLabel)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.75))
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 20).fill(Color.black.opacity(0.72))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color(white: 0.25), lineWidth: 0.8)))
+        .contentShape(RoundedRectangle(cornerRadius: 20))
+        .onTapGesture { onStart() }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Starts the game.")
+    }
+}
+
+extension CompetitiveStartPanel where Accessory == EmptyView {
+    init(title: String, icon: String = "flag.checkered", tint: Color = .white,
+         bullets: [String], difficulty: Binding<MinigameDifficulty>,
+         solo: Binding<Bool>? = nil, showsOptions: Bool = true,
+         startLabel: String = "Tap anywhere to start",
+         onStart: @escaping () -> Void) {
+        self.init(title: title, icon: icon, tint: tint, bullets: bullets,
+                  difficulty: difficulty, solo: solo, showsOptions: showsOptions,
+                  startLabel: startLabel, onStart: onStart,
+                  accessory: { EmptyView() })
+    }
+}
+
+/// A soft pulsing ring around the player's marble before a match starts, so
+/// the player can find their starting spot.  Still with Reduce Motion.
+/// Place it at the marble's position in the arena: `.position(playerPos)`.
+struct StartSpotRing: View {
+    var color: Color = .white
+    var diameter: CGFloat = 58
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .stroke(color.opacity(0.85), lineWidth: 2.5)
+            .frame(width: diameter, height: diameter)
+            .scaleEffect(reduceMotion ? 1 : (pulse ? 1.18 : 0.92))
+            .opacity(reduceMotion ? 0.9 : (pulse ? 0.35 : 0.95))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
+            }
     }
 }
 

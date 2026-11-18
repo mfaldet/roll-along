@@ -425,15 +425,19 @@ struct DiscoBallView: View {
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
                 }
-                HStack(spacing: 12) {
-                    CoinIcon(size: 40)
-                    Text("+\(runCoins)")
-                        .font(.system(size: 46, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
+                // Solo minigames pay no coins, so this line only shows if a
+                // payout is ever set in CoinPayouts.
+                if runCoins > 0 {
+                    HStack(spacing: 12) {
+                        CoinIcon(size: 40)
+                        Text("+\(runCoins)")
+                            .font(.system(size: 46, weight: .black, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Plus \(runCoins) coins")
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Plus \(runCoins) coins")
                 VStack(spacing: 12) {
                     Button { resetGame() } label: {
                         Text("Play Again")
@@ -463,7 +467,8 @@ struct DiscoBallView: View {
             .padding(.horizontal, 28)
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Game over. \(crossings) crossings. Best \(max(best, crossings)). Plus \(runCoins) coins.")
+        .accessibilityLabel("Game over. \(crossings) crossings. Best \(max(best, crossings))."
+                            + (runCoins > 0 ? " Plus \(runCoins) coins." : ""))
         // S2-T2: run ended — drain this run's trophies, coalesced (§6).
         .onAppear { gameState.endTrophyRun() }
     }

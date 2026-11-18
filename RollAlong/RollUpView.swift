@@ -282,15 +282,19 @@ struct RollUpView: View {
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.5))
                 }
-                HStack(spacing: 12) {
-                    CoinIcon(size: 40)
-                    Text("+\(coins)")
-                        .font(.system(size: 46, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
+                // Solo minigames pay no coins, so this line only shows if a
+                // payout is ever set in CoinPayouts.
+                if coins > 0 {
+                    HStack(spacing: 12) {
+                        CoinIcon(size: 40)
+                        Text("+\(coins)")
+                            .font(.system(size: 46, weight: .black, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Plus \(coins) coins")
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Plus \(coins) coins")
                 VStack(spacing: 12) {
                     Button { startRun() } label: {
                         Text("Play Again")
@@ -409,7 +413,7 @@ struct RollUpView: View {
         phase = .ready
     }
 
-    /// Coins paid for a finished run (`CoinPayouts.rollUp`: 1–3 by height).
+    /// Coins paid for a finished run (`CoinPayouts.rollUp`: none — solo).
     private var runCoins: Int { CoinPayouts.rollUp(meters: heightMeters) }
 
     // MARK: - Input
