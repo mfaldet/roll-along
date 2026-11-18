@@ -119,7 +119,7 @@ struct LockerView: View {
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
             Spacer()
-            Text("Tap to equip")
+            Text("Tap to equip · hold to try on")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
         }
@@ -187,6 +187,22 @@ struct LockerView: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        // One tap equips (above).  A long press opens "try it on": the
+        // gameplay replay with this item on the current setup, plus Equip.
+        .contextMenu {
+            Button {
+                onTap()
+            } label: {
+                Label(selected ? "Equipped" : "Equip", systemImage: "checkmark.circle")
+            }
+            .disabled(selected)
+        } preview: {
+            LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(item))
+                .environment(\.cosmeticMotion, .preview)
+                .frame(width: 300, height: 300)
+                .background(Color(white: 0.08))
+        }
+        .accessibilityHint("Double-tap to equip. Touch and hold to try it on.")
     }
 
     /// Packs inventory row — owned ball Packs, shown beneath the Ball row.
