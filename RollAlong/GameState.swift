@@ -924,6 +924,19 @@ final class GameState: ObservableObject {
         minigameDifficultyPlays = Self.loadTrackProgress(key: "ra_minigameDiffPlays", defaults)
         minigameDifficultyWins  = Self.loadTrackProgress(key: "ra_minigameDiffWins", defaults)
         minigameDifficultyBests = Self.loadTrackProgress(key: "ra_minigameDiffBests", defaults)
+        // Comet Clash became Snacky under the same id ("snake").  Its old bests
+        // measured something else (sparks and knockouts, not orbs eaten), so
+        // they are cleared once; wins are kept (a win still means last one
+        // left).  Not through didSet (init), so save explicitly.
+        if !defaults.bool(forKey: "ra_snackyBestsReset_v1") {
+            minigameBests["snake"] = nil
+            for key in minigameDifficultyBests.keys where key.hasPrefix("snake|") {
+                minigameDifficultyBests[key] = nil
+            }
+            defaults.set(try? JSONEncoder().encode(minigameBests), forKey: "ra_minigameBests")
+            defaults.set(try? JSONEncoder().encode(minigameDifficultyBests), forKey: "ra_minigameDiffBests")
+            defaults.set(true, forKey: "ra_snackyBestsReset_v1")
+        }
         completedTracks = Self.loadStringSet(forKey: "ra_completedTracks", defaults)
         playedModeIDs = Self.loadStringSet(forKey: "ra_playedModeIDs", defaults)
         // A saved "last mode" that no longer exists in this build (e.g. Pinball,
@@ -3213,7 +3226,7 @@ enum OpponentTuning {
     /// Tuning-version number.  Sent with every finished round as `ai_version`
     /// so results before and after a change can be told apart.  RAISE IT BY
     /// ONE whenever any number in this table changes.
-    static let version = 3
+    static let version = 4
 
     /// The human limits of one opponent.
     struct Limits {

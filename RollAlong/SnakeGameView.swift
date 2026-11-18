@@ -546,8 +546,9 @@ struct SnackyView: View {
         let w = arena.width, h = arena.height
         let playerSpeed = CGFloat(OpponentTuning.snackyPlayerSpeed)
         let playerTurn = CGFloat(OpponentTuning.snackyPlayerTurnDegrees) * .pi / 180
-        // The player starts above the start panel, heading up.  Opponents
-        // start near the corners and the bottom, heading away from the player.
+        // The player starts in the middle, heading up.  Opponents start near
+        // the top corners heading down their own side, and at the bottom
+        // heading right — none toward the player or toward each other.
         var fresh: [Snake] = [
             Snake(id: 0, isPlayer: true,
                   head: CGPoint(x: w * 0.5, y: h * (mode == .solo ? 0.5 : 0.48)),
@@ -557,8 +558,8 @@ struct SnackyView: View {
             let difficulty = mode.difficulty ?? .normal
             let skills = OpponentTuning.dealSkills(rivalCount)
             let starts: [(CGPoint, CGFloat)] = [
-                (CGPoint(x: w * 0.18, y: h * 0.20), .pi * 0.25),
-                (CGPoint(x: w * 0.82, y: h * 0.20), .pi * 0.75),
+                (CGPoint(x: w * 0.18, y: h * 0.20), .pi * 0.5),
+                (CGPoint(x: w * 0.82, y: h * 0.20), .pi * 0.5),
                 (CGPoint(x: w * 0.50, y: h * 0.84), 0),
             ]
             var freshBrains: [Int: OpponentBrain] = [:]
@@ -777,7 +778,9 @@ struct SnackyView: View {
     /// A random spot clear of every ball and orb, away from the edges.
     private func openSpot() -> CGPoint? {
         let margin = r * 2.5
-        guard arena.width > margin * 2, arena.height > margin * 2 else { return nil }
+        // The spot's range starts 60 pt below the top margin, so the arena
+        // must be taller than that or the range below would be invalid.
+        guard arena.width > margin * 2, arena.height > margin * 2 + 60 else { return nil }
         let clear = r * 3
         for _ in 0..<40 {
             let p = CGPoint(x: CGFloat.random(in: margin...(arena.width - margin)),
