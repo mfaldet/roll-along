@@ -7,57 +7,46 @@ app changes.
 ---
 
 ```
-Roll Along is a tilt-controlled marble game. It needs a physical iPhone: the marble is steered by tilting the device. The main mode is called Adventure; the "Play" button on the Home screen starts it.
+Roll Along is a tilt-controlled marble game and needs a physical iPhone. The main mode, Adventure, starts from "Play" on the Home screen.
 
-SIGN-IN — NO DEMO ACCOUNT NEEDED
-The game is fully playable without an account. Sign in with Apple is optional and is the only sign-in method; please use your own Apple ID. It is needed only for Leaderboard, Clans and Friends. The app does not request name or email. To sign in: Home > Settings > Account > Sign in with Apple (tapping Leaderboard, Clans or Friends while signed out also offers it).
+SIGN-IN (NO DEMO ACCOUNT NEEDED)
+Fully playable without an account. Sign in with Apple is optional, the only method, and needed only for Leaderboard, Clans and Friends; please use your own Apple ID. No name or email is requested. Home > Settings > Account > Sign in with Apple.
 
-WHERE THINGS ARE (buttons on the Home screen)
-- Leaderboard, Clans, Friends: require sign-in.
-- Shop: cosmetics bought with in-game coins. Catalog is inside the Shop.
-- Profile and Settings.
-- "Games" opens the 10 minigames and the 8 challenge tracks.
+WHERE THINGS ARE (Home screen)
+Leaderboard, Clans, Friends (sign-in); Shop (cosmetics for in-game coins; Catalog inside); Profile; Settings; "Games" (10 minigames, 8 challenge tracks).
 
 MINIGAME REWARDS
-Solo minigames (Roll Up, Disco Ball, Zen Garden and Snacky's Solo option) pay no coins. A competitive minigame pays 1, 2 or 3 in-game coins on Easy, Normal or Hard, whatever the result, and a win also earns 1 ticket; a loss or draw earns none. Gold Rush, a 30-second bonus round, costs 5 tickets and pays up to about 100 coins. Tickets are earned only by winning games; they cannot be bought, and they have no other use.
+Solo minigames pay no coins. Competitive minigames pay 1, 2 or 3 coins on Easy, Normal or Hard whatever the result; a win also earns 1 ticket. Gold Rush, a 30-second bonus round, costs 5 tickets and pays up to about 100 coins. Tickets come only from wins, cannot be bought and have no other use.
 
 IN-APP PURCHASES (10)
-Lives — tap the lives counter at the top-left of the Home screen:
-  10 Lives, 60 Lives, 130 Lives (consumable), Unlimited Lives (non-consumable).
-Coins — open Shop and tap the coin balance at the top-right:
-  750, 4,500, 10,000, 22,500 and 60,000 coins (consumable). The 60,000 pack also includes the "Money Ball" skin; this is a fixed item, shown on the purchase card. There are no randomized purchases.
-Starter Pack (non-consumable) — a one-time offer shown automatically on the Home screen the first time the coin balance reaches 250, and available for 48 hours after it first appears. Quickest way to see it: buy the 750-coin pack, then return to Home.
+Lives (tap the lives counter, top-left of Home): 10, 60, 130 Lives (consumable), Unlimited Lives (non-consumable).
+Coins (Shop, tap the coin balance): 750, 4,500, 10,000, 22,500, 60,000 (consumable); the 60,000 pack includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
+Starter Pack (non-consumable): offered on Home once the coin balance first reaches 250, for 48 hours. Quickest way: buy 750 coins, return to Home.
 Restore: Settings > Purchases > Restore Purchases.
 
 ADS
-One rewarded video (Google AdMob), shown only when the player chooses "Watch ad" for an extra life. Ads are non-personalized, limited to Google's "Teen" content rating, and the app does not track (no ATT prompt, no IDFA).
+One rewarded video (Google AdMob), only when the player chooses "Watch ad" for an extra life. Non-personalized, "Teen" rating, no tracking (no ATT prompt, no IDFA).
 
-NAMES AND CHAT — NO USER-WRITTEN CONTENT
-Players cannot type any text that other players see (the only free-text field is Send Feedback, which goes privately to the developer). A nickname (Profile > Nickname) is two words chosen from preset lists, shown with the player's level beside it; a clan name is two preset words plus a number; clan tags are derived from the name; clan descriptions are picked from a fixed list; clan chat is a set of fixed phrases. The server rejects anything not built from these lists.
+NO USER-WRITTEN CONTENT
+Players cannot type text other players see. Nicknames are two preset words; clan names are two preset words plus a number; clan descriptions and clan chat are fixed phrases. The server rejects anything else. The only free-text field is Send Feedback, which goes privately to the developer.
 
-CLANS AND THE MONTHLY CLAN BATTLE
-A clan holds up to 12 players. A player's level is shown as a small badge next to their name, and friends and clan lists show levels gained this week. Each player has a short friend code on their profile (letters and digits only, assigned by our server); another player can type it on the Friends screen to send a friend request. The code is not shown to anyone unless the player shares it.
-
-Clans compete each calendar month. A clan's season score is the number of new stars its members earn in the main game that month; it is counted by our server. Clans > Rankings lists clans by season score (or by total levels or total stars). At the end of the month the server ranks the clans, and members of ranked clans who contributed receive in-game coins (100 to 1,000 depending on the clan's tier), which they claim on the Clans screen. The first season, December 2026, is a warm-up with no prizes. There is no entry fee and nothing to buy to take part; the result depends only on play. Coins are the game's soft currency: they buy cosmetic items only, have no cash value, and cannot be traded, transferred or cashed out.
-
-A clan's owner can remove a member from the clan and can hand ownership to another member; if an owner leaves or deletes their account, the clan passes to its longest-standing member. Removal only ends that player's membership; they keep their account and progress and can join any clan.
-
-A player can ask their clan for lives: a request collects up to 6 lives, one from each clanmate, at no cost to the giver, closes after 24 hours, and can be repeated after a 6-hour wait. A player can also send one life per day to each friend. These are the same in-game lives that refill free over time.
+CLANS, FRIENDS AND THE MONTHLY CLAN BATTLE
+Clans hold up to 12 players. Each player has a server-assigned friend code (letters and digits) that others can type on the Friends screen; it is shown only if the player shares it. Each calendar month, a clan's score is the new stars its members earn in the main game, counted by our server. At month end, contributing members of ranked clans receive 100 to 1,000 in-game coins, claimed on the Clans screen. December 2026 is a warm-up with no prizes. No entry fee, nothing to buy; coins buy cosmetics only and have no cash value. An owner can remove a member or hand over ownership. Players can ask their clan for lives (up to 6, free to givers) and send one life per day to each friend.
 
 ACCOUNT DELETION
-Settings > Account > Delete Account (visible when signed in). After confirming, Apple asks the player to confirm once more; the account and all its server data (profile, friends, clan membership, leaderboard entries, trophies) are then deleted immediately and the player is signed out.
+Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
-RELEASE CALENDAR FOR COSMETICS
-Cosmetic collections are released on a fixed calendar stored in the app: 13 at launch, then a new group every 4 weeks. Upcoming collections are announced by name and date in Shop > Catalog > "Coming soon". Seasonal collections are available during their season each year. Nothing is switched on remotely.
+COSMETIC RELEASE CALENDAR
+Collections release on a fixed calendar built into the app; upcoming ones are listed by name and date in Shop > Catalog > "Coming soon". Seasonal collections return each year.
 
 TROPHIES
-86 in-game trophies, shown as tiles in four sections. They are earned by playing, are display only, and never grant coins or anything purchasable.
+86 display-only trophies earned by playing; they never grant coins or purchasable items.
 
 SEND FEEDBACK
-Settings > About > Send Feedback. The player picks Bug, Idea or Complaint and writes up to 1,000 characters. It goes privately to the developer only: it is never shown to other players, and players cannot read it back. The app adds the app version, iOS version, phone model and the screen it came from, plus the account ID if signed in. Limited to 5 messages per phone per day; offline messages are sent later.
+Settings > About > Send Feedback: Bug, Idea or Complaint, up to 1,000 characters, private to the developer (players cannot read it back). Adds app version, iOS version, phone model, source screen, and account ID if signed in. 5 per phone per day; sent later if offline.
 
 NOTIFICATIONS
-Two optional local notifications (shop restock, lives full), off until the player turns them on in Settings.
+Two optional local notifications (shop restock, lives full), off until turned on in Settings.
 
 PRIVACY POLICY AND CONTACT
 Settings > About, and https://mfaldet.github.io/roll-along/privacy.html
