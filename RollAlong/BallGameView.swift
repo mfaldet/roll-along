@@ -14,23 +14,51 @@ import AVFoundation
 //   green → level complete
 // ---------------------------------------------------------------------------
 
-// Pull the device's actual display corner radius via the unsupported KVC key,
-// so the border traces the screen curve exactly on any iPhone model.
-// Reversed-string trick keeps the literal "_displayCornerRadius" out of the
-// source, which is the conventional way to use this value safely.
-private extension UIScreen {
-    var ra_displayCornerRadius: CGFloat {
-        let key = ["Radius", "Corner", "display", "_"].reversed().joined()
-        return (self.value(forKey: key) as? CGFloat) ?? 55
-    }
+// The corner radius the in-game border uses so it follows the screen's curve.
+//
+// iOS has no public API for the display's corner radius.  This used to read a
+// private UIScreen key, which App Review can reject and which gives no
+// guarantee on new models.  Instead: a table of the published radii of every
+// iPhone iOS 18 supports, keyed by the panel's native pixel height (public
+// `nativeBounds`, fixed in portrait).  A model not in the table (a phone newer
+// than this build) gets 62, the radius of every current Pro, Pro Max and Air
+// panel; a phone with no home indicator (iPhone SE) gets square corners.
+// Display Zoom changes the point size, so the radius is scaled by
+// scale / nativeScale to keep it on the same physical curve.
+private var screenCornerRadius: CGFloat {
+    guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene }).first else { return 55 }
+    let screen = scene.screen
+    let window = scene.windows.first
+    if (window?.safeAreaInsets.bottom ?? 1) == 0 { return 0 }   // Touch ID iPhone: square screen
+    let base = DisplayCorner.radius(nativeHeight: max(screen.nativeBounds.height,
+                                                      screen.nativeBounds.width))
+    let zoom = screen.nativeScale > 0 ? screen.scale / screen.nativeScale : 1
+    return base * min(max(zoom, 0.8), 1.25)
 }
 
-private var screenCornerRadius: CGFloat {
-    if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-       let screen = scene.windows.first?.screen {
-        return screen.ra_displayCornerRadius
+/// Published display corner radii (points) by native panel height (pixels).
+enum DisplayCorner {
+    static let byNativeHeight: [Int: CGFloat] = [
+        1334: 0,       // iPhone SE (2nd, 3rd gen) — square
+        1792: 41.5,    // iPhone XR, 11
+        2340: 44,      // iPhone 12 mini, 13 mini
+        2436: 39,      // iPhone X, XS, 11 Pro
+        2532: 47.33,   // iPhone 12, 12 Pro, 13, 13 Pro, 14, 16e
+        2556: 55,      // iPhone 14 Pro, 15, 15 Pro, 16
+        2622: 62,      // iPhone 16 Pro, 17, 17 Pro
+        2688: 39,      // iPhone XS Max, 11 Pro Max
+        2736: 62,      // iPhone Air
+        2778: 53.33,   // iPhone 12 Pro Max, 13 Pro Max, 14 Plus
+        2796: 55,      // iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus
+        2868: 62,      // iPhone 16 Pro Max, 17 Pro Max
+    ]
+    /// Radius for a model not in the table (newer than this build).
+    static let newModelDefault: CGFloat = 62
+
+    static func radius(nativeHeight: CGFloat) -> CGFloat {
+        byNativeHeight[Int(nativeHeight.rounded())] ?? newModelDefault
     }
-    return 55
 }
 
 private enum GamePhase: Equatable {
@@ -912,8 +940,8 @@ struct BallGameView: View {
     // MARK: - Border
 
     private var screenBorder: some View {
-        // RoundedRectangle with cornerRadius pulled from the actual device's
-        // display corner radius, so the stroke traces the screen curve exactly.
+        // RoundedRectangle with the display's corner radius (public table,
+        // see `screenCornerRadius`), so the stroke follows the screen curve.
         ZStack {
             RoundedRectangle(cornerRadius: screenCornerRadius, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: borderPhase == .normal ? 4 : 5)

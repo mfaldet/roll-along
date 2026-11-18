@@ -1532,3 +1532,16 @@ final class AnalyticsBatchEncodingTests: XCTestCase {
         }
     }
 }
+
+/// The in-game border's corner radius comes from a public table, not a
+/// private screen key.
+final class DisplayCornerTests: XCTestCase {
+    func testKnownPanels() {
+        XCTAssertEqual(DisplayCorner.radius(nativeHeight: 1334), 0)      // iPhone SE
+        XCTAssertEqual(DisplayCorner.radius(nativeHeight: 2556), 55)     // iPhone 15 / 16
+        XCTAssertEqual(DisplayCorner.radius(nativeHeight: 2736), 62)     // iPhone Air
+    }
+    func testUnknownPanelUsesNewModelDefault() {
+        XCTAssertEqual(DisplayCorner.radius(nativeHeight: 3000), DisplayCorner.newModelDefault)
+    }
+}
