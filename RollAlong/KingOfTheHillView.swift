@@ -137,6 +137,10 @@ struct KingOfTheHillView: View {
                         .allowsHitTesting(false)
                     zoneView
                     trailsLayer.allowsHitTesting(false)
+                    // Before the round: a pulsing ring marks your marble.
+                    if !started && !isOver, let me = racers.first(where: { $0.isPlayer }) {
+                        StartSpotRing(color: gameState.primaryColor).position(me.pos)
+                    }
                     ForEach(racers) { r in
                         marble(r)
                             .overlay(alignment: .top) {
@@ -157,15 +161,7 @@ struct KingOfTheHillView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .onTapGesture {
-                    if !started && !isOver {
-                        started = true
-                        AnalyticsClient.shared.track(
-                            "koth_round_started",
-                            properties: ["map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
-                        )
-                    }
-                }
+                .onTapGesture { beginRound() }
             }
 
             topBar
@@ -359,25 +355,26 @@ struct KingOfTheHillView: View {
         String(format: "%d:%02d", secondsLeft / 60, secondsLeft % 60)
     }
 
+    /// Start the round (a tap on the arena or on the start panel).
+    private func beginRound() {
+        guard !started && !isOver else { return }
+        started = true
+        gameState.markModePlayed("koth")
+        AnalyticsClient.shared.track(
+            "koth_round_started",
+            properties: ["map_name": .string(KOTHMaps.maps[mapIndex % KOTHMaps.maps.count].name)]
+        )
+    }
+
     private var startPrompt: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "flag.checkered")
-                .font(.system(size: 38, weight: .light))
-                .foregroundStyle(.white)
-            Text("Tilt to play")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Hold the moving zone — alone.\nMost time on the hill in 60s wins.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .multilineTextAlignment(.center)
-            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
-                .padding(.top, 6)
-        }
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("King of the Hill. Tilt to enter the moving zone and hold it alone. Most time on the hill in 60 seconds wins. Tap anywhere to begin.")
+        CompetitiveStartPanel(title: "King of the Hill",
+                              icon: "flag.checkered",
+                              tint: .white,
+                              bullets: ["Tilt to roll",
+                                        "Hold the glowing zone alone",
+                                        "Most time on the hill in 60 seconds wins"],
+                              difficulty: $gameState.minigameDifficulty,
+                              onStart: beginRound)
     }
 
     private var gameOverOverlay: some View {

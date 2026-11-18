@@ -185,6 +185,11 @@ struct SumoSurvivalView: View {
                     pillarsLayer.allowsHitTesting(false)
                     poofLayer.allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
+                    // Before the round: a pulsing ring marks your marble.
+                    if !started && !roundOver && !matchOver,
+                       let me = bumpers.first(where: { $0.isPlayer }) {
+                        StartSpotRing(color: gameState.primaryColor).position(me.pos)
+                    }
                     ForEach(bumpers) { b in
                         marble(b)
                             .overlay(alignment: .top) {
@@ -204,15 +209,7 @@ struct SumoSurvivalView: View {
                     layout(newSize)
                     if wasEmpty { reset() }
                 }
-                .onTapGesture {
-                    if !started && !roundOver && !matchOver {
-                        started = true
-                        AnalyticsClient.shared.track(
-                            "sumo_round_started",
-                            properties: ["map_name": .string(SumoMaps.maps[mapIndex % SumoMaps.maps.count].name)]
-                        )
-                    }
-                }
+                .onTapGesture { beginRound() }
             }
 
             topBar
@@ -405,28 +402,29 @@ struct SumoSurvivalView: View {
         }
     }
 
+    /// Start the round (a tap on the arena or on the start panel).  Nothing
+    /// moves before this.
+    private func beginRound() {
+        guard !started && !roundOver && !matchOver else { return }
+        started = true
+        gameState.markModePlayed("sumo")
+        AnalyticsClient.shared.track(
+            "sumo_round_started",
+            properties: ["map_name": .string(SumoMaps.maps[mapIndex % SumoMaps.maps.count].name)]
+        )
+    }
+
     private var startPrompt: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "circle.dashed")
-                .font(.system(size: 40, weight: .light))
-                .foregroundStyle(Color(red: 0.98, green: 0.45, blue: 0.40))
-            Text("Tilt to play")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Four marbles, three rounds.\nShove rivals off — last one standing wins the round.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .multilineTextAlignment(.center)
-            // Difficulty is locked in at the match start (round 1 only).
-            if round == 1 {
-                MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
-                    .padding(.top, 6)
-            }
-        }
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Sumo Survival. Four marbles, three rounds. Tilt to shove rivals off the ring; last one standing wins the round. Tap anywhere to begin.")
+        // Difficulty is locked in at the match start (round 1 only).
+        CompetitiveStartPanel(title: "Sumo Survival",
+                              icon: "circle.dashed",
+                              tint: Color(red: 0.98, green: 0.45, blue: 0.40),
+                              bullets: ["Tilt to roll and shove",
+                                        "Knock rivals off the ring",
+                                        "Last one standing wins the round"],
+                              difficulty: $gameState.minigameDifficulty,
+                              showsOptions: round == 1,
+                              onStart: beginRound)
     }
 
     /// Between-round results: this round's points + running totals, then a

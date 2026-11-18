@@ -266,3 +266,72 @@ through a 14-minute Normal cycle loses nothing.
   the Normal loop).
 - **Pit Stop** (play one Gold Rush round) now needs 5 wins first; fine.
 - **Cloudburst** (90 in one round) is unaffected.
+
+## Round 3 (built, 2026-11-18)
+
+Simpler rule, all in `CoinPayouts` (`RollAlong/GameState.swift`):
+
+- **Solo minigames pay no coins**: Roll Up, Disco Ball, Zen Garden and
+  Snacky's Solo option. They are played for a best score only.
+- **A competitive game pays by difficulty, whatever the result**: Easy 1,
+  Normal 2, Hard 3. A win, a loss, a draw and every placement pay the same.
+- **A competitive win also earns 1 ticket.** A loss or a draw earns none.
+- Gold Rush unchanged: 5 tickets a round, 1 coin per coin caught, about 70
+  a round on average (up to about 100).
+
+### Assumptions (same as round 2)
+
+Adventure level 45 s, 3.5 coins. Competitive game 80 s. Gold Rush round
+about 60 s including the stake screen, about 70 coins. Daily reward 15 a
+day. Win rates Easy 70%, Normal 50%, Hard 30%. A 20-minute day is one third
+of an hour.
+
+### Coins per competitive game
+
+| | Round 3 | Round 2 |
+|---|---|---|
+| Easy | **1** | 0.7 × 3 + 0.3 × 1.67 = 2.60 |
+| Normal | **2** | 0.5 × 3 + 0.5 × 1.67 = 2.33 |
+| Hard | **3** | 0.3 × 3 + 0.7 × 1.67 = 2.07 |
+
+### Tickets per hour (competitive games only, unchanged)
+
+3,600 ÷ 80 = 45 games an hour. Easy 45 × 0.7 = **31.5**, Normal 45 × 0.5 =
+**22.5**, Hard 45 × 0.3 = **13.5**.
+
+### Coins per hour
+
+A ticket-loop cycle is the games needed to win 5 tickets (5 ÷ win rate),
+then one Gold Rush round.
+
+| Player | Cycle | Coins per cycle | Per hour, round 3 | Round 2 |
+|---|---|---|---|---|
+| Adventure only | 1 level = 45 s | 3.5 | 3,600 ÷ 45 × 3.5 = **280** | 280 |
+| Ticket loop, Easy | 5 ÷ 0.7 = 7.14 games (7.14 × 80 = 571 s) + 60 s = 631 s | 7.14 × 1 + 70 = 77.1 | 77.1 × 3,600 ÷ 631 = **440** | 505 |
+| Ticket loop, Normal | 5 ÷ 0.5 = 10 games (800 s) + 60 s = 860 s | 10 × 2 + 70 = 90.0 | 90.0 × 3,600 ÷ 860 = **377** | 391 |
+| Ticket loop, Hard | 5 ÷ 0.3 = 16.67 games (1,333 s) + 60 s = 1,393 s | 16.67 × 3 + 70 = 120.0 | 120.0 × 3,600 ÷ 1,393 = **310** | 270 |
+| Mix: half Adventure, half Normal loop | | | (280 + 376.7) ÷ 2 = **328** | 335 |
+| Solo minigames | any | 0 | **0** | about 135 to 150 |
+
+The difficulty order now runs the right way: Hard pays the most per hour of
+the three loops, Easy the least. Every loop stays within about 1.1 to 1.6
+times Adventure.
+
+### Days to a 1,000-coin cosmetic at 20 minutes a day (daily reward included)
+
+| Player | Coins a day | Days, round 3 | Days, round 2 |
+|---|---|---|---|
+| Adventure only | 280 ÷ 3 + 15 = 108.3 | 1,000 ÷ 108.3 = **9.2** | 9.2 |
+| Ticket loop, Easy | 439.8 ÷ 3 + 15 = 161.6 | 1,000 ÷ 161.6 = **6.2** | 5.5 |
+| Ticket loop, Normal | 376.7 ÷ 3 + 15 = 140.6 | 1,000 ÷ 140.6 = **7.1** | 6.9 |
+| Ticket loop, Hard | 310.0 ÷ 3 + 15 = 118.3 | 1,000 ÷ 118.3 = **8.4** | 9.5 |
+| Mix (10 min Adventure + 10 min Normal loop) | 46.7 + 62.8 + 15 = 124.5 | 1,000 ÷ 124.5 = **8.0** | 7.9 |
+| Solo minigames only | 0 + 15 = 15 | **67** (daily reward alone) | about 12 |
+
+### Trophies under round 3
+
+- **Working Capital (2,500 from play):** about 23 days Adventure only
+  (2,500 ÷ 108.3), 20 for the mix (2,500 ÷ 124.5), 18 on the Normal loop
+  (2,500 ÷ 140.6).
+- **Pit Boss (1,000 caught in Gold Rush):** unchanged, about 14 rounds.
+- Coin trophies can no longer be reached by playing solo minigames alone.

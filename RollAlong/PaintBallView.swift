@@ -155,6 +155,10 @@ struct PaintBallView: View {
                     pitLayer.allowsHitTesting(false)
                     splashLayer.allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
+                    // Before the round: a pulsing ring marks your marble.
+                    if !started && !isOver, let me = painters.first(where: { $0.isPlayer }) {
+                        StartSpotRing(color: gameState.primaryColor).position(me.pos)
+                    }
                     ForEach(painters) { p in
                         marble(p)
                             .overlay(alignment: .top) {
@@ -177,15 +181,7 @@ struct PaintBallView: View {
                     // mid-round the grid is rebuilt in tick().
                     if wasEmpty || !started { reset() }
                 }
-                .onTapGesture {
-                    if !started && !isOver {
-                        started = true
-                        AnalyticsClient.shared.track(
-                            "paintball_round_started",
-                            properties: ["map_name": .string(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count].name)]
-                        )
-                    }
-                }
+                .onTapGesture { beginRound() }
             }
 
             topBar
@@ -433,25 +429,26 @@ struct PaintBallView: View {
         }
     }
 
+    /// Start the round (a tap on the arena or on the start panel).
+    private func beginRound() {
+        guard !started && !isOver else { return }
+        started = true
+        gameState.markModePlayed("paintball")
+        AnalyticsClient.shared.track(
+            "paintball_round_started",
+            properties: ["map_name": .string(PaintBallMaps.maps[mapIndex % PaintBallMaps.maps.count].name)]
+        )
+    }
+
     private var startPrompt: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "paintbrush.pointed.fill")
-                .font(.system(size: 38, weight: .light))
-                .foregroundStyle(Self.paintColors[0])
-            Text("Tilt to play")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Splash the most paint in 60 seconds.\nAvoid the puddles — they freeze you for 3s.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .multilineTextAlignment(.center)
-            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
-                .padding(.top, 6)
-        }
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Paint Ball. Tilt to splash the most paint in 60 seconds. Avoid enemy puddles — they freeze you for 3 seconds. Tap anywhere to begin.")
+        CompetitiveStartPanel(title: "Paint Ball",
+                              icon: "paintbrush.pointed.fill",
+                              tint: Self.paintColors[0],
+                              bullets: ["Tilt to roll and paint",
+                                        "Paint the most floor in 60 seconds",
+                                        "Puddles freeze you for 3 seconds"],
+                              difficulty: $gameState.minigameDifficulty,
+                              onStart: beginRound)
     }
 
     private var gameOverOverlay: some View {

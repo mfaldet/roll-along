@@ -2466,7 +2466,7 @@ final class GameState: ObservableObject {
     func addZenSeconds(_ s: Int) {
         guard s > 0 else { return }
         zenSeconds += s
-        let reward = CoinPayouts.zen(seconds: s)   // 1 a minute, ≤ 3 a visit
+        let reward = CoinPayouts.zen(seconds: s)   // solo: no coins
         if reward > 0 { addCoins(reward) }
         syncMinigameStats()
         // zen_hour / zen_10_hours ride the cumulative zenSeconds tally (S1-T3).
@@ -3092,9 +3092,10 @@ final class GameState: ObservableObject {
 // ===========================================================================
 // CoinPayouts — EVERY minigame coin payout, in one place (2026-11 rebalance).
 //
-// The rule (round 2): a minigame pays 1 to 3 coins per game, matching one
-// Adventure level's floor pickups.  A competitive WIN also earns 1 ticket,
-// and 5 tickets buy a Gold Rush round — the one place to earn a large amount
+// The rule (round 3): solo minigames pay no coins; a competitive game pays
+// 1 / 2 / 3 coins on Easy / Normal / Hard, whatever the result.  A
+// competitive WIN also earns 1 ticket (a loss or draw earns none), and 5
+// tickets buy a Gold Rush round — the one place to earn a large amount
 // (about 100 coins a round).  Cosmetics cost 750–1,500 coins and are
 // unchanged.
 //
@@ -3103,78 +3104,53 @@ final class GameState: ObservableObject {
 // ===========================================================================
 enum CoinPayouts {
 
-    // Every minigame pays AT MOST 3 coins — about what one Adventure level
-    // pays from its floor pickups.  Gold Rush (paid for with tickets) is the
-    // one place to earn more.  Change a number here and rebuild; nothing else
-    // computes a minigame payout.
+    // Solo minigames pay NO coins.  Competitive minigames pay a small fixed
+    // amount by DIFFICULTY, whatever the result; a win also earns a ticket.
+    // Gold Rush (paid for with tickets) is the one place to earn more.
+    // Change a number here and rebuild; nothing else computes a minigame
+    // payout.
 
     /// The most any one minigame game pays.
     static let minigameMax = 3
 
-    // ---- Competitive minigames (Comet Clash, Sumo Survival, Paint Ball,
-    //      Smash and Grab, Marble Cup, King of the Hill) -------------------
-    //      The same on every difficulty.
+    // ---- Competitive minigames (Sumo Survival, Paint Ball, Smash and Grab,
+    //      Marble Cup, King of the Hill, and Snacky's Easy/Normal/Hard) -----
+    //      The same for a win, a loss, a draw or any placement.
 
-    /// A win (1st place).  Plus `ticketsPerWin` ticket.
-    static let competitiveWin = 3
-    /// Not a win and not last — any middle place, and a non-winning first
-    /// place (e.g. King of the Hill when nobody held the zone).
-    static let competitiveRunnerUp = 2
-    /// A Marble Cup draw after sudden death.
-    static let competitiveDraw = 2
-    /// Last place, or any other loss.
-    static let competitiveLoss = 1
-    /// Tickets for a competitive win.
+    static let competitiveEasy   = 1
+    static let competitiveNormal = 2
+    static let competitiveHard   = 3
+    /// Tickets for a competitive WIN.  A loss or a draw earns none.
     static let ticketsPerWin = 1
 
-    /// How many places a game has: Marble Cup is you against one side;
-    /// the others are you against three.
-    static func fieldSize(_ modeID: String) -> Int {
-        modeID == "marblecup" ? 2 : 4
+    /// Coins for one competitive game at `difficulty`.
+    static func competitiveCoins(_ difficulty: MinigameDifficulty) -> Int {
+        switch difficulty {
+        case .easy:   return competitiveEasy
+        case .normal: return competitiveNormal
+        case .hard:   return competitiveHard
+        }
     }
 
-    /// Coins for one competitive game.  `placement` is 1-based (nil when the
-    /// game did not report one).  `difficulty` no longer changes the amount;
-    /// it is kept so callers need not change.
+    /// Coins for one competitive game.  The result (`won`, `draw`,
+    /// `placement`) no longer changes the amount; the parameters are kept so
+    /// callers need not change.
     static func competitive(modeID: String, won: Bool, draw: Bool = false,
                             placement: Int?, difficulty: MinigameDifficulty) -> Int {
-        if won { return competitiveWin }
-        if draw { return competitiveDraw }
-        if let placement, placement >= 1, placement < fieldSize(modeID) { return competitiveRunnerUp }
-        return competitiveLoss
+        competitiveCoins(difficulty)
     }
 
-    // ---- Solo minigames (1 to 3 coins) ----------------------------------
+    // ---- Solo minigames (Roll Up, Disco Ball, Zen Garden, Snacky Solo) ----
+    //      No coins.  The functions stay so callers need not change.
 
-    /// Roll Up: 1 coin for any climb, 2 from `rollUpMetersForTwo` meters,
-    /// 3 from `rollUpMetersForThree`.  (0 m pays nothing.)
-    static let rollUpMetersForTwo = 60
-    static let rollUpMetersForThree = 150
-    static func rollUp(meters: Int) -> Int {
-        guard meters > 0 else { return 0 }
-        if meters >= rollUpMetersForThree { return 3 }
-        if meters >= rollUpMetersForTwo { return 2 }
-        return 1
-    }
+    /// What every solo minigame pays.
+    static let solo = 0
+    static func rollUp(meters: Int) -> Int { solo }
+    static func disco(crossings: Int) -> Int { solo }
+    static func zen(seconds: Int) -> Int { solo }
 
-    /// Disco Ball: 1 coin for any crossing, 2 from `discoCrossingsForTwo`,
-    /// 3 from `discoCrossingsForThree`.
-    static let discoCrossingsForTwo = 5
-    static let discoCrossingsForThree = 12
-    static func disco(crossings: Int) -> Int {
-        guard crossings > 0 else { return 0 }
-        if crossings >= discoCrossingsForThree { return 3 }
-        if crossings >= discoCrossingsForTwo { return 2 }
-        return 1
-    }
-
-    /// Zen Garden: 1 coin per full `zenSecondsPerCoin` in the garden, up to 3
-    /// a visit.
-    static let zenSecondsPerCoin = 60
-    static func zen(seconds: Int) -> Int { min(minigameMax, max(0, seconds / zenSecondsPerCoin)) }
-
-    /// Roll Out (held back from 1.0): per maze cleared.
-    static let rollOutClear = 3
+    /// Roll Out (held back from 1.0) is a solo game too.
+    static let rollOutClear = solo
 
     /// A new personal best in a minigame no longer pays a bonus.  The best is
     /// still recorded and shown.
@@ -3212,10 +3188,6 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
 
     // Coin payouts per difficulty live in `CoinPayouts` (above).
 
-    /// Short payout descriptor for the pre-game picker: what a WIN pays.
-    var payoutLabel: String {
-        "Win: \(CoinPayouts.competitiveWin) coins + 1 ticket"
-    }
 
     /// The win rate each difficulty is designed to land near for an average
     /// player.  Documentation and test-report target only; nothing in the game

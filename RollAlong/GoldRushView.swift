@@ -118,6 +118,10 @@ struct GoldRushView: View {
                     ForEach(coins) { c in coinView(c) }
                     poofLayer.allowsHitTesting(false)
                     trailsLayer.allowsHitTesting(false)
+                    // Before the round: a pulsing ring marks your marble.
+                    if !started && !isOver, let me = racers.first(where: { $0.isPlayer }) {
+                        StartSpotRing(color: gameState.primaryColor).position(me.pos)
+                    }
                     ForEach(racers) { r in
                         marble(r)
                             .overlay(alignment: .top) {
@@ -140,11 +144,7 @@ struct GoldRushView: View {
                 }
                 .onTapGesture {
                     if !started && !isOver {
-                        engine.beginPlay()
-                        AnalyticsClient.shared.track(
-                            "goldrush_round_started",
-                            properties: ["map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
-                        )
+                        beginRound()
                     } else if started && !isOver {
                         // Tap = charge: a short forward dash in the tilt direction,
                         // gated to once every 3 s.  Only a charging ram spills coins.
@@ -348,32 +348,26 @@ struct GoldRushView: View {
 
     private func isLeader(_ r: GoldRushEngine.Racer) -> Bool { maxScore > 0 && r.score == maxScore }
 
-    private var startPrompt: some View {
-        VStack(spacing: 10) {
-            VStack(spacing: 10) {
-                Image(systemName: "bag.fill")
-                    .font(.system(size: 36, weight: .light))
-                    .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.30))
-                Text("Tilt to play")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("Grab the most coins in 60 seconds.\nTap to charge — ram rivals to make them spill.")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(white: 0.6))
-                    .multilineTextAlignment(.center)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Smash and Grab. Tilt to steer. Grab the most coins in 60 seconds. Tap to charge forward and ram rivals to make them spill coins. Tap anywhere to begin.")
+    /// Start the round (a tap on the arena or on the start panel).
+    private func beginRound() {
+        guard !started && !isOver else { return }
+        engine.beginPlay()
+        gameState.markModePlayed("goldrush")
+        AnalyticsClient.shared.track(
+            "goldrush_round_started",
+            properties: ["map_name": .string(GoldRushMaps.maps[mapIndex % GoldRushMaps.maps.count].name)]
+        )
+    }
 
-            // Difficulty selector — shared component; custom Buttons (not a
-            // segmented Picker) so the arena's tap-to-start gesture doesn't
-            // steal the selection.  Higher difficulty = harder rivals + bigger
-            // payout (shown per option).
-            MinigameDifficultyPicker(selection: $gameState.minigameDifficulty)
-                .padding(.top, 8)
-        }
-        .padding(28)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.55)))
+    private var startPrompt: some View {
+        CompetitiveStartPanel(title: "Smash and Grab",
+                              icon: "bag.fill",
+                              tint: Color(red: 1.0, green: 0.82, blue: 0.30),
+                              bullets: ["Tilt to roll, tap to charge",
+                                        "Grab the most coins in 60 seconds",
+                                        "Ram rivals to make them spill"],
+                              difficulty: $gameState.minigameDifficulty,
+                              onStart: beginRound)
     }
 
     private var gameOverOverlay: some View {

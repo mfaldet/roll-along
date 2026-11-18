@@ -229,13 +229,13 @@ final class TrophyToastWiringTests: XCTestCase {
         let gs = makeGameState()
         let before = gs.coinBalance
         gs.beginTrophyRun()
-        // 2026-11 rebalance: a win always pays the table (Normal win = 4), so
+        // 2026-11 rebalance: a game always pays the table (Normal = 2), so
         // the balance may move by exactly the funnel's own payout and no more.
         let paid = gs.recordMinigameResult(modeID: "snake", difficulty: .normal,
                                            won: true, score: 0)
         gs.endTrophyRun()
 
-        XCTAssertEqual(paid, CoinPayouts.competitiveWin)
+        XCTAssertEqual(paid, CoinPayouts.competitiveCoins(.normal))
         XCTAssertNotNil(gs.trophyToasts.presented, "The win still toasts…")
         XCTAssertEqual(gs.coinBalance, before + paid,
                        "…but the toast path grants no coins (D1 never-mint).")
