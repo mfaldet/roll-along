@@ -307,13 +307,13 @@ struct CoinPitMode: GameMode {
     let showsScore                   = true
 }
 
-/// Comet Clash — Tron light-cycle twist (internal id stays "snake").  Tilt-steer
-/// a comet that leaves a glowing, lethal wall; the wall fades over time but lasts
-/// longer the more sparks you grab and rivals you wreck.  Last comet glowing wins.
+/// Snacky — the snake game (internal id stays "snake"; it replaced Comet Clash).
+/// Tilt to steer; each orb eaten adds a matching ball behind you.  Hit any chain
+/// and you're out.  Solo is for a best score; Easy/Normal/Hard are last ball left.
 struct SnakeMode: GameMode {
     let id          = "snake"
-    let displayName = "Comet Clash"
-    let tagline     = "Leave a glowing wall. Grab sparks to extend it. Touch any trail and you're out."
+    let displayName = "Snacky"
+    let tagline     = "Eat orbs to grow a chain of balls. Hit any chain and you're out."
     let section:     GameModeSection = .competitive
     let control:     ControlScheme   = .tiltAccel
     let goal:        GoalKind        = .score
@@ -621,7 +621,7 @@ enum GameModeCatalogue {
         (DailyChallengeMode(), false),
         (ZenGardenMode(),    true),    // engine behavior implemented — live
         (CoinPitMode(),      true),    // engine behavior implemented — live
-        (SnakeMode(),        true),    // self-contained SnakeGameView — live
+        (SnakeMode(),        true),    // self-contained SnackyView (SnakeGameView.swift) — live
         (SumoSurvivalMode(), true),    // self-contained SumoSurvivalView — live
         (PaintBallMode(),    true),    // self-contained PaintBallView — live
         (GoldRushMode(),     true),    // self-contained GoldRushView — live
@@ -708,11 +708,6 @@ struct ModeTutorial {
                          goal: "Scoop up as many coins as you can in 30 seconds. A round costs 5 tickets.",
                          hazard: "Only the clock — nothing can hurt you.",
                          reward: "Every coin you grab banks straight to your balance — up to about 100 a round.")
-        case "snake":     // Comet Clash
-            return .init(controls: "Tilt to steer your comet.",
-                         goal: "Be the last comet still glowing.",
-                         hazard: "Touch ANY glowing wall — yours or theirs — and you're out.",
-                         reward: "1 to 3 coins; outlast everyone to win a ticket (5 tickets buy a Gold Rush round).")
         case "rollout":
             return .init(controls: "Tilt to roll the tiny ball through the maze.",
                          goal: "Reach the flag at the top of each maze.",
@@ -816,7 +811,7 @@ struct ModeTutorialOverlay: View {
 }
 
 /// Gates a mode's view behind its one-time how-to-play card.  Applied to each
-/// mode destination: `SnakeGameView().firstPlayTutorial("snake")`.  No-ops for
+/// mode destination: `SnackyView().firstPlayTutorial("snake")`.  No-ops for
 /// ids without an authored ModeTutorial (the climb, challenge tracks).
 private struct FirstPlayTutorialModifier: ViewModifier {
     let modeID: String

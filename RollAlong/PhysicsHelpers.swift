@@ -7,7 +7,7 @@ import CoreGraphics
 // CGSize) so they carry no view state and are straightforward to unit-test.
 //
 // Extracted from:
-//   • SnakeGameView  (bounceEdges, resolveWallSegment, resolveCircleObstacle)
+//   • Comet Clash (old SnakeGameView, now tools/comet-clash/) (bounceEdges, resolveWallSegment, resolveCircleObstacle)
 //   • GoldRushView   (bounceEdges, resolveWallSegment)
 // Plus:
 //   • resolveRectObstacle — circle-vs-rounded-UI collisions for the home

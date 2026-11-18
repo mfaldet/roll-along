@@ -224,8 +224,8 @@ telemetry before ship — the numbers here are design intents, not measured perc
 
 | id | name | tier | trigger | data_source | predicted_rarity | notes |
 |---|---|---|---|---|---|---|
-| snake_first_win | Last Comet Standing | bronze | Win a Comet Clash round | EXISTING `minigameWins["snake"]` ≥ 1 | uncommon 15% | |
-| snake_wins_10 | Ten-Tail Comet | bronze | Win 10 Comet Clash rounds lifetime | EXISTING `minigameWins["snake"]` ≥ 10 | rare 5% | |
+| snake_first_win | First Snack | bronze | Win a Snacky round (Easy, Normal or Hard) | EXISTING `minigameWins["snake"]` ≥ 1 | uncommon 15% | |
+| snake_wins_10 | Snack Attack | bronze | Win 10 Snacky rounds lifetime | EXISTING `minigameWins["snake"]` ≥ 10 | rare 5% | |
 | sumo_first_win | King of the Ring | bronze | Win a Sumo Survival match (rank #1) | EXISTING `minigameWins["sumo"]` ≥ 1 | uncommon 15% | |
 | sumo_wins_10 | Immovable Object | bronze | Win 10 Sumo Survival matches lifetime | EXISTING `minigameWins["sumo"]` ≥ 10 | rare 5% | |
 | paintball_first_win | Fresh Coat | bronze | Win a Paint Ball round | EXISTING `minigameWins["paintball"]` ≥ 1 | uncommon 18% | |

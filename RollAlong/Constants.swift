@@ -9,7 +9,7 @@ import CoreGraphics
 //     view's own "Tunables" block — coupling them here would prevent
 //     independent tuning of each minigame.
 //   • Single-site constants (e.g. reviewCooldownSecs in GameState, maxTrail
-//     Nodes in SnakeGameView) are left in place to avoid the overhead of a
+//     Nodes in the old Comet Clash view) are left in place to avoid the overhead of a
 //     cross-file hop for something with one call site.
 //
 // Add a constant here only when you confirm it appears in ≥ 2 files.

@@ -110,14 +110,14 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 | Six of the Best | Silver | Win at least once in each of the 6 competitive minigames. | `6.circle.fill` | `6.circle` |
 | Hundred-Round Veteran | Gold | Win 100 competitive minigame rounds. | `shield.lefthalf.filled` | `shield` |
 
-### Comet Clash
+### Snacky
 
-**Stack: Wins** · icon `scribble.variable` · fallback `scribble`
+**Stack: Wins** · icon `ellipsis` · fallback `circle.fill`
 
 | Step | Title | What it asks |
 |---|---|---|
-| Bronze I | Last Comet Standing | Win a Comet Clash round. |
-| Bronze II | Ten-Tail Comet | Win 10 Comet Clash rounds. |
+| Bronze I | First Snack | Win a Snacky round on Easy, Normal or Hard. |
+| Bronze II | Snack Attack | Win 10 Snacky rounds on Easy, Normal or Hard. |
 
 ### Sumo Survival
 
@@ -275,7 +275,7 @@ Rule (unchanged): every visible Bronze, Silver and Gold trophy outside Friends &
 - **Adventure** (26): Get the Ball Rolling, Training Wheels Off, Gathering Momentum, Beyond the Meadow, Boulder and Bolder, The Long Roll, Unstoppable Force, Altitude Sickness, Halfway to Heaven, Star Search, Stargazer, Rising Star, Star-Studded, Constellation, Star Power, A Thousand Points of Light, Milky Way, Supernova, One Hundred Perfect Rolls, Gone in Ten Seconds, Steady Hands, Clean Sheet, First Try!, Spotless, Untouchable, Nerves of Steel
 - **Challenges** (9): Sidetracked, Deep in the Pack, Track Record, Triple Crown, High Five, Run the Gauntlet, Seven-Day Roller, Month of Marbles, Season Ticket
 - **Minigames · All minigames** (7): Taste of the Arcade, The Grand Tour, Opening Night, Perfectly Normal, Six of the Best, Hard Bargain, Hundred-Round Veteran
-- **Minigames · Comet Clash** (2): Last Comet Standing, Ten-Tail Comet
+- **Minigames · Snacky** (2): First Snack, Snack Attack
 - **Minigames · Sumo Survival** (2): King of the Ring, Immovable Object
 - **Minigames · Paint Ball** (2): Fresh Coat, Wall-to-Wall
 - **Minigames · Smash and Grab** (2): Smash Hit, Serial Smasher

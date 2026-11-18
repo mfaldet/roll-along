@@ -82,7 +82,7 @@ create table if not exists public.players (
     -- Competitive-mode leaderboards (client-synced).  Each mode persists a
     -- personal best (mode-specific units) plus a lifetime win tally; the boards
     -- rank by wins, then best as the tiebreaker.
-    --   snake_*     — Comet Clash  (best = power; wins = rounds won)
+    --   snake_*     — Snacky (was Comet Clash; best = orbs eaten; wins = rounds won)
     --   sumo_*      — Sumo Survival(best = points; wins = 1st-place finishes)
     --   paintball_* — Paint Ball   (best = coverage %; wins = rounds won)
     --   marblecup_* — Marble Cup   (best = goals; wins = matches won)

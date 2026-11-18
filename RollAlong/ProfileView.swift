@@ -697,7 +697,7 @@ struct PlayerRanksCard: View {
         case .rollAlong:  return "flag.fill"
         case .zenGarden:  return "leaf.fill"
         case .rollUp:     return "arrow.up.circle.fill"
-        case .cometClash: return "sparkles"
+        case .snacky:     return "ellipsis"
         case .sumo:       return "shield.fill"
         case .paintBall:  return "paintbrush.fill"
         case .coinPit:    return "dollarsign.circle.fill"
@@ -711,7 +711,7 @@ struct PlayerRanksCard: View {
         case .rollAlong:  return Color(red: 0.30, green: 0.75, blue: 0.42)
         case .zenGarden:  return Color(red: 0.34, green: 0.78, blue: 0.55)
         case .rollUp:     return Color(red: 0.36, green: 0.70, blue: 1.00)
-        case .cometClash: return Color(red: 0.42, green: 0.80, blue: 1.00)
+        case .snacky:     return Color(red: 0.55, green: 1.00, blue: 0.62)
         case .sumo:       return Color(red: 0.95, green: 0.45, blue: 0.30)
         case .paintBall:  return Color(red: 0.70, green: 0.42, blue: 0.96)
         case .coinPit:    return Color(red: 1.00, green: 0.78, blue: 0.20)

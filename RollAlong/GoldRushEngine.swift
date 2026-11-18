@@ -22,7 +22,7 @@ import Foundation
 // The class is a plain (non-Observable) type with `private(set)` state so the
 // performance test measures pure simulation cost; the view schedules its own
 // redraws by mirroring the engine's arrays into @State once per tick.  Applying
-// the same pattern to de-duplicate SnakeGameView's physics is a future follow-up.
+// the same pattern to other minigame views is a future follow-up.
 // ---------------------------------------------------------------------------
 
 final class GoldRushEngine {

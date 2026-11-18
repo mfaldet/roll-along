@@ -235,7 +235,7 @@ struct TrophyRoomTile: Identifiable, Equatable {
     }
 }
 
-/// A sub-heading inside a section ("Comet Clash") with its tiles — stacks
+/// A sub-heading inside a section ("Snacky") with its tiles — stacks
 /// first, then feats.
 struct TrophyRoomSubsection: Identifiable, Equatable {
     let id: String

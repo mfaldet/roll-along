@@ -331,7 +331,8 @@ final class SocialClient: @unchecked Sendable {
     }
 
     /// Per-(game, difficulty) leaderboard rows.  Competitive games rank by
-    /// wins, then best; Disco Ball ("disco") by most crossings, then the
+    /// wins, then best; Snacky Solo ("snake"/"solo") by best only (Solo has
+    /// no wins); Disco Ball ("disco") by most crossings, then the
     /// faster average time per crossing (an unknown time last).  Mapped onto
     /// `PlayerProfile` with the chosen game's fields holding the
     /// per-difficulty values, so the leaderboard renders them like any board.
@@ -340,7 +341,8 @@ final class SocialClient: @unchecked Sendable {
         let isDisco = game == "disco"
         let sel = "player_id,wins,best" + (isDisco ? ",best_avg_ms" : "")
                 + ",players(display_name,climb_level,total_stars,highest_unlocked,lives)"
-        let order = isDisco ? "best.desc,best_avg_ms.asc.nullslast" : "wins.desc,best.desc"
+        let order = isDisco ? "best.desc,best_avg_ms.asc.nullslast"
+                  : (difficulty == "solo" ? "best.desc" : "wins.desc,best.desc")
         let query = "select=\(sel)&game=eq.\(game)&difficulty=eq.\(difficulty)"
                   + "&order=\(order)&limit=\(limit)"
         let data = try await send(method: "GET", path: "minigame_scores", query: query)
@@ -1432,7 +1434,7 @@ enum BoardCategory: Int, CaseIterable {
 
 enum LeaderboardBoard: String, CaseIterable, Identifiable {
     case rollAlong, zenGarden, rollUp, discoBall
-    case cometClash, sumo, paintBall, coinPit, marbleCup, kingOfHill
+    case snacky, sumo, paintBall, coinPit, marbleCup, kingOfHill
     var id: String { rawValue }
 
     /// Which category this board belongs to (drives the filter's grouping).
@@ -1451,7 +1453,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .zenGarden:  return "Zen Garden"
         case .rollUp:     return "Roll Up"
         case .discoBall:  return "Disco Ball"
-        case .cometClash: return "Comet Clash"
+        case .snacky:     return "Snacky"
         case .sumo:       return "Sumo Survival"
         case .paintBall:  return "Paint Ball"
         case .coinPit:    return "Smash and Grab"   // board id stays `coinPit`; backs the `goldrush` mode
@@ -1464,7 +1466,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
     /// the solo (Zen / Roll Up) boards.
     var competitiveModeID: String? {
         switch self {
-        case .cometClash: return "snake"
+        case .snacky:     return "snake"
         case .sumo:       return "sumo"
         case .paintBall:  return "paintball"
         case .coinPit:    return "goldrush"
@@ -1483,13 +1485,19 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         return self == .discoBall ? "disco" : nil
     }
 
-    /// The tab label for a difficulty ("easy" / "normal" / "hard") on this
+    /// True for the board that also has a fourth "Solo" tab: Snacky's Solo
+    /// mode (minigame_scores game "snake", difficulty "solo"; ranked by most
+    /// orbs eaten).
+    var hasSoloTab: Bool { self == .snacky }
+
+    /// The tab label for a difficulty ("easy" / "normal" / "hard" / "solo") on this
     /// board — the game's own names: Disco Ball's hardest level is "Hardcore".
     func difficultyLabel(_ key: String) -> String {
         switch key {
         case "easy":   return "Easy"
         case "normal": return "Normal"
         case "hard":   return self == .discoBall ? "Hardcore" : "Hard"
+        case "solo":   return "Solo"
         default:       return key.capitalized
         }
     }
@@ -1506,7 +1514,7 @@ enum LeaderboardBoard: String, CaseIterable, Identifiable {
         case .rollUp:     return "rollup_best.desc,rollup_best_seconds.desc"
         // Per difficulty only (minigame_scores); never read from `players`.
         case .discoBall:  return "climb_level.desc"
-        case .cometClash: return "snake_wins.desc,snake_best.desc"
+        case .snacky:     return "snake_wins.desc,snake_best.desc"
         case .sumo:       return "sumo_wins.desc,sumo_best.desc"
         case .paintBall:  return "paintball_wins.desc,paintball_best.desc"
         case .coinPit:    return "goldrush_wins.desc,goldrush_best.desc"

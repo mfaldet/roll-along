@@ -105,7 +105,7 @@ final class TrophyMigrationTests: XCTestCase {
     // MARK: - Mid-progress
 
     /// A believable early-mid save: cleared through climb level ~40 with a
-    /// scatter of stars, one Comet Clash win, one Zen hour, and one
+    /// scatter of stars, one Snacky win, one Zen hour, and one
     /// completed bundle. Grants exactly the derivable trophies its stats
     /// prove — and nothing keyed to a NEW counter or a harder threshold.
     func testMidProgressGrantsDerivableSubset() {
@@ -122,7 +122,7 @@ final class TrophyMigrationTests: XCTestCase {
         // One fast clear at 8.5s → clears skill_speed_10s (lte).
         writeDoubleDict([3: 8.5, 7: 22.0], key: "ra_bestTime")
 
-        // Minigames: 1 Comet Clash (snake) win, played snake + zen.
+        // Minigames: 1 Snacky (snake) win, played snake + zen.
         writeStringDict(["snake": 1], key: "ra_minigameWins")
         writeStringSet(["snake", "zen"], key: "ra_playedModeIDs")
         defaults.set(3600, forKey: "ra_zenSeconds")   // exactly 1 hour → zen_hour

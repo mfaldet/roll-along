@@ -1444,7 +1444,7 @@ final class DiscoBoardBestTests: XCTestCase {
         XCTAssertEqual(LeaderboardBoard.discoBall.category, .solo)
         // Disco Ball and the six competitive games have difficulty tabs.
         XCTAssertEqual(LeaderboardBoard.discoBall.difficultyGameID, "disco")
-        XCTAssertEqual(LeaderboardBoard.cometClash.difficultyGameID, "snake")
+        XCTAssertEqual(LeaderboardBoard.snacky.difficultyGameID, "snake")
         XCTAssertEqual(LeaderboardBoard.coinPit.difficultyGameID, "goldrush")
         XCTAssertNil(LeaderboardBoard.rollAlong.difficultyGameID)
         XCTAssertNil(LeaderboardBoard.zenGarden.difficultyGameID)

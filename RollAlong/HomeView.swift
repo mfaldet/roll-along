@@ -260,7 +260,7 @@ struct HomeView: View {
                                 .position(ballPos)
                             // Competitive modes arm the home marble with the
                             // player's name tag, just as it appears in the game
-                            // itself (Smash and Grab, Comet Clash, Sumo Survival,
+                            // itself (Smash and Grab, Snacky, Sumo Survival,
                             // Paint Ball, Marble Cup, King of the Hill).
                             if gameState.currentMode.section == .competitive {
                                 RivalNameTag(
@@ -480,7 +480,7 @@ struct HomeView: View {
                 case .games:       GameMenuView()
                 case .minigames:   MinigamesGridView()
                 case .mode("snake"):
-                    SnakeGameView()
+                    SnackyView()
                         .onAppear { AnalyticsClient.shared.track("minigame_entered", properties: ["game_mode": .string("snake")]) }
                         .firstPlayTutorial("snake")
                 case .mode("sumo"):
@@ -1453,7 +1453,7 @@ struct HomeView: View {
         }
         switch gameState.currentModeID {
         case "climb":     return "Level \(gameState.currentLevel)"
-        case "snake":     return "Last comet glowing wins"
+        case "snake":     return "Eat orbs · last ball wins"
         case "sumo":      return "Survive the waves"
         case "paintball": return "60s · most paint wins"
         case "marblecup": return "90s · marble soccer"

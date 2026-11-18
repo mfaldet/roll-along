@@ -8,7 +8,9 @@
 --   • the six competitive games (snake, sumo, paintball, goldrush, marblecup,
 --     koth): ranked by wins, then best score;
 --   • Disco Ball (game "disco"): ranked by most crossings in one run, then the
---     faster average time per crossing.
+--     faster average time per crossing;
+--   • Snacky Solo (game "snake", difficulty "solo"): a fourth board on Snacky,
+--     ranked by most orbs eaten in one run (best; wins stays 0).
 -- One row per player per game per difficulty in public.minigame_scores.
 --
 -- The table already exists on the live database (added 2026-06-28 with the
@@ -17,7 +19,8 @@
 --   1. creates it if it is missing (so the repository matches the database),
 --   2. adds best_avg_ms (Disco Ball's average time per crossing, ms),
 --   3. replaces any check rule on game / difficulty with one that allows
---      "disco", plus a sanity rule on the numbers,
+--      "disco" and Snacky's "solo" difficulty, plus a sanity rule on the
+--      numbers,
 --   4. (re)states the access rules: everyone signed in can read; a player
 --      can write only their own rows,
 --   5. adds the indexes the boards are ordered by.
@@ -69,7 +72,8 @@ alter table public.minigame_scores add constraint minigame_scores_game_valid
     check (game in ('snake', 'sumo', 'paintball', 'goldrush', 'marblecup', 'koth', 'disco'))
     not valid;
 alter table public.minigame_scores add constraint minigame_scores_difficulty_valid
-    check (difficulty in ('easy', 'normal', 'hard'))
+    check (difficulty in ('easy', 'normal', 'hard')
+           or (difficulty = 'solo' and game = 'snake'))   -- Snacky Solo (2026-11-18)
     not valid;
 -- Sanity: no negatives, no absurd numbers; a Disco Ball time is between a
 -- quarter of a second and ten minutes per crossing.

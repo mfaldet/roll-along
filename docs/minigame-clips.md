@@ -24,7 +24,7 @@ One clip per game, named `clip_` plus the game's id:
 |---|---|
 | Roll Up | `clip_rollup.mov` |
 | Disco Ball | `clip_disco.mov` |
-| Comet Clash | `clip_snake.mov` |
+| Snacky | `clip_snake.mov` |
 | Sumo Survival | `clip_sumo.mov` |
 | Paint Ball | `clip_paintball.mov` |
 | Smash and Grab | `clip_goldrush.mov` |

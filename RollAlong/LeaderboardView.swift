@@ -58,8 +58,9 @@ struct LeaderboardView: View {
     /// The difficulty tab on a board kept per difficulty (the six competitive
     /// games and Disco Ball).  Each tab ranks that difficulty's own
     /// `minigame_scores` rows; there is no combined board.
+    /// `.solo` is Snacky's Solo board only (`LeaderboardBoard.hasSoloTab`).
     private enum DiffFilter: String, CaseIterable, Identifiable {
-        case easy, normal, hard
+        case easy, normal, hard, solo
         var id: String { rawValue }
         /// The MinigameDifficulty rawValue stored in `minigame_scores`.
         var key: String { rawValue }
@@ -125,7 +126,9 @@ struct LeaderboardView: View {
             await load()
         }
         .onChange(of: selectedBoard) { _, _ in
-            // The difficulty tab carries over between boards that have one.
+            // The difficulty tab carries over between boards that have one;
+            // the Solo tab exists only on Snacky, so leave it for Normal.
+            if diffFilter == .solo && !selectedBoard.hasSoloTab { diffFilter = .normal }
             rows = []
             Task { await load() }
         }
@@ -257,6 +260,11 @@ struct LeaderboardView: View {
                 StatColumn(id: "AVG", width: 58, highlighted: false) { p in
                     AnyView(self.bestCell(LeaderboardBoard.crossingTime(p.discoballBestAvgMs ?? 0))) },
             ]
+        case .snacky where diffFilter == .solo:
+            // Snacky Solo: most orbs eaten in one run (no wins in Solo).
+            return [ StatColumn(id: "ORBS", width: 66, highlighted: true) { p in
+                AnyView(self.iconCell(system: "circle.fill", tint: Self.winTint,
+                                      value: "\(p.competitiveBest("snake"))")) } ]
         default:
             // Competitive boards: Wins (ranking) + Best.
             let mode = selectedBoard.competitiveModeID ?? ""
@@ -344,6 +352,8 @@ struct LeaderboardView: View {
             parts.append("\(profile.discoballBest ?? 0) crossings in one run")
             let ms = profile.discoballBestAvgMs ?? 0
             if ms > 0 { parts.append(String(format: "%.1f seconds per crossing", Double(ms) / 1000)) }
+        case .snacky where diffFilter == .solo:
+            parts.append("\(profile.competitiveBest("snake")) orbs in one Solo run")
         default:
             let mode = selectedBoard.competitiveModeID ?? ""
             parts.append("\(profile.competitiveWins(mode)) wins")
@@ -503,7 +513,7 @@ struct LeaderboardView: View {
             // board for the difficulty it was played on.
             if selectedBoard.difficultyGameID != nil {
                 HStack(spacing: 0) {
-                    ForEach(DiffFilter.allCases) { d in
+                    ForEach(DiffFilter.allCases.filter { $0 != .solo || selectedBoard.hasSoloTab }) { d in
                         diffSegment(d)
                     }
                 }

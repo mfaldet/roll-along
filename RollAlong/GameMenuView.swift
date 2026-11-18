@@ -397,7 +397,7 @@ struct GameMenuView: View {
         switch id {
         case "zen":      return ("leaf.fill",                [c(0.20, 0.72, 0.52), c(0.10, 0.50, 0.55)])
         case "coinpit":  return ("dollarsign.circle.fill",   [c(1.00, 0.80, 0.28), c(0.95, 0.55, 0.12)])
-        case "snake":    return ("sparkles",                 [c(0.32, 0.55, 1.00), c(0.58, 0.30, 0.95)])
+        case "snake":    return ("ellipsis",                 [c(0.32, 0.55, 1.00), c(0.58, 0.30, 0.95)])
         case "sumo":     return ("circle.dashed",            [c(0.98, 0.45, 0.40), c(0.92, 0.30, 0.45)])
         case "paintball":return ("paintbrush.pointed.fill",  [c(0.30, 0.62, 1.00), c(0.90, 0.40, 0.80)])
         case "goldrush": return ("bag.fill",                 [c(1.00, 0.78, 0.30), c(0.90, 0.50, 0.15)])
@@ -665,7 +665,7 @@ struct MinigamesGridView: View {
         "zen",        // Zen Garden         — last
     ]
     static let competitiveOrder: [String] = [
-        "snake",      // Comet Clash
+        "snake",      // Snacky
         "sumo",       // Sumo Survival
         "paintball",  // Paint Ball
         "goldrush",   // Smash and Grab

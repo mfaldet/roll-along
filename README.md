@@ -18,7 +18,7 @@ The main mode is called **Adventure** in the game. In the code it is still named
 |---|---|
 | **Adventure** (the main mode) | Tilt to the goal past the holes. The first 100 levels are authored (`LevelOverrides.json`); after that levels are generated, so Adventure does not end. Stars, coins and lives. |
 | **Challenge Tracks** (8) | Themed 100-level tracks generated from a seed. Finishing one grants a cosmetic collection. |
-| **Competitive minigames** (6, against AI rivals) | Comet Clash, Sumo Survival, Paint Ball, Smash and Grab, Marble Cup, King of the Hill |
+| **Competitive minigames** (6, against AI rivals) | Snacky, Sumo Survival, Paint Ball, Smash and Grab, Marble Cup, King of the Hill |
 | **Solo minigames** (4) | Zen Garden, Gold Rush, Roll Up, Disco Ball |
 
 All game art is drawn in code with SwiftUI `Canvas`; there are no image assets apart from the app icon.

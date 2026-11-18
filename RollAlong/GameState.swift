@@ -517,7 +517,7 @@ final class GameState: ObservableObject {
     }
 
     /// Personal-best score per competitive mode id: [modeID: best].  Units are
-    /// mode-specific (Comet Clash power, Sumo points, Paint Ball coverage %,
+    /// mode-specific (Snacky orbs, Sumo points, Paint Ball coverage %,
     /// Marble Cup goals, KotH hold-seconds).  Gold Rush keeps its own flat
     /// `goldrushBest` above; this dict covers the other competitive modes and
     /// feeds the per-mode leaderboards' "Best" column alongside the win tally.
@@ -3205,7 +3205,7 @@ enum MinigameDifficulty: String, CaseIterable, Identifiable {
 // OpponentTuning — EVERY opponent tuning number, in one place.
 //
 // To retune: change a value here, raise `version` by one, rebuild.  All six
-// competitive minigames (Comet Clash, Sumo Survival, Paint Ball, Smash and
+// competitive minigames (Snacky, Sumo Survival, Paint Ball, Smash and
 // Grab, Marble Cup, King of the Hill) read these and nothing else.
 // ===========================================================================
 enum OpponentTuning {
@@ -3356,63 +3356,83 @@ enum OpponentTuning {
     // ======================================================================
 
 
-    // ---- COMET CLASH -----------------------------------------------------
+    // ---- SNACKY ----------------------------------------------------------
+    // Snacky (mode id "snake") replaced Comet Clash in version 1.0.
 
-    // Speed (points per second).  Before tuning v3 every comet ran at 540.
-    /// Comet Clash: the fastest any comet can go.
-    static let cometTopSpeed: Double = 240
-    /// Comet Clash: a comet never drops below this; it always keeps rolling.
-    static let cometCruiseSpeed: Double = 90
-    /// Comet Clash: how hard the player's tilt pushes (full tilt).
-    static let cometPlayerPush: Double = 1_100
-    /// Comet Clash: an opponent's top speed is this share of `cometTopSpeed`
-    /// at zero effort, rising to all of it at full effort.  So Easy opponents
-    /// roll at roughly three quarters of the player's top speed.
-    static let cometOpponentSpeedFloor: Double = 0.62
-    /// Comet Clash: how quickly an opponent gets up to speed (points/s²).
-    static let cometOpponentSpeedUp: Double = 260
-    /// Comet Clash: how fast an opponent can turn (degrees per second) at zero
+    // The balls.
+    /// Snacky: radius (points) of every ball — heads and chain balls alike.
+    static let snackyBallRadius: Double = 11
+    /// Snacky: distance (points) along the path between two balls in a chain.
+    /// A little less than a ball's width, so a chain reads as one line.
+    static let snackySegmentSpacing: Double = 19
+    /// Snacky: two balls touch (a hit) when their centers are closer than
+    /// this share of a ball's width.  Under 1 forgives grazes.
+    static let snackyHitShare: Double = 0.8
+    /// Snacky: a chain never gets longer than this many balls (it still
+    /// counts every orb eaten).
+    static let snackyMaxSegments: Int = 150
+
+    // Speed and steering.
+    /// Snacky: the player's ball always rolls at this speed (points per second).
+    static let snackyPlayerSpeed: Double = 125
+    /// Snacky: how fast the player's ball can turn (degrees per second).
+    static let snackyPlayerTurnDegrees: Double = 330
+    /// Snacky: tilt smaller than this (share of full tilt) does not steer.
+    static let snackyTiltDeadZone: Double = 0.10
+
+    // Edges and grace.
+    /// Snacky: after an edge bounce a ball cannot hit its own chain for this
+    /// long (seconds), so a bounce is always survivable.
+    static let snackyEdgeGraceSeconds: Double = 0.6
+    /// Snacky: a head can never hit this many of its own nearest chain balls.
+    static let snackyOwnSkipSegments: Int = 2
+
+    // Orbs.
+    /// Snacky: orb radius (points).
+    static let snackyOrbRadius: Double = 9
+    /// Snacky: orbs on the board at once in Solo.
+    static let snackyOrbsSolo: Int = 1
+    /// Snacky: orbs on the board at once in Easy, Normal and Hard.
+    static let snackyOrbsVersus: Int = 5
+
+    // Opponents.  They avoid chains and edges first and go for orbs second;
+    // reaction delay, aim error and mistakes come from their OpponentBrain.
+    /// Snacky: an opponent's speed is this share of the player's at zero
+    /// effort, rising to the player's speed at full effort.
+    static let snackyOpponentSpeedFloor: Double = 0.82
+    /// Snacky: how fast an opponent can turn (degrees per second) at zero
     /// effort and at full effort.  Clumsy opponents turn wide.
-    static let cometTurnSlowDegrees: Double = 150
-    static let cometTurnFastDegrees: Double = 330
-
-    // The tail.  It is measured in LENGTH (points), not time, so it is the
-    // same behind a slow comet and a fast one.
-    /// Comet Clash: tail length when the round starts.
-    static let cometTailStartLength: Double = 110
-    /// Comet Clash: the tail grows by this much every second of the round.
-    static let cometTailGrowthPerSecond: Double = 7
-    /// Comet Clash: extra tail per point of charge (a spark or a knockout).
-    static let cometTailPerCharge: Double = 28
-    /// Comet Clash: the tail never gets longer than this.
-    static let cometTailMaxLength: Double = 620
-    /// Comet Clash: distance between the points the tail is made of.
-    static let cometTailPointSpacing: Double = 6
-    /// Comet Clash: a knocked-out comet's tail is gone within this long (seconds).
-    static let cometDeadTailFadeSeconds: Double = 0.8
-    /// Comet Clash: a comet cannot hit this much of its OWN newest tail, so
-    /// bouncing off a wall is survivable.
-    static let cometOwnTailIgnoreLength: Double = 110
-
-    // Opponent look-ahead.  Opponents avoid trails and walls first and go
-    // for sparks second.
-    /// Comet Clash: an opponent looks this far ahead in time (seconds × its
-    /// speed = distance)…
-    static let cometLookAheadSeconds: Double = 0.6
+    static let snackyTurnSlowDegrees: Double = 140
+    static let snackyTurnFastDegrees: Double = 300
+    /// Snacky: how far ahead an opponent looks (seconds × its speed) at zero
+    /// effort and at full effort…
+    static let snackyLookAheadSlowSeconds: Double = 0.45
+    static let snackyLookAheadFastSeconds: Double = 1.0
     /// …but never less than this many points.
-    static let cometLookAheadMin: Double = 70
-    /// Comet Clash: an opponent re-decides where to steer once per this share
-    /// of its reaction delay (never more often than every other tick).
-    static let cometReplanDelayShare: Double = 0.33
-    /// Comet Clash: during a mistake an opponent only looks this share of its
-    /// normal distance ahead — it reacts late and may clip a trail.
-    static let cometMistakeLookShare: Double = 0.3
-    /// Comet Clash: no opponent makes a mistake in the first seconds of a round.
-    static let cometGraceSeconds: Double = 8
-    /// Comet Clash: every comet starts at least this far (points) from any
-    /// wall, rock or edge, and all four start in the same open area.
-    static let cometStartClearance: Double = 46
-    // (end Comet Clash)
+    static let snackyLookAheadMin: Double = 40
+    /// Snacky: an opponent re-decides where to steer once per this share of
+    /// its reaction delay (never more often than every other tick).
+    static let snackyReplanDelayShare: Double = 0.33
+    /// Snacky: during a mistake an opponent only looks this share of its
+    /// normal distance ahead, so it reacts late and may clip a chain.
+    static let snackyMistakeLookShare: Double = 0.3
+    /// Snacky: no opponent makes a mistake in the first seconds of a round.
+    static let snackyGraceSeconds: Double = 6
+    /// Snacky: an opponent treats this many points inside an edge as blocked.
+    static let snackyEdgeAvoidMargin: Double = 18
+    /// Snacky: an opponent weighs headings up to this many degrees either side
+    /// of where it is going…
+    static let snackyCandidateSpreadDegrees: Double = 120
+    /// …in this many evenly spaced headings.
+    static let snackyCandidateCount: Int = 7
+
+    // After the player is out.
+    /// Snacky: the rest of the round runs this many times faster.
+    static let snackySpectateSpeed: Int = 3
+    /// Snacky: "Skip to result" plays at most this many seconds of the round;
+    /// if opponents are still going after that, the round ends there.
+    static let snackySkipMaxSeconds: Double = 60
+    // (end Snacky)
 
 
     // ---- SUMO SURVIVAL ---------------------------------------------------

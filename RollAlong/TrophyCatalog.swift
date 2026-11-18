@@ -548,7 +548,7 @@ struct TrophyTile: Codable, Equatable, Identifiable {
     /// Stack name ("Levels passed") or, for a feat, the trophy's title.
     let title: String
     let section: TrophyTileSection
-    /// Sub-heading inside the section ("Comet Clash", "Friends & Clans"), or
+    /// Sub-heading inside the section ("Snacky", "Friends & Clans"), or
     /// "" when the section has no sub-headings.
     let subsection: String
     /// SF Symbol for the tile.  No two tiles share one.

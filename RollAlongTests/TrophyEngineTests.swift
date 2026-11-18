@@ -3037,7 +3037,7 @@ final class TrophyRevisionTests: XCTestCase {
         }
         let minigames = try XCTUnwrap(model.tileSections.first { $0.section == .minigames })
         XCTAssertEqual(minigames.subsections.map(\.title),
-                       ["All minigames", "Comet Clash", "Sumo Survival", "Paint Ball",
+                       ["All minigames", "Snacky", "Sumo Survival", "Paint Ball",
                         "Smash and Grab", "Marble Cup", "King of the Hill",
                         "Roll Up", "Disco Ball", "Zen Garden", "Gold Rush"])
         let personal = try XCTUnwrap(model.tileSections.first { $0.section == .personal })
