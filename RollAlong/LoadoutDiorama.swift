@@ -796,12 +796,19 @@ private struct ReplayRecorderMenu: ViewModifier {
 //                Reduce Motion on, nothing moves.
 //   • .held    — a preview that is momentarily covered or scrolling: the
 //                same views, paused on their current frame.
-//   • .still   — Shop / Catalog / Locker grids and lists: never animates.
-//                Balls show their frozen (Reduce Motion) art; the shop draws
-//                its static swatches instead of the animated renderers.
+//   • .still   — never animates; balls show their frozen (Reduce Motion)
+//                art and the shop draws its static swatches.
+//   • .tile / .tileHeld / .tileFrozen — a Shop, Catalog, collection or
+//                Locker tile (see `CosmeticTileMotion`).  Tiles always draw
+//                the game's own renderers.  `.tile` animates at
+//                `ShopTileMotion.fps`; `.tileHeld` (the list is scrolling or
+//                the tile is off screen) keeps its current frame;
+//                `.tileFrozen` (Reduce Motion, or tile motion switched off)
+//                shows the item's hero frame (`cosmeticHeroTime`).
 // ===========================================================================
 enum CosmeticMotion: Equatable {
     case live, preview, held, still
+    case tile, tileHeld, tileFrozen
 
     /// Minimum seconds between frames: the renderer's own interval in play,
     /// at most 30 fps in a shop preview.
@@ -809,6 +816,8 @@ enum CosmeticMotion: Equatable {
         switch self {
         case .live, .still: return liveInterval
         case .preview, .held: return max(liveInterval ?? 0, 1.0 / 30.0)
+        case .tile, .tileHeld, .tileFrozen:
+            return max(liveInterval ?? 0, 1.0 / ShopTileMotion.fps)
         }
     }
 
@@ -819,6 +828,8 @@ enum CosmeticMotion: Equatable {
         case .live:         return false
         case .preview:      return reduceMotion
         case .held, .still: return true
+        case .tile:         return reduceMotion
+        case .tileHeld, .tileFrozen: return true
         }
     }
 
@@ -826,7 +837,107 @@ enum CosmeticMotion: Equatable {
     /// that is running or momentarily held); false in grids and lists and
     /// under Reduce Motion.
     func showsAnimatedRenderers(reduceMotion: Bool) -> Bool {
-        (self == .preview || self == .held) && !reduceMotion
+        switch self {
+        case .preview, .held:               return !reduceMotion
+        case .tile, .tileHeld, .tileFrozen: return true   // frozen when it must be
+        case .live, .still:                 return false
+        }
+    }
+
+    /// True where a paused timeline should hold its current frame instead of
+    /// being rebuilt as a fresh still (tiles that may resume animating).
+    var holdsFrame: Bool { self == .tile || self == .tileHeld }
+
+    /// True for the three tile states.
+    var isTile: Bool { self == .tile || self == .tileHeld || self == .tileFrozen }
+
+    /// True where a ball shows its frozen (Reduce Motion) art.
+    var showsBallStillArt: Bool { self == .still || self == .tileFrozen }
+}
+
+// ===========================================================================
+// Tile motion — the gentle animation of Shop / Catalog / Locker tiles.
+// ===========================================================================
+enum ShopTileMotion {
+    /// The one switch: set to false to keep every tile frozen on its hero
+    /// frame (for example if scrolling a full grid stutters on older phones).
+    static let animateTiles = true
+    /// Frame rate for visible tiles.  15 fps is a quarter of the display rate
+    /// on a 60 Hz phone: slow drifts, pulses and sparkles still read as
+    /// motion, while a screen of ~12–20 tiles redraws a quarter as often as
+    /// the 60 fps the game uses, leaving the main thread free for scrolling.
+    static let fps: Double = 15
+    /// Default hero instant (seconds on the renderers' clock) for a frozen
+    /// tile, used where an item has no hero time of its own: past the first
+    /// second, so particle and wave effects have spread out, and not at
+    /// t = 0, where many effects sit at their start.
+    static let defaultHeroTime: Double = 1.2
+}
+
+/// Seconds on the renderers' clock that a frozen tile draws (nil = use the
+/// real clock).  Set only by `CosmeticTileMotion`.
+private struct CosmeticHeroTimeKey: EnvironmentKey {
+    static let defaultValue: Double? = nil
+}
+
+/// True while the scroll view holding cosmetic tiles is moving.
+private struct CosmeticTilesScrollingKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var cosmeticHeroTime: Double? {
+        get { self[CosmeticHeroTimeKey.self] }
+        set { self[CosmeticHeroTimeKey.self] = newValue }
+    }
+    var cosmeticTilesScrolling: Bool {
+        get { self[CosmeticTilesScrollingKey.self] }
+        set { self[CosmeticTilesScrollingKey.self] = newValue }
+    }
+}
+
+/// Puts one tile into the right motion state:
+///   • frozen on its hero frame under Reduce Motion or with tile motion off;
+///   • held on its current frame while the list scrolls or it is off screen;
+///   • animating at `ShopTileMotion.fps` otherwise.
+/// Inside a preview (the Featured Bundle, a detail popup) the tile follows
+/// the preview's own motion instead.
+struct CosmeticTileMotion: ViewModifier {
+    let heroTime: Double
+    @Environment(\.cosmeticMotion) private var parent
+    @Environment(\.cosmeticTilesScrolling) private var scrolling
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = true
+
+    private var state: CosmeticMotion {
+        if parent == .preview || parent == .held { return parent }
+        if !ShopTileMotion.animateTiles || reduceMotion { return .tileFrozen }
+        return (scrolling || !visible) ? .tileHeld : .tile
+    }
+
+    func body(content: Content) -> some View {
+        let s = state
+        content
+            .environment(\.cosmeticMotion, s)
+            .environment(\.cosmeticHeroTime, s == .tileFrozen ? heroTime : nil)
+            .onScrollVisibilityChange(threshold: 0.05) { visible = $0 }
+    }
+}
+
+extension View {
+    /// Tile motion for one cosmetic tile (see `CosmeticTileMotion`).
+    func cosmeticTileMotion(heroTime: Double = ShopTileMotion.defaultHeroTime) -> some View {
+        modifier(CosmeticTileMotion(heroTime: heroTime))
+    }
+
+    /// Marks a scroll view of cosmetic tiles: every tile inside holds its
+    /// frame while the list moves.
+    func cosmeticTileScrollTracking(_ scrolling: Binding<Bool>) -> some View {
+        self
+            .onScrollPhaseChange { _, phase in
+                let moving = phase != .idle
+                if moving != scrolling.wrappedValue { scrolling.wrappedValue = moving }
+            }
     }
 }
 

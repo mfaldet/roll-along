@@ -1040,6 +1040,41 @@ final class CosmeticMotionTests: XCTestCase {
         XCTAssertTrue(CosmeticMotion.held.isPaused(reduceMotion: false))
     }
 
+    func testTilesDrawTheRealRenderersAtTheTileRate() {
+        for state in [CosmeticMotion.tile, .tileHeld, .tileFrozen] {
+            XCTAssertTrue(state.showsAnimatedRenderers(reduceMotion: false))
+            XCTAssertTrue(state.showsAnimatedRenderers(reduceMotion: true),
+                          "a frozen tile still uses the game's renderer")
+            XCTAssertEqual(state.frameInterval(nil) ?? 0, 1.0 / ShopTileMotion.fps, accuracy: 1e-9)
+            XCTAssertTrue(state.isTile)
+        }
+        XCTAssertGreaterThanOrEqual(ShopTileMotion.fps, 12)
+        XCTAssertLessThanOrEqual(ShopTileMotion.fps, 15)
+        // A visible tile moves; scrolling, off screen or frozen it does not.
+        XCTAssertFalse(CosmeticMotion.tile.isPaused(reduceMotion: false))
+        XCTAssertTrue(CosmeticMotion.tile.isPaused(reduceMotion: true))
+        XCTAssertTrue(CosmeticMotion.tileHeld.isPaused(reduceMotion: false))
+        XCTAssertTrue(CosmeticMotion.tileFrozen.isPaused(reduceMotion: false))
+        // Held tiles keep their frame; frozen balls show their still art.
+        XCTAssertTrue(CosmeticMotion.tileHeld.holdsFrame)
+        XCTAssertFalse(CosmeticMotion.tileFrozen.holdsFrame)
+        XCTAssertTrue(CosmeticMotion.tileFrozen.showsBallStillArt)
+        XCTAssertFalse(CosmeticMotion.tile.showsBallStillArt)
+        XCTAssertNil(EnvironmentValues().cosmeticHeroTime)
+        XCTAssertFalse(EnvironmentValues().cosmeticTilesScrolling)
+    }
+
+    func testHeroFramesSitAtThePulsePeak() {
+        // Breathing targets: sin(1.3 t) peaks at pi / 2.6.
+        XCTAssertEqual(CosmeticTileHero.goal(.target), Double.pi / 2.6, accuracy: 1e-9)
+        XCTAssertEqual(CosmeticTileHero.goal(.halo), Double.pi / 4, accuracy: 1e-9)
+        // Everything else freezes past the first second, never at t = 0.
+        XCTAssertEqual(CosmeticTileHero.time(for: TrailColor.fire), ShopTileMotion.defaultHeroTime)
+        for goal in GoalSkin.allCases {
+            XCTAssertGreaterThan(CosmeticTileHero.goal(goal), 0, "\(goal) hero frame")
+        }
+    }
+
     func testPlayIsUnchanged() {
         XCTAssertFalse(CosmeticMotion.live.isPaused(reduceMotion: true))
         XCTAssertNil(CosmeticMotion.live.frameInterval(nil))

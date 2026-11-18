@@ -17,6 +17,8 @@ struct LockerView: View {
     @EnvironmentObject var gameState: GameState
     @EnvironmentObject var nav:       Navigator
     @Environment(\.dismiss) var dismiss
+    /// True while the Locker scrolls — every tile holds its frame.
+    @State private var scrolling = false
 
     /// The screen beneath the Locker in the nav stack decides the back-button
     /// label: "Profile" when opened from the profile's loadout, "Shop" from the
@@ -84,8 +86,12 @@ struct LockerView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
                 .padding(.bottom, 48)
+                // Tiles hold their frames while the Locker scrolls.
+                .environment(\.cosmeticTilesScrolling, scrolling)
             }
-            // A grid: animated cosmetics stay still here (CosmeticMotion).
+            .cosmeticTileScrollTracking($scrolling)
+            // Tiles draw the game's own renderers (CosmeticTile), frozen or
+            // gently animating; nothing here is a full preview.
             .environment(\.cosmeticMotion, .still)
         }
         .navigationTitle("Locker")
@@ -250,83 +256,22 @@ struct LockerView: View {
 
     // MARK: - Per-item preview
 
+    /// The game's own renderer for the item (see `CosmeticTile`), framed to
+    /// fill the 56 pt cell: frozen on its hero frame, gently animating while
+    /// on screen.
     @ViewBuilder
     private func cosmeticPreview<Item: CosmeticItem>(for item: Item) -> some View {
         switch item {
-        case let s as BallSkin:
-            BallSkinView(skin: s, diameter: 48)
-                .padding(8)
-        case let g as GoalSkin:
-            Circle()
-                .fill(GoalSkin.previewGradient(for: g))
-                .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
-                .padding(8)
-        case let t as TrailColor:
-            Canvas { ctx, size in
-                var path = Path()
-                let pts = 10
-                for i in 0..<pts {
-                    let p = Double(i) / Double(pts - 1)
-                    let x = size.width * CGFloat(0.15 + p * 0.7)
-                    let y = size.height * CGFloat(0.85 - p * 0.7)
-                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                    else      { path.addLine(to: CGPoint(x: x, y: y)) }
-                }
-                if t == .rainbow {
-                    // Multi-hue stroke for the rainbow preview.
-                    let segs = pts - 1
-                    for i in 0..<segs {
-                        let t1 = Double(i) / Double(segs)
-                        let t2 = Double(i + 1) / Double(segs)
-                        let x1 = size.width * CGFloat(0.15 + t1 * 0.7)
-                        let y1 = size.height * CGFloat(0.85 - t1 * 0.7)
-                        let x2 = size.width * CGFloat(0.15 + t2 * 0.7)
-                        let y2 = size.height * CGFloat(0.85 - t2 * 0.7)
-                        var s = Path()
-                        s.move(to: CGPoint(x: x1, y: y1))
-                        s.addLine(to: CGPoint(x: x2, y: y2))
-                        ctx.stroke(s,
-                                   with: .color(Color(hue: t1, saturation: 1.0, brightness: 1.0)),
-                                   style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    }
-                } else {
-                    ctx.stroke(path,
-                               with: .color(t == .none ? Color(white: 0.30) : t.color),
-                               style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                }
-            }
-            .padding(4)
-        case let f as Floor:
-            RoundedRectangle(cornerRadius: 8).fill(f.color)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.30), lineWidth: 0.5))
-                .padding(6)
-        case let p as Pit:
-            ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.18))
-                RoundedRectangle(cornerRadius: 2).fill(p.color).frame(width: 26, height: 14)
-            }
-            .padding(6)
-        case let b as Boundary:
-            RoundedRectangle(cornerRadius: 4)
-                .fill(LinearGradient(colors: [b.color, b.deepColor],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(height: 16)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(b.edgeColor.opacity(0.9), lineWidth: 1.2))
-                .padding(8)
-        case let m as MusicTrack:
-            Image(systemName: m == .none ? "speaker.slash.fill" : "music.note")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: m == .none
-                            ? [Color(white: 0.35), Color(white: 0.20)]
-                            : [Color(red: 0.45, green: 0.65, blue: 1.00),
-                               Color(red: 0.25, green: 0.40, blue: 0.85)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-        default:
-            EmptyView()
+        case is BallSkin:
+            CosmeticTile(item: item, diameter: 46)
+        case is GoalSkin, is MusicTrack:
+            CosmeticTile(item: item, diameter: 44)
+        case is TrailColor:
+            CosmeticTile(item: item, trailWidth: 3.5)
+                .padding(2)
+        default:   // floors, pits, boundaries
+            CosmeticTile(item: item, corner: 8)
+                .padding(5)
         }
     }
 }

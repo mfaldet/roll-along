@@ -32,8 +32,9 @@ struct BallSkinView: View {
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.cosmeticMotion) private var cosmeticMotion
-    /// The frozen (Reduce Motion) art is also what grids and lists show.
-    private var reduceMotion: Bool { systemReduceMotion || cosmeticMotion == .still }
+    /// The frozen (Reduce Motion) art is also what a still list or a frozen
+    /// tile shows.
+    private var reduceMotion: Bool { systemReduceMotion || cosmeticMotion.showsBallStillArt }
     /// Timelines stop ticking where nothing moves: frozen art, or a shop
     /// preview that is held (see CosmeticMotion).
     private var timelinePaused: Bool {
@@ -5442,18 +5443,29 @@ struct SkinTick {
 }
 
 /// A TimelineView that is not created at all when the skin is still (Reduce
-/// Motion, or a grid or list — see CosmeticMotion): the content is drawn
-/// once instead, so a grid of animated balls holds no timelines.
+/// Motion, a frozen tile or a still list — see CosmeticMotion): the content
+/// is drawn once instead.  Tiles that may resume (`holdsFrame`) keep their
+/// timeline, paused, so they hold their current frame while a list scrolls.
 struct SkinTimeline<Content: View>: View {
     let interval: Double?
     let paused: Bool
-    @ViewBuilder let content: (SkinTick) -> Content
+    let content: (SkinTick) -> Content
+    @Environment(\.cosmeticMotion) private var motion
+
+    init(interval: Double?, paused: Bool,
+         @ViewBuilder content: @escaping (SkinTick) -> Content) {
+        self.interval = interval
+        self.paused = paused
+        self.content = content
+    }
 
     var body: some View {
-        if paused {
+        if paused && !motion.holdsFrame {
             content(SkinTick(date: Date()))
         } else {
-            TimelineView(.animation(minimumInterval: interval)) { tl in
+            // Tiles keep one timeline while they pause and resume, so a tile
+            // holds its current frame while the list scrolls.
+            TimelineView(.animation(minimumInterval: interval, paused: paused)) { tl in
                 content(SkinTick(date: tl.date))
             }
         }

@@ -215,6 +215,61 @@ final class SmokeTests: XCTestCase {
                       "Tapping a locked social button should raise the Sign-in-with-Apple prompt")
     }
 
+    // MARK: - Scrolling performance (Catalog tiles)
+
+    /// Opens Shop → Catalog and returns once the Catalog grid is up.
+    private func openCatalog() {
+        XCTAssertTrue(element("HomeView").waitForExistence(timeout: 10))
+        dismissSignInIfPresent(timeout: 5)
+        var shop = app.buttons["Shop"].firstMatch
+        if !shop.waitForExistence(timeout: 5) { shop = app.staticTexts["Shop"].firstMatch }
+        if !shop.exists { attachAccessibilityTree("missing-shop") }
+        XCTAssertTrue(shop.exists, "Shop button should be on Home — see the AX-tree attachment")
+        shop.tap()
+        // The Catalog link reads "Catalog, Browse everything" as one button.
+        var catalog = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Catalog'")).firstMatch
+        if !catalog.waitForExistence(timeout: 5) { catalog = app.staticTexts["Catalog"].firstMatch }
+        XCTAssertTrue(catalog.exists, "Catalog button should be in the Shop")
+        catalog.tap()
+        XCTAssertTrue(app.buttons["Collections"].firstMatch.waitForExistence(timeout: 5),
+                      "The Catalog's tabs should be up")
+    }
+
+    /// Swipes the open list up and down while Xcode records scroll hitches.
+    /// Read the result in the test report: "Hitch Time Ratio" under
+    /// Scroll Dragging and Scroll Deceleration.  Apple's guide: under 5 ms/s
+    /// is smooth, 5–10 ms/s noticeable, over 10 ms/s stutters.
+    private func measureScrolling() {
+        let options = XCTMeasureOptions()
+        options.invocationOptions = [.manuallyStop]
+        measure(metrics: [XCTOSSignpostMetric.scrollDraggingMetric,
+                          XCTOSSignpostMetric.scrollDecelerationMetric],
+                options: options) {
+            app.swipeUp(velocity: .fast)
+            app.swipeUp(velocity: .fast)
+            app.swipeUp(velocity: .fast)
+            app.swipeDown(velocity: .fast)
+            app.swipeDown(velocity: .fast)
+            app.swipeDown(velocity: .fast)
+            stopMeasuring()
+        }
+    }
+
+    /// The Collections list: every card shows six live cosmetic tiles.
+    func testCatalogCollectionsScrollPerformance() throws {
+        openCatalog()
+        measureScrolling()
+    }
+
+    /// The Trail grid: every tile runs the game's trail renderer.
+    func testCatalogTrailGridScrollPerformance() throws {
+        openCatalog()
+        let trailTab = app.buttons["Trail"].firstMatch
+        XCTAssertTrue(trailTab.waitForExistence(timeout: 5), "Trail tab should be in the Catalog")
+        trailTab.tap()
+        measureScrolling()
+    }
+
     // MARK: - Home screen elements
 
     func testHomeView_showsCoinBalance() throws {
