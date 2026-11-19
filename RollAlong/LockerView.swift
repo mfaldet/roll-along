@@ -197,7 +197,8 @@ struct LockerView: View {
             }
             .disabled(selected)
         } preview: {
-            LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(item))
+            LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(item),
+                           framesBoundary: item is Boundary)
                 .environment(\.cosmeticMotion, .preview)
                 .frame(width: 300, height: 300)
                 .background(Color(white: 0.08))

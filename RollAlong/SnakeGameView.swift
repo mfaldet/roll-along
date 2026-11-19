@@ -544,7 +544,8 @@ struct SnackyView: View {
         wantHeading = [:]
 
         let w = arena.width, h = arena.height
-        let playerSpeed = CGFloat(OpponentTuning.snackyPlayerSpeed)
+        // Everyone rolls at the difficulty's speed (Solo: Normal's).
+        let playerSpeed = CGFloat(OpponentTuning.snackySpeed(for: mode.difficulty))
         let playerTurn = CGFloat(OpponentTuning.snackyPlayerTurnDegrees) * .pi / 180
         // The player starts in the middle, heading up.  Opponents start near
         // the top corners heading down their own side, and at the bottom
