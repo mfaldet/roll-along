@@ -380,8 +380,11 @@ struct BuyLivesSheet: View {
         let inProgress = store.purchaseInProgress == pid
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 14) {
-                LivesPackIcon(kind: Self.packIconKind(pid))
-                    .frame(width: 56, height: 48)
+                // The Diamond ball cosmetic itself, with a cool glow — the
+                // ball this purchase adds to the Locker.
+                BallSkinView(skin: .diamond, diameter: 46)
+                    .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.6), radius: 6)
+                    .frame(width: 56, height: 52)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Diamond Balls")
@@ -547,12 +550,12 @@ struct BuyLivesSheet: View {
         )
     }
 
-    /// Pouch (20) → box (120) → chest (300); the truck is Diamond Balls.
+    /// Pouch (20) → box (120) → chest (300).  Diamond Balls shows the
+    /// Diamond ball itself (see `diamondBallsCard`).
     private static func packIconKind(_ pid: StoreKitManager.ProductID) -> LivesPackIcon.Kind {
         switch pid {
         case .lives120:  return .box
         case .lives300:  return .chest
-        case .unlimited: return .truck
         default:         return .pouch
         }
     }
@@ -694,14 +697,6 @@ struct BuyCoinsSheet: View {
         return whole > 0 ? "+\(whole)% coins" : nil
     }
 
-    /// "Top up your balance" on the 100- and 600-coin packs; nil otherwise.
-    static func topUpLine(for pid: StoreKitManager.ProductID) -> String? {
-        switch pid {
-        case .coins100, .coins600: return "Top up your balance"
-        default:                   return nil
-        }
-    }
-
     private func coinCard(
         pid: StoreKitManager.ProductID,
         amount: Int
@@ -734,13 +729,6 @@ struct BuyCoinsSheet: View {
                     Text(bonus)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(red: 0.40, green: 0.82, blue: 0.52))
-                }
-                // The two small packs can't buy a cosmetic on their own
-                // (the cheapest is 750 coins), so they say what they are for.
-                if let topUp = Self.topUpLine(for: pid) {
-                    Text(topUp)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.60))
                 }
             }
             Spacer()
@@ -824,17 +812,15 @@ struct BuyCoinsSheet: View {
 ///   .pouch (20 lives)  — a small cloth pouch, drawstring open, a few balls peeking out
 ///   .box   (120 lives) — a cardboard box, flaps open, filled with balls
 ///   .chest (300 lives) — a treasure chest, lid open, overflowing with balls
-///   .truck (Diamond Balls) — a semi-truck trailer heaped with balls and one
-///                            diamond ball sitting on top of the pile
 /// Every life ball is the same glossy red (the lives red used across the
-/// sheet); the only other ball is the single diamond on the truck.  The
-/// containers grow with the pack (about 0.58 / 0.76 / 0.90 / 1.0 of the
+/// sheet).  The
+/// containers grow with the pack (about 0.58 / 0.76 / 0.90 of the
 /// frame's width) while the balls stay one size, so bigger packs visibly hold
 /// more.  `compact` draws the pouch filling its frame with larger balls — the
 /// purchased-reserve badge beside the life balls.
 /// Drawn in a Canvas from fixed layouts: still, no randomness, no assets.
 struct LivesPackIcon: View {
-    enum Kind { case pouch, box, chest, truck }
+    enum Kind { case pouch, box, chest }
     let kind: Kind
     var compact: Bool = false
 
@@ -842,12 +828,46 @@ struct LivesPackIcon: View {
         Canvas { ctx, size in
             let s = min(size.width, size.height)
             let r = max(2.2, s * (compact ? 0.12 : 0.075))
+            // The containers are drawn standing on the frame's bottom edge,
+            // so the art sat low in its row.  Shift it up so the drawn
+            // content (from the top of the pile or lid down to the base) is
+            // centered vertically in the frame.  The reserve badge (compact)
+            // already fills its frame and is left as it was.
+            if !compact {
+                let bottom: CGFloat = size.height - 1
+                let top: CGFloat = Self.contentTop(kind, size: size, r: r)
+                ctx.translateBy(x: 0, y: size.height / 2 - (top + bottom) / 2)
+            }
             switch kind {
             case .pouch: Self.drawPouch(&ctx, size: size, r: r, compact: compact)
             case .box:   Self.drawBox(&ctx, size: size, r: r)
             case .chest: Self.drawChest(&ctx, size: size, r: r)
-            case .truck: Self.drawTruck(&ctx, size: size, r: r)
             }
+        }
+    }
+
+    /// Highest drawn point of each pack's art (top of the peeking balls, the
+    /// back flap or pile, the lid), from the same numbers the draw
+    /// functions use.
+    private static func contentTop(_ kind: Kind, size: CGSize, r: CGFloat) -> CGFloat {
+        let h: CGFloat = size.height
+        let bottom: CGFloat = h - 1
+        switch kind {
+        case .pouch:
+            let mouthY: CGFloat = bottom - h * 0.50 + r * 0.9
+            return mouthY - r * 1.35 - r
+        case .box:
+            let hb: CGFloat = h * 0.40
+            let top: CGFloat = bottom - hb
+            let flapTop: CGFloat = top - hb * 0.62
+            let pileTop: CGFloat = top + r * 0.55 - 2 * r * 1.62 - r
+            return min(flapTop, pileTop)
+        case .chest:
+            let hc: CGFloat = h * 0.36
+            let top: CGFloat = bottom - hc
+            let lidTop: CGFloat = top - hc * 1.05
+            let pileTop: CGFloat = top + r * 0.55 - 3 * r * 1.62 - r
+            return min(lidTop, pileTop)
         }
     }
 
@@ -871,45 +891,6 @@ struct LivesPackIcon: View {
         ctx.stroke(ball, with: .color(.black.opacity(0.35)), lineWidth: max(0.4, r * 0.12))
         let shine = CGRect(x: c.x - r * 0.62, y: c.y - r * 0.66, width: r * 0.56, height: r * 0.46)
         ctx.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.80)))
-    }
-
-    /// The one diamond ball (Diamond Balls icon only): cool white to cyan, a
-    /// soft halo, a bright specular and a four-point sparkle.
-    private static func diamondBall(_ ctx: inout GraphicsContext, _ c: CGPoint, _ r: CGFloat) {
-        let halo = CGRect(x: c.x - r * 1.7, y: c.y - r * 1.7, width: r * 3.4, height: r * 3.4)
-        ctx.fill(Path(ellipseIn: halo), with: .radialGradient(
-            Gradient(colors: [Color(red: 0.55, green: 0.88, blue: 1.0).opacity(0.55),
-                              Color(red: 0.55, green: 0.88, blue: 1.0).opacity(0.0)]),
-            center: c, startRadius: r * 0.8, endRadius: r * 1.7))
-        let rect = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
-        let ball = Path(ellipseIn: rect)
-        ctx.fill(ball, with: .radialGradient(
-            Gradient(colors: [.white,
-                              Color(red: 0.74, green: 0.93, blue: 1.00),
-                              Color(red: 0.45, green: 0.72, blue: 0.96)]),
-            center: CGPoint(x: c.x - r * 0.34, y: c.y - r * 0.40),
-            startRadius: 0, endRadius: r * 1.5))
-        // Two faint facet lines so it reads as cut, not as a plain blue ball.
-        var facets = Path()
-        facets.move(to: CGPoint(x: c.x - r * 0.75, y: c.y + r * 0.10))
-        facets.addLine(to: CGPoint(x: c.x + r * 0.10, y: c.y - r * 0.78))
-        facets.move(to: CGPoint(x: c.x - r * 0.20, y: c.y + r * 0.80))
-        facets.addLine(to: CGPoint(x: c.x + r * 0.78, y: c.y - r * 0.05))
-        ctx.stroke(facets, with: .color(.white.opacity(0.55)), lineWidth: max(0.4, r * 0.09))
-        ctx.stroke(ball, with: .color(.white.opacity(0.90)), lineWidth: max(0.5, r * 0.12))
-        let shine = CGRect(x: c.x - r * 0.62, y: c.y - r * 0.68, width: r * 0.52, height: r * 0.44)
-        ctx.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.95)))
-        // Sparkle at the upper right.
-        let sc = CGPoint(x: c.x + r * 0.95, y: c.y - r * 0.95)
-        let sr = r * 0.62
-        var star = Path()
-        star.move(to: CGPoint(x: sc.x, y: sc.y - sr))
-        star.addQuadCurve(to: CGPoint(x: sc.x + sr, y: sc.y), control: sc)
-        star.addQuadCurve(to: CGPoint(x: sc.x, y: sc.y + sr), control: sc)
-        star.addQuadCurve(to: CGPoint(x: sc.x - sr, y: sc.y), control: sc)
-        star.addQuadCurve(to: CGPoint(x: sc.x, y: sc.y - sr), control: sc)
-        star.closeSubpath()
-        ctx.fill(star, with: .color(.white))
     }
 
     /// Ball centers for a heap whose bottom row sits at `baseY`, filling
@@ -1149,77 +1130,6 @@ struct LivesPackIcon: View {
         lifeBall(&ctx, CGPoint(x: right - r * 0.2, y: bottom - r), r)
     }
 
-    // MARK: Diamond Balls — semi-truck trailer
-
-    private static let trailerFace = Gradient(colors: [
-        Color(red: 0.82, green: 0.86, blue: 0.92),
-        Color(red: 0.48, green: 0.53, blue: 0.61),
-    ])
-    private static let cabFace = Gradient(colors: [
-        Color(red: 0.26, green: 0.50, blue: 0.90),
-        Color(red: 0.12, green: 0.26, blue: 0.56),
-    ])
-
-    private static func drawTruck(_ ctx: inout GraphicsContext, size: CGSize, r: CGFloat) {
-        let w = size.width, h = size.height
-        let s = min(w, h)
-        let bottom: CGFloat = h - 1
-        let wr: CGFloat = max(2.5, s * 0.085)               // wheel radius
-        let deckY: CGFloat = bottom - wr * 1.25             // underside of the bodies
-        let trailer = CGRect(x: w * 0.01, y: deckY - h * 0.27, width: w * 0.73, height: h * 0.27)
-
-        // Heap of balls above the open trailer.
-        let pile = heap(baseY: trailer.minY + r * 0.55,
-                        minX: trailer.minX + 1, maxX: trailer.maxX - 1, rows: 3, r: r)
-        for p in pile { lifeBall(&ctx, p, r) }
-        let peakY: CGFloat = pile.map { $0.y }.min() ?? trailer.minY
-
-        // Trailer side: aluminum with ribs.
-        let side = Path(roundedRect: trailer, cornerRadius: 1.5)
-        ctx.fill(side, with: .linearGradient(trailerFace,
-                                             startPoint: CGPoint(x: trailer.minX, y: trailer.minY),
-                                             endPoint: CGPoint(x: trailer.minX, y: trailer.maxY)))
-        var ribs = Path()
-        for k in 1..<6 {
-            let x: CGFloat = trailer.minX + trailer.width * CGFloat(k) / 6
-            ribs.move(to: CGPoint(x: x, y: trailer.minY + 1.5))
-            ribs.addLine(to: CGPoint(x: x, y: trailer.maxY - 1.5))
-        }
-        ctx.stroke(ribs, with: .color(.black.opacity(0.18)), lineWidth: 0.6)
-        ctx.stroke(side, with: .color(outline), lineWidth: 0.8)
-
-        // Hitch and cab.
-        let hitch = CGRect(x: trailer.maxX - 1, y: deckY - h * 0.06, width: w * 0.05, height: h * 0.04)
-        ctx.fill(Path(hitch), with: .color(Color(white: 0.22)))
-        let cab = CGRect(x: w * 0.77, y: deckY - h * 0.30, width: w * 0.22, height: h * 0.30)
-        let cabPath = Path(roundedRect: cab, cornerRadius: cab.width * 0.28, style: .continuous)
-        ctx.fill(cabPath, with: .linearGradient(cabFace,
-                                                startPoint: CGPoint(x: cab.minX, y: cab.minY),
-                                                endPoint: CGPoint(x: cab.minX, y: cab.maxY)))
-        ctx.stroke(cabPath, with: .color(outline), lineWidth: 0.8)
-        let window = CGRect(x: cab.minX + cab.width * 0.30, y: cab.minY + cab.height * 0.14,
-                            width: cab.width * 0.58, height: cab.height * 0.32)
-        ctx.fill(Path(roundedRect: window, cornerRadius: 1.5),
-                 with: .color(Color(red: 0.78, green: 0.92, blue: 1.0)))
-        let lamp = CGRect(x: cab.maxX - cab.width * 0.18, y: cab.maxY - cab.height * 0.30,
-                          width: cab.width * 0.14, height: cab.height * 0.12)
-        ctx.fill(Path(ellipseIn: lamp), with: .color(Color(red: 1.0, green: 0.92, blue: 0.55)))
-
-        // Wheels: tandem under the trailer, one under the cab.
-        let wheelXs: [CGFloat] = [trailer.minX + trailer.width * 0.16,
-                                  trailer.minX + trailer.width * 0.34,
-                                  cab.midX]
-        for x in wheelXs {
-            let c = CGPoint(x: x, y: bottom - wr)
-            let tire = CGRect(x: c.x - wr, y: c.y - wr, width: wr * 2, height: wr * 2)
-            ctx.fill(Path(ellipseIn: tire), with: .color(Color(white: 0.12)))
-            let hub = tire.insetBy(dx: wr * 0.48, dy: wr * 0.48)
-            ctx.fill(Path(ellipseIn: hub), with: .color(Color(white: 0.70)))
-        }
-
-        // The one diamond ball, sitting on top of the pile.
-        diamondBall(&ctx, CGPoint(x: trailer.midX, y: peakY - r * 1.75), r * 1.35)
-    }
 }
 
 /// Lowest tier — just a few coins in a little pile.

@@ -106,6 +106,13 @@ extension BallSkin {
     /// seasonal / limited-time event balls — SELLABLE via Sell Back.
     static let iconicBalls: Set<BallSkin> = [.trophy, .diamond, .moneyBall]
     var isIconic: Bool { tier == .starter || Self.iconicBalls.contains(self) }
+
+    /// Balls that exist only in the Locker, and only once owned: never in the
+    /// Shop, the Catalog (even when owned), a collection, the release
+    /// calendar or a gift pool.  The Diamond ball comes only with the
+    /// Diamond Balls purchase.
+    static let lockerOnlyBalls: Set<BallSkin> = [.diamond]
+    var isLockerOnly: Bool { Self.lockerOnlyBalls.contains(self) }
 }
 
 /// Tier roughly corresponds to price + rarity.
@@ -1912,6 +1919,9 @@ enum CosmeticSchedule {
     /// Empty = available from launch.
     static func releaseKeys<Item: CosmeticItem>(of item: Item) -> [String] {
         if item.tier == .starter || item == Item.starter { return [] }   // defaults (e.g. Graphite) are always out
+        // Locker-only balls (Diamond) are never on the calendar: they come
+        // only with a purchase, so they need no release day.
+        if let ball = item as? BallSkin, ball.isLockerOnly { return [] }
         if let ids = itemCollections[key(String(describing: Item.self), item.rawValue)] { return ids }
         return looseSlot(item.rawValue).map { [$0] } ?? []
     }
@@ -2189,7 +2199,8 @@ enum ShopRotation {
     }
     static var ballPool: [BallSkin] {
         BallSkin.allCases.filter {
-            !$0.isBundleExclusive && $0.tier != .starter && CosmeticSchedule.isReleased($0)
+            !$0.isBundleExclusive && !$0.isLockerOnly && $0.tier != .starter
+                && CosmeticSchedule.isReleased($0)
         }
     }
     static var trailPool: [TrailColor] {

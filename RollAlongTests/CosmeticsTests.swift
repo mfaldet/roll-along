@@ -985,6 +985,21 @@ final class CosmeticsTests: XCTestCase {
                        "the upgraded set is saved")
     }
 
+    // MARK: - Diamond ball is Locker-only
+
+    func testDiamondBall_isLockerOnly() {
+        XCTAssertTrue(BallSkin.diamond.isLockerOnly)
+        XCTAssertFalse(CosmeticBundle.catalogue.contains { $0.balls.contains(.diamond) },
+                       "the Diamond ball is in no collection")
+        XCTAssertFalse(BallPack.catalogue.contains { $0.skins.contains(.diamond) },
+                       "the Diamond ball is in no ball pack")
+        XCTAssertFalse(ShopRotation.ballPool.contains(.diamond),
+                       "the Diamond ball never rotates into the Shop")
+        XCTAssertTrue(CosmeticSchedule.releaseKeys(of: BallSkin.diamond).isEmpty,
+                      "the Diamond ball is not on the release calendar")
+        XCTAssertFalse(BallSkin.diamond.isCoinPurchasable)
+    }
+
 }
 
 // MARK: - Loadout preview recording
@@ -1201,5 +1216,26 @@ final class TrailMarksTests: XCTestCase {
         XCTAssertTrue(frozen.times.allSatisfy { 7.3 - $0 < TrailMarks.lifetime && $0 <= 7.3 })
         let rolling = ShopTrailCurve.marks(along: pts, t: 7.3, rolling: true)
         XCTAssertTrue(rolling.times.allSatisfy { 7.3 - $0 < TrailMarks.lifetime && $0 <= 7.3 + 1e-9 })
+    }
+
+    /// The rolling tile: the ball leaves past the right edge and stays off
+    /// screen until the whole trail has faded, so a new lap never starts
+    /// over the old trail.
+    func testShopCurveHoldsOffscreenUntilTrailFades() {
+        let unit = ShopTrailCurve.rollingCurve
+        let pts = unit.map { CGPoint(x: $0.x * 100, y: $0.y * 100) }
+        let visible = ShopTrailCurve.unitCurve.count
+        XCTAssertGreaterThan(unit.last?.x ?? 0, 1.0)
+        // Sample a few cycles finely: whenever a lap has just started (the
+        // ball is near the left), no mark from the previous lap remains.
+        var t = 0.0
+        while t < 20 {
+            let m = ShopTrailCurve.marks(along: pts, t: t, rolling: true, visibleCount: visible)
+            XCTAssertEqual(m.lapBreak, 0)
+            XCTAssertTrue(m.times.allSatisfy { t - $0 < TrailMarks.lifetime && $0 <= t + 1e-9 })
+            if !m.ballVisible { XCTAssertGreaterThan(m.head.x, 100) }
+            t += 0.05
+        }
+        XCTAssertGreaterThan(ShopTrailCurve.offscreenHold, TrailMarks.lifetime)
     }
 }
