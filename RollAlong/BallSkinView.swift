@@ -1805,7 +1805,6 @@ struct BallSkinView: View {
     // gem facets.  Clipped to a circle by the caller.
     // =========================================================================
 
-    /// Polished glass marble — lit base + glowing rim light + soft & sharp speculars.
     /// Dune (Epic, static) — wind-rippled sand: warm tan bands curving across
     /// the ball like dune ridges, each with a lit crest and a soft shadow on
     /// its lee side, over the existing desert-dusk shading.  No motion.
@@ -1834,8 +1833,10 @@ struct BallSkinView: View {
                 for j in 0...steps {
                     let u = Double(j) / Double(steps)
                     let x = cx - r + CGFloat(u) * r * 2
-                    let y = y0 + CGFloat(sin(u * .pi * 2.0 + Double(k) * 0.9)) * amp
-                        - CGFloat(u - 0.5) * r * 0.18                // ridges tilt with the wind
+                    let phase: Double = u * Double.pi * 2.0 + Double(k) * 0.9
+                    let wave: CGFloat = CGFloat(sin(phase)) * amp
+                    let tilt: CGFloat = CGFloat(u - 0.5) * r * 0.18   // ridges tilt with the wind
+                    let y: CGFloat = y0 + wave - tilt
                     if j == 0 { crest.move(to: CGPoint(x: x, y: y)) } else { crest.addLine(to: CGPoint(x: x, y: y)) }
                 }
                 // Lee-side shadow just below the crest, then the lit crest line.
@@ -1852,6 +1853,7 @@ struct BallSkinView: View {
         }
     }
 
+    /// Polished glass marble — lit base + glowing rim light + soft & sharp speculars.
     private func glossMarble(_ colors: [Color]) -> some View {
         Canvas { ctx, size in
             let w = size.width, h = size.height

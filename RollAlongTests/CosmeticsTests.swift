@@ -879,9 +879,6 @@ final class CosmeticsTests: XCTestCase {
 
     // MARK: - Music is not in 1.0
 
-    /// While music is off, no collection offers, prices, grants or requires a
-    /// music track, and no player-facing summary names one — but the music
-    /// data stays in place so it can return in an update.
     /// Approved pit redraws: drawn art for 18 pits; only the two Rare ones
     /// (Graveyard, Aurora) move; Midnight shows as "Moonlit" with its old id.
     func testPitRedraws_tiersAndNames() {
@@ -899,6 +896,9 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(haunted.fullPrice(), 7_000)
     }
 
+    /// While music is off, no collection offers, prices, grants or requires a
+    /// music track, and no player-facing summary names one — but the music
+    /// data stays in place so it can return in an update.
     func testMusicOff_collectionsNeitherOfferNorPriceMusic() throws {
         try XCTSkipIf(CosmeticFeatures.musicEnabled, "music is offered")
         let gs = makeCleanState()

@@ -2657,10 +2657,12 @@ struct BallGameView: View {
             BallSkinView(skin: s, diameter: 48)
                 .padding(6)
         case let g as GoalSkin:
-            Circle()
-                .fill(GoalSkin.previewGradient(for: g))
-                .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
+            // The real goal, drawn by the game's own renderer, with Shop-tile
+            // motion: gentle 15 fps while visible, frozen on its hero frame
+            // under Reduce Motion, held while the list scrolls.
+            GoalSkinView(goal: g)
                 .padding(6)
+                .cosmeticTileMotion(heroTime: CosmeticTileHero.goal(g))
         case let t as TrailColor:
             Canvas { ctx, size in
                 var path = Path()
@@ -4880,10 +4882,12 @@ extension PitOverlayView {
     /// Graveyard (Rare): gravestones on the far rim and a faint ghost that
     /// drifts slowly across the depth.
     var graveyardPitOverlay: some View {
+        // Paused outright under Reduce Motion (even in play, where the motion
+        // mode is `.live` and never pauses), frozen at t = 0.
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
-                                paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t: Double = heroTime ?? tl.date.timeIntervalSinceReferenceDate
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
                 PitArt.drawGraveyard(in: &ctx, size: size, t: t)
             }
         }
@@ -4893,10 +4897,12 @@ extension PitOverlayView {
     /// Aurora (Rare): a green-to-violet aurora band rippling slowly in the
     /// depth under a few still stars.
     var auroraPitOverlay: some View {
+        // Paused outright under Reduce Motion (even in play, where the motion
+        // mode is `.live` and never pauses), frozen at t = 0.
         TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
-                                paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t: Double = heroTime ?? tl.date.timeIntervalSinceReferenceDate
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
                 PitArt.drawAurora(in: &ctx, size: size, t: t)
             }
         }
@@ -5057,9 +5063,9 @@ enum PitArt {
                 blade.addQuadCurve(to: right, control: c2)
                 blade.closeSubpath()
                 let g = Double(rng.nextUnit())
-                let color = pass == 0
-                    ? Color(red: 0.10 + 0.06 * g, green: 0.30 + 0.12 * g, blue: 0.08 + 0.04 * g)
-                    : Color(red: 0.22 + 0.10 * g, green: 0.52 + 0.16 * g, blue: 0.14 + 0.06 * g)
+                let back: Color = Color(red: 0.10 + 0.06 * g, green: 0.30 + 0.12 * g, blue: 0.08 + 0.04 * g)
+                let front: Color = Color(red: 0.22 + 0.10 * g, green: 0.52 + 0.16 * g, blue: 0.14 + 0.06 * g)
+                let color: Color = pass == 0 ? back : front
                 ctx.fill(blade, with: .color(color))
             }
         }
@@ -5519,13 +5525,17 @@ enum PitArt {
         let across = GraphicsContext.Shading.linearGradient(colors, startPoint: .zero,
                                                             endPoint: CGPoint(x: w, y: 0))
         // Soft curtain rising above the band.
-        let curtain = polygon(top.map { CGPoint(x: $0.x, y: $0.y - h * 0.20) } + top.reversed())
+        let lift: CGFloat = h * 0.20
+        let raised: [CGPoint] = top.map { CGPoint(x: $0.x, y: $0.y - lift) }
+        let topBack: [CGPoint] = Array(top.reversed())
+        let bottomBack: [CGPoint] = Array(bottom.reversed())
+        let curtain = polygon(raised + topBack)
         var glow = ctx
         glow.blendMode = .plusLighter
         glow.opacity = 0.22
         glow.fill(curtain, with: across)
         // The band itself.
-        let band = polygon(top + bottom.reversed())
+        let band = polygon(top + bottomBack)
         var bright = ctx
         bright.blendMode = .plusLighter
         bright.opacity = 0.55
@@ -6907,10 +6917,6 @@ struct GoalSkinView: View {
         }
     }
 
-    /// Reusable static banded-target renderer for the Standard goals — the same
-    /// recipe as `simpleBullseyeTarget`, driven by a caller-supplied colour ramp
-    /// (OUTER → INNER, from the goal's `targetBands`).  No particles; a faint
-    /// breathe keeps it alive.
     /// The Standard themed goals, drawn to match their names.  Standard, so
     /// static: no timeline, nothing moves (in play, tiles or Reduce Motion).
     /// Every one keeps a clear round center where the ball finishes, ringed
@@ -7159,6 +7165,10 @@ struct GoalSkinView: View {
         .clipShape(Circle())
     }
 
+    /// Reusable static banded-target renderer for the Standard goals — the same
+    /// recipe as `simpleBullseyeTarget`, driven by a caller-supplied colour ramp
+    /// (OUTER → INNER, from the goal's `targetBands`).  No particles; a faint
+    /// breathe keeps it alive.
     private func bandedTargetGoal(_ colors: [Color]) -> some View {
         let ramp = colors.isEmpty ? [Color.gray] : colors
         return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in

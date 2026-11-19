@@ -237,12 +237,14 @@ struct ProfileView: View {
                     }
                     loadoutRow(category: "Goal",
                                name: gameState.equippedGoal.displayName) {
-                        // Actual goal colour, not a tinted flag — so the swatch
-                        // matches what's equipped (including the default).
-                        Circle()
-                            .fill(GoalSkin.previewGradient(for: gameState.equippedGoal))
-                            .overlay(Circle().stroke(Color.white.opacity(0.30), lineWidth: 1))
+                        // The real goal, drawn by the game's own renderer and
+                        // frozen on its Shop hero frame: no timeline ticks in
+                        // the Profile list.
+                        GoalSkinView(goal: gameState.equippedGoal)
                             .frame(width: 20, height: 20)
+                            .environment(\.cosmeticMotion, .tileFrozen)
+                            .environment(\.cosmeticHeroTime,
+                                         CosmeticTileHero.goal(gameState.equippedGoal))
                     }
                     loadoutRow(category: "Floor",
                                name: gameState.equippedFloor.displayName) {
