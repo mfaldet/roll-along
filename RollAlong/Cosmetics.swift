@@ -1479,6 +1479,22 @@ enum Boundary: String, CosmeticItem {
         }
     }
 
+    /// True for the themed Standard / Rare walls whose texture is still (or
+    /// only gently moving and freezes cleanly), so it stays drawn under
+    /// Reduce Motion.  The Legendary animated walls keep their old rule:
+    /// under Reduce Motion only the plain base stroke shows.
+    var textureShowsUnderReduceMotion: Bool {
+        switch self {
+        case .ember, .notebook, .fairway, .sunset, .pastel, .holly, .autumn,
+             .lantern, .hardwood,
+             .velvet, .marble, .mahogany, .sandstone, .abyss, .brass,
+             .neon, .gold, .ice, .cloud, .tide, .phantom, .amethyst, .chrome:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Darker shade — gradient depth (platform undersides, wall base).
     var deepColor: Color { color.boundaryShaded(0.62) }
     /// Brighter shade — the lit rim/highlight along an edge.

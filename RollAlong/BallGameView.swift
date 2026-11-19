@@ -950,7 +950,7 @@ struct BallGameView: View {
             // .normal phase so the semantic state colours (arming-bright,
             // fell-red, won-green) always read unobstructed, then fades back
             // in.  Reduce Motion keeps the plain static stroke above.
-            if !reduceMotion {
+            if !reduceMotion || gameState.equippedBoundary.textureShowsUnderReduceMotion {
                 legendaryBorderOverlay
                     .opacity(borderPhase == .normal ? 1.0 : 0.0)
                     .animation(.easeInOut(duration: 0.35), value: borderPhase)
@@ -1081,7 +1081,9 @@ struct BallGameView: View {
         PitDepthShade(width: w, height: h)
     }
     private func paperFloorOverlay(geo: GeometryProxy) -> some View {
-        PaperFloorOverlayView(floor: floor)
+        // Equatable: the static floor textures are drawn once per layout,
+        // not on every frame of play.
+        PaperFloorOverlayView(floor: floor).equatable()
     }
 
 
@@ -4890,7 +4892,7 @@ struct PitDepthShade: View {
 
 /// Paper-world floor textures (ruled lines, graph grid, parchment, …).
 /// Draws nothing for other floors.
-struct PaperFloorOverlayView: View {
+struct PaperFloorOverlayView: View, Equatable {
     let floor: Floor
     var body: some View {
         GeometryReader { geo in paperFloorOverlay(geo: geo) }
@@ -4907,6 +4909,20 @@ struct PaperFloorOverlayView: View {
         case .parchment: parchmentTexture(geo: geo)
         case .sketch:    sketchGrain(geo: geo)
         case .origami:   origamiFolds(geo: geo)
+        // Themed Standard floors: static, low-contrast textures with
+        // deterministic seeds and no clock, so they never move, never
+        // compete with the ball and cost nothing per frame.
+        case .meadow:     meadowFloor
+        case .ember:      emberFloor
+        case .blueprint:  blueprintFloor
+        case .velvet:     velvetFloor
+        case .sunset:     sunsetFloor
+        case .mirage:     mirageFloor
+        case .desert:     desertFloor
+        case .stormcloud: stormcloudFloor
+        case .sugar:      sugarFloor
+        case .fog:        fogFloor
+        case .court:      courtFloor
         default:         EmptyView()
         }
     }
@@ -5041,6 +5057,345 @@ struct PaperFloorOverlayView: View {
             }
         }
     }
+
+    // MARK: Themed Standard floors (static)
+
+    /// Meadow — short grass blades with small white and yellow flowers.
+    private var meadowFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x4D_EAD0)
+            let blade = Color(red: 0.38, green: 0.62, blue: 0.30).opacity(0.30)
+            let bladeLight = Color(red: 0.92, green: 0.98, blue: 0.86).opacity(0.35)
+            let count = Int(size.width * size.height / 260)
+            for _ in 0..<count {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let lean = CGFloat(rng.nextUnit() - 0.5) * 3
+                let h = 3 + CGFloat(rng.nextUnit()) * 3
+                var p = Path()
+                p.move(to: CGPoint(x: x, y: y))
+                p.addLine(to: CGPoint(x: x + lean, y: y - h))
+                let light: Bool = rng.nextUnit() >= 0.75
+                ctx.stroke(p, with: .color(light ? bladeLight : blade), lineWidth: 0.9)
+            }
+            let flowers = max(6, Int(size.width * size.height / 5200))
+            for _ in 0..<flowers {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let yellow: Bool = rng.nextUnit() < 0.4
+                let petal: Color = (yellow ? Color(red: 1.0, green: 0.86, blue: 0.30) : Color.white).opacity(0.75)
+                for k in 0..<5 {
+                    let a: Double = Double(k) / 5.0 * 2.0 * Double.pi
+                    let px: CGFloat = x + CGFloat(cos(a)) * 1.8
+                    let py: CGFloat = y + CGFloat(sin(a)) * 1.8
+                    ctx.fill(Path(ellipseIn: CGRect(x: px - 1.2, y: py - 1.2, width: 2.4, height: 2.4)),
+                             with: .color(petal))
+                }
+                ctx.fill(Path(ellipseIn: CGRect(x: x - 0.9, y: y - 0.9, width: 1.8, height: 1.8)),
+                         with: .color(Color(red: 0.95, green: 0.70, blue: 0.15).opacity(0.85)))
+            }
+        }
+    }
+
+    /// Ember — warm gray ash with scattered dim orange coal specks.
+    private var emberFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0xE3B_E401)
+            let ash = Color(red: 0.45, green: 0.42, blue: 0.40)
+            for _ in 0..<Int(size.width * size.height / 900) {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 6 + CGFloat(rng.nextUnit()) * 16
+                let a: Double = 0.06 + rng.nextUnit() * 0.05
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r * 0.7, width: r * 2, height: r * 1.4)),
+                         with: .color(ash.opacity(a)))
+            }
+            let glow = Color(red: 1.0, green: 0.45, blue: 0.10).opacity(0.10)
+            let coal = Color(red: 0.95, green: 0.42, blue: 0.12).opacity(0.55)
+            for _ in 0..<Int(size.width * size.height / 2200) {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 0.8 + CGFloat(rng.nextUnit()) * 1.2
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r * 2.2, y: y - r * 2.2, width: r * 4.4, height: r * 4.4)),
+                         with: .color(glow))
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                         with: .color(coal))
+            }
+        }
+    }
+
+    /// Blueprint — white grid (minor and major lines) plus a few faint
+    /// drafting marks: a dimension line with end ticks and a compass arc.
+    private var blueprintFloor: some View {
+        Canvas { ctx, size in
+            let minor = Color.white.opacity(0.10)
+            let major = Color.white.opacity(0.20)
+            let step: CGFloat = 22
+            var i = 0
+            var x: CGFloat = 0
+            while x <= size.width {
+                var p = Path()
+                p.move(to: CGPoint(x: x, y: 0))
+                p.addLine(to: CGPoint(x: x, y: size.height))
+                let isMajor: Bool = i % 4 == 0
+                ctx.stroke(p, with: .color(isMajor ? major : minor), lineWidth: isMajor ? 0.8 : 0.5)
+                x += step
+                i += 1
+            }
+            i = 0
+            var y: CGFloat = 0
+            while y <= size.height {
+                var p = Path()
+                p.move(to: CGPoint(x: 0, y: y))
+                p.addLine(to: CGPoint(x: size.width, y: y))
+                let isMajor: Bool = i % 4 == 0
+                ctx.stroke(p, with: .color(isMajor ? major : minor), lineWidth: isMajor ? 0.8 : 0.5)
+                y += step
+                i += 1
+            }
+            let mark = Color.white.opacity(0.28)
+            // Dimension line with end ticks.
+            let dy: CGFloat = size.height * 0.18
+            let x0: CGFloat = size.width * 0.12
+            let x1: CGFloat = size.width * 0.52
+            var d = Path()
+            d.move(to: CGPoint(x: x0, y: dy))
+            d.addLine(to: CGPoint(x: x1, y: dy))
+            d.move(to: CGPoint(x: x0, y: dy - 5))
+            d.addLine(to: CGPoint(x: x0, y: dy + 5))
+            d.move(to: CGPoint(x: x1, y: dy - 5))
+            d.addLine(to: CGPoint(x: x1, y: dy + 5))
+            ctx.stroke(d, with: .color(mark), lineWidth: 0.7)
+            // Compass arc with a center cross.
+            let c = CGPoint(x: size.width * 0.74, y: size.height * 0.72)
+            var a = Path()
+            a.addArc(center: c, radius: min(size.width, size.height) * 0.16,
+                     startAngle: .degrees(200), endAngle: .degrees(340), clockwise: false)
+            a.move(to: CGPoint(x: c.x - 4, y: c.y))
+            a.addLine(to: CGPoint(x: c.x + 4, y: c.y))
+            a.move(to: CGPoint(x: c.x, y: c.y - 4))
+            a.addLine(to: CGPoint(x: c.x, y: c.y + 4))
+            ctx.stroke(a, with: .color(mark), style: StrokeStyle(lineWidth: 0.7, dash: [4, 3]))
+        }
+    }
+
+    /// Velvet — soft diagonal sheen bands, like crushed velvet.
+    private var velvetFloor: some View {
+        Canvas { ctx, size in
+            let span: CGFloat = size.width + size.height
+            let slant: CGFloat = size.height * 0.6
+            var k: CGFloat = -size.height
+            var rng = SeededRNG(seed: 0x7E1_7E7)
+            while k < span {
+                let w: CGFloat = 26 + CGFloat(rng.nextUnit()) * 40
+                var p = Path()
+                p.move(to: CGPoint(x: k, y: 0))
+                p.addLine(to: CGPoint(x: k + w, y: 0))
+                p.addLine(to: CGPoint(x: k + w + slant, y: size.height))
+                p.addLine(to: CGPoint(x: k + slant, y: size.height))
+                p.closeSubpath()
+                let light: Bool = rng.nextUnit() < 0.5
+                let tone: Color = light ? Color.white.opacity(0.07) : Color.black.opacity(0.10)
+                ctx.fill(p, with: .linearGradient(
+                    Gradient(colors: [.clear, tone, .clear]),
+                    startPoint: CGPoint(x: k, y: 0), endPoint: CGPoint(x: k + w, y: 0)))
+                k += w * 0.8
+            }
+        }
+    }
+
+    /// Sunset — wide soft bands from gold to orange to pink, top to bottom.
+    private var sunsetFloor: some View {
+        LinearGradient(stops: [
+            .init(color: Color(red: 1.00, green: 0.80, blue: 0.36).opacity(0.55), location: 0.0),
+            .init(color: .clear, location: 0.42),
+            .init(color: Color(red: 0.98, green: 0.48, blue: 0.52).opacity(0.50), location: 1.0),
+        ], startPoint: .top, endPoint: .bottom)
+    }
+
+    /// Mirage — faint wavy heat-haze lines across the sand.
+    private var mirageFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x313A_6E)
+            let lines: Int = max(6, Int(size.height / 34))
+            for n in 0..<lines {
+                let y0: CGFloat = (CGFloat(n) + 0.5) / CGFloat(lines) * size.height
+                let amp: CGFloat = 2 + CGFloat(rng.nextUnit()) * 2.5
+                let freq: Double = 0.025 + rng.nextUnit() * 0.02
+                let phase: Double = rng.nextUnit() * 6.28
+                var p = Path()
+                p.move(to: CGPoint(x: 0, y: y0 + amp * CGFloat(sin(phase))))
+                var x: CGFloat = 6
+                while x <= size.width + 6 {
+                    let yy: CGFloat = y0 + amp * CGFloat(sin(Double(x) * freq + phase))
+                    p.addLine(to: CGPoint(x: x, y: yy))
+                    x += 6
+                }
+                ctx.stroke(p, with: .color(Color.white.opacity(0.16)), lineWidth: 1.2)
+            }
+        }
+    }
+
+    /// Desert — wind ripples in the sand: gently curved crests with a
+    /// light top edge and a soft shadow just below.
+    private var desertFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0xDE5E_27)
+            let shadow = Color(red: 0.55, green: 0.40, blue: 0.20).opacity(0.16)
+            let light = Color.white.opacity(0.22)
+            var y: CGFloat = 8
+            while y < size.height + 10 {
+                let amp: CGFloat = 3 + CGFloat(rng.nextUnit()) * 3
+                let freq: Double = 0.018 + rng.nextUnit() * 0.012
+                let phase: Double = rng.nextUnit() * 6.28
+                var crest = Path()
+                crest.move(to: CGPoint(x: 0, y: y + amp * CGFloat(sin(phase))))
+                var x: CGFloat = 6
+                while x <= size.width + 6 {
+                    let yy: CGFloat = y + amp * CGFloat(sin(Double(x) * freq + phase))
+                    crest.addLine(to: CGPoint(x: x, y: yy))
+                    x += 6
+                }
+                ctx.stroke(crest.offsetBy(dx: 0, dy: 1.6), with: .color(shadow), lineWidth: 1.6)
+                ctx.stroke(crest, with: .color(light), lineWidth: 0.9)
+                y += 14 + CGFloat(rng.nextUnit()) * 8
+            }
+        }
+    }
+
+    /// Stormcloud — darker and lighter soft cloud shapes over slate.
+    private var stormcloudFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x5707_C1)
+            let clouds: Int = max(8, Int(size.width * size.height / 7000))
+            for _ in 0..<clouds {
+                let cx: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let cy: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let dark: Bool = rng.nextUnit() < 0.55
+                let tint: Color = dark ? Color.black.opacity(0.10) : Color.white.opacity(0.07)
+                for _ in 0..<5 {
+                    let r: CGFloat = 14 + CGFloat(rng.nextUnit()) * 22
+                    let ox: CGFloat = CGFloat(rng.nextUnit() - 0.5) * 50
+                    let oy: CGFloat = CGFloat(rng.nextUnit() - 0.5) * 18
+                    let center = CGPoint(x: cx + ox, y: cy + oy)
+                    ctx.fill(Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r * 0.7,
+                                                    width: r * 2, height: r * 1.4)),
+                             with: .radialGradient(Gradient(colors: [tint, .clear]),
+                                                   center: center, startRadius: 0, endRadius: r))
+                }
+            }
+        }
+    }
+
+    /// Sugar — scattered tiny white sugar-crystal sparkles.
+    private var sugarFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x5_06A2)
+            let crystal = Color.white.opacity(0.85)
+            let glint = Color.white.opacity(0.70)
+            let blush = Color(red: 0.90, green: 0.60, blue: 0.72).opacity(0.10)
+            for _ in 0..<Int(size.width * size.height / 420) {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let y: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 0.6 + CGFloat(rng.nextUnit()) * 0.9
+                // A tiny diamond (rotated square).
+                var d = Path()
+                d.move(to: CGPoint(x: x, y: y - r * 1.3))
+                d.addLine(to: CGPoint(x: x + r, y: y))
+                d.addLine(to: CGPoint(x: x, y: y + r * 1.3))
+                d.addLine(to: CGPoint(x: x - r, y: y))
+                d.closeSubpath()
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r * 1.8, y: y - r * 1.8, width: r * 3.6, height: r * 3.6)),
+                         with: .color(blush))
+                ctx.fill(d, with: .color(crystal))
+                if rng.nextUnit() < 0.12 {
+                    var star = Path()
+                    star.move(to: CGPoint(x: x - 2.4, y: y))
+                    star.addLine(to: CGPoint(x: x + 2.4, y: y))
+                    star.move(to: CGPoint(x: x, y: y - 2.4))
+                    star.addLine(to: CGPoint(x: x, y: y + 2.4))
+                    ctx.stroke(star, with: .color(glint), lineWidth: 0.5)
+                }
+            }
+        }
+    }
+
+    /// Fog — soft lighter patches of mist (static).
+    private var fogFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0xF0_6F06)
+            let mist = Color.white.opacity(0.16)
+            let patches: Int = max(6, Int(size.width * size.height / 9000))
+            for _ in 0..<patches {
+                let cx: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let cy: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let rx: CGFloat = 50 + CGFloat(rng.nextUnit()) * 70
+                let ry: CGFloat = rx * (0.35 + CGFloat(rng.nextUnit()) * 0.2)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2)),
+                         with: .radialGradient(Gradient(colors: [mist, .clear]),
+                                               center: CGPoint(x: cx, y: cy),
+                                               startRadius: 0, endRadius: rx))
+            }
+        }
+    }
+
+    /// Court — hardwood planks with grain, and a white court-line arc.
+    private var courtFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0xC0_0127)
+            let seamColor = Color(red: 0.45, green: 0.28, blue: 0.12).opacity(0.28)
+            let jointColor = Color(red: 0.45, green: 0.28, blue: 0.12).opacity(0.22)
+            let grainColor = Color(red: 0.55, green: 0.34, blue: 0.14).opacity(0.14)
+            let plank: CGFloat = 16
+            var x: CGFloat = 0
+            var col = 0
+            while x < size.width {
+                // A tone per plank.
+                let warm: Bool = rng.nextUnit() < 0.5
+                let toneAlpha: Double = 0.04 + rng.nextUnit() * 0.04
+                let tone: Color = warm ? Color(red: 0.5, green: 0.3, blue: 0.1).opacity(toneAlpha)
+                                       : Color.white.opacity(toneAlpha)
+                ctx.fill(Path(CGRect(x: x, y: 0, width: plank, height: size.height)), with: .color(tone))
+                // Plank seam.
+                var seam = Path()
+                seam.move(to: CGPoint(x: x, y: 0))
+                seam.addLine(to: CGPoint(x: x, y: size.height))
+                ctx.stroke(seam, with: .color(seamColor), lineWidth: 0.7)
+                // Staggered butt joints.
+                var y: CGFloat = col % 2 == 0 ? 0 : 60
+                while y < size.height {
+                    var joint = Path()
+                    joint.move(to: CGPoint(x: x, y: y))
+                    joint.addLine(to: CGPoint(x: x + plank, y: y))
+                    ctx.stroke(joint, with: .color(jointColor), lineWidth: 0.6)
+                    y += 120
+                }
+                // Two grain lines.
+                for g in 0..<2 {
+                    let jitter: CGFloat = CGFloat(rng.nextUnit() - 0.5) * 3
+                    let gx: CGFloat = x + plank * (0.3 + 0.4 * CGFloat(g)) + jitter
+                    var grain = Path()
+                    grain.move(to: CGPoint(x: gx, y: 0))
+                    var gy: CGFloat = 12
+                    while gy <= size.height + 12 {
+                        let wobble: CGFloat = CGFloat(sin(Double(gy) * 0.03 + Double(col))) * 1.2
+                        grain.addLine(to: CGPoint(x: gx + wobble, y: gy))
+                        gy += 12
+                    }
+                    ctx.stroke(grain, with: .color(grainColor), lineWidth: 0.5)
+                }
+                x += plank
+                col += 1
+            }
+            // Court-line arc near the bottom.
+            var arc = Path()
+            arc.addArc(center: CGPoint(x: size.width / 2, y: size.height),
+                       radius: min(size.width, size.height) * 0.42,
+                       startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
+            ctx.stroke(arc, with: .color(Color.white.opacity(0.55)), lineWidth: 2)
+        }
+    }
+
 }
 
 /// The animated texture a Legendary boundary wears over its base stroke;
@@ -5071,6 +5426,30 @@ struct BoundaryOverlayView: View {
         case .rainbow:      rainbowBorderOverlay
         case .marquee:      marqueeBorderOverlay
         case .stainedGlass: stainedGlassBorderOverlay
+        // Themed Standard / Rare walls (see "Themed Standard / Rare boundaries").
+        case .ember:        emberBorderOverlay
+        case .notebook:     notebookBorderOverlay
+        case .fairway:      fairwayBorderOverlay
+        case .sunset:       sunsetBorderOverlay
+        case .pastel:       pastelBorderOverlay
+        case .holly:        hollyBorderOverlay
+        case .autumn:       autumnBorderOverlay
+        case .lantern:      lanternBorderOverlay
+        case .hardwood:     hardwoodBorderOverlay
+        case .velvet:       velvetBorderOverlay
+        case .marble:       marbleBorderOverlay
+        case .mahogany:     mahoganyBorderOverlay
+        case .sandstone:    sandstoneBorderOverlay
+        case .abyss:        abyssBorderOverlay
+        case .brass:        brassBorderOverlay
+        case .neon:         neonBorderOverlay
+        case .gold:         goldBorderOverlay
+        case .ice:          iceBorderOverlay
+        case .cloud:        cloudBorderOverlay
+        case .tide:         tideBorderOverlay
+        case .phantom:      phantomBorderOverlay
+        case .amethyst:     amethystBorderOverlay
+        case .chrome:       chromeBorderOverlay
         default:            EmptyView()
         }
     }
@@ -5406,6 +5785,334 @@ struct BoundaryOverlayView: View {
             }
         }
     }
+
+    // MARK: Themed Standard / Rare boundaries
+    //
+    // Textures confined to the ring's band (a few points at the screen edge).
+    // Standard ones and the still Rare ones have no clock at all; the moving
+    // Rare ones run on one 30 fps TimelineView each, move slowly, and freeze
+    // under Reduce Motion (t = 0) or on a Shop tile's hero instant.
+
+    /// The ring inset a further `d` points from the base ring, for thin
+    /// lines laid inside the band.
+    private func ring(_ d: CGFloat) -> some InsettableShape {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .inset(by: d)
+    }
+
+    /// Clock for the moving Rare walls.
+    private func motionClock<V: View>(@ViewBuilder _ content: @escaping (Double) -> V) -> some View {
+        // Paused outright under Reduce Motion (even in play, where the
+        // motion mode is `.live`), so a frozen wall costs no frames.
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+            content(t)
+        }
+    }
+
+    // ── Standard (static) ──
+
+    /// Ember — dark ash ring with scattered glowing coal specks.
+    private var emberBorderOverlay: some View {
+        let coal = Color(red: 1.00, green: 0.50, blue: 0.16)
+        let pattern: [CGFloat] = [2, 9, 1.5, 14, 2.5, 11, 1.8, 17]
+        return ZStack {
+            borderRing().stroke(Color(red: 0.20, green: 0.17, blue: 0.16).opacity(0.92), lineWidth: 4)
+            borderRing()
+                .stroke(coal.opacity(0.35), style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: pattern))
+                .blur(radius: 1.5)
+            borderRing()
+                .stroke(coal.opacity(0.95), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, dash: pattern))
+        }
+    }
+
+    /// Notebook — ruled-paper band: two blue rules and a red margin line.
+    private var notebookBorderOverlay: some View {
+        let rule = Color(red: 0.40, green: 0.58, blue: 0.86)
+        return ZStack {
+            borderRing().stroke(Color(red: 0.98, green: 0.96, blue: 0.90), lineWidth: 4)
+            ring(1.2).stroke(rule.opacity(0.85), lineWidth: 0.7)
+            ring(2.6).stroke(rule.opacity(0.85), lineWidth: 0.7)
+            ring(3.6).stroke(Color(red: 0.88, green: 0.30, blue: 0.30).opacity(0.85), lineWidth: 0.8)
+        }
+    }
+
+    /// Fairway — short grass with lighter mowing stripes.
+    private var fairwayBorderOverlay: some View {
+        ZStack {
+            borderRing()
+                .stroke(Color(red: 0.62, green: 0.86, blue: 0.48).opacity(0.40),
+                        style: StrokeStyle(lineWidth: 4, dash: [14, 14]))
+            borderRing()
+                .stroke(Color(red: 0.12, green: 0.38, blue: 0.14).opacity(0.40),
+                        style: StrokeStyle(lineWidth: 3, dash: [0.8, 2.2]))
+        }
+    }
+
+    /// Sunset — gold to orange to pink to purple around the ring.
+    private var sunsetBorderOverlay: some View {
+        borderRing()
+            .stroke(AngularGradient(colors: [
+                Color(red: 1.00, green: 0.80, blue: 0.30),
+                Color(red: 0.98, green: 0.52, blue: 0.24),
+                Color(red: 0.94, green: 0.40, blue: 0.56),
+                Color(red: 0.56, green: 0.30, blue: 0.70),
+                Color(red: 1.00, green: 0.80, blue: 0.30),
+            ], center: .center), lineWidth: 4)
+    }
+
+    /// Pastel — alternating soft segments: pink, mint, lilac, lemon.
+    private var pastelBorderOverlay: some View {
+        let colors: [Color] = [
+            Color(red: 0.98, green: 0.74, blue: 0.82),
+            Color(red: 0.70, green: 0.92, blue: 0.80),
+            Color(red: 0.82, green: 0.74, blue: 0.96),
+            Color(red: 0.98, green: 0.94, blue: 0.62),
+        ]
+        return ZStack {
+            ForEach(0..<4, id: \.self) { i in
+                borderRing()
+                    .stroke(colors[i], style: StrokeStyle(lineWidth: 4, dash: [18, 54],
+                                                          dashPhase: -CGFloat(i) * 18))
+            }
+        }
+    }
+
+    /// Holly — leaves along a dark green wall, with small red berries.
+    private var hollyBorderOverlay: some View {
+        ZStack {
+            borderRing()
+                .stroke(Color(red: 0.10, green: 0.50, blue: 0.24),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [7, 13]))
+            borderRing()
+                .stroke(Color(red: 0.36, green: 0.74, blue: 0.40).opacity(0.70),
+                        style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 15], dashPhase: -1))
+            borderRing()
+                .stroke(Color(red: 0.88, green: 0.12, blue: 0.14),
+                        style: StrokeStyle(lineWidth: 3.2, lineCap: .round, dash: [0.1, 19.9], dashPhase: -12.5))
+        }
+    }
+
+    /// Autumn — scattered fallen leaves in red, orange and gold.
+    private var autumnBorderOverlay: some View {
+        ZStack {
+            borderRing()
+                .stroke(Color(red: 0.80, green: 0.22, blue: 0.12),
+                        style: StrokeStyle(lineWidth: 4.5, lineCap: .round, dash: [4, 21, 5, 28]))
+            borderRing()
+                .stroke(Color(red: 0.96, green: 0.52, blue: 0.14),
+                        style: StrokeStyle(lineWidth: 4.5, lineCap: .round, dash: [5, 26, 4, 19], dashPhase: -11))
+            borderRing()
+                .stroke(Color(red: 0.98, green: 0.78, blue: 0.22),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [3.5, 23, 4.5, 31], dashPhase: -23))
+        }
+    }
+
+    /// Lantern — small red paper lanterns hung along a dark cord.
+    private var lanternBorderOverlay: some View {
+        ZStack {
+            borderRing().stroke(Color(red: 0.16, green: 0.08, blue: 0.06), lineWidth: 1.4)
+            borderRing()
+                .stroke(Color(red: 0.88, green: 0.16, blue: 0.14),
+                        style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [5, 23]))
+            borderRing()
+                .stroke(Color(red: 1.00, green: 0.78, blue: 0.30).opacity(0.90),
+                        style: StrokeStyle(lineWidth: 2.2, lineCap: .round, dash: [2, 26], dashPhase: -1.5))
+        }
+    }
+
+    /// Hardwood — wood-grain lines along the wall.
+    private var hardwoodBorderOverlay: some View {
+        let grain = Color(red: 0.48, green: 0.30, blue: 0.14).opacity(0.55)
+        return ZStack {
+            ring(1.0).stroke(grain, style: StrokeStyle(lineWidth: 0.5, dash: [40, 6, 25, 4, 60, 8]))
+            ring(2.2).stroke(grain, style: StrokeStyle(lineWidth: 0.6, dash: [55, 5, 30, 9], dashPhase: -17))
+            ring(3.3).stroke(grain, style: StrokeStyle(lineWidth: 0.5, dash: [33, 7, 48, 5], dashPhase: -29))
+        }
+    }
+
+    // ── Rare, still ──
+
+    /// Velvet — soft plum sheen bands.
+    private var velvetBorderOverlay: some View {
+        let dark = Color(red: 0.30, green: 0.08, blue: 0.30)
+        let light = Color(red: 0.62, green: 0.30, blue: 0.62)
+        return borderRing()
+            .stroke(AngularGradient(colors: [dark, light, dark, light, dark, light, dark],
+                                    center: .center), lineWidth: 4)
+    }
+
+    /// Marble — gray veining through white stone.
+    private var marbleBorderOverlay: some View {
+        let vein = Color(red: 0.48, green: 0.48, blue: 0.52).opacity(0.70)
+        return ZStack {
+            ring(1.1).stroke(vein, style: StrokeStyle(lineWidth: 0.6, dash: [30, 10, 8, 22, 45, 15]))
+            ring(2.4).stroke(vein.opacity(0.6), style: StrokeStyle(lineWidth: 0.9, dash: [12, 40, 20, 28], dashPhase: -9))
+            ring(3.2).stroke(vein, style: StrokeStyle(lineWidth: 0.5, dash: [50, 18, 14, 30], dashPhase: -33))
+        }
+    }
+
+    /// Mahogany — polished dark wood grain with a soft shine.
+    private var mahoganyBorderOverlay: some View {
+        let grain = Color(red: 0.22, green: 0.07, blue: 0.04).opacity(0.70)
+        return ZStack {
+            ring(1.0).stroke(grain, style: StrokeStyle(lineWidth: 0.6, dash: [45, 5, 28, 6, 70, 9]))
+            ring(2.6).stroke(grain, style: StrokeStyle(lineWidth: 0.7, dash: [60, 7, 35, 8], dashPhase: -21))
+            ring(1.6).stroke(Color.white.opacity(0.16), lineWidth: 0.9)
+        }
+    }
+
+    /// Sandstone — layered strata in terracotta tones.
+    private var sandstoneBorderOverlay: some View {
+        ZStack {
+            ring(0.7).stroke(Color(red: 0.88, green: 0.62, blue: 0.44), lineWidth: 1.4)
+            ring(2.0).stroke(Color(red: 0.66, green: 0.38, blue: 0.24), lineWidth: 1.3)
+            ring(3.3).stroke(Color(red: 0.92, green: 0.72, blue: 0.52), lineWidth: 1.3)
+        }
+    }
+
+    /// Abyss — an inner shadow so the wall looks deep, plus a faint edge glow.
+    private var abyssBorderOverlay: some View {
+        ZStack {
+            ring(6).stroke(Color.black.opacity(0.32), lineWidth: 10).blur(radius: 4)
+            ring(3.6).stroke(Color(red: 0.30, green: 0.72, blue: 1.00).opacity(0.50), lineWidth: 1)
+                .blur(radius: 0.8)
+        }
+    }
+
+    /// Brass — brass plate with rivets and a soft sheen.
+    private var brassBorderOverlay: some View {
+        let lo = Color(red: 0.64, green: 0.48, blue: 0.18)
+        let hi = Color(red: 0.96, green: 0.84, blue: 0.48)
+        return ZStack {
+            borderRing().stroke(AngularGradient(colors: [lo, hi, lo, hi, lo], center: .center), lineWidth: 4)
+            borderRing()
+                .stroke(Color(red: 0.36, green: 0.26, blue: 0.08),
+                        style: StrokeStyle(lineWidth: 2.8, lineCap: .round, dash: [0.1, 23.9]))
+            borderRing()
+                .stroke(Color(red: 1.00, green: 0.92, blue: 0.62),
+                        style: StrokeStyle(lineWidth: 1.8, lineCap: .round, dash: [0.1, 23.9]))
+        }
+    }
+
+    // ── Rare, gently moving ──
+
+    /// Neon — glowing tube with a slow, gentle brightness hum.
+    private var neonBorderOverlay: some View {
+        motionClock { t in
+            let hum: Double = 0.35 + 0.10 * sin(t * 1.2)
+            let tube = Color(red: 0.10, green: 0.95, blue: 0.78)
+            ZStack {
+                borderRing().stroke(tube.opacity(hum), lineWidth: 7).blur(radius: 4)
+                borderRing().stroke(tube, lineWidth: 2.6)
+                borderRing().stroke(Color.white.opacity(0.70), lineWidth: 0.9)
+            }
+        }
+    }
+
+    /// Gold — polished gold with a highlight that slowly glides around.
+    private var goldBorderOverlay: some View {
+        motionClock { t in
+            let lo = Color(red: 0.80, green: 0.60, blue: 0.18)
+            let hi = Color(red: 1.00, green: 0.88, blue: 0.50)
+            ZStack {
+                borderRing().stroke(AngularGradient(colors: [lo, hi, lo, hi, lo], center: .center), lineWidth: 4)
+                borderTrimSegment(at: t * 0.03, length: 0.08,
+                                  color: Color.white.opacity(0.55), lineWidth: 4, blur: 2)
+            }
+        }
+    }
+
+    /// Ice — frosted wall with small crystal spikes and a faint glint.
+    private var iceBorderOverlay: some View {
+        motionClock { t in
+            let glint: Double = pow(max(0.0, sin(t * 0.7)), 3.0)
+            ZStack {
+                borderRing().stroke(Color.white.opacity(0.35), lineWidth: 4)
+                borderRing()
+                    .stroke(Color.white.opacity(0.70),
+                            style: StrokeStyle(lineWidth: 4, dash: [1.2, 7, 0.8, 11, 1.4, 9]))
+                borderTrimSegment(at: t * 0.025, length: 0.03,
+                                  color: Color.white.opacity(0.85 * glint), lineWidth: 4, blur: 1.5)
+            }
+        }
+    }
+
+    /// Cloud — a puffy cloud edge that drifts very slowly.
+    private var cloudBorderOverlay: some View {
+        motionClock { t in
+            let drift = CGFloat((t * 2.0).truncatingRemainder(dividingBy: 22.0))
+            ZStack {
+                borderRing()
+                    .stroke(Color.white.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [9, 3, 6, 4], dashPhase: drift))
+                borderRing()
+                    .stroke(Color(red: 0.86, green: 0.92, blue: 1.0).opacity(0.65),
+                            style: StrokeStyle(lineWidth: 4.5, lineCap: .round, dash: [5, 7], dashPhase: -drift * 0.75))
+            }
+        }
+    }
+
+    /// Tide — small wave crests rolling slowly along the wall.
+    private var tideBorderOverlay: some View {
+        motionClock { t in
+            let roll = CGFloat((-t * 8.0).truncatingRemainder(dividingBy: 18.0))
+            ZStack {
+                ring(2.6).stroke(Color(red: 0.06, green: 0.36, blue: 0.46).opacity(0.70), lineWidth: 1.6)
+                borderRing()
+                    .stroke(Color.white.opacity(0.75),
+                            style: StrokeStyle(lineWidth: 2.4, lineCap: .round, dash: [3, 15], dashPhase: roll))
+            }
+        }
+    }
+
+    /// Phantom — translucent wall with faint ghostly wisps drifting.
+    private var phantomBorderOverlay: some View {
+        motionClock { t in
+            ZStack {
+                borderRing().stroke(Color.black.opacity(0.28), lineWidth: 4)
+                ForEach(0..<3, id: \.self) { k in
+                    let breathe: Double = 0.30 + 0.15 * sin(t * 0.9 + Double(k) * 2.1)
+                    borderTrimSegment(at: t * 0.02 + Double(k) / 3.0, length: 0.05,
+                                      color: Color(red: 0.86, green: 1.0, blue: 0.92).opacity(breathe),
+                                      lineWidth: 5, blur: 3)
+                }
+            }
+        }
+    }
+
+    /// Amethyst — crystal facets that catch light as a glint passes.
+    private var amethystBorderOverlay: some View {
+        motionClock { t in
+            ZStack {
+                borderRing()
+                    .stroke(Color(red: 0.72, green: 0.54, blue: 0.96),
+                            style: StrokeStyle(lineWidth: 4, dash: [10, 12]))
+                borderRing()
+                    .stroke(Color(red: 0.38, green: 0.20, blue: 0.62),
+                            style: StrokeStyle(lineWidth: 4, dash: [2, 20], dashPhase: -10))
+                borderTrimSegment(at: t * 0.035, length: 0.025,
+                                  color: Color.white.opacity(0.80), lineWidth: 4, blur: 1)
+            }
+        }
+    }
+
+    /// Chrome — mirror gradient with a gliding reflection.
+    private var chromeBorderOverlay: some View {
+        motionClock { t in
+            let a = Color(red: 0.52, green: 0.55, blue: 0.60)
+            let b = Color(red: 0.96, green: 0.97, blue: 1.00)
+            ZStack {
+                borderRing().stroke(AngularGradient(colors: [a, b, a, b, a, b, a], center: .center), lineWidth: 4)
+                borderTrimSegment(at: t * 0.045, length: 0.12,
+                                  color: Color.white.opacity(0.60), lineWidth: 4, blur: 2)
+                borderTrimSegment(at: t * 0.045 + 0.5, length: 0.06,
+                                  color: Color.black.opacity(0.25), lineWidth: 4, blur: 2)
+            }
+        }
+    }
+
 }
 
 /// A goal skin, drawn exactly as on the game screen.  Size it with `.frame`.

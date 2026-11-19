@@ -64,6 +64,11 @@ Gilded (gold glow), Stardust, Comet, Rainbow, Snake, Air, Raybeam, Money Roll, A
 
 ## Floors
 
+**Built (approved 2026-11-19).** All 11 are drawn in `PaperFloorOverlayView` (BallGameView.swift),
+the static floor-texture view the game, the replay and the Shop tiles all use. All are Standard, so
+all are still: deterministic seeds, no clock, low-contrast detail. In play the view is `Equatable`, so
+each texture is drawn once per layout, not every frame.
+
 Delivers: Classic, Inverted; Twilight, Dusk, Midnight (plain color names that match); Felt (plain
 pool-table green reads as felt); Notebook, Graph, Parchment, Sketch, Origami (paper textures); Aurora,
 Disco, Grass, Moon, Eclipse, Grid City, Brass Works, Money Full (bespoke, animated).
@@ -110,6 +115,14 @@ Eclipse, Nightclub (bespoke, animated). Every other pit is drawn as one flat col
 | Midnight | midnight | Standard | pale blue-gray (light, not dark) | **Rename to "Moonlit"**: keep the pale look, which contrasts the dark Midnight floor (see flag 3). |
 
 ## Boundaries
+
+**Built (approved 2026-11-19).** All 23 are drawn in `BoundaryOverlayView` (BallGameView.swift),
+inside the 4-point border band, over the base stroke. Standard ones and the still Rare ones (Velvet,
+Marble, Mahogany, Sandstone, Abyss, Brass) have no clock. The moving Rare ones (Neon, Gold, Ice,
+Cloud, Tide, Phantom, Amethyst, Chrome) run at most 30 fps and move slowly; under Reduce Motion they
+freeze. Unlike the Legendary walls, these textures stay visible under Reduce Motion
+(`Boundary.textureShowsUnderReduceMotion`). As before, the texture fades out while the border shows
+the arming, fell (red) and won (green) states. No tier or price changed.
 
 Delivers: Classic; Slate, Mint, Sky, Orchid, Sand, Rose, Ink, Citrus, Pumpkin, Shamrock, Marigold (plain
 color names that match); Obsidian, Candy, Circuit and the 10 animated Legendaries added last week
