@@ -62,6 +62,9 @@ Contact: rollalongsupport@gmail.com
 - [ ] `docs/cosmetics/cosmetic-calendar.sql` (step 11) has been applied. Until
       it is, the app uses its built-in dates, which are the same, so nothing
       breaks; but dates can only be changed from the server after it is applied.
+- [ ] `docs/social/clan-look.sql` (step 13, after step 12) has been applied, or
+      a clan owner's icon and color choice cannot be saved (clans still show
+      the default shield on blue, so nothing else breaks).
 - [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
       not built from these lists" is only true after that).
 - [ ] The Supabase project is running and not paused during review.

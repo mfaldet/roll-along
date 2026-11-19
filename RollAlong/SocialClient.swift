@@ -533,10 +533,10 @@ final class SocialClient: @unchecked Sendable {
     /// One clan's standing (season score, wins, last finish), or nil when
     /// the rankings view is not available.
     func fetchClanStanding(id: UUID) async -> ClanRanking? {
-        let query = "select=\(Self.rankingColumns)&id=eq.\(id.uuidString)&limit=1"
-        guard let data = try? await send(method: "GET", path: "clan_rankings", query: query),
-              let rows = try? decode([ClanRanking].self, from: data) else { return nil }
-        return rows.first
+        let rows = try? await getClanRows(ClanRanking.self, path: "clan_rankings",
+                                          columns: Self.rankingColumns,
+                                          rest: "&id=eq.\(id.uuidString)&limit=1")
+        return rows?.first
     }
 
     private struct SeasonScoreRow: Decodable {
@@ -655,6 +655,33 @@ final class SocialClient: @unchecked Sendable {
 
     private static let clanColumns =
         "id,name,tag,description,owner_id,created_at,updated_at"
+    /// Columns added by database step 13 (docs/social/clan-look.sql): the
+    /// clan's preset icon and color.
+    private static let clanLookColumns = ",icon,color"
+
+    /// Read clans (from `clans` or the `clan_rankings` view), asking for the
+    /// clan's icon and color too.  Until step 13 has been run the server
+    /// answers 400 for those columns, so this falls back to the query
+    /// without them and the app shows the default icon and color.
+    /// `columns` is the select list without the look columns; `rest` starts
+    /// with "&".
+    private func getClanRows<Row: Decodable>(_ type: Row.Type, path: String,
+                                             columns: String, rest: String) async throws -> [Row] {
+        let attempts = [
+            "select=\(columns)\(Self.clanLookColumns)" + rest,
+            "select=\(columns)" + rest,
+        ]
+        var lastError: Error = SocialError.emptyResponse
+        for query in attempts {
+            do {
+                let data = try await send(method: "GET", path: path, query: query)
+                return try decode([Row].self, from: data)
+            } catch SocialError.http(let status, let body) where status == 400 || status == 404 {
+                lastError = SocialError.http(status: status, body: body)
+            }
+        }
+        throw lastError
+    }
     private static let memberColumns =
         "clan_id,player_id,role,joined_at"
 
@@ -671,17 +698,15 @@ final class SocialClient: @unchecked Sendable {
     /// A single clan by id (nil if it no longer exists, e.g. just disbanded).
     func fetchClan(id: UUID) async throws -> Clan? {
         _ = try requireSession()
-        let query = "select=\(Self.clanColumns)&id=eq.\(id.uuidString)&limit=1"
-        let data = try await send(method: "GET", path: "clans", query: query)
-        return try decode([Clan].self, from: data).first
+        return try await getClanRows(Clan.self, path: "clans", columns: Self.clanColumns,
+                                     rest: "&id=eq.\(id.uuidString)&limit=1").first
     }
 
     /// Recent clans to browse when not searching.
     func fetchClans(limit: Int = 30) async throws -> [Clan] {
         _ = try requireSession()
-        let query = "select=\(Self.clanColumns)&order=created_at.desc&limit=\(limit)"
-        let data = try await send(method: "GET", path: "clans", query: query)
-        return try decode([Clan].self, from: data)
+        return try await getClanRows(Clan.self, path: "clans", columns: Self.clanColumns,
+                                     rest: "&order=created_at.desc&limit=\(limit)")
     }
 
     /// Find clans whose name contains `term` (case-insensitive).  Mirrors
@@ -692,11 +717,8 @@ final class SocialClient: @unchecked Sendable {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? trimmed
-        let query = "select=\(Self.clanColumns)"
-            + "&name=ilike.*\(escaped)*"
-            + "&order=name.asc&limit=\(limit)"
-        let data = try await send(method: "GET", path: "clans", query: query)
-        return try decode([Clan].self, from: data)
+        return try await getClanRows(Clan.self, path: "clans", columns: Self.clanColumns,
+                                     rest: "&name=ilike.*\(escaped)*&order=name.asc&limit=\(limit)")
     }
 
     private static let rankingColumns =
@@ -709,9 +731,9 @@ final class SocialClient: @unchecked Sendable {
     /// until that file has been run.
     func fetchClanRankings(sort: ClanRankSort, limit: Int = 100) async throws -> [ClanRanking] {
         _ = try requireSession()
-        let query = "select=\(Self.rankingColumns)&order=\(sort.orderClause)&limit=\(limit)"
-        let data = try await send(method: "GET", path: "clan_rankings", query: query)
-        return try decode([ClanRanking].self, from: data)
+        return try await getClanRows(ClanRanking.self, path: "clan_rankings",
+                                     columns: Self.rankingColumns,
+                                     rest: "&order=\(sort.orderClause)&limit=\(limit)")
     }
 
     /// Every membership row for a clan (resolve player_ids to profiles via
@@ -817,6 +839,28 @@ final class SocialClient: @unchecked Sendable {
                            query: "id=eq.\(id.uuidString)",
                            bodyData: try encoder.encode(body),
                            prefer: "return=minimal")
+    }
+
+    private struct ClanLookPatch: Encodable {
+        let icon: String
+        let color: String
+    }
+
+    /// Owner only: set the clan's icon and color, both from the preset lists
+    /// in `ClanLook` (the database checks them against the same lists, and
+    /// the "clans update by owner" rule scopes the PATCH).  Throws when the
+    /// server refused or changed nothing (not the owner, or step 13 not run).
+    func setClanLook(id: UUID, icon: String, color: String) async throws {
+        _ = try requireSession()
+        guard ClanLook.icons.contains(icon), ClanLook.colorKeys.contains(color) else {
+            throw SocialError.emptyResponse
+        }
+        let data = try await send(method: "PATCH", path: "clans",
+                                  query: "id=eq.\(id.uuidString)",
+                                  bodyData: try encoder.encode(ClanLookPatch(icon: icon, color: color)),
+                                  prefer: "return=representation")
+        let rows = try decode([Clan].self, from: data)
+        if rows.isEmpty { throw SocialError.emptyResponse }
     }
 
     // MARK: - Ask for a life + clan activity feed  (schema v2)
@@ -1633,6 +1677,15 @@ struct Clan: Codable, Identifiable, Hashable {
     let ownerId: UUID
     var createdAt: String?
     var updatedAt: String?
+    /// The clan's preset icon and color (database step 13); nil before that
+    /// step is run.
+    private var rawIcon: String?
+    private var rawColor: String?
+
+    /// The clan's icon (an SF Symbol from `ClanLook.icons`), default shield.
+    var icon: String { rawIcon.flatMap { ClanLook.icons.contains($0) ? $0 : nil } ?? ClanLook.defaultIcon }
+    /// The clan's color key (from `ClanLook.colorKeys`), default blue.
+    var colorKey: String { rawColor.flatMap { ClanLook.colorKeys.contains($0) ? $0 : nil } ?? ClanLook.defaultColor }
 
     /// The clan name when it is preset-format, else "".
     var name: String { PresetNames.parseClanName(rawName) != nil ? rawName : "" }
@@ -1652,6 +1705,53 @@ struct Clan: Codable, Identifiable, Hashable {
         case ownerId   = "owner_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case rawIcon   = "icon"
+        case rawColor  = "color"
+    }
+}
+
+/// A clan's look: one icon from a preset set of symbols and one color from a
+/// preset palette, chosen by the owner (no typed text).  The lists must
+/// match database step 13 (docs/social/clan-look.sql) — change both.
+enum ClanLook {
+    static let defaultIcon  = "shield.fill"
+    static let defaultColor = "blue"
+
+    /// SF Symbols, all available on iOS 17 and later.
+    static let icons: [String] = [
+        "shield.fill", "flame.fill", "bolt.fill", "star.fill",
+        "crown.fill", "leaf.fill", "moon.stars.fill", "sun.max.fill",
+        "snowflake", "drop.fill", "mountain.2.fill", "tree.fill",
+        "pawprint.fill", "hare.fill", "tortoise.fill", "bird.fill",
+        "fish.fill", "heart.fill", "diamond.fill", "trophy.fill",
+        "flag.fill", "sparkles", "atom", "puzzlepiece.fill",
+    ]
+
+    /// Color keys and their colors, readable on the dark screens.
+    struct Swatch {
+        let key: String
+        let name: String
+        let red: Double, green: Double, blue: Double
+        var color: Color { Color(red: red, green: green, blue: blue) }
+    }
+    static let palette: [Swatch] = [
+        Swatch(key: "red",    name: "Red",    red: 0.94, green: 0.33, blue: 0.33),
+        Swatch(key: "orange", name: "Orange", red: 0.98, green: 0.56, blue: 0.24),
+        Swatch(key: "gold",   name: "Gold",   red: 1.00, green: 0.81, blue: 0.30),
+        Swatch(key: "lime",   name: "Lime",   red: 0.62, green: 0.86, blue: 0.30),
+        Swatch(key: "green",  name: "Green",  red: 0.30, green: 0.75, blue: 0.42),
+        Swatch(key: "teal",   name: "Teal",   red: 0.22, green: 0.78, blue: 0.72),
+        Swatch(key: "sky",    name: "Sky",    red: 0.40, green: 0.78, blue: 1.00),
+        Swatch(key: "blue",   name: "Blue",   red: 0.33, green: 0.55, blue: 1.00),
+        Swatch(key: "indigo", name: "Indigo", red: 0.52, green: 0.48, blue: 1.00),
+        Swatch(key: "purple", name: "Purple", red: 0.72, green: 0.45, blue: 0.98),
+        Swatch(key: "pink",   name: "Pink",   red: 0.98, green: 0.45, blue: 0.72),
+        Swatch(key: "silver", name: "Silver", red: 0.72, green: 0.75, blue: 0.80),
+    ]
+    static let colorKeys: [String] = palette.map { $0.key }
+
+    static func color(_ key: String) -> Color {
+        (palette.first { $0.key == key } ?? palette.first { $0.key == defaultColor } ?? palette[0]).color
     }
 }
 

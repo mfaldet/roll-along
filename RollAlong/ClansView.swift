@@ -72,6 +72,13 @@ struct ClansView: View {
     @State private var prizes: [SeasonPrize] = []        // unclaimed, newest first
     @State private var claimingPrize = false
 
+    // My Clan: which tile is selected (Social or Members).  nil until the
+    // player picks one this session; then `ClanPanelMemory` remembers it
+    // while the app is open.
+    @State private var panelPick: ClanPanel? = ClanPanelMemory.last
+    /// Bumped when the chat is marked seen, so the unread dot redraws.
+    @State private var chatSeenTick = 0
+
     // Owner controls: the member waiting on a confirmation.
     @State private var confirmRemove: ClanMember?
     @State private var confirmHandOver: ClanMember?
@@ -152,6 +159,7 @@ struct ClansView: View {
                               role: membership?.role ?? "member",
                               alreadyAskedPromotion: iAskedForPromotion,
                               onRename:       { await rename(to: $0) },
+                              onSaveLook:     { await saveLook(icon: $0, color: $1) },
                               onAskPromotion: { await askForPromotion() },
                               ownerCanLeave:  SocialSettings.current.loadedFromServer && roster.count > 1,
                               onLeave:        { Task { await leave() } },
@@ -280,6 +288,8 @@ struct ClansView: View {
 
     @ViewBuilder
     private var rankingsSection: some View {
+        ClanSeasonCard()
+
         Picker("", selection: $rankSort) {
             Text("Season").tag(ClanRankSort.season)
             Text("Levels").tag(ClanRankSort.levels)
@@ -287,8 +297,6 @@ struct ClansView: View {
         }
         .pickerStyle(.segmented)
         .onChange(of: rankSort) { _, _ in Task { await loadRankings() } }
-
-        if rankSort == .season { seasonBanner }
 
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Clan rankings", "list.number")
@@ -306,26 +314,6 @@ struct ClansView: View {
                 }
             }
         }
-    }
-
-    /// "December season · 16 days left", and what the season is.
-    private var seasonBanner: some View {
-        let days = SeasonCalendar.daysRemaining()
-        let prizesOn = SeasonCalendar.awardsPrizes(SeasonCalendar.seasonKey())
-        return VStack(alignment: .leading, spacing: 4) {
-            Text("\(SeasonCalendar.monthName()) season · \(days) day\(days == 1 ? "" : "s") left")
-                .font(.system(.subheadline, design: .rounded).weight(.bold))
-                .foregroundStyle(.white)
-            Text(prizesOn
-                 ? "A clan's score is the new Adventure stars its members earn this month. Top clans win coins at month end."
-                 : "A clan's score is the new Adventure stars its members earn this month. This first season is a warm-up: clans are ranked, with no prizes.")
-                .font(.system(.caption, design: .rounded))
-                .foregroundStyle(Color(white: 0.6))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
     }
 
     /// Last month's result with a Claim button.  Shown on the Clans screen
@@ -377,41 +365,36 @@ struct ClansView: View {
         }
     }
 
+    /// One ranking row: rank on the left, the clan's icon and name centered,
+    /// the score on the right.  Wins and last month's finish, when there are
+    /// any, sit in one small line under the name.
     private func rankingRow(_ row: ClanRanking, rank: Int) -> some View {
         let mine = row.clan.id == myClan?.id
         let clanName: String = row.clan.name.nonEmpty ?? "Clan"
-        let spoken: String = "Rank \(rank). \(clanName). \(row.memberCount) of \(Clan.memberCap) members. Season score \(row.seasonScore). \(row.totalLevels) total levels, \(row.totalStars) total stars. \(row.seasonWins) wins."
+        let extras: [String] = [row.winsLine, row.lastMonthLine].compactMap { $0 }
+        let scoreWord: String = rankSort == .levels ? "levels" : (rankSort == .stars ? "stars" : "season score")
+        let spoken: String = "Rank \(rank). \(clanName)\(mine ? ", your clan" : ""). \(rankValue(row)) \(scoreWord)."
+            + (extras.isEmpty ? "" : " " + extras.joined(separator: ". ") + ".")
         return Button { nav.goToClan(row.clan) } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Text("\(rank)")
                     .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Color(white: 0.6))
-                    .frame(minWidth: 26, alignment: .leading)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        if let t = row.clan.tag.nonEmpty {
-                            Text("[\(t)]").font(.system(.caption, design: .rounded).weight(.bold))
-                                .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
-                        }
-                        Text(row.clan.name.nonEmpty ?? "Clan")
+                    .foregroundStyle(rank <= 3 ? Color(red: 1.0, green: 0.81, blue: 0.30) : Color(white: 0.6))
+                    .frame(width: 58, alignment: .leading)
+                VStack(spacing: 3) {
+                    HStack(spacing: 7) {
+                        ClanBadge(clan: row.clan, size: 24)
+                        Text(clanName)
                             .font(.system(.body, design: .rounded).weight(mine ? .bold : .semibold))
-                            .foregroundStyle(.white).lineLimit(1)
+                            .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.8)
                     }
-                    HStack(spacing: 8) {
-                        Text("\(row.memberCount) of \(Clan.memberCap) members")
-                            .font(.system(.caption2, design: .rounded)).foregroundStyle(Color(white: 0.5))
-                        if let wins = row.winsLine {
-                            Text(wins)
-                                .font(.system(.caption2, design: .rounded).weight(.bold))
-                                .foregroundStyle(Color(red: 1.0, green: 0.81, blue: 0.30))
-                        }
-                    }
-                    if let last = row.lastMonthLine {
-                        Text(last)
-                            .font(.system(.caption2, design: .rounded)).foregroundStyle(Color(white: 0.5))
+                    if !extras.isEmpty {
+                        Text(extras.joined(separator: " · "))
+                            .font(.system(.caption2, design: .rounded).weight(.semibold))
+                            .foregroundStyle(Color(white: 0.55)).lineLimit(1).minimumScaleFactor(0.8)
                     }
                 }
-                Spacer(minLength: 8)
+                .frame(maxWidth: .infinity)
                 HStack(spacing: 4) {
                     Image(systemName: rankSort == .levels ? "flag.fill" : "star.fill")
                         .font(.system(size: 11))
@@ -419,15 +402,18 @@ struct ClansView: View {
                                                              : Color(red: 1.0, green: 0.81, blue: 0.30))
                     Text("\(rankValue(row))")
                         .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 }
+                .frame(width: 58, alignment: .trailing)
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
             .background(RoundedRectangle(cornerRadius: 14)
-                .fill(mine ? Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.16) : Color(white: 0.14)))
+                .fill(mine ? ClanLook.color(row.clan.colorKey).opacity(0.16) : Color(white: 0.14)))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
+        .accessibilityAddTraits(.isButton)
     }
 
     /// The number a ranking row shows for the current sort.
@@ -460,11 +446,94 @@ struct ClansView: View {
     @ViewBuilder
     private var myClanSections: some View {
         clanHeader
-        clanStatsRow
-        lifeLoopSection
-        inviteRow
-        rosterSection
-        chatSection
+        panelTiles
+        if currentPanel == .social {
+            lifeLoopSection
+            chatSection
+                .onAppear { markChatSeen() }
+                .onChange(of: events.first?.id) { _, _ in markChatSeen() }
+        } else {
+            rosterSection
+            inviteRow
+        }
+    }
+
+    // MARK: Social / Members tiles
+
+    /// The selected tile: the player's pick this session, else Members when
+    /// a clanmate has a request this player can fill, else Social.
+    private var currentPanel: ClanPanel {
+        panelPick ?? (openRequestCount > 0 ? .members : .social)
+    }
+
+    private func pickPanel(_ p: ClanPanel) {
+        panelPick = p
+        ClanPanelMemory.last = p
+        if p == .social { markChatSeen() }
+    }
+
+    private var panelTiles: some View {
+        HStack(spacing: 12) {
+            panelTile(.social, title: "Social", icon: "bubble.left.and.bubble.right.fill") {
+                if hasUnreadChat {
+                    Circle().fill(Color(red: 0.92, green: 0.20, blue: 0.24))
+                        .frame(width: 10, height: 10)
+                        .accessibilityLabel("Unread messages")
+                }
+            }
+            panelTile(.members, title: "Members \(roster.count)/\(Clan.memberCap)", icon: "person.3.fill") {
+                CountBadge(count: openRequestCount)
+            }
+        }
+    }
+
+    private func panelTile<Badge: View>(_ panel: ClanPanel, title: String, icon: String,
+                                        @ViewBuilder badge: () -> Badge) -> some View {
+        let selected = currentPanel == panel
+        let tint = ClanLook.color(myClan?.colorKey ?? ClanLook.defaultColor)
+        let badgeView = badge()
+        return Button { withAnimation(.easeInOut(duration: 0.18)) { pickPanel(panel) } } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+                Text(title)
+                    .font(.system(.callout, design: .rounded).weight(.bold))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(selected ? .white : Color(white: 0.6))
+            .frame(maxWidth: .infinity).padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: 14)
+                .fill(selected ? tint.opacity(0.28) : Color(white: 0.13)))
+            .overlay(RoundedRectangle(cornerRadius: 14)
+                .stroke(selected ? tint.opacity(0.85) : Color(white: 0.2), lineWidth: selected ? 1.5 : 1))
+            .overlay(alignment: .topTrailing) { badgeView.offset(x: 4, y: -4) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// The newest chat message from someone else (system lines such as
+    /// "joined" do not count).
+    private var newestOthersMessage: ClanEvent? {
+        events.first { $0.actorId != myId && !Self.systemKinds.contains($0.kind) }
+    }
+
+    /// A dot on the Social tile: a clanmate wrote after the chat was last
+    /// seen on this phone.
+    private var hasUnreadChat: Bool {
+        _ = chatSeenTick
+        guard currentPanel != .social, let clan = myClan,
+              let newest = newestOthersMessage else { return false }
+        guard let seen = ClanChatSeen.lastSeen(clan: clan.id) else { return true }
+        guard let at = newest.createdAt.flatMap(SeasonCalendar.parseTimestamp) else { return false }
+        return at > seen
+    }
+
+    /// Remember the newest message as seen (Social is on screen).
+    private func markChatSeen() {
+        guard let clan = myClan else { return }
+        let newest = events.first?.createdAt.flatMap(SeasonCalendar.parseTimestamp) ?? Date()
+        ClanChatSeen.markSeen(clan: clan.id, upTo: newest)
+        chatSeenTick &+= 1
     }
 
     private var clanHeader: some View {
@@ -472,6 +541,7 @@ struct ClansView: View {
         let name = myClan?.name.nonEmpty ?? "Clan"
         let desc = myClan?.description.nonEmpty
         return VStack(spacing: 10) {
+            if let myClan { ClanBadge(clan: myClan, size: 46) }
             if let tag {
                 Text("[\(tag)]")
                     .font(.system(.headline, design: .rounded).weight(.bold))
@@ -510,30 +580,6 @@ struct ClansView: View {
                 ? gameState.activeSkin
                 : (rosterProfiles[member.playerId]?.ballSkin ?? .red)
         }
-    }
-
-    /// Members · combined climb levels · lives shared (a sense of the collective).
-    private var clanStatsRow: some View {
-        HStack(spacing: 10) {
-            clanStat("\(roster.count) of \(Clan.memberCap)", "Members", "person.3.fill", Color(red: 0.55, green: 0.78, blue: 1.0))
-            clanStat("\(combinedLevels)", "Levels", "flag.fill", Color(red: 0.30, green: 0.75, blue: 0.42))
-            clanStat("\(livesShared)", "Lives shared", "heart.fill", Color(red: 0.95, green: 0.32, blue: 0.45))
-        }
-    }
-
-    private var combinedLevels: Int { roster.reduce(0) { $0 + (rosterProfiles[$1.playerId]?.climbLevel ?? 0) } }
-    private var livesShared:    Int { events.filter { $0.kind == "sent_life" }.count }
-
-    private func clanStat(_ value: String, _ label: String, _ icon: String, _ color: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 17)).foregroundStyle(color)
-            Text(value).font(.system(size: 20, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(.white).minimumScaleFactor(0.5).lineLimit(1)
-            Text(label).font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(Color(white: 0.48)).lineLimit(1)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
     }
 
     // The lives loop: ask for a life (or cancel) — clan-mates see it on the roster.
@@ -988,8 +1034,11 @@ struct ClansView: View {
             if isSearching {
                 ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.vertical, 16)
             } else if browse.isEmpty {
-                Text(searchTerm.isEmpty ? "No clans yet — be the first to start one."
-                                        : "No clans match “\(searchTerm)”.")
+                // A player in a clan always has at least their own clan to
+                // list, so an empty list then means it could not be read.
+                Text(!searchTerm.isEmpty ? "No clans match “\(searchTerm)”."
+                     : (inClan ? "Couldn't load clans — pull to refresh."
+                               : "No clans yet — be the first to start one."))
                     .font(.system(.callout, design: .rounded)).foregroundStyle(Color(white: 0.5)).padding(.vertical, 6)
             } else {
                 ForEach(browse) { clan in browseRow(clan) }
@@ -998,9 +1047,16 @@ struct ClansView: View {
     }
 
     private func browseRow(_ clan: Clan) -> some View {
-        Button { nav.goToClan(clan) } label: {
+        let mine = clan.id == (myClan?.id ?? membership?.clanId)
+        return Button { nav.goToClan(clan) } label: {
             HStack(spacing: 14) {
+                ClanBadge(clan: clan, size: 34)
                 VStack(alignment: .leading, spacing: 3) {
+                    if mine {
+                        Text("Your clan")
+                            .font(.system(.caption2, design: .rounded).weight(.bold))
+                            .foregroundStyle(ClanLook.color(clan.colorKey))
+                    }
                     HStack(spacing: 6) {
                         if let t = clan.tag.nonEmpty {
                             Text("[\(t)]").font(.system(.caption, design: .rounded).weight(.bold))
@@ -1020,7 +1076,8 @@ struct ClansView: View {
                     .foregroundStyle(Color(white: 0.4))
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.14)))
+            .background(RoundedRectangle(cornerRadius: 14)
+                .fill(mine ? ClanLook.color(clan.colorKey).opacity(0.16) : Color(white: 0.14)))
         }
         .buttonStyle(.plain)
     }
@@ -1172,7 +1229,9 @@ struct ClansView: View {
                 let profs = try await SocialClient.shared.fetchProfiles(ids: members.map { $0.playerId })
                 var map: [UUID: PlayerProfile] = [:]
                 for p in profs { map[p.id] = p }
-                myClan = clan; roster = members; rosterProfiles = map; events = evs; browse = []
+                myClan = clan; roster = members; rosterProfiles = map; events = evs
+                // Browse lists every clan, this player's own included.
+                if searchTerm.isEmpty, let all = try? await SocialClient.shared.fetchClans() { browse = all }
                 // Remember the clan, so a later removal can be explained.
                 UserDefaults.standard.set(mem.clanId.uuidString, forKey: Self.lastClanIdKey)
                 UserDefaults.standard.set(clan?.name ?? "", forKey: Self.lastClanNameKey)
@@ -1384,6 +1443,20 @@ struct ClansView: View {
         }
     }
 
+    /// Owner-only: set the clan's icon and color (the settings sheet calls
+    /// this).  Returns a user-facing error string, or nil on success.
+    private func saveLook(icon: String, color: String) async -> String? {
+        guard let clan = myClan else { return "You're not in a clan." }
+        do {
+            try await SocialClient.shared.setClanLook(id: clan.id, icon: icon, color: color)
+            await load()
+            flash("Clan look saved.")
+            return nil
+        } catch {
+            return "Couldn't save the look — try again."
+        }
+    }
+
     /// Ask the leadership for a promotion — lands in the clan chat where the
     /// owner (and everyone else) sees it.
     private func askForPromotion() async -> Bool {
@@ -1466,11 +1539,13 @@ struct ClanDetailView: View {
         .task { await load() }
     }
 
-    /// Compact header: tag and name on one line, the description, then one
-    /// line of totals ("7 of 12 members · 412 levels · 980 stars").
+    /// Compact header: the clan's icon, tag and name on one line, the
+    /// description, then one line of totals ("7 of 12 members · 412 levels ·
+    /// 980 stars").
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
+                ClanBadge(clan: clan, size: 30)
                 if let t = clan.tag.nonEmpty {
                     Text("[\(t)]").font(.system(.subheadline, design: .rounded).weight(.bold))
                         .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
@@ -1741,9 +1816,11 @@ private struct ClanNamePicker: View {
                              adjectives: PresetNames.clanAdjectives,
                              nouns: PresetNames.clanNouns,
                              numbers: PresetNames.clanNumbers)
-            Text("Pick two words and a number. The tag is made from the name.")
+            Text("Pick two words and a number.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
     }
 }
@@ -1796,6 +1873,7 @@ private struct ClanSettingsSheet: View {
     let role: String                                  // owner | officer | member
     let alreadyAskedPromotion: Bool
     let onRename:       (PresetNames.Choice) async -> String?   // → error text, nil = ok
+    let onSaveLook:     (String, String) async -> String?       // icon, color → error text, nil = ok
     let onAskPromotion: () async -> Bool
     /// True when the owner may leave: there is someone to hand the clan to,
     /// and the server rule that does the hand-over is in place.
@@ -1804,6 +1882,10 @@ private struct ClanSettingsSheet: View {
     let onDisband:      () -> Void
 
     @State private var nameChoice  = PresetNames.randomClanChoice()
+    @State private var lookIcon    = ClanLook.defaultIcon
+    @State private var lookColor   = ClanLook.defaultColor
+    @State private var lookBusy    = false
+    @State private var lookError:  String?
     @State private var renameBusy  = false
     @State private var renameError: String?
     @State private var askBusy     = false
@@ -1813,6 +1895,7 @@ private struct ClanSettingsSheet: View {
 
     private var isOwner:     Bool   { role == "owner" }
     private var canSaveName: Bool   { PresetNames.clanName(nameChoice) != clan.name }
+    private var canSaveLook: Bool   { lookIcon != clan.icon || lookColor != clan.colorKey }
 
     var body: some View {
         NavigationStack {
@@ -1839,6 +1922,8 @@ private struct ClanSettingsSheet: View {
             .onAppear {
                 // Start the wheels on the current name when it is preset-format.
                 if let current = PresetNames.parseClanName(clan.name) { nameChoice = current }
+                lookIcon = clan.icon
+                lookColor = clan.colorKey
             }
         }
     }
@@ -1877,6 +1962,25 @@ private struct ClanSettingsSheet: View {
     private var personalizationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             header("Personalization")
+            ClanLookPicker(icon: $lookIcon, color: $lookColor)
+            Button { Task { await saveLook() } } label: {
+                ZStack {
+                    Text("Save icon and color").opacity(lookBusy ? 0 : 1)
+                    if lookBusy { ProgressView().tint(.white).scaleEffect(0.8) }
+                }
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                .background(Capsule().fill(canSaveLook ? Color(red: 0.20, green: 0.50, blue: 0.96)
+                                                       : Color(white: 0.2)))
+            }
+            .disabled(!canSaveLook || lookBusy).buttonStyle(.plain)
+            if let lookError {
+                Text(lookError)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.45))
+            }
+            Divider().overlay(Color(white: 0.2)).padding(.vertical, 6)
             ClanNamePicker(choice: $nameChoice)
             Button { Task { await saveName() } } label: {
                 ZStack {
@@ -1898,6 +2002,8 @@ private struct ClanSettingsSheet: View {
             Text("Renaming is announced in the clan chat.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -1955,6 +2061,8 @@ private struct ClanSettingsSheet: View {
                 Text("Disbanding removes the clan for everyone.")
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color(white: 0.45))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
                 if ownerCanLeave {
                     Button { confirmLeave = true } label: {
                         Text("Leave clan")
@@ -2009,10 +2117,258 @@ private struct ClanSettingsSheet: View {
         if let err { renameError = err } else { dismiss() }
     }
 
+    private func saveLook() async {
+        lookBusy = true; lookError = nil
+        let err = await onSaveLook(lookIcon, lookColor)
+        lookBusy = false
+        if let err { lookError = err } else { dismiss() }
+    }
+
     private func ask() async {
         askBusy = true
         if await onAskPromotion() { asked = true }
         askBusy = false
+    }
+}
+
+// ===========================================================================
+// Clan look, season card, and the My Clan tile memory.
+// ===========================================================================
+
+/// A clan's icon on a rounded tile of its color.  Clans that have not
+/// picked one (or before database step 13) show the shield on blue.
+struct ClanBadge: View {
+    let clan: Clan
+    var size: CGFloat = 32
+
+    var body: some View {
+        ClanLookTile(icon: clan.icon, colorKey: clan.colorKey, size: size)
+    }
+}
+
+/// The icon-on-color tile itself (also used by the picker's preview).
+private struct ClanLookTile: View {
+    let icon: String
+    let colorKey: String
+    var size: CGFloat = 32
+
+    var body: some View {
+        let tint = ClanLook.color(colorKey)
+        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+            .fill(tint.opacity(0.24))
+            .overlay(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .stroke(tint.opacity(0.7), lineWidth: max(1, size / 28)))
+            .overlay(Image(systemName: icon)
+                .font(.system(size: size * 0.5, weight: .semibold))
+                .foregroundStyle(tint))
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Owner-only picker: one icon from `ClanLook.icons` and one color from
+/// `ClanLook.palette`.  No typed text.
+private struct ClanLookPicker: View {
+    @Binding var icon: String
+    @Binding var color: String
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 6)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                ClanLookTile(icon: icon, colorKey: color, size: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CLAN ICON AND COLOR")
+                        .font(.system(.caption, design: .rounded).weight(.bold))
+                        .foregroundStyle(Color(white: 0.5)).tracking(0.5)
+                    Text("Shown in the clan header, Rankings and Browse.")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
+                }
+                Spacer(minLength: 0)
+            }
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(ClanLook.icons, id: \.self) { symbol in
+                    let picked = symbol == icon
+                    Button { icon = symbol } label: {
+                        Image(systemName: symbol)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(picked ? ClanLook.color(color) : Color(white: 0.7))
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                            .background(RoundedRectangle(cornerRadius: 10)
+                                .fill(picked ? ClanLook.color(color).opacity(0.22) : Color(white: 0.14)))
+                            .overlay(RoundedRectangle(cornerRadius: 10)
+                                .stroke(picked ? ClanLook.color(color) : .clear, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(symbol.replacingOccurrences(of: ".fill", with: "")
+                                            .replacingOccurrences(of: ".", with: " "))
+                    .accessibilityAddTraits(picked ? [.isButton, .isSelected] : .isButton)
+                }
+            }
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(ClanLook.palette, id: \.key) { swatch in
+                    let picked = swatch.key == color
+                    Button { color = swatch.key } label: {
+                        Circle().fill(swatch.color)
+                            .frame(width: 32, height: 32)
+                            .overlay(Circle().stroke(.white, lineWidth: picked ? 2.5 : 0))
+                            .overlay(Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.black.opacity(0.75))
+                                .opacity(picked ? 1 : 0))
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(swatch.name)
+                    .accessibilityAddTraits(picked ? [.isButton, .isSelected] : .isButton)
+                }
+            }
+        }
+    }
+}
+
+/// The Rankings header: this month's name large, the days left as a ring,
+/// and the four prize tiers as small icons with their coins.  The long
+/// explanation sits behind the info button.
+private struct ClanSeasonCard: View {
+    @State private var showInfo = false
+
+    /// Coins per eligible member for each tier (the `season_coins_*` rows in
+    /// `ra_config`, docs/social-schema-v5.sql).  Shown as a guide only; the
+    /// server pays what its own table says.
+    private static let tiers: [(name: String, icon: String, coins: Int, color: Color)] = [
+        ("Diamond", "diamond.fill",    1000, Color(red: 0.55, green: 0.88, blue: 1.00)),
+        ("Gold",    "medal.fill",       500, Color(red: 1.00, green: 0.81, blue: 0.30)),
+        ("Silver",  "medal.fill",       250, Color(red: 0.80, green: 0.82, blue: 0.86)),
+        ("Bronze",  "medal.fill",       100, Color(red: 0.85, green: 0.55, blue: 0.32)),
+    ]
+
+    private static var eastern: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: SeasonCalendar.seasonTimeZoneName) ?? .gmt
+        return cal
+    }
+
+    var body: some View {
+        let daysLeft = SeasonCalendar.daysRemaining()
+        let totalDays = Self.eastern.range(of: .day, in: .month, for: Date())?.count ?? 30
+        let progress = min(1, max(0, Double(totalDays - daysLeft) / Double(max(1, totalDays))))
+        let prizesOn = SeasonCalendar.awardsPrizes(SeasonCalendar.seasonKey())
+        let gold = Color(red: 1.0, green: 0.81, blue: 0.30)
+        return VStack(spacing: 14) {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CLAN SEASON")
+                        .font(.system(.caption2, design: .rounded).weight(.bold))
+                        .foregroundStyle(Color(white: 0.55)).tracking(1)
+                    Text(SeasonCalendar.monthName())
+                        .font(.system(size: 34, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                    Text(prizesOn ? "Top clans win coins" : "Warm-up month · no prizes")
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .foregroundStyle(prizesOn ? gold : Color(white: 0.6))
+                }
+                Spacer(minLength: 0)
+                ZStack {
+                    Circle().stroke(Color(white: 0.22), lineWidth: 7)
+                    Circle().trim(from: 0, to: progress)
+                        .stroke(gold, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: -2) {
+                        Text("\(daysLeft)")
+                            .font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
+                            .foregroundStyle(.white)
+                        Text(daysLeft == 1 ? "day left" : "days left")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.6))
+                    }
+                }
+                .frame(width: 72, height: 72)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(daysLeft) day\(daysLeft == 1 ? "" : "s") left this season")
+            }
+            HStack(spacing: 8) {
+                ForEach(Self.tiers, id: \.name) { tier in
+                    VStack(spacing: 4) {
+                        Image(systemName: tier.icon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(tier.color)
+                        Text(tier.name)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.6))
+                        HStack(spacing: 3) {
+                            CoinIcon(size: 10)
+                            Text("\(tier.coins)")
+                                .font(.system(size: 12, weight: .bold, design: .rounded)).monospacedDigit()
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(white: 0.17)))
+                    .opacity(prizesOn ? 1 : 0.45)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(tier.name) tier, \(tier.coins) coins per member")
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(LinearGradient(colors: [Color(white: 0.16), Color(white: 0.11)],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(gold.opacity(0.35), lineWidth: 1)))
+        .overlay(alignment: .topTrailing) {
+            Button { showInfo = true } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color(white: 0.6))
+                    .padding(10)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("How the clan season works")
+            .popover(isPresented: $showInfo, arrowEdge: .top) {
+                Text(prizesOn
+                     ? "A clan's score is the new Adventure stars its members earn this month. At month end, ranked clans win coins for each member who helped: Diamond, Gold, Silver or Bronze, by finishing place."
+                     : "A clan's score is the new Adventure stars its members earn this month. This first season is a warm-up: clans are ranked, with no prizes.")
+                    .font(.system(.callout, design: .rounded))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 280)
+                    .padding(16)
+                    .presentationCompactAdaptation(.popover)
+                    .presentationBackground(Color(white: 0.16))
+            }
+        }
+    }
+}
+
+/// The two My Clan tiles.
+enum ClanPanel: Hashable { case social, members }
+
+/// Remembers the last selected My Clan tile while the app is open (not
+/// saved to the phone).
+enum ClanPanelMemory {
+    static var last: ClanPanel?
+}
+
+/// When the clan chat was last seen on this phone, per clan, so the Social
+/// tile can show a dot for newer messages.  Kept in UserDefaults so the dot
+/// is right after the app restarts.
+enum ClanChatSeen {
+    private static func key(_ clan: UUID) -> String { "ra_clanChatSeen_\(clan.uuidString)" }
+
+    static func lastSeen(clan: UUID) -> Date? {
+        UserDefaults.standard.object(forKey: key(clan)) as? Date
+    }
+
+    static func markSeen(clan: UUID, upTo date: Date) {
+        if let old = lastSeen(clan: clan), old >= date { return }
+        UserDefaults.standard.set(date, forKey: key(clan))
     }
 }
 
