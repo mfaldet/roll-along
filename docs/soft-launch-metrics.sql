@@ -33,12 +33,15 @@ order by 1 desc;
 
 
 -- 2. ⭐ D1 / D7 RETENTION by install-day cohort (the headline gate) ----------
--- install_day = the user's first-ever event day.  d1/d7 = % of that cohort
+-- install_day = the install's first launch day.  d1/d7 = % of that cohort
 -- with ANY event 1 / 7 days later.  Gate: D1 >~ 35%, D7 >~ 10% (cohort-biased).
+-- Raw events are kept 90 days (step 20), so install_day comes from the
+-- permanent analytics_installs list; only cohorts from the last ~80 days have
+-- the raw events needed for D1/D7.
 with first_seen as (
-    select user_id, min(created_at)::date as install_day
-    from events
-    group by user_id
+    select user_id, first_seen::date as install_day
+    from public.analytics_installs
+    where first_seen > now() - interval '83 days'
 ),
 active_days as (
     select distinct user_id, created_at::date as d

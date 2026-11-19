@@ -1,7 +1,8 @@
 -- ===========================================================================
 -- Roll Along — wipe test play data before App Store submission
 -- ===========================================================================
--- Run ONCE, right before submitting, after database steps 1–19 are applied.
+-- Run ONCE, right before submitting, after database steps 1–20 are applied
+-- (step 20 creates analytics_installs, which this also clears).
 -- Paste each PART into the Supabase SQL editor separately, in order:
 --   PART 1  preview  (read-only: row counts now)
 --   PART 2  wipe     (one transaction; nothing changes unless all of it works)
@@ -9,6 +10,7 @@
 --
 -- CLEARED (every row deleted)
 --   events                analytics events
+--   analytics_installs    the permanent install list (trophy rarity denominator)
 --   minigame_scores       per-difficulty minigame leaderboards (best, wins)
 --   trophy_unlocks        anonymous trophy unlocks (per install)
 --   player_trophies       signed-in trophy unlocks
@@ -71,6 +73,7 @@
 -- PART 1 — PREVIEW (read-only).  Row counts before the wipe.
 -- ---------------------------------------------------------------------------
 select 'clear' as action, 'events' as table_name, count(*) as rows from public.events
+union all select 'clear', 'analytics_installs',  count(*) from public.analytics_installs
 union all select 'clear', 'minigame_scores',     count(*) from public.minigame_scores
 union all select 'clear', 'trophy_unlocks',      count(*) from public.trophy_unlocks
 union all select 'clear', 'player_trophies',     count(*) from public.player_trophies
@@ -130,6 +133,7 @@ union all select 'adventure stars total',    coalesce(sum(total_stars), 0) from 
 
 truncate table
     public.events,
+    public.analytics_installs,
     public.minigame_scores,
     public.trophy_unlocks,
     public.player_trophies,
@@ -165,7 +169,8 @@ commit;
 -- PART 3 — CHECK.  Every column should be true.
 -- ---------------------------------------------------------------------------
 -- select
---   (select count(*) from public.events) = 0                 as events_empty,
+--   (select count(*) from public.events) = 0
+--     and (select count(*) from public.analytics_installs) = 0 as events_empty,
 --   (select count(*) from public.minigame_scores) = 0        as minigame_scores_empty,
 --   (select count(*) from public.trophy_unlocks) = 0
 --     and (select count(*) from public.player_trophies) = 0
