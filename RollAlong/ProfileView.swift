@@ -242,6 +242,9 @@ struct ProfileView: View {
                         // the Profile list.
                         GoalSkinView(goal: gameState.equippedGoal)
                             .frame(width: 20, height: 20)
+                            // Faint light rim so dark goals (Obsidian…) stay
+                            // visible on the dark card.  Small pictures only.
+                            .overlay(Circle().strokeBorder(Color.white.opacity(0.30), lineWidth: 1))
                             .environment(\.cosmeticMotion, .tileFrozen)
                             .environment(\.cosmeticHeroTime,
                                          CosmeticTileHero.goal(gameState.equippedGoal))
