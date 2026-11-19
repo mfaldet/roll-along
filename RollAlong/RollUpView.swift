@@ -13,7 +13,7 @@ import SwiftUI
 // ECONOMY: FREE TO PLAY.  Minigames never cost lives, so a run that ends (the
 // ball falls off the bottom) spends nothing, there is no lives pill, and the
 // out-of-lives gate is gone.  Solo games pay no coins
-// (`CoinPayouts.rollUp`); the personal best (height + run time) is tracked.
+// (`CoinPayouts.rollUp`); the personal best height (meters) is tracked.
 //
 // SKY: one permanent backdrop for everyone (not a cosmetic) — see RollUpSky
 // at the bottom of this file.  It brightens from a pale horizon through
@@ -75,18 +75,11 @@ struct RollUpView: View {
     @State private var camBottom: CGFloat = 0
     @State private var groundY: CGFloat = 0
     @State private var maxBallY: CGFloat = 0
-    /// Seconds elapsed while actually climbing (accumulated from the physics
-    /// tick, so it excludes paused / backgrounded time).  Drives the run-time
-    /// half of the Roll Up highscore.
-    @State private var runSeconds: Double = 0
-
     @State private var trail = TrailMarks()
 
     // MARK: - Derived
     private var heightMeters: Int { max(0, Int((maxBallY - groundY) / pixelsPerMeter)) }
     private var bestMeters: Int { gameState.minigameBests["rollup", default: 0] }
-    /// This run's elapsed climb time, whole seconds.
-    private var runTimeSeconds: Int { Int(runSeconds.rounded()) }
     private var boundary: Boundary { gameState.equippedBoundary }
     /// Continuous best height of this run in meters (0 at the start) — drives
     /// the sky.  It follows `maxBallY`, so it matches the score, never goes
@@ -281,9 +274,6 @@ struct RollUpView: View {
                     Text("\(heightMeters) m climbed · best \(max(bestMeters, heightMeters)) m")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(white: 0.65))
-                    Text("Time \(LeaderboardBoard.rollUpTime(runTimeSeconds)) · best run \(LeaderboardBoard.rollUpTime(gameState.rollupBestSeconds))")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color(white: 0.5))
                 }
                 // Solo minigames pay no coins, so this line only shows if a
                 // payout is ever set in CoinPayouts.
@@ -368,7 +358,6 @@ struct RollUpView: View {
         grounded = 0
         airJumpsLeft = 1
         maxBallY = ballY
-        runSeconds = 0
         trail.clear()
         ensurePlatforms()
         phase = .ready
@@ -411,7 +400,6 @@ struct RollUpView: View {
     private func tick() {
         guard phase == .playing, arena.width > 0 else { return }
         let dt: CGFloat = 1.0 / 60.0
-        runSeconds += Double(dt)   // climb time (playing frames only)
 
         // Horizontal: tilt → accel, with air friction + cap.
         vx += CGFloat(motion.gravity.x) * moveAccel * dt
@@ -512,10 +500,8 @@ struct RollUpView: View {
     private func endRun() {
         phase = .over
         let meters  = heightMeters
-        let seconds = runTimeSeconds
-        // Keeps the best height + the duration of that run, and publishes both
-        // to the leaderboard.
-        let isBest  = gameState.recordRollUpRun(height: meters, seconds: seconds)
+        // Keeps the best height and publishes it to the leaderboard.
+        let isBest  = gameState.recordRollUpRun(height: meters)
         let coins = runCoins
         if coins > 0 { gameState.addCoins(coins) }
         if isBest && meters > 0 { gameState.addCoins(GameState.minigameBestBonus) }
@@ -529,7 +515,6 @@ struct RollUpView: View {
             properties: ["game_mode": .string("rollup"),
                          "won": .bool(isBest),
                          "height_m": .int(meters),
-                         "time_s": .int(seconds),
                          "coins": .int(coins)])
     }
 }

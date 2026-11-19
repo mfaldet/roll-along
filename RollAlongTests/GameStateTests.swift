@@ -205,52 +205,33 @@ final class GameStateTests: XCTestCase {
         XCTAssertEqual(gs.minigameDifficultyBests["snake|hard"], 40)
     }
 
-    // MARK: - Roll Up highscore (height + run time)
+    // MARK: - Roll Up highscore (height only)
 
-    /// The record keeps the best HEIGHT and the time of that run; height is the
-    /// primary key, and on a tie the LONGER run wins (endurance).  A strictly
-    /// lower height never changes the record.
-    func testRecordRollUpRun_keepsBestHeightAndItsTime() {
+    /// Roll Up keeps only the best HEIGHT.  A higher climb replaces it; a lower
+    /// or equal one never changes it; a zero-height run is a no-op.
+    func testRecordRollUpRun_keepsBestHeight() {
         let gs = makeGameState()
-
-        // First real run sets the record and reports a new best.
-        XCTAssertTrue(gs.recordRollUpRun(height: 120, seconds: 45))
+        XCTAssertTrue(gs.recordRollUpRun(height: 120))
         XCTAssertEqual(gs.rollupBest, 120)
-        XCTAssertEqual(gs.rollupBestSeconds, 45)
-
-        // A higher climb replaces both, even if it was quicker.
-        XCTAssertTrue(gs.recordRollUpRun(height: 200, seconds: 30))
+        XCTAssertTrue(gs.recordRollUpRun(height: 200))
         XCTAssertEqual(gs.rollupBest, 200)
-        XCTAssertEqual(gs.rollupBestSeconds, 30)
-
-        // A lower climb is ignored entirely (height AND time unchanged).
-        XCTAssertFalse(gs.recordRollUpRun(height: 150, seconds: 999))
+        XCTAssertFalse(gs.recordRollUpRun(height: 150))
         XCTAssertEqual(gs.rollupBest, 200)
-        XCTAssertEqual(gs.rollupBestSeconds, 30)
-
-        // Same height on a LONGER run keeps the longer time (endurance tiebreak),
-        // but it is not a new height "best".
-        XCTAssertFalse(gs.recordRollUpRun(height: 200, seconds: 90))
+        XCTAssertFalse(gs.recordRollUpRun(height: 200))
         XCTAssertEqual(gs.rollupBest, 200)
-        XCTAssertEqual(gs.rollupBestSeconds, 90)
-
-        // Same height on a shorter run does not shrink the recorded time.
-        XCTAssertFalse(gs.recordRollUpRun(height: 200, seconds: 10))
-        XCTAssertEqual(gs.rollupBestSeconds, 90)
-
-        // A zero-height run is a no-op.
-        XCTAssertFalse(gs.recordRollUpRun(height: 0, seconds: 5))
+        XCTAssertFalse(gs.recordRollUpRun(height: 0))
         XCTAssertEqual(gs.rollupBest, 200)
     }
 
-    /// The Roll Up record survives a reload (height in the shared dict, seconds
-    /// in its own key).
+    /// The Roll Up record survives a reload, and an old saved run time is
+    /// dropped at launch.
     func testRecordRollUpRun_persistsAcrossReload() {
         let gs = makeGameState()
-        _ = gs.recordRollUpRun(height: 275, seconds: 132)
+        _ = gs.recordRollUpRun(height: 275)
+        defaults.set(132, forKey: "ra_rollupBestSeconds")   // left by an older build
         let reloaded = GameState(defaults: defaults)
         XCTAssertEqual(reloaded.rollupBest, 275)
-        XCTAssertEqual(reloaded.rollupBestSeconds, 132)
+        XCTAssertNil(defaults.object(forKey: "ra_rollupBestSeconds"))
     }
 
     // MARK: - Challenge of the Day

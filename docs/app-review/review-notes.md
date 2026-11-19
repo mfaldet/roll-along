@@ -72,6 +72,9 @@ Contact: rollalongsupport@gmail.com
 - [ ] `docs/feedback/feedback-types.sql` (step 17, after step 16) has been
       applied, or Question and Compliment messages are refused by the server
       (Bug and Idea still arrive).
+- [ ] `docs/social/rollup-height-only.sql` (step 18, after step 17) has been
+      applied.  Roll Up is scored by height only; the step removes the old
+      run-time column (`rollup_best_seconds`).
 - [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
       not built from these lists" is only true after that).
 - [ ] The Supabase project is running and not paused during review.

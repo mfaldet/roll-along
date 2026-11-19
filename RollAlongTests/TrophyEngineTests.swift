@@ -2120,14 +2120,14 @@ final class TrophyMinigameWiringTests: XCTestCase {
     /// through `recordRollUpRun`, at their thresholds.
     func testRollUpHeightTiers() {
         let gs = makeGameState()
-        _ = gs.recordRollUpRun(height: 99, seconds: 30)
+        _ = gs.recordRollUpRun(height: 99)
         XCTAssertFalse(gs.trophyEngine.isUnlocked("rollup_100m"))
 
-        _ = gs.recordRollUpRun(height: 100, seconds: 40)
+        _ = gs.recordRollUpRun(height: 100)
         XCTAssertTrue(gs.trophyEngine.isUnlocked("rollup_100m"))
         XCTAssertFalse(gs.trophyEngine.isUnlocked("rollup_500m"))
 
-        _ = gs.recordRollUpRun(height: 500, seconds: 90)
+        _ = gs.recordRollUpRun(height: 500)
         XCTAssertTrue(gs.trophyEngine.isUnlocked("rollup_500m"))
     }
 

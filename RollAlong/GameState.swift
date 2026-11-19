@@ -378,12 +378,8 @@ final class GameState: ObservableObject {
     @Published var goldrushBest: Int {
         didSet { defaults.set(goldrushBest, forKey: "ra_goldrushBest") }
     }
-    // rollupBestSeconds — duration (seconds) of the best-height Roll Up run.
-    // (The best height itself lives in minigameBests["rollup"].)
-    @Published var rollupBestSeconds: Int {
-        didSet { defaults.set(rollupBestSeconds, forKey: "ra_rollupBestSeconds") }
-    }
     /// Best Roll Up height in meters (mirrors minigameBests["rollup"]).
+    /// Roll Up is scored by height only; run time is not recorded.
     var rollupBest: Int { minigameBests["rollup", default: 0] }
     /// Disco Ball leaderboards are kept PER DIFFICULTY (Easy / Normal /
     /// Hardcore).  The best crossings for each live in `minigameBests` under
@@ -896,7 +892,8 @@ final class GameState: ObservableObject {
         pinballBest  = max(0, defaults.integer(forKey: "ra_pinballBest"))
         zenSeconds   = max(0, defaults.integer(forKey: "ra_zenSeconds"))
         goldrushBest = max(0, defaults.integer(forKey: "ra_goldrushBest"))
-        rollupBestSeconds = max(0, defaults.integer(forKey: "ra_rollupBestSeconds"))
+        // Roll Up no longer records run time; drop the old saved value.
+        defaults.removeObject(forKey: "ra_rollupBestSeconds")
         // Per-difficulty Disco Ball average times.  Bests set before times
         // were recorded have none (shown as "—").
         discoBestAvgMs = Self.loadTrackProgress(key: "ra_discoBestAvgMs", defaults)
@@ -2316,7 +2313,6 @@ final class GameState: ObservableObject {
             kothWins: minigameWins["koth"],
             goldrushWins: minigameWins["goldrush"],
             rollupBest: minigameBests["rollup"],
-            rollupBestSeconds: rollupBestSeconds > 0 ? rollupBestSeconds : nil,
             // Best of the three Disco Ball difficulties (the profile summary);
             // the leaderboards themselves are per difficulty.
             discoballBest: discoBoardBest > 0 ? discoBoardBest : nil,
@@ -2397,7 +2393,7 @@ final class GameState: ObservableObject {
         let pbB = minigameBests["paintball", default: 0], pbW = minigameWins["paintball", default: 0]
         let mcB = minigameBests["marblecup", default: 0], mcW = minigameWins["marblecup", default: 0]
         let koB = minigameBests["koth", default: 0],      koW = minigameWins["koth", default: 0]
-        let ruB = minigameBests["rollup", default: 0],    ruS = rollupBestSeconds
+        let ruB = minigameBests["rollup", default: 0]
         backfillDifficultyScores()
         Task {
             try? await SocialClient.shared.syncMinigameStats(
@@ -2408,7 +2404,7 @@ final class GameState: ObservableObject {
                 paintballBest: pbB, paintballWins: pbW,
                 marblecupBest: mcB, marblecupWins: mcW,
                 kothBest: koB, kothWins: koW,
-                rollupBest: ruB, rollupBestSeconds: ruS)
+                rollupBest: ruB)
         }
     }
 
@@ -2462,22 +2458,15 @@ final class GameState: ObservableObject {
         return isBest
     }
 
-    /// Record a finished Roll Up run — keeps the best height (meters) and the
-    /// duration (seconds) of that best run.  Height is primary; on a tie a
-    /// LONGER run wins (the leaderboard's Time board ranks by endurance).
-    /// Returns whether the height was a new personal best.  The caller owns the
-    /// coin payout; this just keeps the record and publishes it.
+    /// Record a finished Roll Up run — keeps the best height in meters, the
+    /// only Roll Up score.  Returns whether the height was a new personal best.
+    /// The caller owns the coin payout; this just keeps the record and
+    /// publishes it.
     @discardableResult
-    func recordRollUpRun(height: Int, seconds: Int) -> Bool {
+    func recordRollUpRun(height: Int) -> Bool {
         guard height > 0 else { return false }
-        let prevBest = minigameBests["rollup", default: 0]
-        let isBest = height > prevBest
-        if isBest {
-            minigameBests["rollup"] = height
-            rollupBestSeconds = max(0, seconds)
-        } else if height == prevBest && seconds > rollupBestSeconds {
-            rollupBestSeconds = max(0, seconds)   // same height, longer run → keep it
-        }
+        let isBest = height > minigameBests["rollup", default: 0]
+        if isBest { minigameBests["rollup"] = height }
         syncMinigameStats()
         // rollup_100m / rollup_500m ride minigameBests["rollup"] (S1-T3).
         recordMinigameBestTrophy(.rollupBestHeight)
