@@ -1461,8 +1461,8 @@ struct BallSkinView: View {
 
     // =========================================================================
     // MARK: - Baseball  (NEW)
-    // Off-white leather sphere with two red C-shaped seam curves, each
-    // stitched with small perpendicular dashes for the thread effect.
+    // Off-white leather sphere with two red seams near opposite sides, each
+    // bowing in toward the middle and stitched with small red V marks.
     // =========================================================================
     private var baseballCanvas: some View {
         Canvas { ctx, size in
@@ -1491,58 +1491,60 @@ struct BallSkinView: View {
             let tickLen    = r * 0.10
             let stitchN    = 11   // tick marks per seam curve
 
-            // Helper: generate tick-mark paths perpendicular to a quad bezier
-            func tickPaths(from p0: CGPoint, ctrl: CGPoint, to p1: CGPoint) -> [Path] {
-                var ticks = [Path]()
+            // Helper: red "V" stitches along a quad bezier, each V pointing
+            // along the seam like real baseball thread.
+            func stitchPaths(from p0: CGPoint, ctrl: CGPoint, to p1: CGPoint) -> [Path] {
+                var stitches = [Path]()
                 for i in 0..<stitchN {
-                    let t  = CGFloat(i + 1) / CGFloat(stitchN + 1)
-                    let mt = 1 - t
+                    let t: CGFloat  = CGFloat(i + 1) / CGFloat(stitchN + 1)
+                    let mt: CGFloat = 1 - t
                     // Point on bezier
-                    let px = mt * mt * p0.x + 2 * mt * t * ctrl.x + t * t * p1.x
-                    let py = mt * mt * p0.y + 2 * mt * t * ctrl.y + t * t * p1.y
-                    // Tangent (derivative)
-                    let dx = 2 * (mt * (ctrl.x - p0.x) + t * (p1.x - ctrl.x))
-                    let dy = 2 * (mt * (ctrl.y - p0.y) + t * (p1.y - ctrl.y))
-                    let dLen = sqrt(dx * dx + dy * dy)
+                    let px: CGFloat = mt * mt * p0.x + 2 * mt * t * ctrl.x + t * t * p1.x
+                    let py: CGFloat = mt * mt * p0.y + 2 * mt * t * ctrl.y + t * t * p1.y
+                    // Tangent (derivative), normalized
+                    let dx: CGFloat = 2 * (mt * (ctrl.x - p0.x) + t * (p1.x - ctrl.x))
+                    let dy: CGFloat = 2 * (mt * (ctrl.y - p0.y) + t * (p1.y - ctrl.y))
+                    let dLen: CGFloat = sqrt(dx * dx + dy * dy)
                     guard dLen > 0 else { continue }
-                    // Perpendicular normal
-                    let nx = -dy / dLen
-                    let ny =  dx / dLen
-                    var tick = Path()
-                    tick.move(to:    CGPoint(x: px - nx * tickLen, y: py - ny * tickLen))
-                    tick.addLine(to: CGPoint(x: px + nx * tickLen, y: py + ny * tickLen))
-                    ticks.append(tick)
+                    let tx: CGFloat = dx / dLen, ty: CGFloat = dy / dLen
+                    let nx: CGFloat = -ty, ny: CGFloat = tx
+                    let back: CGFloat = tickLen * 0.45
+                    let apex = CGPoint(x: px + tx * back, y: py + ty * back)
+                    var v = Path()
+                    v.move(to:    CGPoint(x: px + nx * tickLen - tx * back,
+                                          y: py + ny * tickLen - ty * back))
+                    v.addLine(to: apex)
+                    v.addLine(to: CGPoint(x: px - nx * tickLen - tx * back,
+                                          y: py - ny * tickLen - ty * back))
+                    stitches.append(v)
                 }
-                return ticks
+                return stitches
             }
 
-            // Left seam: C-curve on the right side of centre, opening leftward
-            let lp0   = CGPoint(x: cx + r * 0.20, y: cy - r * 0.78)
-            let lCtrl = CGPoint(x: cx - r * 0.58, y: cy)
-            let lp1   = CGPoint(x: cx + r * 0.20, y: cy + r * 0.78)
-            var leftSeam = Path()
-            leftSeam.move(to: lp0)
-            leftSeam.addQuadCurve(to: lp1, control: lCtrl)
-            ctx.stroke(leftSeam, with: .color(stitchRed),
-                       style: StrokeStyle(lineWidth: seamW, lineCap: .round))
-            for tick in tickPaths(from: lp0, ctrl: lCtrl, to: lp1) {
-                ctx.stroke(tick, with: .color(stitchRed),
-                           style: StrokeStyle(lineWidth: stitchW, lineCap: .round))
+            // The two seams sit near opposite sides, like a real baseball
+            // seen face-on: each runs from near the top rim to near the
+            // bottom rim and bows in toward the middle without reaching it —
+            // ")" on the left, "(" on the right.
+            func seam(_ g: GraphicsContext, _ p0: CGPoint, _ ctrl: CGPoint, _ p1: CGPoint) {
+                var path = Path()
+                path.move(to: p0)
+                path.addQuadCurve(to: p1, control: ctrl)
+                g.stroke(path, with: .color(stitchRed),
+                         style: StrokeStyle(lineWidth: seamW, lineCap: .round))
+                for v in stitchPaths(from: p0, ctrl: ctrl, to: p1) {
+                    g.stroke(v, with: .color(stitchRed),
+                               style: StrokeStyle(lineWidth: stitchW, lineCap: .round,
+                                                  lineJoin: .round))
+                }
             }
-
-            // Right seam: mirrors left, opening rightward
-            let rp0   = CGPoint(x: cx - r * 0.20, y: cy - r * 0.78)
-            let rCtrl = CGPoint(x: cx + r * 0.58, y: cy)
-            let rp1   = CGPoint(x: cx - r * 0.20, y: cy + r * 0.78)
-            var rightSeam = Path()
-            rightSeam.move(to: rp0)
-            rightSeam.addQuadCurve(to: rp1, control: rCtrl)
-            ctx.stroke(rightSeam, with: .color(stitchRed),
-                       style: StrokeStyle(lineWidth: seamW, lineCap: .round))
-            for tick in tickPaths(from: rp0, ctrl: rCtrl, to: rp1) {
-                ctx.stroke(tick, with: .color(stitchRed),
-                           style: StrokeStyle(lineWidth: stitchW, lineCap: .round))
-            }
+            // Bezier mid-point x = (endpoint x + control x) / 2, so the
+            // seam's deepest point sits at about 0.30 r from the center.
+            seam(ctx, CGPoint(x: cx - r * 0.52, y: cy - r * 0.80),
+                 CGPoint(x: cx - r * 0.08, y: cy),
+                 CGPoint(x: cx - r * 0.52, y: cy + r * 0.80))
+            seam(ctx, CGPoint(x: cx + r * 0.52, y: cy - r * 0.80),
+                 CGPoint(x: cx + r * 0.08, y: cy),
+                 CGPoint(x: cx + r * 0.52, y: cy + r * 0.80))
 
             // Gloss crescent
             ctx.fill(
