@@ -891,8 +891,10 @@ struct CosmeticShopView: View {
             // bundle, not the coin shop.  Owned bundle-exclusive skins ARE
             // shown so the user can equip them (possession implies legitimate
             // acquisition via the bundle or challenge track).
+            // Locker-only balls (Diamond) never appear here, even when owned.
             categoryGrid(items: BallSkin.allCases.filter {
-                (!$0.isBundleExclusive || gameState.isOwned($0)) && isListed($0)
+                !$0.isLockerOnly
+                    && (!$0.isBundleExclusive || gameState.isOwned($0)) && isListed($0)
             })
         }
     }

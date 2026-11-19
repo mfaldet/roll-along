@@ -985,6 +985,21 @@ final class CosmeticsTests: XCTestCase {
                        "the upgraded set is saved")
     }
 
+    // MARK: - Diamond ball is Locker-only
+
+    func testDiamondBall_isLockerOnly() {
+        XCTAssertTrue(BallSkin.diamond.isLockerOnly)
+        XCTAssertFalse(CosmeticBundle.catalogue.contains { $0.balls.contains(.diamond) },
+                       "the Diamond ball is in no collection")
+        XCTAssertFalse(BallPack.catalogue.contains { $0.skins.contains(.diamond) },
+                       "the Diamond ball is in no ball pack")
+        XCTAssertFalse(ShopRotation.ballPool.contains(.diamond),
+                       "the Diamond ball never rotates into the Shop")
+        XCTAssertTrue(CosmeticSchedule.releaseKeys(of: BallSkin.diamond).isEmpty,
+                      "the Diamond ball is not on the release calendar")
+        XCTAssertFalse(BallSkin.diamond.isCoinPurchasable)
+    }
+
 }
 
 // MARK: - Loadout preview recording
