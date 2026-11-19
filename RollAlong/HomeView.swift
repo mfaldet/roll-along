@@ -1189,34 +1189,8 @@ struct HomeView: View {
 
     /// The coin pill's visible capsule (also used, hidden, to reserve its
     /// exact width when the streak pill is laid out between the two pills).
-    private var coinPillLabel: some View {
-        HStack(spacing: 6) {
-            // Shared coin graphic — the same minted coin used on
-            // every screen.  Slightly larger than a plain glyph so
-            // the detail reads inside the small pill.
-            CoinIcon(size: 18)
-
-            Text(GameState.coinPillText(gameState.coinBalance))
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .monospacedDigit()
-                .contentTransition(.numericText(value: Double(gameState.coinBalance)))
-                .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color(white: 0.55))
-        }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color(white: 0.14))
-                .overlay(
-                    Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
-                )
-        )
-    }
+    /// Shared with the Shop's toolbar (`CoinPillLabel`).
+    private var coinPillLabel: some View { CoinPillLabel() }
 
     /// The lives pill's visible capsule (also used, hidden, to reserve its
     /// exact width when the streak pill is laid out between the two pills).
@@ -1734,4 +1708,71 @@ private extension View {
 
 #Preview {
     HomeView().environmentObject(GameState())
+}
+
+
+// ---------------------------------------------------------------------------
+// CoinPillLabel — the coin balance capsule.  Home's pill is the reference;
+// the Shop's toolbar shows this same view, so both are the same size and
+// style.
+// ---------------------------------------------------------------------------
+struct CoinPillLabel: View {
+    /// In a navigation toolbar, which tints its content one color, the coin
+    /// is drawn with `ToolbarCoinIcon` (a full-color image) instead.
+    var inToolbar: Bool = false
+    @EnvironmentObject private var gameState: GameState
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // Shared coin graphic — the same minted coin used on
+            // every screen.  Slightly larger than a plain glyph so
+            // the detail reads inside the small pill.
+            if inToolbar {
+                ToolbarCoinIcon(size: 18)
+            } else {
+                CoinIcon(size: 18)
+            }
+
+            Text(GameState.coinPillText(gameState.coinBalance))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(gameState.coinBalance)))
+                .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(white: 0.55))
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color(white: 0.14))
+                .overlay(
+                    Capsule().stroke(Color(white: 0.28), lineWidth: 0.8)
+                )
+        )
+    }
+}
+
+/// The Shop's coin pill as a toolbar item.  On iOS 26 a toolbar item gets
+/// its own glass capsule, taller than Home's pill and doubling its border;
+/// that background is hidden there, so the pill shows exactly as on Home.
+/// (Before iOS 26 toolbar items have no background of their own.)
+struct CoinPillToolbarItem<Content: View>: ToolbarContent {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            ToolbarItem(placement: .topBarTrailing) { content }
+                .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .topBarTrailing) { content }
+        }
+    }
 }
