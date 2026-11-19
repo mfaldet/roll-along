@@ -55,9 +55,8 @@ struct GoldRushView: View {
     // Rival looks + nicknames come from the shared RivalCosmetics helper
     // (see Cosmetics.swift) — same pool every competitive view uses.
 
-    // Per-racer home-style trail (the keystone: opponents' trails are visible).
-    private let trailMaxLen = 14
-    private let trailMinStep: CGFloat = 3
+    // Per-racer trails (the keystone: opponents' trails are visible) use the
+    // shared racer marks: `recordTrail` / `drawTrails`.
 
     // MARK: - State
 
@@ -88,8 +87,8 @@ struct GoldRushView: View {
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     /// The player always renders their OWN equipped skin/trail.
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
-    /// Recent positions per racer (colorIndex → points) for the trail layer.
-    @State private var trails: [Int: [CGPoint]] = [:]
+    /// Trail marks per racer (colorIndex → marks laid in place) for the trail layer.
+    @State private var trails: [Int: TrailMarks] = [:]
 
     // MARK: - Computed (thin forwards onto the engine — the source of truth)
 
@@ -231,28 +230,11 @@ struct GoldRushView: View {
     }
 
     /// KEYSTONE — every racer's equipped TRAIL, visible to all: the player's
-    /// own, each rival's the one dealt in `reset()`.  Fading home-style streak;
-    /// rainbow gets a per-segment hue cycle.
+    /// own, each rival's the one dealt in `reset()`.  Marks laid in place,
+    /// each fading on its own clock; rainbow keeps each mark's hue.
     private var trailsLayer: some View {
         Canvas { ctx, _ in
-            for r in racers {
-                let pts = trails[r.colorIndex] ?? []
-                guard pts.count >= 2 else { continue }
-                let trail = trailFor(r)
-                guard trail != .none else { continue }
-                let rainbow = trail == .rainbow
-                let solid = trail.color
-                for i in 1..<pts.count {
-                    let age = Double(i) / Double(pts.count - 1)
-                    let segColor: Color = rainbow
-                        ? Color(hue: (Double(i) / Double(pts.count)).truncatingRemainder(dividingBy: 1),
-                                saturation: 1, brightness: 1)
-                        : solid
-                    var path = Path(); path.move(to: pts[i - 1]); path.addLine(to: pts[i])
-                    ctx.stroke(path, with: .color(segColor.opacity(0.10 + 0.55 * age)),
-                               style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-                }
-            }
+            drawTrails(ctx, racers.map { (trails[$0.colorIndex] ?? TrailMarks(), trailFor($0)) })
         }
     }
 
@@ -551,19 +533,10 @@ struct GoldRushView: View {
         accumulateTrails()
     }
 
-    /// Append each racer's current position to its trail buffer (min-step +
-    /// cap) so `trailsLayer` can draw a fading streak behind every marble.
+    /// Lay each racer's trail marks for this tick (they stay where laid and
+    /// fade on their own clock — see `TrailMarks`).
     private func accumulateTrails() {
-        for r in engine.racers {
-            var pts = trails[r.colorIndex] ?? []
-            if let last = pts.last {
-                if hypot(r.pos.x - last.x, r.pos.y - last.y) > trailMinStep { pts.append(r.pos) }
-            } else {
-                pts.append(r.pos)
-            }
-            if pts.count > trailMaxLen { pts.removeFirst(pts.count - trailMaxLen) }
-            trails[r.colorIndex] = pts
-        }
+        for r in engine.racers { recordTrail(&trails, r.colorIndex, r.pos) }
     }
 
     /// Round-end side effects the headless engine intentionally omits: pay the

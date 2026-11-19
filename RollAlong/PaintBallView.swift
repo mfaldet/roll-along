@@ -111,8 +111,8 @@ struct PaintBallView: View {
     @State private var rivalSkills: [Int: Double] = [:]
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
-    /// Recent positions per painter (colorIndex → points) for the trail layer.
-    @State private var trails: [Int: [CGPoint]] = [:]
+    /// Trail marks per painter (colorIndex → marks laid in place) for the trail layer.
+    @State private var trails: [Int: TrailMarks] = [:]
     @State private var pits:     [Pit]     = []
     @State private var splashes: [Splash]  = []
 
@@ -294,7 +294,7 @@ struct PaintBallView: View {
     /// the paint coverage that drives scoring.
     private var trailsLayer: some View {
         Canvas { ctx, _ in
-            drawTrails(ctx, painters.map { (trails[$0.colorIndex] ?? [], trailFor($0)) })
+            drawTrails(ctx, painters.map { (trails[$0.colorIndex] ?? TrailMarks(), trailFor($0)) })
         }
     }
 

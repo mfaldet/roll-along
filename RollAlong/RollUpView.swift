@@ -80,9 +80,7 @@ struct RollUpView: View {
     /// half of the Roll Up highscore.
     @State private var runSeconds: Double = 0
 
-    @State private var trail: [CGPoint] = []
-    private let trailMaxLen = 14
-    private let trailMinStep: CGFloat = 4
+    @State private var trail = TrailMarks()
 
     // MARK: - Derived
     private var heightMeters: Int { max(0, Int((maxBallY - groundY) / pixelsPerMeter)) }
@@ -198,20 +196,14 @@ struct RollUpView: View {
         }
     }
 
+    /// The ball's trail: marks laid in WORLD space where the ball was (so they
+    /// scroll with the platforms rather than sticking to the screen), each
+    /// fading on its own clock.
     private var trailLayer: some View {
         Canvas { ctx, _ in
-            let t = gameState.equippedTrail
-            guard t != .none, trail.count >= 2 else { return }
-            for i in 1..<trail.count {
-                let age = Double(i) / Double(trail.count - 1)
-                let color: Color = t == .rainbow
-                    ? Color(hue: (Double(i) / Double(trail.count)).truncatingRemainder(dividingBy: 1),
-                            saturation: 1, brightness: 1)
-                    : t.color
-                var path = Path(); path.move(to: trail[i - 1]); path.addLine(to: trail[i])
-                ctx.stroke(path, with: .color(color.opacity(0.08 + 0.45 * age)),
-                           style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
-            }
+            drawTrails(ctx, [(marks: trail, trail: gameState.equippedTrail)],
+                       lineWidth: 6,
+                       toScreen: { CGPoint(x: $0.x, y: screenY($0.y)) })
         }
     }
 
@@ -377,7 +369,7 @@ struct RollUpView: View {
         airJumpsLeft = 1
         maxBallY = ballY
         runSeconds = 0
-        trail = []
+        trail.clear()
         ensurePlatforms()
         phase = .ready
     }
@@ -513,13 +505,8 @@ struct RollUpView: View {
     }
 
     private func accumulateTrail() {
-        let screenPos = CGPoint(x: ballX, y: screenY(ballY))
-        if let last = trail.last {
-            if hypot(screenPos.x - last.x, screenPos.y - last.y) > trailMinStep { trail.append(screenPos) }
-        } else {
-            trail.append(screenPos)
-        }
-        if trail.count > trailMaxLen { trail.removeFirst(trail.count - trailMaxLen) }
+        trail.add(CGPoint(x: ballX, y: ballY), at: Date().timeIntervalSinceReferenceDate,
+                  lifetime: TrailMarks.racerLifetime, cap: TrailMarks.racerCap)
     }
 
     private func endRun() {

@@ -140,35 +140,17 @@ struct HomeView: View {
     /// the once-per-launch nudge and Settings use.
     @State private var showSignInPrompt = false
 
-    /// Recent ball positions for the home-screen trail.  Mirrors the
-    /// in-game trail mechanic — only populated when the player has a
-    /// non-`.none` TrailColor equipped.
-    @State private var trailPoints: [CGPoint] = []
-    /// Wall-clock stamp per `trailPoints` entry, kept in lockstep — drives the
-    /// real-time, in-place lifecycle of the ink/fire/ice/air trails so the home
-    /// preview matches the in-game look.
-    @State private var trailTimes: [Double] = []
-    private let homeTrailMaxLength = 120        // ~2.0s at 60fps — doubled so the streak reads across the full-screen arena
-    private let homeTrailMinStep:  CGFloat = 1.5
-
-    /// Hue assigned to `trailPoints[0]` (the visible tail end).  Each
-    /// later segment's hue is `offset + i * homeTrailHueStep mod 1`,
-    /// so once a position is coloured, its hue stays put — the
-    /// spectrum follows the ball rather than redistributing across
-    /// the current segment count.  When segments fall off the tail
-    /// we advance this offset by `removed × step` so the surviving
-    /// segments keep their original hues.
-    @State private var trailHueOffset: Double = 0.0
+    /// The home-screen trail: marks laid where the ball has been, each fading
+    /// on its own clock where it was laid — the same `TrailMarks` system as
+    /// the game.  Only populated when a trail is equipped.
+    @State private var trailMarks = TrailMarks()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Frames (in the arena coordinate space) of every UI element the
     /// free-roaming ball bounces off — reported by `.homeBallCollider()`
     /// on the title, buttons, and pills; consumed each tick.
     @State private var colliders: [CGRect] = []
 
-    /// One full ROYGBIV cycle every `homeTrailMaxLength` segments.
-    /// At less than full length the trail covers a partial slice of
-    /// the spectrum; at full length it shows the whole rainbow.
-    private var homeTrailHueStep: Double { 1.0 / Double(homeTrailMaxLength) }
 
     // Lives sheet (top-left pill → BuyLivesSheet, which also serves as
     // the "lives status / explanation" screen).
@@ -683,9 +665,7 @@ struct HomeView: View {
         guard size.width > 0, size.height > 0 else { return }
         ballPos = CGPoint(x: size.width / 2, y: size.height / 2)
         ballVel = .zero
-        trailPoints.removeAll(keepingCapacity: true)
-        trailTimes.removeAll(keepingCapacity: true)
-        trailHueOffset = 0.0
+        trailMarks.clear()
     }
 
     private func tickBall() {
@@ -723,53 +703,29 @@ struct HomeView: View {
         ballPos.x = min(max(ballPos.x, r), arenaSize.width  - r)
         ballPos.y = min(max(ballPos.y, r), arenaSize.height - r)
 
-        // Trail — append a new point only if the ball moved enough
-        // since the last segment.  Skipped entirely when the player
-        // has `.none` equipped (no trail to draw).
+        // Trail — lay marks where the ball has been (every tick, moving or
+        // not, so old marks expire while it rests).  Skipped when the
+        // player has `.none` equipped.
         if gameState.equippedTrail != .none {
-            let now = Date().timeIntervalSinceReferenceDate
-            if let last = trailPoints.last {
-                if hypot(ballPos.x - last.x, ballPos.y - last.y) > homeTrailMinStep {
-                    trailPoints.append(ballPos)
-                    trailTimes.append(now)
-                }
-            } else {
-                trailPoints.append(ballPos)
-                trailTimes.append(now)
-            }
-            if trailPoints.count > homeTrailMaxLength {
-                let removed = trailPoints.count - homeTrailMaxLength
-                trailPoints.removeFirst(removed)
-                trailTimes.removeFirst(min(removed, trailTimes.count))   // stay in lockstep
-                // Advance the tail hue by exactly the number of
-                // segments we dropped — every remaining segment
-                // keeps its original colour.
-                trailHueOffset = (trailHueOffset
-                                  + Double(removed) * homeTrailHueStep)
-                    .truncatingRemainder(dividingBy: 1.0)
-            }
-        } else if !trailPoints.isEmpty {
+            trailMarks.add(ballPos, at: Date().timeIntervalSinceReferenceDate)
+        } else if !trailMarks.isEmpty {
             // Player just switched to .none — clear any residual trail.
-            trailPoints.removeAll(keepingCapacity: true)
-            trailTimes.removeAll(keepingCapacity: true)
-            trailHueOffset = 0.0
+            trailMarks.clear()
         }
     }
 
-    /// Trail render.  Opacity ramps from 0.10 at the tail to 1.0 at
-    /// the head.  Rainbow trails use a stable per-segment hue baked
-    /// in at creation (`trailHueOffset + i × step`) so each spot
-    /// keeps its colour as the ball moves on — the spectrum follows
-    /// the ball rather than redistributing across the active count.
+    /// Trail render — the same renderer and marks as the game, so a trail
+    /// looks identical everywhere.
     private var homeTrailLayer: some View {
         // Bespoke, animated per-trail rendering (snow trench, fire→smoke,
         // scales, twinkling stars, jet-stream, …) — the same renderer the
         // in-game trail will use, so a trail looks identical everywhere.
         Canvas { ctx, _ in
-            drawRichTrail(ctx, points: trailPoints,
+            drawRichTrail(ctx, points: trailMarks.points,
                           trail: gameState.equippedTrail,
                           t: Date().timeIntervalSinceReferenceDate,
-                          times: trailTimes)
+                          times: trailMarks.times,
+                          reduceMotion: reduceMotion)
         }
     }
 

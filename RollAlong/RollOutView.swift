@@ -136,10 +136,8 @@ struct RollOutView: View {
     @State private var vel: CGVector = .zero
     @State private var mazeIndex = 0
     @State private var phase: Phase = .ready
-    @State private var trail: [CGPoint] = []
+    @State private var trail = TrailMarks()
     @State private var goalPulse = false
-    private let trailMaxLen = 16
-    private let trailMinStep: CGFloat = 3
 
     private var maze: RollOutMaze { RollOutMazes.all[mazeIndex % RollOutMazes.all.count] }
     private var boundary: Boundary { gameState.equippedBoundary }
@@ -274,20 +272,11 @@ struct RollOutView: View {
         .position(c)
     }
 
+    /// The ball's trail: marks laid where the ball was, each fading on its
+    /// own clock (shared racer marks).
     private var trailLayer: some View {
         Canvas { ctx, _ in
-            let t = gameState.equippedTrail
-            guard t != .none, trail.count >= 2 else { return }
-            for i in 1..<trail.count {
-                let age = Double(i) / Double(trail.count - 1)
-                let color: Color = t == .rainbow
-                    ? Color(hue: (Double(i) / Double(trail.count)).truncatingRemainder(dividingBy: 1),
-                            saturation: 1, brightness: 1)
-                    : t.color
-                var path = Path(); path.move(to: trail[i - 1]); path.addLine(to: trail[i])
-                ctx.stroke(path, with: .color(color.opacity(0.10 + 0.5 * age)),
-                           style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-            }
+            drawTrails(ctx, [(marks: trail, trail: gameState.equippedTrail)], lineWidth: 4)
         }
     }
 
@@ -458,7 +447,9 @@ struct RollOutView: View {
     private func resetBall() {
         pos = startPoint()
         vel = .zero
-        trail = [pos]
+        trail.clear()
+        trail.add(pos, at: Date().timeIntervalSinceReferenceDate,
+                  lifetime: TrailMarks.racerLifetime, cap: TrailMarks.racerCap)
     }
 
     /// Restart the current maze (after a fall) — back to the tap-to-start state.
@@ -517,12 +508,8 @@ struct RollOutView: View {
     }
 
     private func accumulateTrail() {
-        if let last = trail.last {
-            if hypot(pos.x - last.x, pos.y - last.y) > trailMinStep { trail.append(pos) }
-        } else {
-            trail.append(pos)
-        }
-        if trail.count > trailMaxLen { trail.removeFirst(trail.count - trailMaxLen) }
+        trail.add(pos, at: Date().timeIntervalSinceReferenceDate,
+                  lifetime: TrailMarks.racerLifetime, cap: TrailMarks.racerCap)
     }
 
     private func clearMaze() {

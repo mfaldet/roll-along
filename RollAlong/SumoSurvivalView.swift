@@ -117,7 +117,7 @@ struct SumoSurvivalView: View {
     @State private var bumpers: [Bumper] = []     // active this round
     @State private var poofs:   [Poof]   = []
     @State private var rivalLooks: [UUID: RivalCosmetics.Look] = [:]
-    @State private var trails:  [UUID: [CGPoint]] = [:]
+    @State private var trails:  [UUID: TrailMarks] = [:]
     @State private var arena:   CGSize = .zero
     @State private var center:  CGPoint = .zero
     @State private var baseRadius: CGFloat = 0
@@ -303,7 +303,7 @@ struct SumoSurvivalView: View {
 
     private var trailsLayer: some View {
         Canvas { ctx, _ in
-            drawTrails(ctx, bumpers.map { (trails[$0.id] ?? [], trailFor($0)) })
+            drawTrails(ctx, bumpers.map { (trails[$0.id] ?? TrailMarks(), trailFor($0)) })
         }
     }
 

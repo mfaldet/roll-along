@@ -2145,11 +2145,15 @@ struct RarityCornerTab: View {
 }
 
 /// The real trail effect along a gentle curve, drawn by the game's own trail
-/// renderer (`drawRichTrail`), with an optional ball at its head.
-///   • In a tile it animates at `ShopTileMotion.fps`, holds its frame while
-///     the list scrolls and shows its hero frame when frozen.
+/// renderer (`drawRichTrail`) from real marks: a ball rolls along the curve
+/// and lays marks behind it exactly as in play (fixed spacing, each fading on
+/// its own clock where it was laid), with an optional ball at its head.
+///   • In a tile it animates at `ShopTileMotion.fps`: the ball rolls across
+///     and restarts, the last lap's marks fading out where they lie.  It
+///     holds its frame while the list scrolls.
+///   • Frozen (hero frame, Reduce Motion, anywhere still) the ball sits near
+///     the end of the curve with a full, fading trail behind it.
 ///   • In a preview (Featured Bundle, a detail popup) it animates at 30 fps.
-///   • Anywhere still it is drawn once at the default hero instant.
 struct ShopTrailCurve: View {
     let trail: TrailColor
     var baseWidth: CGFloat = 5
@@ -2161,16 +2165,18 @@ struct ShopTrailCurve: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if motion.showsAnimatedRenderers(reduceMotion: reduceMotion) {
+        if motion.showsAnimatedRenderers(reduceMotion: reduceMotion) && heroTime == nil {
             TimelineView(.animation(minimumInterval: motion.frameInterval(nil),
                                     paused: motion.isPaused(reduceMotion: reduceMotion))) { tl in
-                Self.curve(trail: trail,
-                           t: heroTime ?? tl.date.timeIntervalSinceReferenceDate,
-                           baseWidth: baseWidth, headBall: headBall)
+                Self.curve(trail: trail, t: tl.date.timeIntervalSinceReferenceDate,
+                           rolling: true, baseWidth: baseWidth, headBall: headBall,
+                           reduceMotion: false)
             }
         } else {
+            // Frozen: the ball near the end of the curve, a full trail behind.
             Self.curve(trail: trail, t: heroTime ?? ShopTileMotion.defaultHeroTime,
-                       baseWidth: baseWidth, headBall: headBall)
+                       rolling: false, baseWidth: baseWidth, headBall: headBall,
+                       reduceMotion: reduceMotion)
         }
     }
 
@@ -2185,14 +2191,83 @@ struct ShopTrailCurve: View {
         }
     }()
 
-    private static func curve(trail: TrailColor, t: Double, baseWidth: CGFloat,
-                              headBall: BallSkin?) -> some View {
+    /// Where the frozen frame puts the ball: this share of the curve.
+    static let frozenHead: Double = 0.97
+    /// The ball covers the whole curve in this many trail lifetimes, so the
+    /// trail's fading tail reaches back to about the start of the curve.
+    static let lapLifetimes: Double = 1.15
+
+    /// Point at arc length `s` along `pts` (cumulative lengths `cum`).
+    private static func point(at s: CGFloat, _ pts: [CGPoint], _ cum: [CGFloat]) -> CGPoint {
+        guard let total = cum.last, total > 0 else { return pts.first ?? .zero }
+        let target = min(max(0, s), total)
+        var j = 1
+        while j < cum.count - 1 && cum[j] < target { j += 1 }
+        let seg = max(0.0001, cum[j] - cum[j - 1])
+        let f = (target - cum[j - 1]) / seg
+        return CGPoint(x: pts[j - 1].x + (pts[j].x - pts[j - 1].x) * f,
+                       y: pts[j - 1].y + (pts[j].y - pts[j - 1].y) * f)
+    }
+
+    /// The marks a ball rolling along `pts` at constant speed would have laid
+    /// by time `t`: spaced `TrailMarks.spacing` apart along the curve, each
+    /// stamped with when the ball passed it.  Laps restart at the curve's
+    /// start; the previous lap's marks stay where they were laid and fade.
+    /// Returns the marks and the ball's position.
+    static func marks(along pts: [CGPoint], t: Double, rolling: Bool)
+        -> (points: [CGPoint], times: [Double], head: CGPoint) {
+        var cum: [CGFloat] = [0]
+        for i in 1..<pts.count {
+            cum.append(cum[i - 1] + hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y))
+        }
+        let total = cum.last ?? 0
+        guard total > 0 else { return ([], [], pts.first ?? .zero) }
+        let lap = TrailMarks.lifetime * lapLifetimes           // seconds per lap
+        let speed = Double(total) / lap                        // points per second
+        let lapPos: Double
+        let lapStart: Double
+        if rolling {
+            lapPos = (t / lap) - floor(t / lap)
+            lapStart = t - lapPos * lap
+        } else {
+            lapPos = frozenHead
+            lapStart = t - frozenHead * lap
+        }
+        let headS = CGFloat(lapPos) * total
+        let spacing = TrailMarks.spacing
+        var outP: [CGPoint] = []
+        var outT: [Double] = []
+        // Previous lap's tail first (oldest), then this lap's marks.
+        if rolling {
+            var s: CGFloat = 0
+            while s <= total {
+                let laid = lapStart - lap + Double(s) / speed
+                if t - laid < TrailMarks.lifetime {
+                    outP.append(point(at: s, pts, cum)); outT.append(laid)
+                }
+                s += spacing
+            }
+        }
+        var s: CGFloat = 0
+        while s <= headS {
+            let laid = lapStart + Double(s) / speed
+            if t - laid < TrailMarks.lifetime {
+                outP.append(point(at: s, pts, cum)); outT.append(laid)
+            }
+            s += spacing
+        }
+        return (outP, outT, point(at: headS, pts, cum))
+    }
+
+    private static func curve(trail: TrailColor, t: Double, rolling: Bool, baseWidth: CGFloat,
+                              headBall: BallSkin?, reduceMotion: Bool) -> some View {
         Canvas { ctx, size in
             let pts = unitCurve.map { CGPoint(x: $0.x * size.width, y: $0.y * size.height) }
-            drawRichTrail(ctx, points: pts, trail: trail, t: t, baseWidth: baseWidth)
-            if headBall != nil, let head = pts.last,
-               let ball = ctx.resolveSymbol(id: 0) {
-                ctx.draw(ball, at: head)
+            let m = marks(along: pts, t: t, rolling: rolling)
+            drawRichTrail(ctx, points: m.points, trail: trail, t: t, baseWidth: baseWidth,
+                          times: m.times, reduceMotion: reduceMotion)
+            if headBall != nil, let ball = ctx.resolveSymbol(id: 0) {
+                ctx.draw(ball, at: m.head)
             }
         } symbols: {
             if let headBall {

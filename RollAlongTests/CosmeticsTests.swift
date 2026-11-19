@@ -1100,3 +1100,104 @@ final class CosmeticMotionTests: XCTestCase {
         XCTAssertEqual(EnvironmentValues().cosmeticMotion, .live)
     }
 }
+
+// MARK: - Trail marks (every trail is laid in place and fades on a timer)
+
+final class TrailMarksTests: XCTestCase {
+
+    /// Marks are laid every `spacing` points along the path, with laid times
+    /// interpolated along the step — the same density at any speed.
+    func testMarksAreLaidAtFixedSpacing() {
+        var m = TrailMarks()
+        m.add(CGPoint(x: 0, y: 0), at: 100.0)
+        m.add(CGPoint(x: 20, y: 0), at: 100.1)          // one fast step: 20 pt
+        XCTAssertEqual(m.count, 1 + 5)                   // start + 20 / 4
+        for i in 1..<m.count {
+            let d = m.points[i].x - m.points[i - 1].x
+            XCTAssertEqual(d, TrailMarks.spacing, accuracy: 0.0001)
+            XCTAssertGreaterThan(m.times[i], m.times[i - 1])
+        }
+        XCTAssertEqual(m.times.last ?? 0, 100.1, accuracy: 0.0001)
+        // A step shorter than the spacing lays nothing.
+        m.add(CGPoint(x: 21, y: 0), at: 100.12)
+        XCTAssertEqual(m.count, 6)
+    }
+
+    /// Marks never move once laid: later steps only append.
+    func testLaidMarksNeverMove() {
+        var m = TrailMarks()
+        m.add(.zero, at: 0)
+        m.add(CGPoint(x: 12, y: 0), at: 0.05)
+        let before = m.points
+        m.add(CGPoint(x: 12, y: 40), at: 0.10)
+        XCTAssertEqual(Array(m.points.prefix(before.count)), before)
+    }
+
+    /// Marks expire by age, even when the ball stops.
+    func testMarksExpireByAge() {
+        var m = TrailMarks()
+        m.add(.zero, at: 0)
+        m.add(CGPoint(x: 40, y: 0), at: 0.2)
+        XCTAssertEqual(m.count, 11)
+        // Ball resting at the last mark: nothing new is laid, old marks go.
+        m.add(CGPoint(x: 40, y: 0), at: 0.2 + TrailMarks.lifetime - 0.01)
+        XCTAssertTrue(m.times.allSatisfy { 0.2 + TrailMarks.lifetime - 0.01 - $0 <= TrailMarks.lifetime })
+        XCTAssertLessThan(m.count, 11)
+        m.add(CGPoint(x: 40, y: 0), at: 10)
+        XCTAssertTrue(m.isEmpty)
+    }
+
+    /// The cap bounds the buffer at any speed, and one step lays at most
+    /// `maxPerStep` marks (a respawn jump can't flood it).
+    func testCapAndPerStepLimit() {
+        var m = TrailMarks()
+        m.add(.zero, at: 0)
+        m.add(CGPoint(x: 10_000, y: 0), at: 0.016)
+        XCTAssertEqual(m.count, 1 + TrailMarks.maxPerStep)
+        XCTAssertEqual(m.points.last?.x ?? 0, 10_000, accuracy: 0.001)
+        var t = 0.016
+        var x: CGFloat = 10_000
+        for _ in 0..<200 { t += 0.016; x += 60; m.add(CGPoint(x: x, y: 0), at: t) }
+        XCTAssertLessThanOrEqual(m.count, TrailMarks.cap)
+    }
+
+    /// A mark's seed comes from when it was laid, so it is the same however
+    /// the buffer shifts or the camera moves.
+    func testSeedIsStablePerMark() {
+        var m = TrailMarks()
+        m.add(.zero, at: 50)
+        m.add(CGPoint(x: 40, y: 0), at: 50.2)
+        let laid = m.times[5]
+        let seed = trailSeed(laid)
+        m.add(CGPoint(x: 80, y: 0), at: 50.4)
+        m.add(CGPoint(x: 80, y: 0), at: 51.15)          // older marks expire, indices shift
+        let idx = m.times.firstIndex(of: laid)
+        XCTAssertNotNil(idx)
+        if let idx { XCTAssertEqual(trailSeed(m.times[idx]), seed) }
+        XCTAssertTrue((0..<1).contains(seed))
+    }
+
+    /// Replays rebuild exactly the marks the live game would have laid.
+    func testReplayMarksMatchLiveMarks() {
+        let samples: [(t: Double, p: CGPoint)] = (0..<60).map { i in
+            (t: Double(i) / 60, p: CGPoint(x: CGFloat(i) * 5, y: CGFloat(i % 7)))
+        }
+        var live = TrailMarks()
+        for s in samples { live.add(s.p, at: s.t) }
+        let replay = TrailMarks.laid(along: samples, now: samples.last!.t)
+        XCTAssertEqual(replay, live)
+    }
+
+    /// The Shop curve lays real marks: spaced along the curve, oldest first,
+    /// none older than a lifetime, and the frozen frame puts the ball near
+    /// the end with a full trail behind it.
+    func testShopCurveLaysRealMarks() {
+        let pts = ShopTrailCurve.unitCurve.map { CGPoint(x: $0.x * 100, y: $0.y * 100) }
+        let frozen = ShopTrailCurve.marks(along: pts, t: 7.3, rolling: false)
+        XCTAssertGreaterThan(frozen.points.count, 8)
+        XCTAssertEqual(frozen.times, frozen.times.sorted())
+        XCTAssertTrue(frozen.times.allSatisfy { 7.3 - $0 < TrailMarks.lifetime && $0 <= 7.3 })
+        let rolling = ShopTrailCurve.marks(along: pts, t: 7.3, rolling: true)
+        XCTAssertTrue(rolling.times.allSatisfy { 7.3 - $0 < TrailMarks.lifetime && $0 <= 7.3 + 1e-9 })
+    }
+}

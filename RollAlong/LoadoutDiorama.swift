@@ -774,17 +774,20 @@ struct LoadoutDiorama: View {
             }
         }
 
-        // Trail: the last 1.5 s of path (the game keeps ~90 frames), oldest
-        // first, through the game's own trail renderer.
+        // Trail: the marks the game would have laid, rebuilt from the run's
+        // own path and times (fed from the clip's start, so every mark sits
+        // exactly where it was laid, in world space) and placed through the
+        // camera like everything else.  Each fades on its own clock.
         if loadout.trail != .none {
-            let tail = r.samples(from: max(c.start, t - 1.5), to: min(t, c.end))
+            let now = min(t, c.end)
+            let path = r.samples(from: c.start, to: now)
+            let marks = TrailMarks.laid(along: path, now: t)
             Canvas { ctx, _ in
-                guard tail.count >= 2 else { return }
-                let pts = tail.map { cam.view($0.p) }
-                let times: [Double]? = wallNow > 0 ? tail.map { wallNow - (t - $0.t) } : nil
+                guard marks.count >= 2 else { return }
+                let pts = marks.points.map { cam.view($0) }
                 drawRichTrail(ctx, points: pts, trail: loadout.trail,
-                              t: wallNow > 0 ? wallNow : 0,
-                              baseWidth: max(2, 6 * cam.scale), times: times)
+                              t: t, baseWidth: max(2, 6 * cam.scale),
+                              times: marks.times, reduceMotion: reduceMotion)
             }
             .opacity(alpha)
             .allowsHitTesting(false)

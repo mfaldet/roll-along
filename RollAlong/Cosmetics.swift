@@ -3992,411 +3992,510 @@ struct TierBadge: View {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Competitive trails — shared so the keystone "opponents' trails are visible"
-// streak is one implementation across every competitive view.
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Trail marks — ONE system for every trail, everywhere a trail is drawn
+// (gameplay, Home, replays, Shop tiles, try-on, the Locker and the
+// minigames' racer trails).
+//
+//   • A mark is laid at the ball's position at that moment, stamped with the
+//     time it was laid.  It never moves with the ball afterward.
+//   • Marks are laid at a fixed spacing along the path (`spacing`), so every
+//     trail has the same density whatever the ball's speed.  A fast step lays
+//     several marks along the straight line it covered, with interpolated
+//     laid times.
+//   • Marks expire by AGE (`lifetime`): each one fades out where it was laid,
+//     on its own clock — even while the ball rests.
+//   • A hard cap (`cap`) bounds memory and draw cost.  Past it (only above
+//     ~465 pt/s) the oldest marks drop early.
+//
+// Every renderer below draws from the marks alone and keys each mark's look
+// to its own laid time (`trailSeed`) and age — never to its index counted
+// back from the ball.  That index-from-the-head keying (plus a fixed-length
+// buffer) is what made most trails look towed: a mark's width, brightness and
+// decorations were recomputed from "how far behind the ball am I" every frame,
+// so the whole effect slid along with the ball.
+// ===========================================================================
+struct TrailMarks: Equatable {
+    /// Distance between consecutive marks, in points.
+    static let spacing: CGFloat = 4
+    /// How long a mark lives, in seconds (shared by every trail).
+    static let lifetime: Double = 1.1
+    /// Most marks alive at once: a full `lifetime` of path at up to ~465 pt/s.
+    static let cap = 128
+    /// Most marks one step may lay, so a respawn jump can't flood the buffer.
+    static let maxPerStep = 16
+    /// Racer trails in the minigames are shorter, so four marbles don't
+    /// smear the board.  Same laying rule, same fade.
+    static let racerLifetime: Double = 0.45
+    static let racerCap = 48
 
-/// Append a position to a per-key trail buffer (min-step gate + length cap).
-/// Call once per racer each tick; the buffer feeds `drawTrails`.
-func recordTrail<K: Hashable>(_ trails: inout [K: [CGPoint]], _ key: K, _ pos: CGPoint,
-                              maxLen: Int = 14, minStep: CGFloat = 3) {
-    var pts = trails[key] ?? []
-    if let last = pts.last {
-        if hypot(pos.x - last.x, pos.y - last.y) > minStep { pts.append(pos) }
-    } else {
-        pts.append(pos)
+    /// Mark positions, oldest first (the newest sits at the ball).
+    private(set) var points: [CGPoint] = []
+    /// When each mark was laid (same clock as `now`), parallel to `points`.
+    private(set) var times: [Double] = []
+
+    init() {}
+
+    var isEmpty: Bool { points.isEmpty }
+    var count: Int { points.count }
+
+    mutating func clear() {
+        points.removeAll(keepingCapacity: true)
+        times.removeAll(keepingCapacity: true)
     }
-    if pts.count > maxLen { pts.removeFirst(pts.count - maxLen) }
-    trails[key] = pts
+
+    /// Record the ball at `p` at time `now` (call every tick, moving or not):
+    /// lays marks every `spacing` points from the last mark toward `p`, then
+    /// drops marks older than `lifetime` and any beyond `cap`.
+    mutating func add(_ p: CGPoint, at now: Double,
+                      lifetime: Double = TrailMarks.lifetime,
+                      cap: Int = TrailMarks.cap) {
+        if let last = points.last, let lastT = times.last {
+            let dx: CGFloat = p.x - last.x
+            let dy: CGFloat = p.y - last.y
+            let d: CGFloat = (dx * dx + dy * dy).squareRoot()
+            if d >= Self.spacing {
+                let whole: Int = Int(d / Self.spacing)
+                let k: Int = min(Self.maxPerStep, whole)
+                // Whole spacings normally; spread evenly to `p` if capped.
+                let step: CGFloat = whole > Self.maxPerStep ? d / CGFloat(k) : Self.spacing
+                for j in 1...k {
+                    let f: CGFloat = step * CGFloat(j) / d
+                    points.append(CGPoint(x: last.x + dx * f, y: last.y + dy * f))
+                    times.append(lastT + (now - lastT) * Double(f))
+                }
+            }
+        } else {
+            points.append(p)
+            times.append(now)
+        }
+        expire(now: now, lifetime: lifetime, cap: cap)
+    }
+
+    /// Drop marks older than `lifetime`, then any beyond `cap` (oldest first).
+    mutating func expire(now: Double, lifetime: Double = TrailMarks.lifetime,
+                         cap: Int = TrailMarks.cap) {
+        var drop = 0
+        while drop < times.count, now - times[drop] > lifetime { drop += 1 }
+        if times.count - drop > cap { drop = times.count - cap }
+        if drop > 0 {
+            points.removeFirst(drop)
+            times.removeFirst(drop)
+        }
+    }
+
+    /// Marks laid by a ball that followed `samples` (oldest first), as of time
+    /// `now`.  Used by replays: feeding the whole clip from its start keeps
+    /// every mark exactly where the live game would have laid it.
+    static func laid(along samples: [(t: Double, p: CGPoint)], now: Double,
+                     lifetime: Double = TrailMarks.lifetime) -> TrailMarks {
+        var m = TrailMarks()
+        for s in samples where s.t <= now { m.add(s.p, at: s.t, lifetime: lifetime) }
+        m.expire(now: now, lifetime: lifetime)
+        return m
+    }
 }
 
-/// Draw fading competitive trails into a Canvas `ctx`.  Each entry is one
-/// racer's recent points + the TrailColor to draw it in (`.rainbow` → a
-/// per-segment hue cycle; `.none` and <2-point trails are skipped).
+// ---------------------------------------------------------------------------
+// Competitive trails — the keystone "opponents' trails are visible" streak,
+// one implementation across every competitive view.  Same laying rule as the
+// rich trail (marks stay where laid, fade on a timer), drawn as a simple line.
+// ---------------------------------------------------------------------------
+
+/// Lay one racer's marks for this tick (call once per racer, every tick).
+func recordTrail<K: Hashable>(_ trails: inout [K: TrailMarks], _ key: K, _ pos: CGPoint,
+                              now: Double = Date().timeIntervalSinceReferenceDate) {
+    // `default:` mutates the stored value in place — no copy of its buffers.
+    trails[key, default: TrailMarks()].add(pos, at: now,
+                                           lifetime: TrailMarks.racerLifetime,
+                                           cap: TrailMarks.racerCap)
+}
+
+/// Draw racer trails into a Canvas `ctx`.  Each mark's segment fades by its
+/// own age where it was laid.  `.rainbow` colors each mark by when it was
+/// laid, so a mark keeps its hue; `.none` and <2-mark trails are skipped.
+/// `toScreen` maps stored positions to the canvas (Roll Up stores world
+/// coordinates and scrolls).
 func drawTrails(_ ctx: GraphicsContext,
-                _ entries: [(points: [CGPoint], trail: TrailColor)]) {
+                _ entries: [(marks: TrailMarks, trail: TrailColor)],
+                now: Double = Date().timeIntervalSinceReferenceDate,
+                lineWidth: CGFloat = 5,
+                toScreen: (CGPoint) -> CGPoint = { $0 }) {
     for e in entries {
-        let pts = e.points
-        guard pts.count >= 2, e.trail != .none else { continue }
+        let pts = e.marks.points, times = e.marks.times
+        guard pts.count >= 2, times.count == pts.count, e.trail != .none else { continue }
         let rainbow = e.trail == .rainbow
         let solid = e.trail.color
         for i in 1..<pts.count {
-            let age = Double(i) / Double(pts.count - 1)
+            let fresh: Double = max(0, 1 - (now - times[i - 1]) / TrailMarks.racerLifetime)
+            guard fresh > 0.01 else { continue }
             let segColor: Color = rainbow
-                ? Color(hue: (Double(i) / Double(pts.count)).truncatingRemainder(dividingBy: 1),
-                        saturation: 1, brightness: 1)
+                ? Color(hue: trailHue(times[i]), saturation: 1, brightness: 1)
                 : solid
-            var path = Path(); path.move(to: pts[i - 1]); path.addLine(to: pts[i])
-            ctx.stroke(path, with: .color(segColor.opacity(0.10 + 0.55 * age)),
-                       style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+            var path = Path(); path.move(to: toScreen(pts[i - 1])); path.addLine(to: toScreen(pts[i]))
+            ctx.stroke(path, with: .color(segColor.opacity(0.65 * fresh)),
+                       style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
     }
 }
 
+/// Stable 0…1 pseudo-random value for a mark, from the time it was laid.
+/// Laid times only ever increase, so this is a per-mark identity that never
+/// changes as the buffer shifts — and unlike a position it doesn't change
+/// when a replay camera moves.
+func trailSeed(_ laidAt: Double) -> Double {
+    let a: Double = laidAt * 61.7
+    let v: Double = sin((a - floor(a)) * 12.9898 + floor(a).truncatingRemainder(dividingBy: 997.0) * 0.7853) * 43758.5453
+    return v - floor(v)
+}
+
+/// A mark's rainbow hue, from when it was laid: neighbours differ a little,
+/// so the path reads as a spectrum, and a mark never changes colour.
+func trailHue(_ laidAt: Double) -> Double {
+    let v: Double = laidAt * 0.55
+    return v - floor(v)
+}
+
 // ===========================================================================
-// Rich per-trail rendering — bespoke, animated effects for the player's
-// equipped trail (snow trench for ice, fire→smoke for comet, scales for snake,
-// twinkling stars for stardust, a jet-stream for air, …).  Drawn for ONE ball
-// at a time (home + climb), so it can afford the detail.  `pts` runs
-// oldest→newest (the ball sits at pts.last); `t` is a time value for animation.
+// Rich per-trail rendering — the player's equipped trail (gameplay, Home,
+// replays, the Shop).  Every effect lives at a mark: it appears where the
+// ball was, may change gently IN PLACE (smoke thins and rises, sparks rise,
+// bubbles pop, flames flicker) and fades on the mark's own clock.  Under
+// Reduce Motion the marks still appear and fade, with no extra movement.
 // ===========================================================================
-/// Draw the equipped trail.
+
+/// What a renderer needs about the current marks.
+private struct TrailFrame {
+    let pts: [CGPoint]
+    let laid: [Double]
+    let now: Double
+    let life: Double
+    /// 1 normally, 0 under Reduce Motion — scales every in-place movement.
+    let m: Double
+    let bw: CGFloat
+
+    var n: Int { pts.count }
+    /// Time used for in-place flicker/sway; frozen under Reduce Motion.
+    var tm: Double { now * m }
+    func age(_ i: Int) -> Double { max(0, now - laid[i]) }
+    /// 0 just laid → 1 expired.
+    func f(_ i: Int) -> Double { min(1, age(i) / life) }
+    /// 1 just laid → 0 expired.
+    func fresh(_ i: Int) -> Double { 1 - f(i) }
+    func seed(_ i: Int) -> Double { trailSeed(laid[i]) }
+}
+
+/// Draw the equipped trail from its marks.
 ///
-/// `times` is the wall-clock stamp (`timeIntervalSinceReferenceDate`) at which
-/// each point was laid, parallel to `pts`.  The "elemental" trails (ink, fire,
-/// ice, air) use it to drive a real-time lifecycle — each mark stays put where
-/// it was laid and animates/dissipates on its own clock, independent of the
-/// ball's speed — rather than the old index-as-age proxy that pinned the effect
-/// to the ball.  When `times` is nil (e.g. the static shop preview) those trails
-/// fall back to a synthetic age spread so they still read.
+/// `points`/`times` are the marks (oldest first, see `TrailMarks`); `t` is
+/// "now" on the same clock as `times`.  When `times` is missing the marks are
+/// spread evenly over one lifetime, newest at the head.
 func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
                    trail: TrailColor, t: Double, baseWidth: CGFloat = 6,
-                   times: [Double]? = nil) {
+                   times: [Double]? = nil,
+                   lifetime: Double = TrailMarks.lifetime,
+                   reduceMotion: Bool = false) {
     guard pts.count >= 2, trail != .none else { return }
-    let n = pts.count
+    let laid: [Double]
+    if let times, times.count == pts.count {
+        laid = times
+    } else {
+        let n = pts.count
+        laid = (0..<n).map { i in t - Double(n - 1 - i) / Double(n - 1) * lifetime * 0.95 }
+    }
+    let fr = TrailFrame(pts: pts, laid: laid, now: t, life: lifetime,
+                        m: reduceMotion ? 0 : 1, bw: baseWidth)
     switch trail {
-    case .snake:           trailSnake(ctx, pts, n, t, baseWidth)
-    case .cometTrail:      trailComet(ctx, pts, n, t, baseWidth)
-    case .ice:             trailIce(ctx, pts, n, t, baseWidth, times)
-    case .fire:            trailFire(ctx, pts, n, t, baseWidth, times)
-    case .ink:             trailInk(ctx, pts, n, t, baseWidth, times)
-    case .smoke:           trailMist(ctx, pts, n, t, baseWidth, base: trail.color, times)
-    case .stardust:        trailStardust(ctx, pts, n, t, baseWidth)
-    case .air:             trailAir(ctx, pts, n, t, baseWidth, times)
-    case .rainbow:         trailRainbow(ctx, pts, n, t, baseWidth, times)
-    case .graphite:        trailGraphite(ctx, pts, n, baseWidth)
-    case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth, times)
-    case .moneyRoll:       trailMoney(ctx, pts, n, t, baseWidth, times)
-    case .aurora:          trailAurora(ctx, pts, n, t, baseWidth)
-    case .forest:          trailForest(ctx, pts, n, baseWidth)
-    case .bubblegum:       trailBubblegum(ctx, pts, n, baseWidth)
-    case .ember:           trailEmber(ctx, pts, n, t, baseWidth, times)
+    case .snake:           trailSnake(ctx, fr)
+    case .cometTrail:      trailComet(ctx, fr)
+    case .ice:             trailIce(ctx, fr)
+    case .fire:            trailFire(ctx, fr)
+    case .ink:             trailInk(ctx, fr)
+    case .smoke:           trailMist(ctx, fr, base: trail.color)
+    case .stardust:        trailStardust(ctx, fr)
+    case .air:             trailAir(ctx, fr)
+    case .rainbow:         trailRainbow(ctx, fr)
+    case .graphite:        trailGraphite(ctx, fr)
+    case .roseTrail:       trailRose(ctx, fr)
+    case .moneyRoll:       trailMoney(ctx, fr)
+    case .aurora:          trailAurora(ctx, fr)
+    case .forest:          trailForest(ctx, fr)
+    case .bubblegum:       trailBubblegum(ctx, fr)
+    case .ember:           trailEmber(ctx, fr)
     default:
-        trailTapered(ctx, pts, n, baseWidth, color: trail.color,
+        trailTapered(ctx, fr, width: baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded)
     }
 }
 
-/// Real seconds since point `i` was laid.  Falls back to a synthetic spread
-/// (head ≈ fresh, tail ≈ `lifetime`) when timestamps are unavailable — e.g. the
-/// static shop preview — so the lifecycle still animates.
-private func trailAge(_ i: Int, _ n: Int, _ t: Double,
-                      _ times: [Double]?, lifetime: Double) -> Double {
-    if let times, i < times.count { return max(0, t - times[i]) }
-    guard n > 1 else { return 0 }
-    return Double(n - 1 - i) / Double(n - 1) * lifetime * 0.95
-}
-
-/// Stable per-location phase seed so an element flickers/sways IN PLACE instead
-/// of jumping when the FIFO buffer shifts its index out from under it.
-private func trailSeed(_ p: CGPoint) -> Double {
-    Double(p.x) * 0.1037 + Double(p.y) * 0.0719
-}
-
-/// Tapered, optionally-glowing streak — the default for the simple colour trails.
-private func trailTapered(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int,
-                          _ baseWidth: CGFloat, color: Color, glow: Bool) {
+/// The plain line: each segment narrows and fades with the age of its older
+/// mark, so the line thins away from the tail where it was laid.  Used by the
+/// simple colour trails (Sky, Gilded, Raybeam) and under several rich ones.
+private func trailTapered(_ ctx: GraphicsContext, _ fr: TrailFrame,
+                          width: CGFloat, color: Color, glow: Bool) {
     var ctx = ctx
-    for i in 1..<n {
-        let age = Double(i) / Double(n - 1)
-        let w   = baseWidth * CGFloat(0.30 + 0.70 * age)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let w: CGFloat = width * CGFloat(0.35 + 0.65 * k)
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
         if glow {
             ctx.blendMode = .plusLighter
-            ctx.stroke(p, with: .color(color.opacity(0.16 * age)),
+            ctx.stroke(p, with: .color(color.opacity(0.16 * k)),
                        style: StrokeStyle(lineWidth: w * 2.4, lineCap: .round))
             ctx.blendMode = .normal
         }
-        ctx.stroke(p, with: .color(color.opacity(0.12 + 0.70 * age)),
+        ctx.stroke(p, with: .color(color.opacity(0.82 * k)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
     }
 }
 
-/// Aurora — a luminous ribbon whose hue flows teal-green → cyan → violet along
-/// its length and shimmers over time, with an additive outer glow and a bright
-/// white-teal core, so the streak reads like a sliver of northern lights.
-private func trailAurora(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int,
-                         _ t: Double, _ baseWidth: CGFloat) {
+/// Aurora — a luminous ribbon, teal-green through cyan to violet.  Each mark's
+/// hue comes from when it was laid and shimmers slowly in place; an additive
+/// glow and a bright core on the freshest stretch.
+private func trailAurora(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     var ctx = ctx
     ctx.blendMode = .plusLighter
-    for i in 1..<n {
-        let age = Double(i) / Double(n - 1)                 // 0 tail … 1 head
-        let w   = baseWidth * CGFloat(0.30 + 0.95 * age)
-        // Hue waves teal(0.42) → violet(0.74) down the length, drifting in time.
-        let hue = 0.42 + 0.32 * (0.5 + 0.5 * sin(Double(i) * 0.45 - t * 2.0))
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let w: CGFloat = fr.bw * CGFloat(0.35 + 0.90 * k)
+        let phase: Double = fr.laid[i] * 3.0 + fr.tm * 0.8
+        let hue: Double = 0.42 + 0.32 * (0.5 + 0.5 * sin(phase))
         let col = Color(hue: hue, saturation: 0.80, brightness: 1.0)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        // Outer glow.
-        ctx.stroke(p, with: .color(col.opacity(0.16 * age)),
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(col.opacity(0.16 * k)),
                    style: StrokeStyle(lineWidth: w * 2.8, lineCap: .round))
-        // Body.
-        ctx.stroke(p, with: .color(col.opacity(0.18 + 0.65 * age)),
+        ctx.stroke(p, with: .color(col.opacity(0.83 * k)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
-        // Bright core on the fresher half.
-        if age > 0.45 {
-            ctx.stroke(p, with: .color(Color(red: 0.85, green: 1.0, blue: 0.95).opacity(0.5 * age)),
+        if k > 0.55 {
+            ctx.stroke(p, with: .color(Color(red: 0.85, green: 1.0, blue: 0.95).opacity(0.5 * k)),
                        style: StrokeStyle(lineWidth: w * 0.4, lineCap: .round))
         }
     }
     ctx.blendMode = .normal
 }
 
-/// Snake — a fat scaled body that tapers to the tail, with a head + eyes +
-/// tongue.  The body slithers: each point is swung sideways by a sine wave that
-/// travels down the length over time, so the snake winds back and forth like
-/// it's threading through grass — even while the ball is momentarily still.
-private func trailSnake(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+/// Snake — a scaled body laid along the path, head at the ball.  Each body
+/// segment narrows and fades with its own age where it was laid, so the snake
+/// sheds its tail behind it instead of being dragged; coins lengthen its life
+/// (the caller passes a longer `lifetime`).
+private func trailSnake(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     let dark = Color(red: 0.09, green: 0.38, blue: 0.15)
     let mid  = Color(red: 0.18, green: 0.64, blue: 0.24)
     let lite = Color(red: 0.50, green: 0.90, blue: 0.42)
-    let headW = baseWidth * 2.0
-
-    // ── Slither: offset every point sideways by a travelling sine wave.  The
-    //    phase is keyed to arc-length-FROM-THE-HEAD (stable as the FIFO trims
-    //    the tail, so the wave glides smoothly instead of jumping), and the
-    //    amplitude ramps up from 0 at the head — the head stays pinned to the
-    //    ball while the body winds behind it.
-    let amp        = Double(baseWidth) * 2.0     // sideways swing (px)
-    let waveLen    = Double(baseWidth) * 18.0    // px between crests
-    let slitherSpd = 5.0                         // wave travel speed (rad/s)
-    let headAnchor = Double(baseWidth) * 5.0     // px over which amplitude eases in
-
-    var sFromHead = [Double](repeating: 0, count: n)
-    for i in stride(from: n - 2, through: 0, by: -1) {
-        sFromHead[i] = sFromHead[i + 1]
-            + Double(hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y))
-    }
-    var body = [CGPoint](repeating: .zero, count: n)
-    for i in 0..<n {
-        let a = pts[max(0, i - 1)], b = pts[min(n - 1, i + 1)]
-        let dx = Double(b.x - a.x), dy = Double(b.y - a.y)
-        let len = max(0.001, (dx * dx + dy * dy).squareRoot())
-        let px = -dy / len, py = dx / len                 // unit perpendicular
-        let s = sFromHead[i]
-        let fade = min(1.0, s / headAnchor)               // anchor the head
-        let lat = amp * fade * sin(s / waveLen * 2 * .pi - t * slitherSpd)
-        body[i] = CGPoint(x: pts[i].x + CGFloat(px * lat),
-                          y: pts[i].y + CGFloat(py * lat))
-    }
-
+    let headW: CGFloat = fr.bw * 2.0
+    let n = fr.n
     for i in 1..<n {
-        let age = CGFloat(i) / CGFloat(n - 1)
-        let w = headW * (0.30 + 0.70 * age)
-        var p = Path(); p.move(to: body[i - 1]); p.addLine(to: body[i])
-        ctx.stroke(p, with: .color(dark), style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
-        ctx.stroke(p, with: .color(mid),  style: StrokeStyle(lineWidth: w * 0.72, lineCap: .round, lineJoin: .round))
-        ctx.stroke(p, with: .color(lite.opacity(0.5)), style: StrokeStyle(lineWidth: w * 0.24, lineCap: .round, lineJoin: .round))
-        // Scale chevron across the body at this segment.
-        let dx = body[i].x - body[i - 1].x, dy = body[i].y - body[i - 1].y
-        let len = max(0.001, hypot(dx, dy))
-        let ux = dx / len, uy = dy / len, px = -uy, py = ux
-        let h = w * 0.42, b = body[i]
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let w: CGFloat = headW * CGFloat(0.30 + 0.70 * k)
+        let a = fr.pts[i - 1], b = fr.pts[i]
+        var p = Path(); p.move(to: a); p.addLine(to: b)
+        ctx.stroke(p, with: .color(dark.opacity(k)), style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(mid.opacity(k)),  style: StrokeStyle(lineWidth: w * 0.72, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(lite.opacity(0.5 * k)), style: StrokeStyle(lineWidth: w * 0.24, lineCap: .round, lineJoin: .round))
+        // Scale chevron across the body at this mark.
+        let dx: CGFloat = b.x - a.x, dy: CGFloat = b.y - a.y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let ux: CGFloat = dx / len, uy: CGFloat = dy / len
+        let px: CGFloat = -uy, py: CGFloat = ux
+        let h: CGFloat = w * 0.42
         var chev = Path()
         chev.move(to: CGPoint(x: b.x + px * h - ux * h, y: b.y + py * h - uy * h))
-        chev.addLine(to: CGPoint(x: b.x, y: b.y))
+        chev.addLine(to: b)
         chev.addLine(to: CGPoint(x: b.x - px * h - ux * h, y: b.y - py * h - uy * h))
-        ctx.stroke(chev, with: .color(dark.opacity(0.45)),
+        ctx.stroke(chev, with: .color(dark.opacity(0.45 * k)),
                    style: StrokeStyle(lineWidth: max(0.6, w * 0.09), lineCap: .round, lineJoin: .round))
     }
-    // Head — pinned to the ball (body[n-1] == pts[n-1]), banking along the slither.
-    let head = body[n - 1], prev = body[n - 2]
-    let hdx = head.x - prev.x, hdy = head.y - prev.y, hlen = max(0.001, hypot(hdx, hdy))
-    let ux = hdx / hlen, uy = hdy / hlen, ex = -uy, ey = ux
-    let hr = headW * 0.62
-    ctx.fill(Path(ellipseIn: CGRect(x: head.x - hr, y: head.y - hr, width: hr * 2, height: hr * 2)), with: .color(mid))
-    ctx.fill(Path(ellipseIn: CGRect(x: head.x - hr, y: head.y - hr, width: hr * 2, height: hr * 2)),
-        with: .radialGradient(Gradient(colors: [lite.opacity(0.6), .clear]),
+    // Head — on the newest mark (the ball); fades away if the ball rests so
+    // long that even the newest mark expires.
+    let hk: Double = fr.fresh(n - 1)
+    guard hk > 0.05 else { return }
+    let head = fr.pts[n - 1], prev = fr.pts[n - 2]
+    let hdx: CGFloat = head.x - prev.x, hdy: CGFloat = head.y - prev.y
+    let hlen: CGFloat = max(0.001, hypot(hdx, hdy))
+    let ux: CGFloat = hdx / hlen, uy: CGFloat = hdy / hlen
+    let ex: CGFloat = -uy, ey: CGFloat = ux
+    let hr: CGFloat = headW * 0.62
+    let headRect = CGRect(x: head.x - hr, y: head.y - hr, width: hr * 2, height: hr * 2)
+    ctx.fill(Path(ellipseIn: headRect), with: .color(mid.opacity(hk)))
+    ctx.fill(Path(ellipseIn: headRect),
+        with: .radialGradient(Gradient(colors: [lite.opacity(0.6 * hk), .clear]),
             center: CGPoint(x: head.x - hr * 0.3, y: head.y - hr * 0.3), startRadius: 0, endRadius: hr))
-    let er = hr * 0.22
+    let er: CGFloat = hr * 0.22
     for s in [CGFloat(1), -1] {
-        let cxp = head.x + ux * hr * 0.2 + ex * hr * 0.45 * s
-        let cyp = head.y + uy * hr * 0.2 + ey * hr * 0.45 * s
-        ctx.fill(Path(ellipseIn: CGRect(x: cxp - er, y: cyp - er, width: er * 2, height: er * 2)), with: .color(.white))
-        ctx.fill(Path(ellipseIn: CGRect(x: cxp - er * 0.5, y: cyp - er * 0.5, width: er, height: er)), with: .color(.black))
+        let cxp: CGFloat = head.x + ux * hr * 0.2 + ex * hr * 0.45 * s
+        let cyp: CGFloat = head.y + uy * hr * 0.2 + ey * hr * 0.45 * s
+        ctx.fill(Path(ellipseIn: CGRect(x: cxp - er, y: cyp - er, width: er * 2, height: er * 2)),
+                 with: .color(Color.white.opacity(hk)))
+        ctx.fill(Path(ellipseIn: CGRect(x: cxp - er * 0.5, y: cyp - er * 0.5, width: er, height: er)),
+                 with: .color(Color.black.opacity(hk)))
     }
     var tongue = Path()
     tongue.move(to: CGPoint(x: head.x + ux * hr, y: head.y + uy * hr))
     tongue.addLine(to: CGPoint(x: head.x + ux * hr * 2.1, y: head.y + uy * hr * 2.1))
-    ctx.stroke(tongue, with: .color(Color(red: 0.9, green: 0.12, blue: 0.30)),
+    ctx.stroke(tongue, with: .color(Color(red: 0.9, green: 0.12, blue: 0.30).opacity(hk)),
                style: StrokeStyle(lineWidth: max(0.8, hr * 0.16), lineCap: .round))
 }
 
-/// Comet — bright yellow/white fire at the head, bleeding to deep red, then a
-/// long tail of dissipating grey smoke.
-private func trailComet(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
+/// Comet — each mark burns bright yellow-white when laid, cools through orange
+/// to deep red, then turns into a grey smoke puff that swells, rises a little
+/// and thins away where it was laid.
+private func trailComet(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     var ctx = ctx
-    // Smoke on the older portion — soft grey puffs that spread + drift.
-    for i in 0..<n {
-        let age = Double(i) / Double(n - 1)
-        guard age <= 0.6 else { continue }
-        let f = age / 0.6                         // 0 tail → 1 mid
-        let p = pts[i]
-        let pr = baseWidth * CGFloat(1.4 + 3.0 * (1 - f))
-        let drift = CGFloat(sin(t * 1.2 + Double(i))) * baseWidth * 0.5
-        ctx.fill(Path(ellipseIn: CGRect(x: p.x - pr + drift, y: p.y - pr, width: pr * 2, height: pr * 2)),
-            with: .radialGradient(Gradient(colors: [Color(white: 0.55).opacity(0.18 * f), .clear]),
-                center: CGPoint(x: p.x + drift, y: p.y), startRadius: 0, endRadius: pr))
+    // Smoke: marks past 30 % of their life, every other mark (by seed).
+    for i in 0..<fr.n {
+        let f: Double = fr.f(i)
+        guard f > 0.30, f < 1 else { continue }
+        let seed: Double = fr.seed(i)
+        guard seed < 0.55 else { continue }
+        let s: Double = (f - 0.30) / 0.70                       // 0 → 1 across the smoke phase
+        let env: Double = min(1, s / 0.15) * (1 - s)
+        guard env > 0.02 else { continue }
+        let p = fr.pts[i]
+        let pr: CGFloat = fr.bw * CGFloat(1.6 + 2.4 * s * fr.m)
+        let lift: CGFloat = CGFloat(s * fr.m) * fr.bw * 1.4
+        let drift: CGFloat = CGFloat(sin(seed * 6.283 + fr.tm * 1.2) * fr.m * s) * fr.bw * 0.5
+        let c = CGPoint(x: p.x + drift, y: p.y - lift)
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - pr, y: c.y - pr, width: pr * 2, height: pr * 2)),
+            with: .radialGradient(Gradient(colors: [Color(white: 0.55).opacity(0.22 * env), .clear]),
+                center: c, startRadius: 0, endRadius: pr))
     }
-    // Fire near the head — additive, yellow/white → orange → deep red.
+    // Fire: the young half of each mark's life.
     ctx.blendMode = .plusLighter
-    for i in 1..<n {
-        let age = Double(i) / Double(n - 1)
-        guard age >= 0.45 else { continue }
-        let f = (age - 0.45) / 0.55               // 0 mid → 1 head
-        let col = f > 0.7 ? Color(red: 1, green: 0.96, blue: 0.65)
-                : (f > 0.4 ? Color(red: 1, green: 0.55, blue: 0.12)
+    for i in 1..<fr.n {
+        let f: Double = fr.f(i - 1)
+        guard f < 0.5 else { continue }
+        let k: Double = 1 - f / 0.5                              // 1 fresh → 0 cooled
+        let col: Color = k > 0.7 ? Color(red: 1, green: 0.96, blue: 0.65)
+                : (k > 0.4 ? Color(red: 1, green: 0.55, blue: 0.12)
                            : Color(red: 0.82, green: 0.12, blue: 0.05))
-        let w = baseWidth * CGFloat(0.5 + 1.7 * f)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(col.opacity(0.25 + 0.6 * f)),
+        let w: CGFloat = fr.bw * CGFloat(0.5 + 1.7 * k)
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(col.opacity(0.25 + 0.6 * k)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
     }
 }
 
-/// Ice — a carved trench: a faint cut down the middle with snow mounds piled
-/// on each side.
-/// Ice — an icy-blue trench the ball cuts through, with irregular snow piles
-/// heaped on each side.  The piles are DISCRETE clumps (not continuous rails)
-/// with seeded varying size and a little settling "life", so it reads as snow
-/// shoved aside rather than three coloured lines.
-private func trailIce(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                      _ times: [Double]?) {
-    let lifetime = 1.4
-    // A faint icy cut connecting recent points — fades out as it ages so it
-    // doesn't read as a permanent ribbon trailing the ball.
-    for i in 1..<n {
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let env = max(0, 1 - age / lifetime)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(Color(red: 0.62, green: 0.84, blue: 1.0).opacity(0.22 * env)),
-                   style: StrokeStyle(lineWidth: baseWidth * 0.7, lineCap: .round, lineJoin: .round))
+/// Ice — a faint icy cut with snow piles heaped on each side.  Each pile heaps
+/// up where it was laid, settles gently in place, then melts away.
+private func trailIce(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(Color(red: 0.62, green: 0.84, blue: 1.0).opacity(0.22 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 0.7, lineCap: .round, lineJoin: .round))
     }
-    // Snow piles — clumps heaped where the ball passed.  Each pile is laid at
-    // full size, settles gently in place, then melts (shrinks + fades) at the
-    // end of its life, rather than scaling with distance from the ball.
-    for i in stride(from: 1, to: n, by: 2) {
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life = age / lifetime
-        let rise = min(1.0, age / 0.10)                          // quick heap-up
-        let melt = life < 0.6 ? 1.0 : 1.0 - (life - 0.6) / 0.4   // hold, then melt
-        let env  = rise * max(0, melt)
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.6 else { continue }                       // a pile at about 3 marks in 5
+        let age: Double = fr.age(i)
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.10) : 1.0
+        let melt: Double = life < 0.6 ? 1.0 : 1.0 - (life - 0.6) / 0.4
+        let env: Double = rise * max(0, melt)
         guard env > 0.02 else { continue }
-        let dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y
-        let len = max(0.001, hypot(dx, dy)), px = -dy / len, py = dx / len
-        let baseOff = baseWidth * 0.9
+        let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x, dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let px: CGFloat = -dy / len, py: CGFloat = dx / len
+        let baseOff: CGFloat = fr.bw * 0.9
         for side in [CGFloat(1), -1] {
-            let seed = trailSeed(pts[i]) + (side > 0 ? 0.0 : 0.37)
-            let r1 = seed.truncatingRemainder(dividingBy: 1.0)            // 0…1, stable per pile
-            let settle = 0.92 + 0.08 * sin(t * 2.0 + seed * 6.283)        // gentle in-place settling
-            let pileR = baseWidth * (0.50 + 0.70 * CGFloat(r1)) * CGFloat(env) * CGFloat(settle)
+            let s2: Double = side > 0 ? seed : (seed * 7.3 + 0.37).truncatingRemainder(dividingBy: 1.0)
+            let settle: Double = 0.92 + 0.08 * sin(fr.tm * 2.0 + s2 * 6.283) * fr.m
+            let pileR: CGFloat = fr.bw * (0.50 + 0.70 * CGFloat(s2)) * CGFloat(env * settle)
             if pileR < 0.6 { continue }
-            let cx = pts[i].x + px * baseOff * side, cy = pts[i].y + py * baseOff * side
-            let op = 0.85 * Double(env)
-            // Lumpy clump — three overlapping blobs of varying size.
+            let cx: CGFloat = fr.pts[i].x + px * baseOff * side
+            let cy: CGFloat = fr.pts[i].y + py * baseOff * side
+            let op: Double = 0.85 * env
             for k in 0..<3 {
                 let kk = Double(k)
-                let bx = cx + CGFloat(cos(kk * 2.1 + seed * 3)) * pileR * 0.6
-                let by = cy + CGFloat(sin(kk * 2.1 + seed * 3)) * pileR * 0.6 - pileR * 0.2
-                let br = pileR * CGFloat(0.55 + 0.45 * (kk / 3))
+                let bx: CGFloat = cx + CGFloat(cos(kk * 2.1 + s2 * 3)) * pileR * 0.6
+                let by: CGFloat = cy + CGFloat(sin(kk * 2.1 + s2 * 3)) * pileR * 0.6 - pileR * 0.2
+                let br: CGFloat = pileR * CGFloat(0.55 + 0.45 * (kk / 3))
                 ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
                     with: .radialGradient(Gradient(colors: [.white.opacity(op),
                                                             Color(red: 0.86, green: 0.93, blue: 1.0).opacity(0)]),
                         center: CGPoint(x: bx - br * 0.3, y: by - br * 0.3), startRadius: 0, endRadius: br))
             }
-            // Cool shadow where the pile meets the ground.
             ctx.fill(Path(ellipseIn: CGRect(x: cx - pileR * 0.8, y: cy + pileR * 0.3, width: pileR * 1.6, height: pileR * 0.7)),
-                with: .color(Color(red: 0.5, green: 0.66, blue: 0.88).opacity(0.12 * Double(env))))
+                with: .color(Color(red: 0.5, green: 0.66, blue: 0.88).opacity(0.12 * env)))
         }
     }
 }
 
-/// Graphite — pencil on paper: a faint base line broken up by short, jittered,
-/// uneven strokes so it reads as scratchy lead catching the paper's tooth (not
-/// a solid ink line).  Static — the jitter is seeded per segment so it holds.
-private func trailGraphite(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+/// Graphite — pencil on paper: a faint base line broken up by short, uneven
+/// strokes.  The jitter comes from each mark's own seed, so a stroke never
+/// shifts; it simply fades where it was drawn.
+private func trailGraphite(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     let lead = Color(red: 0.20, green: 0.20, blue: 0.22)
-    for i in 1..<n {
-        let age = Double(i) / Double(n - 1)
-        let a = pts[i - 1], b = pts[i]
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let a = fr.pts[i - 1], b = fr.pts[i]
         var base = Path(); base.move(to: a); base.addLine(to: b)
-        ctx.stroke(base, with: .color(lead.opacity(0.10 + 0.30 * age)),
-                   style: StrokeStyle(lineWidth: baseWidth * 0.6, lineCap: .round))
-        let dx = b.x - a.x, dy = b.y - a.y, len = max(0.001, hypot(dx, dy))
-        let ux = dx / len, uy = dy / len, px = -uy, py = ux
-        let seed = Double(i) * 12.9898
-        for k in 0..<3 {
-            let f = (Double(k) + 0.5) / 3.0
-            let jit = CGFloat((seed * Double(k + 1)).truncatingRemainder(dividingBy: 1.0) - 0.5) * baseWidth * 0.7
-            let mx = a.x + dx * CGFloat(f) + px * jit, my = a.y + dy * CGFloat(f) + py * jit
-            let l2 = baseWidth * 0.55
-            var m = Path()
-            m.move(to: CGPoint(x: mx - ux * l2, y: my - uy * l2))
-            m.addLine(to: CGPoint(x: mx + ux * l2, y: my + uy * l2))
-            let op = (0.10 + 0.5 * age) * (0.4 + 0.6 * (seed * Double(k + 3)).truncatingRemainder(dividingBy: 1.0))
-            ctx.stroke(m, with: .color(lead.opacity(op)),
-                       style: StrokeStyle(lineWidth: max(0.5, baseWidth * 0.16), lineCap: .round))
+        ctx.stroke(base, with: .color(lead.opacity(0.40 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 0.6, lineCap: .round))
+        let dx: CGFloat = b.x - a.x, dy: CGFloat = b.y - a.y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let ux: CGFloat = dx / len, uy: CGFloat = dy / len
+        let px: CGFloat = -uy, py: CGFloat = ux
+        let seed: Double = fr.seed(i) * 12.9898
+        for s in 0..<3 {
+            let f: Double = (Double(s) + 0.5) / 3.0
+            let jit: CGFloat = CGFloat((seed * Double(s + 1)).truncatingRemainder(dividingBy: 1.0) - 0.5) * fr.bw * 0.7
+            let mx: CGFloat = a.x + dx * CGFloat(f) + px * jit
+            let my: CGFloat = a.y + dy * CGFloat(f) + py * jit
+            let l2: CGFloat = fr.bw * 0.55
+            var mk = Path()
+            mk.move(to: CGPoint(x: mx - ux * l2, y: my - uy * l2))
+            mk.addLine(to: CGPoint(x: mx + ux * l2, y: my + uy * l2))
+            let op: Double = 0.6 * k * (0.4 + 0.6 * (seed * Double(s + 3)).truncatingRemainder(dividingBy: 1.0))
+            ctx.stroke(mk, with: .color(lead.opacity(op)),
+                       style: StrokeStyle(lineWidth: max(0.5, fr.bw * 0.16), lineCap: .round))
         }
     }
 }
 
-/// Rose — sheds rose petals that settle where they're laid and dissipate in
-/// place over a short life (like the fire/ice trails), rather than being towed
-/// along behind the ball.  A faint rose stem fades beneath them so the path
-/// still reads.  `times` drives each petal's own lifecycle so it lives and dies
-/// on its own clock wherever it was dropped, independent of the ball's motion.
-private func trailRose(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                       _ times: [Double]?) {
-    let lifetime = 1.3
+/// Rose — petals dropped where the ball passed.  Each pops in, settles (falls
+/// a little, sways, turns slowly) in place while it fades.  A faint stem fades
+/// beneath them.
+private func trailRose(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     let stem = Color(red: 0.42, green: 0.06, blue: 0.18)
     let petals = [Color(red: 0.85, green: 0.20, blue: 0.40),
                   Color(red: 0.95, green: 0.45, blue: 0.60),
                   Color(red: 0.62, green: 0.10, blue: 0.28)]
-
-    // Faint stem connecting recent points, fading out as it ages so it doesn't
-    // read as a permanent ribbon towed behind the ball.
-    for i in 1..<n {
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let env = max(0, 1 - age / lifetime)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(stem.opacity(0.22 * env)),
-                   style: StrokeStyle(lineWidth: baseWidth * 0.5, lineCap: .round, lineJoin: .round))
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(stem.opacity(0.22 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 0.5, lineCap: .round, lineJoin: .round))
     }
-
-    // Petals — dropped along the path and left behind.  Each is pinned to the
-    // spot it was laid (a fixed point in `pts`): it pops in, then gently settles
-    // (falls + sways + slowly turns) IN PLACE while it fades, and vanishes.
-    // Whether a spot sheds a petal is a stable function of its position, so the
-    // scatter doesn't flicker as the FIFO buffer shifts indices underneath it.
-    for i in 0..<n {
-        let p = pts[i]
-        let seed = trailSeed(p)
-        let r1 = seed.truncatingRemainder(dividingBy: 1.0)
-        guard r1 < 0.34 else { continue }                    // stable thinning of shed spots
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life = age / lifetime
-        let rise = min(1.0, age / 0.06)                      // pop in when shed
-        let fade = life < 0.55 ? 1.0 : 1.0 - (life - 0.55) / 0.45
-        let env  = rise * max(0, fade)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.45 else { continue }
+        let age: Double = fr.age(i)
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.06) : 1.0
+        let fade: Double = life < 0.55 ? 1.0 : 1.0 - (life - 0.55) / 0.45
+        let env: Double = rise * max(0, fade)
         guard env > 0.02 else { continue }
-
-        let r2   = (seed * 2.13).truncatingRemainder(dividingBy: 1.0)
-        let r3   = (seed * 5.70).truncatingRemainder(dividingBy: 1.0)
-        let side = r2 < 0.5 ? CGFloat(-1) : CGFloat(1)
-        let scatter = baseWidth * (0.2 + 0.6 * CGFloat(r2))  // sits just off the path
-        let sway = CGFloat(sin(t * 1.6 + seed * 6.283)) * baseWidth * 0.22 * CGFloat(life)
-        let fall = CGFloat(life) * baseWidth * 0.55          // gentle drop as it settles
-        let cx = p.x + side * scatter + sway
-        let cy = p.y + fall
-        let sz = baseWidth * CGFloat(0.32 + 0.26 * r3) * (1.0 - 0.22 * CGFloat(life))
-        let rot = seed * 6.283 + t * 0.5 + Double(life) * 1.0   // slow turn in place
-        let colorIdx = min(2, max(0, Int(r3 * 3)))              // clamp (seed may be <0 off-edge)
-        drawPetal(ctx, CGPoint(x: cx, y: cy), sz, rot,
-                  petals[colorIdx].opacity(0.82 * env))
+        let r2: Double = (seed * 2.13 * 10).truncatingRemainder(dividingBy: 1.0)
+        let r3: Double = (seed * 5.70 * 10).truncatingRemainder(dividingBy: 1.0)
+        let side: CGFloat = r2 < 0.5 ? -1 : 1
+        let scatter: CGFloat = fr.bw * (0.2 + 0.6 * CGFloat(r2))
+        let sway: CGFloat = CGFloat(sin(fr.tm * 1.6 + seed * 6.283) * life * fr.m) * fr.bw * 0.22
+        let fall: CGFloat = CGFloat(life * fr.m) * fr.bw * 0.55
+        let p = fr.pts[i]
+        let c = CGPoint(x: p.x + side * scatter + sway, y: p.y + fall)
+        let sz: CGFloat = fr.bw * CGFloat(0.32 + 0.26 * r3) * (1.0 - 0.22 * CGFloat(life * fr.m))
+        let rot: Double = seed * 6.283 + (fr.tm * 0.5 + life * 1.0) * fr.m
+        let colorIdx: Int = min(2, max(0, Int(r3 * 3)))
+        drawPetal(ctx, c, sz, rot, petals[colorIdx].opacity(0.82 * env))
     }
 }
 
@@ -4414,56 +4513,44 @@ private func drawPetal(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ rot
     ctx.fill(petal, with: .color(color))
 }
 
-/// Money Roll — a money-green streak that sheds little dollar bills.  Each bill
-/// is pinned to the spot it was laid: it pops in, then flutters (sways + tumbles)
-/// and floats up a touch IN PLACE while it fades, then vanishes.  Whether a spot
-/// sheds a bill is a stable function of position, so the scatter doesn't flicker
-/// as the FIFO buffer shifts indices underneath it.
-private func trailMoney(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                        _ times: [Double]?) {
-    let lifetime = 1.2
+/// Money Roll — a money-green streak shedding little dollar bills.  Each bill
+/// pops in where it was laid, flutters and floats up a touch in place while
+/// it fades.
+private func trailMoney(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     let green = Color(red: 0.16, green: 0.55, blue: 0.30)
-
-    // Faint green streak connecting recent points, fading as it ages.
-    for i in 1..<n {
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let env = max(0, 1 - age / lifetime)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(green.opacity(0.34 * env)),
-                   style: StrokeStyle(lineWidth: baseWidth * 0.55, lineCap: .round, lineJoin: .round))
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(green.opacity(0.34 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 0.55, lineCap: .round, lineJoin: .round))
     }
-
-    // Bills shed along the path.
-    for i in 0..<n {
-        let p = pts[i]
-        let seed = trailSeed(p)
-        let r1 = seed.truncatingRemainder(dividingBy: 1.0)
-        guard r1 < 0.40 else { continue }                    // stable thinning of shed spots
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life = age / lifetime
-        let rise = min(1.0, age / 0.05)                      // pop in when shed
-        let fade = life < 0.6 ? 1.0 : 1.0 - (life - 0.6) / 0.4
-        let env  = rise * max(0, fade)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.45 else { continue }
+        let age: Double = fr.age(i)
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.05) : 1.0
+        let fade: Double = life < 0.6 ? 1.0 : 1.0 - (life - 0.6) / 0.4
+        let env: Double = rise * max(0, fade)
         guard env > 0.02 else { continue }
-
-        let r2   = (seed * 2.13).truncatingRemainder(dividingBy: 1.0)
-        let r3   = (seed * 5.70).truncatingRemainder(dividingBy: 1.0)
-        let side = r2 < 0.5 ? CGFloat(-1) : CGFloat(1)
-        let scatter = baseWidth * (0.2 + 0.7 * CGFloat(r2))
-        let sway = CGFloat(sin(t * 3.0 + seed * 6.283)) * baseWidth * 0.5 * CGFloat(1 - life * 0.4)
-        let lift = -CGFloat(life) * baseWidth * 0.6          // float upward as it fades
-        let cx = p.x + side * scatter + sway
-        let cy = p.y + lift
-        let sz = baseWidth * CGFloat(0.55 + 0.30 * r3)
-        let rot = seed * 6.283 + t * (1.4 + r3) + Double(side) * Double(life) * 2.0   // tumble in place
-        drawBill(ctx, CGPoint(x: cx, y: cy), sz, rot, env)
+        let r2: Double = (seed * 2.13 * 10).truncatingRemainder(dividingBy: 1.0)
+        let r3: Double = (seed * 5.70 * 10).truncatingRemainder(dividingBy: 1.0)
+        let side: CGFloat = r2 < 0.5 ? -1 : 1
+        let scatter: CGFloat = fr.bw * (0.2 + 0.7 * CGFloat(r2))
+        let sway: CGFloat = CGFloat(sin(fr.tm * 3.0 + seed * 6.283) * (1 - life * 0.4) * fr.m) * fr.bw * 0.5
+        let lift: CGFloat = -CGFloat(life * fr.m) * fr.bw * 0.6
+        let p = fr.pts[i]
+        let c = CGPoint(x: p.x + side * scatter + sway, y: p.y + lift)
+        let sz: CGFloat = fr.bw * CGFloat(0.55 + 0.30 * r3)
+        let rot: Double = seed * 6.283 + (fr.tm * (1.4 + r3) + Double(side) * life * 2.0) * fr.m
+        drawBill(ctx, c, sz, rot, env)
     }
 }
 
-/// One little fluttering dollar bill — a green rounded card with a faint
-/// "portrait" oval and corner pips, rotated by `rot`.
+/// One little dollar bill — a green rounded card with a faint "portrait" oval
+/// and corner pips, rotated by `rot`.
 private func drawBill(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ rot: Double, _ env: Double) {
     var ctx = ctx
     ctx.translateBy(x: c.x, y: c.y)
@@ -4489,40 +4576,37 @@ private func drawBill(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ rot:
     }
 }
 
-/// Fire — flickering little flames left along the trail.
-private func trailFire(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                       _ times: [Double]?) {
+/// Fire — little flames left along the path.  Each flares up where it was
+/// laid, flickers in place, burns steady, then sinks and dies.
+private func trailFire(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     var ctx = ctx
     ctx.blendMode = .plusLighter
-    let lifetime = 0.9
-    for i in 0..<n {
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life = age / lifetime
-        let rise = min(1.0, age / 0.05)                          // quick flare-up when laid
-        let env  = life < 0.55 ? 1.0 : 1.0 - (life - 0.55) / 0.45 // burn steady, then die down
-        let intensity = rise * max(0, env)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.7 else { continue }                       // a flame at about 7 marks in 10
+        let age: Double = fr.age(i)
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.05) : 1.0
+        let env: Double = life < 0.55 ? 1.0 : 1.0 - (life - 0.55) / 0.45
+        let intensity: Double = rise * max(0, env)
         guard intensity > 0.02 else { continue }
-        let p = pts[i]
-        let seed = trailSeed(p)                                  // stable per-spot flicker phase
-        let flick = 0.65 + 0.35 * sin(t * 11 + seed * 6.283)
-        let grow  = 0.55 + 0.45 * intensity                     // flames sink as they die
-        let h = baseWidth * CGFloat(1.5 + 1.2 * flick) * CGFloat(grow)
-        let w = baseWidth * 0.85 * CGFloat(0.6 + 0.4 * intensity)
-        let sway = CGFloat(sin(t * 7 + seed * 6.283)) * w * 0.35
-        let baseY = p.y + w * 0.5
-        // Heat glow pooled at the foot so a fresh flame reads hot.
-        let gr = w * 1.5
+        let p = fr.pts[i]
+        let flick: Double = 0.65 + 0.35 * sin(fr.tm * 11 + seed * 6.283)
+        let grow: Double = 0.55 + 0.45 * intensity
+        let h: CGFloat = fr.bw * CGFloat((1.5 + 1.2 * flick) * grow)
+        let w: CGFloat = fr.bw * 0.85 * CGFloat(0.6 + 0.4 * intensity)
+        let sway: CGFloat = CGFloat(sin(fr.tm * 7 + seed * 6.283) * fr.m) * w * 0.35
+        let baseY: CGFloat = p.y + w * 0.5
+        let gr: CGFloat = w * 1.5
         ctx.fill(Path(ellipseIn: CGRect(x: p.x - gr, y: p.y - gr * 0.5, width: gr * 2, height: gr)),
             with: .radialGradient(Gradient(colors: [Color(red: 1, green: 0.5, blue: 0.15).opacity(0.22 * intensity), .clear]),
-                center: CGPoint(x: p.x, y: p.y), startRadius: 0, endRadius: gr))
-        // Outer flame (orange) — always licking upward.
+                center: p, startRadius: 0, endRadius: gr))
         var flame = Path()
         flame.move(to: CGPoint(x: p.x, y: baseY))
         flame.addQuadCurve(to: CGPoint(x: p.x + sway, y: p.y - h), control: CGPoint(x: p.x + w, y: p.y))
         flame.addQuadCurve(to: CGPoint(x: p.x, y: baseY), control: CGPoint(x: p.x - w + sway, y: p.y))
         ctx.fill(flame, with: .color(Color(red: 1, green: 0.42, blue: 0.05).opacity(0.55 * intensity)))
-        // Inner flame (yellow-white core).
         var inner = Path()
         inner.move(to: CGPoint(x: p.x, y: p.y + w * 0.2))
         inner.addQuadCurve(to: CGPoint(x: p.x + sway * 0.7, y: p.y - h * 0.6), control: CGPoint(x: p.x + w * 0.5, y: p.y))
@@ -4531,38 +4615,32 @@ private func trailFire(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: 
     }
 }
 
-/// Mist / smoke — puffs born at the ball that live their own life where they
-/// were laid (trailAge-driven, like fire/rose): each puff pops in small and
-/// dense, then expands, thins, and curls IN PLACE as it ages — its two lobes
-/// slowly orbiting the birth spot while the whole puff lifts a touch — and its
-/// colour cools from the dense base grey toward a faint blue-grey fringe
-/// before it dissipates.  When `times` is nil (shop preview) the synthetic age
-/// spread still sells the expand-and-fade down the trail's length.
-private func trailMist(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                       base: Color, _ times: [Double]?) {
-    let lifetime: Double = 1.6
-    let cool = Color(red: 0.60, green: 0.68, blue: 0.80)     // the blue-grey a puff cools toward
-    for i in 0..<n {
-        let age: Double = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life: Double = age / lifetime
-        let rise: Double = min(1.0, age / 0.08)                             // quick puff-in when laid
-        let thin: Double = life < 0.40 ? 1.0 : 1.0 - (life - 0.40) / 0.60   // hold, then thin away
-        let env:  Double = rise * max(0.0, thin)
+/// Smoke — puffs laid where the ball passed.  Each pops in small and dense,
+/// then swells, curls, rises a little and thins away in place, cooling from
+/// the base grey toward a faint blue-grey.
+private func trailMist(_ ctx: GraphicsContext, _ fr: TrailFrame, base: Color) {
+    let cool = Color(red: 0.60, green: 0.68, blue: 0.80)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.7 else { continue }                       // a puff at about 7 marks in 10
+        let age: Double = fr.age(i)
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.08) : 1.0
+        let thin: Double = life < 0.40 ? 1.0 : 1.0 - (life - 0.40) / 0.60
+        let env: Double = rise * max(0.0, thin)
         guard env > 0.02 else { continue }
-        let p = pts[i]
-        let seed: Double = trailSeed(p)                      // stable per-spot curl phase
-        let expand: Double = 1.0 + 1.8 * life                // puff grows as it ages
-        let curl: Double = seed * 6.283 + age * 1.4          // lobes curl around the birth spot
-        let lift: CGFloat = CGFloat(life) * baseWidth * 0.7  // smoke rises a touch as it thins
-        // Colour over life: dense base-grey core young → faint cool fringe old.
+        let p = fr.pts[i]
+        let expand: Double = 1.0 + 1.8 * life * fr.m
+        let curl: Double = seed * 6.283 + age * 1.4 * fr.m
+        let lift: CGFloat = CGFloat(life * fr.m) * fr.bw * 0.9
         let coreOp: Double = (0.06 + 0.12 * (1.0 - 0.55 * life)) * env
         let coolOp: Double = 0.08 * life * env
         for k in 0..<2 {
             let kk: Double = Double(k)
             let ang: Double = curl + kk * 3.1
-            let orbit: CGFloat = baseWidth * CGFloat(0.35 + 0.65 * life)
-            let pr: CGFloat = baseWidth * CGFloat((0.90 + 0.25 * kk) * expand)
+            let orbit: CGFloat = fr.bw * CGFloat(0.35 + 0.65 * life * fr.m)
+            let pr: CGFloat = fr.bw * CGFloat((0.90 + 0.25 * kk) * expand)
             let cx: CGFloat = p.x + CGFloat(cos(ang)) * orbit
             let cy: CGFloat = p.y + CGFloat(sin(ang)) * orbit * 0.7 - lift
             ctx.fill(Path(ellipseIn: CGRect(x: cx - pr, y: cy - pr, width: pr * 2, height: pr * 2)),
@@ -4575,105 +4653,111 @@ private func trailMist(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: 
     }
 }
 
-/// Stardust — twinkling stars spinning off the trail.
-private func trailStardust(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat) {
-    trailTapered(ctx, pts, n, baseWidth * 0.5, color: Color(red: 0.85, green: 0.82, blue: 1.0), glow: true)
+/// Stardust — a soft glowing line with small stars set beside it.  Each star
+/// sits at a fixed spot next to the mark that laid it, twinkles in place and
+/// fades.
+private func trailStardust(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    trailTapered(ctx, fr, width: fr.bw * 0.5, color: Color(red: 0.85, green: 0.82, blue: 1.0), glow: true)
     var ctx = ctx
     ctx.blendMode = .plusLighter
-    for i in 0..<n {
-        let age = Double(i) / Double(n - 1)
-        let tw = 0.4 + 0.6 * sin(t * 4 + Double(i) * 1.3)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.5 else { continue }
+        let k: Double = fr.fresh(i)
+        guard k > 0.01 else { continue }
+        let tw: Double = fr.m > 0 ? 0.4 + 0.6 * sin(fr.tm * 4 + seed * 37.0) : 0.8
         guard tw > 0.25 else { continue }
-        let ang = t * 1.2 + Double(i) * 1.9
-        let off = baseWidth * CGFloat(0.6 + 2.2 * (1 - age))
-        let sx = pts[i].x + CGFloat(cos(ang)) * off, sy = pts[i].y + CGFloat(sin(ang)) * off
-        let sz = baseWidth * CGFloat(0.22 + 0.30 * age)
-        trailStar(ctx, CGPoint(x: sx, y: sy), sz, Color(red: 1, green: 0.98, blue: 0.85).opacity(tw * (0.3 + 0.6 * age)))
+        let ang: Double = seed * 6.283 * 3
+        let off: CGFloat = fr.bw * CGFloat(0.6 + 1.6 * ((seed * 7.0).truncatingRemainder(dividingBy: 1.0)))
+        let c = CGPoint(x: fr.pts[i].x + CGFloat(cos(ang)) * off, y: fr.pts[i].y + CGFloat(sin(ang)) * off)
+        let sz: CGFloat = fr.bw * CGFloat(0.22 + 0.30 * k)
+        trailStar(ctx, c, sz, Color(red: 1, green: 0.98, blue: 0.85).opacity(tw * 0.9 * k))
     }
 }
 
-/// Forest (Standard, static) — a green streak with small leaves set along it
-/// in two greens.  Each leaf is keyed to the spot where its point was laid
-/// (`trailSeed`), so leaves stay put as the trail moves; nothing animates.
-private func trailForest(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
-    trailTapered(ctx, pts, n, baseWidth * 0.55, color: TrailColor.forest.color, glow: false)
+/// Forest (Standard) — a green line with small leaves set along it in two
+/// greens.  Each leaf is keyed to the mark that laid it, stays put and fades.
+private func trailForest(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    trailTapered(ctx, fr, width: fr.bw * 0.55, color: TrailColor.forest.color, glow: false)
     let dark  = Color(red: 0.10, green: 0.40, blue: 0.16)
     let light = Color(red: 0.38, green: 0.70, blue: 0.26)
-    for i in 1..<n {
-        let p = pts[i]
-        let seed = trailSeed(p)
-        let pick = (seed * 7.31).truncatingRemainder(dividingBy: 1.0)
-        guard abs(pick) < 0.55 else { continue }               // about half the points carry a leaf
-        let age = Double(i) / Double(n - 1)                     // 0 tail … 1 head
-        let a = pts[i - 1]
-        let dir = atan2(Double(p.y - a.y), Double(p.x - a.x))
-        let side: Double = Int(abs(seed * 13).rounded()) % 2 == 0 ? 1 : -1
-        let ang = dir + side * 0.9                              // leaves splay off the line
-        let len = baseWidth * CGFloat(0.9 + 0.6 * age)
-        let wid = len * 0.48
-        let base = CGPoint(x: p.x + CGFloat(cos(ang)) * baseWidth * 0.2,
-                           y: p.y + CGFloat(sin(ang)) * baseWidth * 0.2)
-        let tip  = CGPoint(x: base.x + CGFloat(cos(ang)) * len, y: base.y + CGFloat(sin(ang)) * len)
-        let nx = CGFloat(-sin(ang)) * wid, ny = CGFloat(cos(ang)) * wid
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.55 else { continue }                      // about half the marks carry a leaf
+        let k: Double = fr.fresh(i)
+        guard k > 0.01 else { continue }
+        let p = fr.pts[i], a = fr.pts[i - 1]
+        let dir: Double = atan2(Double(p.y - a.y), Double(p.x - a.x))
+        let side: Double = (seed * 20).truncatingRemainder(dividingBy: 2) < 1 ? 1 : -1
+        let ang: Double = dir + side * 0.9
+        let len: CGFloat = fr.bw * CGFloat(0.9 + 0.6 * ((seed * 9).truncatingRemainder(dividingBy: 1)))
+        let wid: CGFloat = len * 0.48
+        let base = CGPoint(x: p.x + CGFloat(cos(ang)) * fr.bw * 0.2,
+                           y: p.y + CGFloat(sin(ang)) * fr.bw * 0.2)
+        let tip = CGPoint(x: base.x + CGFloat(cos(ang)) * len, y: base.y + CGFloat(sin(ang)) * len)
+        let nx: CGFloat = CGFloat(-sin(ang)) * wid, ny: CGFloat = CGFloat(cos(ang)) * wid
         let mid = CGPoint(x: (base.x + tip.x) / 2, y: (base.y + tip.y) / 2)
         var leaf = Path()
         leaf.move(to: base)
         leaf.addQuadCurve(to: tip, control: CGPoint(x: mid.x + nx, y: mid.y + ny))
         leaf.addQuadCurve(to: base, control: CGPoint(x: mid.x - nx, y: mid.y - ny))
-        let col = abs(seed * 3.7).truncatingRemainder(dividingBy: 1.0) < 0.5 ? dark : light
-        ctx.fill(leaf, with: .color(col.opacity(0.25 + 0.70 * age)))
+        let col: Color = (seed * 13).truncatingRemainder(dividingBy: 1.0) < 0.5 ? dark : light
+        ctx.fill(leaf, with: .color(col.opacity(0.95 * k)))
         var vein = Path(); vein.move(to: base); vein.addLine(to: tip)
-        ctx.stroke(vein, with: .color(Color.black.opacity(0.18 * age)), lineWidth: 0.6)
+        ctx.stroke(vein, with: .color(Color.black.opacity(0.18 * k)), lineWidth: 0.6)
     }
 }
 
-/// Bubblegum (Standard, static) — a pink streak carrying a row of small pink
-/// bubbles, each with a white highlight.  Bubbles are keyed to where their
-/// point was laid, so they stay in place; nothing animates.
-private func trailBubblegum(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
-    trailTapered(ctx, pts, n, baseWidth * 0.45, color: TrailColor.bubblegum.color, glow: false)
+/// Bubblegum (Standard) — a pink line with small pink bubbles, each with a
+/// white highlight.  A bubble stays where it was laid, fades, and at the end
+/// of its life pops (a quick ring that widens and vanishes).
+private func trailBubblegum(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    trailTapered(ctx, fr, width: fr.bw * 0.45, color: TrailColor.bubblegum.color, glow: false)
     let pink = Color(red: 1.00, green: 0.42, blue: 0.80)
-    for i in 0..<n {
-        let p = pts[i]
-        let seed = trailSeed(p)
-        let pick = abs(seed * 5.13).truncatingRemainder(dividingBy: 1.0)
-        guard pick < 0.6 else { continue }
-        let age = Double(i) / Double(max(1, n - 1))
-        let r = baseWidth * CGFloat(0.35 + 0.55 * pick) * CGFloat(0.6 + 0.4 * age)
-        let off = CGFloat(sin(seed * 9.0)) * baseWidth * 0.7
-        let c = CGPoint(x: p.x + off, y: p.y - off * 0.5)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.6 else { continue }
+        let f: Double = fr.f(i)
+        guard f < 1 else { continue }
+        let pick: Double = seed / 0.6
+        let r: CGFloat = fr.bw * CGFloat(0.35 + 0.55 * pick)
+        let off: CGFloat = CGFloat(sin(seed * 90.0)) * fr.bw * 0.7
+        let c = CGPoint(x: fr.pts[i].x + off, y: fr.pts[i].y - off * 0.5)
+        if fr.m > 0 && f > 0.82 {
+            // Pop: a thin ring widens and vanishes.
+            let s: Double = (f - 0.82) / 0.18
+            let pr: CGFloat = r * CGFloat(1 + 0.6 * s)
+            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - pr, y: c.y - pr, width: pr * 2, height: pr * 2)),
+                       with: .color(pink.opacity(0.7 * (1 - s))), lineWidth: max(0.5, r * 0.12))
+            continue
+        }
+        let a: Double = fr.m > 0 ? min(1, (1 - f) / 0.2) : 1 - f
         let rect = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
-        let a = 0.25 + 0.65 * age
-        ctx.fill(Path(ellipseIn: rect), with: .color(pink.opacity(0.55 * a)))
-        ctx.stroke(Path(ellipseIn: rect), with: .color(pink.opacity(a)), lineWidth: max(0.6, r * 0.18))
-        let hr = r * 0.32
+        ctx.fill(Path(ellipseIn: rect), with: .color(pink.opacity(0.50 * a)))
+        ctx.stroke(Path(ellipseIn: rect), with: .color(pink.opacity(0.9 * a)), lineWidth: max(0.6, r * 0.18))
+        let hr: CGFloat = r * 0.32
         ctx.fill(Path(ellipseIn: CGRect(x: c.x - r * 0.45 - hr / 2, y: c.y - r * 0.45 - hr / 2,
                                         width: hr, height: hr)),
                  with: .color(Color.white.opacity(0.85 * a)))
     }
 }
 
-/// Ember (Rare) — a glowing orange streak with a few tiny sparks that rise
-/// off the tail and fade.  Sparks are born at the spot a point was laid and
-/// live on their own short clock (`trailAge`), so they drift in place.
-/// Bounded: at most one spark per three points, each a single small dot.
-private func trailEmber(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double,
-                        _ baseWidth: CGFloat, _ times: [Double]?) {
-    trailTapered(ctx, pts, n, baseWidth, color: TrailColor.ember.color, glow: true)
+/// Ember (Rare) — a glowing orange line with a few tiny sparks.  Each spark
+/// is born where its mark was laid, rises and sways a little, and fades.
+private func trailEmber(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    trailTapered(ctx, fr, width: fr.bw, color: TrailColor.ember.color, glow: true)
     var ctx = ctx
     ctx.blendMode = .plusLighter
-    let lifetime = 0.9
-    for i in stride(from: 0, to: n, by: 3) {
-        let p = pts[i]
-        let seed = trailSeed(p)
-        guard abs(seed * 4.7).truncatingRemainder(dividingBy: 1.0) < 0.6 else { continue }
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life = age / lifetime
-        let rise  = CGFloat(life) * baseWidth * 2.2
-        let sway  = CGFloat(sin(seed * 6.283 + life * 3.0)) * baseWidth * 0.6
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.22 else { continue }                      // about one mark in five sheds a spark
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let p = fr.pts[i]
+        let rise: CGFloat = CGFloat(life * fr.m) * fr.bw * 2.2
+        let sway: CGFloat = CGFloat(sin(seed * 6.283 + life * 3.0) * fr.m) * fr.bw * 0.6
         let c = CGPoint(x: p.x + sway, y: p.y - rise)
-        let r = baseWidth * CGFloat(0.20 * (1 - life * 0.5))
+        let r: CGFloat = fr.bw * CGFloat(0.20 * (1 - life * 0.5))
         let glow = Color(red: 1.0, green: 0.62, blue: 0.20).opacity(0.75 * (1 - life))
         ctx.fill(Path(ellipseIn: CGRect(x: c.x - r * 2, y: c.y - r * 2, width: r * 4, height: r * 4)),
                  with: .radialGradient(Gradient(colors: [glow.opacity(0.5), .clear]),
@@ -4683,28 +4767,26 @@ private func trailEmber(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t:
     }
 }
 
-/// Air — pillowy puffs that billow behind the ball and sway like a jet stream.
-private func trailAir(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                      _ times: [Double]?) {
-    let lifetime = 1.1
-    for i in 0..<n {
-        let age = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life = age / lifetime
-        let rise = min(1.0, age / 0.08)
-        let env  = rise * max(0, 1 - life)             // billow in, then fade out
+/// Air — soft puffs laid where the ball passed.  Each billows in, swells a
+/// little, lifts and sways in place, and fades.
+private func trailAir(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.7 else { continue }
+        let age: Double = fr.age(i)
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.08) : 1.0
+        let env: Double = rise * max(0, 1 - life)
         guard env > 0.02 else { continue }
-        let p = pts[i]
-        let seed = trailSeed(p)                        // stable per-spot drift phase
-        // Each puff expands a little and lifts/sways AS IT AGES, in place.
-        let expand = 1.0 + 0.8 * life
-        let drift  = CGFloat(sin(t * 1.6 + seed * 6.283)) * baseWidth * 0.5
-        let lift   = -CGFloat(life) * baseWidth * 0.8
-        let pr = baseWidth * CGFloat(1.3 * expand)
-        let cxp = p.x + drift, cyp = p.y + lift
-        // Two overlapping lobes read as a soft cloud rather than a disc.
+        let p = fr.pts[i]
+        let expand: Double = 1.0 + 0.8 * life * fr.m
+        let drift: CGFloat = CGFloat(sin(fr.tm * 1.6 + seed * 6.283) * fr.m) * fr.bw * 0.5
+        let lift: CGFloat = -CGFloat(life * fr.m) * fr.bw * 0.8
+        let pr: CGFloat = fr.bw * CGFloat(1.3 * expand)
+        let cxp: CGFloat = p.x + drift, cyp: CGFloat = p.y + lift
         for k in 0..<2 {
-            let ox = CGFloat(k == 0 ? -0.32 : 0.32) * pr
+            let ox: CGFloat = CGFloat(k == 0 ? -0.32 : 0.32) * pr
             ctx.fill(Path(ellipseIn: CGRect(x: cxp + ox - pr, y: cyp - pr, width: pr * 2, height: pr * 2)),
                 with: .radialGradient(Gradient(colors: [Color(red: 0.88, green: 0.94, blue: 1.0).opacity(0.18 * env), .clear]),
                     center: CGPoint(x: cxp + ox, y: cyp), startRadius: 0, endRadius: pr))
@@ -4712,97 +4794,68 @@ private func trailAir(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: D
     }
 }
 
-/// Ink — a wide, neat line while the pen moves; where the ball lingers the ink
-/// pools and bleeds outward, wider the longer it dwells, like a pen held to
-/// paper.  Dwell is read from the time GAP between successive points: fast
-/// strokes lay points in quick succession (tiny gaps → a crisp line); a resting
-/// ball stops laying new points, so the last gap keeps growing and that spot's
-/// blot bleeds wider and wider until it saturates.  Once the pen moves on, each
-/// spot's gap is fixed, so the bled blot stays exactly where it was set.
-private func trailInk(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                      _ times: [Double]?) {
-    let ink      = Color(red: 0.05, green: 0.05, blue: 0.10)
-    let neatR    = baseWidth * 0.30          // half-width at full speed — a thin pen line when racing
-    let maxBleed = baseWidth * 3.2           // cap so a long rest can't flood the whole page
-    let tau      = 0.10                       // dwell time-constant: smaller ⇒ slow strokes bleed wide sooner
-
-    // Per-point ink half-width.  Points are laid at a fixed spatial step, so the
-    // dwell (seconds the pen lingered leaving this spot) is ≈ step ÷ speed — the
-    // slower the ball moves, the bigger the gap to the next point and the wider
-    // this spot bleeds.  A resting head's gap keeps growing (next = now), so its
-    // blot keeps widening until it saturates.  Once the pen moves on each gap is
-    // fixed, so the bled mark stays exactly where it was set.
+/// Ink — a neat pen line while the ball moves; where it lingers the ink pools
+/// and bleeds wider, like a pen held to paper.  Dwell is the time gap to the
+/// next mark: a fast stroke lays marks in quick succession (a crisp line); a
+/// resting ball lays none, so its newest mark's blot keeps widening until it
+/// saturates.  Once the pen moves on each blot is fixed where it was set, and
+/// fades there on its own clock.
+private func trailInk(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    let ink = Color(red: 0.05, green: 0.05, blue: 0.10)
+    let neatR: CGFloat = fr.bw * 0.30
+    let maxBleed: CGFloat = fr.bw * 3.2
+    let tau: Double = 0.10
+    let n = fr.n
     func radius(_ i: Int) -> CGFloat {
-        let dwell: Double
-        if let times, i < times.count {
-            let next = (i < times.count - 1) ? times[i + 1] : t
-            dwell = max(0, next - times[i])
-        } else {
-            // No timing (shop preview): synthesize pooling toward the head so the
-            // cell still sells the bleed.
-            let f = n > 1 ? Double(i) / Double(n - 1) : 0
-            dwell = f * f * 0.5
-        }
+        let next: Double = i < n - 1 ? fr.laid[i + 1] : fr.now
+        let dwell: Double = max(0, next - fr.laid[i])
         return neatR + CGFloat(Double(maxBleed) * (1 - exp(-dwell / tau)))
     }
-
-    // 1) Solid ink ribbon — each segment stroked at the width its endpoints
-    //    earned, so the line itself swells where the ball crawled and stays
-    //    thin where it raced.  Dense, flat ink (no soft feather) reads as a pen
-    //    line rather than a watercolour wash.  A gentle fade over the oldest few
-    //    points hides the FIFO pop as marks scroll off the tail.
+    /// Full ink while fresh, then fades over the last 40 % of its life.
+    func inkFade(_ i: Int) -> Double {
+        let f: Double = fr.f(i)
+        return f < 0.6 ? 1.0 : max(0, 1.0 - (f - 0.6) / 0.4)
+    }
     for i in 1..<n {
-        let tailFade = min(1.0, Double(i + 1) / Double(n))       // ~0 tail → 1 head
-        let w = radius(i - 1) + radius(i)                        // local diameter
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
-        ctx.stroke(p, with: .color(ink.opacity(0.55 + 0.45 * tailFade)),   // solid ink at the head
+        let k: Double = inkFade(i - 1)
+        guard k > 0.01 else { continue }
+        let w: CGFloat = radius(i - 1) + radius(i)
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(ink.opacity(k)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
     }
-
-    // 2) Pooled blots where the pen dwelled — a FULLY OPAQUE, solid ink disc.
-    //    A wide slow/stopped bleed reads as saturated ink soaked into the page,
-    //    not a translucent watercolour wash: the fill holds full opacity flat to
-    //    the very rim, with only a 1-px antialiased edge so it isn't jagged.
-    //    (`tailFade` still eases the very oldest marks out to hide the FIFO pop.)
     for i in 0..<n {
-        let r = radius(i)
-        guard r > neatR + 0.6 else { continue }                  // skip spots that didn't pool
-        let tailFade = min(1.0, Double(i + 1) / Double(n))
-        let p = pts[i]
+        let r: CGFloat = radius(i)
+        guard r > neatR + 0.6 else { continue }
+        let k: Double = inkFade(i)
+        guard k > 0.01 else { continue }
+        let p = fr.pts[i]
         ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
             with: .radialGradient(Gradient(stops: [
-                .init(color: ink.opacity(1.0 * tailFade), location: 0.00),
-                .init(color: ink.opacity(1.0 * tailFade), location: 0.97),
-                .init(color: ink.opacity(0.0),            location: 1.00)]),
+                .init(color: ink.opacity(k),   location: 0.00),
+                .init(color: ink.opacity(k),   location: 0.97),
+                .init(color: ink.opacity(0.0), location: 1.00)]),
                 center: p, startRadius: 0, endRadius: r))
     }
 }
 
-/// Rainbow — the glowing, hue-cycling streak (its identity), now with a real
-/// element lifecycle on top: each segment blooms bright where it was laid,
-/// holds, then dissolves — and as it dissolves it sheds tiny spectral sparkles
-/// that scatter outward and twinkle out IN PLACE (trailAge-driven, like
-/// fire/rose), so the spectrum is born and dies along the path instead of only
-/// rippling behind the ball.
-private func trailRainbow(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double, _ baseWidth: CGFloat,
-                          _ times: [Double]?) {
+/// Rainbow — a glowing spectrum line.  Each mark gets its hue when laid and
+/// keeps it, so the colours stay where they were painted.  A segment blooms,
+/// holds, then dissolves into tiny spectral sparkles that scatter outward and
+/// twinkle out in place.
+private func trailRainbow(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     var ctx = ctx
-    let lifetime: Double = 1.3
-    // 1) Hue-cycling ribbon — `t * 0.30` ripples the spectrum along the trail;
-    //    each segment blooms in fast, holds, then fades fully out by ~3/4 of
-    //    its life, handing the last stretch over to the sparkles below.
-    for i in 1..<n {
-        let age: Double = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life: Double = age / lifetime
-        let bloom: Double = min(1.0, age / 0.10)
+    for i in 1..<fr.n {
+        let age: Double = fr.age(i - 1)
+        let life: Double = fr.f(i - 1)
+        guard life < 1 else { continue }
+        let bloom: Double = fr.m > 0 ? min(1.0, age / 0.10) : 1.0
         let fade: Double = life < 0.30 ? 1.0 : 1.0 - (life - 0.30) / 0.45
         let env: Double = bloom * max(0.0, fade)
         guard env > 0.02 else { continue }
-        let hue: Double = (Double(i) / Double(n) + t * 0.30).truncatingRemainder(dividingBy: 1)
-        let col = Color(hue: hue, saturation: 1, brightness: 1)
-        let w: CGFloat = baseWidth * CGFloat(0.4 + 0.8 * env)
-        var p = Path(); p.move(to: pts[i - 1]); p.addLine(to: pts[i])
+        let col = Color(hue: trailHue(fr.laid[i]), saturation: 1, brightness: 1)
+        let w: CGFloat = fr.bw * CGFloat(0.4 + 0.8 * env)
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
         ctx.blendMode = .plusLighter
         ctx.stroke(p, with: .color(col.opacity(0.20 * env)),
                    style: StrokeStyle(lineWidth: w * 2.2, lineCap: .round))
@@ -4810,36 +4863,26 @@ private func trailRainbow(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ 
         ctx.stroke(p, with: .color(col.opacity(0.90 * env)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
     }
-    // 2) Spectral sparkles — a dissolving segment sheds tiny stars in a stable
-    //    per-spot hue that drift outward, shrink, and twinkle out where the
-    //    ribbon died.  Shed spots are a stable function of position so the
-    //    scatter doesn't flicker as the FIFO shifts indices underneath it.
     ctx.blendMode = .plusLighter
-    for i in 0..<n {
-        let p = pts[i]
-        let seed: Double = trailSeed(p)
-        let r1: Double = seed.truncatingRemainder(dividingBy: 1.0)
-        guard r1 < 0.40 else { continue }                    // stable thinning of shed spots
-        let age: Double = trailAge(i, n, t, times, lifetime: lifetime)
-        guard age < lifetime else { continue }
-        let life: Double = age / lifetime
-        guard life > 0.35 else { continue }                  // only dissolving segments shed
-        let s: Double = (life - 0.35) / 0.65                 // 0 → 1 across the sparkle phase
-        let tw: Double = 0.55 + 0.45 * sin(t * 6.0 + seed * 6.283)
+    for i in 0..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.40 else { continue }
+        let life: Double = fr.f(i)
+        guard life > 0.35, life < 1 else { continue }
+        let s: Double = (life - 0.35) / 0.65
+        let tw: Double = fr.m > 0 ? 0.55 + 0.45 * sin(fr.tm * 6.0 + seed * 40.0) : 0.8
         let op: Double = (1.0 - s) * tw * 0.9
         guard op > 0.03 else { continue }
-        let hue: Double = (r1 * 2.5 + t * 0.10).truncatingRemainder(dividingBy: 1.0)
-        let ang: Double = seed * 6.283
-        let scatter: CGFloat = baseWidth * CGFloat(0.6 + 2.0 * s)
-        let sx: CGFloat = p.x + CGFloat(cos(ang)) * scatter
-        let sy: CGFloat = p.y + CGFloat(sin(ang)) * scatter
-        let sz: CGFloat = baseWidth * CGFloat(0.36 - 0.14 * s)
-        trailStar(ctx, CGPoint(x: sx, y: sy), sz,
-                  Color(hue: hue, saturation: 0.85, brightness: 1.0).opacity(op))
+        let ang: Double = seed * 6.283 * 2.5
+        let scatter: CGFloat = fr.bw * CGFloat(0.6 + 2.0 * s * fr.m)
+        let c = CGPoint(x: fr.pts[i].x + CGFloat(cos(ang)) * scatter,
+                        y: fr.pts[i].y + CGFloat(sin(ang)) * scatter)
+        let sz: CGFloat = fr.bw * CGFloat(0.36 - 0.14 * s)
+        trailStar(ctx, c, sz, Color(hue: trailHue(fr.laid[i]), saturation: 0.85, brightness: 1.0).opacity(op))
     }
 }
 
-/// A small 4-point sparkle star (used by the stardust trail).
+/// A small 4-point sparkle star (used by the stardust and rainbow trails).
 private func trailStar(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ color: Color) {
     var star = Path()
     for k in 0..<8 {

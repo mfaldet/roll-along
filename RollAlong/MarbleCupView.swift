@@ -108,8 +108,8 @@ struct MarbleCupView: View {
     @State private var aiLooks: [UUID: RivalCosmetics.Look] = [:]
     /// Chosen on the start screen each match.
     @State private var mode: MatchMode = .oneVone
-    /// Recent positions per mover (id → points) for the trail layer (ball excluded).
-    @State private var trails: [UUID: [CGPoint]] = [:]
+    /// Trail marks per mover (id → marks laid in place) for the trail layer (ball excluded).
+    @State private var trails: [UUID: TrailMarks] = [:]
     @State private var arena:  CGSize  = .zero
     @State private var field:  CGRect  = .zero
 
@@ -312,7 +312,7 @@ struct MarbleCupView: View {
     private var trailsLayer: some View {
         Canvas { ctx, _ in
             drawTrails(ctx, movers.filter { $0.role != .ball }
-                                  .map { (trails[$0.id] ?? [], trailFor($0)) })
+                                  .map { (trails[$0.id] ?? TrailMarks(), trailFor($0)) })
         }
     }
 

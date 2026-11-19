@@ -98,8 +98,8 @@ struct KingOfTheHillView: View {
     @State private var holderSinceTick = 0
     /// Each rival's keystone look (colorIndex → skin+trail+name), dealt in reset().
     @State private var rivalLooks: [Int: RivalCosmetics.Look] = [:]
-    /// Recent positions per racer (colorIndex → points) for the trail layer.
-    @State private var trails: [Int: [CGPoint]] = [:]
+    /// Trail marks per racer (colorIndex → marks laid in place) for the trail layer.
+    @State private var trails: [Int: TrailMarks] = [:]
     @State private var arena:  CGSize  = .zero
     @State private var field:  CGRect  = .zero
     @State private var zoneCenter: CGPoint = .zero
@@ -263,7 +263,7 @@ struct KingOfTheHillView: View {
     /// each rival's the one dealt in reset()).
     private var trailsLayer: some View {
         Canvas { ctx, _ in
-            drawTrails(ctx, racers.map { (trails[$0.colorIndex] ?? [], trailFor($0)) })
+            drawTrails(ctx, racers.map { (trails[$0.colorIndex] ?? TrailMarks(), trailFor($0)) })
         }
     }
 

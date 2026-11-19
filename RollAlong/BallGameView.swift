@@ -174,14 +174,10 @@ struct BallGameView: View {
     /// Reset on every spawn so it never leaks across attempts.
     @State private var tutorialCoinBonus: Int = 0
 
-    // Graphite trail (Paper world).  Holds recent ball positions so we can
-    // render a fading lead streak behind the ball.  Cleared each spawn.
-    @State private var trailPoints:           [CGPoint] = []
-    /// Wall-clock stamp (timeIntervalSinceReferenceDate) for each `trailPoints`
-    /// entry, kept strictly in lockstep.  Lets the elemental trails (ink/fire/
-    /// ice/air) animate and dissipate on a real clock, in place, instead of
-    /// riding the ball.  Cleared with the points each spawn.
-    @State private var trailTimes:            [Double] = []
+    // The equipped cosmetic trail: marks laid where the ball has been, each
+    // fading on its own clock where it was laid (see `TrailMarks`).  Cleared
+    // each spawn.
+    @State private var trailMarks = TrailMarks()
     /// Opacity of the Zen sand groove.  The "smooth the sand" (rake) button
     /// fades this to 0, wipes the trail, then restores it to 1 so the next
     /// strokes draw crisp.  Stays 1 in every other mode.
@@ -217,46 +213,30 @@ struct BallGameView: View {
     @State private var sandCanvasSize: CGSize = .zero
     private let sandMinStep: CGFloat = 3.0
 
-    /// Default cap on trail segments — about 1.5s at 60fps.
-    private let trailMaxLength = 90
-    /// Extra segments granted per coin picked up while the Snake
-    /// trail is equipped (~0.5s of growth per coin).
-    private let snakeGrowthPerCoin = 30
-    private let trailMinStep:  CGFloat = 1.5
-
-    /// Hue assigned to `trailPoints[0]`.  Each later segment's hue
-    /// is `offset + i * trailHueStep mod 1`, so once the ball paints
-    /// a position with a hue the colour stays put — the spectrum
-    /// follows the ball rather than redistributing each frame.  Bump
-    /// it forward when segments fall off the tail so the survivors
-    /// keep their original colours.
-    @State private var trailHueOffset: Double = 0.0
-    /// One full ROYGBIV cycle every `trailMaxLength` segments.  The
-    /// Snake trail (which can grow past `trailMaxLength`) isn't
-    /// rainbow, so the step staying tied to the base length is fine.
-    private let trailHueStep: Double = 1.0 / 90.0
-
-    /// Persistent-trail cap for Zen Garden's raked-sand line.  Far longer
-    /// than the cosmetic trail so the ball builds a lasting drawing; still
-    /// bounded so a long session can't grow the point buffer without limit
-    /// (the very oldest marks quietly smooth away once the cap is reached).
-    private let sandTrailMaxLength = 2000
+    /// Extra life a Snake trail mark gets per coin picked up this attempt —
+    /// the eat-and-grow mechanic: the snake's body lasts longer behind it.
+    private let snakeGrowthPerCoin: Double = 0.5
+    /// Longest a grown Snake can get (seconds of body).
+    private let snakeMaxLifetime: Double = 6.0
 
     /// True when the active mode carves a single persistent sand line
     /// (Zen Garden) instead of the standard fading cosmetic trail.
     private var usesSandTrail: Bool { activeMode.leavesPersistentTrail }
 
-    /// Actual trim cap used by the tick loop.  Equals `trailMaxLength`
-    /// for every trail except the Snake, which grows by
-    /// `snakeGrowthPerCoin` for each coin the player has picked up
-    /// this attempt — the eat-and-grow mechanic.  Sand-trail modes use the
-    /// much larger persistent cap.
-    private var effectiveTrailMaxLength: Int {
-        if usesSandTrail { return sandTrailMaxLength }
+    /// How long each trail mark lives.  The shared lifetime for every trail,
+    /// except the Snake, whose body lasts `snakeGrowthPerCoin` longer for
+    /// each coin picked up this attempt.
+    private var trailLifetime: Double {
         if gameState.equippedTrail == .snake {
-            return trailMaxLength + coinsPickedThisAttempt.count * snakeGrowthPerCoin
+            return min(snakeMaxLifetime,
+                       TrailMarks.lifetime + Double(coinsPickedThisAttempt.count) * snakeGrowthPerCoin)
         }
-        return trailMaxLength
+        return TrailMarks.lifetime
+    }
+
+    /// Mark cap for the current lifetime (a grown Snake needs more marks).
+    private var trailCap: Int {
+        Int((Double(TrailMarks.cap) * trailLifetime / TrailMarks.lifetime).rounded(.up))
     }
 
     // MARK: - Coin Pit (collect-count reward round) state
@@ -635,7 +615,7 @@ struct BallGameView: View {
                             .opacity(sandClearFade)
                             .allowsHitTesting(false)
                     }
-                } else if gameState.equippedTrail != .none && trailPoints.count >= 2 {
+                } else if gameState.equippedTrail != .none && trailMarks.count >= 2 {
                     trailOverlay(geo: geo)
                         .allowsHitTesting(false)
                 }
@@ -1091,17 +1071,9 @@ struct BallGameView: View {
     }
 
 
-    /// Trail — drawn as a sequence of short line segments with increasing
-    /// opacity from oldest (tail) to newest (head).  This gives a natural
-    /// pencil-fade without needing a gradient-stroke API.
-    ///
-    /// Most trail colors are flat (.graphite, .fire, .ice, .ink, .gold)
-    /// so each segment uses the trail's single color.  The .rainbow
-    /// trail uses a stable per-segment hue baked in at creation —
-    /// `trailHueOffset + i × trailHueStep`.  As segments fall off the
-    /// tail the offset advances by exactly the number dropped, so the
-    /// surviving positions keep their original colours and the
-    /// spectrum follows the ball.
+    /// Trail — the equipped trail's marks, each laid where the ball was and
+    /// fading on its own clock where it was laid (`TrailMarks`,
+    /// `drawRichTrail`).  Zen Garden draws its persistent sand groove instead.
     private func trailOverlay(geo: GeometryProxy) -> some View {
         Canvas { ctx, size in
             // Zen Garden — the raked-sand groove is a PERSISTENT furrow baked
@@ -1116,12 +1088,13 @@ struct BallGameView: View {
             // Bespoke, animated per-trail rendering (scales, fire→smoke, snow
             // trench, jet-stream, …) — the same renderer the home trail uses,
             // so a trail looks identical everywhere.
-            let n = trailPoints.count
-            guard n >= 2 else { return }
-            drawRichTrail(ctx, points: trailPoints,
+            guard trailMarks.count >= 2 else { return }
+            drawRichTrail(ctx, points: trailMarks.points,
                           trail: gameState.equippedTrail,
                           t: Date().timeIntervalSinceReferenceDate,
-                          times: trailTimes)
+                          times: trailMarks.times,
+                          lifetime: trailLifetime,
+                          reduceMotion: reduceMotion)
         }
     }
 
@@ -1346,8 +1319,7 @@ struct BallGameView: View {
         if gameState.hapticsEnabled { Haptics.soft() }
         withAnimation(.easeOut(duration: 0.45)) { sandClearFade = 0 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            trailPoints.removeAll(keepingCapacity: true)
-            trailTimes.removeAll(keepingCapacity: true)
+            trailMarks.clear()
             // Wipe the persistent groove image so the next strokes draw fresh.
             sandAccumImage = nil
             lastSandPoint  = nil
@@ -2946,9 +2918,7 @@ struct BallGameView: View {
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level
         coinsPickedThisAttempt = []
-        trailPoints.removeAll(keepingCapacity: true)
-        trailTimes.removeAll(keepingCapacity: true)
-        trailHueOffset = 0.0
+        trailMarks.clear()
         // Coin Pit: a fresh ball means a fresh round — clear the rain, the
         // clock, and the stake (the stake overlay re-appears for the next
         // round; defaults reset to the minimum 1-time-ticket buy).
@@ -3132,32 +3102,14 @@ struct BallGameView: View {
         if usesSandTrail {
             addSandPoint(b.position, size: geoSize)
         }
-        // Graphite trail (Paper world / cosmetic trails) — accumulate position
-        // points so we can render the fading streak behind the ball.  Skip if
-        // too close to the previous point (the ball is nearly stationary).
+        // Cosmetic trail — lay marks where the ball has been (fixed spacing,
+        // each mark fading on its own clock; see `TrailMarks`).  Called every
+        // tick, moving or not, so old marks expire while the ball rests.
         else if gameState.equippedTrail != .none {
-            let now = Date().timeIntervalSinceReferenceDate
-            if let last = trailPoints.last {
-                if hypot(b.position.x - last.x, b.position.y - last.y) > trailMinStep {
-                    trailPoints.append(b.position)
-                    trailTimes.append(now)
-                }
-            } else {
-                trailPoints.append(b.position)
-                trailTimes.append(now)
-            }
-            let cap = effectiveTrailMaxLength
-            if trailPoints.count > cap {
-                let removed = trailPoints.count - cap
-                trailPoints.removeFirst(removed)
-                trailTimes.removeFirst(min(removed, trailTimes.count))   // stay in lockstep
-                // Bake-in hue per position: advancing the tail offset
-                // by `removed × step` means each surviving segment
-                // keeps the colour it had before the trim.
-                trailHueOffset = (trailHueOffset
-                                  + Double(removed) * trailHueStep)
-                    .truncatingRemainder(dividingBy: 1.0)
-            }
+            trailMarks.add(b.position, at: Date().timeIntervalSinceReferenceDate,
+                           lifetime: trailLifetime, cap: trailCap)
+        } else if !trailMarks.isEmpty {
+            trailMarks.clear()
         }
 
         // Screen-edge wall bounces.  The screen border is a permanent
