@@ -44,7 +44,7 @@ Not listed in the Shop or Catalog and never sold as a set. Owners keep every ite
 
 ### Seasonal events (calendar change)
 
-The 16 seasonal collections are no longer sold as sets. Their yearly windows are unchanged (same dates, the per-year rows for Lunar New Year, Mardi Gras and Oktoberfest, server overrides, midnight Eastern). While a window is open the Shop shows the event: its own ball and boundary, sold one by one (the seasonal balls are sold only then), and a line pointing to one active collection that fits. The Catalog's "Seasonal & Holiday" filter lists the featured collections of the open events.
+The 16 seasonal collections are no longer sold as sets. Their yearly windows are unchanged (same dates, the per-year rows for Lunar New Year, Mardi Gras and Oktoberfest, server overrides, midnight Eastern). While a window is open the Shop shows the event: its own ball and boundary, sold one by one (the seasonal balls are sold only then), and a line pointing to one active collection that fits. The Catalog no longer has a theme filter; its Collections list filters by rarity only (All, Standard, Rare, Legendary). The event's featured collection is named in the Shop's seasonal spotlight.
 
 | Event | Window | Spotlight items | Featured collection |
 |---|---|---|---|

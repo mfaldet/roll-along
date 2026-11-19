@@ -86,77 +86,38 @@ private struct ItemTryOn: Identifiable {
     let act: () -> Void
 }
 
-/// Catalog "Collections" filter — derived from each bundle's existing data (its
-/// limited-time window + ball count), so no per-bundle tagging is required.
+/// Catalog "Collections" filter — by each collection's existing rarity band
+/// (`CosmeticBundle.rarity`).  Cosmetics are grouped only by collection or by
+/// rarity; there is no theme grouping.
 private enum BundleFilter: String, CaseIterable, Identifiable {
-    case all, seasonal, space, nature, sports, nightlife, luxe, fire, mystic, sweet, art
+    case all, standard, rare, legendary
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .all:       return "All Collections"
-        case .seasonal:  return "Seasonal & Holiday"
-        case .space:     return "Space"
-        case .nature:    return "Nature"
-        case .sports:    return "Sports"
-        case .nightlife: return "Nightlife"
-        case .luxe:      return "Luxe"
-        case .fire:      return "Fire"
-        case .mystic:    return "Mystic"
-        case .sweet:     return "Sweet"
-        case .art:       return "Art"
+        case .standard:  return BundleRarity.standard.label
+        case .rare:      return BundleRarity.rare.label
+        case .legendary: return BundleRarity.legendary.label
         }
     }
     var icon: String {
         switch self {
         case .all:       return "square.stack.3d.up.fill"
-        case .seasonal:  return "gift.fill"
-        case .space:     return "moon.stars.fill"
-        case .nature:    return "leaf.fill"
-        case .sports:    return "sportscourt.fill"
-        case .nightlife: return "music.note"
-        case .luxe:      return "crown.fill"
-        case .fire:      return "flame.fill"
-        case .mystic:    return "wand.and.stars"
-        case .sweet:     return "birthday.cake.fill"
-        case .art:       return "paintbrush.fill"
+        case .standard:  return "circle.fill"
+        case .rare:      return "diamond.fill"
+        case .legendary: return "crown.fill"
         }
     }
 
-    /// "Seasonal & Holiday" derives from the limited-time window; the themed
-    /// categories come from `themeMap` (keyed by bundle id, so adding a category
-    /// never means editing the bundle initializers).  A limited-time bundle also
-    /// carries a theme, so it shows under both its theme and Seasonal & Holiday.
     func matches(_ b: CosmeticBundle) -> Bool {
         switch self {
-        case .all:      return true
-        case .seasonal: return SeasonalEvent.features(b)
-        default:        return BundleFilter.themeMap[b.id] == self
+        case .all:       return true
+        case .standard:  return b.rarity == .standard
+        case .rare:      return b.rarity == .rare
+        case .legendary: return b.rarity == .legendary
         }
     }
-
-    private static let themeMap: [String: BundleFilter] = {
-        var m: [String: BundleFilter] = [:]
-        func tag(_ t: BundleFilter, _ ids: [String]) { ids.forEach { m[$0] = t } }
-        tag(.space,     ["planets", "space-travel", "cosmos", "eclipse", "aurora"])
-        tag(.nature,    ["winter", "nature", "water", "ocean", "bloom", "zen-garden", "aquarium",
-                         "dune", "abyssal-depths", "summer-2026", "winter-2026",
-                         "stpatricks-2027", "spring-2027", "harvest-2026", "earthday-2027"])
-        tag(.sports,    ["golf", "soccer", "full-court", "billiards-hall", "champion",
-                         "sports-balls"])
-        tag(.nightlife, ["nightclub", "arcade", "neon", "midnight-carnival", "lava-lamp",
-                         "plasma-globe", "neon-city", "clockwork", "newyear-2027",
-                         "july4-2026", "mardigras-2027", "pride-2027", "oktoberfest-2026"])
-        tag(.luxe,      ["velvet-night", "golden-hour", "midas", "diamond",
-                         "high-roller", "quicksilver"])
-        tag(.fire,      ["fire", "hellfire", "citrus", "lava-flow", "magma-core"])
-        tag(.mystic,    ["heavens", "noir", "realistic-marble", "glass-marbles", "tempest", "storm",
-                         "haunted", "ancient-temple", "crystal-cavern", "oracle", "geode",
-                         "halloween-2026", "muertos-2026", "lunar-2027"])
-        tag(.sweet,     ["pastel", "candyland", "valentines-2027"])
-        tag(.art,       ["paper-world", "sketchbook", "cathedral", "backtoschool-2026"])
-        return m
-    }()
 }
 
 /// One row in the collection detail popup — a single cosmetic from the bundle,
@@ -191,8 +152,7 @@ struct CosmeticShopView: View {
     /// Non-nil while the Catalog "where to buy" popup is showing (tap an unowned
     /// individual cosmetic).  Replaces the old coin-shortfall "Heads up" alert.
     @State private var tryOn: ItemTryOn? = nil
-    /// Catalog → Collections type filter (the dropdown that replaced the
-    /// "ALL COLLECTIONS" header).
+    /// Catalog → Collections rarity filter (All / Standard / Rare / Legendary).
     @State private var bundleFilter: BundleFilter = .all
     /// Non-nil while the collection detail popup is open (tap a collection card).
     @State private var detailBundle: CosmeticBundle? = nil
@@ -1244,7 +1204,7 @@ struct CosmeticShopView: View {
         // point; a bundle is the one thing you can actually buy here.  (Seasonal
         // bundles still appear only while their window is open, so they can't be
         // bought out of season.)
-        // Filtered by the chosen collection type, then sorted by full price
+        // Filtered by the chosen rarity, then sorted by full price
         // (simplest/cheapest up top), alphabetically for equal-priced bundles.
         // Seasonal bundles still appear only while their window is open.
         // Collections not yet released (see `CosmeticSchedule`) are announced
@@ -1323,11 +1283,10 @@ struct CosmeticShopView: View {
         }
     }
 
-    /// Dropdown that replaced the old "ALL COLLECTIONS" header — filters the
-    /// Collections list by type (Seasonal / Holiday / Ball Packs / Evergreen).
+    /// Dropdown above the Collections list — filters by rarity band.
     private var collectionFilterMenu: some View {
         Menu {
-            Picker("Filter collections", selection: $bundleFilter) {
+            Picker("Filter collections by rarity", selection: $bundleFilter) {
                 ForEach(BundleFilter.allCases) { f in
                     Label(f.label, systemImage: f.icon).tag(f)
                 }

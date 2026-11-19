@@ -955,6 +955,18 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(SeasonalEvent.features(CosmeticBundle.active.first { $0.id == "haunted" }!, at: mid))
     }
 
+    /// The Catalog's Collections filter is by rarity band only (All /
+    /// Standard / Rare / Legendary): every band has collections on sale, so
+    /// no filter choice is ever empty at launch.
+    func testCatalogRarityFilter_everyBandHasActiveCollections() {
+        let bands = Set(CosmeticBundle.active.map(\.rarity))
+        XCTAssertEqual(bands, Set(BundleRarity.allCases))
+        for band in BundleRarity.allCases {
+            XCTAssertFalse(CosmeticBundle.active.filter { $0.rarity == band }.isEmpty,
+                           "no active \(band.label) collection")
+        }
+    }
+
     /// Seasonal windows repeat every year; holidays that move use their
     /// per-year rows.
     func testSeasonalWindowsRepeatYearly() {
