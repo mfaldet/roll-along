@@ -5,6 +5,115 @@ floor, pit, boundary and music. This file records what was missing and what
 was added. `tools/cosmetic-calendar/bundle_rarity.py` prints the live table
 (slots, rarity, full price) straight from `RollAlong/Cosmetics.swift`.
 
+## 2026-11-20 — 18 complete, unique collections (Option 2)
+
+Approved: keep about 18 collections on sale, each with exactly one item per offered slot (ball, goal, trail, floor, pit, boundary), and no cosmetic in more than one of them. Every other collection is **retired**: never listed or sold as a set, but its definition stays so owners keep what they have and its items keep their release days. Retired items stay buyable one by one (the Shop's rotating picks, and seasonal spotlights). Music is hidden in 1.0; each active collection keeps its old music entry for when music returns, and music is not part of the uniqueness rule.
+
+Trails set the number: there are 17 coin-buyable trails plus the free Graphite default, so 18 is the most complete, unique collections the current art allows.
+
+### The 18 collections on sale
+
+| Collection | Release | Items now | Price before → after | Rarity before → after | New to the set |
+|---|---|---|---|---|---|
+| Aurora | Launch | Aurora ball · Aurora goal · Aurora trail · Aurora floor · Aurora pit · Aurora boundary | 8,500 → 8,500 | legendary → legendary | no change |
+| Nature | Launch | Jade ball · Meadow goal · Forest trail · Meadow floor · Meadow pit · Mint boundary | 5,000 → 4,500 | standard → standard | Meadow goal |
+| Citrus | Launch | Lemon ball · Flame goal · Ember trail · Dusk floor · Sunset pit · Citrus boundary | 5,250 → 5,250 | standard → standard | no change |
+| Sketchbook | Launch | Silver ball · Archery goal · Graphite trail · Sketch floor · Sketch pit · Slate boundary | 5,500 → 4,000 | standard → standard | Graphite trail |
+| Midas | Launch | Fool's Gold ball · Bullion goal · Gilded trail · Mirage floor · Mirage pit · Gold boundary | 5,750 → 5,000 | standard → standard | Bullion goal |
+| Winter | Launch | Snowglobe ball · Frost goal · Ice trail · Twilight floor · Twilight pit · Ice boundary | 6,750 → 6,250 | legendary → legendary | Frost goal |
+| Cosmos | Launch | Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Moonlit pit · Starlight boundary | 7,250 → 7,250 | legendary → legendary | no change |
+| Lava Flow | Launch | Lava ball · Inferno goal · Fire trail · Ember floor · Evil pit · Molten boundary | 8,000 → 8,250 | legendary → legendary | Inferno goal, Ember floor |
+| Neon | Launch | Neon ball · Neon goal · Raybeam trail · Grid City floor · Graph pit · Neon boundary | 6,750 → 7,000 | legendary → legendary | Raybeam trail, Grid City floor, Graph pit |
+| Haunted | Launch | Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Phantom boundary | 7,000 → 7,000 | legendary → legendary | no change |
+| Ancient Temple | Launch | Dune ball · Eclipse goal · Snake trail · Desert floor · Canyon pit · Sandstone boundary | 6,000 → 6,000 | rare → rare | Snake trail |
+| Abyssal Depths | Launch | Trench ball · Vortex goal · Ink trail · Inverted floor · Space pit · Abyss boundary | 7,500 → 7,000 | legendary → legendary | Vortex goal, Ink trail, Inverted floor |
+| Champion | Launch | Trophy ball · Quasar goal · Comet trail · Brass Works floor · Sideline pit · Brass boundary | 6,500 → 7,750 | legendary → legendary | Comet trail, Brass Works floor, Sideline pit, Brass boundary |
+| Golf | Apr 1, 2027 | Golf Ball · Hole-in-One goal · Air trail · Grass floor · Pond pit · Fairway boundary | 8,000 → 8,000 | legendary → legendary | no change |
+| Candyland | Feb 11, 2027 | Candy ball · Candy goal · Bubblegum trail · Sugar floor · Syrup pit · Candy boundary | 6,750 → 6,000 | legendary → legendary | Candy goal |
+| Bloom | Apr 1, 2027 | Rose ball · Blossom goal · Rose trail · Parchment floor · Parchment pit · Rose boundary | 6,250 → 6,000 | legendary → rare | Blossom goal |
+| Ocean | Jun 3, 2027 | Aquarium ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Tide boundary | 5,250 → 6,000 | rare → rare | Aquarium ball |
+| Nightclub | Feb 11, 2027 | Disco Ball · Mosaic goal · Rainbow trail · Disco floor · Nightclub pit · Marquee boundary | 7,750 → 9,000 | legendary → legendary | Mosaic goal, Rainbow trail, Marquee boundary |
+
+### Retired as sets (48)
+
+Not listed in the Shop or Catalog and never sold as a set. Owners keep every item; a set an owner already completed still counts. Their items are sold one by one.
+
+- **Permanent (32):** Hellfire (7,500), Heavens (6,750), Paper World (5,250), Planets (20,000), Space Travel (8,500), Velvet Night (6,000), Golden Hour (5,750), Arcade (6,250), Noir (5,750), Zen Garden (5,750), Eclipse (7,500), Pastel (6,250), Soccer (7,250), Aquarium (7,500), Realistic Marble (6,250), Dune (6,250), Tempest (7,250), Full Court (6,250), Billiards Hall (6,500), Diamond (5,000), Crystal Cavern (7,000), Midnight Carnival (6,750), High Roller (6,500), Quicksilver (7,000), Oracle (7,250), Geode (6,500), Lava Lamp (6,750), Plasma Globe (7,750), Cathedral (7,250), Magma Core (7,250), Neon City (8,500), Clockwork (7,500)
+- **Seasonal (16):** Summer Vibes, Trick or Roll, Winter Wonderland, Sweetheart, Luck of the Roll, Countdown, Spring Fling, Star-Spangled, Día de los Muertos, Harvest Moon, Lunar New Year, Mardi Gras, Spectrum, Oktoberfest, Earth Day, Back to School. These are now seasonal *events* (below).
+
+
+### Seasonal events (calendar change)
+
+The 16 seasonal collections are no longer sold as sets. Their yearly windows are unchanged (same dates, the per-year rows for Lunar New Year, Mardi Gras and Oktoberfest, server overrides, midnight Eastern). While a window is open the Shop shows the event: its own ball and boundary, sold one by one (the seasonal balls are sold only then), and a line pointing to one active collection that fits. The Catalog's "Seasonal & Holiday" filter lists the featured collections of the open events.
+
+| Event | Window | Spotlight items | Featured collection |
+|---|---|---|---|
+| Summer Vibes | Jun 1 – Aug 31 | Beach Ball · Sky boundary | Ocean |
+| Trick or Roll | Oct 1 – Oct 31 | Pumpkin ball · Pumpkin boundary | Haunted |
+| Winter Wonderland | Dec 1 – Jan 5 | Ornament ball · Holly boundary | Winter |
+| Sweetheart | Feb 1 – Feb 14 | Heartstone ball · Rose boundary | Bloom |
+| Luck of the Roll | Mar 1 – Mar 17 | Shamrock ball · Shamrock boundary | Nature |
+| Countdown | Dec 26 – Jan 4 | Confetti ball · Confetti boundary | Nightclub |
+| Spring Fling | Mar 20 – Apr 30 | Speckled Egg ball · Pastel boundary | Bloom |
+| Star-Spangled | Jun 21 – Jul 5 | Fireworks ball · Star-Spangled boundary | Cosmos |
+| Día de los Muertos | Oct 21 – Nov 2 | Sugar Skull ball · Marigold boundary | Haunted |
+| Harvest Moon | Nov 1 – Nov 29 | Harvest ball · Autumn boundary | Citrus |
+| Lunar New Year | per year (2027: Jan 27 – Feb 19) | Lunar Dragon ball · Lantern boundary | Ancient Temple |
+| Mardi Gras | per year (2027: Jan 28 – Feb 9) | Mardi Gras ball · Orchid boundary | Nightclub |
+| Spectrum | Jun 1 – Jun 29 | Spectrum ball · Rainbow boundary | Aurora |
+| Oktoberfest | per year (2027: Sep 16 – Oct 3) | Oktoberfest ball · Autumn boundary | Midas |
+| Earth Day | Apr 12 – Apr 25 | Earth ball · Mint boundary | Nature |
+| Back to School | Aug 1 – Sep 7 | Apple ball · Notebook boundary | Sketchbook |
+
+(Last open day shown; the windows are those in `Cosmetics.swift` and step 11's rows, unchanged.)
+
+### Other calendar changes
+
+- **Drop days:** unchanged. The 12 days and every server row stay. A retired collection's id now only names the day its items are released; an active collection's id is also the day its set goes on sale.
+- **"Coming soon":** names the active collections that arrive on the next day, then that day's single items (up to six names, then "and more"). Dec 17, 2026, for example, now announces single items (Cathedral ball, Stained Glass boundary, …) because Cathedral, Velvet Night and Crystal Cavern are retired as sets.
+- **Database:** no change. The app still reads the same `cosmetic_calendar` rows (collection ids and seasonal windows), and `check_calendar.py` still matches. No step 20.
+
+### Item release days
+
+No item arrives later than before. Seven items left a launch collection when the sets were made unique; they are kept available from launch (`CosmeticSchedule.keptAtLaunch`): Blueprint floor, Disco floor, Sunset floor, Blossom goal, Comet goal, Crystal goal, Bubblegum trail.
+
+These 18 items now arrive **earlier**, because they joined an active collection that releases sooner (or left every collection):
+
+| Item | Before | Now |
+|---|---|---|
+| Mint ball | Jun 3, 2027 | Feb 11, 2027 |
+| Brass boundary | Jan 14, 2027 | launch |
+| Marquee boundary | Oct 7, 2027 | Feb 11, 2027 |
+| Brass Works floor | Jan 14, 2027 | launch |
+| Ember floor | Oct 7, 2027 | launch |
+| Grid City floor | Nov 11, 2027 | launch |
+| Inverted floor | Jan 14, 2027 | launch |
+| Bullion goal | May 6, 2027 | launch |
+| Candy goal | May 6, 2027 | Feb 11, 2027 |
+| Frost goal | Feb 11, 2027 | launch |
+| Inferno goal | Oct 7, 2027 | launch |
+| Vortex goal | Feb 11, 2027 | launch |
+| Graph pit | May 6, 2027 | launch |
+| Sideline pit | Mar 11, 2027 | launch |
+| Comet trail | Dec 17, 2026 | launch |
+| Ink trail | Jan 14, 2027 | launch |
+| Raybeam trail | Mar 11, 2027 | launch |
+| Snake trail | Jan 14, 2027 | launch |
+
+### What else this touches
+
+- **Post-tutorial gift pool:** still the four Standard active collections (Nature, Citrus, Sketchbook, Midas). The gift picker now draws only from active collections.
+- **Starter Pack:** unchanged (Aurora ball, trail and boundary + 500 coins); Aurora stays on sale.
+- **Challenge Track rewards:** all eight reward collections are active (Winter, Cosmos, Lava Flow, Neon, Haunted, Ancient Temple, Abyssal Depths, Champion). A track now grants its reshaped set.
+- **Pricing rules:** unchanged (sum of item prices; music and free defaults add nothing). Sketchbook includes the free Graphite trail, so it costs 4,000.
+- **Rarity:** Bloom moves from Legendary to Rare (its mosaic goal became a blossom goal). Overall: 42 Legendary, 20 Rare, 4 Standard across all 66 entries (was 43 / 19 / 4).
+- **Trophies:** no trophy counts completed collections; "Retail Therapy" (first cosmetic buy) and the full-kit and evergreen trophies count items, so nothing changes. Completed sets still count for retired collections too.
+- **Collection-complete toast:** fires only for active sets.
+
+---
+
+## History: every collection made complete (2026-11-19)
+
 ## What counts as a collection
 
 - **Collections:** the 66 entries in `CosmeticBundle.catalogue`. That covers:

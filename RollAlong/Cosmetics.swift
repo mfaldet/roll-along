@@ -1905,6 +1905,15 @@ enum CosmeticSchedule {
         return map
     }()
 
+    /// Items that were available from launch before the collections were
+    /// reshaped (each left a launch collection when the active set was made
+    /// unique) — kept at launch so no item arrives later than it used to.
+    static let keptAtLaunch: Set<String> = [
+        "Floor|blueprint", "Floor|disco", "Floor|sunset",
+        "GoalSkin|blossom", "GoalSkin|comet", "GoalSkin|crystal",
+        "TrailColor|bubblegum",
+    ]
+
     /// Items in no permanent collection: launch (nil) or one of the three
     /// loose slots, chosen by a stable hash of the name (FNV-1a) so it never
     /// changes between builds.
@@ -1922,7 +1931,9 @@ enum CosmeticSchedule {
         // Locker-only balls (Diamond) are never on the calendar: they come
         // only with a purchase, so they need no release day.
         if let ball = item as? BallSkin, ball.isLockerOnly { return [] }
-        if let ids = itemCollections[key(String(describing: Item.self), item.rawValue)] { return ids }
+        let k = key(String(describing: Item.self), item.rawValue)
+        if keptAtLaunch.contains(k) { return [] }
+        if let ids = itemCollections[k] { return ids }
         return looseSlot(item.rawValue).map { [$0] } ?? []
     }
 
@@ -1972,22 +1983,59 @@ enum CosmeticSchedule {
 
     struct Upcoming {
         let date: Date
+        /// Active collections released that day.
         let bundles: [CosmeticBundle]
+        /// Single items first released that day and not in those collections
+        /// ("Ember floor", …), in slot order.
+        var itemNames: [String] = []
     }
 
-    /// The next release day that has not arrived yet, with every collection
-    /// on it; nil once all are out.  Uses the effective (server or built-in)
-    /// dates.
+    /// The earliest release moment of a single item; nil when it is available
+    /// from launch (or has no dated key).
+    static func releaseDate<Item: CosmeticItem>(ofItem item: Item,
+                                                store: CosmeticCalendarStore = .shared) -> Date? {
+        let keys = releaseKeys(of: item)
+        if keys.isEmpty { return nil }
+        var earliest: Date? = nil
+        for k in keys {
+            guard let d = releaseDate(of: k, store: store) else { return nil }
+            if earliest == nil || d < earliest! { earliest = d }
+        }
+        return earliest
+    }
+
+    /// The next release day that has not arrived yet: the active collections
+    /// on it plus the single items it brings.  nil once everything is out.
+    /// Uses the effective (server or built-in) dates.
     static func nextDrop(at now: Date = Date(),
                          store: CosmeticCalendarStore = .shared) -> Upcoming? {
-        let pending: [(date: Date, bundle: CosmeticBundle)] = CosmeticBundle.catalogue.compactMap { b in
-            guard !b.isLimitedTime, !isReleased(collectionID: b.id, at: now, store: store),
-                  let date = releaseDate(of: b.id, store: store) else { return nil }
-            return (date: date, bundle: b)
+        var first: Date? = nil
+        for id in builtInReleaseDays.keys where !isReleased(collectionID: id, at: now, store: store) {
+            guard let d = releaseDate(of: id, store: store) else { continue }
+            if first == nil || d < first! { first = d }
         }
-        guard let first = pending.map({ $0.date }).min() else { return nil }
-        let bundles = pending.filter { $0.date == first }.map { $0.bundle }
-        return Upcoming(date: first, bundles: bundles)
+        guard let day = first else { return nil }
+        let bundles = CosmeticBundle.active.filter {
+            !$0.isLimitedTime && releaseDate(of: $0.id, store: store) == day
+                && !isReleased(collectionID: $0.id, at: now, store: store)
+        }
+        var names: [String] = []
+        func note<Item: CosmeticItem>(_ items: [Item], _ label: String) {
+            for item in items where item.isCoinPurchasable {
+                if let b = item as? BallSkin, b.isBundleExclusive || b.isLockerOnly { continue }
+                if bundles.contains(where: { $0.contains(item) }) { continue }
+                guard releaseDate(ofItem: item, store: store) == day,
+                      !isReleased(item, at: now, store: store) else { continue }
+                names.append(label.isEmpty ? item.displayName : "\(item.displayName) \(label)")
+            }
+        }
+        note(BallSkin.allCases, "")
+        note(GoalSkin.allCases, "goal")
+        note(TrailColor.allCases, "trail")
+        note(Floor.allCases, "floor")
+        note(Pit.allCases, "pit")
+        note(Boundary.allCases, "boundary")
+        return Upcoming(date: day, bundles: bundles, itemNames: names)
     }
 }
 
@@ -2193,7 +2241,7 @@ enum ShopRotation {
     // Pools of coin-purchasable items eligible to be featured.  Only RELEASED
     // items and collections (see `CosmeticSchedule`) can ever be featured.
     static var bundlePool: [CosmeticBundle] {
-        CosmeticBundle.catalogue.filter {
+        CosmeticBundle.active.filter {
             $0.isAvailable && !$0.isExpired && CosmeticSchedule.isReleased($0)
         }
     }
@@ -2306,6 +2354,84 @@ enum ShopRotation {
         default: break
         }
         return featuredBundle(at: date)?.contains(item) ?? false
+    }
+}
+
+// ===========================================================================
+// SeasonalEvent — the yearly holiday windows, now that seasonal collections
+// are retired as sets.
+//
+// Each retired seasonal catalogue entry keeps its window (same yearly dates,
+// per-year rows and server overrides as before: `CosmeticSchedule.
+// seasonalWindow`, Eastern midnight).  While its window is open the Shop
+// shows the event with:
+//   • its spotlight items, sold one by one: the event's own ball and
+//     boundary (the seasonal balls are sold only here, only in season);
+//   • optionally one ACTIVE collection that fits the holiday.
+// ===========================================================================
+struct SeasonalEvent: Identifiable {
+    /// The retired seasonal catalogue entry: name, window, spotlight items.
+    let bundle: CosmeticBundle
+    var id: String { bundle.id }
+    var displayName: String { bundle.displayName }
+
+    /// The active collection featured during this event, if any.
+    var featuredCollection: CosmeticBundle? {
+        guard let fid = Self.featuredCollectionIDs[bundle.id] else { return nil }
+        return CosmeticBundle.active.first { $0.id == fid }
+    }
+
+    /// Spotlight items sold one by one while the event is open.
+    var spotlightBalls: [BallSkin] { bundle.balls.filter { !$0.isLockerOnly } }
+    var spotlightBoundaries: [Boundary] { bundle.boundaries }
+
+    func isOpen(at now: Date = Date()) -> Bool { bundle.isOpen(at: now) }
+
+    /// Event id → featured active collection id.
+    static let featuredCollectionIDs: [String: String] = [
+        "summer-2026":       "ocean",
+        "halloween-2026":    "haunted",
+        "winter-2026":       "winter",
+        "valentines-2027":   "bloom",
+        "stpatricks-2027":   "nature",
+        "newyear-2027":      "nightclub",
+        "spring-2027":       "bloom",
+        "july4-2026":        "cosmos",
+        "muertos-2026":      "haunted",
+        "harvest-2026":      "citrus",
+        "lunar-2027":        "ancient-temple",
+        "mardigras-2027":    "nightclub",
+        "pride-2027":        "aurora",
+        "oktoberfest-2026":  "midas",
+        "earthday-2027":     "nature",
+        "backtoschool-2026": "sketchbook",
+    ]
+
+    /// Every seasonal event, in catalogue order.
+    static var all: [SeasonalEvent] {
+        CosmeticBundle.catalogue.filter(\.isLimitedTime).map { SeasonalEvent(bundle: $0) }
+    }
+
+    /// The events whose window is open now.
+    static func open(at now: Date = Date()) -> [SeasonalEvent] {
+        all.filter { $0.isOpen(at: now) }
+    }
+
+    /// True while `item` is a spotlight item of an open event (sold then even
+    /// if it is a seasonal-only ball or not yet on the release calendar).
+    static func isSpotlit<Item: CosmeticItem>(_ item: Item, at now: Date = Date()) -> Bool {
+        open(at: now).contains { event in
+            switch item {
+            case let b as BallSkin: return event.spotlightBalls.contains(b)
+            case let w as Boundary: return event.spotlightBoundaries.contains(w)
+            default:                return false
+            }
+        }
+    }
+
+    /// True when an open event features `bundle`.
+    static func features(_ bundle: CosmeticBundle, at now: Date = Date()) -> Bool {
+        open(at: now).contains { $0.featuredCollection?.id == bundle.id }
     }
 }
 
@@ -2584,8 +2710,37 @@ struct CosmeticBundle: Identifiable {
     /// set(s) the item was released with.  Used by the Catalog to show
     /// each cosmetic's related bundle(s).
     static func bundles<Item: CosmeticItem>(containing item: Item) -> [CosmeticBundle] {
-        catalogue.filter { $0.contains(item) }
+        active.filter { $0.contains(item) }
     }
+
+    // ── Active vs retired collections ──────────────────────────────
+    //
+    // Only these 18 collections are on sale (Shop, Catalog, featured bundle,
+    // post-tutorial gift pool, Challenge Track rewards).  Each has exactly one
+    // item per offered slot, and no item is in more than one of them
+    // (CosmeticsTests pins both).  Every other catalogue entry is RETIRED: it
+    // is never listed or sold as a set, but its definition stays so owners'
+    // records (`ownedBundles`, completed-collection counts) keep their meaning
+    // and so its items keep the release days they had.  Retired items stay
+    // buyable one by one.  Seasonal events no longer sell a set; they feature
+    // an active collection and spotlight items (`SeasonalEvent`).
+
+    static let activeIDs: [String] = [
+        // Launch: the Starter Pack's Aurora, the post-tutorial gift pool
+        // (Standard) and the eight Challenge Track rewards.
+        "aurora", "nature", "citrus", "sketchbook", "midas",
+        "winter", "cosmos", "lava-flow", "neon", "haunted",
+        "ancient-temple", "abyssal-depths", "champion",
+        // Calendar drops.
+        "candyland", "nightclub", "golf", "bloom", "ocean",
+    ]
+    private static let activeIDSet = Set(activeIDs)
+
+    /// True for a collection that is no longer sold as a set.
+    var isRetired: Bool { !Self.activeIDSet.contains(id) }
+
+    /// The collections on sale, in catalogue order.
+    static var active: [CosmeticBundle] { catalogue.filter { !$0.isRetired } }
 
     /// Add every contained item to the appropriate owned-set on
     /// `state`.  One-way grant — items remain owned forever even if
@@ -2637,15 +2792,15 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "nightclub",
             displayName:    "Nightclub",
-            tagline:        "Disco lights, neon goal, bubblegum streak.",
-            contentSummary: "Disco Ball · Disco floor · Nightclub pit · Neon goal · Bubblegum trail · Retrowave music · Neon boundary",
+            tagline:        "Mirror ball, rainbow lights and a sunken dance floor.",
+            contentSummary: "Disco Ball · Mosaic goal · Rainbow trail · Disco floor · Nightclub pit · Retrowave music · Marquee boundary",
             balls:  [.disco],
-            goals:  [.neon],
-            trails: [.bubblegum],
+            goals:  [.mosaic],
+            trails: [.rainbow],
             floors: [.disco],
             pits:   [.nightclub],
             music:  [.retrowave],
-            boundaries: [.neon]
+            boundaries: [.marquee]
         ),
         CosmeticBundle(
             id:             "paper-world",
@@ -2664,7 +2819,7 @@ struct CosmeticBundle: Identifiable {
             id:             "golf",
             displayName:    "Golf",
             tagline:        "Dimpled ball, fairway green, lily-pad pond, hole-in-one flag.",
-            contentSummary: "Golf Ball · Grass floor · Pond pit · Air trail · Hole-in-One goal · Jazz music · Fairway boundary",
+            contentSummary: "Golf Ball · Hole-in-One goal · Air trail · Grass floor · Pond pit · Jazz music · Fairway boundary",
             balls:  [.golfBall],
             goals:  [.holeInOne],
             trails: [.air],
@@ -2706,10 +2861,10 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "winter",
             displayName:    "Winter",
-            tagline:        "A snowglobe marble through crystal frost.",
-            contentSummary: "Snowglobe ball · Crystal goal · Ice trail · Twilight floor · Twilight pit · Classical music · Ice boundary",
+            tagline:        "Frost, fresh snow and a snowglobe ball.",
+            contentSummary: "Snowglobe ball · Frost goal · Ice trail · Twilight floor · Twilight pit · Classical music · Ice boundary",
             balls:  [.snowglobe],
-            goals:  [.crystal],
+            goals:  [.frost],
             trails: [.ice],
             floors: [.twilight],
             pits:   [.twilight],
@@ -2734,10 +2889,10 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "nature",
             displayName:    "Nature",
-            tagline:        "Jade and blossoms over a meadow green.",
-            contentSummary: "Jade ball · Blossom goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
+            tagline:        "Daisies, long grass and a mint-green rim.",
+            contentSummary: "Jade ball · Meadow goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
             balls:  [.jade],
-            goals:  [.blossom],
+            goals:  [.meadow],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],
@@ -2748,9 +2903,9 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "ocean",
             displayName:    "Ocean",
-            tagline:        "Ride the tide on a wave of mint.",
-            contentSummary: "Mint ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music · Tide boundary",
-            balls:  [.mint],
+            tagline:        "Clear water, rolling tides and a fishbowl ball.",
+            contentSummary: "Aquarium ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music · Tide boundary",
+            balls:  [.aquarium],
             goals:  [.ripple],
             trails: [.sky],
             floors: [.blueprint],
@@ -2805,9 +2960,9 @@ struct CosmeticBundle: Identifiable {
             id:             "bloom",
             displayName:    "Bloom",
             tagline:        "Soft petals on warm parchment.",
-            contentSummary: "Rose ball · Mosaic goal · Rose trail · Parchment floor · Parchment pit · Piano music · Rose boundary",
+            contentSummary: "Rose ball · Blossom goal · Rose trail · Parchment floor · Parchment pit · Piano music · Rose boundary",
             balls:  [.rose],
-            goals:  [.mosaic],
+            goals:  [.blossom],
             trails: [.roseTrail],
             floors: [.parchment],
             pits:   [.parchment],
@@ -2861,9 +3016,9 @@ struct CosmeticBundle: Identifiable {
             id:             "midas",
             displayName:    "Midas",
             tagline:        "Everything you touch turns to gold.",
-            contentSummary: "Gold ball · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music · Gold boundary",
+            contentSummary: "Fool's Gold ball · Bullion goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music · Gold boundary",
             balls:  [.gold],
-            goals:  [.quasar],
+            goals:  [.bullion],
             trails: [.gilded],
             floors: [.mirage],
             pits:   [.mirage],
@@ -2874,11 +3029,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "sketchbook",
             displayName:    "Sketchbook",
-            tagline:        "Pencil, graphite, and a steady hand.",
-            contentSummary: "Silver ball · Archery goal · Smoke trail · Sketch floor · Sketch pit · Classical music · Slate boundary",
+            tagline:        "Pencil lines, cross-hatching and a silver ball.",
+            contentSummary: "Silver ball · Archery goal · Graphite trail · Sketch floor · Sketch pit · Classical music · Slate boundary",
             balls:  [.silver],
             goals:  [.archery],
-            trails: [.smoke],
+            trails: [.graphite],
             floors: [.sketch],
             pits:   [.sketch],
             music:  [.classical],
@@ -2928,13 +3083,13 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "neon",
             displayName:    "Neon",
-            tagline:        "Electric pink on a pulsing dance floor.",
-            contentSummary: "Neon ball · Neon goal · Bubblegum trail · Disco floor · Moonlit pit · Electronic music · Neon boundary",
+            tagline:        "Electric pink and laser green on a glowing grid.",
+            contentSummary: "Neon ball · Neon goal · Raybeam trail · Grid City floor · Graph pit · Electronic music · Neon boundary",
             balls:  [.neon],
             goals:  [.neon],
-            trails: [.bubblegum],
-            floors: [.disco],
-            pits:   [.midnight],
+            trails: [.raybeam],
+            floors: [.gridCity],
+            pits:   [.graph],
             music:  [.electronic],
             boundaries: [.neon]
         ),
@@ -3008,10 +3163,10 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "candyland",
             displayName:    "Candyland",
-            tagline:        "A peppermint swirl through a sugar-dusted world.",
-            contentSummary: "Candy ball · Mosaic goal · Bubblegum trail · Sugar floor · Syrup pit · Lo-fi music · Candy boundary",
+            tagline:        "Peppermint, bubblegum and a pool of syrup.",
+            contentSummary: "Candy ball · Candy goal · Bubblegum trail · Sugar floor · Syrup pit · Lo-fi music · Candy boundary",
             balls:  [.candy],
-            goals:  [.mosaic],
+            goals:  [.candy],
             trails: [.bubblegum],
             floors: [.sugar],
             pits:   [.syrup],
@@ -3340,11 +3495,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "ancient-temple",
             displayName:    "Ancient Temple",
-            tagline:        "Every stone carries the weight of centuries.",
-            contentSummary: "Dune ball · Eclipse goal · Gilded trail · Desert floor · Canyon pit · Orchestral music · Sandstone boundary",
+            tagline:        "A serpent's trail through sun-baked stone.",
+            contentSummary: "Dune ball · Eclipse goal · Snake trail · Desert floor · Canyon pit · Orchestral music · Sandstone boundary",
             balls:  [.dune],
             goals:  [.eclipse],
-            trails: [.gilded],
+            trails: [.snake],
             floors: [.desert],
             pits:   [.canyon],
             music:  [.orchestral],
@@ -3355,12 +3510,12 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "abyssal-depths",
             displayName:    "Abyssal Depths",
-            tagline:        "Light doesn't reach here. Roll by feel.",
-            contentSummary: "Trench ball · Comet goal · Ice trail · Blueprint floor · Space pit · Dreamscape music · Abyss boundary",
+            tagline:        "Squid ink and a whirlpool at the bottom of the sea.",
+            contentSummary: "Trench ball · Vortex goal · Ink trail · Inverted floor · Space pit · Dreamscape music · Abyss boundary",
             balls:  [.trench],
-            goals:  [.comet],
-            trails: [.ice],
-            floors: [.blueprint],
+            goals:  [.vortex],
+            trails: [.ink],
+            floors: [.inverted],
             pits:   [.space],
             music:  [.dreamscape],
             boundaries: [.abyss]
@@ -3371,15 +3526,15 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "champion",
             displayName:    "Champion",
-            tagline:        "No tutorial. No mercy. A hundred flawless rooms.",
-            contentSummary: "Trophy ball (exclusive) · Quasar goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music · Gold boundary",
+            tagline:        "Polished brass, a blazing comet and the trophy itself.",
+            contentSummary: "Trophy ball · Quasar goal · Comet trail · Brass Works floor · Sideline pit · Orchestral music · Brass boundary",
             balls:  [.trophy],
             goals:  [.quasar],
-            trails: [.gilded],
-            floors: [.mirage],
-            pits:   [.mirage],
+            trails: [.cometTrail],
+            floors: [.brass],
+            pits:   [.sideline],
             music:  [.orchestral],
-            boundaries: [.gold]
+            boundaries: [.brass]
         ),
 
         // ── S15 ──────────────────────────────────────────────────────────
@@ -3416,12 +3571,12 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "lava-flow",
             displayName:    "Lava Flow",
-            tagline:        "Slow, relentless, unstoppable.",
-            contentSummary: "Lava ball · Eclipse goal · Fire trail · Sunset floor · Evil pit · Downtempo music · Molten boundary",
+            tagline:        "Molten rock, open flame and a demon's pit.",
+            contentSummary: "Lava ball · Inferno goal · Fire trail · Ember floor · Evil pit · Downtempo music · Molten boundary",
             balls:  [.lava],
-            goals:  [.eclipse],
+            goals:  [.inferno],
             trails: [.fire],
-            floors: [.sunset],
+            floors: [.ember],
             pits:   [.evil],
             music:  [.downtempo],
             boundaries: [.molten]

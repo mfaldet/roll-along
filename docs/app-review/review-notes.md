@@ -37,7 +37,7 @@ ACCOUNT DELETION
 Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
 COSMETIC RELEASE CALENDAR
-Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; that only changes when a collection appears in the Shop. Nothing else is switched on remotely. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal collections return each year.
+Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; that only changes when a collection appears in the Shop. Nothing else is switched on remotely. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal events return each year.
 
 TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.
@@ -57,21 +57,9 @@ Contact: rollalongsupport@gmail.com
 
 ## Before pasting, check these are true
 
-- [ ] `docs/feedback/feedback-schema.sql` (step 10) has been applied, or
-      Send Feedback messages will wait on the phone and never arrive.
-- [ ] `docs/cosmetics/cosmetic-calendar.sql` (step 11) has been applied. Until
-      it is, the app uses its built-in dates, which are the same, so nothing
-      breaks; but dates can only be changed from the server after it is applied.
-- [ ] `docs/social/clan-look.sql` (step 13, after step 12) has been applied, or
-      a clan owner's icon and color choice cannot be saved (clans still show
-      the default shield on blue, so nothing else breaks).
-- [ ] Steps 14, 15 and 16 have been applied, in order, after step 13:
-      `docs/social/drop-friend-gifts.sql`, `docs/social/drop-clan-tags.sql`,
-      `docs/social/rollup-columns.sql`.  This build sends no clan tag, so
-      creating a clan fails until step 15 removes the tag column.
-- [ ] `docs/feedback/feedback-types.sql` (step 17, after step 16) has been
-      applied, or Question and Compliment messages are refused by the server
-      (Bug and Idea still arrive).
+- [ ] Steps 1–17 are applied (confirmed: every check query true).  Step 16
+      was applied in its original form, which also added
+      `rollup_best_seconds`; step 18 removes it.
 - [ ] `docs/social/rollup-height-only.sql` (step 18, after step 17) has been
       applied.  Roll Up is scored by height only; the step removes the old
       run-time column (`rollup_best_seconds`).

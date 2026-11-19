@@ -362,7 +362,7 @@ final class CosmeticsTests: XCTestCase {
     /// bundles — small enough to stay curated, big enough to feel like a
     /// choice — so drifting outside that band also fails.
     func testTutorialGift_permanentStandardBundlePool_neverEmpty() {
-        let pool = CosmeticBundle.catalogue.filter { !$0.isLimitedTime && $0.rarity == .standard }
+        let pool = CosmeticBundle.active.filter { !$0.isLimitedTime && $0.rarity == .standard }
         print("GIFTPOOL permanent Standard bundles:", pool.map { $0.id }.joined(separator: ", "))
         XCTAssertFalse(pool.isEmpty,
                        "The permanent Standard-rarity bundle pool is empty — the post-tutorial gift dead-ends")
@@ -693,7 +693,7 @@ final class CosmeticsTests: XCTestCase {
     func testSchedule_giftAndRewardBundlesAreLaunchContent() {
         let launch = Set(CosmeticSchedule.launchBundleIDs)
         XCTAssertTrue(launch.contains("aurora"))
-        for b in CosmeticBundle.catalogue where !b.isLimitedTime && b.rarity == .standard {
+        for b in CosmeticBundle.active where !b.isLimitedTime && b.rarity == .standard {
             XCTAssertTrue(launch.contains(b.id), "gift-pool collection \(b.id) must be launch content")
         }
         for track in GameModeCatalogue.challengeTracks {
@@ -762,8 +762,14 @@ final class CosmeticsTests: XCTestCase {
         let store = calendarStore()
         let first = CosmeticSchedule.nextDrop(at: eastern(2026, 12, 1), store: store)
         XCTAssertEqual(first?.date, eastern(2026, 12, 17))
-        XCTAssertEqual(Set(first?.bundles.map(\.id) ?? []),
-                       ["cathedral", "velvet-night", "crystal-cavern"])
+        // Cathedral, Velvet Night and Crystal Cavern are retired as sets, so
+        // the first drop announces their single items instead.
+        XCTAssertEqual(first?.bundles.map(\.id) ?? ["?"], [])
+        XCTAssertTrue(first?.itemNames.contains("Cathedral") ?? false)
+        XCTAssertTrue(first?.itemNames.contains("Stained Glass boundary") ?? false)
+        let feb = CosmeticSchedule.nextDrop(at: eastern(2027, 2, 11, plus: -1), store: store)
+        XCTAssertEqual(Set(feb?.bundles.map(\.id) ?? []), ["candyland", "nightclub"],
+                       "active collections are announced by name on their day")
         let march = CosmeticSchedule.nextDrop(at: eastern(2027, 3, 11, plus: -1), store: store)
         XCTAssertEqual(march?.date, eastern(2027, 3, 11))
         let afterAll = eastern(2027, 11, 11)
@@ -831,6 +837,80 @@ final class CosmeticsTests: XCTestCase {
                               "\(ball.rawValue) must be out no later than \(b.id)")
             }
         }
+    }
+
+    /// Only 18 collections are on sale.  Each is one item per offered slot,
+    /// and no item is in two of them.  Gift pool, Starter Pack and track
+    /// rewards all point at active collections.
+    func testActiveCollections_areCompleteAndUnique() {
+        let active = CosmeticBundle.active
+        XCTAssertEqual(active.count, 18)
+        XCTAssertEqual(Set(active.map(\.id)), Set(CosmeticBundle.activeIDs))
+        var seen: [String: String] = [:]
+        func check(_ b: CosmeticBundle, _ keys: [String]) {
+            XCTAssertEqual(keys.count, 1, "\(b.id) must have exactly one item in each slot")
+            for k in keys {
+                if let other = seen[k] { XCTFail("\(k) is in both \(other) and \(b.id)") }
+                seen[k] = b.id
+            }
+        }
+        for b in active {
+            XCTAssertFalse(b.isLimitedTime, "\(b.id): active collections are permanent")
+            check(b, b.balls.map { "ball|" + $0.rawValue })
+            check(b, b.goals.map { "goal|" + $0.rawValue })
+            check(b, b.trails.map { "trail|" + $0.rawValue })
+            check(b, b.floors.map { "floor|" + $0.rawValue })
+            check(b, b.pits.map { "pit|" + $0.rawValue })
+            check(b, b.boundaries.map { "boundary|" + $0.rawValue })
+        }
+        XCTAssertEqual(active.filter { $0.rarity == .standard }.count, 4, "gift pool keeps four sets")
+        XCTAssertTrue(CosmeticBundle.activeIDs.contains("aurora"), "Starter Pack's Aurora stays on sale")
+        for track in GameModeCatalogue.challengeTracks {
+            guard let id = ChallengeTrackMode.rewardBundleID(for: track.trackID) else { continue }
+            XCTAssertTrue(CosmeticBundle.activeIDs.contains(id), "track reward \(id) must be active")
+        }
+        // Retired sets are never listed: the featured bundle and "containing"
+        // lookups only see active ones.
+        XCTAssertTrue(CosmeticBundle.bundles(containing: BallSkin.cathedral).isEmpty)
+        XCTAssertEqual(CosmeticBundle.bundles(containing: TrailColor.smoke).map(\.id), ["haunted"])
+    }
+
+    /// Items that left a launch collection when the sets were reshaped are
+    /// still available from launch; no item arrives later than before.
+    func testReshapedItems_keepTheirLaunchAvailability() {
+        let store = calendarStore()
+        let early = eastern(2026, 12, 1)
+        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.blueprint, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.disco, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.sunset, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(GoalSkin.blossom, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(GoalSkin.comet, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(GoalSkin.crystal, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(TrailColor.bubblegum, at: early, store: store))
+        // A retired collection still holds its items back until its day.
+        XCTAssertFalse(CosmeticSchedule.isReleased(BallSkin.cathedral, at: early, store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.cathedral, at: eastern(2026, 12, 17), store: store))
+    }
+
+    /// Seasonal events: every seasonal entry is retired as a set, features an
+    /// active collection, and spotlights its own ball (sold only in season).
+    func testSeasonalEvents_featureActiveCollectionsAndSpotlightItems() {
+        let events = SeasonalEvent.all
+        XCTAssertEqual(events.count, 16)
+        for e in events {
+            XCTAssertTrue(e.bundle.isRetired, "\(e.id) must not be sold as a set")
+            XCTAssertNotNil(e.featuredCollection, "\(e.id) features an active collection")
+            XCTAssertFalse(e.spotlightBalls.isEmpty, "\(e.id) spotlights its ball")
+        }
+        let halloween = events.first { $0.id == "halloween-2026" }!
+        XCTAssertEqual(halloween.featuredCollection?.id, "haunted")
+        let mid = eastern(2026, 10, 20)
+        XCTAssertTrue(halloween.isOpen(at: mid))
+        XCTAssertTrue(SeasonalEvent.isSpotlit(BallSkin.pumpkin, at: mid))
+        XCTAssertTrue(SeasonalEvent.isSpotlit(Boundary.pumpkin, at: mid))
+        XCTAssertFalse(SeasonalEvent.isSpotlit(BallSkin.pumpkin, at: eastern(2027, 3, 1)),
+                       "the seasonal ball is sold only in season")
+        XCTAssertTrue(SeasonalEvent.features(CosmeticBundle.active.first { $0.id == "haunted" }!, at: mid))
     }
 
     /// Seasonal windows repeat every year; holidays that move use their

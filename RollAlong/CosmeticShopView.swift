@@ -130,7 +130,7 @@ private enum BundleFilter: String, CaseIterable, Identifiable {
     func matches(_ b: CosmeticBundle) -> Bool {
         switch self {
         case .all:      return true
-        case .seasonal: return b.isLimitedTime
+        case .seasonal: return SeasonalEvent.features(b)
         default:        return BundleFilter.themeMap[b.id] == self
         }
     }
@@ -631,6 +631,12 @@ struct CosmeticShopView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                // ── Seasonal events: spotlight items, sold one by one while
+                //    the holiday window is open (SeasonalEvent). ─────────
+                ForEach(SeasonalEvent.open()) { event in
+                    seasonalSection(event)
+                }
+
                 // ── One section per cosmetic category: three picks each
                 //    (two Standard + one better), in the requested order. ───
                 shopPicksSection("BALLS",      items: ShopRotation.featuredBalls())
@@ -685,6 +691,34 @@ struct CosmeticShopView: View {
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.18), lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+
+    /// One open seasonal event: its spotlight items (sold one by one, in
+    /// season only) and a pointer to the collection it features.
+    private func seasonalSection(_ event: SeasonalEvent) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                sectionLabel(event.displayName.uppercased())
+                Spacer()
+                if let left = event.bundle.timeRemainingLabel {
+                    Text(left)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.40))
+                }
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ForEach(event.spotlightBalls, id: \.id) { item in itemCell(item: item) }
+                ForEach(event.spotlightBoundaries, id: \.id) { item in itemCell(item: item) }
+            }
+            if let featured = event.featuredCollection {
+                Text("Also in season: the \(featured.displayName) collection, in the Catalog.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// One Shop category section: a label over a 3-up row of buyable item cells.
@@ -848,6 +882,7 @@ struct CosmeticShopView: View {
     /// "Coming soon" row instead.
     private func isListed<Item: CosmeticItem>(_ item: Item) -> Bool {
         CosmeticSchedule.isReleased(item) || gameState.isOwned(item)
+            || SeasonalEvent.isSpotlit(item)
     }
 
     private func categoryGrid<Item: CosmeticItem>(items: [Item]) -> some View {
@@ -894,7 +929,8 @@ struct CosmeticShopView: View {
             // Locker-only balls (Diamond) never appear here, even when owned.
             categoryGrid(items: BallSkin.allCases.filter {
                 !$0.isLockerOnly
-                    && (!$0.isBundleExclusive || gameState.isOwned($0)) && isListed($0)
+                    && (!$0.isBundleExclusive || gameState.isOwned($0) || SeasonalEvent.isSpotlit($0))
+                    && isListed($0)
             })
         }
     }
@@ -1213,7 +1249,7 @@ struct CosmeticShopView: View {
         // Seasonal bundles still appear only while their window is open.
         // Collections not yet released (see `CosmeticSchedule`) are announced
         // in the "Coming soon" row below rather than listed.
-        let bundles = CosmeticBundle.catalogue
+        let bundles = CosmeticBundle.active
             .filter { !$0.isLimitedTime || $0.isAvailable }
             .filter { CosmeticSchedule.isReleased($0) }
             .filter { bundleFilter.matches($0) }
@@ -1244,6 +1280,13 @@ struct CosmeticShopView: View {
     /// "Coming soon" — only the next scheduled drop, by name and date.  It
     /// never says how many collections are scheduled after it.
     @ViewBuilder
+    /// "Ember floor · Graph pit · Sandstone boundary and more" — at most six
+    /// names, so a big release day stays one short line or two.
+    static func comingSoonItems(_ names: [String]) -> String {
+        let shown = names.prefix(6).joined(separator: " · ")
+        return names.count > 6 ? shown + " and more" : shown
+    }
+
     private var comingSoonRow: some View {
         if let next = CosmeticSchedule.nextDrop() {
             VStack(alignment: .leading, spacing: 8) {
@@ -1258,10 +1301,20 @@ struct CosmeticShopView: View {
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
-                Text(next.bundles.map(\.displayName).joined(separator: " · "))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !next.bundles.isEmpty {
+                    Text(next.bundles.map(\.displayName).joined(separator: " · "))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !next.itemNames.isEmpty {
+                    Text(Self.comingSoonItems(next.itemNames))
+                        .font(.system(size: next.bundles.isEmpty ? 15 : 13,
+                                      weight: next.bundles.isEmpty ? .semibold : .medium,
+                                      design: .rounded))
+                        .foregroundStyle(next.bundles.isEmpty ? Color.white : Color(white: 0.7))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1917,7 +1970,7 @@ struct CosmeticShopView: View {
     /// (Only meaningful when `item` itself is unowned, which is the only path
     /// that calls it.)
     private func lastItemBundle<Item: CosmeticItem>(for item: Item) -> CosmeticBundle? {
-        CosmeticBundle.catalogue.first {
+        CosmeticBundle.active.first {
             $0.contains(item) && ownedCount(in: $0) == $0.itemCount - 1
         }
     }
@@ -1987,7 +2040,9 @@ struct CosmeticShopView: View {
     /// `completedBundleIDs` taken BEFORE the purchase.  Auto-dismisses
     /// after 3 seconds.
     private func checkCompletionToast(before: Set<String>) {
+        // Only sets on sale toast; finishing a retired set by single buys is silent.
         let newIDs = gameState.completedBundleIDs.subtracting(before)
+            .filter { CosmeticBundle.activeIDs.contains($0) }
         guard let newID = newIDs.first,
               let bundle = CosmeticBundle.catalogue.first(where: { $0.id == newID })
         else { return }

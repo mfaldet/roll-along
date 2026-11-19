@@ -2520,7 +2520,7 @@ struct BallGameView: View {
 
     private var tutorialRewardOverlay: some View {
         // The post-tutorial gift: pick ONE entire Standard-rarity collection.
-        let bundles = CosmeticBundle.catalogue.filter { $0.rarity == .standard && $0.isAvailable }
+        let bundles = CosmeticBundle.active.filter { $0.rarity == .standard && $0.isAvailable }
         let hasPick = tutorialBundlePick != nil
 
         return ZStack {
