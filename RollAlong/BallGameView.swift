@@ -7543,7 +7543,8 @@ struct GoalSkinView: View {
 
     /// Doodle goal (Paper World bundle) — a hand-drawn pencil bullseye on cream
     /// paper.  The rings wobble (seeded, stable) so they read as sketched, not
-    /// printed.  Static — no animation.
+    /// printed, and crowd closer toward the center so it looks deep.  Static —
+    /// no animation.
     private var doodleGoal: some View {
         Canvas { ctx, size in
             let w  = size.width, h = size.height
@@ -7555,25 +7556,30 @@ struct GoalSkinView: View {
             ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
                      with: .color(Color(red: 0.97, green: 0.96, blue: 0.90)))
 
-            // Concentric wobbly pencil rings.
-            let fracs: [CGFloat] = [0.92, 0.66, 0.40]
+            // Concentric wobbly pencil rings.  The gaps shrink toward the
+            // center (0.30, 0.20, 0.13, 0.08 of the radius) and the inner
+            // rings draw a little thinner, so the bullseye reads as a hole
+            // receding into the paper.
+            let fracs: [CGFloat] = [0.92, 0.62, 0.42, 0.29, 0.21]
             for (ri, frac) in fracs.enumerated() {
-                let rr  = r * frac
+                let rr: CGFloat  = r * frac
                 let seg = 60
+                let wobAmp: CGFloat = r * 0.02 * min(1, frac / 0.6)
                 var ring = Path()
                 for s in 0...seg {
                     let a   = Double(s) / Double(seg) * 2 * .pi
                     let wob = sin(a * 5 + Double(ri) * 2.1) * 0.5 + sin(a * 9 + Double(ri)) * 0.5
-                    let rad = rr + CGFloat(wob) * r * 0.02
+                    let rad: CGFloat = rr + CGFloat(wob) * wobAmp
                     let p   = CGPoint(x: cx + CGFloat(cos(a)) * rad, y: cy + CGFloat(sin(a)) * rad)
                     if s == 0 { ring.move(to: p) } else { ring.addLine(to: p) }
                 }
+                let lineW: CGFloat = max(1.0, r * 0.045 * (0.55 + 0.45 * frac / 0.92))
                 ctx.stroke(ring, with: .color(lead.opacity(0.85)),
-                           style: StrokeStyle(lineWidth: max(1.2, r * 0.045), lineCap: .round, lineJoin: .round))
+                           style: StrokeStyle(lineWidth: lineW, lineCap: .round, lineJoin: .round))
             }
 
             // Filled centre dot.
-            let dotR = r * 0.16
+            let dotR = r * 0.12
             ctx.fill(Path(ellipseIn: CGRect(x: cx - dotR, y: cy - dotR, width: dotR * 2, height: dotR * 2)),
                      with: .color(lead.opacity(0.9)))
         }

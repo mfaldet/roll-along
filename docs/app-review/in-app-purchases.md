@@ -38,10 +38,8 @@ whole percent. Base rate: 100 ÷ $0.99 = 101.01 coins per dollar.
 
 The 100-coin pack shows no bonus label.
 
-**Top-up line.** The 100- and 600-coin packs can't buy a cosmetic on their own
-(the cheapest is 750 coins), so their cards also show a gray line under the
-amount: **"Top up your balance"**. The 600-coin card shows both "+19% coins"
-and that line. The other three packs show no top-up line.
+No coin card shows a top-up line (removed 2026-11-19); the cards show the
+amount, the bonus label where there is one, and the price.
 
 ## Paste into App Store Connect
 
@@ -114,12 +112,12 @@ RUN OUT". It says "Indestructible. Unlimited lives, forever." and names the
 Diamond ball skin. It shows no savings figure. Once it is owned, the packs are
 hidden and the sheet shows only a "You own Diamond Balls" card.
 
-The Diamond Balls card shows a semi-truck trailer heaped with red balls and one
-diamond ball on top.
+The Diamond Balls card shows the Diamond ball cosmetic itself, large, with a
+soft cyan glow.
 
 The lives cards, prices and product IDs changed on 2026-11-18, and the pack
-icons changed on 2026-11-19 (pouch, box, chest and truck replaced the jars and
-the diamond ball). Any screenshot of the Get Lives sheet taken before
+icons changed on 2026-11-19 (pouch, box and chest replaced the jars; Diamond
+Balls shows the Diamond ball cosmetic). Any screenshot of the Get Lives sheet taken before
 2026-11-19 must be retaken for products 1 to 4.
 Take them before buying Diamond Balls on the test account, or the packs will
 not be shown.
@@ -150,5 +148,5 @@ not be shown.
 - The screen and button names above come from reading the code. Confirm them
   on the phone.
 - Whether the Get Lives sheet shows Diamond Balls without scrolling.
-- How the pouch, box, chest and truck icons and the reserve pouch look on the
+- How the pouch, box and chest icons, the Diamond ball and the reserve pouch look on the
   phone.
