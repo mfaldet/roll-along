@@ -1103,6 +1103,8 @@ final class CosmeticMotionTests: XCTestCase {
 
 // MARK: - Trail marks (every trail is laid in place and fades on a timer)
 
+// @MainActor: `ShopTrailCurve` is a View, so its statics are main-actor isolated.
+@MainActor
 final class TrailMarksTests: XCTestCase {
 
     /// Marks are laid every `spacing` points along the path, with laid times

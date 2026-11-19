@@ -2213,15 +2213,18 @@ struct ShopTrailCurve: View {
     /// by time `t`: spaced `TrailMarks.spacing` apart along the curve, each
     /// stamped with when the ball passed it.  Laps restart at the curve's
     /// start; the previous lap's marks stay where they were laid and fade.
-    /// Returns the marks and the ball's position.
+    /// Returns the marks, the ball's position and `lapBreak`: how many of the
+    /// marks (from the front) belong to the previous lap — the two laps must
+    /// be drawn separately, or a segment joins the curve's end to its start.
     static func marks(along pts: [CGPoint], t: Double, rolling: Bool)
-        -> (points: [CGPoint], times: [Double], head: CGPoint) {
+        -> (points: [CGPoint], times: [Double], head: CGPoint, lapBreak: Int) {
+        guard pts.count >= 2 else { return ([], [], pts.first ?? .zero, 0) }
         var cum: [CGFloat] = [0]
         for i in 1..<pts.count {
             cum.append(cum[i - 1] + hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y))
         }
         let total = cum.last ?? 0
-        guard total > 0 else { return ([], [], pts.first ?? .zero) }
+        guard total > 0 else { return ([], [], pts.first ?? .zero, 0) }
         let lap = TrailMarks.lifetime * lapLifetimes           // seconds per lap
         let speed = Double(total) / lap                        // points per second
         let lapPos: Double
@@ -2248,6 +2251,7 @@ struct ShopTrailCurve: View {
                 s += spacing
             }
         }
+        let lapBreak = outP.count
         var s: CGFloat = 0
         while s <= headS {
             let laid = lapStart + Double(s) / speed
@@ -2256,7 +2260,7 @@ struct ShopTrailCurve: View {
             }
             s += spacing
         }
-        return (outP, outT, point(at: headS, pts, cum))
+        return (outP, outT, point(at: headS, pts, cum), lapBreak)
     }
 
     private static func curve(trail: TrailColor, t: Double, rolling: Bool, baseWidth: CGFloat,
@@ -2264,8 +2268,17 @@ struct ShopTrailCurve: View {
         Canvas { ctx, size in
             let pts = unitCurve.map { CGPoint(x: $0.x * size.width, y: $0.y * size.height) }
             let m = marks(along: pts, t: t, rolling: rolling)
-            drawRichTrail(ctx, points: m.points, trail: trail, t: t, baseWidth: baseWidth,
-                          times: m.times, reduceMotion: reduceMotion)
+            // Previous lap's fading tail and this lap's marks, drawn apart so
+            // no segment bridges the curve's end back to its start.
+            let cut: Int = min(m.lapBreak, m.points.count)
+            if cut > 0 {
+                drawRichTrail(ctx, points: Array(m.points[..<cut]), trail: trail, t: t,
+                              baseWidth: baseWidth, times: Array(m.times[..<cut]),
+                              reduceMotion: reduceMotion)
+            }
+            drawRichTrail(ctx, points: Array(m.points[cut...]), trail: trail, t: t,
+                          baseWidth: baseWidth, times: Array(m.times[cut...]),
+                          reduceMotion: reduceMotion)
             if headBall != nil, let ball = ctx.resolveSymbol(id: 0) {
                 ctx.draw(ball, at: m.head)
             }

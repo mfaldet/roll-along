@@ -4054,7 +4054,7 @@ struct TrailMarks: Equatable {
             let dx: CGFloat = p.x - last.x
             let dy: CGFloat = p.y - last.y
             let d: CGFloat = (dx * dx + dy * dy).squareRoot()
-            if d >= Self.spacing {
+            if d.isFinite && d >= Self.spacing {
                 let whole: Int = Int(d / Self.spacing)
                 let k: Int = min(Self.maxPerStep, whole)
                 // Whole spacings normally; spread evenly to `p` if capped.
