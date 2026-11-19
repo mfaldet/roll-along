@@ -2300,9 +2300,10 @@ enum CosmeticTileHero {
     static func goal(_ g: GoalSkin) -> Double {
         switch g {
         // Breathing targets and portals: sin(1.3 t) at their fullest size.
-        case .target, .archery, .frost, .ember, .meadow, .bullion,
-             .amethyst, .candy, .slate, .vortex, .wormhole:
+        case .target, .archery, .slate:
             return peak(1.3)
+        // Frost, Ember, Meadow, Bullion, Amethyst, Candy, Vortex and Wormhole
+        // are drawn static (Standard), so any instant shows the same frame.
         case .aurora, .eclipse: return peak(1.6)   // brightest pulse / fullest corona
         case .halo:             return peak(2.0)   // halo at its widest
         case .crystal:          return peak(2.0)   // first facet at full shimmer

@@ -26,6 +26,8 @@ flat color.
 
 ## Balls
 
+**Built 2026-11-19:** Dune now draws wind-rippled sand ridges (static).
+
 Delivers: the mono-color balls have plain color names (Ocean Blue, Rose, Lemon…); metals (Fool's Gold,
 Silver, Copper) have a metal sheen; gems (Jade, Ruby) have a gem finish; every Epic and Legendary ball
 except Dune has its own renderer.
@@ -35,6 +37,8 @@ except Dune has its own renderer.
 | Dune | dune | Epic (1,250) | glossy two-tone marble | Static wind-rippled sand bands in warm tans curving across the ball. |
 
 ## Goals
+
+**Built 2026-11-19:** all eight goals below are redrawn to match their names, static (Standard), each keeping a clear round center and a dark outer rim so it reads as a goal.
 
 Delivers: Target, Archery, Hole-in-One, Tractor Beam, Inferno, Halo, Doodle, Soccer Net, Aurora, Galaxy,
 Crystal, Flame, Blossom, Mosaic, Ripple, Comet, Rainbow, Neon, Eclipse, Plasma, Mirage, Prism, Obsidian,
@@ -52,6 +56,8 @@ Quasar (all bespoke), and Slate (a slate-gray target is a fair reading of the na
 | Wormhole | wormhole | Standard | static colored rings | Rings drawn in perspective so it reads as a tunnel. |
 
 ## Trails
+
+**Built 2026-11-19:** Forest (leaves) and Bubblegum (bubbles) are static; Ember (Rare) adds a few tiny sparks that rise and fade.
 
 Delivers: Off, Graphite, Ink, Fire, Ice, Sky (plain sky-blue is a fair color name), Rose, Smoke,
 Gilded (gold glow), Stardust, Comet, Rainbow, Snake, Air, Raybeam, Money Roll, Aurora.
