@@ -714,7 +714,7 @@ struct LoadoutDiorama: View {
             ZStack {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(base, lineWidth: 4)
-                if !reduceMotion {
+                if !reduceMotion || loadout.boundary.textureShowsUnderReduceMotion {
                     BoundaryOverlayView(boundary: loadout.boundary, cornerRadius: radius)
                 }
             }
@@ -844,7 +844,7 @@ struct LoadoutDiorama: View {
         return ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .strokeBorder(base, lineWidth: 4)
-            if !reduceMotion {
+            if !reduceMotion || loadout.boundary.textureShowsUnderReduceMotion {
                 BoundaryOverlayView(boundary: loadout.boundary, cornerRadius: radius)
             }
         }

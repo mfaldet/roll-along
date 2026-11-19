@@ -26,6 +26,8 @@ flat color.
 
 ## Balls
 
+**Built 2026-11-19:** Dune now draws wind-rippled sand ridges (static).
+
 Delivers: the mono-color balls have plain color names (Ocean Blue, Rose, Lemon…); metals (Fool's Gold,
 Silver, Copper) have a metal sheen; gems (Jade, Ruby) have a gem finish; every Epic and Legendary ball
 except Dune has its own renderer.
@@ -35,6 +37,8 @@ except Dune has its own renderer.
 | Dune | dune | Epic (1,250) | glossy two-tone marble | Static wind-rippled sand bands in warm tans curving across the ball. |
 
 ## Goals
+
+**Built 2026-11-19:** all eight goals below are redrawn to match their names, static (Standard), each keeping a clear round center and a dark outer rim so it reads as a goal.
 
 Delivers: Target, Archery, Hole-in-One, Tractor Beam, Inferno, Halo, Doodle, Soccer Net, Aurora, Galaxy,
 Crystal, Flame, Blossom, Mosaic, Ripple, Comet, Rainbow, Neon, Eclipse, Plasma, Mirage, Prism, Obsidian,
@@ -53,6 +57,8 @@ Quasar (all bespoke), and Slate (a slate-gray target is a fair reading of the na
 
 ## Trails
 
+**Built 2026-11-19:** Forest (leaves) and Bubblegum (bubbles) are static; Ember (Rare) adds a few tiny sparks that rise and fade.
+
 Delivers: Off, Graphite, Ink, Fire, Ice, Sky (plain sky-blue is a fair color name), Rose, Smoke,
 Gilded (gold glow), Stardust, Comet, Rainbow, Snake, Air, Raybeam, Money Roll, Aurora.
 
@@ -63,6 +69,11 @@ Gilded (gold glow), Stardust, Comet, Rainbow, Snake, Air, Raybeam, Money Roll, A
 | Ember | ember | Rare | orange line with glow | A few tiny sparks that drift off the tail and fade (subtle). |
 
 ## Floors
+
+**Built (approved 2026-11-19).** All 11 are drawn in `PaperFloorOverlayView` (BallGameView.swift),
+the static floor-texture view the game, the replay and the Shop tiles all use. All are Standard, so
+all are still: deterministic seeds, no clock, low-contrast detail. In play the view is `Equatable`, so
+each texture is drawn once per layout, not every frame.
 
 Delivers: Classic, Inverted; Twilight, Dusk, Midnight (plain color names that match); Felt (plain
 pool-table green reads as felt); Notebook, Graph, Parchment, Sketch, Origami (paper textures); Aurora,
@@ -115,6 +126,14 @@ Eclipse, Nightclub (bespoke, animated). Every other pit is drawn as one flat col
 | Midnight | midnight | Standard | pale blue-gray (light, not dark) | **Rename to "Moonlit"**: keep the pale look, which contrasts the dark Midnight floor (see flag 3). |
 
 ## Boundaries
+
+**Built (approved 2026-11-19).** All 23 are drawn in `BoundaryOverlayView` (BallGameView.swift),
+inside the 4-point border band, over the base stroke. Standard ones and the still Rare ones (Velvet,
+Marble, Mahogany, Sandstone, Abyss, Brass) have no clock. The moving Rare ones (Neon, Gold, Ice,
+Cloud, Tide, Phantom, Amethyst, Chrome) run at most 30 fps and move slowly; under Reduce Motion they
+freeze. Unlike the Legendary walls, these textures stay visible under Reduce Motion
+(`Boundary.textureShowsUnderReduceMotion`). As before, the texture fades out while the border shows
+the arming, fell (red) and won (green) states. No tier or price changed.
 
 Delivers: Classic; Slate, Mint, Sky, Orchid, Sand, Rose, Ink, Citrus, Pumpkin, Shamrock, Marigold (plain
 color names that match); Obsidian, Candy, Circuit and the 10 animated Legendaries added last week
