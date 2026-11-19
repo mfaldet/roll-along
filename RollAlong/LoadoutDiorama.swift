@@ -446,6 +446,11 @@ struct LoadoutDiorama: View {
     /// `nil` when an outer container already clips (e.g. the challenge-pack
     /// showcase card, radius 18) so the two clips don't fight.
     var cornerRadius: CGFloat? = 12
+    /// Keep the nearest corner of the play area, and so the boundary, in the
+    /// shot: for trying on a boundary or a whole set.  The boundary sits at
+    /// the play area's edge and moves with the camera like everything else,
+    /// so a close follow shot would otherwise leave it out of view.
+    var framesBoundary: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.cosmeticMotion) private var cosmeticMotion
@@ -471,11 +476,13 @@ struct LoadoutDiorama: View {
             let s = geo.size
             let scene = ZStack {
                 if let replay = ReplayStore.current, s.width > 1, s.height > 1 {
+                    // The replay draws its boundary at the play area's edge,
+                    // through the same camera as everything else.
                     replayScene(replay, size: s)
                 } else {
                     stillScene(s)
+                    boundaryRing
                 }
-                boundaryRing
             }
             .id(recorder.revision)
             if let r = cornerRadius {
@@ -565,6 +572,12 @@ struct LoadoutDiorama: View {
             }
         }
         if !minX.isFinite { include(r.position(at: 0)) }
+        if framesBoundary {
+            // The play-area corner nearest the action, just inside it, so the
+            // boundary's stroke and curve show.
+            let cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+            include(CGPoint(x: cx < aw / 2 ? 0 : aw, y: cy < ah / 2 ? 0 : ah))
+        }
 
         let aspect = s.width / max(1, s.height)
         let pad = br * 2.5
@@ -574,7 +587,10 @@ struct LoadoutDiorama: View {
         let fitScale = s.width / w
 
         let ballDiameter = br * 2 * loadout.ball.radiusScale
-        let minScale = minBallShare * min(s.width, s.height) / max(1, ballDiameter)
+        // When the boundary must stay in the shot, allow a smaller ball
+        // before switching to the follow camera.
+        let share: CGFloat = framesBoundary ? minBallShare * 0.5 : minBallShare
+        let minScale = share * min(s.width, s.height) / max(1, ballDiameter)
 
         let scale: CGFloat
         let center: CGPoint
@@ -639,34 +655,86 @@ struct LoadoutDiorama: View {
                             t: Double, alpha: Double, wallNow: Double) -> some View {
         let cam = camera(r, clip: c, size: s, at: t)
         return ZStack {
-            floorLayer(cam, size: s)
+            floorLayer(r, cam, size: s)
             pitsLayer(r, cam)
             goalLayer(r, cam)
             movingLayer(r, cam, clip: c, size: s, t: t, alpha: alpha, wallNow: wallNow)
+            boundaryLayer(r, cam, size: s)
         }
         .frame(width: s.width, height: s.height)
     }
 
-    /// The floor, drawn at the game's scale over the camera's region.
-    private func floorLayer(_ cam: Camera, size s: CGSize) -> some View {
+    /// Places a view drawn in play-area points (`arena` × `arena`, origin at
+    /// the play area's top-left, as the game draws it) into the preview
+    /// through the camera: scaled by `cam.scale` and shifted by
+    /// `cam.origin`, exactly like `cam.view(_:)` maps a single point.  Any
+    /// layer that fills the play area (floor, boundary) must go through
+    /// this, so it moves with the camera instead of staying put on screen.
+    private func worldLayer<V: View>(_ r: RunReplay, _ cam: Camera, size s: CGSize,
+                                     @ViewBuilder _ content: () -> V) -> some View {
+        content()
+            .frame(width: CGFloat(r.arenaWidth), height: CGFloat(r.arenaHeight))
+            .scaleEffect(cam.scale, anchor: .topLeading)
+            .offset(x: -cam.origin.x * cam.scale, y: -cam.origin.y * cam.scale)
+            .frame(width: s.width, height: s.height, alignment: .topLeading)
+    }
+
+    /// The floor, drawn over the whole play area at the game's scale and
+    /// placed through the camera, so its texture and animation stay fixed
+    /// to the ground as the camera moves.  (It used to be drawn the size of
+    /// the camera's view and pinned to the preview's top-left corner without
+    /// the camera's offset, so when the camera followed the ball everything
+    /// else moved and the floor stayed put: it slid under the ball.)  The
+    /// plain floor color fills the preview first, for any margin the camera
+    /// shows beyond the play area.
+    private func floorLayer(_ r: RunReplay, _ cam: Camera, size s: CGSize) -> some View {
         let showOverlay = !(reduceMotion && FloorOverlayView.hiddenUnderReduceMotion(loadout.floor))
         return ZStack {
             loadout.floor.color
-            if showOverlay { FloorOverlayView(floor: loadout.floor) }
-            PaperFloorOverlayView(floor: loadout.floor)
+            worldLayer(r, cam, size: s) {
+                ZStack {
+                    loadout.floor.color
+                    if showOverlay { FloorOverlayView(floor: loadout.floor) }
+                    PaperFloorOverlayView(floor: loadout.floor)
+                }
+            }
         }
-        .frame(width: cam.region.width, height: cam.region.height)
-        .scaleEffect(cam.scale, anchor: .topLeading)
-        .frame(width: s.width, height: s.height, alignment: .topLeading)
+        .frame(width: s.width, height: s.height)
         .allowsHitTesting(false)
     }
+
+    /// The boundary at the play area's edge, as the game draws it around the
+    /// screen (base stroke plus the Legendary texture), placed through the
+    /// camera like the floor.  Drawn in play-area points, so its width and
+    /// corners scale with everything else.
+    private func boundaryLayer(_ r: RunReplay, _ cam: Camera, size s: CGSize) -> some View {
+        let base: Color = loadout.boundary == .classic ? Color(white: 0.68) : loadout.boundary.color
+        let radius = Self.arenaCornerRadius
+        return worldLayer(r, cam, size: s) {
+            ZStack {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(base, lineWidth: 4)
+                if !reduceMotion {
+                    BoundaryOverlayView(boundary: loadout.boundary, cornerRadius: radius)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Corner radius of the play area's border in the replay, in play-area
+    /// points: a typical current iPhone's display corner.
+    private static let arenaCornerRadius: CGFloat = 55
 
     /// Pits, as the game draws them (base color, animated overlay, depth).
     private func pitsLayer(_ r: RunReplay, _ cam: Camera) -> some View {
         let aw = CGFloat(r.arenaWidth), ah = CGFloat(r.arenaHeight)
+        // Each pit is drawn at its size in play-area points, as in play, then
+        // scaled and placed through the camera, so its texture keeps the
+        // game's scale and moves with the floor.
         return ForEach(Array(r.holes.enumerated()), id: \.offset) { _, h in
-            let w = CGFloat(h.w) * aw * cam.scale
-            let ht = CGFloat(h.h) * ah * cam.scale
+            let w: CGFloat = max(1, CGFloat(h.w) * aw)
+            let ht: CGFloat = max(1, CGFloat(h.h) * ah)
             let center = cam.view(CGPoint(x: (CGFloat(h.x) + CGFloat(h.w) / 2) * aw,
                                           y: (CGFloat(h.y) + CGFloat(h.h) / 2) * ah))
             ZStack {
@@ -674,8 +742,9 @@ struct LoadoutDiorama: View {
                 if !reduceMotion { PitOverlayView(pit: loadout.pit) }
                 PitDepthShade(width: w, height: ht)
             }
-            .frame(width: max(1, w), height: max(1, ht))
+            .frame(width: w, height: ht)
             .clipped()
+            .scaleEffect(cam.scale)
             .position(center)
         }
     }

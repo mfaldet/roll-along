@@ -319,7 +319,7 @@ struct CosmeticShopView: View {
                 }
             }
             // Coin pill, top-right — tap to summon the Get Coins sheet.
-            ToolbarItem(placement: .navigationBarTrailing) {
+            CoinPillToolbarItem {
                 coinPill
             }
         }
@@ -405,7 +405,7 @@ struct CosmeticShopView: View {
                     .layoutPriority(1)
 
                     // The replay with this item on the player's own setup.
-                    LoadoutDiorama(loadout: info.loadout)
+                    LoadoutDiorama(loadout: info.loadout, framesBoundary: info.slot == "Boundary")
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 120, maxHeight: 300)
 
@@ -718,23 +718,8 @@ struct CosmeticShopView: View {
             AnalyticsClient.shared.track("buy_coins_sheet_opened",
                                          properties: ["from": .string("shop_pill")])
         } label: {
-            HStack(spacing: 6) {
-                // Lives in the nav-bar toolbar, which tints its content one
-                // color — use the full-color image version of the coin.
-                ToolbarCoinIcon(size: 16)
-                Text(GameState.coinPillText(gameState.coinBalance))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
-                    .contentTransition(.numericText(value: Double(gameState.coinBalance)))
-                    .animation(.easeInOut(duration: 0.4), value: gameState.coinBalance)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color(white: 0.55))
-            }
-            // No custom capsule here — the nav-bar toolbar item already supplies
-            // its own pill background (same as the Home button). Adding our own
-            // produced a double border.
+            // Home's pill, same size and style (see CoinPillLabel).
+            CoinPillLabel(inToolbar: true)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -1489,7 +1474,8 @@ struct CosmeticShopView: View {
                 // together on the player's own setup (slots the set doesn't
                 // fill keep the player's pieces).  It shrinks — down to
                 // 120 pt — before the purchase button would leave the screen.
-                LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(bundle: bundle))
+                LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(bundle: bundle),
+                               framesBoundary: true)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 120, maxHeight: 230)
 

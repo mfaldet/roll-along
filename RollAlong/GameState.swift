@@ -1894,7 +1894,7 @@ final class GameState: ObservableObject {
 
     /// `social_send_life` (≥1) / `social_lives_sent_25` (≥25) — lifetime lives
     /// gifted (friend gifts AND clan fulfillments both count, per the catalog).
-    /// Called from Friends/Clans views after `SocialClient.sendLife` succeeds;
+    /// Called from the Clans view after `SocialClient.sendLife` succeeds;
     /// bumps the persisted go-forward counter, then records its current value.
     func recordLifeSent() {
         trophyStats.recordLifeSent()
@@ -3327,7 +3327,7 @@ enum OpponentTuning {
     /// Tuning-version number.  Sent with every finished round as `ai_version`
     /// so results before and after a change can be told apart.  RAISE IT BY
     /// ONE whenever any number in this table changes.
-    static let version = 4
+    static let version = 5
 
     /// The human limits of one opponent.
     struct Limits {
@@ -3475,10 +3475,11 @@ enum OpponentTuning {
 
     // The balls.
     /// Snacky: radius (points) of every ball — heads and chain balls alike.
-    static let snackyBallRadius: Double = 11
+    /// (v5: 11 → 12.1, every ball 10% larger.)
+    static let snackyBallRadius: Double = 12.1
     /// Snacky: distance (points) along the path between two balls in a chain.
     /// A little less than a ball's width, so a chain reads as one line.
-    static let snackySegmentSpacing: Double = 19
+    static let snackySegmentSpacing: Double = 20.9
     /// Snacky: two balls touch (a hit) when their centers are closer than
     /// this share of a ball's width.  Under 1 forgives grazes.
     static let snackyHitShare: Double = 0.8
@@ -3487,8 +3488,21 @@ enum OpponentTuning {
     static let snackyMaxSegments: Int = 150
 
     // Speed and steering.
-    /// Snacky: the player's ball always rolls at this speed (points per second).
+    /// Snacky: the player's ball always rolls at this speed (points per second)
+    /// on Normal and in Solo.  Easy and Hard use the speeds below; opponents
+    /// scale from the same speed.
     static let snackyPlayerSpeed: Double = 125
+    /// Snacky: rolling speed on Easy (a little slower) and Hard (a little faster).
+    static let snackySpeedEasy: Double = 112
+    static let snackySpeedHard: Double = 138
+    /// Snacky: the rolling speed for a difficulty (nil = Solo, which uses Normal).
+    static func snackySpeed(for difficulty: MinigameDifficulty?) -> Double {
+        switch difficulty {
+        case .easy?: return snackySpeedEasy
+        case .hard?: return snackySpeedHard
+        default:     return snackyPlayerSpeed
+        }
+    }
     /// Snacky: how fast the player's ball can turn (degrees per second).
     static let snackyPlayerTurnDegrees: Double = 330
     /// Snacky: tilt smaller than this (share of full tilt) does not steer.
@@ -3502,8 +3516,8 @@ enum OpponentTuning {
     static let snackyOwnSkipSegments: Int = 2
 
     // Orbs.
-    /// Snacky: orb radius (points).
-    static let snackyOrbRadius: Double = 9
+    /// Snacky: orb radius (points).  (v5: 9 → 9.9, 10% larger.)
+    static let snackyOrbRadius: Double = 9.9
     /// Snacky: orbs on the board at once in Solo.
     static let snackyOrbsSolo: Int = 1
     /// Snacky: orbs on the board at once in Easy, Normal and Hard.
@@ -3533,7 +3547,7 @@ enum OpponentTuning {
     /// Snacky: no opponent makes a mistake in the first seconds of a round.
     static let snackyGraceSeconds: Double = 6
     /// Snacky: an opponent treats this many points inside an edge as blocked.
-    static let snackyEdgeAvoidMargin: Double = 18
+    static let snackyEdgeAvoidMargin: Double = 20
     /// Snacky: an opponent weighs headings up to this many degrees either side
     /// of where it is going…
     static let snackyCandidateSpreadDegrees: Double = 120

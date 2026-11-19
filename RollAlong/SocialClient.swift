@@ -426,7 +426,10 @@ final class SocialClient: @unchecked Sendable {
 
     // MARK: - Life gifts
 
-    /// Send 1–5 lives to another player (caps enforced by RLS + table CHECKs).
+    /// Give one life to a clanmate's open request.  The server
+    /// (`ra_life_gift_request`, DB step 14) refuses any gift that does not
+    /// answer an open, unfilled request from a clanmate (`no_request`), and a
+    /// second gift to the same request (`already_gave`).
     func sendLife(to recipient: UUID, amount: Int = 1) async throws {
         let me = try requireSession()
         let body = GiftInsert(sender_id: me.userId, recipient_id: recipient, amount: amount)
@@ -494,22 +497,6 @@ final class SocialClient: @unchecked Sendable {
     /// Identifies one life request: the asker plus the moment they asked.
     static func requestKey(_ asker: UUID, _ askedAt: String) -> String {
         "\(asker.uuidString)|\(askedAt)"
-    }
-
-    /// The players the signed-in player has already sent an ORDINARY life gift
-    /// to today (Eastern time) — "Send life" allows one per player per day.  Gifts that
-    /// answered a clan request are not included.
-    func fetchMyGiftsToday() async -> Set<UUID> {
-        guard let me = currentUserId else { return [] }
-        // The timestamp carries a "+" or "-" offset; percent-encode it so a
-        // "+" is not read as a space.
-        let since = SeasonCalendar.dayStartTimestamp()
-            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
-        let query = "select=recipient_id,request_at&sender_id=eq.\(me.uuidString)"
-            + "&request_at=is.null&created_at=gte.\(since)&limit=500"
-        guard let data = try? await send(method: "GET", path: "life_gifts", query: query),
-              let rows = try? decode([RequestGiftRow].self, from: data) else { return [] }
-        return Set(rows.map { $0.recipient })
     }
 
     // MARK: - Settings kept on the server
@@ -1763,7 +1750,6 @@ struct SocialSettings {
     var requestSize = 6
     var requestHours = 24
     var cooldownHours = 6
-    var giftsPerFriendPerDay = 1
     var seasonMinClanScore = 25
     var seasonMinMemberStars = 10
     /// First season (yyyymm) that awards coins; earlier ones are a rehearsal.
@@ -1778,7 +1764,6 @@ struct SocialSettings {
         requestSize          = v["life_request_size"] ?? requestSize
         requestHours         = v["life_request_hours"] ?? requestHours
         cooldownHours        = v["life_request_cooldown_hours"] ?? cooldownHours
-        giftsPerFriendPerDay = v["gift_per_friend_per_day"] ?? giftsPerFriendPerDay
         seasonMinClanScore   = v["season_min_clan_score"] ?? seasonMinClanScore
         seasonMinMemberStars = v["season_min_member_stars"] ?? seasonMinMemberStars
         seasonPrizesFrom     = v["season_prizes_from"] ?? seasonPrizesFrom
@@ -1825,19 +1810,8 @@ enum FriendCode {
 /// The game's social clock: Eastern time (America/New_York).  Seasons of the
 /// monthly clan battle (calendar months, named by their first day
 /// "2026-12-01" exactly as the database names them), the daily star cap,
-/// the cosmetic calendar and the one-gift-per-friend-per-day limit all use it.
+/// and the cosmetic calendar all use it.
 enum SeasonCalendar {
-    /// The moment today began in Eastern time (midnight America/New_York), as
-    /// a full timestamp with its offset ("2026-11-17T00:00:00-05:00"), ready
-    /// to compare with server timestamps.
-    static func dayStartTimestamp(_ date: Date = Date()) -> String {
-        let start = eastern.startOfDay(for: date)
-        let f = ISO8601DateFormatter()
-        f.timeZone = eastern.timeZone
-        f.formatOptions = [.withInternetDateTime]
-        return f.string(from: start)
-    }
-
     /// The clock the monthly clan battle runs on: Eastern time, by its
     /// NAMED zone so daylight saving is handled.  The database uses the same
     /// name (`ra_season_now()` in docs/social-schema-v5.sql) — change both.
