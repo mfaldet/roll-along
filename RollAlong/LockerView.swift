@@ -174,8 +174,8 @@ struct LockerView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(selected ? Color.white : Color(white: 0.22),
-                                    lineWidth: selected ? 2.0 : 0.8)
+                            .stroke(selected ? Color.equippedGreen : Color(white: 0.22),
+                                    lineWidth: selected ? 2.5 : 0.8)
                     )
                     .scaleEffect(selected ? 1.06 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.65), value: selected)
@@ -256,8 +256,8 @@ struct LockerView: View {
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.10)))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(selected ? Color.white : Color(white: 0.22),
-                                lineWidth: selected ? 2.0 : 0.8)
+                        .stroke(selected ? Color.equippedGreen : Color(white: 0.22),
+                                lineWidth: selected ? 2.5 : 0.8)
                 )
                 .scaleEffect(selected ? 1.06 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.65), value: selected)

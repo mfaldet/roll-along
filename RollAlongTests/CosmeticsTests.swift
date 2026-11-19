@@ -984,22 +984,23 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(CosmeticSchedule.dayLabel(eastern(2026, 12, 17)).contains("17"), true)
     }
 
-    /// Every collection releases eventually; "Coming soon" names the next real
-    /// day and everything on it.
-    func testSchedule_comingSoonShowsTheNextRealDate() {
+    /// Every collection releases eventually; "Coming soon" names only the
+    /// collections on the next release day that has any — never single items —
+    /// and is hidden once no collection is scheduled.
+    func testSchedule_comingSoonShowsTheNextCollectionDay() {
         let store = calendarStore()
+        // Dec 17 and Jan 14 release only pieces of retired sets, so the first
+        // announcement is Feb 11.
         let first = CosmeticSchedule.nextDrop(at: eastern(2026, 12, 1), store: store)
-        XCTAssertEqual(first?.date, eastern(2026, 12, 17))
-        // Cathedral, Velvet Night and Crystal Cavern are retired as sets, so
-        // the first drop announces their single items instead.
-        XCTAssertEqual(first?.bundles.map(\.id) ?? ["?"], [])
-        XCTAssertTrue(first?.itemNames.contains("Cathedral") ?? false)
-        XCTAssertTrue(first?.itemNames.contains("Stained Glass boundary") ?? false)
-        let feb = CosmeticSchedule.nextDrop(at: eastern(2027, 2, 11, plus: -1), store: store)
-        XCTAssertEqual(Set(feb?.bundles.map(\.id) ?? []), ["candyland", "nightclub"],
-                       "active collections are announced by name on their day")
+        XCTAssertEqual(first?.date, eastern(2027, 2, 11))
+        XCTAssertEqual(Set(first?.bundles.map(\.id) ?? []), ["candyland", "nightclub"])
         let march = CosmeticSchedule.nextDrop(at: eastern(2027, 3, 11, plus: -1), store: store)
-        XCTAssertEqual(march?.date, eastern(2027, 3, 11))
+        XCTAssertEqual(march?.date, eastern(2027, 4, 1), "Mar 11 brings no collection, so it is skipped")
+        XCTAssertEqual(Set(march?.bundles.map(\.id) ?? []), ["golf", "bloom"])
+        let june = CosmeticSchedule.nextDrop(at: eastern(2027, 4, 2), store: store)
+        XCTAssertEqual(june?.bundles.map(\.id), ["ocean"])
+        XCTAssertNil(CosmeticSchedule.nextDrop(at: eastern(2027, 6, 3), store: store),
+                     "no collection scheduled after Ocean: the tile is hidden")
         let afterAll = eastern(2027, 11, 11)
         XCTAssertNil(CosmeticSchedule.nextDrop(at: afterAll, store: store),
                      "nothing is left to announce after the last drop")
@@ -1019,6 +1020,7 @@ final class CosmeticsTests: XCTestCase {
             Row(collection_id: "cathedral", starts_on: "2027-01-21", ends_on: nil),   // later
             Row(collection_id: "not-a-collection", starts_on: "2027-01-01", ends_on: nil),
             Row(collection_id: "noir", starts_on: "garbage", ends_on: nil),
+            Row(collection_id: "candyland", starts_on: "2027-01-07", ends_on: nil),   // earlier
         ])
         XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "planets",
                                                   at: eastern(2027, 1, 7), store: store))

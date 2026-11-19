@@ -48,7 +48,7 @@ Most cosmetics are held back at launch and released on fixed calendar dates (`Co
 - The 12 drop days stay as approved, at midnight Eastern: Dec 17, 2026, then Jan 14, Feb 11, Mar 11, Apr 1, May 6, Jun 3, Jul 1, Jul 29, Sep 2, Oct 7 and Nov 11, 2027 (`docs/proposals/cosmetic-calendar.md`). Each retired collection's id still names a release day for its items, so the server table needs no new rows.
 - 16 seasonal events open for their window each year (Lunar New Year, Mardi Gras and Oktoberfest have per-year windows). An open event spotlights its own ball and boundary, sold one by one in the Shop (the seasonal balls only then), and points to one active collection that fits the holiday (`SeasonalEvent`).
 - The dates live in the server table `cosmetic_calendar` (`docs/cosmetics/cosmetic-calendar.sql`, database step 11). The app reads it at launch and on return (at most every 6 hours), caches it, and falls back to the same dates built into the app. Change a date in the table, no app update needed. A release a phone has already seen stays released there.
-- The Catalog shows the next release day in a "Coming soon" row: the active collections that arrive that day, then the single items.
+- The Catalog shows the next release day in a "Coming soon" row: only the collections that arrive on the next release day that has any, by name and date (never single items; hidden when no collection is scheduled). It sits under the category buttons, above the rarity filter. The equipped piece is marked with one green border everywhere (Shop, Catalog, Locker, collection cards and popup rows).
 - `python3 tools/cosmetic-calendar/check_calendar.py` confirms the built-in dates match the SQL rows.
 
 ---

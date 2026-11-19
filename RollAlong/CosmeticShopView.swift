@@ -406,7 +406,7 @@ struct CosmeticShopView: View {
                 Image(systemName: "checkmark.circle.fill").font(.system(size: 15, weight: .bold))
                 Text("Equipped").font(.system(size: 15, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+            .foregroundStyle(Color.equippedGreen)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
             .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.10)))
@@ -916,8 +916,8 @@ struct CosmeticShopView: View {
         // even for unowned items — only the price pill reads as greyed (you buy
         // in the Shop / a Collection, not here).  Equipped items keep the green
         // status border.
-        // Same equipped mark as the Locker: white border + slight scale-up.
-        let border: Color? = equipped ? Color.white : nil
+        // Same equipped mark as the Locker: green border + slight scale-up.
+        let border: Color? = equipped ? Color.equippedGreen : nil
         return Button {
             tapItem(item)
         } label: {
@@ -1241,12 +1241,14 @@ struct CosmeticShopView: View {
                     : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
             }
         LazyVStack(alignment: .leading, spacing: 0) {
+            // Coming soon sits directly under the category buttons, above
+            // the rarity filter.
+            comingSoonRow
             collectionFilterMenu
                 .padding(.bottom, 10)
             // The Iconic Roll Along set is always first, under every filter.
             collectionCard(CosmeticBundle.rollAlong, isFeatured: false)
                 .padding(.bottom, 12)
-            comingSoonRow
             if bundles.isEmpty {
                 Text("No other collections match this filter.")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -1262,15 +1264,9 @@ struct CosmeticShopView: View {
         }
     }
 
-    /// "Ember floor · Graph pit · Sandstone boundary and more" — at most six
-    /// names, so a big release day stays one short line or two.
-    static func comingSoonItems(_ names: [String]) -> String {
-        let shown = names.prefix(6).joined(separator: " · ")
-        return names.count > 6 ? shown + " and more" : shown
-    }
-
-    /// "Coming soon" — only the next scheduled drop, by name and date.  It
-    /// never says how many collections are scheduled after it.
+    /// "Coming soon" — the collections arriving on the next release day that
+    /// has any, by name, with the date.  Never single cosmetics; hidden when
+    /// no collection is scheduled.
     @ViewBuilder
     private var comingSoonRow: some View {
         if let next = CosmeticSchedule.nextDrop() {
@@ -1286,20 +1282,10 @@ struct CosmeticShopView: View {
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
-                if !next.bundles.isEmpty {
-                    Text(next.bundles.map(\.displayName).joined(separator: " · "))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if !next.itemNames.isEmpty {
-                    Text(Self.comingSoonItems(next.itemNames))
-                        .font(.system(size: next.bundles.isEmpty ? 15 : 13,
-                                      weight: next.bundles.isEmpty ? .semibold : .medium,
-                                      design: .rounded))
-                        .foregroundStyle(next.bundles.isEmpty ? Color.white : Color(white: 0.7))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(next.bundles.map(\.displayName).joined(separator: " · "))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1590,7 +1576,7 @@ struct CosmeticShopView: View {
                 if bundleOwned {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill").font(.system(size: 15, weight: .bold))
-                        Text(bundle.isRollAlong ? "Iconic · Yours to keep" : "Collection Complete")
+                        Text(bundle.isRollAlong ? "Iconic · Owned" : "Collection Complete")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(bundle.isRollAlong ? BallSkin.iconicColor
@@ -1708,7 +1694,7 @@ struct CosmeticShopView: View {
                 .frame(width: 34, height: 34)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(row.equipped ? Color.white : Color.clear, lineWidth: 2)
+                        .stroke(row.equipped ? Color.equippedGreen : Color.clear, lineWidth: 2.5)
                 )
                 .scaleEffect(row.equipped ? 1.06 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.65), value: row.equipped)
@@ -1723,13 +1709,13 @@ struct CosmeticShopView: View {
             Spacer(minLength: 0)
             if row.equipped {
                 Text("Equipped").font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.equippedGreen)
             } else if row.owned {
                 HStack(spacing: 3) {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
-                    Text("Owned · tap to equip").font(.system(size: 10, weight: .bold, design: .rounded))
+                    Text("Owned").font(.system(size: 10, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+                .foregroundStyle(Color(white: 0.72))
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -1970,10 +1956,10 @@ struct CosmeticShopView: View {
                             .strokeBorder(
                                 isEmpty
                                     ? Color(white: 0.22).opacity(0.60)
-                                    : (isEquipped ? Color.white : Color.clear),
+                                    : (isEquipped ? Color.equippedGreen : Color.clear),
                                 style: isEmpty
                                     ? StrokeStyle(lineWidth: 1.0, dash: [3, 3])
-                                    : StrokeStyle(lineWidth: isEquipped ? 2.0 : 1.2)
+                                    : StrokeStyle(lineWidth: isEquipped ? 2.5 : 1.2)
                             )
                     )
 

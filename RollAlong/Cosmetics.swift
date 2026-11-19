@@ -2059,70 +2059,33 @@ enum CosmeticSchedule {
 
     struct Upcoming {
         let date: Date
-        /// Active collections released that day.
+        /// Active collections released that day (never empty).
         let bundles: [CosmeticBundle]
-        /// Single items first released that day and not in those collections
-        /// ("Ember floor", …), in slot order.
-        var itemNames: [String] = []
     }
 
-    /// The earliest release moment of a single item; nil when it is available
-    /// from launch (or has no dated key).
-    static func releaseDate<Item: CosmeticItem>(ofItem item: Item,
-                                                store: CosmeticCalendarStore = .shared) -> Date? {
-        let keys = releaseKeys(of: item)
-        if keys.isEmpty { return nil }
-        var earliest: Date? = nil
-        for k in keys {
-            guard let d = releaseDate(of: k, store: store) else { return nil }
-            if earliest == nil || d < earliest! { earliest = d }
-        }
-        return earliest
-    }
-
-    /// The next release day that has not arrived yet and brings something to
-    /// announce: the active collections on it plus the single items it
-    /// brings.  A day that would announce nothing (e.g. a retired collection
-    /// whose items are all out already) is skipped.  nil once everything is
-    /// out.  Uses the effective (server or built-in) dates.
+    /// The next release day that has not arrived yet and brings at least one
+    /// collection on sale.  Days that only release single items (pieces of
+    /// retired sets) are skipped — "Coming soon" names collections only.  nil
+    /// when no collection is scheduled.  Uses the effective (server or
+    /// built-in) dates.
     static func nextDrop(at now: Date = Date(),
                          store: CosmeticCalendarStore = .shared) -> Upcoming? {
-        var pendingDays = Set<Date>()
-        for id in builtInReleaseDays.keys where !isReleased(collectionID: id, at: now, store: store) {
-            if let d = releaseDate(of: id, store: store) { pendingDays.insert(d) }
+        var byDay: [Date: [CosmeticBundle]] = [:]
+        for bundle in CosmeticBundle.active where !bundle.isLimitedTime {
+            guard !isReleased(collectionID: bundle.id, at: now, store: store),
+                  let day = releaseDate(of: bundle.id, store: store) else { continue }
+            byDay[day, default: []].append(bundle)
         }
-        for day in pendingDays.sorted() {
-            let drop = upcoming(on: day, at: now, store: store)
-            if !drop.bundles.isEmpty || !drop.itemNames.isEmpty { return drop }
-        }
-        return nil
+        guard let day = byDay.keys.min(), let bundles = byDay[day] else { return nil }
+        return Upcoming(date: day, bundles: bundles)
     }
+}
 
-    /// What release day `day` brings, as announced by `nextDrop`.
-    private static func upcoming(on day: Date, at now: Date,
-                                 store: CosmeticCalendarStore) -> Upcoming {
-        let bundles = CosmeticBundle.active.filter {
-            !$0.isLimitedTime && releaseDate(of: $0.id, store: store) == day
-                && !isReleased(collectionID: $0.id, at: now, store: store)
-        }
-        var names: [String] = []
-        func note<Item: CosmeticItem>(_ items: [Item], _ label: String) {
-            for item in items where item.isCoinPurchasable {
-                if let b = item as? BallSkin, b.isBundleExclusive || b.isLockerOnly { continue }
-                if bundles.contains(where: { $0.contains(item) }) { continue }
-                guard releaseDate(ofItem: item, store: store) == day,
-                      !isReleased(item, at: now, store: store) else { continue }
-                names.append(label.isEmpty ? item.displayName : "\(item.displayName) \(label)")
-            }
-        }
-        note(BallSkin.allCases, "")
-        note(GoalSkin.allCases, "goal")
-        note(TrailColor.allCases, "trail")
-        note(Floor.allCases, "floor")
-        note(Pit.allCases, "pit")
-        note(Boundary.allCases, "boundary")
-        return Upcoming(date: day, bundles: bundles, itemNames: names)
-    }
+/// The one green used for every "equipped" mark (Shop, Catalog, Locker,
+/// collection cards and popup rows).  Bright enough to read on light and dark
+/// tiles alike.
+extension Color {
+    static let equippedGreen = Color(red: 0.20, green: 0.90, blue: 0.46)
 }
 
 // ===========================================================================

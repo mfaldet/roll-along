@@ -70,7 +70,7 @@ The 16 seasonal collections are no longer sold as sets. Their yearly windows are
 ### Other calendar changes
 
 - **Drop days:** unchanged. The 12 days and every server row stay. A retired collection's id now only names the day its items are released; an active collection's id is also the day its set goes on sale.
-- **"Coming soon":** names the active collections that arrive on the next day, then that day's single items (up to six names, then "and more"). Dec 17, 2026, for example, now announces single items (Cathedral ball, Stained Glass boundary, …) because Cathedral, Velvet Night and Crystal Cavern are retired as sets.
+- **"Coming soon":** names only the collections that arrive on the next release day that has any, with the date. Single items are never listed. A release day with no collection is skipped (Dec 17, 2026 and Jan 14, 2027 release only pieces of retired sets, so the first announcement is Feb 11, 2027: Candyland and Nightclub). The tile is hidden when no collection is scheduled (after Ocean, Jun 3, 2027).
 - **Database:** no change. The app still reads the same `cosmetic_calendar` rows (collection ids and seasonal windows), and `check_calendar.py` still matches. No step 20.
 
 ### Item release days

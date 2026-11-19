@@ -190,7 +190,7 @@ struct ChallengeTrackView: View {
                         // mark); unowned ones are just a preview.
                         let equipped = gameState.isEquipped(skin)
                         let ball = BallSkinView(skin: skin, diameter: 32)
-                            .overlay(Circle().stroke(equipped ? Color.white : Color.clear, lineWidth: 2))
+                            .overlay(Circle().stroke(equipped ? Color.equippedGreen : Color.clear, lineWidth: 2.5))
                             .scaleEffect(equipped ? 1.06 : 1.0)
                             .animation(.spring(response: 0.3, dampingFraction: 0.65), value: equipped)
                         if gameState.isOwned(skin) {
