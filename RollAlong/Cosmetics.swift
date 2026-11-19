@@ -4051,9 +4051,12 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .roseTrail:       trailRose(ctx, pts, n, t, baseWidth, times)
     case .moneyRoll:       trailMoney(ctx, pts, n, t, baseWidth, times)
     case .aurora:          trailAurora(ctx, pts, n, t, baseWidth)
+    case .forest:          trailForest(ctx, pts, n, baseWidth)
+    case .bubblegum:       trailBubblegum(ctx, pts, n, baseWidth)
+    case .ember:           trailEmber(ctx, pts, n, t, baseWidth, times)
     default:
         trailTapered(ctx, pts, n, baseWidth, color: trail.color,
-                     glow: trail == .raybeam || trail == .gilded || trail == .ember)
+                     glow: trail == .raybeam || trail == .gilded)
     }
 }
 
@@ -4568,6 +4571,97 @@ private func trailStardust(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _
         let sx = pts[i].x + CGFloat(cos(ang)) * off, sy = pts[i].y + CGFloat(sin(ang)) * off
         let sz = baseWidth * CGFloat(0.22 + 0.30 * age)
         trailStar(ctx, CGPoint(x: sx, y: sy), sz, Color(red: 1, green: 0.98, blue: 0.85).opacity(tw * (0.3 + 0.6 * age)))
+    }
+}
+
+/// Forest (Standard, static) — a green streak with small leaves set along it
+/// in two greens.  Each leaf is keyed to the spot where its point was laid
+/// (`trailSeed`), so leaves stay put as the trail moves; nothing animates.
+private func trailForest(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+    trailTapered(ctx, pts, n, baseWidth * 0.55, color: TrailColor.forest.color, glow: false)
+    let dark  = Color(red: 0.10, green: 0.40, blue: 0.16)
+    let light = Color(red: 0.38, green: 0.70, blue: 0.26)
+    for i in 1..<n {
+        let p = pts[i]
+        let seed = trailSeed(p)
+        let pick = (seed * 7.31).truncatingRemainder(dividingBy: 1.0)
+        guard abs(pick) < 0.55 else { continue }               // about half the points carry a leaf
+        let age = Double(i) / Double(n - 1)                     // 0 tail … 1 head
+        let a = pts[i - 1]
+        let dir = atan2(Double(p.y - a.y), Double(p.x - a.x))
+        let side: Double = Int(abs(seed * 13).rounded()) % 2 == 0 ? 1 : -1
+        let ang = dir + side * 0.9                              // leaves splay off the line
+        let len = baseWidth * CGFloat(0.9 + 0.6 * age)
+        let wid = len * 0.48
+        let base = CGPoint(x: p.x + CGFloat(cos(ang)) * baseWidth * 0.2,
+                           y: p.y + CGFloat(sin(ang)) * baseWidth * 0.2)
+        let tip  = CGPoint(x: base.x + CGFloat(cos(ang)) * len, y: base.y + CGFloat(sin(ang)) * len)
+        let nx = CGFloat(-sin(ang)) * wid, ny = CGFloat(cos(ang)) * wid
+        let mid = CGPoint(x: (base.x + tip.x) / 2, y: (base.y + tip.y) / 2)
+        var leaf = Path()
+        leaf.move(to: base)
+        leaf.addQuadCurve(to: tip, control: CGPoint(x: mid.x + nx, y: mid.y + ny))
+        leaf.addQuadCurve(to: base, control: CGPoint(x: mid.x - nx, y: mid.y - ny))
+        let col = abs(seed * 3.7).truncatingRemainder(dividingBy: 1.0) < 0.5 ? dark : light
+        ctx.fill(leaf, with: .color(col.opacity(0.25 + 0.70 * age)))
+        var vein = Path(); vein.move(to: base); vein.addLine(to: tip)
+        ctx.stroke(vein, with: .color(Color.black.opacity(0.18 * age)), lineWidth: 0.6)
+    }
+}
+
+/// Bubblegum (Standard, static) — a pink streak carrying a row of small pink
+/// bubbles, each with a white highlight.  Bubbles are keyed to where their
+/// point was laid, so they stay in place; nothing animates.
+private func trailBubblegum(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ baseWidth: CGFloat) {
+    trailTapered(ctx, pts, n, baseWidth * 0.45, color: TrailColor.bubblegum.color, glow: false)
+    let pink = Color(red: 1.00, green: 0.42, blue: 0.80)
+    for i in 0..<n {
+        let p = pts[i]
+        let seed = trailSeed(p)
+        let pick = abs(seed * 5.13).truncatingRemainder(dividingBy: 1.0)
+        guard pick < 0.6 else { continue }
+        let age = Double(i) / Double(max(1, n - 1))
+        let r = baseWidth * CGFloat(0.35 + 0.55 * pick) * CGFloat(0.6 + 0.4 * age)
+        let off = CGFloat(sin(seed * 9.0)) * baseWidth * 0.7
+        let c = CGPoint(x: p.x + off, y: p.y - off * 0.5)
+        let rect = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
+        let a = 0.25 + 0.65 * age
+        ctx.fill(Path(ellipseIn: rect), with: .color(pink.opacity(0.55 * a)))
+        ctx.stroke(Path(ellipseIn: rect), with: .color(pink.opacity(a)), lineWidth: max(0.6, r * 0.18))
+        let hr = r * 0.32
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r * 0.45 - hr / 2, y: c.y - r * 0.45 - hr / 2,
+                                        width: hr, height: hr)),
+                 with: .color(Color.white.opacity(0.85 * a)))
+    }
+}
+
+/// Ember (Rare) — a glowing orange streak with a few tiny sparks that rise
+/// off the tail and fade.  Sparks are born at the spot a point was laid and
+/// live on their own short clock (`trailAge`), so they drift in place.
+/// Bounded: at most one spark per three points, each a single small dot.
+private func trailEmber(_ ctx: GraphicsContext, _ pts: [CGPoint], _ n: Int, _ t: Double,
+                        _ baseWidth: CGFloat, _ times: [Double]?) {
+    trailTapered(ctx, pts, n, baseWidth, color: TrailColor.ember.color, glow: true)
+    var ctx = ctx
+    ctx.blendMode = .plusLighter
+    let lifetime = 0.9
+    for i in stride(from: 0, to: n, by: 3) {
+        let p = pts[i]
+        let seed = trailSeed(p)
+        guard abs(seed * 4.7).truncatingRemainder(dividingBy: 1.0) < 0.6 else { continue }
+        let age = trailAge(i, n, t, times, lifetime: lifetime)
+        guard age < lifetime else { continue }
+        let life = age / lifetime
+        let rise  = CGFloat(life) * baseWidth * 2.2
+        let sway  = CGFloat(sin(seed * 6.283 + life * 3.0)) * baseWidth * 0.6
+        let c = CGPoint(x: p.x + sway, y: p.y - rise)
+        let r = baseWidth * CGFloat(0.20 * (1 - life * 0.5))
+        let glow = Color(red: 1.0, green: 0.62, blue: 0.20).opacity(0.75 * (1 - life))
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r * 2, y: c.y - r * 2, width: r * 4, height: r * 4)),
+                 with: .radialGradient(Gradient(colors: [glow.opacity(0.5), .clear]),
+                                       center: c, startRadius: 0, endRadius: r * 2))
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                 with: .color(Color(red: 1.0, green: 0.86, blue: 0.50).opacity(0.85 * (1 - life))))
     }
 }
 

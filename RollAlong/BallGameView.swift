@@ -6148,11 +6148,11 @@ struct GoalSkinView: View {
         case .prism:       prismGoal
         case .obsidian:    obsidianGoal
         case .quasar:      quasarGoal
-        case .frost, .ember, .meadow, .bullion,
-             .amethyst, .candy, .slate:
+        case .slate:
             bandedTargetGoal(goal.targetBands ?? [])
-        case .vortex, .wormhole:
-            ringPortalGoal(goal.portalStops ?? [])
+        case .frost, .ember, .meadow, .bullion,
+             .amethyst, .candy, .vortex, .wormhole:
+            themedStandardGoal(goal)
         case .aurora:      auroraGoal
         default:           rainbowHole   // .rainbow + any future goal
         }
@@ -6231,6 +6231,254 @@ struct GoalSkinView: View {
     /// recipe as `simpleBullseyeTarget`, driven by a caller-supplied colour ramp
     /// (OUTER → INNER, from the goal's `targetBands`).  No particles; a faint
     /// breathe keeps it alive.
+    /// The Standard themed goals, drawn to match their names.  Standard, so
+    /// static: no timeline, nothing moves (in play, tiles or Reduce Motion).
+    /// Every one keeps a clear round center where the ball finishes, ringed
+    /// by a defined rim, so it still reads as a goal and never as a pit.
+    private func themedStandardGoal(_ goal: GoalSkin) -> some View {
+        Canvas { ctx, size in
+            let cx = size.width / 2, cy = size.height / 2
+            let R: CGFloat = min(size.width, size.height) / 2 * 0.95
+            let c = CGPoint(x: cx, y: cy)
+            func disc(_ r: CGFloat) -> Path {
+                Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+            }
+            func polar(_ a: Double, _ r: CGFloat) -> CGPoint {
+                CGPoint(x: cx + CGFloat(cos(a)) * r, y: cy + CGFloat(sin(a)) * r)
+            }
+
+            switch goal {
+            case .frost:
+                // Icy disc, a ring of frost-crystal spikes, a bright icy center.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.86, green: 0.95, blue: 1.0), Color(red: 0.46, green: 0.74, blue: 0.96),
+                    Color(red: 0.16, green: 0.40, blue: 0.72)]), center: c, startRadius: 0, endRadius: R))
+                for k in 0..<12 {
+                    let a: Double = Double(k) / 12 * .pi * 2
+                    var spike = Path()
+                    spike.move(to: polar(a - 0.13, R * 0.52))
+                    spike.addLine(to: polar(a, R * 0.96))
+                    spike.addLine(to: polar(a + 0.13, R * 0.52))
+                    spike.closeSubpath()
+                    ctx.fill(spike, with: .color(Color.white.opacity(0.78)))
+                    ctx.stroke(spike, with: .color(Color(red: 0.55, green: 0.80, blue: 1.0)), lineWidth: 0.6)
+                    for sgn in [-1.0, 1.0] {
+                        var br = Path()
+                        br.move(to: polar(a, R * 0.80))
+                        br.addLine(to: polar(a + sgn * 0.16, R * 0.88))
+                        ctx.stroke(br, with: .color(Color.white.opacity(0.85)), lineWidth: max(0.6, R * 0.025))
+                    }
+                }
+                ctx.fill(disc(R * 0.34), with: .radialGradient(Gradient(colors: [.white,
+                    Color(red: 0.80, green: 0.93, blue: 1.0)]), center: c, startRadius: 0, endRadius: R * 0.34))
+                ctx.stroke(disc(R * 0.34), with: .color(Color(red: 0.30, green: 0.60, blue: 0.92)), lineWidth: max(1, R * 0.04))
+
+            case .ember:
+                // Dark ash rings, glowing coal specks, a hot orange core.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.30, green: 0.27, blue: 0.26), Color(red: 0.16, green: 0.14, blue: 0.14)]),
+                    center: c, startRadius: 0, endRadius: R))
+                for f: CGFloat in [0.86, 0.68] {
+                    ctx.stroke(disc(R * f), with: .color(Color(red: 0.45, green: 0.42, blue: 0.40).opacity(0.6)),
+                               lineWidth: max(1, R * 0.05))
+                }
+                var glow = ctx
+                glow.blendMode = .plusLighter
+                for k in 0..<18 {
+                    let a: Double = Double(k) * 2.399                       // golden-angle scatter
+                    let spread: Double = Double((k * 37) % 17) / 17.0
+                    let p = polar(a, R * CGFloat(0.48 + 0.42 * spread))
+                    let sz: CGFloat = R * CGFloat(0.035 + 0.03 * Double(k % 3))
+                    glow.fill(Path(ellipseIn: CGRect(x: p.x - sz * 2, y: p.y - sz * 2, width: sz * 4, height: sz * 4)),
+                              with: .radialGradient(Gradient(colors: [Color(red: 1, green: 0.45, blue: 0.10).opacity(0.7), .clear]),
+                                                    center: p, startRadius: 0, endRadius: sz * 2))
+                    glow.fill(Path(ellipseIn: CGRect(x: p.x - sz, y: p.y - sz, width: sz * 2, height: sz * 2)),
+                              with: .color(Color(red: 1, green: 0.70, blue: 0.30)))
+                }
+                ctx.fill(disc(R * 0.40), with: .radialGradient(Gradient(colors: [
+                    Color(red: 1, green: 0.95, blue: 0.60), Color(red: 1, green: 0.55, blue: 0.12),
+                    Color(red: 0.70, green: 0.15, blue: 0.05)]), center: c, startRadius: 0, endRadius: R * 0.40))
+
+            case .meadow:
+                // Grass ring with daisies around a deep-green hole.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.52, green: 0.80, blue: 0.36), Color(red: 0.26, green: 0.56, blue: 0.20)]),
+                    center: c, startRadius: 0, endRadius: R))
+                for k in 0..<28 {
+                    let a: Double = Double(k) / 28 * .pi * 2 + 0.05 * Double(k % 3)
+                    var blade = Path()
+                    blade.move(to: polar(a, R * 0.80))
+                    blade.addQuadCurve(to: polar(a + 0.06, R * 0.98), control: polar(a - 0.04, R * 0.92))
+                    ctx.stroke(blade, with: .color(Color(red: 0.16, green: 0.44, blue: 0.14)), lineWidth: max(0.8, R * 0.03))
+                }
+                for k in 0..<8 {
+                    let a: Double = Double(k) / 8 * .pi * 2 + 0.2
+                    let p = polar(a, R * 0.64)
+                    let pr: CGFloat = R * 0.085
+                    for q in 0..<5 {
+                        let pa: Double = Double(q) / 5 * .pi * 2
+                        let pp = CGPoint(x: p.x + CGFloat(cos(pa)) * pr, y: p.y + CGFloat(sin(pa)) * pr)
+                        ctx.fill(Path(ellipseIn: CGRect(x: pp.x - pr * 0.65, y: pp.y - pr * 0.65,
+                                                        width: pr * 1.3, height: pr * 1.3)), with: .color(.white))
+                    }
+                    ctx.fill(Path(ellipseIn: CGRect(x: p.x - pr * 0.6, y: p.y - pr * 0.6, width: pr * 1.2, height: pr * 1.2)),
+                             with: .color(Color(red: 1.0, green: 0.82, blue: 0.20)))
+                }
+                ctx.fill(disc(R * 0.34), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.06, green: 0.22, blue: 0.08), Color(red: 0.12, green: 0.36, blue: 0.14)]),
+                    center: c, startRadius: 0, endRadius: R * 0.34))
+                ctx.stroke(disc(R * 0.34), with: .color(Color(red: 0.95, green: 0.96, blue: 0.84)), lineWidth: max(1, R * 0.04))
+
+            case .bullion:
+                // Stamped gold-coin rim with reeding, a ring of gold bars, a recessed center.
+                ctx.fill(disc(R), with: .linearGradient(Gradient(colors: [
+                    Color(red: 1.0, green: 0.90, blue: 0.55), Color(red: 0.86, green: 0.64, blue: 0.18),
+                    Color(red: 0.60, green: 0.42, blue: 0.10)]),
+                    startPoint: CGPoint(x: cx - R, y: cy - R), endPoint: CGPoint(x: cx + R, y: cy + R)))
+                for k in 0..<48 {
+                    let a: Double = Double(k) / 48 * .pi * 2
+                    var tick = Path()
+                    tick.move(to: polar(a, R * 0.88))
+                    tick.addLine(to: polar(a, R * 0.99))
+                    ctx.stroke(tick, with: .color(Color(red: 0.50, green: 0.34, blue: 0.08).opacity(0.7)), lineWidth: max(0.6, R * 0.02))
+                }
+                ctx.fill(disc(R * 0.86), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.99, green: 0.88, blue: 0.50), Color(red: 0.90, green: 0.70, blue: 0.24)]),
+                    center: polar(-2.3, R * 0.3), startRadius: 0, endRadius: R))
+                ctx.stroke(disc(R * 0.86), with: .color(Color(red: 0.55, green: 0.38, blue: 0.08)), lineWidth: max(1, R * 0.03))
+                for k in 0..<6 {
+                    let a: Double = Double(k) / 6 * .pi * 2 - .pi / 2
+                    let p = polar(a, R * 0.58)
+                    let bw: CGFloat = R * 0.30
+                    let bh: CGFloat = R * 0.15
+                    var bar = ctx
+                    bar.translateBy(x: p.x, y: p.y)
+                    bar.rotate(by: .radians(a + .pi / 2))
+                    var ingot = Path()
+                    ingot.move(to: CGPoint(x: -bw / 2, y: bh / 2))
+                    ingot.addLine(to: CGPoint(x: bw / 2, y: bh / 2))
+                    ingot.addLine(to: CGPoint(x: bw * 0.36, y: -bh / 2))
+                    ingot.addLine(to: CGPoint(x: -bw * 0.36, y: -bh / 2))
+                    ingot.closeSubpath()
+                    bar.fill(ingot, with: .linearGradient(Gradient(colors: [
+                        Color(red: 1.0, green: 0.93, blue: 0.62), Color(red: 0.80, green: 0.58, blue: 0.14)]),
+                        startPoint: CGPoint(x: 0, y: -bh / 2), endPoint: CGPoint(x: 0, y: bh / 2)))
+                    bar.stroke(ingot, with: .color(Color(red: 0.50, green: 0.34, blue: 0.08)), lineWidth: 0.7)
+                }
+                ctx.fill(disc(R * 0.28), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.40, green: 0.28, blue: 0.06), Color(red: 0.70, green: 0.50, blue: 0.14)]),
+                    center: c, startRadius: 0, endRadius: R * 0.28))
+                ctx.stroke(disc(R * 0.28), with: .color(Color(red: 1.0, green: 0.88, blue: 0.50)), lineWidth: max(1, R * 0.035))
+
+            case .amethyst:
+                // Gray rock rim, purple crystal points facing inward, a dark geode center.
+                ctx.fill(disc(R), with: .color(Color(red: 0.42, green: 0.40, blue: 0.44)))
+                ctx.fill(disc(R * 0.86), with: .color(Color(red: 0.22, green: 0.10, blue: 0.36)))
+                for k in 0..<10 {
+                    let a: Double = Double(k) / 10 * .pi * 2
+                    let tip = polar(a, R * 0.40)
+                    let mid = polar(a, R * 0.86)
+                    var left = Path()
+                    left.move(to: polar(a - 0.30, R * 0.86))
+                    left.addLine(to: tip)
+                    left.addLine(to: mid)
+                    left.closeSubpath()
+                    var right = Path()
+                    right.move(to: polar(a + 0.30, R * 0.86))
+                    right.addLine(to: tip)
+                    right.addLine(to: mid)
+                    right.closeSubpath()
+                    ctx.fill(left, with: .color(Color(red: 0.74, green: 0.52, blue: 0.98)))
+                    ctx.fill(right, with: .color(Color(red: 0.50, green: 0.26, blue: 0.82)))
+                    ctx.stroke(left, with: .color(Color(red: 0.90, green: 0.82, blue: 1.0).opacity(0.6)), lineWidth: 0.5)
+                }
+                ctx.fill(disc(R * 0.36), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.10, green: 0.04, blue: 0.18), Color(red: 0.30, green: 0.14, blue: 0.48)]),
+                    center: c, startRadius: 0, endRadius: R * 0.36))
+                ctx.stroke(disc(R * 0.36), with: .color(Color(red: 0.86, green: 0.80, blue: 0.98)), lineWidth: max(1, R * 0.035))
+
+            case .candy:
+                // Peppermint swirl: red and white spiral stripes around a white center.
+                ctx.fill(disc(R), with: .color(.white))
+                let arms = 8
+                let steps = 14
+                for k in stride(from: 0, to: arms, by: 2) {
+                    let a0: Double = Double(k) / Double(arms) * .pi * 2
+                    let a1: Double = Double(k + 1) / Double(arms) * .pi * 2
+                    var wedge = Path()
+                    wedge.move(to: c)
+                    for j in 0...steps {
+                        let u: Double = Double(j) / Double(steps)
+                        wedge.addLine(to: polar(a0 + u * 1.3, R * CGFloat(u)))
+                    }
+                    for j in stride(from: steps, through: 0, by: -1) {
+                        let u: Double = Double(j) / Double(steps)
+                        wedge.addLine(to: polar(a1 + u * 1.3, R * CGFloat(u)))
+                    }
+                    wedge.closeSubpath()
+                    ctx.fill(wedge, with: .color(Color(red: 0.88, green: 0.12, blue: 0.20)))
+                }
+                ctx.fill(disc(R * 0.26), with: .color(.white))
+                ctx.stroke(disc(R * 0.26), with: .color(Color(red: 0.88, green: 0.12, blue: 0.20)), lineWidth: max(1, R * 0.05))
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [Color.white.opacity(0.25), .clear]),
+                    center: polar(-2.3, R * 0.35), startRadius: 0, endRadius: R * 0.9))
+
+            case .vortex:
+                // Static spiral arms curling into a bright center.
+                let stops: [Color] = goal.portalStops ?? [.black, .white]
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: Array(stops.reversed())),
+                                                        center: c, startRadius: 0, endRadius: R))
+                for k in 0..<4 {
+                    let a0: Double = Double(k) / 4 * .pi * 2
+                    var arm = Path()
+                    for j in 0...24 {
+                        let u: Double = Double(j) / 24                       // 0 rim … 1 center
+                        let rr: CGFloat = R * CGFloat(0.95 * (1 - u) + 0.08 * u)
+                        let p = polar(a0 + u * 3.4, rr)
+                        if j == 0 { arm.move(to: p) } else { arm.addLine(to: p) }
+                    }
+                    ctx.stroke(arm, with: .color(Color(red: 0.55, green: 0.90, blue: 1.0).opacity(0.75)),
+                               style: StrokeStyle(lineWidth: max(1.2, R * 0.08), lineCap: .round, lineJoin: .round))
+                }
+                ctx.fill(disc(R * 0.24), with: .radialGradient(Gradient(colors: [.white, Color(red: 0.55, green: 0.90, blue: 1.0).opacity(0)]),
+                                                               center: c, startRadius: 0, endRadius: R * 0.24))
+
+            case .wormhole:
+                // Rings in perspective, stepping toward an off-center vanishing point.
+                let stops: [Color] = goal.portalStops ?? [.black, .white]
+                ctx.fill(disc(R), with: .color(stops.first ?? .black))
+                let vp = CGPoint(x: cx + R * 0.12, y: cy - R * 0.10)
+                for k in 0..<8 {
+                    let a: Double = Double(k) / 8 * .pi * 2
+                    var line = Path()
+                    line.move(to: polar(a, R * 0.95))
+                    line.addLine(to: vp)
+                    ctx.stroke(line, with: .color((stops.dropFirst().first ?? .purple).opacity(0.45)), lineWidth: 0.7)
+                }
+                let rings = 7
+                for i in 0..<rings {
+                    let shrink: Double = pow(0.70, Double(i))
+                    let rr: CGFloat = R * CGFloat(0.95 * shrink)
+                    let ox: CGFloat = cx + (vp.x - cx) * CGFloat(1 - shrink)
+                    let oy: CGFloat = cy + (vp.y - cy) * CGFloat(1 - shrink)
+                    let idx: Int = min(stops.count - 1, i * stops.count / rings)
+                    let ring = Path(ellipseIn: CGRect(x: ox - rr, y: oy - rr * 0.92, width: rr * 2, height: rr * 1.84))
+                    ctx.stroke(ring, with: .color(stops[idx].opacity(0.9)), lineWidth: max(1, rr * 0.12))
+                }
+                let cr: CGFloat = R * 0.18
+                ctx.fill(Path(ellipseIn: CGRect(x: vp.x - cr, y: vp.y - cr, width: cr * 2, height: cr * 2)),
+                         with: .radialGradient(Gradient(colors: [.white, (stops.last ?? .white).opacity(0)]),
+                                               center: vp, startRadius: 0, endRadius: cr))
+
+            default:
+                ctx.fill(disc(R), with: .color(.gray))
+            }
+            // Shared dark outer rim so every goal reads as a defined target.
+            ctx.stroke(disc(R), with: .color(Color.black.opacity(0.55)), lineWidth: 1.4)
+        }
+        .clipShape(Circle())
+    }
+
     private func bandedTargetGoal(_ colors: [Color]) -> some View {
         let ramp = colors.isEmpty ? [Color.gray] : colors
         return TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in

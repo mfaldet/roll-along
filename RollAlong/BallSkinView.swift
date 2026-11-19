@@ -216,8 +216,10 @@ struct BallSkinView: View {
         // ── Polished marbles / metals / gems — richer than a flat gradient ─
         // The basic solid colours get an understated plain marble — no rim
         // highlight, just gentle shading (per Mac).  Metals keep their sheen.
-        case .pastel, .dune:
+        case .pastel:
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+        case .dune:
+            duneCanvas.clipShape(Circle()).overlay(planetRim)
         case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon:
             plainMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
@@ -1804,6 +1806,52 @@ struct BallSkinView: View {
     // =========================================================================
 
     /// Polished glass marble — lit base + glowing rim light + soft & sharp speculars.
+    /// Dune (Epic, static) — wind-rippled sand: warm tan bands curving across
+    /// the ball like dune ridges, each with a lit crest and a soft shadow on
+    /// its lee side, over the existing desert-dusk shading.  No motion.
+    private var duneCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+            let sand  = Color(red: 0.93, green: 0.78, blue: 0.52)
+            let ochre = Color(red: 0.82, green: 0.60, blue: 0.32)
+            let shade = Color(red: 0.55, green: 0.32, blue: 0.22)
+
+            // Base: sunlit sand to a warm dusk shadow.
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: [Color(red: 0.99, green: 0.90, blue: 0.70), sand, ochre, shade]),
+                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.34), startRadius: 0, endRadius: r * 1.25))
+
+            // Ripple bands: gentle S-curves stacked down the ball.
+            let bands = 7
+            for k in 0..<bands {
+                let f  = (Double(k) + 0.5) / Double(bands)          // 0 top … 1 bottom
+                let y0 = cy - r + CGFloat(f) * r * 2
+                let amp = r * 0.10
+                var crest = Path()
+                let steps = 18
+                for j in 0...steps {
+                    let u = Double(j) / Double(steps)
+                    let x = cx - r + CGFloat(u) * r * 2
+                    let y = y0 + CGFloat(sin(u * .pi * 2.0 + Double(k) * 0.9)) * amp
+                        - CGFloat(u - 0.5) * r * 0.18                // ridges tilt with the wind
+                    if j == 0 { crest.move(to: CGPoint(x: x, y: y)) } else { crest.addLine(to: CGPoint(x: x, y: y)) }
+                }
+                // Lee-side shadow just below the crest, then the lit crest line.
+                ctx.stroke(crest.offsetBy(dx: 0, dy: r * 0.045),
+                           with: .color(shade.opacity(0.30)), lineWidth: r * 0.07)
+                ctx.stroke(crest, with: .color(Color(red: 1.0, green: 0.94, blue: 0.78).opacity(0.55)),
+                           lineWidth: r * 0.028)
+            }
+
+            // Soft top-left sheen, as on the other Epic marbles.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.20), .clear]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+        }
+    }
+
     private func glossMarble(_ colors: [Color]) -> some View {
         Canvas { ctx, size in
             let w = size.width, h = size.height
