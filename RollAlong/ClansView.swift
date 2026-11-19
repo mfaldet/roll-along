@@ -452,8 +452,10 @@ struct ClansView: View {
                 .onAppear { markChatSeen() }
                 .onChange(of: events.first?.id) { _, _ in markChatSeen() }
         } else {
-            rosterSection
+            // Invite sits where "Ask the clan for a life" sits on Social, with
+            // the same shape and size, so the two tabs line up.
             inviteRow
+            rosterSection
         }
     }
 
@@ -499,7 +501,8 @@ struct ClansView: View {
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(selected ? .white : Color(white: 0.6))
-            .frame(maxWidth: .infinity).padding(.vertical, 14)
+            // Taller tiles (was 14 pt of padding) so they are easier to tap.
+            .frame(maxWidth: .infinity).padding(.vertical, 21)
             .background(RoundedRectangle(cornerRadius: 14)
                 .fill(selected ? tint.opacity(0.28) : Color(white: 0.13)))
             .overlay(RoundedRectangle(cornerRadius: 14)
@@ -536,16 +539,10 @@ struct ClansView: View {
     }
 
     private var clanHeader: some View {
-        let tag  = myClan?.tag.nonEmpty
         let name = myClan?.name.nonEmpty ?? "Clan"
         let desc = myClan?.description.nonEmpty
         return VStack(spacing: 10) {
             if let myClan { ClanBadge(clan: myClan, size: 46) }
-            if let tag {
-                Text("[\(tag)]")
-                    .font(.system(.headline, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
-            }
             Text(name)
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .foregroundStyle(.white)
@@ -609,27 +606,24 @@ struct ClansView: View {
             .background(RoundedRectangle(cornerRadius: 16)
                 .fill(Color(red: 0.95, green: 0.32, blue: 0.45).opacity(0.14)))
         } else if wait > 0 {
-            // The wait between requests, shown where the ask button is.
+            // The wait between requests, shown where the ask button is: a
+            // flatter, darker pill with no border, gray text and a clock, so
+            // it never reads as a button.
             HStack(spacing: 8) {
                 Image(systemName: "clock.fill")
                 Text("You can ask again in \(Self.waitText(wait))")
             }
             .font(.system(.body, design: .rounded).weight(.semibold))
-            .foregroundStyle(Color(white: 0.6))
+            .foregroundStyle(Color(white: 0.5))
             .frame(maxWidth: .infinity).padding(.vertical, 13)
-            .background(Capsule().fill(Color(white: 0.16)))
+            .background(Capsule().fill(Color(white: 0.10)))
             .accessibilityElement(children: .combine)
         } else {
             Button { Task { await askForLives() } } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "heart.text.square.fill")
-                    Text("Ask the clan for a life")
-                }
-                .font(.system(.body, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity).padding(.vertical, 13)
-                .background(Capsule().fill(Color(red: 0.95, green: 0.32, blue: 0.45)))
-                .opacity(actionBusy ? 0.6 : 1)
+                ClanPanelActionLabel(icon: "heart.fill",
+                                     title: "Ask the clan for a life",
+                                     tint: ClanPanelActionLabel.lifeRed,
+                                     busy: actionBusy)
             }
             .disabled(actionBusy).buttonStyle(.plain)
         }
@@ -649,18 +643,10 @@ struct ClansView: View {
         return ShareLink(item: link,
                          subject: Text("Join my Roll Along clan"),
                          message: Text("Join \(name) on Roll Along so we can send each other lives! Tap: \(link.absoluteString)")) {
-            HStack(spacing: 10) {
-                Image(systemName: "person.crop.circle.badge.plus").font(.system(size: 15, weight: .semibold))
-                Text("Invite a friend to the clan")
-                    .font(.system(.callout, design: .rounded).weight(.semibold))
-                Spacer()
-                Image(systemName: "square.and.arrow.up").font(.system(size: 13, weight: .semibold))
-            }
-            .foregroundStyle(.white).padding(.horizontal, 14).padding(.vertical, 13)
-            .background(RoundedRectangle(cornerRadius: 14)
-                .fill(Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.18))
-                .overlay(RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(red: 0.20, green: 0.50, blue: 0.96).opacity(0.45), lineWidth: 1)))
+            ClanPanelActionLabel(icon: "person.crop.circle.badge.plus",
+                                 title: "Invite a friend to the clan",
+                                 tint: ClanLook.color(myClan?.colorKey ?? ClanLook.defaultColor),
+                                 busy: false)
         }
         .buttonStyle(.plain)
     }
@@ -984,7 +970,7 @@ struct ClansView: View {
                 .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
             Text("Start your own clan")
                 .font(.system(.title3, design: .rounded).weight(.bold)).foregroundStyle(.white)
-            Text("Create a clan, pick a [TAG], and send each other lives.")
+            Text("Create a clan, pick its name, and send each other lives.")
                 .font(.system(.callout, design: .rounded)).foregroundStyle(Color(white: 0.55))
                 .multilineTextAlignment(.center)
             Button { showCreate = true } label: {
@@ -1054,15 +1040,9 @@ struct ClansView: View {
                             .font(.system(.caption2, design: .rounded).weight(.bold))
                             .foregroundStyle(ClanLook.color(clan.colorKey))
                     }
-                    HStack(spacing: 6) {
-                        if let t = clan.tag.nonEmpty {
-                            Text("[\(t)]").font(.system(.caption, design: .rounded).weight(.bold))
-                                .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
-                        }
-                        Text(clan.name.nonEmpty ?? "Clan")
-                            .font(.system(.body, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.white).lineLimit(1)
-                    }
+                    Text(clan.name.nonEmpty ?? "Clan")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white).lineLimit(1)
                     if let d = clan.description.nonEmpty {
                         Text(d).font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.55)).lineLimit(2)
@@ -1532,17 +1512,13 @@ struct ClanDetailView: View {
         .task { await load() }
     }
 
-    /// Compact header: the clan's icon, tag and name on one line, the
+    /// Compact header: the clan's icon and name on one line, the
     /// description, then one line of totals ("7 of 12 members · 412 levels ·
     /// 980 stars").
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 ClanBadge(clan: clan, size: 30)
-                if let t = clan.tag.nonEmpty {
-                    Text("[\(t)]").font(.system(.subheadline, design: .rounded).weight(.bold))
-                        .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
-                }
                 Text(clan.name.nonEmpty ?? "Clan").font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
@@ -1720,7 +1696,7 @@ struct ClanDetailView: View {
 }
 
 // ===========================================================================
-// ClanCreateSheet — picks a preset-built name (+ derived tag) and an optional
+// ClanCreateSheet — picks a preset-built name and an optional
 // preset description, and creates the clan.
 // Posts a `created` activity event so the new clan's feed isn't empty.
 // ===========================================================================
@@ -1776,7 +1752,7 @@ private struct ClanCreateSheet: View {
 
 // ===========================================================================
 // ClanNamePicker / ClanDescriptionPicker — the ONLY ways to set a clan's
-// name, tag and description.  Everything is assembled from `PresetNames`
+// name and description.  Everything is assembled from `PresetNames`
 // lists; there is no text field, so there is no user-written content.
 // ===========================================================================
 private struct ClanNamePicker: View {
@@ -1787,9 +1763,6 @@ private struct ClanNamePicker: View {
             Text("CLAN NAME").font(.system(.caption, design: .rounded).weight(.bold))
                 .foregroundStyle(Color(white: 0.5)).tracking(0.5)
             HStack(spacing: 8) {
-                Text("[\(PresetNames.clanTag(choice))]")
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
                 Text(PresetNames.clanName(choice))
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
@@ -1950,8 +1923,8 @@ private struct ClanSettingsSheet: View {
         }
     }
 
-    // Owner: clan personalization — the name (built from preset words; the tag
-    // follows the name).
+    // Owner: clan personalization — icon, color and the name (built from
+    // preset words).
     private var personalizationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             header("Personalization")
@@ -2454,5 +2427,39 @@ struct ClanmatesOrbit: View {
         if d <= rect.width { return CGPoint(x: rect.maxX - d, y: rect.maxY) }
         d -= rect.width
         return CGPoint(x: rect.minX, y: rect.maxY - d)
+    }
+}
+
+
+/// The one action button at the top of each My Clan tab ("Ask the clan for a
+/// life" on Social, "Invite a friend to the clan" on Members).  Same capsule,
+/// height and width on both tabs, so they line up when switching: the
+/// default dark fill of secondary buttons, the label in normal text color,
+/// and the tint only on the icon and a thin border.
+struct ClanPanelActionLabel: View {
+    let icon: String
+    let title: String
+    let tint: Color
+    var busy: Bool = false
+
+    /// A smoother, darker red than the old bright fill — for the heart and
+    /// the border only.
+    static let lifeRed = Color(red: 0.78, green: 0.20, blue: 0.26)
+
+    var body: some View {
+        ZStack {
+            HStack(spacing: 8) {
+                Image(systemName: icon).foregroundStyle(tint)
+                Text(title).foregroundStyle(.white)
+            }
+            .opacity(busy ? 0 : 1)
+            if busy { ProgressView().tint(.white).scaleEffect(0.8) }
+        }
+        .font(.system(.body, design: .rounded).weight(.semibold))
+        .lineLimit(1).minimumScaleFactor(0.85)
+        .frame(maxWidth: .infinity).padding(.vertical, 13)
+        .background(Capsule().fill(Color(white: 0.16)))
+        .overlay(Capsule().stroke(tint.opacity(0.9), lineWidth: 1.2))
+        .contentShape(Capsule())
     }
 }

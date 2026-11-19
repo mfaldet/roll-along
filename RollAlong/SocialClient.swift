@@ -641,7 +641,7 @@ final class SocialClient: @unchecked Sendable {
     // MARK: - Clans
 
     private static let clanColumns =
-        "id,name,tag,description,owner_id,created_at,updated_at"
+        "id,name,description,owner_id,created_at,updated_at"
     /// Columns added by database step 13 (docs/social/clan-look.sql): the
     /// clan's preset icon and color.
     private static let clanLookColumns = ",icon,color"
@@ -709,7 +709,7 @@ final class SocialClient: @unchecked Sendable {
     }
 
     private static let rankingColumns =
-        "id,name,tag,description,owner_id,created_at,updated_at,"
+        "id,name,description,owner_id,created_at,updated_at,"
         + "member_count,total_levels,total_stars,season_score,"
         + "season_wins,last_season,last_season_rank,last_season_clans,last_season_tier"
 
@@ -735,13 +735,13 @@ final class SocialClient: @unchecked Sendable {
     /// Create a clan (you become its owner) and join it as `owner`.  Two
     /// writes: insert the clan with `return=representation` to recover its
     /// generated id, then insert your owner membership row.
-    /// The name and tag are built from a `PresetNames.Choice` and the
+    /// The name is built from a `PresetNames.Choice` and the
     /// description must be one of the preset options (anything else is sent
     /// as empty), so no free text can reach the server from here.
     func createClan(name choice: PresetNames.Choice, description: String) async throws -> Clan {
         let me = try requireSession()
         let insert = ClanInsert(name: PresetNames.clanName(choice),
-                                tag: PresetNames.clanTag(choice),
+                                tag: PresetNames.hiddenClanTag(choice),
                                 description: PresetNames.isValidClanDescription(description) ? description : "",
                                 owner_id: me.userId)
         let data = try await send(method: "POST", path: "clans",
@@ -816,12 +816,13 @@ final class SocialClient: @unchecked Sendable {
     /// Rename a clan — the first of the owner's personalization knobs (the RLS
     /// "clans update by owner" policy scopes the PATCH, so a non-owner's call
     /// matches zero rows).  The unique lower(name) index makes a taken name
-    /// (or its derived tag) throw; surface it as "name taken".
-    /// The new name is a `PresetNames.Choice`; the derived tag changes with it.
+    /// throw; surface it as "name taken".
+    /// The new name is a `PresetNames.Choice`.  The hidden tag the database
+    /// still requires is sent along with it (see `hiddenClanTag`).
     func renameClan(id: UUID, name choice: PresetNames.Choice) async throws {
         _ = try requireSession()
         let body = ClanUpdatePatch(name: PresetNames.clanName(choice),
-                                   tag: PresetNames.clanTag(choice))
+                                   tag: PresetNames.hiddenClanTag(choice))
         _ = try await send(method: "PATCH", path: "clans",
                            query: "id=eq.\(id.uuidString)",
                            bodyData: try encoder.encode(body),
@@ -960,8 +961,9 @@ final class SocialClient: @unchecked Sendable {
 // Roll Along has no free-text fields that other players can see.  A nickname
 // is  <word><word>  ("SwiftComet", no number, not unique — the player's
 // Adventure level is shown beside it as part of the name); a clan name is
-// <word> <plural word> <number>  ("Swift Rockets 42"); the clan tag is derived
-// from the name ("SR42"); the clan description is one of a fixed list (or
+// <word> <plural word> <number>  ("Swift Rockets 42"); clans have no tag in
+// the app (a hidden one is still sent for the database, see
+// `hiddenClanTag`); the clan description is one of a fixed list (or
 // none).  Clan chat was already fixed phrases.
 //
 // The same lists are enforced on the server by docs/social-schema-v4.sql
@@ -1159,9 +1161,13 @@ enum PresetNames {
         "\(clanAdjectives[c.adjective]) \(clanNouns[c.noun]) \(c.number)"
     }
 
-    /// The clan tag is derived, never typed: the two initials + the number
-    /// ("Swift Rockets 42" -> "SR42", 3-5 characters).
-    static func clanTag(_ c: Choice) -> String {
+    /// Clans have no tag in the app any more.  The database still has a
+    /// required `clans.tag` column with a check (social-schema-v4.sql,
+    /// `clans_tag_derived`: tag = ra_clan_tag_for(name), 2–5 characters), so
+    /// every create and rename sends the value that check expects: the two
+    /// initials + the number ("Swift Rockets 42" -> "SR42").  It is never
+    /// shown.  Tags need not be unique (that index was dropped in v4).
+    static func hiddenClanTag(_ c: Choice) -> String {
         "\(clanAdjectives[c.adjective].prefix(1))\(clanNouns[c.noun].prefix(1))".uppercased()
             + String(c.number)
     }
@@ -1652,14 +1658,14 @@ struct Friendship: Codable, Identifiable {
     }
 }
 
-/// A collaborative group.  `tag` is the short [TAG] shown beside member names.
+/// A collaborative group, identified by its name.  The server's hidden `tag`
+/// column is not read.
 struct Clan: Codable, Identifiable, Hashable {
     let id: UUID
     // Stored values exactly as the server returned them.  Never shown
     // directly — the accessors below only pass preset-format values (see
     // `PresetNames`), so a legacy or tampered row renders as a plain "Clan".
     private var rawName: String
-    private var rawTag: String
     private var rawDescription: String
     let ownerId: UUID
     var createdAt: String?
@@ -1676,18 +1682,12 @@ struct Clan: Codable, Identifiable, Hashable {
 
     /// The clan name when it is preset-format, else "".
     var name: String { PresetNames.parseClanName(rawName) != nil ? rawName : "" }
-    /// The tag when it is the one derived from a preset-format name, else "".
-    var tag: String {
-        guard let c = PresetNames.parseClanName(rawName), PresetNames.clanTag(c) == rawTag else { return "" }
-        return rawTag
-    }
     /// The description when it is one of the preset options, else "".
     var description: String { PresetNames.isValidClanDescription(rawDescription) ? rawDescription : "" }
 
     enum CodingKeys: String, CodingKey {
         case id
         case rawName        = "name"
-        case rawTag         = "tag"
         case rawDescription = "description"
         case ownerId   = "owner_id"
         case createdAt = "created_at"
@@ -2104,6 +2104,7 @@ private struct FriendStatusPatch: Encodable {
 
 private struct ClanInsert: Encodable {
     let name: String
+    /// Hidden; required by the database (see `PresetNames.hiddenClanTag`).
     let tag: String
     let description: String
     let owner_id: UUID
@@ -2115,8 +2116,8 @@ private struct ClanMemberInsert: Encodable {
     let role: String
 }
 
-/// Owner-only clan edits (renameClan today; future personalization columns —
-/// description, tag, colors — become optional fields here).
+/// Owner-only clan rename.  `tag` is the hidden value the database check
+/// still requires (`PresetNames.hiddenClanTag`); the app never shows it.
 private struct ClanUpdatePatch: Encodable {
     let name: String
     let tag: String
