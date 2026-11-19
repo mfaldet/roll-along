@@ -53,7 +53,6 @@
 		AA000013000000000000AA01 /* AnalyticsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000013000000000000AA00 /* AnalyticsClient.swift */; };
 		AA000014000000000000AA01 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014000000000000AA00 /* StoreKitManager.swift */; };
 		AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000015000000000000AA00 /* PurchaseSheets.swift */; };
-		AA000016000000000000AA02 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA000016000000000000AA00 /* Products.storekit */; };
 		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
 		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
 		AA000099000000000000AA01 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000099000000000000AA00 /* IntroView.swift */; };
@@ -480,7 +479,6 @@
 				7A0F0002000000000000AA02 /* TrophyCatalog.json in Resources */,
 				C11F0001000000000000C102 /* MinigameClips in Resources */,
 				7B0E0001000000000000BB02 /* PreviewReplay.json in Resources */,
-				AA000016000000000000AA02 /* Products.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -733,14 +731,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RollAlong/RollAlong.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2026112001;
 				ENABLE_PREVIEWS = YES;
+				GAD_APPLICATION_ID = "ca-app-pub-3940256099942544~1458002511";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RollAlong/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -766,14 +764,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RollAlong/RollAlong.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2026112001;
 				ENABLE_PREVIEWS = YES;
+				GAD_APPLICATION_ID = "ca-app-pub-7121593460502747~1774498708";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RollAlong/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

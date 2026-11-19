@@ -2972,7 +2972,7 @@ struct BallGameView: View {
             tutorialCoinBonus = 0
         }
 
-        // Preview recorder: an armed recorder (debug/TestFlight only) captures
+        // Preview recorder: an armed recorder (debug builds only) captures
         // the next Adventure level, never the L1 tutorial or another mode.
         if isClimb && !isFirstL1Run {
             ReplayRecorder.shared.beginIfArmed(layout: effectiveLayout, arena: size,
@@ -3153,7 +3153,7 @@ struct BallGameView: View {
         // Coin Pit: rain, fall, and catch the falling coins for this round.
         if isCoinPit { coinPitTick(ballPos: b.position, size: geoSize, dt: dt) }
 
-        // Preview recorder (debug/TestFlight only; a no-op unless a recording
+        // Preview recorder (debug builds only; a no-op unless a recording
         // is running — see ReplayRecorder in LoadoutDiorama.swift).
         ReplayRecorder.shared.frame(b.position)
 
