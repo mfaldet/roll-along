@@ -1772,6 +1772,14 @@ struct SocialSettings {
     var seasonMinMemberStars = 10
     /// First season (yyyymm) that awards coins; earlier ones are a rehearsal.
     var seasonPrizesFrom = 202701
+    /// Coins per eligible member for each season tier.  The server pays the
+    /// `season_coins_*` rows in `ra_config`; step 19 (docs/economy/
+    /// season-prize-settings.sql) exposes them so the Rankings card shows the
+    /// server's numbers.  These defaults match the server's defaults.
+    var seasonCoinsDiamond = 1000
+    var seasonCoinsGold    = 500
+    var seasonCoinsSilver  = 250
+    var seasonCoinsBronze  = 100
     /// True once the server has answered — i.e. docs/social-schema-v5.sql is
     /// in place, including the rule that hands a clan on when its owner leaves.
     var loadedFromServer = false
@@ -1785,6 +1793,10 @@ struct SocialSettings {
         seasonMinClanScore   = v["season_min_clan_score"] ?? seasonMinClanScore
         seasonMinMemberStars = v["season_min_member_stars"] ?? seasonMinMemberStars
         seasonPrizesFrom     = v["season_prizes_from"] ?? seasonPrizesFrom
+        seasonCoinsDiamond   = v["season_coins_diamond"] ?? seasonCoinsDiamond
+        seasonCoinsGold      = v["season_coins_gold"] ?? seasonCoinsGold
+        seasonCoinsSilver    = v["season_coins_silver"] ?? seasonCoinsSilver
+        seasonCoinsBronze    = v["season_coins_bronze"] ?? seasonCoinsBronze
     }
 
     /// Read on the main thread by the views; replaced by

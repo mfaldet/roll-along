@@ -2219,15 +2219,19 @@ private struct ClanLookPicker: View {
 private struct ClanSeasonCard: View {
     @State private var showInfo = false
 
-    /// Coins per eligible member for each tier (the `season_coins_*` rows in
-    /// `ra_config`, docs/social-schema-v5.sql).  Shown as a guide only; the
-    /// server pays what its own table says.
-    private static let tiers: [(name: String, icon: String, coins: Int, color: Color)] = [
-        ("Diamond", "diamond.fill",    1000, Color(red: 0.55, green: 0.88, blue: 1.00)),
-        ("Gold",    "medal.fill",       500, Color(red: 1.00, green: 0.81, blue: 0.30)),
-        ("Silver",  "medal.fill",       250, Color(red: 0.80, green: 0.82, blue: 0.86)),
-        ("Bronze",  "medal.fill",       100, Color(red: 0.85, green: 0.55, blue: 0.32)),
-    ]
+    /// Coins per eligible member for each tier: the server's `season_coins_*`
+    /// rows in `ra_config`, read through `ra_social_settings` (step 19), with
+    /// the server's defaults until they load.  So the card shows what the
+    /// server pays.
+    private static var tiers: [(name: String, icon: String, coins: Int, color: Color)] {
+        let s = SocialSettings.current
+        return [
+            ("Diamond", "diamond.fill", s.seasonCoinsDiamond, Color(red: 0.55, green: 0.88, blue: 1.00)),
+            ("Gold",    "medal.fill",   s.seasonCoinsGold,    Color(red: 1.00, green: 0.81, blue: 0.30)),
+            ("Silver",  "medal.fill",   s.seasonCoinsSilver,  Color(red: 0.80, green: 0.82, blue: 0.86)),
+            ("Bronze",  "medal.fill",   s.seasonCoinsBronze,  Color(red: 0.85, green: 0.55, blue: 0.32)),
+        ]
+    }
 
     private static var eastern: Calendar {
         var cal = Calendar(identifier: .gregorian)
@@ -2241,6 +2245,7 @@ private struct ClanSeasonCard: View {
         let progress = min(1, max(0, Double(totalDays - daysLeft) / Double(max(1, totalDays))))
         let prizesOn = SeasonCalendar.awardsPrizes(SeasonCalendar.seasonKey())
         let gold = Color(red: 1.0, green: 0.81, blue: 0.30)
+        let tiers = Self.tiers
         return VStack(spacing: 14) {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -2273,7 +2278,7 @@ private struct ClanSeasonCard: View {
                 .accessibilityLabel("\(daysLeft) day\(daysLeft == 1 ? "" : "s") left this season")
             }
             HStack(spacing: 8) {
-                ForEach(Self.tiers.indices, id: \.self) { i in let tier = Self.tiers[i]
+                ForEach(tiers.indices, id: \.self) { i in let tier = tiers[i]
                     VStack(spacing: 4) {
                         Image(systemName: tier.icon)
                             .font(.system(size: 16, weight: .semibold))
@@ -2315,7 +2320,7 @@ private struct ClanSeasonCard: View {
             .accessibilityLabel("How the clan season works")
             .popover(isPresented: $showInfo, arrowEdge: .top) {
                 Text(prizesOn
-                     ? "A clan's score is the new Adventure stars its members earn this month. At month end, ranked clans win coins for each member who helped: Diamond, Gold, Silver or Bronze, by finishing place."
+                     ? "A clan's score is the new Adventure stars its members earn this month. At month end, ranked clans win coins for each member still in the clan who earned at least \(SocialSettings.current.seasonMinMemberStars) of those stars: Diamond, Gold, Silver or Bronze, by finishing place."
                      : "A clan's score is the new Adventure stars its members earn this month. This first season is a warm-up: clans are ranked, with no prizes.")
                     .font(.system(.callout, design: .rounded))
                     .foregroundStyle(.white)

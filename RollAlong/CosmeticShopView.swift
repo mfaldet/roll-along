@@ -1112,7 +1112,7 @@ struct CosmeticShopView: View {
                     "shortfall": .int(item.coinCost - gameState.coinBalance),
                 ]
             )
-            alertMessage = "You need \(item.coinCost - gameState.coinBalance) more coins.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack (coming with the next update)."
+            alertMessage = "You need \(item.coinCost - gameState.coinBalance) more coins.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
             showAlert = true
             return
         }

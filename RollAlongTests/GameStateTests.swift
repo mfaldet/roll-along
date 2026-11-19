@@ -1556,3 +1556,101 @@ final class DisplayCornerTests: XCTestCase {
         XCTAssertEqual(DisplayCorner.radius(nativeHeight: 3000), DisplayCorner.newModelDefault)
     }
 }
+
+// MARK: - Payout audit (2026-11)
+//
+// Pins what each reward pays, so a screen and the code can't drift apart
+// again.  See docs/economy/2026-11-payout-audit.md.
+final class PayoutAuditTests: XCTestCase {
+
+    private var defaults: UserDefaults!
+    private let suiteName = "PayoutAuditTests.isolated"
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        super.tearDown()
+    }
+
+    func testMinigamePayoutTable() {
+        XCTAssertEqual(CoinPayouts.competitiveCoins(.easy), 1)
+        XCTAssertEqual(CoinPayouts.competitiveCoins(.normal), 2)
+        XCTAssertEqual(CoinPayouts.competitiveCoins(.hard), 3)
+        XCTAssertEqual(CoinPayouts.ticketsPerWin, 1)
+        XCTAssertEqual(CoinPayouts.rollUp(meters: 500), 0)
+        XCTAssertEqual(CoinPayouts.disco(crossings: 50), 0)
+        XCTAssertEqual(CoinPayouts.zen(seconds: 600), 0)
+        XCTAssertEqual(CoinPayouts.personalBestBonus, 0)
+        XCTAssertEqual(CoinPayouts.goldRushTicketCost, 5)
+        XCTAssertEqual(CoinPayouts.goldRushBoostTicketCost, 10)
+        XCTAssertEqual(CoinPayouts.goldRushPerCoin, 1)
+    }
+
+    /// A competitive game pays its difficulty's coins whatever the result;
+    /// only a win adds a ticket.
+    func testCompetitiveResultPaysCoinsAndTicketOnlyOnWin() {
+        let gs = GameState(defaults: defaults)
+        let coins0 = gs.coinBalance, tickets0 = gs.tickets
+        let lossPay = gs.recordMinigameResult(modeID: "sumo", difficulty: .hard, won: false, score: 1)
+        XCTAssertEqual(lossPay, 3)
+        XCTAssertEqual(gs.coinBalance, coins0 + 3)
+        XCTAssertEqual(gs.tickets, tickets0)
+        let winPay = gs.recordMinigameResult(modeID: "sumo", difficulty: .easy, won: true, score: 5)
+        XCTAssertEqual(winPay, 1)
+        XCTAssertEqual(gs.coinBalance, coins0 + 4)
+        XCTAssertEqual(gs.tickets, tickets0 + 1)
+    }
+
+    func testLevelAndDailyRewards() {
+        XCTAssertEqual(GameState.coinPerPickup, 1)
+        XCTAssertEqual(GameState.coinPerClear, 2)
+        XCTAssertEqual(GameState.dailyRewardLadder, [5, 8, 10, 12, 15, 20, 35])
+        XCTAssertEqual(GameState.dailyRewardLadder.reduce(0, +), 105)
+        XCTAssertEqual(GameState.livesMax, 10)
+        XCTAssertEqual(GameState.livesRegenInterval, 360)
+    }
+
+    func testPurchaseGrantTable() {
+        typealias P = StoreKitManager.ProductID
+        XCTAssertEqual(P.lives20.rewardLives, 20)
+        XCTAssertEqual(P.lives120.rewardLives, 120)
+        XCTAssertEqual(P.lives300.rewardLives, 300)
+        XCTAssertEqual(P.coins100.rewardCoins, 100)
+        XCTAssertEqual(P.coins600.rewardCoins, 600)
+        XCTAssertEqual(P.coins1300.rewardCoins, 1_300)
+        XCTAssertEqual(P.coins3000.rewardCoins, 3_000)
+        XCTAssertEqual(P.coins10000.rewardCoins, 10_000)
+        XCTAssertEqual(P.starterPack.rewardCoins, 500)
+        XCTAssertEqual(P.unlimited.rewardCoins, 0)
+        XCTAssertEqual(P.unlimited.rewardLives, 0)
+    }
+
+    /// Sell Back refunds half the current price of a coin-bought item.
+    func testSellBackRefundsHalf() {
+        let gs = GameState(defaults: defaults)
+        gs.addCoins(5_000)
+        guard let item = Floor.allCases.first(where: { $0.isSellable && $0.coinCost == 750 }) else {
+            return XCTFail("no 750-coin floor")
+        }
+        XCTAssertTrue(gs.purchase(item))
+        XCTAssertEqual(gs.sellBackValue(item), 375)
+    }
+
+    /// A Challenge Track reward is a gift: Sell Back keeps it and refunds
+    /// nothing (before the audit, a finished track could be sold back for
+    /// half the collection's price).
+    func testTrackRewardIsNotSellable() {
+        let gs = GameState(defaults: defaults)
+        let before = gs.coinLiquidationPreview()
+        gs.deliverTrackReward(for: "frozen-peaks")
+        let after = gs.coinLiquidationPreview()
+        XCTAssertEqual(after.count, before.count)
+        XCTAssertEqual(after.coins, before.coins)
+    }
+}

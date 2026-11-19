@@ -392,8 +392,8 @@ final class StoreKitManager: ObservableObject {
             // IAP grant — purchased, not earned: never counts toward the
             // play-earned trophy counter (trophy-catalog.md §6 item 4).
             gameState.addCoins(productID.rewardCoins, source: .iap)
-            // The top coin pack (coins.10000, 10,000 coins) also drops ONE random not-yet-owned "Money"
-            // cosmetic — up to three unlock across repeat purchases.
+            // The top coin pack (coins.10000, 10,000 coins) also grants the
+            // fixed Money Ball skin on the first purchase; repeats are coins only.
             if productID == .coins10000 {
                 grantedCosmetic = grantMoneyBall(gameState)
             }

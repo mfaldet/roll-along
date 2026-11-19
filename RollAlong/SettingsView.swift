@@ -83,7 +83,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This sells back every cosmetic you can sell — coin-shop buys plus seasonal & limited-time pieces — for half their current coin value, and resets your equipped look to default. Only your Iconic items are kept (the classic starter look and secret rewards like Diamond, Money & Trophy), just unequipped. Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
+            Text("This sells back every cosmetic you bought with coins — including seasonal & limited-time pieces — for half their current coin value (never more than you paid), and resets your equipped look to default. Kept, just unequipped: your Iconic items (the classic starter look and secret rewards like Diamond, Money & Trophy) and anything you were given (the tutorial gift, Challenge Track rewards, the Starter Pack). Heads up: seasonal pieces may not be re-buyable once their event ends. Your level progress is untouched.")
         }
     }
 

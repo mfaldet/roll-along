@@ -2854,13 +2854,18 @@ final class GameState: ObservableObject {
     /// Uses the mapping defined in `ChallengeTrackMode.rewardBundleID(for:)`.
     /// Idempotent — no-op when the bundle is already owned or the track
     /// has no paired bundle yet (future tracks may be planned but not built).
+    ///
+    /// A free reward, so it goes through `grantBundleFree`: Sell Back keeps
+    /// the items and never refunds them (2026-11 payout audit — a plain
+    /// grant let a finished track be sold back for half the collection's
+    /// price), and any piece the player had already bought is compensated
+    /// at its Sell Back value first.
     func deliverTrackReward(for trackID: String) {
         guard let bundleID = ChallengeTrackMode.rewardBundleID(for: trackID),
               let bundle   = CosmeticBundle.catalogue.first(where: { $0.id == bundleID }),
               !ownedBundles.contains(bundleID)
         else { return }
-        bundle.grantContents(to: self)
-        ownedBundles.insert(bundleID)
+        grantBundleFree(bundle)
     }
 
     /// Gift an entire bundle for free (the post-tutorial Standard-bundle reward,

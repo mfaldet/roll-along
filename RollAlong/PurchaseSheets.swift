@@ -391,7 +391,7 @@ struct BuyLivesSheet: View {
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(Self.diamondGradient)
                     Text(isOwned ? "Active — indestructible, never run out."
-                                 : "Indestructible.\nUnlimited lives, forever.")
+                                 : "Unlimited lives, forever,\nplus the Diamond ball skin.")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(white: 0.72))
                         .fixedSize(horizontal: false, vertical: true)
