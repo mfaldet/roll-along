@@ -4201,7 +4201,10 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
         laid = times
     } else {
         let n = pts.count
-        laid = (0..<n).map { i in t - Double(n - 1 - i) / Double(n - 1) * lifetime * 0.95 }
+        let span = lifetime * 0.95 / Double(n - 1)
+        laid = (0..<n).map { i -> Double in
+            t - Double(n - 1 - i) * span
+        }
     }
     let fr = TrailFrame(pts: pts, laid: laid, now: t, life: lifetime,
                         m: reduceMotion ? 0 : 1, bw: baseWidth)
