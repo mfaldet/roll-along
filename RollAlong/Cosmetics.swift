@@ -2004,17 +2004,27 @@ enum CosmeticSchedule {
         return earliest
     }
 
-    /// The next release day that has not arrived yet: the active collections
-    /// on it plus the single items it brings.  nil once everything is out.
-    /// Uses the effective (server or built-in) dates.
+    /// The next release day that has not arrived yet and brings something to
+    /// announce: the active collections on it plus the single items it
+    /// brings.  A day that would announce nothing (e.g. a retired collection
+    /// whose items are all out already) is skipped.  nil once everything is
+    /// out.  Uses the effective (server or built-in) dates.
     static func nextDrop(at now: Date = Date(),
                          store: CosmeticCalendarStore = .shared) -> Upcoming? {
-        var first: Date? = nil
+        var pendingDays = Set<Date>()
         for id in builtInReleaseDays.keys where !isReleased(collectionID: id, at: now, store: store) {
-            guard let d = releaseDate(of: id, store: store) else { continue }
-            if first == nil || d < first! { first = d }
+            if let d = releaseDate(of: id, store: store) { pendingDays.insert(d) }
         }
-        guard let day = first else { return nil }
+        for day in pendingDays.sorted() {
+            let drop = upcoming(on: day, at: now, store: store)
+            if !drop.bundles.isEmpty || !drop.itemNames.isEmpty { return drop }
+        }
+        return nil
+    }
+
+    /// What release day `day` brings, as announced by `nextDrop`.
+    private static func upcoming(on day: Date, at now: Date,
+                                 store: CosmeticCalendarStore) -> Upcoming {
         let bundles = CosmeticBundle.active.filter {
             !$0.isLimitedTime && releaseDate(of: $0.id, store: store) == day
                 && !isReleased(collectionID: $0.id, at: now, store: store)

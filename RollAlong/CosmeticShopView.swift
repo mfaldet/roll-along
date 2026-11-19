@@ -1277,9 +1277,6 @@ struct CosmeticShopView: View {
         }
     }
 
-    /// "Coming soon" — only the next scheduled drop, by name and date.  It
-    /// never says how many collections are scheduled after it.
-    @ViewBuilder
     /// "Ember floor · Graph pit · Sandstone boundary and more" — at most six
     /// names, so a big release day stays one short line or two.
     static func comingSoonItems(_ names: [String]) -> String {
@@ -1287,6 +1284,9 @@ struct CosmeticShopView: View {
         return names.count > 6 ? shown + " and more" : shown
     }
 
+    /// "Coming soon" — only the next scheduled drop, by name and date.  It
+    /// never says how many collections are scheduled after it.
+    @ViewBuilder
     private var comingSoonRow: some View {
         if let next = CosmeticSchedule.nextDrop() {
             VStack(alignment: .leading, spacing: 8) {
