@@ -221,7 +221,7 @@ struct SettingsView: View {
                     }
                     .disabled(auth.isWorking)
 
-                    Text("Optional. Sign in to climb the global leaderboard, join clans, and send friends extra lives. Your level progress is always saved on this device either way.")
+                    Text("Optional. Sign in to climb the global leaderboard, add friends, and join a clan to share lives with clanmates. Your level progress is always saved on this device either way.")
                         .font(.system(.caption, design: .rounded))
                         .foregroundStyle(Color(white: 0.45))
 
@@ -434,7 +434,7 @@ struct SettingsView: View {
             }
             .disabled(isRestoring)
 
-            Text("New device? Your purchases are always yours.\nClick to download anything you've bought with real money.")
+            Text("New device? Your purchases are always yours.\nTap to restore anything you've bought with real money.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
         }

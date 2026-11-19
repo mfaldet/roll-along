@@ -1,3 +1,9 @@
+// REFERENCE COPY — the deployed `delete-account` function in the Supabase
+// dashboard is the source of truth (it already revokes Sign in with Apple,
+// reads `apple_authorization_code` from the request body, and has its four
+// Apple secrets set).  This file documents the expected behavior; do not
+// redeploy it over the live function without comparing the two first.
+//
 // delete-account — Supabase Edge Function (Deno).
 //
 // Called by the app from Settings → Delete Account with the player's sign-in
