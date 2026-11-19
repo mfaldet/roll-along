@@ -556,6 +556,9 @@ actor SessionManager {
     private var current: Current?
     private var inFlight: Task<String, Error>?
     private var observer: (@Sendable (SessionEvent) -> Void)?
+    /// Bumped by `clear()`, so a renewal still in flight at sign-out cannot
+    /// reinstall the session it started with.
+    private var generation = 0
 
     init(transport: @escaping HTTPTransport,
          store: SessionTokenStore,
@@ -576,6 +579,7 @@ actor SessionManager {
 
     /// Forget the session (sign-out).  Clears the saved sign-in too.
     func clear() {
+        generation += 1
         current = nil
         store.clear()
     }
@@ -644,6 +648,7 @@ actor SessionManager {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Self.apiKey,        forHTTPHeaderField: "apikey")
         req.httpBody = try JSONEncoder().encode(RefreshGrant(refresh_token: refreshToken))
+        let startedGeneration = generation
 
         let data: Data
         let response: URLResponse
@@ -653,6 +658,8 @@ actor SessionManager {
             // No answer at all: keep the saved sign-in and try again later.
             throw SessionError.unreachable
         }
+        // Signed out while the renewal was in flight: drop its answer.
+        guard startedGeneration == generation else { throw SessionError.notSignedIn }
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         switch status {
         case 200...299:
@@ -704,6 +711,7 @@ actor SessionManager {
 
     /// True when the server refused the request because of the sign-in token.
     static func isRejectedSignIn(status: Int, body: Data) -> Bool {
+        if (200...299).contains(status) { return false }
         if status == 401 { return true }
         let text = String(decoding: body.prefix(2048), as: UTF8.self).lowercased()
         return text.contains("jwt expired") || text.contains("pgrst301")
