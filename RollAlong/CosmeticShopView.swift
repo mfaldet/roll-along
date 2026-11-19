@@ -318,11 +318,9 @@ struct CosmeticShopView: View {
                     .foregroundStyle(.white)
                 }
             }
-            // Coin pill, top-right — tap to summon the Get Coins sheet.
-            CoinPillToolbarItem {
-                coinPill
-            }
         }
+        // Coin pill, top-right — tap to summon the Get Coins sheet.
+        .coinPillToolbar { coinPill }
         .alert("Heads up", isPresented: $showAlert) {
             Button("Get more coins") {
                 showBuyCoinsSheet = true

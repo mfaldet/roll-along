@@ -1760,19 +1760,21 @@ struct CoinPillLabel: View {
 /// its own glass capsule, taller than Home's pill and doubling its border;
 /// that background is hidden there, so the pill shows exactly as on Home.
 /// (Before iOS 26 toolbar items have no background of their own.)
-struct CoinPillToolbarItem<Content: View>: ToolbarContent {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some ToolbarContent {
+/// A View modifier (not ToolbarContent) so the `#available` branch goes
+/// through ViewBuilder, which supports limited availability.
+extension View {
+    @ViewBuilder
+    func coinPillToolbar<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        let item = content()
         if #available(iOS 26.0, *) {
-            ToolbarItem(placement: .topBarTrailing) { content }
-                .sharedBackgroundVisibility(.hidden)
+            self.toolbar {
+                ToolbarItem(placement: .topBarTrailing) { item }
+                    .sharedBackgroundVisibility(.hidden)
+            }
         } else {
-            ToolbarItem(placement: .topBarTrailing) { content }
+            self.toolbar {
+                ToolbarItem(placement: .topBarTrailing) { item }
+            }
         }
     }
 }
