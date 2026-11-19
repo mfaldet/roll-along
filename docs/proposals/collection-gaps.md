@@ -221,3 +221,19 @@ track is a free default).
 | magma-core | 8,500 | 7,250 | -1,250 |
 | neon-city | 9,250 | 8,500 | -750 |
 | clockwork | 8,250 | 7,500 | -750 |
+
+## Rare pits (November 2026 redraws)
+
+The Graveyard and Aurora pits became Rare (1,000 coins, was 750) when they gained gently moving
+art: gravestones with a drifting ghost, and a moving aurora band. Every collection holding one of
+them costs 250 coins more. No collection changed rarity band (all six stay Legendary), and none is
+in the post-tutorial gift pool.
+
+| Collection | Pit | Full price before | Full price now |
+|---|---|---:|---:|
+| aurora | Aurora | 8,250 | 8,500 |
+| pride-2027 | Aurora | 8,250 | 8,500 |
+| crystal-cavern | Aurora | 6,750 | 7,000 |
+| haunted | Graveyard | 6,750 | 7,000 |
+| halloween-2026 | Graveyard | 6,500 | 6,750 |
+| muertos-2026 | Graveyard | 6,500 | 6,750 |

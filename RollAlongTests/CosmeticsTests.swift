@@ -882,6 +882,23 @@ final class CosmeticsTests: XCTestCase {
     /// While music is off, no collection offers, prices, grants or requires a
     /// music track, and no player-facing summary names one — but the music
     /// data stays in place so it can return in an update.
+    /// Approved pit redraws: drawn art for 18 pits; only the two Rare ones
+    /// (Graveyard, Aurora) move; Midnight shows as "Moonlit" with its old id.
+    func testPitRedraws_tiersAndNames() {
+        let drawn = Pit.allCases.filter { $0.hasDrawnArt }
+        XCTAssertEqual(drawn.count, 18)
+        XCTAssertEqual(Pit.graveyard.tier, .rare)
+        XCTAssertEqual(Pit.aurora.tier, .rare)
+        XCTAssertEqual(Pit.graveyard.coinCost, 1_000)
+        for p in drawn where p != .graveyard && p != .aurora {
+            XCTAssertEqual(p.tier, .standard, "\(p) should stay Standard and still")
+        }
+        XCTAssertEqual(Pit.midnight.displayName, "Moonlit")
+        XCTAssertEqual(Pit.midnight.rawValue, "midnight")
+        let haunted = CosmeticBundle.catalogue.first { $0.id == "haunted" }!
+        XCTAssertEqual(haunted.fullPrice(), 7_000)
+    }
+
     func testMusicOff_collectionsNeitherOfferNorPriceMusic() throws {
         try XCTSkipIf(CosmeticFeatures.musicEnabled, "music is offered")
         let gs = makeCleanState()
@@ -895,9 +912,10 @@ final class CosmeticsTests: XCTestCase {
             XCTAssertEqual(b.proratedPrice(in: gs), b.fullPrice(),
                            "\(b.id): a clean state pays the full (music-free) price")
         }
-        // Aurora: 9,750 with its 1,500-coin music track, 8,250 without.
+        // Aurora: 8,500 without its music track (the Aurora pit is Rare,
+        // 1,000 coins, since its art moves).
         let aurora = CosmeticBundle.catalogue.first { $0.id == "aurora" }!
-        XCTAssertEqual(aurora.fullPrice(), 8_250)
+        XCTAssertEqual(aurora.fullPrice(), 8_500)
         // Owning every offered item completes a collection; music isn't needed.
         aurora.balls.forEach { gs.grant($0) }; aurora.goals.forEach { gs.grant($0) }
         aurora.trails.forEach { gs.grant($0) }; aurora.floors.forEach { gs.grant($0) }

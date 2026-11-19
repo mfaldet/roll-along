@@ -1130,7 +1130,7 @@ enum Pit: String, CosmeticItem {
     // Starter
     case classic
 
-    // Standard (750 coins) — static solid pit colour
+    // Standard (750 coins) — static (flat color or drawn art; never animates)
     case inverted
     case twilight
     case ember
@@ -1146,11 +1146,11 @@ enum Pit: String, CosmeticItem {
     case sunset
     case origami
     case mirage
-    case aurora
+    case aurora           // Rare — gently moving aurora band
     case canyon           // Round-5 Dune bundle — deep rust gorge
     case downpour         // Round-5 Tempest bundle — dark rainy blue
     case syrup            // Round-5 Candyland bundle — dark molasses
-    case graveyard        // Round-5 Haunted bundle — near-black graveyard earth
+    case graveyard        // Rare — gravestones and a gently drifting ghost (Haunted bundle)
 
     // Exclusive / Legendary (1,500 coins) — animated pit overlays
     case evil             // burning fire-pit animation
@@ -1179,7 +1179,7 @@ enum Pit: String, CosmeticItem {
         case .parchment:  return "Parchment"
         case .sketch:     return "Sketch"
         case .velvet:     return "Velvet"
-        case .midnight:   return "Midnight"
+        case .midnight:   return "Moonlit"   // id stays "midnight"
         case .sunset:     return "Sunset"
         case .origami:    return "Origami"
         case .mirage:     return "Mirage"
@@ -1208,9 +1208,11 @@ enum Pit: String, CosmeticItem {
         case .inverted, .twilight, .ember, .notebook, .graph,
              .blueprint, .dusk, .meadow,
              .parchment, .sketch, .velvet, .midnight, .sunset,
-             .origami, .mirage, .aurora, .canyon, .downpour, .syrup, .graveyard,
+             .origami, .mirage, .canyon, .downpour, .syrup,
              .sideline, .pocket:
-            return .standard   //  750 coins
+            return .standard   //  750 coins — drawn art, never animates
+        case .graveyard, .aurora:
+            return .rare       // 1,000 coins — drawn art with gentle motion
         case .evil, .sky, .pond, .space, .eclipse, .nightclub:
             return .exclusive  // 1,500 coins — animated overlay
         }
@@ -1258,8 +1260,24 @@ enum Pit: String, CosmeticItem {
     /// Space starfield).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .evil, .sky, .pond, .space, .eclipse, .nightclub: return true
+        case .evil, .sky, .pond, .space, .eclipse, .nightclub,
+             .graveyard, .aurora: return true
         default: return false
+        }
+    }
+
+    /// True for pits whose look is drawn art (grass, gravestones, ruled
+    /// paper, strata …) rather than a flat color.  That art is part of the
+    /// pit itself, so it stays visible with Reduce Motion on (frozen for the
+    /// two Rare pits, which are the only ones that move).
+    var hasDrawnArt: Bool {
+        switch self {
+        case .meadow, .graveyard, .ember, .notebook, .graph, .blueprint,
+             .parchment, .sketch, .origami, .velvet, .sunset, .mirage,
+             .aurora, .canyon, .downpour, .syrup, .sideline, .pocket:
+            return true
+        default:
+            return false
         }
     }
 }
@@ -2676,7 +2694,7 @@ struct CosmeticBundle: Identifiable {
             id:             "cosmos",
             displayName:    "Cosmos",
             tagline:        "Drift the deep with a nebula in hand.",
-            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Celestial music · Starlight boundary",
+            contentSummary: "Nebula ball · Galaxy goal · Stardust trail · Midnight floor · Moonlit pit · Celestial music · Starlight boundary",
             balls:  [.nebula],
             goals:  [.galaxy],
             trails: [.stardust],
@@ -2884,7 +2902,7 @@ struct CosmeticBundle: Identifiable {
             id:             "neon",
             displayName:    "Neon",
             tagline:        "Electric pink on a pulsing dance floor.",
-            contentSummary: "Neon ball · Neon goal · Bubblegum trail · Disco floor · Midnight pit · Electronic music · Neon boundary",
+            contentSummary: "Neon ball · Neon goal · Bubblegum trail · Disco floor · Moonlit pit · Electronic music · Neon boundary",
             balls:  [.neon],
             goals:  [.neon],
             trails: [.bubblegum],
@@ -3077,7 +3095,7 @@ struct CosmeticBundle: Identifiable {
             id:             "newyear-2027",
             displayName:    "Countdown",
             tagline:        "Three, two, one — roll.",
-            contentSummary: "Confetti ball · Rainbow goal · Gilded trail · Disco floor · Midnight pit · Electronic music · Confetti boundary",
+            contentSummary: "Confetti ball · Rainbow goal · Gilded trail · Disco floor · Moonlit pit · Electronic music · Confetti boundary",
             balls:  [.confetti],
             goals:  [.rainbow],
             trails: [.gilded],
@@ -3107,7 +3125,7 @@ struct CosmeticBundle: Identifiable {
             id:             "july4-2026",
             displayName:    "Star-Spangled",
             tagline:        "Light up the night sky.",
-            contentSummary: "Fireworks ball · Rainbow goal · Stardust trail · Midnight floor · Midnight pit · Orchestral music · Star-Spangled boundary",
+            contentSummary: "Fireworks ball · Rainbow goal · Stardust trail · Midnight floor · Moonlit pit · Orchestral music · Star-Spangled boundary",
             balls:  [.fireworks],
             goals:  [.rainbow],
             trails: [.stardust],
@@ -3167,7 +3185,7 @@ struct CosmeticBundle: Identifiable {
             id:             "mardigras-2027",
             displayName:    "Mardi Gras",
             tagline:        "Purple, green, and gold — let the good times roll.",
-            contentSummary: "Mardi Gras ball · Plasma goal · Bubblegum trail · Disco floor · Midnight pit · Jazz music · Orchid boundary",
+            contentSummary: "Mardi Gras ball · Plasma goal · Bubblegum trail · Disco floor · Moonlit pit · Jazz music · Orchid boundary",
             balls:  [.mardiGras],
             goals:  [.plasma],
             trails: [.bubblegum],
@@ -3413,7 +3431,7 @@ struct CosmeticBundle: Identifiable {
             id:             "oracle",
             displayName:    "Oracle",
             tagline:        "Gaze in. Roll forward.",
-            contentSummary: "Oracle ball · Galaxy goal · Stardust trail · Midnight floor · Midnight pit · Mysterium music · Starlight boundary",
+            contentSummary: "Oracle ball · Galaxy goal · Stardust trail · Midnight floor · Moonlit pit · Mysterium music · Starlight boundary",
             balls:  [.oracle],
             goals:  [.galaxy],
             trails: [.stardust],
@@ -3439,7 +3457,7 @@ struct CosmeticBundle: Identifiable {
             id:             "lava-lamp",
             displayName:    "Lava Lamp",
             tagline:        "Slow, warm, and a little groovy.",
-            contentSummary: "Lava Lamp ball · Plasma goal · Ember trail · Disco floor · Midnight pit · Retrowave music · Orchid boundary",
+            contentSummary: "Lava Lamp ball · Plasma goal · Ember trail · Disco floor · Moonlit pit · Retrowave music · Orchid boundary",
             balls:  [.lavaLamp],
             goals:  [.plasma],
             trails: [.ember],

@@ -84,13 +84,18 @@ Disco, Grass, Moon, Eclipse, Grid City, Brass Works, Money Full (bespoke, animat
 
 ## Pits
 
+**Built (approved).** All 18 redraws below are drawn in code (`PitArt` in `BallGameView.swift`).
+Changes from the proposal: Graveyard and Aurora became **Rare** (1,000 coins) and move gently: the
+ghost drifts and fades, and the aurora band ripples. Midnight is now shown as **Moonlit** (id
+`midnight` unchanged). The other 16 are Standard and never move.
+
 Delivers: Classic, Inverted; Twilight, Dusk (plain color names that match); Evil, Sky, Pond, Space,
 Eclipse, Nightclub (bespoke, animated). Every other pit is drawn as one flat color today.
 
 | Name | Id | Tier | Now | Idea or rename |
 |---|---|---|---|---|
 | Meadow | meadow | Standard | plain dark green | Long dense grass blades leaning in over the rim. |
-| Graveyard | graveyard | Standard | near-black | Small gravestones on the far rim and a faint ghost in the depth (static; see flag 1). |
+| Graveyard | graveyard | Standard → **Rare** | near-black | Small gravestones on the far rim and a faint ghost drifting gently in the depth. |
 | Ember | ember | Standard | plain dark red | Dim glowing coals at the bottom, ash-gray rim. |
 | Notebook | notebook | Standard | plain dark brown | Torn-paper edge with blue ruled lines on the rim. |
 | Graph | graph | Standard | plain navy | Graph-paper grid lines shrinking into the depth. |
@@ -101,7 +106,7 @@ Eclipse, Nightclub (bespoke, animated). Every other pit is drawn as one flat col
 | Velvet | velvet | Standard | plain dark purple | Soft velvet sheen on the inner wall. |
 | Sunset | sunset | Standard | plain dark red | Dark gradient from deep red to purple toward the center. |
 | Mirage | mirage | Standard | plain dark brown | Faint wavy heat-haze rings inside. |
-| Aurora | aurora | Standard | plain deep indigo | A static green-and-violet aurora band glowing in the depth (see flag 2). |
+| Aurora | aurora | Standard → **Rare** | plain deep indigo | A green-and-violet aurora band rippling gently in the depth. |
 | Canyon | canyon | Standard | plain rust | Layered rock strata stepping down. |
 | Downpour | downpour | Standard | plain dark blue | Static rain streaks falling into the dark. |
 | Syrup | syrup | Standard | plain dark maroon | Glossy highlight and a few drips over the rim. |

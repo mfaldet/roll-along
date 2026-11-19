@@ -1007,6 +1007,10 @@ struct BallGameView: View {
                     default:         EmptyView()
                     }
                 }
+                // Drawn pit art (grass, gravestones, strata …) is part of the
+                // pit's look, so it shows with Reduce Motion on too; the two
+                // Rare pits that move hold still then.
+                if pit.hasDrawnArt { PitOverlayView(pit: pit) }
 
                 // Depth shade — a soft inset shadow around the rim plus a
                 // darker pooling toward the centre, so EVERY pit (even the
@@ -4403,7 +4407,10 @@ struct PitOverlayView: View {
         case .space:     spacePitOverlay
         case .eclipse:   eclipsePitOverlay
         case .nightclub: nightclubPitOverlay
-        default:         EmptyView()
+        case .graveyard: graveyardPitOverlay
+        case .aurora:    auroraPitOverlay
+        default:
+            if pit.hasDrawnArt { staticPitArt } else { EmptyView() }
         }
     }
 
@@ -4848,6 +4855,679 @@ struct PitOverlayView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Drawn pit art
+//
+// Pits whose names promise a look (Meadow grass, Graveyard stones, ruled
+// Notebook paper …) draw it here instead of a flat color.  Standard pits are
+// one still Canvas; the two Rare pits (Graveyard, Aurora) move gently.  Every
+// design keeps a dark center so the hole still reads as a pit, and the
+// caller's PitDepthShade darkens the rim and center on top.
+extension PitOverlayView {
+
+    /// Still art for the Standard drawn pits.
+    var staticPitArt: some View {
+        Canvas { ctx, size in
+            PitArt.drawStatic(pit, in: &ctx, size: size)
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Graveyard (Rare): gravestones on the far rim and a faint ghost that
+    /// drifts slowly across the depth.
+    var graveyardPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
+                                paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? tl.date.timeIntervalSinceReferenceDate
+                PitArt.drawGraveyard(in: &ctx, size: size, t: t)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Aurora (Rare): a green-to-violet aurora band rippling slowly in the
+    /// depth under a few still stars.
+    var auroraPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
+                                paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? tl.date.timeIntervalSinceReferenceDate
+                PitArt.drawAurora(in: &ctx, size: size, t: t)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// The drawing code behind the drawn pits.  Pure functions of the pit, its
+/// size and (for the two Rare pits) the time, with fixed random seeds, so
+/// every phone draws the same art.
+enum PitArt {
+
+    // MARK: Shared helpers
+
+    private static func fill(_ ctx: inout GraphicsContext, _ size: CGSize, _ color: Color) {
+        ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(color))
+    }
+
+    private static func line(_ ctx: inout GraphicsContext, _ a: CGPoint, _ b: CGPoint,
+                             _ color: Color, _ width: CGFloat) {
+        var p = Path()
+        p.move(to: a)
+        p.addLine(to: b)
+        ctx.stroke(p, with: .color(color), lineWidth: width)
+    }
+
+    /// One closed outline through `points`.
+    private static func polygon(_ points: [CGPoint]) -> Path {
+        var p = Path()
+        p.addLines(points)
+        p.closeSubpath()
+        return p
+    }
+
+    /// A rect inset by `d` on every side (never smaller than 1×1).
+    private static func inset(_ size: CGSize, _ d: CGFloat) -> CGRect {
+        let w: CGFloat = max(1, size.width - 2 * d)
+        let h: CGFloat = max(1, size.height - 2 * d)
+        return CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h)
+    }
+
+    /// The outline of `rect` with each point pushed in or out by up to
+    /// `jitter`, `step` points apart: a torn, burnt or rocky edge.
+    private static func raggedRect(_ rect: CGRect, step: CGFloat, jitter: CGFloat,
+                                   seed: UInt64) -> Path {
+        var rng = SeededRNG(seed: seed)
+        var pts: [CGPoint] = []
+        let corners: [CGPoint] = [
+            CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+            CGPoint(x: rect.maxX, y: rect.maxY), CGPoint(x: rect.minX, y: rect.maxY),
+        ]
+        for i in 0..<4 {
+            let a = corners[i]
+            let b = corners[(i + 1) % 4]
+            let len: CGFloat = max(0.001, hypot(b.x - a.x, b.y - a.y))
+            let n = max(2, Int(len / max(1, step)))
+            let nx: CGFloat = -(b.y - a.y) / len
+            let ny: CGFloat = (b.x - a.x) / len
+            for k in 0..<n {
+                let f: CGFloat = CGFloat(k) / CGFloat(n)
+                let j: CGFloat = (CGFloat(rng.nextUnit()) - 0.5) * 2 * jitter
+                pts.append(CGPoint(x: a.x + (b.x - a.x) * f + nx * j,
+                                   y: a.y + (b.y - a.y) * f + ny * j))
+            }
+        }
+        var p = Path()
+        p.addLines(pts)
+        p.closeSubpath()
+        return p
+    }
+
+    /// Spots along every edge, each with its inward direction and the
+    /// direction along the edge.
+    private struct EdgeSpot {
+        let point: CGPoint
+        let inward: CGVector
+        let along: CGVector
+    }
+
+    private static func edgeSpots(_ size: CGSize, spacing: CGFloat, seed: UInt64) -> [EdgeSpot] {
+        var rng = SeededRNG(seed: seed)
+        var out: [EdgeSpot] = []
+        let w = size.width
+        let h = size.height
+        let edges: [(CGPoint, CGVector, CGVector, CGFloat)] = [
+            (CGPoint(x: 0, y: 0), CGVector(dx: 0, dy: 1), CGVector(dx: 1, dy: 0), w),
+            (CGPoint(x: 0, y: h), CGVector(dx: 0, dy: -1), CGVector(dx: 1, dy: 0), w),
+            (CGPoint(x: 0, y: 0), CGVector(dx: 1, dy: 0), CGVector(dx: 0, dy: 1), h),
+            (CGPoint(x: w, y: 0), CGVector(dx: -1, dy: 0), CGVector(dx: 0, dy: 1), h),
+        ]
+        for (origin, inward, along, len) in edges {
+            let n = max(2, Int(len / max(1, spacing)))
+            for k in 0..<n {
+                let f: CGFloat = (CGFloat(k) + CGFloat(rng.nextUnit())) / CGFloat(n)
+                let p = CGPoint(x: origin.x + along.dx * len * f, y: origin.y + along.dy * len * f)
+                out.append(EdgeSpot(point: p, inward: inward, along: along))
+            }
+        }
+        return out
+    }
+
+    // MARK: Standard pits (still)
+
+    static func drawStatic(_ pit: Pit, in ctx: inout GraphicsContext, size: CGSize) {
+        switch pit {
+        case .meadow:    meadow(&ctx, size)
+        case .ember:     ember(&ctx, size)
+        case .notebook:  notebook(&ctx, size)
+        case .graph:
+            perspectiveGrid(&ctx, size, base: Color(red: 0.05, green: 0.10, blue: 0.18),
+                            lineColor: Color(red: 0.45, green: 0.70, blue: 1.00), rings: 6, rays: 5)
+        case .blueprint:
+            perspectiveGrid(&ctx, size, base: Color(red: 0.04, green: 0.11, blue: 0.27),
+                            lineColor: Color(red: 0.92, green: 0.96, blue: 1.00), rings: 8, rays: 7)
+            let m = min(size.width, size.height)
+            ctx.stroke(Path(inset(size, m * 0.05)),
+                       with: .color(Color.white.opacity(0.55)), lineWidth: 1)
+        case .parchment: parchment(&ctx, size)
+        case .sketch:    sketch(&ctx, size)
+        case .origami:   origami(&ctx, size)
+        case .velvet:    velvet(&ctx, size)
+        case .sunset:    sunset(&ctx, size)
+        case .mirage:    mirage(&ctx, size)
+        case .canyon:    canyon(&ctx, size)
+        case .downpour:  downpour(&ctx, size)
+        case .syrup:     syrup(&ctx, size)
+        case .sideline:  sideline(&ctx, size)
+        case .pocket:    pocket(&ctx, size)
+        default:         break
+        }
+    }
+
+    /// Meadow: long, dense grass blades leaning in over the rim.
+    private static func meadow(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        fill(&ctx, size, Color(red: 0.04, green: 0.13, blue: 0.05))
+        let m = min(size.width, size.height)
+        // Two passes: long dark blades behind, shorter bright ones in front.
+        for pass in 0..<2 {
+            var rng = SeededRNG(seed: pass == 0 ? 0x3EAD_0001 : 0x3EAD_0002)
+            let spots = edgeSpots(size, spacing: pass == 0 ? 3.2 : 4.2,
+                                  seed: pass == 0 ? 0x3EAD_1001 : 0x3EAD_1002)
+            for s in spots {
+                let r = CGFloat(rng.nextUnit())
+                let len: CGFloat = m * (pass == 0 ? 0.24 + 0.16 * r : 0.13 + 0.10 * r)
+                let lean: CGFloat = (CGFloat(rng.nextUnit()) - 0.5) * len * 0.9
+                let bw: CGFloat = pass == 0 ? 2.4 : 2.0
+                let tip = CGPoint(x: s.point.x + s.inward.dx * len + s.along.dx * lean,
+                                  y: s.point.y + s.inward.dy * len + s.along.dy * lean)
+                let left = CGPoint(x: s.point.x - s.along.dx * bw, y: s.point.y - s.along.dy * bw)
+                let right = CGPoint(x: s.point.x + s.along.dx * bw, y: s.point.y + s.along.dy * bw)
+                let c1 = CGPoint(x: s.point.x + s.inward.dx * len * 0.6,
+                                 y: s.point.y + s.inward.dy * len * 0.6)
+                let c2 = CGPoint(x: right.x + s.inward.dx * len * 0.5,
+                                 y: right.y + s.inward.dy * len * 0.5)
+                var blade = Path()
+                blade.move(to: left)
+                blade.addQuadCurve(to: tip, control: c1)
+                blade.addQuadCurve(to: right, control: c2)
+                blade.closeSubpath()
+                let g = Double(rng.nextUnit())
+                let color = pass == 0
+                    ? Color(red: 0.10 + 0.06 * g, green: 0.30 + 0.12 * g, blue: 0.08 + 0.04 * g)
+                    : Color(red: 0.22 + 0.10 * g, green: 0.52 + 0.16 * g, blue: 0.14 + 0.06 * g)
+                ctx.fill(blade, with: .color(color))
+            }
+        }
+    }
+
+    /// Ember: dim glowing coals at the bottom, ash-gray rim.
+    private static func ember(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        fill(&ctx, size, Color(red: 0.09, green: 0.03, blue: 0.025))
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        var rng = SeededRNG(seed: 0xE3BE_0001)
+        let count = max(8, min(30, Int(w * h / (m * m) * 12)))
+        for _ in 0..<count {
+            let a = rng.nextUnit() * 2 * .pi
+            let d = sqrt(rng.nextUnit())
+            let cx: CGFloat = w / 2 + CGFloat(cos(a) * d) * w * 0.30
+            let cy: CGFloat = h / 2 + CGFloat(sin(a) * d) * h * 0.30
+            let r: CGFloat = m * (0.035 + 0.04 * CGFloat(rng.nextUnit()))
+            let heat = 0.55 + 0.45 * rng.nextUnit()
+            let center = CGPoint(x: cx, y: cy)
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 1.8, y: cy - r * 1.8, width: r * 3.6, height: r * 3.6)),
+                     with: .radialGradient(Gradient(colors: [
+                        Color(red: 1.0, green: 0.45, blue: 0.10).opacity(0.35 * heat), .clear]),
+                        center: center, startRadius: 0, endRadius: r * 1.8))
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r * 0.8, width: r * 2, height: r * 1.6)),
+                     with: .radialGradient(Gradient(colors: [
+                        Color(red: 1.0, green: 0.62, blue: 0.22).opacity(heat),
+                        Color(red: 0.55, green: 0.10, blue: 0.03).opacity(0.9)]),
+                        center: center, startRadius: 0, endRadius: r))
+        }
+        // Ash rim with a few pale specks.
+        ctx.stroke(Path(inset(size, m * 0.06)),
+                   with: .color(Color(white: 0.40).opacity(0.65)), lineWidth: m * 0.12)
+        for s in edgeSpots(size, spacing: 7, seed: 0xE3BE_0002) {
+            let d: CGFloat = m * 0.12 * CGFloat(rng.nextUnit())
+            let p = CGPoint(x: s.point.x + s.inward.dx * d, y: s.point.y + s.inward.dy * d)
+            ctx.fill(Path(ellipseIn: CGRect(x: p.x - 0.8, y: p.y - 0.8, width: 1.6, height: 1.6)),
+                     with: .color(Color(white: 0.72).opacity(0.6)))
+        }
+    }
+
+    /// Notebook: a torn-paper edge with blue ruled lines and a red margin.
+    private static func notebook(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        fill(&ctx, size, Color(red: 0.93, green: 0.91, blue: 0.84))
+        let gap: CGFloat = max(4, m * 0.09)
+        var y: CGFloat = gap * 0.7
+        while y < h {
+            line(&ctx, CGPoint(x: 0, y: y), CGPoint(x: w, y: y),
+                 Color(red: 0.45, green: 0.62, blue: 0.90).opacity(0.75), 0.8)
+            y += gap
+        }
+        line(&ctx, CGPoint(x: w * 0.12, y: 0), CGPoint(x: w * 0.12, y: h),
+             Color(red: 0.85, green: 0.25, blue: 0.25).opacity(0.7), 0.9)
+        let hole = raggedRect(inset(size, m * 0.16), step: max(2.5, m * 0.05),
+                              jitter: m * 0.035, seed: 0x0B00_0001)
+        ctx.fill(hole, with: .color(Color(red: 0.11, green: 0.08, blue: 0.05)))
+        ctx.stroke(hole, with: .color(Color.black.opacity(0.35)), lineWidth: 1.2)
+    }
+
+    /// Graph and Blueprint: grid lines shrinking toward the center, like a
+    /// grid drawn down the inside of a deep shaft.
+    private static func perspectiveGrid(_ ctx: inout GraphicsContext, _ size: CGSize,
+                                        base: Color, lineColor: Color,
+                                        rings: Int, rays: Int) {
+        fill(&ctx, size, base)
+        let w = size.width
+        let h = size.height
+        let c = CGPoint(x: w / 2, y: h / 2)
+        let innermost: CGFloat = pow(0.74, CGFloat(rings))
+        // Rays from the rim toward the center, stopping at the innermost ring.
+        for i in 0...rays {
+            let f: CGFloat = CGFloat(i) / CGFloat(rays)
+            let rim: [CGPoint] = [CGPoint(x: w * f, y: 0), CGPoint(x: w * f, y: h),
+                                  CGPoint(x: 0, y: h * f), CGPoint(x: w, y: h * f)]
+            for p in rim {
+                let q = CGPoint(x: c.x + (p.x - c.x) * innermost, y: c.y + (p.y - c.y) * innermost)
+                line(&ctx, p, q, lineColor.opacity(0.35), 0.7)
+            }
+        }
+        for k in 1...rings {
+            let f: CGFloat = pow(0.74, CGFloat(k))
+            let r = CGRect(x: c.x - w * f / 2, y: c.y - h * f / 2, width: w * f, height: h * f)
+            let a: Double = 0.15 + 0.55 * Double(f)
+            ctx.stroke(Path(r), with: .color(lineColor.opacity(a)), lineWidth: 0.8)
+        }
+    }
+
+    /// Parchment: a burnt, curled parchment edge around the hole.
+    private static func parchment(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        fill(&ctx, size, Color(red: 0.80, green: 0.69, blue: 0.48))
+        // Age stains in the corners.
+        let corners: [CGPoint] = [.zero, CGPoint(x: size.width, y: 0),
+                                  CGPoint(x: 0, y: size.height),
+                                  CGPoint(x: size.width, y: size.height)]
+        for (i, corner) in corners.enumerated() {
+            let r: CGFloat = m * (0.30 + 0.06 * CGFloat(i % 2))
+            ctx.fill(Path(ellipseIn: CGRect(x: corner.x - r, y: corner.y - r, width: r * 2, height: r * 2)),
+                     with: .radialGradient(Gradient(colors: [
+                        Color(red: 0.45, green: 0.30, blue: 0.14).opacity(0.55), .clear]),
+                        center: corner, startRadius: 0, endRadius: r))
+        }
+        let hole = raggedRect(inset(size, m * 0.17), step: max(3, m * 0.07),
+                              jitter: m * 0.05, seed: 0x9A5C_0001)
+        // Scorch: a wide dark-brown char, then a thin orange ember line.
+        ctx.stroke(hole, with: .color(Color(red: 0.25, green: 0.12, blue: 0.04).opacity(0.85)),
+                   lineWidth: m * 0.08)
+        ctx.stroke(hole, with: .color(Color(red: 0.80, green: 0.38, blue: 0.08).opacity(0.45)),
+                   lineWidth: max(0.8, m * 0.02))
+        ctx.fill(hole, with: .color(Color(red: 0.10, green: 0.06, blue: 0.03)))
+    }
+
+    /// Sketch: pencil cross-hatching that gets denser toward the center.
+    private static func sketch(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        fill(&ctx, size, Color(red: 0.34, green: 0.34, blue: 0.36))
+        let m = min(size.width, size.height)
+        let spacing: CGFloat = max(2.6, m * 0.065)
+        let span: CGFloat = size.width + size.height
+        let pencil = Color(red: 0.06, green: 0.06, blue: 0.08).opacity(0.55)
+        for layer in 0..<4 {
+            let r = inset(size, m * 0.09 * CGFloat(layer))
+            let rising = layer % 2 == 0
+            ctx.drawLayer { l in
+                l.clip(to: Path(r))
+                var x: CGFloat = -span
+                while x < span {
+                    var p = Path()
+                    if rising {
+                        p.move(to: CGPoint(x: x, y: 0))
+                        p.addLine(to: CGPoint(x: x + size.height, y: size.height))
+                    } else {
+                        p.move(to: CGPoint(x: x + size.height, y: 0))
+                        p.addLine(to: CGPoint(x: x, y: size.height))
+                    }
+                    l.stroke(p, with: .color(pencil), lineWidth: 0.7)
+                    x += spacing
+                }
+            }
+        }
+    }
+
+    /// Origami: folded-paper creases stepping down into a funnel.
+    private static func origami(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        let steps = 5
+        let step: CGFloat = m * 0.085
+        let shade: [Double] = [1.0, 0.82, 0.62, 0.48]   // top, left, right, bottom
+        for k in 0..<steps {
+            let outer = inset(size, step * CGFloat(k))
+            let inner = inset(size, step * CGFloat(k + 1))
+            let tone: Double = 0.58 * pow(0.70, Double(k))
+            let faces: [[CGPoint]] = [
+                [CGPoint(x: outer.minX, y: outer.minY), CGPoint(x: outer.maxX, y: outer.minY),
+                 CGPoint(x: inner.maxX, y: inner.minY), CGPoint(x: inner.minX, y: inner.minY)],
+                [CGPoint(x: outer.minX, y: outer.minY), CGPoint(x: inner.minX, y: inner.minY),
+                 CGPoint(x: inner.minX, y: inner.maxY), CGPoint(x: outer.minX, y: outer.maxY)],
+                [CGPoint(x: outer.maxX, y: outer.minY), CGPoint(x: outer.maxX, y: outer.maxY),
+                 CGPoint(x: inner.maxX, y: inner.maxY), CGPoint(x: inner.maxX, y: inner.minY)],
+                [CGPoint(x: outer.minX, y: outer.maxY), CGPoint(x: inner.minX, y: inner.maxY),
+                 CGPoint(x: inner.maxX, y: inner.maxY), CGPoint(x: outer.maxX, y: outer.maxY)],
+            ]
+            for (i, face) in faces.enumerated() {
+                var p = Path()
+                p.addLines(face)
+                p.closeSubpath()
+                let v: Double = tone * shade[i]
+                ctx.fill(p, with: .color(Color(red: v * 1.05, green: v * 0.97, blue: v * 0.86)))
+            }
+        }
+        ctx.fill(Path(inset(size, step * CGFloat(steps))),
+                 with: .color(Color(red: 0.06, green: 0.05, blue: 0.04)))
+        // Diagonal creases from the corners down to the center.
+        let c = CGPoint(x: size.width / 2, y: size.height / 2)
+        let corners: [CGPoint] = [.zero, CGPoint(x: size.width, y: 0),
+                                  CGPoint(x: 0, y: size.height),
+                                  CGPoint(x: size.width, y: size.height)]
+        for corner in corners {
+            line(&ctx, corner, c, Color.black.opacity(0.25), 0.8)
+        }
+    }
+
+    /// Velvet: soft sheen on the inner wall.
+    private static func velvet(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        fill(&ctx, size, Color(red: 0.08, green: 0.02, blue: 0.12))
+        ctx.fill(Path(CGRect(x: 0, y: 0, width: w, height: m * 0.32)),
+                 with: .linearGradient(Gradient(colors: [
+                    Color(red: 0.62, green: 0.32, blue: 0.72).opacity(0.38), .clear]),
+                    startPoint: .zero, endPoint: CGPoint(x: 0, y: m * 0.32)))
+        ctx.fill(Path(CGRect(origin: .zero, size: size)),
+                 with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.55, green: 0.24, blue: 0.66).opacity(0.32), .clear]),
+                    center: CGPoint(x: w * 0.30, y: h * 0.26), startRadius: 0, endRadius: m * 0.55))
+        let sideX: CGFloat = w - m * 0.22
+        ctx.fill(Path(CGRect(x: sideX, y: 0, width: m * 0.22, height: h)),
+                 with: .linearGradient(Gradient(colors: [.clear,
+                    Color(red: 0.40, green: 0.15, blue: 0.50).opacity(0.22)]),
+                    startPoint: CGPoint(x: sideX, y: 0), endPoint: CGPoint(x: w, y: 0)))
+    }
+
+    /// Sunset: deep red at the rim falling to purple at the center.
+    private static func sunset(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let c = CGPoint(x: size.width / 2, y: size.height / 2)
+        let stops: [Gradient.Stop] = [
+            .init(color: Color(red: 0.12, green: 0.03, blue: 0.17), location: 0.0),
+            .init(color: Color(red: 0.30, green: 0.05, blue: 0.20), location: 0.45),
+            .init(color: Color(red: 0.50, green: 0.10, blue: 0.06), location: 0.80),
+            .init(color: Color(red: 0.62, green: 0.20, blue: 0.06), location: 1.0),
+        ]
+        ctx.fill(Path(CGRect(origin: .zero, size: size)),
+                 with: .radialGradient(Gradient(stops: stops), center: c, startRadius: 0,
+                                       endRadius: max(size.width, size.height) * 0.62))
+    }
+
+    /// Mirage: faint wavy heat-haze rings inside.
+    private static func mirage(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let w = size.width
+        let h = size.height
+        fill(&ctx, size, Color(red: 0.20, green: 0.13, blue: 0.05))
+        let c = CGPoint(x: w / 2, y: h / 2)
+        let n = 56
+        for k in 1...6 {
+            let f: CGFloat = 1 - CGFloat(k) * 0.14
+            var p = Path()
+            for i in 0...n {
+                let a: Double = Double(i) / Double(n) * 2 * .pi
+                let wob: CGFloat = 1 + 0.04 * CGFloat(sin(a * 7 + Double(k) * 1.3))
+                let pt = CGPoint(x: c.x + CGFloat(cos(a)) * w / 2 * f * wob,
+                                 y: c.y + CGFloat(sin(a)) * h / 2 * f * wob)
+                if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+            }
+            p.closeSubpath()
+            let a: Double = 0.10 + 0.03 * Double(7 - k)
+            ctx.stroke(p, with: .color(Color(red: 0.90, green: 0.74, blue: 0.48).opacity(a)), lineWidth: 1.0)
+        }
+    }
+
+    /// Canyon: layered rock strata stepping down.
+    private static func canyon(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        let strata: [Color] = [
+            Color(red: 0.62, green: 0.32, blue: 0.17), Color(red: 0.50, green: 0.23, blue: 0.12),
+            Color(red: 0.66, green: 0.40, blue: 0.22), Color(red: 0.40, green: 0.17, blue: 0.09),
+            Color(red: 0.30, green: 0.12, blue: 0.07), Color(red: 0.17, green: 0.07, blue: 0.04),
+        ]
+        let step: CGFloat = m * 0.075
+        for (k, color) in strata.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            let layer: Path = k == 0
+                ? Path(r)
+                : raggedRect(r, step: max(3, m * 0.06), jitter: m * 0.015,
+                             seed: 0xCA27_0000 + UInt64(k))
+            ctx.fill(layer, with: .color(color))
+            if k > 0 { ctx.stroke(layer, with: .color(Color.black.opacity(0.28)), lineWidth: 1) }
+        }
+    }
+
+    /// Downpour: rain streaks falling in toward the dark center.
+    private static func downpour(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        fill(&ctx, size, Color(red: 0.07, green: 0.11, blue: 0.19))
+        var rng = SeededRNG(seed: 0xD0E9_0001)
+        let c = CGPoint(x: w / 2, y: h / 2)
+        let half: CGFloat = max(w, h) * 0.5
+        let count = max(24, min(90, Int(w * h / (m * m) * 40)))
+        for _ in 0..<count {
+            let p = CGPoint(x: CGFloat(rng.nextUnit()) * w, y: CGFloat(rng.nextUnit()) * h)
+            let dx: CGFloat = c.x - p.x
+            let dy: CGFloat = c.y - p.y
+            let dist: CGFloat = max(0.001, hypot(dx, dy))
+            let rim: CGFloat = min(1, dist / half)          // 0 at the center, 1 at the rim
+            let len: CGFloat = m * (0.05 + 0.12 * CGFloat(rng.nextUnit())) * (0.4 + 0.6 * rim)
+            let q = CGPoint(x: p.x + dx / dist * len, y: p.y + dy / dist * len)
+            let a: Double = 0.12 + 0.30 * Double(rim)
+            line(&ctx, p, q, Color(red: 0.62, green: 0.76, blue: 0.96).opacity(a), 0.8)
+        }
+    }
+
+    /// Syrup: a glossy highlight and a few drips over the rim.
+    private static func syrup(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        let c = CGPoint(x: w / 2, y: h / 2)
+        ctx.fill(Path(CGRect(origin: .zero, size: size)),
+                 with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.14, green: 0.03, blue: 0.05),
+                    Color(red: 0.34, green: 0.10, blue: 0.06)]),
+                    center: c, startRadius: 0, endRadius: max(w, h) * 0.6))
+        // Drips hanging from the top rim.
+        let amber = Color(red: 0.62, green: 0.28, blue: 0.07)
+        let deep = Color(red: 0.46, green: 0.16, blue: 0.05)
+        ctx.fill(Path(CGRect(x: 0, y: 0, width: w, height: m * 0.05)), with: .color(amber))
+        var rng = SeededRNG(seed: 0x5E2F_0001)
+        let drips = max(3, min(6, Int(w / (m * 0.3))))
+        for i in 0..<drips {
+            let x: CGFloat = w * (CGFloat(i) + 0.3 + 0.4 * CGFloat(rng.nextUnit())) / CGFloat(drips)
+            let dw: CGFloat = m * (0.05 + 0.03 * CGFloat(rng.nextUnit()))
+            let len: CGFloat = m * (0.10 + 0.16 * CGFloat(rng.nextUnit()))
+            var d = Path()
+            d.addRect(CGRect(x: x - dw / 2, y: 0, width: dw, height: len))
+            d.addEllipse(in: CGRect(x: x - dw * 0.75, y: len - dw * 0.75, width: dw * 1.5, height: dw * 1.5))
+            ctx.fill(d, with: .linearGradient(Gradient(colors: [amber, deep]),
+                                              startPoint: CGPoint(x: x, y: 0),
+                                              endPoint: CGPoint(x: x, y: len + dw)))
+            ctx.fill(Path(ellipseIn: CGRect(x: x - dw * 0.35, y: len - dw * 0.45,
+                                             width: dw * 0.3, height: dw * 0.4)),
+                     with: .color(Color.white.opacity(0.35)))
+        }
+        // Glossy highlight curving along the upper left of the surface.
+        let r = inset(size, m * 0.20)
+        var arc = Path()
+        arc.addArc(center: CGPoint(x: r.midX, y: r.midY), radius: min(r.width, r.height) / 2,
+                   startAngle: .degrees(195), endAngle: .degrees(255), clockwise: false)
+        ctx.stroke(arc, with: .color(Color.white.opacity(0.30)),
+                   style: StrokeStyle(lineWidth: max(1.2, m * 0.04), lineCap: .round))
+    }
+
+    /// Sideline: a white out-of-bounds line along the rim.
+    private static func sideline(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        fill(&ctx, size, Color(red: 0.13, green: 0.13, blue: 0.15))
+        ctx.stroke(Path(inset(size, m * 0.09)),
+                   with: .color(Color.white.opacity(0.9)), lineWidth: max(1.5, m * 0.055))
+    }
+
+    /// Pocket: a stitched leather pocket rim with a hint of net inside.
+    private static func pocket(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        fill(&ctx, size, Color(red: 0.04, green: 0.05, blue: 0.04))
+        let inner = inset(size, m * 0.16)
+        let span: CGFloat = size.width + size.height
+        let gap: CGFloat = max(3, m * 0.11)
+        let net = Color(white: 0.85).opacity(0.13)
+        ctx.drawLayer { l in
+            l.clip(to: Path(inner))
+            var x: CGFloat = -span
+            while x < span {
+                var a = Path()
+                a.move(to: CGPoint(x: x, y: 0))
+                a.addLine(to: CGPoint(x: x + span, y: span))
+                var b = Path()
+                b.move(to: CGPoint(x: x, y: 0))
+                b.addLine(to: CGPoint(x: x - span, y: span))
+                l.stroke(a, with: .color(net), lineWidth: 0.6)
+                l.stroke(b, with: .color(net), lineWidth: 0.6)
+                x += gap
+            }
+        }
+        let band = Path(inset(size, m * 0.065))
+        ctx.stroke(band, with: .color(Color(red: 0.36, green: 0.20, blue: 0.10)), lineWidth: m * 0.13)
+        ctx.stroke(band, with: .color(Color(red: 0.86, green: 0.71, blue: 0.46).opacity(0.7)),
+                   style: StrokeStyle(lineWidth: 0.8, dash: [3, 2.5]))
+    }
+
+    // MARK: Rare pits (gentle motion)
+
+    /// Graveyard: gravestones on the far rim; a faint ghost drifts slowly
+    /// side to side in the depth and fades in and out a little.
+    static func drawGraveyard(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        fill(&ctx, size, Color(red: 0.035, green: 0.055, blue: 0.045))
+        // Low mist pooled in the depth.
+        ctx.fill(Path(CGRect(origin: .zero, size: size)),
+                 with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.45, green: 0.55, blue: 0.50).opacity(0.14), .clear]),
+                    center: CGPoint(x: w / 2, y: h * 0.6), startRadius: 0, endRadius: m * 0.6))
+        // Gravestones along the far (top) rim.
+        var rng = SeededRNG(seed: 0x6EA7_0001)
+        let sw: CGFloat = m * 0.13
+        let count = max(2, min(6, Int(w / (m * 0.28))))
+        let engraving = Color.black.opacity(0.45)
+        for i in 0..<count {
+            let jitter: CGFloat = (CGFloat(rng.nextUnit()) - 0.5) * sw * 0.6
+            let x: CGFloat = w * (CGFloat(i) + 0.5) / CGFloat(count) - sw / 2 + jitter
+            let sh: CGFloat = m * (0.15 + 0.06 * CGFloat(rng.nextUnit()))
+            let y: CGFloat = m * 0.02
+            var stone = Path()
+            stone.addRect(CGRect(x: x, y: y + sw / 2, width: sw, height: sh - sw / 2))
+            stone.addEllipse(in: CGRect(x: x, y: y, width: sw, height: sw))
+            ctx.fill(stone, with: .linearGradient(Gradient(colors: [
+                        Color(red: 0.52, green: 0.54, blue: 0.56),
+                        Color(red: 0.30, green: 0.32, blue: 0.34)]),
+                        startPoint: CGPoint(x: x, y: y), endPoint: CGPoint(x: x + sw, y: y + sh)))
+            let cx: CGFloat = x + sw / 2
+            line(&ctx, CGPoint(x: cx, y: y + sh * 0.30), CGPoint(x: cx, y: y + sh * 0.62), engraving, 0.9)
+            line(&ctx, CGPoint(x: cx - sw * 0.22, y: y + sh * 0.40),
+                 CGPoint(x: cx + sw * 0.22, y: y + sh * 0.40), engraving, 0.9)
+        }
+        // The ghost.
+        let gx: CGFloat = w * 0.5 + CGFloat(sin(t * 0.31)) * w * 0.22
+        let gy: CGFloat = h * 0.60 + CGFloat(sin(t * 0.73)) * m * 0.04
+        let gr: CGFloat = m * 0.11
+        let alpha: Double = 0.22 + 0.07 * sin(t * 0.9)
+        let gc = CGPoint(x: gx, y: gy)
+        ctx.fill(Path(ellipseIn: CGRect(x: gx - gr * 2, y: gy - gr * 2, width: gr * 4, height: gr * 4)),
+                 with: .radialGradient(Gradient(colors: [Color.white.opacity(alpha * 0.5), .clear]),
+                    center: gc, startRadius: 0, endRadius: gr * 2))
+        var ghost = Path()
+        ghost.addArc(center: gc, radius: gr, startAngle: .degrees(180), endAngle: .degrees(0),
+                     clockwise: false)
+        let bottom: CGFloat = gy + gr * 1.5
+        ghost.addLine(to: CGPoint(x: gx + gr, y: bottom))
+        let sway: CGFloat = CGFloat(sin(t * 1.4)) * gr * 0.12
+        for k in 0..<3 {
+            let x1: CGFloat = gx + gr - CGFloat(k) * gr * 2 / 3
+            let x2: CGFloat = x1 - gr * 2 / 3
+            ghost.addQuadCurve(to: CGPoint(x: x2, y: bottom),
+                               control: CGPoint(x: (x1 + x2) / 2 + sway, y: bottom - gr * 0.35))
+        }
+        ghost.closeSubpath()
+        ctx.fill(ghost, with: .color(Color.white.opacity(alpha)))
+        let eye = Color.black.opacity(min(1, alpha * 1.8))
+        for dx in [-gr * 0.35, gr * 0.35] {
+            ctx.fill(Path(ellipseIn: CGRect(x: gx + dx - gr * 0.12, y: gy - gr * 0.15,
+                                             width: gr * 0.24, height: gr * 0.3)),
+                     with: .color(eye))
+        }
+    }
+
+    /// Aurora: a green-to-violet band rippling slowly in the depth.
+    static func drawAurora(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        let w = size.width
+        let h = size.height
+        fill(&ctx, size, Color(red: 0.02, green: 0.03, blue: 0.09))
+        var rng = SeededRNG(seed: 0xA0E0_0001)
+        for _ in 0..<14 {
+            let p = CGPoint(x: CGFloat(rng.nextUnit()) * w, y: CGFloat(rng.nextUnit()) * h)
+            let r: CGFloat = 0.5 + 0.6 * CGFloat(rng.nextUnit())
+            ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
+                     with: .color(Color.white.opacity(0.5)))
+        }
+        let n = 24
+        var top: [CGPoint] = []
+        var bottom: [CGPoint] = []
+        for i in 0...n {
+            let fx: Double = Double(i) / Double(n)
+            let x: CGFloat = CGFloat(fx) * w
+            let y1: CGFloat = h * 0.44 + CGFloat(sin(fx * 2 * .pi * 1.2 + t * 0.5)) * h * 0.10
+            let thick: CGFloat = h * (0.10 + 0.05 * CGFloat(sin(fx * 2 * .pi * 0.8 + t * 0.35)))
+            top.append(CGPoint(x: x, y: y1))
+            bottom.append(CGPoint(x: x, y: y1 + thick))
+        }
+        let colors = Gradient(colors: [Color(red: 0.25, green: 0.95, blue: 0.60),
+                                       Color(red: 0.20, green: 0.80, blue: 0.85),
+                                       Color(red: 0.65, green: 0.35, blue: 1.00)])
+        let across = GraphicsContext.Shading.linearGradient(colors, startPoint: .zero,
+                                                            endPoint: CGPoint(x: w, y: 0))
+        // Soft curtain rising above the band.
+        let curtain = polygon(top.map { CGPoint(x: $0.x, y: $0.y - h * 0.20) } + top.reversed())
+        var glow = ctx
+        glow.blendMode = .plusLighter
+        glow.opacity = 0.22
+        glow.fill(curtain, with: across)
+        // The band itself.
+        let band = polygon(top + bottom.reversed())
+        var bright = ctx
+        bright.blendMode = .plusLighter
+        bright.opacity = 0.55
+        bright.fill(band, with: across)
     }
 }
 

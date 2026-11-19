@@ -739,7 +739,7 @@ struct LoadoutDiorama: View {
                                           y: (CGFloat(h.y) + CGFloat(h.h) / 2) * ah))
             ZStack {
                 Rectangle().fill(loadout.pit.color)
-                if !reduceMotion { PitOverlayView(pit: loadout.pit) }
+                if !reduceMotion || loadout.pit.hasDrawnArt { PitOverlayView(pit: loadout.pit) }
                 PitDepthShade(width: w, height: ht)
             }
             .frame(width: w, height: ht)
