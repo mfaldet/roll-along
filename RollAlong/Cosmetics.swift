@@ -53,11 +53,19 @@ extension CosmeticItem {
 
     /// True when Sell Back can liquidate this item for coins — everything that
     /// isn't the starter look or a permanent Iconic special, including seasonal /
-    /// limited-time cosmetics.  `Self.starter` is excluded explicitly because a
-    /// starter needn't be `.starter` tier (TrailColor's is Graphite, tier .rare):
-    /// Sell Back re-grants every category's starter, so refunding it would mint
-    /// coins on every pass.
+    /// limited-time cosmetics.  `Self.starter` (the slot's Roll Along piece) is
+    /// excluded explicitly as a guard: Sell Back re-grants every category's
+    /// starter, so refunding one would mint coins on every pass.
     var isSellable: Bool { !isIconic && self != Self.starter }
+
+    /// True for this slot's piece of the Iconic Roll Along set (the default).
+    var isRollAlongPiece: Bool { self == Self.starter }
+
+    /// `items` with this slot's Roll Along piece moved to the front (other
+    /// items keep their order).  Catalog tabs and the Locker list it first.
+    static func rollAlongFirst(_ items: [Self]) -> [Self] {
+        items.filter(\.isRollAlongPiece) + items.filter { !$0.isRollAlongPiece }
+    }
 
     /// Player-facing rarity word: "Iconic" for un-sellable specials, otherwise
     /// the tier's rarity name (Standard / Rare / Epic / Legendary).
@@ -867,7 +875,8 @@ enum GoalSkin: String, CosmeticItem {
 enum TrailColor: String, CosmeticItem {
     // Starter
     case none           // no trail — free "Off" option in the shop
-    case graphite       // Paper-world's lead trail; THE default — equipped from first launch
+    case classic        // THE default — a faint pressed-in shadow; equipped from first launch (Roll Along set)
+    case graphite       // Sketchbook's pencil-lead trail (Standard; no longer a default)
 
     // Tiers are assigned in `tier` below (Standard / Rare / Legendary).
     case ink
@@ -897,6 +906,7 @@ enum TrailColor: String, CosmeticItem {
     var displayName: String {
         switch self {
         case .none:        return "Off"
+        case .classic:     return "Classic"
         case .aurora:      return "Aurora"
         case .graphite:    return "Graphite"
         case .moneyRoll:   return "Money Roll"
@@ -923,11 +933,11 @@ enum TrailColor: String, CosmeticItem {
     }
     var coinCost: Int { tier.basePrice }
     var unlockLevel: Int { 0 }
-    /// The default-equipped trail.  Graphite (not .none) so a brand-new
-    /// player sees a trail behind their ball from the very first roll;
-    /// "Off" stays a free starter-tier choice in the shop for players
-    /// who prefer no trail.
-    static var starter: TrailColor { .graphite }
+    /// The default-equipped trail: Classic, a faint pressed-in shadow (part of
+    /// the Iconic Roll Along set).  Not .none, so a brand-new player sees the
+    /// ball's path from the very first roll; "Off" stays a free starter-tier
+    /// choice for players who prefer no trail.
+    static var starter: TrailColor { .classic }
     /// Tier rule:
     ///   • Standard  — solid mono-colour trails.
     ///   • Epic      — multi-colour trails (per-segment hue cycle).
@@ -935,11 +945,12 @@ enum TrailColor: String, CosmeticItem {
     ///                 coins, sparkle, etc.).
     var tier: CosmeticTier {
         switch self {
-        case .none:
+        case .none, .classic:
             return .starter
-        case .sky, .forest, .bubblegum, .wildfire, .splash, .squall:
+        case .sky, .forest, .bubblegum, .wildfire, .splash, .squall,
+             .graphite:        // Sketchbook's pencil trail — priced like its set's other pieces
             return .standard   //  750 coins — solid mono colour
-        case .snake, .raybeam, .gilded, .graphite,
+        case .snake, .raybeam, .gilded,
              .ember:           // audit 2026-07 ruling 1(c): rides the plusLighter glow path — Rare
             return .rare       // 1,000 coins — distinctive textured trails
         case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air, .aurora,
@@ -963,6 +974,7 @@ enum TrailColor: String, CosmeticItem {
     var color: Color {
         switch self {
         case .none:        return .clear
+        case .classic:     return Color.black.opacity(0.22)   // hue-less shadow; renderer adds the light edge
         case .aurora:      return Color(red: 0.28, green: 0.92, blue: 0.78).opacity(0.85)   // teal base; renderer adds the violet shimmer
         case .graphite:    return Color(red: 0.20, green: 0.20, blue: 0.22).opacity(0.70)
         case .ink:         return Color(red: 0.09, green: 0.09, blue: 0.14).opacity(0.80)
@@ -2326,10 +2338,10 @@ enum ShopRotation {
         }
     }
     static var trailPool: [TrailColor] {
-        // Exclude the free default (graphite), the bundle-only trails, and the
-        // IAP-secret Money Roll.
+        // Exclude the free defaults (starter tier: Classic, Off), the
+        // bundle-only trails, and the IAP-secret Money Roll.
         TrailColor.allCases.filter { $0.tier != .starter && !$0.isBundleExclusive
-            && $0 != .graphite && $0 != .air && $0 != .raybeam
+            && $0 != .air && $0 != .raybeam
             && CosmeticSchedule.isReleased($0) }
     }
     static var goalPool: [GoalSkin] {
@@ -2834,6 +2846,32 @@ struct CosmeticBundle: Identifiable {
     /// True for a collection that is no longer sold as a set.
     var isRetired: Bool { !Self.activeIDSet.contains(id) }
 
+    // MARK: Roll Along — the Iconic default set
+
+    /// The six defaults every player starts with: Red ball, Target goal and the
+    /// Classic trail, floor, pit and boundary.  Iconic: free, owned by every
+    /// player from first launch and equipped on a fresh install; never sold or
+    /// sellable.  Deliberately NOT in `catalogue`, so it is never in the Shop
+    /// rotation, the featured bundle, gift pools, Challenge Track rewards or
+    /// the release calendar.  The Catalog pins it first in Collections.
+    static let rollAlongID = "roll-along"
+    static let rollAlong = CosmeticBundle(
+        id:             rollAlongID,
+        displayName:    "Roll Along",
+        tagline:        "The classic look every player starts with. Yours forever.",
+        contentSummary: "Red ball · Target goal · Classic trail · Classic floor · Classic pit · Classic boundary",
+        balls:  [BallSkin.starter],
+        goals:  [GoalSkin.starter],
+        trails: [TrailColor.starter],
+        floors: [Floor.starter],
+        pits:   [Pit.starter],
+        music:  [],
+        boundaries: [Boundary.starter]
+    )
+
+    /// True for the Iconic Roll Along set (free, owned by all, never sold).
+    var isRollAlong: Bool { id == Self.rollAlongID }
+
     /// The collections on sale, in catalogue order.
     static var active: [CosmeticBundle] { catalogue.filter { !$0.isRetired } }
 
@@ -2875,11 +2913,11 @@ struct CosmeticBundle: Identifiable {
             id:             "heavens",
             displayName:    "Heavens",
             tagline:        "Drift the sky on opal lustre.",
-            contentSummary: "Opal ball · Halo goal · Classic floor · Sky pit · Stardust trail · Celestial music · Cloud boundary",
+            contentSummary: "Opal ball · Halo goal · Sky pit · Stardust trail · Celestial music · Cloud boundary",
             balls:  [.opal],
             goals:  [.halo],
             trails: [.stardust],
-            floors: [.classic],
+            floors: [],
             pits:   [.sky],
             music:  [.celestial],
             boundaries: [.cloud]
@@ -2900,11 +2938,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "paper-world",
             displayName:    "Paper World",
-            tagline:        "The full Notebook + Graphite-trail pack.",
-            contentSummary: "Paper ball · Doodle goal · Notebook floor · Notebook pit · Graphite trail · Lo-fi music · Notebook boundary",
+            tagline:        "The full Notebook pack.",
+            contentSummary: "Paper ball · Doodle goal · Notebook floor · Notebook pit · Lo-fi music · Notebook boundary",
             balls:  [.paper],
             goals:  [.doodle],
-            trails: [.graphite],   // the default trail everyone owns — adds nothing to the price paid
+            trails: [],            // Graphite now belongs to Sketchbook only (no shared pieces)
             floors: [.notebook],
             pits:   [.notebook],
             music:  [.lofi],
@@ -3564,9 +3602,9 @@ struct CosmeticBundle: Identifiable {
             id:             "backtoschool-2026",
             displayName:    "Back to School",
             tagline:        "Sharpen up. Class is rolling.",
-            contentSummary: "Teacher's Apple ball · Target goal · Ink trail · Notebook floor · Notebook pit · Piano music · Notebook boundary",
+            contentSummary: "Teacher's Apple ball · Ink trail · Notebook floor · Notebook pit · Piano music · Notebook boundary",
             balls:  [.apple],
-            goals:  [.target],
+            goals:  [],
             trails: [.ink],
             floors: [.notebook],
             pits:   [.notebook],
@@ -3607,9 +3645,9 @@ struct CosmeticBundle: Identifiable {
             id:             "diamond",
             displayName:    "Diamond",
             tagline:        "Step up to the plate. The crowd is watching.",
-            contentSummary: "Baseball · Target goal · Rose trail · Meadow floor · Sketch pit · Orchestral music · Fairway boundary",
+            contentSummary: "Baseball · Rose trail · Meadow floor · Sketch pit · Orchestral music · Fairway boundary",
             balls:  [.baseball],
-            goals:  [.target],
+            goals:  [],
             trails: [.roseTrail],
             floors: [.meadow],
             pits:   [.sketch],
@@ -4521,6 +4559,7 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .stardust:        trailStardust(ctx, fr)
     case .air:             trailAir(ctx, fr)
     case .rainbow:         trailRainbow(ctx, fr)
+    case .classic:         trailClassic(ctx, fr)
     case .graphite:        trailGraphite(ctx, fr)
     case .roseTrail:       trailRose(ctx, fr)
     case .moneyRoll:       trailMoney(ctx, fr)
@@ -4738,6 +4777,34 @@ private func trailIce(_ ctx: GraphicsContext, _ fr: TrailFrame) {
 /// Graphite — pencil on paper: a faint base line broken up by short, uneven
 /// strokes.  The jitter comes from each mark's own seed, so a stroke never
 /// shifts; it simply fades where it was drawn.
+/// Classic — the default.  A very subtle shallow indent pressed into the floor:
+/// a soft low-alpha dark groove with a faint light lip on one side (like an
+/// emboss), no hue of its own, so it reads on light and dark floors alike.
+/// Marks stay where they were laid and only fade with age (no motion).
+private func trailClassic(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let a: CGPoint = fr.pts[i - 1], b: CGPoint = fr.pts[i]
+        let dx: CGFloat = b.x - a.x, dy: CGFloat = b.y - a.y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        // Unit normal; the light lip sits on the lower-right side of the groove
+        // (light from the top-left, as on the ball's highlight).
+        var nx: CGFloat = -dy / len, ny: CGFloat = dx / len
+        if nx + ny < 0 { nx = -nx; ny = -ny }
+        let w: CGFloat = fr.bw * CGFloat(0.55 + 0.45 * k)
+        var groove = Path(); groove.move(to: a); groove.addLine(to: b)
+        ctx.stroke(groove, with: .color(Color.black.opacity(0.20 * k)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round))
+        let off: CGFloat = w * 0.45
+        var lip = Path()
+        lip.move(to: CGPoint(x: a.x + nx * off, y: a.y + ny * off))
+        lip.addLine(to: CGPoint(x: b.x + nx * off, y: b.y + ny * off))
+        ctx.stroke(lip, with: .color(Color.white.opacity(0.16 * k)),
+                   style: StrokeStyle(lineWidth: max(0.6, w * 0.22), lineCap: .round))
+    }
+}
+
 private func trailGraphite(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     let lead = Color(red: 0.20, green: 0.20, blue: 0.22)
     for i in 1..<fr.n {

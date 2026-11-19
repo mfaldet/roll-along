@@ -30,7 +30,7 @@ extension Loadout {
     init(bundle: CosmeticBundle) {
         self.init(
             ball:     bundle.balls.first  ?? .red,
-            trail:    bundle.trails.first ?? .graphite,
+            trail:    bundle.trails.first ?? TrailColor.starter,
             goal:     bundle.goals.first  ?? .target,
             floor:    bundle.floors.first ?? .classic,
             pit:      bundle.pits.first   ?? .classic,

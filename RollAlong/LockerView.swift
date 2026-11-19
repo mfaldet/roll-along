@@ -146,7 +146,8 @@ struct LockerView: View {
                 .kerning(1.5)
                 .foregroundStyle(Color(white: 0.55))
             LazyVGrid(columns: Self.lockerColumns, alignment: .leading, spacing: 14) {
-                ForEach(items, id: \.id) { item in
+                // The Roll Along piece for this slot always comes first.
+                ForEach(Item.rollAlongFirst(items), id: \.id) { item in
                     cosmeticCell(item: item, selected: isEquipped(item)) {
                         onTap(item)
                     }

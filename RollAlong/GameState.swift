@@ -2960,6 +2960,8 @@ final class GameState: ObservableObject {
     /// ball, and by CosmeticShopView to fire the collection-complete toast.
     var completedBundleIDs: Set<String> {
         var completed = ownedBundles   // bought-as-a-unit bundles are always complete
+        // The Iconic Roll Along set: every piece is a default, owned by everyone.
+        completed.insert(CosmeticBundle.rollAlongID)
         for bundle in CosmeticBundle.catalogue {
             guard !completed.contains(bundle.id) else { continue }
             let allOwned =

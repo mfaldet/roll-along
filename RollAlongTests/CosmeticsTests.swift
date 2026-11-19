@@ -172,20 +172,21 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// Sell Back re-grants every category's starter, so refunding a starter
-    /// would mint coins on every pass.  TrailColor's starter is Graphite —
-    /// tier .rare, NOT tier .starter — which used to slip through the iconic
-    /// filter and pay out +100 coins per Sell Back, forever (infinite faucet).
+    /// would mint coins on every pass.  (TrailColor's starter used to be
+    /// Graphite — tier .rare — which slipped through the iconic filter and paid
+    /// out on every Sell Back.  It is now the starter-tier Classic trail; the
+    /// guard stays.)
     func testLiquidate_secondPassRefundsNothing_starterIsNotAFaucet() {
         let gs = makeCleanState()
         gs.coinBalance = 0
         gs.ownedBallSkins.insert(BallSkin.blue.rawValue)             // coin-bought
-        gs.ownedTrails.insert(TrailColor.graphite.rawValue)          // the starter
+        gs.ownedTrails.insert(TrailColor.starter.rawValue)           // the starter (Classic)
         gs.ownedTrails.insert(TrailColor.fire.rawValue)              // coin-bought
 
         let first = gs.liquidateCoinCosmetics()
-        XCTAssertEqual(first.count, 2)   // .blue + .fire; graphite NOT refunded
+        XCTAssertEqual(first.count, 2)   // .blue + .fire; the starter NOT refunded
         XCTAssertEqual(first.coins, BallSkin.blue.coinCost / 2 + TrailColor.fire.coinCost / 2)   // 50% refund
-        XCTAssertTrue(gs.ownedTrails.contains(TrailColor.graphite.rawValue))   // starter kept
+        XCTAssertTrue(gs.ownedTrails.contains(TrailColor.starter.rawValue))    // starter kept
 
         let second = gs.liquidateCoinCosmetics()
         XCTAssertEqual(second.count, 0, "second consecutive Sell Back must refund nothing")
@@ -203,7 +204,7 @@ final class CosmeticsTests: XCTestCase {
     func testStarters_areNeverSellable() {
         XCTAssertFalse(BallSkin.starter.isSellable)
         XCTAssertFalse(GoalSkin.starter.isSellable)
-        XCTAssertFalse(TrailColor.starter.isSellable)   // Graphite — tier .rare but still the starter
+        XCTAssertFalse(TrailColor.starter.isSellable)   // Classic
         XCTAssertFalse(Floor.starter.isSellable)
         XCTAssertFalse(Pit.starter.isSellable)
         XCTAssertFalse(MusicTrack.starter.isSellable)
@@ -244,8 +245,8 @@ final class CosmeticsTests: XCTestCase {
 
     func testBundle_fullPrice_equalsSumOfItemCosts() {
         for bundle in CosmeticBundle.catalogue {
-            // A slot's default item (Paper World's Graphite trail) is owned by
-            // everyone and adds nothing.
+            // A slot's default item (a Roll Along piece) is owned by everyone
+            // and adds nothing.
             let ballSum  = bundle.balls.filter  { $0 != BallSkin.starter }.reduce(0)   { $0 + $1.coinCost }
             let goalSum  = bundle.goals.filter  { $0 != GoalSkin.starter }.reduce(0)   { $0 + $1.coinCost }
             let trailSum = bundle.trails.filter { $0 != TrailColor.starter }.reduce(0) { $0 + $1.coinCost }
@@ -501,19 +502,126 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(aurora.boundaries, [.aurora])
     }
 
+    /// Slots left empty when the Roll Along defaults (and Graphite, now
+    /// Sketchbook-only) were taken out of other collections.  All four are
+    /// retired or seasonal sets; replacements are still to be chosen.
+    static let knownSlotGaps: [String: Set<String>] = [
+        "heavens":           ["floor"],   // was the Classic floor
+        "backtoschool-2026": ["goal"],    // was the Target goal
+        "diamond":           ["goal"],    // was the Target goal
+        "paper-world":       ["trail"],   // was the Graphite trail
+    ]
+
     /// Every collection is a complete set: at least one item in each of the
-    /// seven slots (ball, goal, trail, floor, pit, boundary, music).  The
-    /// music data stays even while music is off, so it can return later.
+    /// seven slots (ball, goal, trail, floor, pit, boundary, music), except the
+    /// known gaps above.  The music data stays even while music is off.
     func testEveryCollection_isACompleteSevenSlotSet() {
         for b in CosmeticBundle.catalogue {
-            XCTAssertFalse(b.balls.isEmpty,      "\(b.id) has no ball")
-            XCTAssertFalse(b.goals.isEmpty,      "\(b.id) has no goal")
-            XCTAssertFalse(b.trails.isEmpty,     "\(b.id) has no trail")
-            XCTAssertFalse(b.floors.isEmpty,     "\(b.id) has no floor")
-            XCTAssertFalse(b.pits.isEmpty,       "\(b.id) has no pit")
-            XCTAssertFalse(b.boundaries.isEmpty, "\(b.id) has no boundary")
-            XCTAssertFalse(b.music.isEmpty,      "\(b.id) has no music")
+            let gaps = Self.knownSlotGaps[b.id] ?? []
+            func check(_ empty: Bool, _ slot: String) {
+                if gaps.contains(slot) {
+                    XCTAssertTrue(empty, "\(b.id) \(slot) gap is filled — update knownSlotGaps")
+                } else {
+                    XCTAssertFalse(empty, "\(b.id) has no \(slot)")
+                }
+            }
+            check(b.balls.isEmpty, "ball")
+            check(b.goals.isEmpty, "goal")
+            check(b.trails.isEmpty, "trail")
+            check(b.floors.isEmpty, "floor")
+            check(b.pits.isEmpty, "pit")
+            check(b.boundaries.isEmpty, "boundary")
+            XCTAssertFalse(b.music.isEmpty, "\(b.id) has no music")
         }
+        XCTAssertTrue(Self.knownSlotGaps.keys.allSatisfy { id in
+            CosmeticBundle.catalogue.contains { $0.id == id && $0.isRetired }
+        }, "every gap is in a retired set")
+    }
+
+    // MARK: - Roll Along (the Iconic default set) and the Classic trail
+
+    func testRollAlong_isTheSixDefaults_iconicFreeAndOwned() {
+        let set = CosmeticBundle.rollAlong
+        XCTAssertEqual(set.id, "roll-along")
+        XCTAssertEqual(set.displayName, "Roll Along")
+        XCTAssertEqual(set.balls, [.red])
+        XCTAssertEqual(set.goals, [.target])
+        XCTAssertEqual(set.trails, [.classic])
+        XCTAssertEqual(set.floors, [.classic])
+        XCTAssertEqual(set.pits, [.classic])
+        XCTAssertEqual(set.boundaries, [.classic])
+        XCTAssertEqual(set.fullPrice(), 0)
+        XCTAssertTrue(set.isRollAlong)
+        for piece in [set.balls.map { $0.isIconic && !$0.isSellable && !$0.isCoinPurchasable },
+                      set.goals.map { $0.isIconic && !$0.isSellable && !$0.isCoinPurchasable },
+                      set.trails.map { $0.isIconic && !$0.isSellable && !$0.isCoinPurchasable },
+                      set.floors.map { $0.isIconic && !$0.isSellable && !$0.isCoinPurchasable },
+                      set.pits.map { $0.isIconic && !$0.isSellable && !$0.isCoinPurchasable },
+                      set.boundaries.map { $0.isIconic && !$0.isSellable && !$0.isCoinPurchasable }]
+            .flatMap({ $0 }) {
+            XCTAssertTrue(piece, "every Roll Along piece is Iconic, unsellable and not for sale")
+        }
+        let gs = makeCleanState()
+        XCTAssertTrue(gs.completedBundleIDs.contains("roll-along"), "owned from first launch")
+        XCTAssertEqual(gs.equippedTrail, .classic, "Classic is equipped on a fresh install")
+        XCTAssertEqual(gs.activeSkin, .red)
+        XCTAssertEqual(gs.equippedGoal, .target)
+        XCTAssertEqual(gs.equippedFloor, .classic)
+        XCTAssertEqual(gs.equippedPit, .classic)
+        XCTAssertEqual(gs.equippedBoundary, .classic)
+    }
+
+    /// Never sold: not in the catalogue, so never in the Shop rotation, the
+    /// featured bundle, gift pools, Challenge Track rewards or the calendar.
+    func testRollAlong_isNeverSoldOrScheduled() {
+        XCTAssertFalse(CosmeticBundle.catalogue.contains { $0.id == "roll-along" })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.id == "roll-along" })
+        XCTAssertFalse(CosmeticBundle.starterGift.contains { $0.id == "roll-along" })
+        XCTAssertFalse(ShopRotation.trailPool.contains(.classic))
+        XCTAssertFalse(ShopRotation.ballPool.contains(.red))
+        XCTAssertTrue(CosmeticSchedule.releaseKeys(of: TrailColor.classic).isEmpty)
+    }
+
+    /// No Roll Along piece is in any other collection (active, retired or
+    /// seasonal).
+    func testRollAlong_sharesNoPieceWithAnyCollection() {
+        for b in CosmeticBundle.catalogue {
+            XCTAssertFalse(b.balls.contains(.red), "\(b.id) uses the Red ball")
+            XCTAssertFalse(b.goals.contains(.target), "\(b.id) uses the Target goal")
+            XCTAssertFalse(b.trails.contains(.classic), "\(b.id) uses the Classic trail")
+            XCTAssertFalse(b.floors.contains(.classic), "\(b.id) uses the Classic floor")
+            XCTAssertFalse(b.pits.contains(.classic), "\(b.id) uses the Classic pit")
+            XCTAssertFalse(b.boundaries.contains(.classic), "\(b.id) uses the Classic boundary")
+        }
+    }
+
+    /// Graphite is a normal Standard trail, sold only in Sketchbook; new
+    /// players don't own it.  Sketchbook's price includes it (4,750).
+    func testGraphite_isASketchbookOnlyStandardTrail() {
+        XCTAssertEqual(TrailColor.graphite.tier, .standard)
+        XCTAssertTrue(TrailColor.graphite.isCoinPurchasable)
+        XCTAssertTrue(TrailColor.graphite.isSellable)
+        XCTAssertNotEqual(TrailColor.starter, .graphite)
+        let holders = CosmeticBundle.catalogue.filter { $0.trails.contains(.graphite) }.map(\.id)
+        XCTAssertEqual(holders, ["sketchbook"])
+        XCTAssertEqual(CosmeticBundle.catalogue.first { $0.id == "sketchbook" }?.fullPrice(), 4_750)
+        XCTAssertFalse(makeCleanState().isOwned(TrailColor.graphite))
+    }
+
+    /// A saved loadout with a trail the player doesn't own (Graphite from an
+    /// older build) falls back to Classic.
+    func testSavedUnownedTrail_fallsBackToClassic() {
+        let defaults = UserDefaults(suiteName: "roll-along-fallback-\(UUID().uuidString)")!
+        defaults.set(TrailColor.graphite.rawValue, forKey: "ra_equippedTrail")
+        let gs = GameState(defaults: defaults)
+        XCTAssertEqual(gs.equippedTrail, .classic)
+    }
+
+    /// Catalog tabs and the Locker list the slot's Roll Along piece first.
+    func testRollAlongPiece_isListedFirst() {
+        XCTAssertEqual(TrailColor.rollAlongFirst(TrailColor.allCases).first, .classic)
+        XCTAssertEqual(BallSkin.rollAlongFirst(BallSkin.allCases.reversed()).first, .red)
+        XCTAssertEqual(Floor.rollAlongFirst(Array(Floor.allCases.reversed())).first, .classic)
     }
 
     /// Every boundary added for a collection belongs to at least one

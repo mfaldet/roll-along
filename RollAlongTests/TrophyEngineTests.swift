@@ -2641,7 +2641,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
         // Equip a non-starter in six slots — ball slot still starter.
         gs.equippedGoal = GoalSkin.allCases.first { $0 != .target }!
-        gs.equippedTrail = TrailColor.allCases.first { $0 != .graphite && $0 != .moneyRoll }!
+        gs.equippedTrail = TrailColor.allCases.first { $0 != .classic && $0 != .none && $0 != .moneyRoll }!
         gs.equippedFloor = Floor.allCases.first { $0 != .classic && $0 != .moneyFull }!
         gs.equippedPit = Pit.allCases.first { $0 != .classic }!
         gs.equippedBoundary = Boundary.allCases.first { $0 != .classic }!
@@ -2660,7 +2660,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         try XCTSkipIf(CosmeticFeatures.musicEnabled, "music is offered — seven slots apply")
         let gs = makeGameState()
         gs.equippedGoal = GoalSkin.allCases.first { $0 != .target }!
-        gs.equippedTrail = TrailColor.allCases.first { $0 != .graphite && $0 != .moneyRoll }!
+        gs.equippedTrail = TrailColor.allCases.first { $0 != .classic && $0 != .none && $0 != .moneyRoll }!
         gs.equippedFloor = Floor.allCases.first { $0 != .classic && $0 != .moneyFull }!
         gs.equippedPit = Pit.allCases.first { $0 != .classic }!
         gs.equippedBoundary = Boundary.allCases.first { $0 != .classic }!

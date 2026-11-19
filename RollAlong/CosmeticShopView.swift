@@ -849,10 +849,10 @@ struct CosmeticShopView: View {
         // Sort every Catalog page by rarity — "iconic" (free starter) up top,
         // then Standard, Rare, Epic, Legendary.  Pairing the tier rank with the
         // original index keeps the sort stable, so items within a tier hold their
-        // natural catalogue order.
-        let sorted = items.enumerated()
+        // natural catalogue order.  The slot's Roll Along piece is always first.
+        let sorted = Item.rollAlongFirst(items.enumerated()
             .sorted { ($0.element.tier.sortRank, $0.offset) < ($1.element.tier.sortRank, $1.offset) }
-            .map(\.element)
+            .map(\.element))
         return LazyVGrid(columns: columns, spacing: 14) {
             ForEach(sorted, id: \.id) { item in
                 itemCell(item: item)
@@ -1221,9 +1221,12 @@ struct CosmeticShopView: View {
         LazyVStack(alignment: .leading, spacing: 0) {
             collectionFilterMenu
                 .padding(.bottom, 10)
+            // The Iconic Roll Along set is always first, under every filter.
+            collectionCard(CosmeticBundle.rollAlong, isFeatured: false)
+                .padding(.bottom, 12)
             comingSoonRow
             if bundles.isEmpty {
-                Text("No collections match this filter.")
+                Text("No other collections match this filter.")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(white: 0.5))
                     .frame(maxWidth: .infinity)
@@ -1356,7 +1359,9 @@ struct CosmeticShopView: View {
                 Spacer()
                 // % OFF sticker on a discounted (Shop) bundle; in the Catalog an
                 // OWNED tag for a complete set; otherwise the X/Y counter.
-                if discounted {
+                if bundle.isRollAlong {
+                    iconicTag
+                } else if discounted {
                     discountSticker(discount)
                 } else if bundleOwned && !isShop {
                     ownedTag
@@ -1431,9 +1436,12 @@ struct CosmeticShopView: View {
                         .stroke(borderColor(bundle: bundle), lineWidth: 1.2)
                 )
         )
-        // Rarity corner tab — colored triangle + white star, top-right.
+        // Rarity corner tab — colored triangle + white star, top-right
+        // (prismatic Iconic colors for the Roll Along set).
         .overlay(alignment: .topTrailing) {
-            RarityCornerTab(colors: bundle.rarity.gemColors, side: 44, corner: 18)
+            RarityCornerTab(colors: bundle.isRollAlong ? BallSkin.iconicGemColors
+                                                       : bundle.rarity.gemColors,
+                            side: 44, corner: 18)
         }
 
         // Catalog: the whole card is a button that opens the detail popup.  Shop:
@@ -1454,6 +1462,18 @@ struct CosmeticShopView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    /// "ICONIC · OWNED" tag for the Roll Along set: free, owned by everyone,
+    /// no price.
+    private var iconicTag: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
+            Text("ICONIC · OWNED").font(.system(size: 10, weight: .black, design: .rounded)).tracking(0.5)
+        }
+        .foregroundStyle(BallSkin.iconicColor)
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(Capsule().fill(BallSkin.iconicColor.opacity(0.16)))
     }
 
     /// Small green "owned" tag shown where the X/Y progress badge sits, for a
@@ -1548,10 +1568,11 @@ struct CosmeticShopView: View {
                 if bundleOwned {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill").font(.system(size: 15, weight: .bold))
-                        Text("Collection Complete")
+                        Text(bundle.isRollAlong ? "Iconic · Yours to keep" : "Collection Complete")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
+                    .foregroundStyle(bundle.isRollAlong ? BallSkin.iconicColor
+                                                        : Color(red: 0.24, green: 0.82, blue: 0.48))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.10)))

@@ -23,7 +23,7 @@ SLOTS = {"balls": "BallSkin", "goals": "GoalSkin", "trails": "TrailColor",
 MUSIC_OFFERED = bool(os.environ.get("WITH_MUSIC"))
 # Each slot's default item: owned by everyone, so it adds nothing to a
 # collection's price (CosmeticBundle.listPrice).
-STARTER = {"BallSkin": "red", "GoalSkin": "target", "TrailColor": "graphite",
+STARTER = {"BallSkin": "red", "GoalSkin": "target", "TrailColor": "classic",
            "Floor": "classic", "Pit": "classic", "Boundary": "classic",
            "MusicTrack": "none"}
 PRICE = {"starter": 0, "standard": 750, "rare": 1000, "premium": 1250,
