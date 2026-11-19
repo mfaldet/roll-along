@@ -26,6 +26,10 @@ struct RollAlongApp: App {
             ContentView()
                 .onAppear {
                     if isUITesting { gameState.seenOnboarding = true }
+                    // Cold launch = an app open (Welcome Gift timing).  The
+                    // .active phase change below may also fire; a second call
+                    // in the same process never double-counts.
+                    gameState.registerAppActive()
                 }
                 .environmentObject(gameState)
                 .environmentObject(store)
@@ -168,12 +172,15 @@ struct RollAlongApp: App {
                 // Best-effort flush so events don't get lost when the user
                 // backgrounds the app.
                 AnalyticsClient.shared.flush()
+                if newPhase == .background { gameState.registerAppBackgrounded() }
             case .active:
                 // Mint a new session if we've been idle long enough that
                 // the previous one shouldn't count as "the same session".
                 // Threshold: 5 minutes.  Implemented inside startNewSession
                 // via tracking the last-active timestamp.
                 AnalyticsClient.shared.track("app_resume")
+                // A return after 30+ minutes away counts as a new app open.
+                gameState.registerAppActive()
                 // Re-affirm the lives-restock alert against time elapsed while
                 // backgrounded (regen kept accruing; the alert may need to be
                 // rescheduled or cleared).

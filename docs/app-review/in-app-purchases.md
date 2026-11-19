@@ -66,10 +66,17 @@ same text.
 - **Get Coins sheet:** Home → Shop → tap the coin balance at the top-right.
   The 10,000-coin card shows "Includes the Money Ball skin" until the player
   owns the Money Ball.
-- **Starter Pack offer sheet:** appears by itself on the Home screen the first
-  time the coin balance reaches 250, and can be reopened for 48 hours. On a
-  fresh install, the quickest route is to buy the 600-coin pack (sandbox or
-  TestFlight purchase) and go back to Home.
+- **Starter Pack offer sheet ("Welcome Gift"):** appears by itself on the Home
+  screen the next time the app is opened after the tutorial is complete, never
+  in the same session as the tutorial. It can be reopened for 48 hours.
+  To reach it on a fresh install:
+  1. Play levels 1–10 (the tutorial) and pick a starter set on the "Choose
+     your starter set" screen, then confirm.
+  2. Close the app completely (swipe it away in the app switcher) and open it
+     again — or leave it in the background for 30 minutes or more.
+  3. Go to Home: the Welcome Gift sheet appears.
+  An "open" is a fresh launch, or a return after 30+ minutes in the
+  background.
 
 ## What the Starter Pack sheet shows
 
