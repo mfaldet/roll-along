@@ -9,7 +9,7 @@ was added. `tools/cosmetic-calendar/bundle_rarity.py` prints the live table
 
 Approved: keep about 18 collections on sale, each with exactly one item per offered slot (ball, goal, trail, floor, pit, boundary), and no cosmetic in more than one of them. Every other collection is **retired**: never listed or sold as a set, but its definition stays so owners keep what they have and its items keep their release days. Retired items stay buyable one by one (the Shop's rotating picks, and seasonal spotlights). Music is hidden in 1.0; each active collection keeps its old music entry for when music returns, and music is not part of the uniqueness rule.
 
-Trails set the number: there are 17 coin-buyable trails plus the free Graphite default, so 18 is the most complete, unique collections the current art allows.
+Trails set the number: there are 17 coin-buyable trails plus the free default (then Graphite; now the Classic trail), so 18 was the most complete, unique collections the current art allows.
 
 ### The 18 collections on sale
 
@@ -105,7 +105,7 @@ These 18 items now arrive **earlier**, because they joined an active collection 
 - **Post-tutorial gift pool:** still the four Standard active collections (Nature, Citrus, Sketchbook, Midas). The gift picker now draws only from active collections.
 - **Starter Pack:** unchanged (Aurora ball, trail and boundary + 500 coins); Aurora stays on sale.
 - **Challenge Track rewards:** all eight reward collections are active (Winter, Cosmos, Lava Flow, Neon, Haunted, Ancient Temple, Abyssal Depths, Champion). A track now grants its reshaped set.
-- **Pricing rules:** unchanged (sum of item prices; music and free defaults add nothing). Sketchbook includes the free Graphite trail, so it costs 4,000.
+- **Pricing rules:** unchanged (sum of item prices; music and free defaults add nothing). Sketchbook included the then-free Graphite trail, so it cost 4,000; Graphite is now a 750-coin trail and Sketchbook costs 4,750 (see Roll Along below).
 - **Rarity:** Bloom moves from Legendary to Rare (its mosaic goal became a blossom goal). Overall: 42 Legendary, 20 Rare, 4 Standard across all 66 entries (was 43 / 19 / 4).
 - **Trophies:** no trophy counts completed collections; "Retail Therapy" (first cosmetic buy) and the full-kit and evergreen trophies count items, so nothing changes. Completed sets still count for retired collections too.
 - **Collection-complete toast:** fires only for active sets.
@@ -369,3 +369,24 @@ needed. Active collections: 18 → 21. Standard-rarity active collections: 4 →
 Each set keeps a music entry for when music returns (Electronic, Classical, Orchestral), which is
 not shown or charged in 1.0. The evergreen cosmetic count rises by 18 (242 → 260 with music,
 223 → 241 without); no trophy is affected.
+
+## Roll Along — the Iconic default set (2026-11)
+
+**Roll Along** (`roll-along`) is the six defaults: Red ball, Target goal, Classic trail, Classic floor, Classic pit, Classic boundary. It is Iconic: free, owned by every player from first launch, equipped on a fresh install, never sold or sellable, and never in the Shop rotation, featured bundle, gift pools, Challenge Track rewards or the release calendar (it is defined outside `catalogue`). The Catalog lists it first under every Collections filter, and each slot tab and the Locker list its piece first.
+
+**Classic trail (new default):** a very subtle shallow indent pressed into the floor — a soft low-alpha dark groove with a faint light lip on one side, no color of its own. Marks are laid in place and only fade with age. It replaces Graphite as the default trail.
+
+**Graphite:** now a normal Standard trail (750 coins), sold only in Sketchbook. New players don't own it. A saved loadout with Graphite the player doesn't own falls back to Classic.
+
+**Pieces removed from other collections (no replacements yet):**
+
+| Collection | Status | Now missing |
+|---|---|---|
+| Heavens | retired | floor (was the Classic floor) |
+| Back to School 2026 | seasonal (retired as a set) | goal (was the Target goal) |
+| Diamond | retired | goal (was the Target goal) |
+| Paper World | retired | trail (was Graphite, now Sketchbook-only) |
+
+No active collection used a Roll Along piece. `tools/cosmetic-calendar/defaults_scan.py` checks that none does.
+
+**Prices:** Sketchbook 4,000 → 4,750 (Graphite now counts at 750). Heavens, Back to School 2026, Diamond and Paper World are unchanged, because the removed pieces were free defaults.

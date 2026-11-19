@@ -2057,7 +2057,7 @@ struct CosmeticShopView: View {
     /// Live in BOTH surfaces now: the Catalog charges the full prorated price,
     /// the Shop the discounted price for the featured bundle.
     private func handleBundleTap(_ bundle: CosmeticBundle, owned: Bool) {
-        if owned { return }
+        if owned || bundle.isRollAlong { return }   // Roll Along is never sold
         let cost = bundleCost(bundle)
         guard gameState.coinBalance >= cost else {
             alertMessage = "You need \(cost - gameState.coinBalance) more coins for the \(bundle.displayName) bundle.\n\nEarn coins by playing levels and collecting pickups, or buy a coin pack."
