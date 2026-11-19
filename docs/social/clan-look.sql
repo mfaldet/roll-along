@@ -10,15 +10,16 @@
 --                     "clans update by owner" rule.  Members, other players
 --                     and signed-out users cannot.
 --   3. clan_rankings  recreated with `icon` and `color`, so the Rankings
---                     list can show them.  Otherwise identical to the view
+--                     list can show them, and without the old `tag`
+--                     column (clans are known by name only; step 15
+--                     removes the column).  Otherwise identical to the view
 --                     in step 12 (docs/social/drop-weekly-pace.sql).
 --
--- Run ONCE in the Supabase SQL editor, AFTER step 12.  Safe to run again.
--- The app works before this step: it asks for the new columns, and when the
--- server does not know them it reads clans without them and shows the
--- default icon (shield) and color (blue).
--- If step 12 is ever run again, run this step again right after it (step 12
--- recreates clan_rankings without the two new columns).
+-- Run ONCE in the Supabase SQL editor, AFTER step 12 and BEFORE steps 14
+-- and 15.  Safe to run again.
+-- If step 12 is ever run again, run steps 13 and 15 again right after it
+-- (step 12 recreates clan_rankings with the old tag column and without the
+-- two new columns).
 -- ===========================================================================
 
 begin;
@@ -51,7 +52,7 @@ drop view if exists public.clan_rankings;
 create view public.clan_rankings
 with (security_invoker = true) as
 select
-    c.id, c.name, c.tag, c.description, c.owner_id, c.created_at, c.updated_at,
+    c.id, c.name, c.description, c.owner_id, c.created_at, c.updated_at,
     c.icon, c.color,
     count(m.player_id)::int                                              as member_count,
     coalesce(sum(p.climb_level) filter (where not p.excluded), 0)::int   as total_levels,

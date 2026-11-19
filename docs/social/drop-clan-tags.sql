@@ -1,95 +1,65 @@
 -- ===========================================================================
--- Roll Along — PROPOSAL (not numbered yet): clans without tags on the server
+-- Roll Along — database step 15: clans without tags
 --
--- The app no longer shows or asks for a clan tag; clans are identified by
--- name only.  The database still has `clans.tag`:
---   • NOT NULL, no default                       (docs/social-schema.sql)
---   • clans_tag_len: 2–5 characters              (docs/social-schema.sql)
---   • clans_tag_derived: tag = ra_clan_tag_for(name)
---                                                (docs/social-schema-v4.sql)
---   • the old unique index on lower(tag) was already dropped in v4.
--- So the current app keeps sending the one value that check accepts — the
--- two initials + the number ("Swift Rockets 42" -> "SR42"), see
--- PresetNames.hiddenClanTag — and never shows it.
+-- Clans are known by name only.  The app no longer sends, reads or shows a
+-- clan tag, so the server's tag and everything that existed only for it go:
+--   • the clans_tag_derived check (tag = ra_clan_tag_for(name), social v4)
+--   • the clans_tag_len check (2–5 characters, docs/social-schema.sql)
+--   • the old unique index on lower(tag) (already dropped in v4; dropped
+--     again here only if it is still there)
+--   • a fill-in trigger and its function, if an earlier draft of this file
+--     was ever run (clans_fill_tag / ra_clans_fill_tag)
+--   • the helper function ra_clan_tag_for(text)
+--   • the clans.tag column itself
 --
--- This file has two parts.  NOTHING here is required for the app to work.
+-- Nothing else reads or writes the tag: no function, policy, trigger or
+-- search uses it, and clan_rankings no longer selects it once step 13 has
+-- run (step 13 recreates that view without `tag`).  This file checks that
+-- first and stops with a clear message if the view still has `tag`.
 --
--- PART A (safe any time after step 13):
---   A trigger fills `tag` from the name on every insert and rename, so the
---   server no longer depends on the app sending it.  The current build's
---   value is simply overwritten with the same value.
---
--- PART B (commented out — run ONLY when no phone runs a build that still
---   sends or reads `tag`.  The current build still SENDS it on create and
---   rename, so PART B would break creating and renaming clans on it):
---   drops the tag checks, the trigger and the column, and recreates
---   clan_rankings without `tag` (identical to step 13 otherwise).
---
--- Ordering: run after step 13 (docs/social/clan-look.sql), because PART B
--- recreates the clan_rankings view that step 13 defines.  Independent of
--- step 14.  If step 12 or 13 is ever re-run after PART B, they recreate the
--- view WITH `c.tag` and fail (the column is gone): remove `c.tag` from those
--- files first.
+-- Run ONCE in the Supabase SQL editor, AFTER steps 13 and 14, and only once
+-- every phone has the build that no longer sends a tag (an older build's
+-- create and rename would be refused).  Safe to run again.
+-- If step 12 is ever run again, run steps 13 and 15 again right after it.
 -- ===========================================================================
 
 begin;
 
--- PART A · the server fills the hidden tag itself -------------------------
-create or replace function public.ra_clans_fill_tag()
-returns trigger language plpgsql as $$
+-- 0 · Guard: clan_rankings must already be the step 13 version ---------------
+do $$
 begin
-    new.tag := public.ra_clan_tag_for(new.name);
-    return new;
-end;
+    if exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = 'clan_rankings'
+                  and column_name = 'tag') then
+        raise exception 'clan_rankings still has the tag column: run step 13 (docs/social/clan-look.sql) first';
+    end if;
+end
 $$;
 
-drop trigger if exists clans_fill_tag on public.clans;
-create trigger clans_fill_tag
-    before insert or update of name, tag on public.clans
-    for each row execute function public.ra_clans_fill_tag();
+-- 1 · Anything that only existed for tags -----------------------------------
+drop trigger  if exists clans_fill_tag on public.clans;
+drop function if exists public.ra_clans_fill_tag();
+alter table public.clans drop constraint if exists clans_tag_derived;
+alter table public.clans drop constraint if exists clans_tag_len;
+drop index    if exists public.clans_tag_unique_idx;
+
+-- 2 · The column, then its helper function ----------------------------------
+alter table public.clans drop column if exists tag;
+drop function if exists public.ra_clan_tag_for(text);
 
 commit;
 
--- PART B · remove the column (see the warning above) ----------------------
--- begin;
--- drop view if exists public.clan_rankings;
--- create view public.clan_rankings
--- with (security_invoker = true) as
--- select
---     c.id, c.name, c.description, c.owner_id, c.created_at, c.updated_at,
---     c.icon, c.color,
---     count(m.player_id)::int                                              as member_count,
---     coalesce(sum(p.climb_level) filter (where not p.excluded), 0)::int   as total_levels,
---     coalesce(sum(p.total_stars) filter (where not p.excluded), 0)::int   as total_stars,
---     coalesce((select sum(sc.stars)
---                 from public.clan_season_scores sc
---                 join public.players sp on sp.id = sc.player_id and not sp.excluded
---                where sc.clan_id = c.id
---                  and sc.season = date_trunc('month', public.ra_season_now())::date), 0)::int
---                                                                          as season_score,
---     c.season_wins, c.last_season, c.last_season_rank, c.last_season_clans,
---     c.last_season_tier, c.last_season_score
--- from public.clans c
--- left join public.clan_members m on m.clan_id = c.id
--- left join public.players      p on p.id = m.player_id
--- where not c.excluded
--- group by c.id;
--- grant select on public.clan_rankings to authenticated;
---
--- drop trigger if exists clans_fill_tag on public.clans;
--- drop function if exists public.ra_clans_fill_tag();
--- alter table public.clans drop constraint if exists clans_tag_derived;
--- alter table public.clans drop constraint if exists clans_tag_len;
--- drop index if exists public.clans_tag_unique_idx;
--- alter table public.clans drop column if exists tag;
--- commit;
-
 -- ---------------------------------------------------------------------------
--- Check after PART A (read-only).  Expect two true columns.
+-- Check (read-only).  Expect four true columns.
 -- ---------------------------------------------------------------------------
 -- select
---     exists (select 1 from pg_trigger
---              where tgname = 'clans_fill_tag'
---                and tgrelid = 'public.clans'::regclass)                  as fill_trigger_present,
---     not exists (select 1 from public.clans
---                  where tag <> public.ra_clan_tag_for(name))               as every_tag_matches_name;
+--     not exists (select 1 from information_schema.columns
+--                  where table_schema = 'public' and table_name in ('clans', 'clan_rankings')
+--                    and column_name = 'tag')                        as no_tag_column,
+--     not exists (select 1 from pg_constraint
+--                  where conrelid = 'public.clans'::regclass
+--                    and conname in ('clans_tag_derived', 'clans_tag_len')) as no_tag_checks,
+--     not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--                  where n.nspname = 'public'
+--                    and p.proname in ('ra_clan_tag_for', 'ra_clans_fill_tag')) as no_tag_functions,
+--     (select count(*) >= 0 from public.clan_rankings)                as rankings_still_work;

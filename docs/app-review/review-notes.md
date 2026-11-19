@@ -65,6 +65,10 @@ Contact: rollalongsupport@gmail.com
 - [ ] `docs/social/clan-look.sql` (step 13, after step 12) has been applied, or
       a clan owner's icon and color choice cannot be saved (clans still show
       the default shield on blue, so nothing else breaks).
+- [ ] Steps 14, 15 and 16 have been applied, in order, after step 13:
+      `docs/social/drop-friend-gifts.sql`, `docs/social/drop-clan-tags.sql`,
+      `docs/social/rollup-columns.sql`.  This build sends no clan tag, so
+      creating a clan fails until step 15 removes the tag column.
 - [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
       not built from these lists" is only true after that).
 - [ ] The Supabase project is running and not paused during review.

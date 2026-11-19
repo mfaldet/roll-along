@@ -1379,8 +1379,6 @@ final class PresetNamesTests: XCTestCase {
                 let name = PresetNames.clanName(choice)
                 XCTAssertLessThanOrEqual(name.count, 32, name)
                 XCTAssertEqual(PresetNames.parseClanName(name), choice, name)
-                let tag = PresetNames.hiddenClanTag(choice)
-                XCTAssertTrue((2...5).contains(tag.count), tag)
             }
         }
     }

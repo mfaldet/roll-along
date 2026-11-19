@@ -25,7 +25,7 @@ in `docs/social-schema-v4.sql`, which makes the database refuse anything else.
   `SwiftComet` followed by the level badge. The level is not stored in the
   name; it comes from the player's progress.
 - A clan name is `<first word> <second word> <number>`, for example
-  `Swift Rockets 42`. Clans have no tag in the app; the database still stores a hidden one (the two initials and the number, `SR42`), which the app never shows.
+  `Swift Rockets 42`. Clans have no tag; they are known by name only.
 - The clan numbers 69, 88, 420 and 666 are never offered or accepted.
 - Nicknames are not unique; the level beside the name tells players apart, and
   friend requests, gifts and clan membership all go by account, never by name.
