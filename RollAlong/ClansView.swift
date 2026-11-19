@@ -2284,7 +2284,7 @@ private struct ClanSeasonCard: View {
                 .accessibilityLabel("\(daysLeft) day\(daysLeft == 1 ? "" : "s") left this season")
             }
             HStack(spacing: 8) {
-                ForEach(Self.tiers, id: \.name) { tier in
+                ForEach(Self.tiers.indices, id: \.self) { i in let tier = Self.tiers[i]
                     VStack(spacing: 4) {
                         Image(systemName: tier.icon)
                             .font(.system(size: 16, weight: .semibold))
