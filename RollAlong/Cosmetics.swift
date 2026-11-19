@@ -2531,13 +2531,22 @@ struct CosmeticBundle: Identifiable {
     /// goes through this; `music` itself is kept for when music returns.
     var offeredMusic: [MusicTrack] { CosmeticFeatures.musicEnabled ? music : [] }
 
-    /// `contentSummary` without its music entry while music is off.
+    /// What the player gets, built from the set's actual items (so it can
+    /// never drift from the contents), e.g. "Jade ball · Meadow goal · …".
+    /// Music is listed only while music is offered.
     var displaySummary: String {
-        guard !CosmeticFeatures.musicEnabled else { return contentSummary }
-        return contentSummary
-            .components(separatedBy: " · ")
-            .filter { !$0.hasSuffix(" music") }
-            .joined(separator: " · ")
+        func named(_ name: String, _ slot: String) -> String {
+            name.lowercased().hasSuffix(slot) ? name : "\(name) \(slot)"
+        }
+        var parts: [String] = []
+        parts += balls.map { named($0.displayName, "ball") }
+        parts += goals.map { named($0.displayName, "goal") }
+        parts += trails.map { named($0.displayName, "trail") }
+        parts += floors.map { named($0.displayName, "floor") }
+        parts += pits.map { named($0.displayName, "pit") }
+        parts += boundaries.map { named($0.displayName, "boundary") }
+        parts += offeredMusic.map { named($0.displayName, "music") }
+        return parts.joined(separator: " · ")
     }
 
     // ── Seasonal availability window ───────────────────────────────

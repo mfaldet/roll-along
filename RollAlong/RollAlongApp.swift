@@ -85,7 +85,9 @@ struct RollAlongApp: App {
                                     lives:           lives
                                 )
                             } catch {
+                                #if DEBUG
                                 print("[RollAlong] Profile save after sign-in failed: \(error)")
+                                #endif
                             }
                             // After the row exists: accent color and ball.
                             await MainActor.run { state.syncMyLook() }

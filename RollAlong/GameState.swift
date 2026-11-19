@@ -960,22 +960,6 @@ final class GameState: ObservableObject {
         let savedPack  = defaults.string(forKey: "ra_equippedPack")
         equippedPackID = savedPack.flatMap { loadedOwnedPacks.contains($0) ? $0 : nil }
 
-        // Comet Clash became Snacky under the same id ("snake").  This runs
-        // LAST in init, after every stored property has a value (it reads and
-        // writes `minigameBests` / `minigameDifficultyBests`).  Its old bests
-        // measured something else (sparks and knockouts, not orbs eaten), so
-        // they are cleared once; wins are kept (a win still means last one
-        // left).  Not through didSet (init), so save explicitly.
-        if !defaults.bool(forKey: "ra_snackyBestsReset_v1") {
-            minigameBests["snake"] = nil
-            for key in minigameDifficultyBests.keys where key.hasPrefix("snake|") {
-                minigameDifficultyBests[key] = nil
-            }
-            defaults.set(try? JSONEncoder().encode(minigameBests), forKey: "ra_minigameBests")
-            defaults.set(try? JSONEncoder().encode(minigameDifficultyBests), forKey: "ra_minigameDiffBests")
-            defaults.set(true, forKey: "ra_snackyBestsReset_v1")
-        }
-
         // Free gifts used to be keyed by bare rawValue, which confused
         // same-named items in different slots.  Qualify old entries once to
         // unique ids (see `qualifyFreeGrants`).  Runs after every stored

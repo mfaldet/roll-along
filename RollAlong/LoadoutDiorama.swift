@@ -195,7 +195,7 @@ struct RunReplay: Codable {
 // ReplayStore — which recording previews play.
 //
 // Order: the player's own recording on this phone (only when they chose "Use
-// my recording on this phone", which only TestFlight/debug builds offer), then
+// my recording on this phone", which only debug builds offer), then
 // the bundled PreviewReplay.json, then nothing (still picture).
 // ===========================================================================
 enum ReplayStore {
@@ -235,7 +235,7 @@ enum ReplayStore {
 // ===========================================================================
 // ReplayRecorder — records one stretch of real Adventure play.
 //
-// Only in debug and TestFlight builds (`isAvailable`); an App Store build can
+// Only in debug builds (`isAvailable`); a release build can
 // never arm it.  Arming: long-press any loadout preview → "Record next
 // Adventure run".  The next Adventure level played is then recorded from the
 // moment play starts until the goal, a fall, or `maxSeconds`, and saved as a
@@ -248,12 +248,13 @@ enum ReplayStore {
 final class ReplayRecorder: ObservableObject {
     static let shared = ReplayRecorder()
 
-    /// True in debug builds and TestFlight builds; false in App Store builds.
+    /// Developer tool: debug builds only.  Release builds (TestFlight, App
+    /// Review and the App Store) never show the record menu.
     static var isAvailable: Bool {
         #if DEBUG
         return true
         #else
-        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        return false
         #endif
     }
 
@@ -857,7 +858,7 @@ struct LoadoutDiorama: View {
 
 // ===========================================================================
 // ReplayRecorderMenu — the long-press menu on a loadout preview that drives
-// the recorder.  Attached only in debug and TestFlight builds; in an App Store
+// the recorder.  Attached only in debug builds; in a release
 // build it changes nothing.
 // ===========================================================================
 private struct ReplayRecorderMenu: ViewModifier {
