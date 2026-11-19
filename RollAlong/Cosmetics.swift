@@ -4774,9 +4774,6 @@ private func trailIce(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     }
 }
 
-/// Graphite — pencil on paper: a faint base line broken up by short, uneven
-/// strokes.  The jitter comes from each mark's own seed, so a stroke never
-/// shifts; it simply fades where it was drawn.
 /// Classic — the default.  A very subtle shallow indent pressed into the floor:
 /// a soft low-alpha dark groove with a faint light lip on one side (like an
 /// emboss), no hue of its own, so it reads on light and dark floors alike.
@@ -4805,6 +4802,9 @@ private func trailClassic(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     }
 }
 
+/// Graphite — pencil on paper: a faint base line broken up by short, uneven
+/// strokes.  The jitter comes from each mark's own seed, so a stroke never
+/// shifts; it simply fades where it was drawn.
 private func trailGraphite(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     let lead = Color(red: 0.20, green: 0.20, blue: 0.22)
     for i in 1..<fr.n {
