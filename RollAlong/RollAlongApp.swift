@@ -7,6 +7,13 @@ struct RollAlongApp: App {
     @StateObject private var ads       = AdManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // One audio-session setup for the whole app, before any sound, clip
+        // or ad can run: .ambient mixes with other apps' audio and respects
+        // the silent switch (see AudioManager).
+        AudioManager.shared.configureSessionAtLaunch()
+    }
+
     /// True when launched by the UI test runner with `--skip-onboarding`.
     /// Setting `seenOnboarding = true` in the GameState before the first
     /// frame prevents the onboarding overlay from blocking UI test navigation.

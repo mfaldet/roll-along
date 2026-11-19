@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreMotion
 import UIKit
-import AudioToolbox
 import AVFoundation
 
 // ---------------------------------------------------------------------------
@@ -8442,14 +8441,6 @@ enum Haptics {
 }
 
 // ---------------------------------------------------------------------------
-// SFX — MVP sound layer using AudioToolbox SystemSoundIDs.
-//
-// NOTE: these are iOS built-in placeholders so the game has audible feedback
-// from day one without bundling audio assets.  Replace with proper royalty-
-// free or commissioned .wav files in a follow-up pass (see Sprint 1 notes).
-// To swap a sound, drop a .wav into the bundle and call .playFile("name").
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 // BallSquash — animatable scale pair used by the squash-on-bounce
 // keyframeAnimator.  Both axes are independently driven via KeyframeTrack
 // so a horizontal pinch reads correctly even mid-bounce.
@@ -8981,145 +8972,186 @@ struct CoinIcon: View {
 // ---------------------------------------------------------------------------
 // AudioManager — game sound layer.
 //
-// Two channels:
-// 1. Short UI taps (bounce, coin) play via SystemSoundIDs in the 1100-1306
-//    range.  These are documented as UI sounds and respect the device
-//    silent switch.  We deliberately avoid the alert-category IDs (1000s)
-//    that bypass silent — those were the cause of the "loud thud playing
-//    even on silent" complaint.
-// 2. The win sound plays via AVAudioEngine through an AVAudioSession
-//    configured as .ambient — meaning it respects the silent switch and
-//    mixes politely with any other audio.  The buffer is synthesized on
-//    init (small ascending C-E-G-C major arpeggio) so we don't have to
-//    ship a WAV asset.
+// Rules (so Roll Along never changes how other apps' audio sounds):
+//   • ONE audio session setup, at launch: category .ambient, mode .default,
+//     no options beyond mixing.  Ambient mixes with Spotify & co. at full
+//     volume (no ducking, no pausing), respects the ring/silent switch, and
+//     never touches the microphone, so the route never drops to a headset
+//     (Bluetooth HFP) profile.  No preferred sample rate or buffer size is
+//     ever set — the hardware keeps whatever the music app chose.
+//   • The session is activated once and only re-activated after the system
+//     deactivates it (interruption ended, engine stopped) — never per sound.
+//   • Every game sound plays through one AVAudioEngine at a modest level with
+//     headroom.  The old bounce/coin/fanfare used full-scale system sounds
+//     (AudioServicesPlaySystemSound), which summed with loud music can push
+//     the iPhone speaker's protection limiter into compressing the whole mix
+//     — heard as muffled, crunchy music for as long as the sound plays.
 //
 // There is intentionally no "drop" sound.  When the ball falls, we lean
-// entirely on a double-tap haptic — losing should feel like a tap on the
-// shoulder, not a jump-scare.
+// entirely on a double-tap haptic.
 // ---------------------------------------------------------------------------
 final class AudioManager {
     static let shared = AudioManager()
 
     private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
-    private var winBuffer:  AVAudioPCMBuffer?
+    private let winPlayer = AVAudioPlayerNode()
+    private let uiPlayer = AVAudioPlayerNode()
+    private let fanfarePlayer = AVAudioPlayerNode()
+    private var winBuffer: AVAudioPCMBuffer?
+    private var bounceBuffer: AVAudioPCMBuffer?
+    private var coinBuffer: AVAudioPCMBuffer?
+    private var fanfareBuffer: AVAudioPCMBuffer?
     private var sessionConfigured = false
+    private var observersInstalled = false
+    /// Overall level of game sounds.  Leaves headroom so a game sound mixed
+    /// on top of loud music never clips the output.
+    private static let masterVolume: Float = 0.55
     /// Every audio-session and engine call runs on this queue, never on the
-    /// main thread: activating the session can block for a moment, and the
-    /// system warns when that happens on the main thread.
+    /// main thread: activating the session can block for a moment.
     private let audioQueue = DispatchQueue(label: "rollalong.audio", qos: .userInitiated)
 
     private init() {}
 
-    /// Lazily configure the audio session + synth the win buffer.  Called
-    /// from BallGameView's onAppear so we don't pay this cost until the
-    /// game actually starts.
+    /// Set the session category once, as early as possible (app launch), so
+    /// nothing — a muted clip, an ad, a first sound — ever runs under the
+    /// default .soloAmbient category, which would stop other apps' audio.
+    /// Setting the category does not activate the session or start audio.
+    func configureSessionAtLaunch() {
+        audioQueue.async {
+            try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [])
+        }
+    }
+
+    /// Activate the session once and build the engine + sound buffers.
     func prepareIfNeeded() {
         guard !sessionConfigured else { return }
         sessionConfigured = true
 
         audioQueue.async { [self] in
-            // Ambient + mixWithOthers: respects the silent switch, mixes with
-            // music apps, never ducks anything.
             let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            try? session.setCategory(.ambient, mode: .default, options: [])
             try? session.setActive(true)
 
-            engine.attach(player)
+            for p in [winPlayer, uiPlayer, fanfarePlayer] { engine.attach(p) }
             let format = engine.outputNode.outputFormat(forBus: 0)
-            engine.connect(player, to: engine.mainMixerNode, format: format)
-            winBuffer = makeWinBuffer(format: format)
-
+            for p in [winPlayer, uiPlayer, fanfarePlayer] {
+                engine.connect(p, to: engine.mainMixerNode, format: format)
+            }
+            engine.mainMixerNode.outputVolume = Self.masterVolume
+            winBuffer     = makeWinBuffer(format: format)
+            bounceBuffer  = makeTone(format: format, notes: [(0, 1760, 0.035, 0.18)], length: 0.09)
+            coinBuffer    = makeTone(format: format, notes: [(0, 1318.5, 0.05, 0.16),
+                                                             (0.045, 1975.5, 0.07, 0.16)], length: 0.16)
+            fanfareBuffer = makeTone(format: format, notes: [(0.00, 784.0, 0.20, 0.14),
+                                                             (0.10, 987.8, 0.20, 0.14),
+                                                             (0.20, 1174.7, 0.25, 0.15),
+                                                             (0.32, 1568.0, 0.45, 0.17)], length: 1.1)
             engine.prepare()
             try? engine.start()
         }
 
-        // Keep the engine warm.  The system STOPS the engine on an audio
-        // interruption (call, Siri, another app) or an engine-config change
-        // (route change — e.g. plugging in headphones), and a freshly-stopped
-        // engine can't be played until it has rendered an IO cycle.  Restarting
-        // on those events means playWin() rarely has to cold-start, which is
-        // what triggers the "player did not see an IO cycle" crash.
+        guard !observersInstalled else { return }
+        observersInstalled = true
+        // The system stops the engine on an interruption (call, Siri, alarm)
+        // or a route change (AirPods in/out).  Restart it then — re-activating
+        // the session only when the engine actually stopped.
         let nc = NotificationCenter.default
         nc.addObserver(forName: AVAudioSession.interruptionNotification,
                        object: nil, queue: .main) { [weak self] note in
             guard let self,
                   let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
                   AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
-            self.restartEngine()
+            self.restartEngineIfStopped()
         }
         nc.addObserver(forName: .AVAudioEngineConfigurationChange,
                        object: engine, queue: .main) { [weak self] _ in
-            self?.restartEngine()
+            self?.restartEngineIfStopped()
         }
-        // Returning from the background re-activates the session and restarts the
-        // engine, so the engine is already warm by the time the player wins.
         nc.addObserver(forName: UIApplication.didBecomeActiveNotification,
                        object: nil, queue: .main) { [weak self] _ in
-            self?.restartEngine()
+            self?.restartEngineIfStopped()
         }
     }
 
-    /// Re-activate the session and restart the engine if the system stopped it.
-    private func restartEngine() {
+    /// Restart the engine only if the system stopped it; otherwise do nothing
+    /// (no session re-activation on every foreground).
+    private func restartEngineIfStopped() {
         audioQueue.async { [self] in
+            guard sessionConfigured, !engine.isRunning else { return }
             try? AVAudioSession.sharedInstance().setActive(true)
-            guard !engine.isRunning else { return }
             engine.prepare()
             try? engine.start()
+        }
+    }
+
+    private func play(_ buffer: AVAudioPCMBuffer?, on player: AVAudioPlayerNode) {
+        audioQueue.async { [self] in
+            guard let buffer else { return }
+            // Only play when the engine is already rendering.  Playing on a
+            // just-started engine that hasn't seen an IO cycle crashes; a rare
+            // skipped sound is the safe trade.
+            guard engine.isRunning else {
+                restartEngineIfStopped()
+                return
+            }
+            player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
+            if !player.isPlaying { player.play() }
         }
     }
 
     func playWin(enabled: Bool) {
         guard enabled else { return }
-        audioQueue.async { [self] in playWinOnAudioQueue() }
+        prepareIfNeeded()
+        play(winBuffer, on: winPlayer)
     }
 
-    private func playWinOnAudioQueue() {
-        guard let buffer = winBuffer else { return }
-        // Only play when the engine is ALREADY running — i.e. it has been
-        // rendering IO cycles.  If the system stopped it (interruption / route
-        // change / backgrounding), restart it for next time but SKIP this one
-        // sound: calling play() on a just-started engine that hasn't yet
-        // rendered an IO cycle throws "player did not see an IO cycle" and
-        // crashes.  A rare missed win chime beats a crash.
-        guard engine.isRunning else {
-            try? AVAudioSession.sharedInstance().setActive(true)
-            engine.prepare()
-            try? engine.start()
-            return
-        }
-        player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
-        if !player.isPlaying {
-            player.play()
-        }
-    }
-
-    /// Short UI tick for wall bounces.  System sound 1104 ("Tink") respects
-    /// silent mode.
+    /// Short soft tick for wall bounces.
     func playBounce(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(1104)
+        prepareIfNeeded()
+        play(bounceBuffer, on: uiPlayer)
     }
 
-    /// Coin pickup tick.  System sound 1306 (UI "Pop") respects silent.
+    /// Two-note coin pickup blip.
     func playCoin(enabled: Bool) {
         guard enabled else { return }
-        AudioServicesPlaySystemSound(1306)
+        prepareIfNeeded()
+        play(coinBuffer, on: uiPlayer)
     }
 
-    /// The Platinum-capstone fanfare (S2-T5) — a UNIQUE, bigger flourish
-    /// distinct from the standard win chime that every grade banner reuses
-    /// (design.md §6 "unique fanfare distinct from the standard chime").
-    /// Layers the synthesised win arpeggio with a brighter system fanfare
-    /// (1025, "Fanfare") so the once-ever moment sounds unmistakably grander.
-    /// Respects the player's sound setting like every other cue here.
+    /// The Platinum-capstone fanfare: the win arpeggio plus a brighter rising
+    /// flourish on its own channel, so the once-ever moment sounds grander.
     func playCapstoneFanfare(enabled: Bool) {
         guard enabled else { return }
-        // The familiar celebratory arpeggio…
-        playWin(enabled: true)
-        // …plus a distinct, brighter fanfare on top (respects silent mode).
-        AudioServicesPlaySystemSound(1025)
+        prepareIfNeeded()
+        play(winBuffer, on: winPlayer)
+        play(fanfareBuffer, on: fanfarePlayer)
+    }
+
+    /// Simple synthesized tones: each note = (start s, Hz, decay s, gain).
+    private func makeTone(format: AVAudioFormat,
+                          notes: [(start: Double, freq: Double, decay: Double, gain: Double)],
+                          length: Double) -> AVAudioPCMBuffer? {
+        let sampleRate: Double = format.sampleRate
+        let frameCount = AVAudioFrameCount(sampleRate * length)
+        guard frameCount > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount),
+              let channelData = buffer.floatChannelData else { return nil }
+        buffer.frameLength = frameCount
+        let channelCount = Int(format.channelCount)
+        let attack: Double = 0.004
+        for frame in 0..<Int(frameCount) {
+            let t: Double = Double(frame) / sampleRate
+            var s: Double = 0
+            for n in notes where t >= n.start {
+                let local: Double = t - n.start
+                let env: Double = local < attack ? local / attack : exp(-(local - attack) / n.decay)
+                s += sin(2.0 * .pi * n.freq * local) * env * n.gain
+            }
+            let sample = Float(max(-0.6, min(0.6, s)))
+            for ch in 0..<channelCount { channelData[ch][frame] = sample }
+        }
+        return buffer
     }
 
     // MARK: - Win sound synthesis
@@ -9166,8 +9198,8 @@ final class AudioManager {
                 let harmonic    = sin(2.0 * .pi * n.freq * 2.0 * local) * 0.18
                 s += (fundamental + harmonic) * envelope * n.gain
             }
-            // Soft global limiter — divide by ~2 worth of overlap, clamp.
-            let sample = Float(max(-0.95, min(0.95, s)))
+            // Clamp with headroom.
+            let sample = Float(max(-0.6, min(0.6, s)))
             for ch in 0..<channelCount {
                 channelData[ch][frame] = sample
             }

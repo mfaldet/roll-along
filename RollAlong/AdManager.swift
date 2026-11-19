@@ -86,6 +86,12 @@ final class AdManager: NSObject, ObservableObject {
         let adConfig = MobileAds.shared.requestConfiguration
         adConfig.maxAdContentRating = .teen
         adConfig.ageRestrictedTreatment = .teen
+        // The app owns the audio session (.ambient, set once at launch).  Without
+        // this the SDK may switch the session category around ad playback,
+        // which can pause or alter other apps' audio.  Under .ambient a
+        // rewarded ad's sound mixes with the player's music and is silent
+        // when the ring/silent switch is on.
+        MobileAds.shared.audioVideoManager.isAudioSessionApplicationManaged = true
         // Start the Mobile Ads SDK.  All ad requests are non-personalised.
         _ = await MobileAds.shared.start()
         await loadRewarded()
