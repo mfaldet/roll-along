@@ -670,7 +670,22 @@ struct LeaderboardView: View {
         )
     }
 
+    @ViewBuilder
     private var signedOutState: some View {
+        if auth.sessionExpired {
+            messageBlock(
+                icon: "person.crop.circle.badge.exclamationmark",
+                title: "Please sign in again",
+                message: "Your sign-in has expired. Sign in with Apple to see the rankings again. Your progress is saved on this device either way.",
+                actionTitle: auth.isWorking ? "Signing in…" : "Sign in with Apple",
+                action: { auth.startSignIn() }
+            )
+        } else {
+            signedOutInvite
+        }
+    }
+
+    private var signedOutInvite: some View {
         messageBlock(
             icon: "trophy.fill",
             title: "Climb the global board",
@@ -735,7 +750,7 @@ struct LeaderboardView: View {
             rows = []
             errorText = "Disco Ball rankings are not available yet."
         } catch {
-            errorText = "The ranking server is unreachable right now. Pull to refresh or try again."
+            errorText = ServerProblem.message(for: error, server: "ranking", what: "the rankings")
         }
         isLoading = false
     }

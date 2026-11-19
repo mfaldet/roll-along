@@ -1161,10 +1161,18 @@ struct ClansView: View {
         messageBlock(icon: "wifi.exclamationmark", title: "Couldn't load clans",
                      message: text, actionTitle: "Try Again", action: { Task { await load() } })
     }
+    @ViewBuilder
     private var signedOutState: some View {
-        messageBlock(icon: "person.3.fill", title: "Join a clan",
-                     message: "Sign in with Apple to start or join a clan and send each other lives. Your progress is saved on this device either way.",
-                     actionTitle: "Sign in from Settings", action: { nav.goToSettings() })
+        if auth.sessionExpired {
+            messageBlock(icon: "person.crop.circle.badge.exclamationmark", title: "Please sign in again",
+                         message: "Your sign-in has expired. Sign in with Apple to see your clan again. Your progress is saved on this device either way.",
+                         actionTitle: auth.isWorking ? "Signing in…" : "Sign in with Apple",
+                         action: { auth.startSignIn() })
+        } else {
+            messageBlock(icon: "person.3.fill", title: "Join a clan",
+                         message: "Sign in with Apple to start or join a clan and send each other lives. Your progress is saved on this device either way.",
+                         actionTitle: "Sign in from Settings", action: { nav.goToSettings() })
+        }
     }
     private func messageBlock(icon: String, title: String, message: String,
                               actionTitle: String?, action: (() -> Void)?) -> some View {
@@ -1243,7 +1251,7 @@ struct ClansView: View {
             }
             hasLoaded = true
         } catch {
-            errorText = "The clan server is unreachable right now. Pull to refresh or try again."
+            errorText = ServerProblem.message(for: error, server: "clan", what: "clans")
         }
         isLoading = false
     }

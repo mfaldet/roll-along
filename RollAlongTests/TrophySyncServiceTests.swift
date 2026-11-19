@@ -474,3 +474,216 @@ final class FeedbackOutboxTests: XCTestCase {
         XCTAssertEqual(box.pendingCount, 1)
     }
 }
+
+// MARK: - Sign-in renewal (SessionManager)
+
+/// In-memory saved sign-in for the session tests.
+private final class MemorySessionStore: SessionTokenStore, @unchecked Sendable {
+    var refreshToken: String?
+    var userId: String?
+    init(refreshToken: String?) { self.refreshToken = refreshToken }
+}
+
+/// Scripted fake server: counts refreshes and answers data requests with
+/// 200 only for the current valid token.
+private final class FakeAuthServer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _refreshCalls = 0
+    private var _dataCalls = 0
+    var refreshCalls: Int { lock.lock(); defer { lock.unlock() }; return _refreshCalls }
+    var dataCalls: Int { lock.lock(); defer { lock.unlock() }; return _dataCalls }
+    let validToken = "fresh-token"
+    /// Status the refresh endpoint answers with (200 = success).
+    var refreshStatus = 200
+    /// Throw a network error on refresh instead of answering.
+    var refreshNetworkError: URLError?
+    /// Nanoseconds the refresh endpoint waits before answering.
+    var refreshDelay: UInt64 = 0
+    let userId = UUID()
+
+    private func bumpRefresh() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        _refreshCalls += 1
+        return _refreshCalls
+    }
+    private func bumpData() {
+        lock.lock(); defer { lock.unlock() }
+        _dataCalls += 1
+    }
+
+    func handle(_ req: URLRequest) async throws -> (Data, URLResponse) {
+        let url = req.url!
+        if url.path.hasSuffix("/auth/v1/token") {
+            let n = bumpRefresh()
+            if refreshDelay > 0 { try? await Task.sleep(nanoseconds: refreshDelay) }
+            if let e = refreshNetworkError { throw e }
+            let body: String
+            if refreshStatus == 200 {
+                body = "{\"access_token\":\"\(validToken)\",\"refresh_token\":\"rotated-\(n)\","
+                    + "\"expires_in\":3600,\"user\":{\"id\":\"\(userId.uuidString)\"}}"
+            } else {
+                body = #"{"error":"invalid_grant","error_description":"Invalid Refresh Token: Refresh Token Not Found"}"#
+            }
+            return (Data(body.utf8), HTTPURLResponse(url: url, statusCode: refreshStatus,
+                                                     httpVersion: nil, headerFields: nil)!)
+        }
+        bumpData()
+        let auth = req.value(forHTTPHeaderField: "Authorization") ?? ""
+        if auth == "Bearer \(validToken)" {
+            return (Data("[]".utf8), HTTPURLResponse(url: url, statusCode: 200,
+                                                     httpVersion: nil, headerFields: nil)!)
+        }
+        let body = #"{"code":"PGRST301","message":"JWT expired"}"#
+        return (Data(body.utf8), HTTPURLResponse(url: url, statusCode: 401,
+                                                 httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+private func dataRequest(_ token: String) -> URLRequest {
+    var req = URLRequest(url: URL(string: "https://example.invalid/rest/v1/clan_members")!)
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    return req
+}
+
+final class SessionRenewalTests: XCTestCase {
+
+    private func makeManager(_ server: FakeAuthServer,
+                             store: MemorySessionStore) -> SessionManager {
+        SessionManager(transport: { try await server.handle($0) },
+                       store: store,
+                       liveAllowed: true)
+    }
+
+    /// An expired token gets a 401; the request renews once and is retried once.
+    func testExpiredToken_isRenewed_andRequestRetried() async throws {
+        let server = FakeAuthServer()
+        let store = MemorySessionStore(refreshToken: "saved-refresh")
+        let manager = makeManager(server, store: store)
+        // Looks valid locally (an hour left) but the server says it expired.
+        await manager.install(accessToken: "stale-token", refreshToken: "saved-refresh",
+                              expiresAt: Date().addingTimeInterval(3600), userId: server.userId)
+
+        let (_, http) = try await manager.perform { dataRequest($0) }
+
+        XCTAssertEqual(http.statusCode, 200)
+        XCTAssertEqual(server.refreshCalls, 1, "exactly one renewal")
+        XCTAssertEqual(server.dataCalls, 2, "the request was retried exactly once")
+        XCTAssertEqual(store.refreshToken, "rotated-1", "the rotated refresh token is saved")
+    }
+
+    /// A token about to expire is renewed before the request is sent.
+    func testNearExpiry_renewsBeforeSending() async throws {
+        let server = FakeAuthServer()
+        let store = MemorySessionStore(refreshToken: "saved-refresh")
+        let manager = makeManager(server, store: store)
+        await manager.install(accessToken: "stale-token", refreshToken: "saved-refresh",
+                              expiresAt: Date().addingTimeInterval(60), userId: server.userId)
+
+        let (_, http) = try await manager.perform { dataRequest($0) }
+
+        XCTAssertEqual(http.statusCode, 200)
+        XCTAssertEqual(server.refreshCalls, 1)
+        XCTAssertEqual(server.dataCalls, 1, "no wasted request with the old token")
+    }
+
+    /// After a relaunch there is only the saved refresh token: it is used.
+    func testRelaunch_withOnlyRefreshToken_renews() async throws {
+        let server = FakeAuthServer()
+        let store = MemorySessionStore(refreshToken: "saved-refresh")
+        let manager = makeManager(server, store: store)
+        let token = try await manager.validAccessToken()
+        XCTAssertEqual(token, "fresh-token")
+        XCTAssertEqual(server.refreshCalls, 1)
+    }
+
+    /// A refused refresh token means "sign in again": no retry loop, the saved
+    /// sign-in is cleared and the observer is told.
+    func testRefusedRefresh_needsSignIn_noLoop() async throws {
+        let server = FakeAuthServer()
+        server.refreshStatus = 400
+        let store = MemorySessionStore(refreshToken: "revoked")
+        let manager = makeManager(server, store: store)
+        await manager.install(accessToken: "stale-token", refreshToken: "revoked",
+                              expiresAt: Date().addingTimeInterval(3600), userId: server.userId)
+        let told = expectation(description: "needsSignIn posted")
+        await manager.setObserver { event in
+            if case .needsSignIn = event { told.fulfill() }
+        }
+
+        do {
+            _ = try await manager.perform { dataRequest($0) }
+            XCTFail("expected needsSignIn")
+        } catch {
+            XCTAssertEqual(error as? SessionError, .needsSignIn)
+        }
+        await fulfillment(of: [told], timeout: 1)
+        XCTAssertEqual(server.refreshCalls, 1, "one refresh attempt, no loop")
+        XCTAssertEqual(server.dataCalls, 1, "no retry after a refused refresh")
+        XCTAssertNil(store.refreshToken, "saved sign-in cleared")
+        XCTAssertEqual(ServerProblem.of(SessionError.needsSignIn), .signInExpired)
+    }
+
+    /// A network failure during renewal keeps the saved sign-in and reads as
+    /// "unreachable", not "sign in again".
+    func testNetworkFailureDuringRefresh_keepsSignIn_unreachable() async throws {
+        let server = FakeAuthServer()
+        server.refreshNetworkError = URLError(.notConnectedToInternet)
+        let store = MemorySessionStore(refreshToken: "saved-refresh")
+        let manager = makeManager(server, store: store)
+
+        do {
+            _ = try await manager.validAccessToken()
+            XCTFail("expected unreachable")
+        } catch {
+            XCTAssertEqual(error as? SessionError, .unreachable)
+            XCTAssertEqual(ServerProblem.of(error), .unreachable)
+        }
+        XCTAssertEqual(store.refreshToken, "saved-refresh", "saved sign-in kept")
+    }
+
+    /// Several requests at once with no fresh token share one renewal.
+    func testConcurrentRequests_shareOneRefresh() async throws {
+        let server = FakeAuthServer()
+        server.refreshDelay = 50_000_000
+        let store = MemorySessionStore(refreshToken: "saved-refresh")
+        let manager = makeManager(server, store: store)
+
+        try await withThrowingTaskGroup(of: Int.self) { group in
+            for _ in 0..<5 {
+                group.addTask {
+                    let (_, http) = try await manager.perform { dataRequest($0) }
+                    return http.statusCode
+                }
+            }
+            for try await status in group { XCTAssertEqual(status, 200) }
+        }
+        XCTAssertEqual(server.refreshCalls, 1, "single-flight renewal")
+    }
+
+    /// Error classification for the screens.
+    func testServerProblemClassification() {
+        XCTAssertEqual(ServerProblem.of(URLError(.timedOut)), .unreachable)
+        XCTAssertEqual(ServerProblem.of(URLError(.notConnectedToInternet)), .unreachable)
+        XCTAssertEqual(ServerProblem.of(SocialError.http(status: 500, body: "")), .other)
+        XCTAssertEqual(ServerProblem.of(SocialError.notSignedIn), .signInExpired)
+        XCTAssertNil(ServerProblem.message(for: SessionError.needsSignIn, server: "clan", what: "clans"))
+        XCTAssertTrue(SessionManager.isRejectedSignIn(status: 401, body: Data()))
+        XCTAssertTrue(SessionManager.isRejectedSignIn(
+            status: 400, body: Data(#"{"code":"PGRST303","message":"JWT expired"}"#.utf8)))
+        XCTAssertFalse(SessionManager.isRejectedSignIn(status: 403, body: Data("permission denied".utf8)))
+    }
+
+    /// The shared session never touches the live server in a test run.
+    func testSharedManager_isOfflineDuringTests() async {
+        let live = await SessionManager.shared.liveAllowed
+        XCTAssertFalse(live)
+        do {
+            _ = try await SessionManager.shared.perform { _ in
+                URLRequest(url: URL(string: "https://example.invalid")!)
+            }
+            XCTFail("expected liveServerDisabled")
+        } catch {
+            XCTAssertEqual(error as? SessionError, .liveServerDisabled)
+        }
+    }
+}

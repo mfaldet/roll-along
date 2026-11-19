@@ -563,7 +563,22 @@ struct FriendsView: View {
         )
     }
 
+    @ViewBuilder
     private var signedOutState: some View {
+        if auth.sessionExpired {
+            messageBlock(
+                icon: "person.crop.circle.badge.exclamationmark",
+                title: "Please sign in again",
+                message: "Your sign-in has expired. Sign in with Apple to see your friends again. Your progress is saved on this device either way.",
+                actionTitle: auth.isWorking ? "Signing in…" : "Sign in with Apple",
+                action: { auth.startSignIn() }
+            )
+        } else {
+            signedOutInvite
+        }
+    }
+
+    private var signedOutInvite: some View {
         messageBlock(
             icon: "person.2.fill",
             title: "Play with friends",
@@ -644,7 +659,7 @@ struct FriendsView: View {
             edges    = loadedEdges
             profiles = map
         } catch {
-            errorText = "The social server is unreachable right now. Pull to refresh or try again."
+            errorText = ServerProblem.message(for: error, server: "social", what: "your friends")
         }
         isLoading = false
     }

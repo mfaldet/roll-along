@@ -173,6 +173,10 @@ struct RollAlongApp: App {
                 // updates (S3-T8) and flush unlocks earned offline to the
                 // rarity rail (S3-T3).  Both no-op when nothing changed.
                 Task {
+                    // Renew the sign-in first (it may have expired while the
+                    // app was in the background), so the calls below and every
+                    // screen use a fresh token.
+                    await AppleAuthManager.shared.renewIfNeeded()
                     _ = TrophyCloudMirror.shared.reconcile(engine: gameState.trophyEngine)
                     await TrophySyncService.shared.sync(engine: gameState.trophyEngine)
                     await FeedbackOutbox.shared.flush()

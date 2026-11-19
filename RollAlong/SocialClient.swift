@@ -11,9 +11,10 @@ import UIKit
 // a player's name), leaderboards, clans, friends, and the send-a-life economy.
 //
 // IDENTITY: Sign in with Apple → Supabase Auth.
-//   After the player signs in, the auth layer hands this client the resulting
-//   Supabase access token (a short-lived authenticated JWT) and the player's
-//   user id via `setSession(accessToken:userId:)`.  Every request then sends:
+//   After the player signs in, the auth layer hands this client the player's
+//   user id via `setSession(userId:)`.  The short-lived access token itself
+//   lives in `SessionManager` (AppleAuthManager.swift), which renews it; every
+//   signed-in request goes through `SessionManager.perform` and sends:
 //       apikey:        <publishable key>      (identifies the project)
 //       Authorization: Bearer <access token>  (sets role=authenticated → RLS)
 //   so Postgres RLS scopes writes to the player's own rows.  Talking to
@@ -41,12 +42,13 @@ final class SocialClient: @unchecked Sendable {
 
     // MARK: - Session (set by the Sign-in-with-Apple auth layer)
 
-    private struct Session { let token: String; let userId: UUID }
+    private struct Session { let userId: UUID }
     private var session: Session?
 
-    /// Install the authenticated session after a successful Sign in with Apple.
-    func setSession(accessToken: String, userId: UUID) {
-        session = Session(token: accessToken, userId: userId)
+    /// Mark the player signed in after Sign in with Apple or a restored /
+    /// renewed session.  The token itself is held by `SessionManager`.
+    func setSession(userId: UUID) {
+        session = Session(userId: userId)
     }
 
     /// Tear down on sign-out / token loss.
@@ -78,19 +80,16 @@ final class SocialClient: @unchecked Sendable {
         guard let url = URL(string: "\(Self.projectURL)/functions/v1/delete-account") else {
             throw SocialError.badURL
         }
+        _ = session
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json",        forHTTPHeaderField: "Content-Type")
         req.setValue(Self.apiKey,               forHTTPHeaderField: "apikey")
-        req.setValue("Bearer \(session.token)", forHTTPHeaderField: "Authorization")
         if let appleAuthorizationCode {
             req.httpBody = try encoder.encode(["apple_authorization_code": appleAuthorizationCode])
         }
 
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw SocialError.http(status: -1, body: "no HTTP response")
-        }
+        let (data, http) = try await authorizedResponse(for: req)
         guard (200...299).contains(http.statusCode) else {
             throw SocialError.http(status: http.statusCode,
                                    body: String(data: data, encoding: .utf8) ?? "")
@@ -898,14 +897,22 @@ final class SocialClient: @unchecked Sendable {
         return session
     }
 
-    /// The signed-in player's bearer token, for the trophy showcase push
-    /// (S3-T3, `SocialTrophyBackend`). A thin accessor so `TrophySyncService`
-    /// can drive the `player_trophies` REST call through its own backend seam
-    /// (kept out of `SocialClient` to preserve its network-abstraction seam)
-    /// without exposing the private `Session`. Throws `.notSignedIn` when
-    /// signed out, so the signed-in push is a no-op until sign-in.
-    func trophyAccessToken() throws -> String {
-        try requireSession().token
+    /// Throws `.notSignedIn` when signed out (trophy sync, feedback).
+    func requireSignedIn() throws {
+        _ = try requireSession()
+    }
+
+    /// The one path for every signed-in request in the app (this client,
+    /// trophy sync, feedback, account deletion): `SessionManager` adds a
+    /// fresh token, and on an expired sign-in renews once and retries once.
+    /// `base` carries everything except the Authorization header.
+    func authorizedResponse(for base: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        try requireSignedIn()
+        return try await SessionManager.shared.perform { token in
+            var req = base
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            return req
+        }
     }
 
     /// Unit and UI test runs never touch the live server (RuntimeEnvironment
@@ -922,7 +929,6 @@ final class SocialClient: @unchecked Sendable {
                       bodyData: Data? = nil,
                       prefer: String? = nil) async throws -> Data {
         try Self.requireLiveServerAllowed()
-        let session = try requireSession()
         let urlString = "\(Self.projectURL)/rest/v1/\(path)"
             + (query.isEmpty ? "" : "?\(query)")
         guard let url = URL(string: urlString) else { throw SocialError.badURL }
@@ -931,14 +937,10 @@ final class SocialClient: @unchecked Sendable {
         req.httpMethod = method
         req.setValue("application/json",            forHTTPHeaderField: "Content-Type")
         req.setValue(Self.apiKey,                   forHTTPHeaderField: "apikey")
-        req.setValue("Bearer \(session.token)",     forHTTPHeaderField: "Authorization")
         if let prefer { req.setValue(prefer, forHTTPHeaderField: "Prefer") }
         req.httpBody = bodyData
 
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw SocialError.http(status: -1, body: "no HTTP response")
-        }
+        let (data, http) = try await authorizedResponse(for: req)
         guard (200...299).contains(http.statusCode) else {
             throw SocialError.http(status: http.statusCode,
                                    body: String(data: data, encoding: .utf8) ?? "")
@@ -1226,6 +1228,47 @@ enum SocialError: Error {
     case emptyResponse
     case http(status: Int, body: String)
     case decoding(Error)
+}
+
+/// What a failed signed-in load means for the player, so screens show the
+/// right message: "Please sign in again" only when the sign-in itself is gone,
+/// "server unreachable" only when there is truly no connection, otherwise a
+/// plain "something went wrong".
+enum ServerProblem: Equatable {
+    case signInExpired
+    case unreachable
+    case other
+
+    static let unreachableCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .timedOut, .cannotConnectToHost, .cannotFindHost,
+        .networkConnectionLost, .dnsLookupFailed, .dataNotAllowed,
+        .internationalRoamingOff, .callIsActive,
+    ]
+
+    static func of(_ error: Error) -> ServerProblem {
+        if let s = error as? SessionError {
+            switch s {
+            case .notSignedIn, .needsSignIn:        return .signInExpired
+            case .unreachable, .liveServerDisabled: return .unreachable
+            case .refreshFailed:                    return .other
+            }
+        }
+        if case SocialError.notSignedIn = error { return .signInExpired }
+        if let u = error as? URLError, unreachableCodes.contains(u.code) { return .unreachable }
+        return .other
+    }
+
+    /// The banner text for a failed load, or nil when the screen's own
+    /// "Please sign in again" state takes over.
+    static func message(for error: Error, server: String, what: String) -> String? {
+        switch of(error) {
+        case .signInExpired: return nil
+        case .unreachable:
+            return "The \(server) server is unreachable right now. Pull to refresh or try again."
+        case .other:
+            return "Something went wrong loading \(what). Pull to refresh or try again."
+        }
+    }
 }
 
 // ===========================================================================
@@ -2402,8 +2445,6 @@ struct SupabaseFeedbackSender: FeedbackSending {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
-        let token = try? SocialClient.shared.trophyAccessToken()
-        req.setValue("Bearer \(token ?? Self.anonKey)", forHTTPHeaderField: "Authorization")
         req.httpBody = try JSONEncoder().encode(Body(
             p_client_id: item.clientID.uuidString,
             p_kind: item.kind.rawValue,
@@ -2414,21 +2455,33 @@ struct SupabaseFeedbackSender: FeedbackSending {
             p_source: item.source,
             p_install_hash: installHash))
 
+        // Signed in: through the shared session (fresh token; one renewal and
+        // one retry on an expired one).  Signed out, or the sign-in is gone:
+        // anonymously, so the message still arrives.
+        var anon = req
+        anon.setValue("Bearer \(Self.anonKey)", forHTTPHeaderField: "Authorization")
         let data: Data
-        let response: URLResponse
+        let http: HTTPURLResponse
+        var signedIn = SocialClient.shared.isSignedIn
         do {
-            (data, response) = try await URLSession.shared.data(for: req)
+            if signedIn {
+                do {
+                    (data, http) = try await SocialClient.shared.authorizedResponse(for: req)
+                } catch let e as SessionError where e == .needsSignIn || e == .notSignedIn {
+                    signedIn = false
+                    (data, http) = try await Self.sendPlain(anon)
+                }
+            } else {
+                (data, http) = try await Self.sendPlain(anon)
+            }
         } catch {
             throw FeedbackSendError.retryLater(error.localizedDescription)
-        }
-        guard let http = response as? HTTPURLResponse else {
-            throw FeedbackSendError.retryLater("no HTTP response")
         }
         let body = String(data: data, encoding: .utf8) ?? ""
         switch http.statusCode {
         case 200...299:
             return
-        case 401 where token != nil:
+        case 401 where signedIn:
             // Expired sign-in token: keep it and retry after the token
             // refreshes, rather than drop the message.
             throw FeedbackSendError.retryLater("sign-in token refused")
@@ -2437,5 +2490,13 @@ struct SupabaseFeedbackSender: FeedbackSending {
         default:
             throw FeedbackSendError.retryLater("HTTP \(http.statusCode)")
         }
+    }
+
+    private static func sendPlain(_ req: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw SocialError.http(status: -1, body: "no HTTP response")
+        }
+        return (data, http)
     }
 }

@@ -47,6 +47,10 @@ final class AppleAuthManager: NSObject, ObservableObject {
     /// Human-readable last error, for surfacing a toast/label.  Cleared on
     /// each new attempt.
     @Published private(set) var lastError: String?
+    /// True when the saved sign-in could not be renewed (the server refused
+    /// the refresh token).  Social screens then show "Please sign in again"
+    /// with a sign-in button instead of a server error.  Cleared on sign-in.
+    @Published private(set) var sessionExpired: Bool = false
 
     // MARK: - Config (mirrors SocialClient; both are client-safe values)
 
@@ -93,9 +97,13 @@ final class AppleAuthManager: NSObject, ObservableObject {
     /// Forget the local session.  (Apple has no programmatic sign-out; this
     /// just drops our Supabase token so the social layer goes quiet again.)
     func signOut() {
+        renewalTask?.cancel()
+        renewalTask = nil
         SocialClient.shared.clearSession()
-        Keychain.delete(Self.refreshTokenKey)
+        KeychainSessionStore.shared.clear()
+        Task { await SessionManager.shared.clear() }
         isSignedIn = false
+        sessionExpired = false
     }
 
     // MARK: - Fresh authorization code (account deletion)
@@ -162,71 +170,115 @@ final class AppleAuthManager: NSObject, ObservableObject {
             }
 
             let session = try JSONDecoder().decode(SupabaseSession.self, from: data)
-            try install(session)
+            try await install(session)
             onSignedIn?()
         } catch {
             fail(error.localizedDescription)
         }
     }
 
-    // MARK: - Session persistence (stay signed in across launches)
+    // MARK: - Session persistence and renewal
+    //
+    // The access token lives one hour.  `SessionManager` (below) holds it,
+    // renews it with the saved refresh token, and is the ONLY place any
+    // signed-in request gets a token from.  This class drives renewal:
+    //   • at launch (`restoreSession`),
+    //   • when the app comes back to the foreground (`renewIfNeeded`),
+    //   • on a timer five minutes before the token expires,
+    // and every signed-in request also renews once and retries once if the
+    // server says the token has expired (`SessionManager.perform`).
 
-    /// Keychain key for the Supabase refresh token.
-    private static let refreshTokenKey = "ra_supabase_refresh_token"
+    /// Fires `renewIfNeeded` shortly before the current token expires.
+    private var renewalTask: Task<Void, Never>?
+    private var observingSession = false
 
-    /// Restore a signed-in session on launch by trading the persisted refresh
-    /// token for a fresh access token.  No-op (stays signed out) when there's
-    /// no stored token or it has expired / been revoked.  Call once at launch.
+    /// Hear about renewals (to re-arm the timer) and refused refresh tokens
+    /// (to show "Please sign in again") from any caller of the session.
+    private func ensureSessionObserver() async {
+        guard !observingSession else { return }
+        observingSession = true
+        await SessionManager.shared.setObserver { event in
+            Task { @MainActor in AppleAuthManager.shared.handle(event) }
+        }
+    }
+
+    private func handle(_ event: SessionEvent) {
+        switch event {
+        case .renewed(let expiresAt, let userId):
+            SocialClient.shared.setSession(userId: userId)
+            isSignedIn = true
+            sessionExpired = false
+            scheduleRenewal(expiresAt: expiresAt)
+        case .needsSignIn:
+            renewalTask?.cancel()
+            renewalTask = nil
+            SocialClient.shared.clearSession()
+            isSignedIn = false
+            sessionExpired = true
+        }
+    }
+
+    private func scheduleRenewal(expiresAt: Date) {
+        renewalTask?.cancel()
+        let delay = max(30, expiresAt.timeIntervalSinceNow - SessionManager.refreshLeeway)
+        renewalTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            await self?.renewIfNeeded()
+        }
+    }
+
+    /// Restore a signed-in session on launch from the saved refresh token.
+    /// A refused refresh token shows "Please sign in again"; a network failure
+    /// keeps the saved sign-in so the next attempt can renew it.
     func restoreSession() async {
-        // Test runs never call the live auth server — and must not reach the
-        // catch below, which would DELETE the real player's saved refresh
-        // token (unit tests run inside the app on the same phone/keychain).
+        // Test runs never call the live auth server and never touch the
+        // player's saved sign-in (tests run inside the app on the same phone).
         guard !RuntimeEnvironment.isRunningTests else { return }
-        guard !isSignedIn, let token = Keychain.read(Self.refreshTokenKey) else { return }
+        await ensureSessionObserver()
+        if isSignedIn { await renewIfNeeded(); return }
+        let store = KeychainSessionStore.shared
+        guard store.refreshToken != nil else { return }
+        // Signed in from the saved account straight away (requests renew the
+        // token themselves), so an offline launch isn't shown as signed out.
+        if let saved = store.userId.flatMap(UUID.init(uuidString:)) {
+            SocialClient.shared.setSession(userId: saved)
+            isSignedIn = true
+        }
         do {
-            let session = try await refreshSession(refreshToken: token)
-            try install(session)
-            onSignedIn?()
+            // Posts `.renewed`.  Deliberately no `onSignedIn`: a restore must
+            // never overwrite the server profile with this device's stats.
+            _ = try await SessionManager.shared.refresh()
         } catch {
-            // Expired / revoked / invalid — drop it; the user can sign in again.
-            Keychain.delete(Self.refreshTokenKey)
+            // `.needsSignIn` is handled by the observer; anything else (no
+            // connection, a server hiccup) keeps the saved sign-in.
         }
     }
 
-    /// Exchange a refresh token for a fresh Supabase session.  Supabase rotates
-    /// the refresh token on each use, so `install` persists the new one.
-    private func refreshSession(refreshToken: String) async throws -> SupabaseSession {
-        if RuntimeEnvironment.isRunningTests {
-            throw AuthError.message("Token refresh is disabled during test runs.")
+    /// Renew the token if it is missing or expires within five minutes.
+    /// Called on foreground and by the expiry timer.
+    func renewIfNeeded() async {
+        guard !RuntimeEnvironment.isRunningTests else { return }
+        await ensureSessionObserver()
+        guard isSignedIn else {
+            if !sessionExpired { await restoreSession() }
+            return
         }
-        let url = URL(string: "\(Self.projectURL)/auth/v1/token?grant_type=refresh_token")!
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Self.apiKey,        forHTTPHeaderField: "apikey")
-        req.httpBody = try JSONEncoder().encode(RefreshGrant(refresh_token: refreshToken))
-
-        let (data, response) = try await URLSession.shared.data(for: req)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        guard (200...299).contains(status) else {
-            throw AuthError.message("Token refresh failed (\(status)).")
-        }
-        return try JSONDecoder().decode(SupabaseSession.self, from: data)
+        _ = try? await SessionManager.shared.validAccessToken()
     }
 
-    /// Install a freshly-minted session: hand the access token to
-    /// `SocialClient`, persist the (rotated) refresh token for next launch, and
-    /// flip the published flags.
-    private func install(_ session: SupabaseSession) throws {
+    /// Install a freshly minted session from the Apple sign-in exchange.
+    private func install(_ session: SupabaseSession) async throws {
         guard let userId = UUID(uuidString: session.user.id) else {
             throw AuthError.message("Auth server returned an unreadable user id.")
         }
-        SocialClient.shared.setSession(accessToken: session.access_token, userId: userId)
-        if let refresh = session.refresh_token {
-            Keychain.save(refresh, for: Self.refreshTokenKey)
-        }
+        await ensureSessionObserver()
+        let expiresAt = await SessionManager.shared.install(session, userId: userId)
+        SocialClient.shared.setSession(userId: userId)
         isSignedIn = true
         isWorking  = false
+        sessionExpired = false
+        scheduleRenewal(expiresAt: expiresAt)
     }
 
     private func fail(_ message: String) {
@@ -352,6 +404,10 @@ private struct RefreshGrant: Encodable {
 private struct SupabaseSession: Decodable {
     let access_token: String
     let refresh_token: String?
+    /// Seconds the access token lives (Supabase: 3600).
+    let expires_in: Double?
+    /// Unix time the access token expires.
+    let expires_at: Double?
     let user: SupabaseUser
 }
 
@@ -402,5 +458,278 @@ private enum Keychain {
             kSecAttrAccount as String: key,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+}
+
+// ===========================================================================
+// Saved sign-in: the Supabase refresh token and the account id, in the
+// Keychain.  A protocol so tests can use an in-memory store.
+// ===========================================================================
+protocol SessionTokenStore: AnyObject, Sendable {
+    var refreshToken: String? { get set }
+    var userId: String? { get set }
+}
+
+extension SessionTokenStore {
+    func clear() { refreshToken = nil; userId = nil }
+}
+
+final class KeychainSessionStore: SessionTokenStore, @unchecked Sendable {
+    static let shared = KeychainSessionStore()
+    /// Same key as earlier builds, so an existing saved sign-in still restores.
+    private static let refreshKey = "ra_supabase_refresh_token"
+    private static let userKey    = "ra_supabase_user_id"
+
+    var refreshToken: String? {
+        get { Keychain.read(Self.refreshKey) }
+        set {
+            if let newValue { Keychain.save(newValue, for: Self.refreshKey) }
+            else { Keychain.delete(Self.refreshKey) }
+        }
+    }
+    var userId: String? {
+        get { Keychain.read(Self.userKey) }
+        set {
+            if let newValue { Keychain.save(newValue, for: Self.userKey) }
+            else { Keychain.delete(Self.userKey) }
+        }
+    }
+}
+
+/// What can go wrong getting a usable sign-in.
+enum SessionError: Error, Equatable {
+    /// No saved sign-in at all.
+    case notSignedIn
+    /// The server refused the saved refresh token: the player must sign in again.
+    case needsSignIn
+    /// The auth server could not be reached (no connection, timeout).
+    case unreachable
+    /// The auth server answered with an unexpected status (kept signed in).
+    case refreshFailed(status: Int)
+    /// Test runs never touch the live server.
+    case liveServerDisabled
+}
+
+enum SessionEvent: Sendable {
+    case renewed(expiresAt: Date, userId: UUID)
+    case needsSignIn
+}
+
+/// Sends a request: `URLSession.shared` in the app, a fake in unit tests.
+typealias HTTPTransport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+
+// ===========================================================================
+// SessionManager — the one source of truth for the signed-in token.
+//
+// Every signed-in request (SocialClient, trophy sync, feedback, account
+// deletion) gets its token here:
+//   • `validAccessToken()` renews first when the token expires within five
+//     minutes (or is missing after a relaunch);
+//   • `perform(_:)` sends a request and, if the server says the token is
+//     expired or invalid (401, PGRST301/PGRST303, "JWT expired"), renews once
+//     and retries once — never more;
+//   • renewals are single-flight: concurrent callers share one refresh, so a
+//     rotated refresh token is never used twice;
+//   • the rotated refresh token is saved immediately after every renewal.
+// A refused refresh token (400/401/403) clears the saved sign-in and posts
+// `.needsSignIn`; a network failure keeps it and throws `.unreachable`.
+// ===========================================================================
+actor SessionManager {
+    static let shared = SessionManager(
+        transport: { try await URLSession.shared.data(for: $0) },
+        store: KeychainSessionStore.shared,
+        liveAllowed: !RuntimeEnvironment.isRunningTests)
+
+    /// Renew this long before the token expires.
+    static let refreshLeeway: TimeInterval = 5 * 60
+
+    private static let projectURL = "https://mhwpcwauzvmtmuphtajs.supabase.co"
+    private static let apiKey = "sb_publishable_A1RRz_2m9qDAWikrVlyfnQ_M-YgOSaR"
+
+    private struct Current { let accessToken: String; let expiresAt: Date; let userId: UUID }
+
+    private let transport: HTTPTransport
+    private let store: SessionTokenStore
+    private let now: @Sendable () -> Date
+    let liveAllowed: Bool
+
+    private var current: Current?
+    private var inFlight: Task<String, Error>?
+    private var observer: (@Sendable (SessionEvent) -> Void)?
+
+    init(transport: @escaping HTTPTransport,
+         store: SessionTokenStore,
+         now: @escaping @Sendable () -> Date = { Date() },
+         liveAllowed: Bool) {
+        self.transport = transport
+        self.store = store
+        self.now = now
+        self.liveAllowed = liveAllowed
+    }
+
+    func setObserver(_ observer: @escaping @Sendable (SessionEvent) -> Void) {
+        self.observer = observer
+    }
+
+    var currentUserId: UUID? { current?.userId }
+    var currentExpiry: Date? { current?.expiresAt }
+
+    /// Forget the session (sign-out).  Clears the saved sign-in too.
+    func clear() {
+        current = nil
+        store.clear()
+    }
+
+    /// Install a session from the Apple sign-in exchange.  Returns its expiry.
+    @discardableResult
+    fileprivate func install(_ session: SupabaseSession, userId: UUID) -> Date {
+        let expiresAt = Self.expiry(of: session, now: now())
+        current = Current(accessToken: session.access_token, expiresAt: expiresAt, userId: userId)
+        if let refresh = session.refresh_token { store.refreshToken = refresh }
+        store.userId = userId.uuidString
+        return expiresAt
+    }
+
+    /// Test seam: install a session from raw values.
+    func install(accessToken: String, refreshToken: String?, expiresAt: Date, userId: UUID) {
+        current = Current(accessToken: accessToken, expiresAt: expiresAt, userId: userId)
+        if let refreshToken { store.refreshToken = refreshToken }
+        store.userId = userId.uuidString
+    }
+
+    /// A token good for at least five more minutes, renewing first if needed.
+    func validAccessToken() async throws -> String {
+        if let c = current, c.expiresAt.timeIntervalSince(now()) > Self.refreshLeeway {
+            return c.accessToken
+        }
+        guard current != nil || store.refreshToken != nil else { throw SessionError.notSignedIn }
+        return try await refresh()
+    }
+
+    /// Renew because the server refused `rejected`.  If another request has
+    /// already renewed since, the newer token is returned without a second
+    /// refresh.
+    func forceRefresh(rejecting rejected: String) async throws -> String {
+        if let c = current, c.accessToken != rejected { return c.accessToken }
+        return try await refresh()
+    }
+
+    /// Renew now.  Concurrent callers share one refresh.
+    func refresh() async throws -> String {
+        if let running = inFlight { return try await running.value }
+        let task = Task { try await self.performRefresh() }
+        inFlight = task
+        do {
+            let token = try await task.value
+            inFlight = nil
+            return token
+        } catch {
+            inFlight = nil
+            throw error
+        }
+    }
+
+    private func performRefresh() async throws -> String {
+        guard liveAllowed else { throw SessionError.liveServerDisabled }
+        guard let refreshToken = store.refreshToken else {
+            if current != nil { expire(); throw SessionError.needsSignIn }
+            throw SessionError.notSignedIn
+        }
+        guard let url = URL(string: "\(Self.projectURL)/auth/v1/token?grant_type=refresh_token") else {
+            throw SessionError.refreshFailed(status: -1)
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 20
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Self.apiKey,        forHTTPHeaderField: "apikey")
+        req.httpBody = try JSONEncoder().encode(RefreshGrant(refresh_token: refreshToken))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await transport(req)
+        } catch {
+            // No answer at all: keep the saved sign-in and try again later.
+            throw SessionError.unreachable
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        switch status {
+        case 200...299:
+            let session: SupabaseSession
+            do { session = try JSONDecoder().decode(SupabaseSession.self, from: data) }
+            catch { throw SessionError.refreshFailed(status: status) }
+            guard let userId = UUID(uuidString: session.user.id) else {
+                throw SessionError.refreshFailed(status: status)
+            }
+            let expiresAt = install(session, userId: userId)
+            observer?(.renewed(expiresAt: expiresAt, userId: userId))
+            return session.access_token
+        case 400, 401, 403:
+            // invalid_grant: the refresh token was revoked, already used, or
+            // not found.  Only a new sign-in can fix this.
+            expire()
+            throw SessionError.needsSignIn
+        default:
+            throw SessionError.refreshFailed(status: status)
+        }
+    }
+
+    private func expire() {
+        current = nil
+        store.clear()
+        observer?(.needsSignIn)
+    }
+
+    // MARK: Signed-in requests
+
+    /// Send one signed-in request.  `make` builds it with the given token.
+    /// On an expired or invalid token: renew once and retry once.
+    nonisolated func perform(_ make: (String) throws -> URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard liveAllowed else { throw SessionError.liveServerDisabled }
+        let first = try await validAccessToken()
+        let (data, http) = try await send(try make(first))
+        guard Self.isRejectedSignIn(status: http.statusCode, body: data) else { return (data, http) }
+        let second = try await forceRefresh(rejecting: first)
+        return try await send(try make(second))
+    }
+
+    private nonisolated func send(_ req: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await transport(req)
+        guard let http = response as? HTTPURLResponse else {
+            throw SocialError.http(status: -1, body: "no HTTP response")
+        }
+        return (data, http)
+    }
+
+    /// True when the server refused the request because of the sign-in token.
+    static func isRejectedSignIn(status: Int, body: Data) -> Bool {
+        if status == 401 { return true }
+        let text = String(decoding: body.prefix(2048), as: UTF8.self).lowercased()
+        return text.contains("jwt expired") || text.contains("pgrst301")
+            || text.contains("pgrst303") || text.contains("invalid jwt")
+            || text.contains("bad_jwt")
+    }
+
+    // MARK: Expiry
+
+    private static func expiry(of session: SupabaseSession, now: Date) -> Date {
+        if let at = session.expires_at { return Date(timeIntervalSince1970: at) }
+        if let inSeconds = session.expires_in { return now.addingTimeInterval(inSeconds) }
+        if let exp = jwtExpiry(session.access_token) { return exp }
+        return now.addingTimeInterval(3600)
+    }
+
+    /// The `exp` claim of a JWT, if readable.
+    static func jwtExpiry(_ token: String) -> Date? {
+        let parts = token.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        var b64 = String(parts[1]).replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64 += "=" }
+        guard let data = Data(base64Encoded: b64),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let exp = obj["exp"] as? Double else { return nil }
+        return Date(timeIntervalSince1970: exp)
     }
 }

@@ -481,7 +481,7 @@ struct SocialTrophyBackend: TrophyBackend {
     func upsertPlayerTrophies(playerID: UUID, trophyIDs: [String]) async throws {
         let ids = Self.wireSafe(trophyIDs)
         guard !ids.isEmpty else { return }
-        let token = try SocialClient.shared.trophyAccessToken()
+        try SocialClient.shared.requireSignedIn()
         let rows = ids.map {
             PlayerTrophyRow(player_id: playerID.uuidString, trophy_id: $0)
         }
@@ -491,7 +491,6 @@ struct SocialTrophyBackend: TrophyBackend {
             path: "player_trophies",
             query: "on_conflict=player_id,trophy_id",
             body: try encoder.encode(rows),
-            token: token,
             prefer: "resolution=ignore-duplicates,return=minimal"
         )
     }
@@ -499,14 +498,14 @@ struct SocialTrophyBackend: TrophyBackend {
     // MARK: - Hydrate: read own player_trophies (S3-T5 sign-in restore)
 
     func fetchPlayerTrophies(playerID: UUID) async throws -> [String] {
-        let token = try SocialClient.shared.trophyAccessToken()
+        try SocialClient.shared.requireSignedIn()
         // GET only this player's rows, selecting just the id column — the
         // server→local restore never needs timestamps (the engine keeps its own
         // first-unlock stamp; a merged id adopts `now()`). Filtering to
         // player_id=eq.<self> keeps the payload to the player's own set even
         // though RLS lets authenticated read all rows (the showcase read path).
         let query = "select=trophy_id&player_id=eq.\(playerID.uuidString)"
-        let data = try await getAuthed(path: "player_trophies", query: query, token: token)
+        let data = try await getAuthed(path: "player_trophies", query: query)
         let rows = try JSONDecoder().decode([PlayerTrophyIDRow].self, from: data)
         return rows.map(\.trophy_id)
     }
@@ -514,7 +513,7 @@ struct SocialTrophyBackend: TrophyBackend {
     // MARK: - S3-T9 curated public showcase (player_showcase table)
 
     func upsertShowcase(_ showcase: TrophyPublicShowcase, playerID: UUID) async throws {
-        let token = try SocialClient.shared.trophyAccessToken()
+        try SocialClient.shared.requireSignedIn()
         // One row per player (PK player_id). merge-duplicates so a re-push
         // OVERWRITES the counts/ids (unlike the ignore-duplicates unlock rails,
         // the showcase is a mutable snapshot that must reflect the latest set).
@@ -522,19 +521,17 @@ struct SocialTrophyBackend: TrophyBackend {
             path: "player_showcase",
             query: "on_conflict=player_id",
             body: try encoder.encode([showcase.row(playerID: playerID)]),
-            token: token,
             prefer: "resolution=merge-duplicates,return=minimal"
         )
     }
 
     func deleteShowcase(playerID: UUID) async throws {
-        let token = try SocialClient.shared.trophyAccessToken()
+        try SocialClient.shared.requireSignedIn()
         // RLS also scopes delete to the caller's own row; the explicit filter
         // keeps the request well-formed (PostgREST requires a filter to delete).
         try await deleteAuthed(
             path: "player_showcase",
-            query: "player_id=eq.\(playerID.uuidString)",
-            token: token
+            query: "player_id=eq.\(playerID.uuidString)"
         )
     }
 
@@ -544,8 +541,8 @@ struct SocialTrophyBackend: TrophyBackend {
         // viewer so a deep-link visitor still sees the showcase.
         let query = "player_id=eq.\(playerID.uuidString)&limit=1"
         let data: Data
-        if let token = try? SocialClient.shared.trophyAccessToken() {
-            data = try await getAuthed(path: "player_showcase", query: query, token: token)
+        if SocialClient.shared.isSignedIn {
+            data = try await getAuthed(path: "player_showcase", query: query)
         } else {
             data = try await getAnon(path: "player_showcase", query: query)
         }
@@ -563,18 +560,17 @@ struct SocialTrophyBackend: TrophyBackend {
         try await run(req)
     }
 
-    private func postAuthed(path: String, query: String, body: Data, token: String, prefer: String) async throws {
+    private func postAuthed(path: String, query: String, body: Data, prefer: String) async throws {
         var req = try request(path: path, query: query, body: body, prefer: prefer)
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        try await run(req)
+        _ = try await sendAuthed(req)
     }
 
     /// Authenticated GET returning the response body (the hydrate read). Mirrors
     /// SocialClient.send's GET shape: anon apikey header + the player's Bearer
     /// token, no body/Prefer. Throws on any non-2xx so the caller leaves the
     /// local ledger untouched.
-    private func getAuthed(path: String, query: String, token: String) async throws -> Data {
+    private func getAuthed(path: String, query: String) async throws -> Data {
         let urlString = "\(Self.projectURL)/rest/v1/\(path)"
             + (query.isEmpty ? "" : "?\(query)")
         guard let url = URL(string: urlString) else { throw SocialError.badURL }
@@ -582,8 +578,7 @@ struct SocialTrophyBackend: TrophyBackend {
         req.httpMethod = "GET"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        return try await send(req)
+        return try await sendAuthed(req)
     }
 
     /// Anonymous GET returning the response body (the signed-out showcase read).
@@ -604,7 +599,7 @@ struct SocialTrophyBackend: TrophyBackend {
     /// Authenticated DELETE (the showcase toggle-off). Mirrors the authed shape:
     /// anon apikey header + the player's Bearer token, a PostgREST filter in the
     /// query. Throws on any non-2xx so the caller can retry.
-    private func deleteAuthed(path: String, query: String, token: String) async throws {
+    private func deleteAuthed(path: String, query: String) async throws {
         let urlString = "\(Self.projectURL)/rest/v1/\(path)"
             + (query.isEmpty ? "" : "?\(query)")
         guard let url = URL(string: urlString) else { throw SocialError.badURL }
@@ -613,8 +608,7 @@ struct SocialTrophyBackend: TrophyBackend {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
         req.setValue(Self.anonKey, forHTTPHeaderField: "apikey")
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        try await run(req)
+        _ = try await sendAuthed(req)
     }
 
     private func request(path: String, query: String, body: Data, prefer: String) throws -> URLRequest {
@@ -633,7 +627,28 @@ struct SocialTrophyBackend: TrophyBackend {
         _ = try await send(req)
     }
 
-    /// The single network exit for this backend: refuses during test runs,
+    /// Signed-in requests: through the shared session (fresh token; one
+    /// renewal and one retry on an expired one), logging refusals.
+    private func sendAuthed(_ req: URLRequest) async throws -> Data {
+        try Self.requireLiveServerAllowed()
+        let label = "\(req.httpMethod ?? "?") \(req.url?.path ?? "?")"
+        let data: Data
+        let http: HTTPURLResponse
+        do {
+            (data, http) = try await SocialClient.shared.authorizedResponse(for: req)
+        } catch {
+            TrophySyncService.debugLog("\(label) failed: \(error)")
+            throw error
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            TrophySyncService.debugLog("\(label) refused: HTTP \(http.statusCode) \(body)")
+            throw SocialError.http(status: http.statusCode, body: body)
+        }
+        return data
+    }
+
+    /// The single anonymous network exit for this backend: refuses during test runs,
     /// and logs (DEBUG) every refused request with its status + server body
     /// before throwing, so a refusal is never silent.
     private func send(_ req: URLRequest) async throws -> Data {
