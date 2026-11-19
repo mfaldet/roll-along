@@ -64,10 +64,12 @@ same text.
 
 - **Get Lives sheet:** Home screen → tap the lives counter at the top-left.
 - **Get Coins sheet:** Home → Shop → tap the coin balance at the top-right.
+  The 10,000-coin card shows "Includes the Money Ball skin" until the player
+  owns the Money Ball.
 - **Starter Pack offer sheet:** appears by itself on the Home screen the first
   time the coin balance reaches 250, and can be reopened for 48 hours. On a
-  fresh install, the quickest route is to buy the 600-coin pack with the local
-  StoreKit test configuration and go back to Home.
+  fresh install, the quickest route is to buy the 600-coin pack (sandbox or
+  TestFlight purchase) and go back to Home.
 
 ## What the Starter Pack sheet shows
 
@@ -108,12 +110,12 @@ price changes:
 - 300 lives: $19.99 ÷ 300 = $0.0666 a life; 1 − 0.0666 ÷ 0.0995 = 33.0%, shown as 33%
 
 Diamond Balls is a separate card below the packs, under the heading "OR NEVER
-RUN OUT". It says "Indestructible. Unlimited lives, forever." and names the
-Diamond ball skin. It shows no savings figure. Once it is owned, the packs are
-hidden and the sheet shows only a "You own Diamond Balls" card.
-
-The Diamond Balls card shows the Diamond ball cosmetic itself, large, with a
-soft cyan glow.
+RUN OUT". It shows the Diamond ball cosmetic itself with a soft cyan glow, the
+title "Diamond Balls" and the line "Unlimited lives, forever, plus the Diamond
+ball skin." It shows no savings figure. Once it is owned, the packs are hidden
+and the sheet shows the owned state ("Unlimited lives, forever" — "Indestructible
+· exclusive Diamond skin unlocked"). The Diamond ball is never sold in the Shop
+or Catalog; it appears only in the Locker after this purchase.
 
 The lives cards, prices and product IDs changed on 2026-11-18, and the pack
 icons changed on 2026-11-19 (pouch, box and chest replaced the jars; Diamond

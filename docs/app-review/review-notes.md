@@ -16,11 +16,11 @@ WHERE THINGS ARE (Home screen)
 Leaderboard, Clans, Friends (sign-in); Shop (cosmetics for in-game coins; Catalog inside); Profile; Settings; "Games" (10 minigames, 8 challenge tracks).
 
 MINIGAME REWARDS
-Solo minigames pay no coins. Competitive minigames pay 1, 2 or 3 coins on Easy, Normal or Hard whatever the result; a win also earns 1 ticket. Gold Rush, a 30-second bonus round, costs 5 tickets; each coin caught pays 1 coin (up to 100), or 2 after an optional 10-ticket boost. Tickets come only from wins, cannot be bought and have no other use.
+Solo minigames pay no coins. Competitive minigames pay 1, 2 or 3 coins on Easy, Normal or Hard whatever the result; a win also earns 1 ticket. Gold Rush, a 30-second bonus round, costs 5 tickets; each coin caught pays 1 coin (up to 100), or 2 after an optional 10-ticket boost. Tickets come only from wins and cannot be bought.
 
 IN-APP PURCHASES (10)
 Lives (tap the lives counter, top-left of Home): 20, 120, 300 Lives (consumable); Diamond Balls, unlimited lives plus the Diamond ball skin (non-consumable).
-Coins (Shop, tap the coin balance): 100, 600, 1,300, 3,000, 10,000 (consumable); the 10,000 pack includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
+Coins (Shop, tap the coin balance): 100, 600, 1,300, 3,000, 10,000 (consumable); the first 10,000 pack also includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
 Starter Pack (non-consumable): 500 coins plus the Aurora ball, trail and boundary, one time only; offered on Home once the coin balance first reaches 250, for 48 hours. Quickest way: buy 600 coins, return to Home.
 Restore: Settings > Purchases > Restore Purchases.
 
@@ -28,7 +28,7 @@ ADS
 One rewarded video (Google AdMob), only when the player chooses "Watch ad" for an extra life. Non-personalized, "Teen" rating, no tracking (no ATT prompt, no IDFA).
 
 NO USER-WRITTEN CONTENT
-Players cannot type text other players see. Nicknames are two preset words; clan names are two preset words plus a number; clan descriptions and clan chat are fixed phrases. The server rejects anything else. The only free-text field is Send Feedback, which goes privately to the developer.
+Players cannot type text other players see. Nicknames are two preset words; clan names are two preset words plus a number (no tags); clan descriptions and clan chat are fixed phrases. The server rejects anything else. The only free-text field is Send Feedback, which goes privately to the developer.
 
 CLANS, FRIENDS AND THE MONTHLY CLAN BATTLE
 Clans hold up to 12 players. Each player has a server-assigned friend code others can type on the Friends screen; it is shown only if shared. Each calendar month, a clan's score is the new stars its members earn in the main game, counted by our server. At month end, contributing members of ranked clans receive 100 to 1,000 in-game coins, claimed on the Clans screen. December 2026 is a warm-up with no prizes. No entry fee, nothing to buy; coins buy cosmetics only and have no cash value. An owner can remove a member or hand over ownership. Players can ask their clan for lives (up to 6, one per clanmate, free to givers); lives can only be given to such requests.
@@ -37,7 +37,7 @@ ACCOUNT DELETION
 Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
 COSMETIC RELEASE CALENDAR
-Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; that only changes when a collection appears in the Shop. Nothing else is switched on remotely. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal events return each year.
+Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; nothing else is switched on remotely. 18 collections are sold as sets; other items are sold singly. The next releases are shown by name and date in Shop > Catalog > "Coming soon". Seasonal events return each year.
 
 TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.
@@ -60,14 +60,15 @@ Contact: rollalongsupport@gmail.com
 - [ ] Steps 1–17 are applied (confirmed: every check query true).  Step 16
       was applied in its original form, which also added
       `rollup_best_seconds`; step 18 removes it.
-- [ ] `docs/social/rollup-height-only.sql` (step 18, after step 17) has been
-      applied.  Roll Up is scored by height only; the step removes the old
-      run-time column (`rollup_best_seconds`).
-- [ ] `docs/economy/season-prize-settings.sql` (step 19, after step 18) has
-      been applied, so clan season prizes are exactly 1,000 / 500 / 250 / 100
-      coins as the notes say.
-- [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
-      not built from these lists" is only true after that).
+- [ ] Step 18, `docs/social/rollup-height-only.sql`, has been applied
+      (Roll Up is scored by height only).
+- [ ] Step 19, `docs/economy/season-prize-settings.sql`, has been applied, so
+      clan season prizes are exactly 1,000 / 500 / 250 / 100 coins as the
+      notes say.
+- [ ] Right before submitting: delete the app on the test phones, then run
+      `docs/launch/wipe-play-data.sql` (preview, wipe, check all true).  A
+      test phone that opens the app afterwards re-uploads its scores.
 - [ ] The Supabase project is running and not paused during review.
-- [ ] All ten purchases are "Ready to Submit" and attached to the version.
+- [ ] All ten purchases are "Ready to Submit", attached to the version, and
+      use the names and descriptions in `docs/app-review/in-app-purchases.md`.
 - [ ] The Home button labels and paths above match the build you submit.
