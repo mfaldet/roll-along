@@ -1202,4 +1202,25 @@ final class TrailMarksTests: XCTestCase {
         let rolling = ShopTrailCurve.marks(along: pts, t: 7.3, rolling: true)
         XCTAssertTrue(rolling.times.allSatisfy { 7.3 - $0 < TrailMarks.lifetime && $0 <= 7.3 + 1e-9 })
     }
+
+    /// The rolling tile: the ball leaves past the right edge and stays off
+    /// screen until the whole trail has faded, so a new lap never starts
+    /// over the old trail.
+    func testShopCurveHoldsOffscreenUntilTrailFades() {
+        let unit = ShopTrailCurve.rollingCurve
+        let pts = unit.map { CGPoint(x: $0.x * 100, y: $0.y * 100) }
+        let visible = ShopTrailCurve.unitCurve.count
+        XCTAssertGreaterThan(unit.last?.x ?? 0, 1.0)
+        // Sample a few cycles finely: whenever a lap has just started (the
+        // ball is near the left), no mark from the previous lap remains.
+        var t = 0.0
+        while t < 20 {
+            let m = ShopTrailCurve.marks(along: pts, t: t, rolling: true, visibleCount: visible)
+            XCTAssertEqual(m.lapBreak, 0)
+            XCTAssertTrue(m.times.allSatisfy { t - $0 < TrailMarks.lifetime && $0 <= t + 1e-9 })
+            if !m.ballVisible { XCTAssertGreaterThan(m.head.x, 100) }
+            t += 0.05
+        }
+        XCTAssertGreaterThan(ShopTrailCurve.offscreenHold, TrailMarks.lifetime)
+    }
 }
