@@ -492,7 +492,7 @@ struct SettingsView: View {
                              title: "Send Feedback", trailing: "chevron.right")
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Report a bug, share an idea or make a complaint")
+                .accessibilityHint("Report a bug, share an idea, ask a question or pay a compliment")
             }
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
 
@@ -843,10 +843,7 @@ struct FeedbackSheet: View {
     private var form: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Picker("Kind", selection: $kind) {
-                    ForEach(FeedbackKind.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
+                kindPicker
 
                 Text(prompt)
                     .font(.system(.subheadline, design: .rounded))
@@ -910,11 +907,45 @@ struct FeedbackSheet: View {
         .onAppear { editorFocused = true }
     }
 
+    /// Four tiles, icon over title: Bug, Idea, Question, Compliment.
+    private var kindPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(FeedbackKind.allCases) { k in
+                kindTile(k)
+            }
+        }
+    }
+
+    private func kindTile(_ k: FeedbackKind) -> some View {
+        let selected: Bool = k == kind
+        return Button { kind = k } label: {
+            VStack(spacing: 6) {
+                Image(systemName: k.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                Text(k.title)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(selected ? Color.black : Color(white: 0.85))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(selected ? Color.white : Color(white: 0.16))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(k.title)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+
     private var prompt: String {
         switch kind {
-        case .bug:       return "What happened, and what were you doing just before?"
-        case .idea:      return "What would make Roll Along better?"
-        case .complaint: return "Tell us what went wrong. We read every message."
+        case .bug:        return "What happened, and what were you doing just before?"
+        case .idea:       return "What would make Roll Along better?"
+        case .question:   return "What would you like to know? We read every message."
+        case .compliment: return "What do you enjoy? We'd love to hear it."
         }
     }
 

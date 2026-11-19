@@ -43,7 +43,7 @@ TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.
 
 SEND FEEDBACK
-Settings > About > Send Feedback: Bug, Idea or Complaint, up to 1,000 characters, private to the developer (players cannot read it back). Adds app version, iOS version, phone model, source screen, and account ID if signed in. 5 per phone per day; sent later if offline.
+Settings > About > Send Feedback: Bug, Idea, Question or Compliment, up to 1,000 characters, private to the developer (players cannot read it back). Adds app version, iOS version, phone model, source screen, and account ID if signed in. 5 per phone per day; sent later if offline.
 
 NOTIFICATIONS
 Two optional local notifications (shop restock, lives full), off until turned on in Settings.
@@ -69,6 +69,9 @@ Contact: rollalongsupport@gmail.com
       `docs/social/drop-friend-gifts.sql`, `docs/social/drop-clan-tags.sql`,
       `docs/social/rollup-columns.sql`.  This build sends no clan tag, so
       creating a clan fails until step 15 removes the tag column.
+- [ ] `docs/feedback/feedback-types.sql` (step 17, after step 16) has been
+      applied, or Question and Compliment messages are refused by the server
+      (Bug and Idea still arrive).
 - [ ] `docs/social-schema-v4.sql` has been applied ("The server rejects anything
       not built from these lists" is only true after that).
 - [ ] The Supabase project is running and not paused during review.

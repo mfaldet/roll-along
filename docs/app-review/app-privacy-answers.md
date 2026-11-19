@@ -43,7 +43,7 @@ the Google Mobile Ads SDK.
 | Diagnostics → **Crash Data** | Google: SDK crash logs | No | Analytics; Third-Party Advertising |
 | Diagnostics → **Performance Data** | Google: launch time, hang rate, energy use | No | Analytics; Third-Party Advertising |
 | Diagnostics → **Other Diagnostic Data** | App: phone model, iOS version and app version on each analytics event, and on each feedback message | No (analytics); Yes when feedback is sent signed in | Analytics; App Functionality |
-| User Content → **Customer Support** | App: the Bug / Idea / Complaint message a player writes in Settings → Send Feedback, with the screen it came from; linked to the account ID only when signed in | Yes | App Functionality |
+| User Content → **Customer Support** | App: the Bug / Idea / Question / Compliment message a player writes in Settings → Send Feedback, with the screen it came from; linked to the account ID only when signed in | Yes | App Functionality |
 
 App Store Connect asks about each data type once. Where a type appears twice
 above (Gameplay Content), give the combined answer: **linked: yes**, purposes

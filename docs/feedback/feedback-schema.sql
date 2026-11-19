@@ -13,6 +13,8 @@
 --     in the dashboard (Table Editor or SQL Editor), which uses the owner role.
 --   * public.submit_feedback(...) checks and stores one message:
 --       - kind is bug, idea or complaint; message 1 to 1,000 characters;
+--         (step 17, docs/feedback/feedback-types.sql, changes the kinds to
+--         bug, idea, question and compliment);
 --       - the other fields are short (version, iOS, model, screen);
 --       - player_id comes from the sign-in token (auth.uid()), never from
 --         the request, so nobody can file feedback as someone else;

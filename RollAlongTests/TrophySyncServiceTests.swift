@@ -380,6 +380,31 @@ final class FeedbackOutboxTests: XCTestCase {
                        liveAllowed: true, now: clock, autoFlush: false)
     }
 
+    func testKindsAreTheFourTheServerAccepts() {
+        XCTAssertEqual(FeedbackKind.allCases.map(\.rawValue),
+                       ["bug", "idea", "question", "compliment"])
+        XCTAssertEqual(FeedbackKind.allCases.map(\.title),
+                       ["Bug", "Idea", "Question", "Compliment"])
+    }
+
+    func testOldQueuedComplaintIsSentAsCompliment() async throws {
+        // A message queued by an older build with the retired "complaint" kind.
+        let old = FeedbackItem(clientID: UUID(), kind: .bug, message: "hi",
+                               appVersion: "1.0", iosVersion: "18.0",
+                               deviceModel: "iPhone17,1", source: "t",
+                               createdAt: Date(timeIntervalSince1970: 1_800_000_000))
+        let json = String(decoding: try JSONEncoder().encode([old]), as: UTF8.self)
+            .replacingOccurrences(of: "\"bug\"", with: "\"complaint\"")
+        defaults.set(Data(json.utf8), forKey: "ra_feedback_queue_v1")
+
+        let sender = MockFeedbackSender()
+        let box = outbox(sender)
+        XCTAssertEqual(box.pendingCount, 1, "the old queue still decodes")
+        await box.flush()
+        XCTAssertEqual(sender.sent.map(\.kind), [.compliment])
+        XCTAssertEqual(sender.sent.map(\.message), ["hi"])
+    }
+
     func testEmptyMessageIsNotQueued() {
         let box = outbox(MockFeedbackSender())
         XCTAssertEqual(box.submit(kind: .bug, message: "   \n ", source: "t"), .empty)
@@ -416,7 +441,7 @@ final class FeedbackOutboxTests: XCTestCase {
         let sender = MockFeedbackSender()
         sender.mode = .refused
         let box = outbox(sender)
-        box.submit(kind: .complaint, message: "x", source: "t")
+        box.submit(kind: .question, message: "x", source: "t")
         await box.flush()
         XCTAssertEqual(box.pendingCount, 0)
     }

@@ -2124,7 +2124,8 @@ private struct NeedsLivesPatch: Encodable {
 // ===========================================================================
 // Send Feedback (Settings → Send Feedback)
 //
-// A player picks Bug, Idea or Complaint and writes up to 1,000 characters.
+// A player picks Bug, Idea, Question or Compliment and writes up to 1,000
+// characters.
 // The app quietly adds the app version, iOS version, phone model, the screen
 // they came from and — only when signed in — their player id (taken by the
 // SERVER from the sign-in token, never from the request body). For rate
@@ -2142,14 +2143,35 @@ private struct NeedsLivesPatch: Encodable {
 // ===========================================================================
 
 enum FeedbackKind: String, Codable, CaseIterable, Identifiable {
-    case bug, idea, complaint
+    case bug, idea, question, compliment
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .bug:       return "Bug"
-        case .idea:      return "Idea"
-        case .complaint: return "Complaint"
+        case .bug:        return "Bug"
+        case .idea:       return "Idea"
+        case .question:   return "Question"
+        case .compliment: return "Compliment"
         }
+    }
+    var icon: String {
+        switch self {
+        case .bug:        return "ladybug.fill"
+        case .idea:       return "lightbulb.fill"
+        case .question:   return "questionmark.bubble.fill"
+        case .compliment: return "heart.fill"
+        }
+    }
+
+    /// Messages queued on the phone by an earlier build may carry the old
+    /// "complaint" kind.  The old third button is the one that became
+    /// Compliment (database step 17 relabels stored rows the same way), so a
+    /// queued "complaint" is sent as "compliment".  Any other unknown kind is
+    /// sent as "question" rather than dropping the player's message: a kind
+    /// that failed to decode would otherwise take the whole queue with it.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        if raw == "complaint" { self = .compliment; return }
+        self = FeedbackKind(rawValue: raw) ?? .question
     }
 }
 
