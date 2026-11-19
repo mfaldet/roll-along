@@ -25,7 +25,7 @@ Starter Pack (non-consumable): 500 coins plus the Aurora ball, trail and boundar
 Restore: Settings > Purchases > Restore Purchases.
 
 ADS
-One rewarded video (Google AdMob), only when the player chooses "Watch ad" for an extra life. Non-personalized, "Teen" rating, no tracking (no ATT prompt, no IDFA).
+One rewarded video (Google AdMob), only when the player chooses "Watch ad" for an extra life. Non-personalized, ad content capped at Google's "PG" rating, no tracking (no ATT prompt, no IDFA).
 
 NO USER-WRITTEN CONTENT
 Players cannot type text other players see. Nicknames are two preset words; clan names are two preset words plus a number (no tags); clan descriptions and clan chat are fixed phrases. The server rejects anything else. The only free-text field is Send Feedback, which goes privately to the developer.

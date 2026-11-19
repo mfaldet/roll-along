@@ -18,8 +18,9 @@ import GoogleMobileAds
 // request is tagged non-personalised (npa=1), so AdMob serves only generic
 // ads.  No ATT prompt is ever shown.
 //
-// Audience — the app is rated 13+.  Ad content is capped at Google's "Teen"
-// rating and every request carries teen age treatment (see `bootstrap`).
+// Audience — the app is rated 13+.  Ad content is capped at Google's
+// "Parental guidance" (PG) rating and every request carries teen age
+// treatment (see `bootstrap`).
 //
 // DEBUG vs RELEASE — in DEBUG builds we use Google's documented test ad
 // unit ID so dev runs don't generate fraud impressions against the real
@@ -77,14 +78,16 @@ final class AdManager: NSObject, ObservableObject {
         self.gameState = gameState
         // Audience settings — set BEFORE the SDK starts so they apply to every
         // request.  Roll Along is rated 13+ and is not directed at children:
-        //   • maxAdContentRating = teen — no ad rated above "Teen" is served
-        //     (App Review Guideline 2.5.18: ads must suit the app's age rating).
+        //   • maxAdContentRating = parentalGuidance — no ad rated above
+        //     "Parental guidance" (PG) is served; stricter than the 13+ app
+        //     rating (App Review Guideline 2.5.18: ads must suit the app's age
+        //     rating).
         //   • ageRestrictedTreatment = teen — Google applies its teen ad-serving
         //     protections to every request, since we never learn a player's age.
         //     (Added in Google Mobile Ads SDK 13.3.0; replaces the deprecated
         //     tagForChildDirectedTreatment / tagForUnderAgeOfConsent.)
         let adConfig = MobileAds.shared.requestConfiguration
-        adConfig.maxAdContentRating = .teen
+        adConfig.maxAdContentRating = .parentalGuidance
         adConfig.ageRestrictedTreatment = .teen
         // The app owns the audio session (.ambient, set once at launch).  Without
         // this the SDK may switch the session category around ad playback,
