@@ -13,7 +13,8 @@ import UIKit
 //                       server marks the gift claimed, so a failed write can
 //                       never hand out free lives.
 //   • Friend requests — incoming pending edges; accept or decline.
-//   • Friends         — accepted edges; send each one a life.
+//   • Friends         — accepted edges.  (Lives are given only to a
+//                       clanmate's open request, on the Clans screen.)
 //   • Add friends     — search players by name, send a request.
 //
 // Requires a Supabase session (Sign in with Apple).  Signed out, it shows the
@@ -43,7 +44,6 @@ struct FriendsView: View {
     @State private var isLoading  = false
     @State private var errorText: String?
     @State private var busyIds:      Set<UUID> = []   // rows with an action in flight
-    @State private var sentLifeIds:  Set<UUID> = []   // friends gifted this session
     @State private var banner: String?
 
     // Friend codes.
@@ -221,8 +221,11 @@ struct FriendsView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Add by code", "number")
             HStack(spacing: 10) {
-                TextField("", text: $codeInput, prompt: Text("Friend code, e.g. AF3K-7MXY"))
-                    .font(.system(.body, design: .monospaced).weight(.semibold))
+                // Same size as the name search field; a short example code
+                // as the placeholder.
+                TextField("", text: $codeInput, prompt: Text("AF3K-7MXY"))
+                    .font(.body)
+                    .accessibilityLabel("Friend code")
                     .foregroundStyle(.white)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.characters)
@@ -409,16 +412,9 @@ struct FriendsView: View {
     private func friendRow(_ edge: Friendship) -> some View {
         let id   = edge.otherId(than: myId ?? UUID())
         let prof = profiles[id]
-        let sent = sentLifeIds.contains(id)
-        return personCard(prof) {
-            if sent {
-                tag("Sent ♥", Color(red: 0.95, green: 0.32, blue: 0.45))
-            } else {
-                actionButton("Send life", filled: true, busy: busyIds.contains(id)) {
-                    await sendLife(to: id)
-                }
-            }
-        }
+        // No trailing action: lives are given only to a clanmate's open
+        // request (Clans), never to a friend directly.
+        return personCard(prof) { EmptyView() }
     }
 
     // MARK: - Reusable person card
@@ -647,9 +643,6 @@ struct FriendsView: View {
             gifts    = loadedGifts
             edges    = loadedEdges
             profiles = map
-            // One "Send life" per friend per day: mark today's as sent.
-            let sentToday = await SocialClient.shared.fetchMyGiftsToday()
-            sentLifeIds.formUnion(sentToday)
         } catch {
             errorText = "The social server is unreachable right now. Pull to refresh or try again."
         }
@@ -726,23 +719,6 @@ struct FriendsView: View {
             flash("Request sent to \(profile.displayName.nonEmpty ?? "roller").")
         } catch {
             flash("Couldn't send request — try again.")
-        }
-    }
-
-    private func sendLife(to id: UUID) async {
-        busyIds.insert(id)
-        defer { busyIds.remove(id) }
-        do {
-            try await SocialClient.shared.sendLife(to: id, amount: 1)
-            // social_send_life / social_lives_sent_25 (S1-T6): friend gift.
-            gameState.recordLifeSent()
-            sentLifeIds.insert(id)
-            flash("Life sent ♥")
-        } catch SocialError.http(_, let body) where body.contains("gift_limit") {
-            sentLifeIds.insert(id)
-            flash("You already sent this friend a life today.")
-        } catch {
-            flash("Couldn't send a life — try again.")
         }
     }
 
@@ -904,7 +880,7 @@ struct AccentBackground: View {
 /// Layout, left to right: an optional leading view (avatar or rank), then the
 /// player's name with the level badge right after it, an optional small
 /// accessory (owner crown, role), and at most ONE detail line below; the
-/// trailing control (Send life, Give life, Accept…) sits on the right at its
+/// trailing control (Give life, Accept…) sits on the right at its
 /// natural size and never wraps.
 ///
 /// When space is short:
