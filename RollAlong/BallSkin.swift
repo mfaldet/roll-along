@@ -270,6 +270,14 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     Static.  Back to School seasonal (Legendary).
     case apple       = "Teacher's Apple"
 
+    // ── Starter element sets (Standard, static; post-tutorial choice) ──
+    //   • blaze — Fire set: glowing red-orange core with dark cooled cracks.
+    //   • droplet — Water set: deep blue marble with a bright wave band.
+    //   • thundercloud — Storm set: gray cloud marble with a yellow bolt.
+    case blaze        = "Blaze"
+    case droplet      = "Droplet"
+    case thundercloud = "Thundercloud"
+
     var id: String { rawValue }
 
     /// Multiplier on the in-game ball radius (rendering AND physics).
@@ -388,6 +396,27 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.46, green: 0.50, blue: 0.58),
                 Color(red: 0.22, green: 0.26, blue: 0.34),
                 Color(red: 0.08, green: 0.10, blue: 0.14),
+            ]
+        case .blaze:
+            return [
+                Color(red: 1.00, green: 0.78, blue: 0.40),
+                Color(red: 0.96, green: 0.36, blue: 0.12),
+                Color(red: 0.70, green: 0.10, blue: 0.06),
+                Color(red: 0.30, green: 0.03, blue: 0.02),
+            ]
+        case .droplet:
+            return [
+                Color(red: 0.78, green: 0.92, blue: 1.00),
+                Color(red: 0.24, green: 0.56, blue: 0.95),
+                Color(red: 0.08, green: 0.28, blue: 0.70),
+                Color(red: 0.03, green: 0.12, blue: 0.34),
+            ]
+        case .thundercloud:
+            return [
+                Color(red: 0.80, green: 0.82, blue: 0.86),
+                Color(red: 0.50, green: 0.52, blue: 0.58),
+                Color(red: 0.28, green: 0.29, blue: 0.34),
+                Color(red: 0.12, green: 0.12, blue: 0.16),
             ]
         case .lemon:
             return [

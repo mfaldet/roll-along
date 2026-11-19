@@ -220,6 +220,12 @@ struct BallSkinView: View {
             glossMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .dune:
             duneCanvas.clipShape(Circle()).overlay(planetRim)
+        case .blaze:
+            blazeCanvas.clipShape(Circle()).overlay(planetRim)
+        case .droplet:
+            dropletCanvas.clipShape(Circle()).overlay(planetRim)
+        case .thundercloud:
+            thundercloudCanvas.clipShape(Circle()).overlay(planetRim)
         case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon:
             plainMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
@@ -1852,6 +1858,116 @@ struct BallSkinView: View {
             ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
                 with: .radialGradient(Gradient(colors: [.white.opacity(0.20), .clear]),
                     center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+        }
+    }
+
+    // MARK: Starter element balls (Standard, static)
+
+    /// Blaze (Fire set) — a glowing red-orange core with dark cooled cracks
+    /// running over it, like a coal split open.  No motion.
+    private var blazeCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: [Color(red: 1.00, green: 0.86, blue: 0.46),
+                                  Color(red: 0.98, green: 0.44, blue: 0.14),
+                                  Color(red: 0.74, green: 0.12, blue: 0.06),
+                                  Color(red: 0.32, green: 0.03, blue: 0.02)]),
+                center: CGPoint(x: cx - r * 0.12, y: cy - r * 0.10), startRadius: 0, endRadius: r * 1.15))
+            // Cooled-crust cracks: fixed jagged polylines.
+            let cracks: [[(CGFloat, CGFloat)]] = [
+                [(-0.95, -0.20), (-0.55, -0.05), (-0.30, -0.30), (0.05, -0.18), (0.40, -0.45), (0.85, -0.40)],
+                [(-0.70, 0.55), (-0.35, 0.30), (0.00, 0.42), (0.30, 0.18), (0.70, 0.30), (0.95, 0.10)],
+                [(-0.20, -0.95), (-0.10, -0.60), (-0.30, -0.30)],
+                [(0.30, 0.18), (0.20, 0.55), (0.35, 0.92)],
+            ]
+            for c in cracks {
+                var p = Path()
+                for (i, pt) in c.enumerated() {
+                    let q = CGPoint(x: cx + pt.0 * r, y: cy + pt.1 * r)
+                    if i == 0 { p.move(to: q) } else { p.addLine(to: q) }
+                }
+                ctx.stroke(p, with: .color(Color(red: 0.22, green: 0.04, blue: 0.02).opacity(0.80)),
+                           style: StrokeStyle(lineWidth: r * 0.09, lineCap: .round, lineJoin: .round))
+                ctx.stroke(p, with: .color(Color(red: 1.00, green: 0.80, blue: 0.30).opacity(0.35)),
+                           style: StrokeStyle(lineWidth: r * 0.025, lineCap: .round, lineJoin: .round))
+            }
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.22), .clear]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+        }
+    }
+
+    /// Droplet (Water set) — deep blue marble crossed by a bright wave band
+    /// with a white crest, and a glassy highlight.  No motion.
+    private var dropletCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: [Color(red: 0.62, green: 0.84, blue: 1.00),
+                                  Color(red: 0.22, green: 0.54, blue: 0.94),
+                                  Color(red: 0.08, green: 0.28, blue: 0.70),
+                                  Color(red: 0.03, green: 0.11, blue: 0.32)]),
+                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32), startRadius: 0, endRadius: r * 1.25))
+            for k in 0..<2 {
+                let y0: CGFloat = cy + r * (k == 0 ? 0.10 : 0.42)
+                var wave = Path()
+                let steps = 20
+                for j in 0...steps {
+                    let u = Double(j) / Double(steps)
+                    let x: CGFloat = cx - r + CGFloat(u) * r * 2
+                    let y: CGFloat = y0 + CGFloat(sin(u * Double.pi * 3.0 + Double(k))) * r * 0.10
+                    if j == 0 { wave.move(to: CGPoint(x: x, y: y)) } else { wave.addLine(to: CGPoint(x: x, y: y)) }
+                }
+                ctx.stroke(wave, with: .color(Color(red: 0.04, green: 0.16, blue: 0.46).opacity(0.45)),
+                           lineWidth: r * 0.14)
+                ctx.stroke(wave.offsetBy(dx: 0, dy: -r * 0.05),
+                           with: .color(Color.white.opacity(k == 0 ? 0.70 : 0.45)), lineWidth: r * 0.045)
+            }
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.74, width: r * 0.50, height: r * 0.36)),
+                with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
+                    center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.56), startRadius: 0, endRadius: r * 0.34))
+        }
+    }
+
+    /// Thundercloud (Storm set) — billowing gray cloud shading with a single
+    /// yellow lightning bolt across the front.  No motion.
+    private var thundercloudCanvas: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                Gradient(colors: [Color(red: 0.78, green: 0.80, blue: 0.85),
+                                  Color(red: 0.50, green: 0.52, blue: 0.58),
+                                  Color(red: 0.27, green: 0.28, blue: 0.33),
+                                  Color(red: 0.11, green: 0.11, blue: 0.15)]),
+                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32), startRadius: 0, endRadius: r * 1.25))
+            // Cloud billows: soft lighter puffs along the top half.
+            let puffs: [(CGFloat, CGFloat, CGFloat)] = [(-0.45, -0.30, 0.42), (0.05, -0.45, 0.46),
+                                                        (0.50, -0.25, 0.38), (-0.10, -0.05, 0.36)]
+            for p in puffs {
+                let pr = p.2 * r
+                ctx.fill(Path(ellipseIn: CGRect(x: cx + p.0 * r - pr, y: cy + p.1 * r - pr,
+                                                width: pr * 2, height: pr * 2)),
+                         with: .radialGradient(Gradient(colors: [Color(white: 0.92).opacity(0.38), .clear]),
+                            center: CGPoint(x: cx + p.0 * r, y: cy + p.1 * r), startRadius: 0, endRadius: pr))
+            }
+            // Lightning bolt.
+            let bolt: [(CGFloat, CGFloat)] = [(0.10, -0.55), (-0.20, 0.05), (0.02, 0.05),
+                                              (-0.16, 0.62), (0.26, -0.08), (0.04, -0.08), (0.24, -0.55)]
+            var b = Path()
+            for (i, pt) in bolt.enumerated() {
+                let q = CGPoint(x: cx + pt.0 * r, y: cy + pt.1 * r)
+                if i == 0 { b.move(to: q) } else { b.addLine(to: q) }
+            }
+            b.closeSubpath()
+            ctx.fill(b, with: .color(Color(red: 1.00, green: 0.86, blue: 0.20)))
+            ctx.stroke(b, with: .color(Color(red: 0.55, green: 0.40, blue: 0.02).opacity(0.75)), lineWidth: r * 0.035)
         }
     }
 

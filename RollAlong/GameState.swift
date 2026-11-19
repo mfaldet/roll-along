@@ -69,7 +69,7 @@ import SwiftUI
 //     DO count toward collection criteria.
 //   • `seasonalExclusiveBalls` — the 7 `isBundleExclusive` seasonal balls
 //     whose bundle windows are hard-coded one-shot 2026–27 ranges.  Excluded
-//     from `collection_complete` ONLY (scoping it to the 242-item evergreen
+//     from `collection_complete` ONLY (scoping it to the 260-item evergreen
 //     set), so the trophy never becomes permanently unearnable once a window
 //     lapses.  (NOT excluded from `balls_own_*`/`items_own_50`, which count
 //     seasonal balls per catalog §3.6.)  BallSkin.isBundleExclusive is a
@@ -1713,13 +1713,13 @@ final class GameState: ObservableObject {
     }
 
     /// Count of owned EVERGREEN cosmetics — the `collection_complete`
-    /// metric, capped at the 242-item evergreen set (253 total − 4 IAP
+    /// metric, capped at the 260-item evergreen set (271 total − 4 IAP
     /// secrets − 7 seasonal balls).  Iterates every case per slot, keeps the
     /// evergreen ones (not an IAP secret, not a seasonal-exclusive ball —
     /// starters ARE evergreen and always owned), and counts those `isOwned`.
-    /// Reaches exactly 242 iff every evergreen cosmetic is owned; owning a
-    /// seasonal or IAP-secret item can never push it past 242.  While music
-    /// is off (1.0) the 19 music tracks don't count, so the set is 223.
+    /// Reaches exactly 260 iff every evergreen cosmetic is owned; owning a
+    /// seasonal or IAP-secret item can never push it past 260.  While music
+    /// is off (1.0) the 19 music tracks don't count, so the set is 241.
     var trophyEvergreenCosmeticsOwnedCount: Int {
         var count = 0
         for b in BallSkin.allCases
@@ -1774,7 +1774,7 @@ final class GameState: ObservableObject {
         fireTrophy(.ballsOwned, value: trophyBallsOwnedCount)
         // items_own_50 — total owned across 7 slots minus the 4 IAP secrets.
         fireTrophy(.cosmeticsOwned, value: trophyCosmeticsOwnedCount)
-        // collection_complete — owned evergreen items toward the 242 set.
+        // collection_complete — owned evergreen items toward the 260 set.
         fireTrophy(.evergreenCosmeticsOwned,
                             value: trophyEvergreenCosmeticsOwnedCount)
         // bundle_first / bundle_5 — completed bundles (IAP-secret-free by

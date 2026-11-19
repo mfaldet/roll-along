@@ -362,16 +362,52 @@ final class CosmeticsTests: XCTestCase {
     /// bundles — small enough to stay curated, big enough to feel like a
     /// choice — so drifting outside that band also fails.
     func testTutorialGift_permanentStandardBundlePool_neverEmpty() {
-        let pool = CosmeticBundle.active.filter { !$0.isLimitedTime && $0.rarity == .standard }
-        print("GIFTPOOL permanent Standard bundles:", pool.map { $0.id }.joined(separator: ", "))
-        XCTAssertFalse(pool.isEmpty,
-                       "The permanent Standard-rarity bundle pool is empty — the post-tutorial gift dead-ends")
-        XCTAssertTrue((4...8).contains(pool.count),
-                      "The permanent Standard pool must hold 4–8 bundles, got \(pool.count)")
-        // Every permanent Standard bundle is (trivially) always available, so
-        // the gift picker's `isAvailable` filter can never see fewer options
-        // than this pool.
-        for b in pool { XCTAssertTrue(b.isAvailable, "permanent bundle \(b.id) must always be available") }
+        // The picker now offers exactly the four starter element sets.
+        let pool = CosmeticBundle.starterGift
+        XCTAssertEqual(pool.map(\.id), ["nature", "fire", "water", "storm"])
+        for b in pool {
+            XCTAssertFalse(b.isLimitedTime, "\(b.id) must be permanent")
+            XCTAssertEqual(b.rarity, .standard, "\(b.id) must be Standard")
+            XCTAssertTrue(b.isAvailable, "permanent bundle \(b.id) must always be available")
+            XCTAssertFalse(b.isRetired, "\(b.id) must be on sale")
+        }
+        // The wider Standard pool (Shop) still exists and is healthy.
+        let standard = CosmeticBundle.active.filter { !$0.isLimitedTime && $0.rarity == .standard }
+        XCTAssertTrue((4...8).contains(standard.count),
+                      "The permanent Standard pool must hold 4–8 bundles, got \(standard.count)")
+    }
+
+    /// Fire, Water and Storm: new complete Standard sets, every piece new art
+    /// that belongs to no other collection, still (no animated overlay),
+    /// priced by the normal rule (6 × 750) and on sale from launch.
+    func testStarterElementSets_areNewCompleteStandardSets() {
+        let ids = ["fire", "water", "storm"]
+        let others = CosmeticBundle.catalogue.filter { !ids.contains($0.id) }
+        for id in ids {
+            guard let b = CosmeticBundle.catalogue.first(where: { $0.id == id }) else {
+                return XCTFail("missing collection \(id)")
+            }
+            XCTAssertEqual(b.balls.count, 1); XCTAssertEqual(b.goals.count, 1)
+            XCTAssertEqual(b.trails.count, 1); XCTAssertEqual(b.floors.count, 1)
+            XCTAssertEqual(b.pits.count, 1); XCTAssertEqual(b.boundaries.count, 1)
+            XCTAssertEqual(b.rarity, .standard)
+            XCTAssertEqual(b.fullPrice(), 4_500, "\(id): six Standard items at 750")
+            XCTAssertTrue(CosmeticSchedule.launchBundleIDs.contains(id), "\(id) is launch content")
+            let tiers: [CosmeticTier] = [b.balls[0].tier, b.goals[0].tier, b.trails[0].tier,
+                                         b.floors[0].tier, b.pits[0].tier, b.boundaries[0].tier]
+            XCTAssertTrue(tiers.allSatisfy { $0 == .standard }, "\(id): every piece is Standard")
+            XCTAssertFalse(b.floors[0].hasAnimatedOverlay)
+            XCTAssertFalse(b.pits[0].hasAnimatedOverlay)
+            XCTAssertTrue(b.pits[0].hasDrawnArt)
+            for o in others {
+                XCTAssertFalse(o.balls.contains(b.balls[0]), "\(id) ball is also in \(o.id)")
+                XCTAssertFalse(o.goals.contains(b.goals[0]), "\(id) goal is also in \(o.id)")
+                XCTAssertFalse(o.trails.contains(b.trails[0]), "\(id) trail is also in \(o.id)")
+                XCTAssertFalse(o.floors.contains(b.floors[0]), "\(id) floor is also in \(o.id)")
+                XCTAssertFalse(o.pits.contains(b.pits[0]), "\(id) pit is also in \(o.id)")
+                XCTAssertFalse(o.boundaries.contains(b.boundaries[0]), "\(id) boundary is also in \(o.id)")
+            }
+        }
     }
 
     /// Iconic = the un-sellable specials.  Starter look + earned/IAP exclusives
@@ -839,12 +875,12 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
-    /// Only 18 collections are on sale.  Each is one item per offered slot,
+    /// Only 21 collections are on sale.  Each is one item per offered slot,
     /// and no item is in two of them.  Gift pool, Starter Pack and track
     /// rewards all point at active collections.
     func testActiveCollections_areCompleteAndUnique() {
         let active = CosmeticBundle.active
-        XCTAssertEqual(active.count, 18)
+        XCTAssertEqual(active.count, 21)
         XCTAssertEqual(Set(active.map(\.id)), Set(CosmeticBundle.activeIDs))
         var seen: [String: String] = [:]
         func check(_ b: CosmeticBundle, _ keys: [String]) {
@@ -863,7 +899,13 @@ final class CosmeticsTests: XCTestCase {
             check(b, b.pits.map { "pit|" + $0.rawValue })
             check(b, b.boundaries.map { "boundary|" + $0.rawValue })
         }
-        XCTAssertEqual(active.filter { $0.rarity == .standard }.count, 4, "gift pool keeps four sets")
+        XCTAssertEqual(active.filter { $0.rarity == .standard }.count, 7,
+                       "Standard sets: Nature, Fire, Water, Storm, Citrus, Sketchbook, Midas")
+        XCTAssertEqual(CosmeticBundle.starterGiftIDs, ["nature", "fire", "water", "storm"],
+                       "the post-tutorial choice is exactly the four element sets")
+        for id in CosmeticBundle.starterGiftIDs {
+            XCTAssertTrue(CosmeticBundle.activeIDs.contains(id), "starter set \(id) must be active")
+        }
         XCTAssertTrue(CosmeticBundle.activeIDs.contains("aurora"), "Starter Pack's Aurora stays on sale")
         for track in GameModeCatalogue.challengeTracks {
             guard let id = ChallengeTrackMode.rewardBundleID(for: track.trackID) else { continue }
@@ -963,7 +1005,7 @@ final class CosmeticsTests: XCTestCase {
     /// (Graveyard, Aurora) move; Midnight shows as "Moonlit" with its old id.
     func testPitRedraws_tiersAndNames() {
         let drawn = Pit.allCases.filter { $0.hasDrawnArt }
-        XCTAssertEqual(drawn.count, 18)
+        XCTAssertEqual(drawn.count, 21)   // 18 redraws + the Fire, Water and Storm starter pits
         XCTAssertEqual(Pit.graveyard.tier, .rare)
         XCTAssertEqual(Pit.aurora.tier, .rare)
         XCTAssertEqual(Pit.graveyard.coinCost, 1_000)

@@ -2518,8 +2518,8 @@ struct BallGameView: View {
     // item is granted + equipped on Claim.
 
     private var tutorialRewardOverlay: some View {
-        // The post-tutorial gift: pick ONE entire Standard-rarity collection.
-        let bundles = CosmeticBundle.active.filter { $0.rarity == .standard && $0.isAvailable }
+        // The post-tutorial gift: pick ONE of the four starter element sets.
+        let bundles = CosmeticBundle.starterGift.filter { $0.isAvailable }
         let hasPick = tutorialBundlePick != nil
 
         return ZStack {
@@ -4985,7 +4985,77 @@ enum PitArt {
         case .syrup:     syrup(&ctx, size)
         case .sideline:  sideline(&ctx, size)
         case .pocket:    pocket(&ctx, size)
+        case .crater:    crater(&ctx, size)
+        case .deepEnd:   deepEnd(&ctx, size)
+        case .maelstrom: maelstrom(&ctx, size)
         default:         break
+        }
+    }
+
+    /// Crater (Fire set): a glowing orange-red rim stepping down to a dark core.
+    private static func crater(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        let layers: [Color] = [
+            Color(red: 1.00, green: 0.56, blue: 0.16), Color(red: 0.90, green: 0.28, blue: 0.08),
+            Color(red: 0.62, green: 0.12, blue: 0.04), Color(red: 0.34, green: 0.05, blue: 0.02),
+            Color(red: 0.14, green: 0.02, blue: 0.01),
+        ]
+        let step: CGFloat = m * 0.07
+        for (k, color) in layers.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            let layer: Path = k == 0
+                ? Path(r)
+                : raggedRect(r, step: max(3, m * 0.07), jitter: m * 0.012,
+                             seed: 0xC2A7_0000 + UInt64(k))
+            ctx.fill(layer, with: .color(color))
+        }
+    }
+
+    /// Deep End (Water set): deep blue water with lighter ripple rings
+    /// shrinking toward a dark center.
+    private static func deepEnd(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        fill(&ctx, size, Color(red: 0.02, green: 0.07, blue: 0.20))
+        let m = min(size.width, size.height)
+        let rings = 5
+        for k in 0..<rings {
+            let r = inset(size, m * (0.04 + 0.08 * CGFloat(k)))
+            let a: Double = 0.55 - 0.09 * Double(k)
+            ctx.stroke(Path(roundedRect: r, cornerRadius: m * 0.10),
+                       with: .color(Color(red: 0.45, green: 0.72, blue: 1.00).opacity(a)), lineWidth: 1.2)
+        }
+        let core = inset(size, m * 0.40)
+        ctx.fill(Path(roundedRect: core, cornerRadius: m * 0.06),
+                 with: .color(Color(red: 0.01, green: 0.03, blue: 0.10)))
+    }
+
+    /// Maelstrom (Storm set): a dark storm center ringed by gray cloud bands,
+    /// with a yellow flash along the rim.
+    private static func maelstrom(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        fill(&ctx, size, Color(red: 0.06, green: 0.06, blue: 0.09))
+        let m = min(size.width, size.height)
+        for k in 0..<4 {
+            let r = inset(size, m * (0.05 + 0.08 * CGFloat(k)))
+            let a: Double = 0.40 - 0.08 * Double(k)
+            ctx.stroke(Path(roundedRect: r, cornerRadius: m * 0.12),
+                       with: .color(Color(white: 0.62).opacity(a)), lineWidth: max(1.5, m * 0.03))
+        }
+        ctx.stroke(Path(inset(size, m * 0.015)),
+                   with: .color(Color(red: 1.0, green: 0.86, blue: 0.20).opacity(0.65)), lineWidth: 1.4)
+        var rng = SeededRNG(seed: 0x3AE1_0001)
+        let spots = edgeSpots(size, spacing: m * 0.45, seed: 0x3AE1_1001)
+        for s in spots {
+            guard rng.nextUnit() < 0.5 else { continue }
+            let len: CGFloat = m * 0.10
+            let a = s.point
+            let b = CGPoint(x: a.x + s.inward.dx * len * 0.5 + s.along.dx * len * 0.3,
+                            y: a.y + s.inward.dy * len * 0.5 + s.along.dy * len * 0.3)
+            let c = CGPoint(x: a.x + s.inward.dx * len * 0.45 - s.along.dx * len * 0.1,
+                            y: a.y + s.inward.dy * len * 0.45 - s.along.dy * len * 0.1)
+            let d = CGPoint(x: a.x + s.inward.dx * len, y: a.y + s.inward.dy * len)
+            var z = Path()
+            z.move(to: a); z.addLine(to: b); z.addLine(to: c); z.addLine(to: d)
+            ctx.stroke(z, with: .color(Color(red: 1.0, green: 0.86, blue: 0.20).opacity(0.80)),
+                       style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
         }
     }
 
@@ -5567,6 +5637,9 @@ struct PaperFloorOverlayView: View, Equatable {
         case .sugar:      sugarFloor
         case .fog:        fogFloor
         case .court:      courtFloor
+        case .scorched:   scorchedFloor
+        case .shallows:   shallowsFloor
+        case .overcast:   overcastFloor
         default:         EmptyView()
         }
     }
@@ -5705,6 +5778,99 @@ struct PaperFloorOverlayView: View, Equatable {
     // MARK: Themed Standard floors (static)
 
     /// Meadow — short grass blades with small white and yellow flowers.
+    /// Scorched (Fire set) — darker flagstone seams over red stone, with a
+    /// few dim ember specks.  Static, low contrast.
+    private var scorchedFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x5C0_4C4E)
+            let seam = Color(red: 0.30, green: 0.08, blue: 0.06).opacity(0.35)
+            let rowH: CGFloat = 34
+            var row = 0
+            var y: CGFloat = 0
+            while y < size.height + rowH {
+                var h = Path()
+                h.move(to: CGPoint(x: 0, y: y))
+                h.addLine(to: CGPoint(x: size.width, y: y))
+                ctx.stroke(h, with: .color(seam), lineWidth: 1.2)
+                let stoneW: CGFloat = 46
+                var x: CGFloat = (row % 2 == 0) ? 0 : stoneW / 2
+                while x < size.width {
+                    var v = Path()
+                    v.move(to: CGPoint(x: x, y: y))
+                    v.addLine(to: CGPoint(x: x + CGFloat(rng.nextUnit() - 0.5) * 4, y: y + rowH))
+                    ctx.stroke(v, with: .color(seam), lineWidth: 1.2)
+                    x += stoneW
+                }
+                y += rowH
+                row += 1
+            }
+            let specks = Int(size.width * size.height / 1800)
+            for _ in 0..<specks {
+                let px = CGFloat(rng.nextUnit()) * size.width
+                let py = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 0.8 + CGFloat(rng.nextUnit()) * 1.2
+                ctx.fill(Path(ellipseIn: CGRect(x: px - r, y: py - r, width: r * 2, height: r * 2)),
+                         with: .color(Color(red: 1.0, green: 0.62, blue: 0.20).opacity(0.45)))
+            }
+        }
+    }
+
+    /// Shallows (Water set) — soft lighter ripple rings scattered over blue
+    /// water.  Static, low contrast.
+    private var shallowsFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x5A11_0035)
+            let ring = Color.white.opacity(0.22)
+            let count = max(6, Int(size.width * size.height / 9000))
+            for _ in 0..<count {
+                let cx = CGFloat(rng.nextUnit()) * size.width
+                let cy = CGFloat(rng.nextUnit()) * size.height
+                let base: CGFloat = 8 + CGFloat(rng.nextUnit()) * 10
+                for k in 0..<3 {
+                    let r: CGFloat = base * (1 + CGFloat(k) * 0.7)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: cx - r, y: cy - r * 0.55, width: r * 2, height: r * 1.1)),
+                               with: .color(ring.opacity(1.0 - Double(k) * 0.3)), lineWidth: 1)
+                }
+            }
+            let glints = Int(size.width * size.height / 2600)
+            for _ in 0..<glints {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                var g = Path()
+                g.move(to: CGPoint(x: x, y: y))
+                g.addLine(to: CGPoint(x: x + 6, y: y))
+                ctx.stroke(g, with: .color(Color.white.opacity(0.18)), lineWidth: 0.8)
+            }
+        }
+    }
+
+    /// Overcast (Storm set) — darker and lighter cloud blotches over slate,
+    /// with one faint yellow lightning streak.  Static, low contrast.
+    private var overcastFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x0FE6_CA57)
+            let blobs = max(8, Int(size.width * size.height / 6000))
+            for _ in 0..<blobs {
+                let x = CGFloat(rng.nextUnit()) * size.width
+                let y = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 18 + CGFloat(rng.nextUnit()) * 26
+                let light: Bool = rng.nextUnit() < 0.5
+                let col: Color = light ? Color.white.opacity(0.10) : Color.black.opacity(0.10)
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r * 0.6, width: r * 2, height: r * 1.2)),
+                         with: .radialGradient(Gradient(colors: [col, col.opacity(0)]),
+                                               center: CGPoint(x: x, y: y), startRadius: 0, endRadius: r))
+            }
+            let sx: CGFloat = size.width * 0.72
+            var bolt = Path()
+            bolt.move(to: CGPoint(x: sx, y: size.height * 0.10))
+            bolt.addLine(to: CGPoint(x: sx - 18, y: size.height * 0.24))
+            bolt.addLine(to: CGPoint(x: sx - 6, y: size.height * 0.25))
+            bolt.addLine(to: CGPoint(x: sx - 26, y: size.height * 0.40))
+            ctx.stroke(bolt, with: .color(Color(red: 1.0, green: 0.86, blue: 0.22).opacity(0.28)),
+                       style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        }
+    }
+
     private var meadowFloor: some View {
         Canvas { ctx, size in
             var rng = SeededRNG(seed: 0x4D_EAD0)
@@ -6080,6 +6246,9 @@ struct BoundaryOverlayView: View {
         case .autumn:       autumnBorderOverlay
         case .lantern:      lanternBorderOverlay
         case .hardwood:     hardwoodBorderOverlay
+        case .flare:        flareBorderOverlay
+        case .breakers:     breakersBorderOverlay
+        case .thunderbolt:  thunderboltBorderOverlay
         case .velvet:       velvetBorderOverlay
         case .marble:       marbleBorderOverlay
         case .mahogany:     mahoganyBorderOverlay
@@ -6566,6 +6735,45 @@ struct BoundaryOverlayView: View {
         }
     }
 
+    /// Flare (Fire set) — a red wall with small orange flame tips and
+    /// yellow hearts.  Static.
+    private var flareBorderOverlay: some View {
+        ZStack {
+            borderRing().stroke(Color(red: 0.62, green: 0.08, blue: 0.05), lineWidth: 4)
+            borderRing()
+                .stroke(Color(red: 1.00, green: 0.42, blue: 0.10),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [3, 7, 2, 9]))
+            borderRing()
+                .stroke(Color(red: 1.00, green: 0.82, blue: 0.28),
+                        style: StrokeStyle(lineWidth: 1.8, lineCap: .round, dash: [1.2, 8.8, 0.8, 10.2]))
+        }
+    }
+
+    /// Breakers (Water set) — a blue wall with white wave crests.  Static.
+    private var breakersBorderOverlay: some View {
+        ZStack {
+            borderRing().stroke(Color(red: 0.12, green: 0.36, blue: 0.80), lineWidth: 4)
+            ring(0.6)
+                .stroke(Color(red: 0.55, green: 0.80, blue: 1.00).opacity(0.85),
+                        style: StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [10, 6]))
+            ring(1.4)
+                .stroke(Color.white.opacity(0.92),
+                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [4, 12], dashPhase: -3))
+        }
+    }
+
+    /// Thunderbolt (Storm set) — a gray wall with yellow bolt flashes.  Static.
+    private var thunderboltBorderOverlay: some View {
+        ZStack {
+            borderRing().stroke(Color(red: 0.34, green: 0.35, blue: 0.40), lineWidth: 4)
+            ring(1.0)
+                .stroke(Color(white: 0.70).opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [20, 8]))
+            borderRing()
+                .stroke(Color(red: 1.00, green: 0.86, blue: 0.20),
+                        style: StrokeStyle(lineWidth: 2.6, lineCap: .butt, dash: [6, 3, 4, 31]))
+        }
+    }
+
     /// Hardwood — wood-grain lines along the wall.
     private var hardwoodBorderOverlay: some View {
         let grain = Color(red: 0.48, green: 0.30, blue: 0.14).opacity(0.55)
@@ -6795,7 +7003,8 @@ struct GoalSkinView: View {
         case .slate:
             bandedTargetGoal(goal.targetBands ?? [])
         case .frost, .ember, .meadow, .bullion,
-             .amethyst, .candy, .vortex, .wormhole:
+             .amethyst, .candy, .vortex, .wormhole,
+             .flameRing, .whirlpool, .thunderRing:
             themedStandardGoal(goal)
         case .aurora:      auroraGoal
         default:           rainbowHole   // .rainbow + any future goal
@@ -7109,6 +7318,82 @@ struct GoalSkinView: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: vp.x - cr, y: vp.y - cr, width: cr * 2, height: cr * 2)),
                          with: .radialGradient(Gradient(colors: [.white, (stops.last ?? .white).opacity(0)]),
                                                center: vp, startRadius: 0, endRadius: cr))
+
+            case .flameRing:
+                // Fire set: dark red disc, a ring of flame tongues pointing in,
+                // a white-hot center.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.80, green: 0.18, blue: 0.06), Color(red: 0.42, green: 0.05, blue: 0.03)]),
+                    center: c, startRadius: 0, endRadius: R))
+                for k in 0..<14 {
+                    let a: Double = Double(k) / 14 * .pi * 2
+                    var tongue = Path()
+                    tongue.move(to: polar(a - 0.20, R * 0.95))
+                    tongue.addQuadCurve(to: polar(a + 0.06, R * 0.46), control: polar(a - 0.22, R * 0.66))
+                    tongue.addQuadCurve(to: polar(a + 0.20, R * 0.95), control: polar(a + 0.16, R * 0.68))
+                    tongue.closeSubpath()
+                    ctx.fill(tongue, with: .color(Color(red: 1.00, green: 0.48, blue: 0.10)))
+                    var inner = Path()
+                    inner.move(to: polar(a - 0.08, R * 0.92))
+                    inner.addQuadCurve(to: polar(a + 0.04, R * 0.60), control: polar(a - 0.08, R * 0.72))
+                    inner.addQuadCurve(to: polar(a + 0.09, R * 0.92), control: polar(a + 0.08, R * 0.74))
+                    inner.closeSubpath()
+                    ctx.fill(inner, with: .color(Color(red: 1.00, green: 0.82, blue: 0.30)))
+                }
+                ctx.fill(disc(R * 0.36), with: .radialGradient(Gradient(colors: [
+                    .white, Color(red: 1.0, green: 0.90, blue: 0.55), Color(red: 1.0, green: 0.55, blue: 0.15)]),
+                    center: c, startRadius: 0, endRadius: R * 0.36))
+                ctx.stroke(disc(R * 0.36), with: .color(Color(red: 0.55, green: 0.08, blue: 0.04)), lineWidth: max(1, R * 0.04))
+
+            case .whirlpool:
+                // Water set: blue water disc, spiral arms curling into a deep center.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.06, green: 0.18, blue: 0.48), Color(red: 0.24, green: 0.56, blue: 0.94)]),
+                    center: c, startRadius: 0, endRadius: R))
+                for k in 0..<5 {
+                    let base: Double = Double(k) / 5 * .pi * 2
+                    var arm = Path()
+                    let steps = 16
+                    for j in 0...steps {
+                        let u: Double = Double(j) / Double(steps)
+                        let rr: CGFloat = R * CGFloat(0.94 - 0.62 * u)
+                        let p = polar(base + u * 2.4, rr)
+                        if j == 0 { arm.move(to: p) } else { arm.addLine(to: p) }
+                    }
+                    ctx.stroke(arm, with: .color(Color.white.opacity(0.70)),
+                               style: StrokeStyle(lineWidth: max(1, R * 0.06), lineCap: .round, lineJoin: .round))
+                }
+                ctx.fill(disc(R * 0.30), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.01, green: 0.04, blue: 0.14), Color(red: 0.06, green: 0.20, blue: 0.48)]),
+                    center: c, startRadius: 0, endRadius: R * 0.30))
+                ctx.stroke(disc(R * 0.30), with: .color(Color(red: 0.70, green: 0.88, blue: 1.0)), lineWidth: max(1, R * 0.04))
+
+            case .thunderRing:
+                // Storm set: gray cloud ring, four yellow bolts, a dark center.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.62, green: 0.64, blue: 0.70), Color(red: 0.32, green: 0.33, blue: 0.38)]),
+                    center: c, startRadius: 0, endRadius: R))
+                for k in 0..<10 {
+                    let a: Double = Double(k) / 10 * .pi * 2
+                    let p = polar(a, R * 0.80)
+                    let pr: CGFloat = R * 0.20
+                    ctx.fill(Path(ellipseIn: CGRect(x: p.x - pr, y: p.y - pr, width: pr * 2, height: pr * 2)),
+                             with: .color(Color(white: 0.80).opacity(0.45)))
+                }
+                for k in 0..<4 {
+                    let a: Double = Double(k) / 4 * .pi * 2 + .pi / 4
+                    var bolt = Path()
+                    bolt.move(to: polar(a, R * 0.92))
+                    bolt.addLine(to: polar(a + 0.16, R * 0.70))
+                    bolt.addLine(to: polar(a - 0.06, R * 0.66))
+                    bolt.addLine(to: polar(a + 0.08, R * 0.42))
+                    ctx.stroke(bolt, with: .color(Color(red: 1.0, green: 0.86, blue: 0.20)),
+                               style: StrokeStyle(lineWidth: max(1.2, R * 0.07), lineCap: .round, lineJoin: .round))
+                }
+                ctx.fill(disc(R * 0.32), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.10, green: 0.10, blue: 0.14), Color(red: 0.24, green: 0.25, blue: 0.30)]),
+                    center: c, startRadius: 0, endRadius: R * 0.32))
+                ctx.stroke(disc(R * 0.32), with: .color(Color(red: 1.0, green: 0.86, blue: 0.20)), lineWidth: max(1, R * 0.04))
 
             default:
                 ctx.fill(disc(R), with: .color(.gray))
@@ -8553,8 +8838,8 @@ struct PitLandingView: View {
 
     private var style: Style {
         switch event.pit {
-        case .pond, .downpour, .syrup:                 return .splash
-        case .evil, .ember, .sunset, .dusk:            return .embers
+        case .pond, .downpour, .syrup, .deepEnd:       return .splash
+        case .evil, .ember, .sunset, .dusk, .crater:   return .embers
         case .space, .eclipse, .aurora, .midnight,
              .twilight, .velvet:                       return .voidImplosion
         case .nightclub:                               return .confetti
@@ -8572,6 +8857,8 @@ struct PitLandingView: View {
         case .meadow:    return (Color(red: 0.55, green: 0.78, blue: 0.42), Color(red: 0.10, green: 0.22, blue: 0.10))
         case .canyon:    return (Color(red: 0.78, green: 0.52, blue: 0.34), Color(red: 0.32, green: 0.14, blue: 0.08))
         case .graveyard: return (Color(red: 0.45, green: 0.55, blue: 0.45), Color(red: 0.10, green: 0.14, blue: 0.10))
+        case .deepEnd:   return (Color(red: 0.50, green: 0.78, blue: 1.0),  Color(red: 0.06, green: 0.20, blue: 0.48))
+        case .maelstrom: return (Color(red: 0.70, green: 0.72, blue: 0.78), Color(red: 0.30, green: 0.30, blue: 0.36))
         default:         return (Color(white: 0.78),                        Color(white: 0.42))
         }
     }

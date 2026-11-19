@@ -702,7 +702,7 @@ final class TrophyEngine: ObservableObject {
 /// (added by S1-T5): they derive from the SAME `GameState` computed
 /// properties the live `grant`/equip funnels record, so a grandfather and a
 /// live grant can't drift. The IAP-secret exclusion constant and the
-/// 242-item evergreen arithmetic live in `TrophyCosmeticExclusions` + those
+/// 260-item evergreen arithmetic live in `TrophyCosmeticExclusions` + those
 /// GameState helpers. `bundles_completed` and `packs_owned` are likewise
 /// exclusion-free (bundles are kept IAP-secret-free by guardrail;
 /// `ownedPacks` has no IAP-secret members).
@@ -798,7 +798,7 @@ enum TrophyBackfill {
         // Ownership counts derive from the SAME GameState computed properties
         // the live `grant` funnel records (S1-T5), so a first-launch
         // grandfather and a live grant can never disagree. The IAP-secret
-        // exclusion and the 242-item evergreen arithmetic live in
+        // exclusion and the 260-item evergreen arithmetic live in
         // `TrophyCosmeticExclusions` + those GameState helpers — never
         // re-implemented here.
         snap[.bundlesCompleted]         = Double(state.completedBundleIDs.count)

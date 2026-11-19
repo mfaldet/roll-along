@@ -346,3 +346,26 @@ in the post-tutorial gift pool.
 | haunted | Graveyard | 6,750 | 7,000 |
 | halloween-2026 | Graveyard | 6,500 | 6,750 |
 | muertos-2026 | Graveyard | 6,500 | 6,750 |
+
+## Starter element sets (November 2026)
+
+The one-time post-tutorial choice now offers exactly four collections, one per element:
+**Nature** (unchanged), **Fire**, **Water** and **Storm**. Citrus, Midas and Sketchbook stay on
+sale in the Shop as normal collections but are no longer offered in the starter choice. The
+picker reads `CosmeticBundle.starterGiftIDs` (`["nature", "fire", "water", "storm"]`) instead of
+"every active Standard collection".
+
+Fire, Water and Storm are new collections built entirely from new art drawn in code. Every piece
+is Standard (750 coins) and still, and belongs to no other collection. Each set is available from
+launch (`launchBundleIDs`); launch collections have no calendar rows, so no database step is
+needed. Active collections: 18 → 21. Standard-rarity active collections: 4 → 7.
+
+| Collection | Ball | Goal | Trail | Floor | Pit | Boundary | Full price |
+|---|---|---|---|---|---|---|---:|
+| Fire (red) | Blaze — glowing red-orange core with dark cooled cracks | Flame Ring — flame tongues ringing a white-hot center | Wildfire — red line with flame tongues | Scorched — red flagstones with faint ember specks | Crater — glowing orange rim stepping down to a dark core | Flare — red wall with orange flame tips | 4,500 |
+| Water (blue) | Droplet — deep blue marble with white-crested wave bands | Whirlpool — white spiral arms into a deep blue center | Splash — blue line with droplets and ripple rings | Shallows — blue water with soft ripple rings | Deep End — ripple rings narrowing to a dark center | Breakers — blue wall with white wave crests | 4,500 |
+| Storm (gray + yellow) | Thundercloud — gray cloud marble with a yellow bolt | Thunder Ring — gray cloud ring with four yellow bolts, dark center | Squall — gray cloud puffs with small yellow zig-zags | Overcast — slate cloud blotches with a faint yellow streak | Maelstrom — dark center, gray cloud bands, yellow flash rim | Thunderbolt — gray wall with yellow bolt flashes | 4,500 |
+
+Each set keeps a music entry for when music returns (Electronic, Classical, Orchestral), which is
+not shown or charged in 1.0. The evergreen cosmetic count rises by 18 (242 → 260 with music,
+223 → 241 without); no trophy is affected.

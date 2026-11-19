@@ -2456,7 +2456,7 @@ final class TrophyDiscoRollOutWiringTests: XCTestCase {
 /// assert the right trophies latch on `gs.trophyEngine`.  The load-bearing
 /// claims: the 4 IAP secrets are excluded from every collection criterion;
 /// the earned Trophy ball / coin-buyable Aurora / free starters DO count;
-/// `collection_complete` uses the 242-item evergreen denominator; no trophy
+/// `collection_complete` uses the 260-item evergreen denominator; no trophy
 /// keys to a purchase/IAP count.
 final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
@@ -2559,9 +2559,9 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
     // MARK: - items_own_50
 
-    // MARK: - collection_complete (242 evergreen denominator)
+    // MARK: - collection_complete (260 evergreen denominator)
 
-    /// Grant EVERY evergreen cosmetic (the 242-item set) and prove
+    /// Grant EVERY evergreen cosmetic (the 260-item set) and prove
     /// `collection_complete` latches — while owning Money/Diamond neither
     /// helps nor is required, and the 7 seasonal balls are NOT required.
     func testCollectionCompleteUsesEvergreenDenominatorAndExcludesSecretsAndSeasonal() {
@@ -2569,7 +2569,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
         let evergreenTotal = Self.evergreenTotal
 
         // Own the 4 IAP secrets + all 7 seasonal balls — none should be
-        // needed, and they must not push the count past 242 either.
+        // needed, and they must not push the count past 260 either.
         gs.grant(BallSkin.diamond); gs.grant(BallSkin.moneyBall)
         gs.grant(TrailColor.moneyRoll); gs.grant(Floor.moneyFull)
         for b in TrophyCosmeticExclusions.seasonalExclusiveBalls { gs.grant(b) }
@@ -2597,13 +2597,14 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
                        "the evergreen denominator must be exactly \(evergreenTotal)")
     }
 
-    /// The evergreen set: 242 items with music, 223 while music is off
+    /// The evergreen set: 260 items with music, 241 while music is off
     /// (1.0 — the 19 music tracks aren't offered, so they don't count).
+    /// (242 + the 18 Fire / Water / Storm starter-set pieces.)
     static var evergreenTotal: Int {
-        242 - (CosmeticFeatures.musicEnabled ? 0 : MusicTrack.allCases.count)
+        260 - (CosmeticFeatures.musicEnabled ? 0 : MusicTrack.allCases.count)
     }
 
-    /// The evergreen count NEVER exceeds 242 even when every IAP secret and
+    /// The evergreen count NEVER exceeds 260 even when every IAP secret and
     /// seasonal ball is also owned — proving they can't help/pad the metric.
     func testEvergreenCountCannotExceedEvergreenTotal() {
         let gs = makeGameState()
