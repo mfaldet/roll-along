@@ -376,11 +376,17 @@ struct ClansView: View {
             + (extras.isEmpty ? "" : " " + extras.joined(separator: ". ") + ".")
         return Button { nav.goToClan(row.clan) } label: {
             HStack(spacing: 8) {
-                Text("\(rank)")
-                    .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
-                    .foregroundStyle(rank <= 3 ? Color(red: 1.0, green: 0.81, blue: 0.30) : Color(white: 0.6))
-                    .frame(width: 58, alignment: .leading)
-                VStack(spacing: 3) {
+                // Fixed rank column sized to "999" so every name starts at
+                // the same x whatever the rank.
+                ZStack(alignment: .leading) {
+                    Text("999").hidden()
+                    Text("\(rank)")
+                        .foregroundStyle(rank <= 3 ? Color(red: 1.0, green: 0.81, blue: 0.30) : Color(white: 0.6))
+                }
+                .font(.system(.subheadline, design: .rounded).weight(.bold)).monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
+                VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 7) {
                         ClanBadge(clan: row.clan, size: 24)
                         Text(clanName)
@@ -391,9 +397,10 @@ struct ClansView: View {
                         Text(extras.joined(separator: " · "))
                             .font(.system(.caption2, design: .rounded).weight(.semibold))
                             .foregroundStyle(Color(white: 0.55)).lineLimit(1).minimumScaleFactor(0.8)
+                            .padding(.leading, 31)   // under the name, past the badge
                     }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 4) {
                     Image(systemName: rankSort == .levels ? "flag.fill" : "star.fill")
                         .font(.system(size: 11))
@@ -766,28 +773,30 @@ struct ClansView: View {
     private var chatSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Clan chat", "bubble.left.and.bubble.right.fill")
-            chatPanel
             quickChatBar
+            chatPanel
         }
     }
 
-    /// Oldest → newest, like any messages app (the server returns newest-first).
-    private var chronologicalEvents: [ClanEvent] { Array(events.reversed()) }
+    /// Newest first: the newest message sits at the top and older ones stack
+    /// below it (the server already returns newest-first).
+    private var newestFirstEvents: [ClanEvent] { events }
 
-    /// The scroll itself: bubbles + system lines, pinned to the newest entry,
-    /// with a light poll so clan-mates' posts appear while you're looking.
+    /// The scroll itself: bubbles + system lines, newest at the top, with a
+    /// light poll so clan-mates' posts appear while you're looking.  Scrolling
+    /// down shows older messages.
     private var chatPanel: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 10) {
                     if events.isEmpty {
-                        Text("It's quiet in here — send a quick message below 👇")
+                        Text("It's quiet in here — send a quick message above 👆")
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(Color(white: 0.45))
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 36)
                     }
-                    ForEach(chronologicalEvents) { e in
+                    ForEach(newestFirstEvents) { e in
                         chatRow(e).id(e.id)
                     }
                 }
@@ -802,10 +811,11 @@ struct ClansView: View {
         }
     }
 
+    /// New messages arrive at the top, so keep the top in view.
     private func scrollToLatest(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard let last = chronologicalEvents.last?.id else { return }
-        if animated { withAnimation { proxy.scrollTo(last, anchor: .bottom) } }
-        else        { proxy.scrollTo(last, anchor: .bottom) }
+        guard let newest = newestFirstEvents.first?.id else { return }
+        if animated { withAnimation { proxy.scrollTo(newest, anchor: .top) } }
+        else        { proxy.scrollTo(newest, anchor: .top) }
     }
 
     @ViewBuilder
@@ -2203,7 +2213,7 @@ private struct ClanLookPicker: View {
     }
 }
 
-/// The Rankings header: this month's name large, the days left as a ring,
+/// The Rankings header: this month's name large, the days left as an hourglass,
 /// and the four prize tiers as small icons with their coins.  The long
 /// explanation sits behind the info button.
 private struct ClanSeasonCard: View {
@@ -2246,12 +2256,10 @@ private struct ClanSeasonCard: View {
                         .foregroundStyle(prizesOn ? gold : Color(white: 0.6))
                 }
                 Spacer(minLength: 0)
-                ZStack {
-                    Circle().stroke(Color(white: 0.22), lineWidth: 7)
-                    Circle().trim(from: 0, to: progress)
-                        .stroke(gold, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: -2) {
+                HStack(spacing: 8) {
+                    SeasonHourglass(timeLeft: 1 - progress, sand: gold)
+                        .frame(width: 30, height: 46)
+                    VStack(alignment: .leading, spacing: -2) {
                         Text("\(daysLeft)")
                             .font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
                             .foregroundStyle(.white)
@@ -2260,7 +2268,7 @@ private struct ClanSeasonCard: View {
                             .foregroundStyle(Color(white: 0.6))
                     }
                 }
-                .frame(width: 72, height: 72)
+                .frame(height: 72)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(daysLeft) day\(daysLeft == 1 ? "" : "s") left this season")
             }
@@ -2469,5 +2477,121 @@ struct ClanPanelActionLabel: View {
         .background(Capsule().fill(Color(white: 0.16)))
         .overlay(Capsule().stroke(tint.opacity(0.9), lineWidth: 1.2))
         .contentShape(Capsule())
+    }
+}
+
+/// The season card's hourglass: sand in the top bulb shows the time left in
+/// the season (full at the start, nearly empty at the end) and the bottom
+/// bulb fills as it runs out.  A very slow, faint trickle falls through the
+/// neck; none with Reduce Motion on, or once the top is empty.
+private struct SeasonHourglass: View {
+    /// 0…1 share of the season still to come.
+    let timeLeft: Double
+    let sand: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let left: Double = min(1, max(0, timeLeft))
+        let still: Bool = reduceMotion || left <= 0.001
+        TimelineView(.animation(minimumInterval: 1.0 / 12.0, paused: still)) { tl in
+            let t: Double = still ? 0 : tl.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                Self.draw(&ctx, size: size, left: left, t: t, trickle: !still, sand: sand)
+            }
+        }
+    }
+
+    private static func draw(_ ctx: inout GraphicsContext, size: CGSize,
+                             left: Double, t: Double, trickle: Bool, sand: Color) {
+        let w: CGFloat = size.width
+        let h: CGFloat = size.height
+        let cap: CGFloat = 3                       // caps top and bottom
+        let inset: CGFloat = 3                     // glass inset from the caps' ends
+        let top: CGFloat = cap
+        let bottom: CGFloat = h - cap
+        let mid: CGFloat = h / 2
+        let neck: CGFloat = 1.6                    // half-width of the neck
+        let left0: CGFloat = inset
+        let right0: CGFloat = w - inset
+        let cx: CGFloat = w / 2
+        let bulbH: CGFloat = mid - top
+
+        // Top bulb: wide at the cap, narrowing to the neck.
+        var topBulb = Path()
+        topBulb.move(to: CGPoint(x: left0, y: top))
+        topBulb.addLine(to: CGPoint(x: right0, y: top))
+        topBulb.addQuadCurve(to: CGPoint(x: cx + neck, y: mid),
+                             control: CGPoint(x: right0, y: mid - bulbH * 0.25))
+        topBulb.addLine(to: CGPoint(x: cx - neck, y: mid))
+        topBulb.addQuadCurve(to: CGPoint(x: left0, y: top),
+                             control: CGPoint(x: left0, y: mid - bulbH * 0.25))
+        topBulb.closeSubpath()
+
+        // Bottom bulb: the mirror image.
+        var bottomBulb = Path()
+        bottomBulb.move(to: CGPoint(x: cx - neck, y: mid))
+        bottomBulb.addLine(to: CGPoint(x: cx + neck, y: mid))
+        bottomBulb.addQuadCurve(to: CGPoint(x: right0, y: bottom),
+                                control: CGPoint(x: right0, y: mid + bulbH * 0.25))
+        bottomBulb.addLine(to: CGPoint(x: left0, y: bottom))
+        bottomBulb.addQuadCurve(to: CGPoint(x: cx - neck, y: mid),
+                                control: CGPoint(x: left0, y: mid + bulbH * 0.25))
+        bottomBulb.closeSubpath()
+
+        let glass: Color = Color(white: 0.22)
+        ctx.fill(topBulb, with: .color(glass))
+        ctx.fill(bottomBulb, with: .color(glass))
+
+        // Top sand: the lower part of the top bulb; its surface drops as the
+        // season runs out.
+        let topLevel: CGFloat = CGFloat(left)
+        if topLevel > 0.001 {
+            let surfaceY: CGFloat = mid - bulbH * topLevel
+            var c = ctx
+            c.clip(to: topBulb)
+            c.fill(Path(CGRect(x: 0, y: surfaceY, width: w, height: mid - surfaceY)),
+                   with: .color(sand))
+        }
+
+        // Bottom sand: a soft pile rising from the base.
+        let bottomLevel: CGFloat = CGFloat(1 - left)
+        if bottomLevel > 0.001 {
+            let pileTop: CGFloat = bottom - bulbH * bottomLevel
+            let edgeY: CGFloat = min(bottom, pileTop + bulbH * 0.18 * bottomLevel)
+            let peakY: CGFloat = pileTop - bulbH * 0.12 * bottomLevel
+            var pile = Path()
+            pile.move(to: CGPoint(x: 0, y: bottom))
+            pile.addLine(to: CGPoint(x: 0, y: edgeY))
+            pile.addQuadCurve(to: CGPoint(x: w, y: edgeY), control: CGPoint(x: cx, y: peakY))
+            pile.addLine(to: CGPoint(x: w, y: bottom))
+            pile.closeSubpath()
+            var c = ctx
+            c.clip(to: bottomBulb)
+            c.fill(pile, with: .color(sand))
+        }
+
+        // The trickle: a faint thin stream with a few grains drifting down.
+        if trickle && topLevel > 0.001 {
+            let streamEnd: CGFloat = bottomLevel > 0.001 ? bottom - bulbH * bottomLevel : bottom
+            let streamH: CGFloat = max(0, streamEnd - mid + 1)
+            ctx.fill(Path(CGRect(x: cx - 0.5, y: mid - 1, width: 1, height: streamH)),
+                     with: .color(sand.opacity(0.45)))
+            for i in 0..<3 {
+                let phase: Double = (t * 0.35 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
+                let gy: CGFloat = mid + (streamEnd - mid) * CGFloat(phase)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - 0.9, y: gy - 0.9, width: 1.8, height: 1.8)),
+                         with: .color(sand.opacity(0.8)))
+            }
+        }
+
+        // Glass outline and caps.
+        let rim: Color = Color(white: 0.45)
+        ctx.stroke(topBulb, with: .color(rim), lineWidth: 1)
+        ctx.stroke(bottomBulb, with: .color(rim), lineWidth: 1)
+        let capColor: Color = Color(white: 0.55)
+        ctx.fill(Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: cap), cornerRadius: 1.2),
+                 with: .color(capColor))
+        ctx.fill(Path(roundedRect: CGRect(x: 0, y: h - cap, width: w, height: cap), cornerRadius: 1.2),
+                 with: .color(capColor))
     }
 }
