@@ -29,7 +29,7 @@ struct BuyLivesSheet: View {
     @State private var purchaseError: String? = nil
     @State private var fitHeight: CGFloat = 560   // content height; set on first layout
     @State private var celebrate = false          // drives the Diamond Balls victory loop
-    @State private var showReserveInfo = false    // popover on the gold reserve jar
+    @State private var showReserveInfo = false    // popover on the reserve pouch
 
     var body: some View {
         ZStack {
@@ -123,7 +123,7 @@ struct BuyLivesSheet: View {
                     .lineLimit(1)
                     .fixedSize()
                 if gameState.purchasedLives > 0 {
-                    reserveJar
+                    reservePouch
                         .padding(.leading, 4)
                 }
             }
@@ -131,17 +131,17 @@ struct BuyLivesSheet: View {
         .padding(.bottom, 6)
     }
 
-    /// The purchased reserve as a small gold jar with "+N" on it, beside the
+    /// The purchased reserve as a small pouch of red lives with "+N" on it, beside the
     /// row of life balls.  Tapping it explains the reserve in a short popover.
     /// Hidden (by the caller) when the reserve is zero.
-    private var reserveJar: some View {
+    private var reservePouch: some View {
         let reserve = gameState.purchasedLives
         let explanation = "\(reserve) \(reserve == 1 ? "life" : "lives") in reserve. They're used when your free lives run out."
         return Button {
             showReserveInfo = true
         } label: {
             ZStack(alignment: .bottom) {
-                MarbleJarIcon(tier: 2, gold: true)
+                LivesPackIcon(kind: .pouch, compact: true)
                     .frame(width: 30, height: 32)
                 Text("+\(reserve)")
                     .font(.system(size: 10, weight: .heavy, design: .rounded))
@@ -203,7 +203,7 @@ struct BuyLivesSheet: View {
     }
 
     /// Live status under the marble-row header: the next-life countdown while
-    /// regen is active.  (The reserve is the gold jar in the header; the earn
+    /// regen is active.  (The reserve is the pouch in the header; the earn
     /// rule sits under the title.)
     private var statusBlock: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
@@ -228,7 +228,7 @@ struct BuyLivesSheet: View {
                         }
                         .foregroundStyle(Color(white: 0.78))
                     }
-                    // The reserve is the gold jar beside the life balls, and
+                    // The reserve is the pouch beside the life balls, and
                     // the earn rule sits under the title — only the countdown
                     // is left here.
                 }
@@ -380,7 +380,9 @@ struct BuyLivesSheet: View {
         let inProgress = store.purchaseInProgress == pid
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 14) {
-                diamondBall(size: 42)
+                LivesPackIcon(kind: Self.packIconKind(pid))
+                    .frame(width: 56, height: 48)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Diamond Balls")
                         .font(.system(size: 18, weight: .black, design: .rounded))
@@ -441,32 +443,6 @@ struct BuyLivesSheet: View {
         }
     }
 
-    /// A super-shiny diamond marble — cool white→cyan, a bright specular, and a
-    /// sparkle.  The visual identity for indestructible lives (was "golden ball").
-    private func diamondBall(size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.white,
-                                 Color(red: 0.74, green: 0.93, blue: 1.0),
-                                 Color(red: 0.45, green: 0.72, blue: 0.96)],
-                        center: .init(x: 0.34, y: 0.30),
-                        startRadius: 1, endRadius: size * 0.75)
-                )
-                .frame(width: size, height: size)
-                .overlay(Circle().stroke(Color.white.opacity(0.8), lineWidth: 1))
-            Circle().fill(Color.white.opacity(0.9))
-                .frame(width: size * 0.26, height: size * 0.26)
-                .offset(x: -size * 0.18, y: -size * 0.20)
-            Image(systemName: "sparkle")
-                .font(.system(size: size * 0.28, weight: .bold))
-                .foregroundStyle(.white)
-                .offset(x: size * 0.22, y: size * 0.20)
-        }
-        .shadow(color: Color(red: 0.50, green: 0.85, blue: 1.0).opacity(0.6), radius: 6)
-    }
-
     private static let diamondGradient = LinearGradient(
         colors: [Color(red: 0.86, green: 0.96, blue: 1.0),
                  Color(red: 0.55, green: 0.80, blue: 1.0),
@@ -513,8 +489,8 @@ struct BuyLivesSheet: View {
         return percent > 0 ? percent : nil
     }
 
-    /// One lives pack, laid out like a coin pack on the Get Coins sheet: a jar
-    /// of marbles that is bigger for bigger packs, the number of lives, the
+    /// One lives pack, laid out like a coin pack on the Get Coins sheet: a
+    /// container of red lives that is bigger for bigger packs, the number of lives, the
     /// percent saved (not on the smallest pack), and the price button.
     private func lifePackCard(pid: StoreKitManager.ProductID) -> some View {
         let inProgress = store.purchaseInProgress == pid
@@ -524,8 +500,8 @@ struct BuyLivesSheet: View {
         let spoken: String = saved.map { "Buy \(lives) lives for \(priceText). Save \($0) percent." }
             ?? "Buy \(lives) lives for \(priceText)."
         return HStack(alignment: .center, spacing: 12) {
-            // Same frame for every pack; the jar inside grows with the pack.
-            MarbleJarIcon(tier: Self.jarTier(pid))
+            // Same frame for every pack; the container inside grows with the pack.
+            LivesPackIcon(kind: Self.packIconKind(pid))
                 .frame(width: 60, height: 64)
                 .accessibilityHidden(true)
 
@@ -571,12 +547,13 @@ struct BuyLivesSheet: View {
         )
     }
 
-    /// 0 = smallest jar … 2 = largest.
-    private static func jarTier(_ pid: StoreKitManager.ProductID) -> Int {
+    /// Pouch (20) → box (120) → chest (300); the truck is Diamond Balls.
+    private static func packIconKind(_ pid: StoreKitManager.ProductID) -> LivesPackIcon.Kind {
         switch pid {
-        case .lives120: return 1
-        case .lives300: return 2
-        default:           return 0
+        case .lives120:  return .box
+        case .lives300:  return .chest
+        case .unlimited: return .truck
+        default:         return .pouch
         }
     }
 
@@ -842,154 +819,406 @@ struct BuyCoinsSheet: View {
 // pack.  All drawn in pure SwiftUI shapes so they scale crisply and reuse the
 // shared CoinIcon gold so the coins match the rest of the app.
 
-/// Lives-pack art for the Get Lives sheet: a "guess how many marbles" glass
-/// jar.  Every pack card gives it the same frame; the JAR itself grows with
-/// the pack while the marbles stay the same size, so a bigger pack is a
-/// visibly bigger jar holding many more marbles:
-///   tier 0 (20 lives)  — a little jar with a handful of marbles at the bottom
-///   tier 1 (120 lives) — a medium jar, most of the way full
-///   tier 2 (300 lives) — a big jar packed to the brim
-/// `gold` draws the same jar as gold glass full of gold marbles with a gold
-/// lid — the purchased-reserve jar in the sheet header.
-/// Drawn in a Canvas from a fixed layout (no randomness, no image assets).
-struct MarbleJarIcon: View {
-    let tier: Int
-    var gold: Bool = false
-
-    /// Jar height as a share of the frame, per tier.
-    private static let jarScale: [CGFloat] = [0.50, 0.76, 1.0]
-    /// Share of the jar's marble slots that are filled, per tier.
-    private static let fillShare: [CGFloat] = [0.0, 0.70, 1.0]
-    /// Marbles in the smallest jar (a handful, not a share).
-    private static let smallJarMarbles = 5
-
-    private static let palette: [(Color, Color)] = [
-        (Color(red: 1.00, green: 0.42, blue: 0.40), Color(red: 0.72, green: 0.10, blue: 0.12)), // red
-        (Color(red: 0.45, green: 0.70, blue: 1.00), Color(red: 0.10, green: 0.30, blue: 0.78)), // blue
-        (Color(red: 0.50, green: 0.92, blue: 0.52), Color(red: 0.10, green: 0.52, blue: 0.22)), // green
-        (Color(red: 1.00, green: 0.88, blue: 0.40), Color(red: 0.86, green: 0.56, blue: 0.05)), // yellow
-        (Color(red: 0.82, green: 0.58, blue: 1.00), Color(red: 0.44, green: 0.18, blue: 0.74)), // purple
-        (Color(red: 1.00, green: 0.66, blue: 0.34), Color(red: 0.84, green: 0.34, blue: 0.06)), // orange
-        (Color(red: 0.50, green: 0.95, blue: 0.95), Color(red: 0.06, green: 0.56, blue: 0.62)), // teal
-    ]
-    private static let goldShades: [(Color, Color)] = [
-        (Color(red: 1.00, green: 0.92, blue: 0.55), Color(red: 0.80, green: 0.55, blue: 0.08)),
-        (Color(red: 1.00, green: 0.84, blue: 0.40), Color(red: 0.70, green: 0.45, blue: 0.04)),
-        (Color(red: 0.98, green: 0.95, blue: 0.70), Color(red: 0.86, green: 0.64, blue: 0.16)),
-    ]
+/// Lives-pack art for the Get Lives sheet.  Each pack is a different
+/// container, so the size reads from the container alone:
+///   .pouch (20 lives)  — a small cloth pouch, drawstring open, a few balls peeking out
+///   .box   (120 lives) — a cardboard box, flaps open, filled with balls
+///   .chest (300 lives) — a treasure chest, lid open, overflowing with balls
+///   .truck (Diamond Balls) — a semi-truck trailer heaped with balls and one
+///                            diamond ball sitting on top of the pile
+/// Every life ball is the same glossy red (the lives red used across the
+/// sheet); the only other ball is the single diamond on the truck.  The
+/// containers grow with the pack (about 0.58 / 0.76 / 0.90 / 1.0 of the
+/// frame's width) while the balls stay one size, so bigger packs visibly hold
+/// more.  `compact` draws the pouch filling its frame with larger balls — the
+/// purchased-reserve badge beside the life balls.
+/// Drawn in a Canvas from fixed layouts: still, no randomness, no assets.
+struct LivesPackIcon: View {
+    enum Kind { case pouch, box, chest, truck }
+    let kind: Kind
+    var compact: Bool = false
 
     var body: some View {
         Canvas { ctx, size in
-            let t = min(2, max(0, tier))
             let s = min(size.width, size.height)
-
-            // ---- Jar geometry: bottom-centered, scaled per tier ----
-            let jarH = size.height * Self.jarScale[t]
-            let jarW = min(size.width, jarH * 0.80)
-            let left = (size.width - jarW) / 2
-            let bottom = size.height
-            let lidH = max(2.5, jarH * 0.13)
-            let lidW = jarW * 0.80
-            let neckH = max(1.5, jarH * 0.05)
-            let bodyTop = bottom - jarH + lidH + neckH
-            let body = CGRect(x: left, y: bodyTop, width: jarW, height: bottom - bodyTop)
-            let bodyPath = Path(roundedRect: body, cornerRadius: jarW * 0.24, style: .continuous)
-            let neck = CGRect(x: (size.width - lidW * 0.92) / 2, y: bodyTop - neckH,
-                              width: lidW * 0.92, height: neckH + jarW * 0.10)
-            let neckPath = Path(roundedRect: neck, cornerRadius: neckH * 0.6)
-            let lid = CGRect(x: (size.width - lidW) / 2, y: bottom - jarH,
-                             width: lidW, height: lidH)
-            let lidPath = Path(roundedRect: lid, cornerRadius: lidH * 0.30, style: .continuous)
-
-            // ---- Glass back (a faint tint behind the marbles) ----
-            let glassTint: Color = gold ? Color(red: 1.0, green: 0.80, blue: 0.30) : Color(red: 0.70, green: 0.88, blue: 1.0)
-            ctx.fill(bodyPath, with: .color(glassTint.opacity(gold ? 0.22 : 0.10)))
-
-            // ---- Marbles: hexagonal packing, bottom up, clipped to the glass ----
-            // Marble size follows the FRAME, not the jar, so a bigger jar
-            // holds visibly more of them.
-            let d = s * 0.118
-            let wall = max(1.0, jarW * 0.06)
-            let inner = body.insetBy(dx: wall, dy: wall)
-            var slots: [CGPoint] = []
-            var row = 0
-            var cy = inner.maxY - d / 2
-            let topLimit = (t == 2 ? neck.minY + neckH * 0.4 : inner.minY) + d * 0.35
-            while cy >= topLimit {
-                let offset: CGFloat = row % 2 == 0 ? 0 : d / 2
-                var cx = inner.minX + d / 2 + offset
-                while cx <= inner.maxX - d / 2 + 0.01 {
-                    // Above the shoulders only the neck holds marbles.
-                    let inNeck = cx - d / 2 >= neck.minX && cx + d / 2 <= neck.maxX
-                    if cy >= inner.minY + d / 2 || inNeck {
-                        slots.append(CGPoint(x: cx, y: cy))
-                    }
-                    cx += d
-                }
-                row += 1
-                cy -= d * 0.87
+            let r = max(2.2, s * (compact ? 0.12 : 0.075))
+            switch kind {
+            case .pouch: Self.drawPouch(&ctx, size: size, r: r, compact: compact)
+            case .box:   Self.drawBox(&ctx, size: size, r: r)
+            case .chest: Self.drawChest(&ctx, size: size, r: r)
+            case .truck: Self.drawTruck(&ctx, size: size, r: r)
             }
-            let count: Int = {
-                switch t {
-                case 0:  return min(slots.count, Self.smallJarMarbles)
-                default: return min(slots.count, max(1, Int((CGFloat(slots.count) * Self.fillShare[t]).rounded())))
-                }
-            }()
-            ctx.drawLayer { layer in
-                layer.clip(to: bodyPath.union(neckPath))
-                for i in 0..<count {
-                    let c = slots[i]
-                    let colors = gold ? Self.goldShades[(i * 2 + i / 3) % Self.goldShades.count]
-                                      : Self.palette[(i * 3 + i / 4) % Self.palette.count]
-                    let r = CGRect(x: c.x - d / 2, y: c.y - d / 2, width: d, height: d)
-                    let marble = Path(ellipseIn: r)
-                    layer.fill(marble, with: .radialGradient(
-                        Gradient(colors: [colors.0, colors.1]),
-                        center: CGPoint(x: r.minX + d * 0.35, y: r.minY + d * 0.32),
-                        startRadius: 0, endRadius: d * 0.72))
-                    layer.stroke(marble, with: .color(.black.opacity(0.28)), lineWidth: max(0.4, d * 0.05))
-                    let shine = CGRect(x: r.minX + d * 0.20, y: r.minY + d * 0.16,
-                                       width: d * 0.30, height: d * 0.26)
-                    layer.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.75)))
-                }
-            }
-
-            // ---- Glass front: rim, neck, and shine ----
-            let rim: Color = gold ? Color(red: 1.0, green: 0.86, blue: 0.45) : Color(white: 0.90)
-            ctx.stroke(bodyPath, with: .color(rim.opacity(0.95)), lineWidth: max(1.0, jarW * 0.045))
-            ctx.fill(neckPath, with: .color(glassTint.opacity(0.18)))
-            ctx.stroke(neckPath, with: .color(rim.opacity(0.85)), lineWidth: max(0.8, jarW * 0.035))
-            // A tall streak and a dot of light down the left of the glass.
-            let streak = CGRect(x: body.minX + jarW * 0.13, y: body.minY + body.height * 0.14,
-                                width: max(1.2, jarW * 0.09), height: body.height * 0.58)
-            ctx.fill(Path(roundedRect: streak, cornerRadius: streak.width / 2),
-                     with: .color(.white.opacity(0.42)))
-            let dot = CGRect(x: streak.minX, y: streak.maxY + body.height * 0.06,
-                             width: streak.width, height: streak.width)
-            ctx.fill(Path(ellipseIn: dot), with: .color(.white.opacity(0.38)))
-
-            // ---- Lid: metal band with ridges ----
-            let lidColors: [Color] = gold
-                ? [Color(red: 1.00, green: 0.88, blue: 0.42), Color(red: 0.74, green: 0.50, blue: 0.06)]
-                : [Color(red: 0.95, green: 0.38, blue: 0.36), Color(red: 0.62, green: 0.12, blue: 0.14)]
-            ctx.fill(lidPath, with: .linearGradient(
-                Gradient(colors: lidColors),
-                startPoint: CGPoint(x: lid.midX, y: lid.minY),
-                endPoint: CGPoint(x: lid.midX, y: lid.maxY)))
-            ctx.stroke(lidPath, with: .color(.black.opacity(0.30)), lineWidth: 0.6)
-            let ridges = max(3, Int(lidW / max(3, s * 0.07)))
-            for k in 1..<ridges {
-                let x = lid.minX + lid.width * CGFloat(k) / CGFloat(ridges)
-                var ridge = Path()
-                ridge.move(to: CGPoint(x: x, y: lid.minY + lidH * 0.22))
-                ridge.addLine(to: CGPoint(x: x, y: lid.maxY - lidH * 0.22))
-                ctx.stroke(ridge, with: .color(.black.opacity(0.22)), lineWidth: 0.6)
-            }
-            let lidShine = CGRect(x: lid.minX + lidW * 0.08, y: lid.minY + lidH * 0.18,
-                                  width: lidW * 0.84, height: max(0.8, lidH * 0.22))
-            ctx.fill(Path(roundedRect: lidShine, cornerRadius: lidShine.height / 2),
-                     with: .color(.white.opacity(0.45)))
         }
+    }
+
+    // MARK: Balls
+
+    /// The lives red, shaded like a glossy marble.
+    private static let lifeRed = Gradient(colors: [
+        Color(red: 1.00, green: 0.52, blue: 0.50),
+        Color(red: 1.00, green: 0.32, blue: 0.32),
+        Color(red: 0.78, green: 0.14, blue: 0.14),
+    ])
+
+    /// One red life ball.
+    private static func lifeBall(_ ctx: inout GraphicsContext, _ c: CGPoint, _ r: CGFloat) {
+        let rect = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
+        let ball = Path(ellipseIn: rect)
+        ctx.fill(ball, with: .radialGradient(
+            lifeRed,
+            center: CGPoint(x: c.x - r * 0.35, y: c.y - r * 0.40),
+            startRadius: 0, endRadius: r * 1.45))
+        ctx.stroke(ball, with: .color(.black.opacity(0.35)), lineWidth: max(0.4, r * 0.12))
+        let shine = CGRect(x: c.x - r * 0.62, y: c.y - r * 0.66, width: r * 0.56, height: r * 0.46)
+        ctx.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.80)))
+    }
+
+    /// The one diamond ball (Diamond Balls icon only): cool white to cyan, a
+    /// soft halo, a bright specular and a four-point sparkle.
+    private static func diamondBall(_ ctx: inout GraphicsContext, _ c: CGPoint, _ r: CGFloat) {
+        let halo = CGRect(x: c.x - r * 1.7, y: c.y - r * 1.7, width: r * 3.4, height: r * 3.4)
+        ctx.fill(Path(ellipseIn: halo), with: .radialGradient(
+            Gradient(colors: [Color(red: 0.55, green: 0.88, blue: 1.0).opacity(0.55),
+                              Color(red: 0.55, green: 0.88, blue: 1.0).opacity(0.0)]),
+            center: c, startRadius: r * 0.8, endRadius: r * 1.7))
+        let rect = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
+        let ball = Path(ellipseIn: rect)
+        ctx.fill(ball, with: .radialGradient(
+            Gradient(colors: [.white,
+                              Color(red: 0.74, green: 0.93, blue: 1.00),
+                              Color(red: 0.45, green: 0.72, blue: 0.96)]),
+            center: CGPoint(x: c.x - r * 0.34, y: c.y - r * 0.40),
+            startRadius: 0, endRadius: r * 1.5))
+        // Two faint facet lines so it reads as cut, not as a plain blue ball.
+        var facets = Path()
+        facets.move(to: CGPoint(x: c.x - r * 0.75, y: c.y + r * 0.10))
+        facets.addLine(to: CGPoint(x: c.x + r * 0.10, y: c.y - r * 0.78))
+        facets.move(to: CGPoint(x: c.x - r * 0.20, y: c.y + r * 0.80))
+        facets.addLine(to: CGPoint(x: c.x + r * 0.78, y: c.y - r * 0.05))
+        ctx.stroke(facets, with: .color(.white.opacity(0.55)), lineWidth: max(0.4, r * 0.09))
+        ctx.stroke(ball, with: .color(.white.opacity(0.90)), lineWidth: max(0.5, r * 0.12))
+        let shine = CGRect(x: c.x - r * 0.62, y: c.y - r * 0.68, width: r * 0.52, height: r * 0.44)
+        ctx.fill(Path(ellipseIn: shine), with: .color(.white.opacity(0.95)))
+        // Sparkle at the upper right.
+        let sc = CGPoint(x: c.x + r * 0.95, y: c.y - r * 0.95)
+        let sr = r * 0.62
+        var star = Path()
+        star.move(to: CGPoint(x: sc.x, y: sc.y - sr))
+        star.addQuadCurve(to: CGPoint(x: sc.x + sr, y: sc.y), control: sc)
+        star.addQuadCurve(to: CGPoint(x: sc.x, y: sc.y + sr), control: sc)
+        star.addQuadCurve(to: CGPoint(x: sc.x - sr, y: sc.y), control: sc)
+        star.addQuadCurve(to: CGPoint(x: sc.x, y: sc.y - sr), control: sc)
+        star.closeSubpath()
+        ctx.fill(star, with: .color(.white))
+    }
+
+    /// Ball centers for a heap whose bottom row sits at `baseY`, filling
+    /// `minX...maxX` and narrowing by about a ball per row going up.
+    /// Returned top row first, so lower (nearer) rows draw over higher ones.
+    private static func heap(baseY: CGFloat, minX: CGFloat, maxX: CGFloat,
+                             rows: Int, r: CGFloat) -> [CGPoint] {
+        var byRow: [[CGPoint]] = []
+        for row in 0..<rows {
+            let inset: CGFloat = CGFloat(row) * r * 1.05
+            let lo: CGFloat = minX + r + inset
+            let hi: CGFloat = maxX - r - inset
+            if hi < lo { break }
+            let y: CGFloat = baseY - CGFloat(row) * r * 1.62
+            let span: CGFloat = hi - lo
+            let count: Int = max(1, Int(span / (r * 1.85)) + 1)
+            var pts: [CGPoint] = []
+            for i in 0..<count {
+                let x: CGFloat = count > 1 ? lo + span * CGFloat(i) / CGFloat(count - 1) : (lo + hi) / 2
+                pts.append(CGPoint(x: x, y: y))
+            }
+            byRow.append(pts)
+        }
+        return byRow.reversed().flatMap { $0 }
+    }
+
+    private static let outline = Color.black.opacity(0.35)
+
+    // MARK: 20 lives — cloth pouch
+
+    private static let clothFace = Gradient(colors: [
+        Color(red: 0.50, green: 0.60, blue: 0.80),
+        Color(red: 0.27, green: 0.34, blue: 0.54),
+    ])
+    private static let cord = Color(red: 0.96, green: 0.88, blue: 0.68)
+
+    private static func drawPouch(_ ctx: inout GraphicsContext, size: CGSize,
+                                  r: CGFloat, compact: Bool) {
+        let w = size.width, h = size.height
+        let cx = w / 2
+        let bottom = h - 1
+        let W: CGFloat = w * (compact ? 0.92 : 0.58)
+        let H: CGFloat = h * (compact ? 0.80 : 0.50)
+        let mouthY: CGFloat = bottom - H + r * 0.9
+        let bodyTop: CGFloat = bottom - H * 0.70
+        let mouthW: CGFloat = W * 0.70
+
+        // Inside of the open mouth.
+        let mouth = CGRect(x: cx - mouthW / 2, y: mouthY - H * 0.07, width: mouthW, height: H * 0.14)
+        ctx.fill(Path(ellipseIn: mouth), with: .color(Color(red: 0.12, green: 0.14, blue: 0.24)))
+
+        // A few balls peeking out of the mouth.
+        let peek: [CGPoint] = [
+            CGPoint(x: cx - r * 1.05, y: mouthY - r * 0.35),
+            CGPoint(x: cx + r * 1.05, y: mouthY - r * 0.30),
+            CGPoint(x: cx + r * 0.05, y: mouthY - r * 1.35),
+        ]
+        for p in peek { lifeBall(&ctx, p, r) }
+
+        // Gathered neck, flaring up to the open mouth (covers the balls' lower halves).
+        var neck = Path()
+        neck.move(to: CGPoint(x: cx - mouthW / 2, y: mouthY))
+        neck.addLine(to: CGPoint(x: cx - W * 0.20, y: bodyTop + H * 0.08))
+        neck.addLine(to: CGPoint(x: cx + W * 0.20, y: bodyTop + H * 0.08))
+        neck.addLine(to: CGPoint(x: cx + mouthW / 2, y: mouthY))
+        neck.addQuadCurve(to: CGPoint(x: cx - mouthW / 2, y: mouthY),
+                          control: CGPoint(x: cx, y: mouthY + H * 0.10))
+        neck.closeSubpath()
+        ctx.fill(neck, with: .linearGradient(clothFace,
+                                             startPoint: CGPoint(x: cx, y: mouthY),
+                                             endPoint: CGPoint(x: cx, y: bottom)))
+        ctx.stroke(neck, with: .color(outline), lineWidth: 0.7)
+
+        // Round body.
+        let bodyRect = CGRect(x: cx - W / 2, y: bodyTop, width: W, height: bottom - bodyTop)
+        let bodyPath = Path(roundedRect: bodyRect, cornerRadius: W * 0.42, style: .continuous)
+        ctx.fill(bodyPath, with: .linearGradient(clothFace,
+                                                 startPoint: CGPoint(x: cx, y: bodyTop),
+                                                 endPoint: CGPoint(x: cx, y: bottom)))
+        ctx.stroke(bodyPath, with: .color(outline), lineWidth: 0.8)
+        // Stitched seam and a soft cloth highlight.
+        let seam = bodyRect.insetBy(dx: W * 0.10, dy: (bottom - bodyTop) * 0.14)
+        ctx.stroke(Path(roundedRect: seam, cornerRadius: W * 0.32, style: .continuous),
+                   with: .color(.white.opacity(0.30)),
+                   style: StrokeStyle(lineWidth: max(0.5, W * 0.025), dash: [W * 0.06, W * 0.05]))
+        let gleam = CGRect(x: bodyRect.minX + W * 0.16, y: bodyRect.minY + bodyRect.height * 0.22,
+                           width: W * 0.16, height: bodyRect.height * 0.30)
+        ctx.fill(Path(ellipseIn: gleam), with: .color(.white.opacity(0.18)))
+
+        // Drawstring around the neck, its two ends hanging loose (open).
+        let tieY: CGFloat = bodyTop + H * 0.06
+        let tieH: CGFloat = max(2, H * 0.08)
+        let tie = CGRect(x: cx - W * 0.26, y: tieY - tieH / 2, width: W * 0.52, height: tieH)
+        let tiePath = Path(roundedRect: tie, cornerRadius: tieH / 2)
+        ctx.fill(tiePath, with: .color(cord))
+        ctx.stroke(tiePath, with: .color(outline), lineWidth: 0.5)
+        var ends = Path()
+        ends.move(to: CGPoint(x: cx + W * 0.18, y: tieY))
+        ends.addQuadCurve(to: CGPoint(x: cx + W * 0.30, y: tieY + H * 0.30),
+                          control: CGPoint(x: cx + W * 0.36, y: tieY + H * 0.08))
+        ends.move(to: CGPoint(x: cx + W * 0.22, y: tieY))
+        ends.addQuadCurve(to: CGPoint(x: cx + W * 0.42, y: tieY + H * 0.22),
+                          control: CGPoint(x: cx + W * 0.44, y: tieY + H * 0.02))
+        ctx.stroke(ends, with: .color(cord),
+                   style: StrokeStyle(lineWidth: max(0.8, W * 0.035), lineCap: .round))
+    }
+
+    // MARK: 120 lives — cardboard box
+
+    private static let kraftFace = Gradient(colors: [
+        Color(red: 0.86, green: 0.68, blue: 0.44),
+        Color(red: 0.64, green: 0.46, blue: 0.26),
+    ])
+    private static let kraftFlap = Gradient(colors: [
+        Color(red: 0.76, green: 0.58, blue: 0.36),
+        Color(red: 0.90, green: 0.74, blue: 0.50),
+    ])
+
+    private static func drawBox(_ ctx: inout GraphicsContext, size: CGSize, r: CGFloat) {
+        let w = size.width, h = size.height
+        let W: CGFloat = w * 0.76
+        let Hb: CGFloat = h * 0.40
+        let left: CGFloat = (w - W) / 2
+        let right: CGFloat = left + W
+        let bottom: CGFloat = h - 1
+        let top: CGFloat = bottom - Hb
+
+        // Back flap, standing up behind the balls.
+        let back = CGRect(x: left + W * 0.06, y: top - Hb * 0.62, width: W * 0.88, height: Hb * 0.66)
+        ctx.fill(Path(back), with: .color(Color(red: 0.56, green: 0.40, blue: 0.22)))
+        ctx.stroke(Path(back), with: .color(outline), lineWidth: 0.6)
+
+        // Side flaps, folded open outward.
+        var lf = Path()
+        lf.move(to: CGPoint(x: left, y: top))
+        lf.addLine(to: CGPoint(x: left - W * 0.13, y: top - Hb * 0.48))
+        lf.addLine(to: CGPoint(x: left + W * 0.08, y: top - Hb * 0.56))
+        lf.addLine(to: CGPoint(x: left + W * 0.18, y: top))
+        lf.closeSubpath()
+        var rf = Path()
+        rf.move(to: CGPoint(x: right, y: top))
+        rf.addLine(to: CGPoint(x: right + W * 0.13, y: top - Hb * 0.48))
+        rf.addLine(to: CGPoint(x: right - W * 0.08, y: top - Hb * 0.56))
+        rf.addLine(to: CGPoint(x: right - W * 0.18, y: top))
+        rf.closeSubpath()
+        for flap in [lf, rf] {
+            ctx.fill(flap, with: .linearGradient(kraftFlap,
+                                                 startPoint: CGPoint(x: left, y: top),
+                                                 endPoint: CGPoint(x: left, y: top - Hb * 0.56)))
+            ctx.stroke(flap, with: .color(outline), lineWidth: 0.6)
+        }
+
+        // Filled to the top with balls.
+        for p in heap(baseY: top + r * 0.55, minX: left + 1, maxX: right - 1, rows: 3, r: r) {
+            lifeBall(&ctx, p, r)
+        }
+
+        // Front face with packing tape.
+        let front = CGRect(x: left, y: top, width: W, height: Hb)
+        let frontPath = Path(roundedRect: front, cornerRadius: 1.5)
+        ctx.fill(frontPath, with: .linearGradient(kraftFace,
+                                                  startPoint: CGPoint(x: left, y: top),
+                                                  endPoint: CGPoint(x: left, y: bottom)))
+        let tape = CGRect(x: left + W * 0.42, y: top, width: W * 0.16, height: Hb)
+        ctx.fill(Path(tape), with: .color(Color(red: 0.95, green: 0.84, blue: 0.62).opacity(0.75)))
+        var rim = Path()
+        rim.move(to: CGPoint(x: left, y: top + 0.5))
+        rim.addLine(to: CGPoint(x: right, y: top + 0.5))
+        ctx.stroke(rim, with: .color(.white.opacity(0.35)), lineWidth: 0.8)
+        ctx.stroke(frontPath, with: .color(outline), lineWidth: 0.8)
+    }
+
+    // MARK: 300 lives — treasure chest
+
+    private static let woodFace = Gradient(colors: [
+        Color(red: 0.60, green: 0.40, blue: 0.20),
+        Color(red: 0.40, green: 0.25, blue: 0.11),
+    ])
+    private static let woodLid = Gradient(colors: [
+        Color(red: 0.52, green: 0.34, blue: 0.16),
+        Color(red: 0.34, green: 0.21, blue: 0.09),
+    ])
+    private static let goldBand = Color(red: 0.93, green: 0.76, blue: 0.32)
+
+    private static func drawChest(_ ctx: inout GraphicsContext, size: CGSize, r: CGFloat) {
+        let w = size.width, h = size.height
+        let W: CGFloat = w * 0.90
+        let Hc: CGFloat = h * 0.36
+        let left: CGFloat = (w - W) / 2
+        let right: CGFloat = left + W
+        let bottom: CGFloat = h - 1
+        let top: CGFloat = bottom - Hc
+
+        // Open lid, tipped back: its domed outside and its dark inside.
+        let lidRect = CGRect(x: left + W * 0.02, y: top - Hc * 1.05, width: W * 0.96, height: Hc * 0.98)
+        let lid = Path(roundedRect: lidRect, cornerRadius: W * 0.22, style: .continuous)
+        ctx.fill(lid, with: .linearGradient(woodLid,
+                                            startPoint: CGPoint(x: left, y: lidRect.minY),
+                                            endPoint: CGPoint(x: left, y: lidRect.maxY)))
+        ctx.stroke(lid, with: .color(outline), lineWidth: 0.8)
+        let inside = lidRect.insetBy(dx: W * 0.07, dy: Hc * 0.14)
+        ctx.fill(Path(roundedRect: inside, cornerRadius: W * 0.16, style: .continuous),
+                 with: .color(Color(red: 0.36, green: 0.06, blue: 0.10)))
+        var lidBand = Path()
+        lidBand.move(to: CGPoint(x: lidRect.minX, y: lidRect.maxY - 1))
+        lidBand.addLine(to: CGPoint(x: lidRect.maxX, y: lidRect.maxY - 1))
+        ctx.stroke(lidBand, with: .color(goldBand), lineWidth: max(1.2, Hc * 0.10))
+
+        // Heaped well above the rim.
+        for p in heap(baseY: top + r * 0.55, minX: left - r * 0.2, maxX: right + r * 0.2, rows: 4, r: r) {
+            lifeBall(&ctx, p, r)
+        }
+
+        // Chest base with gold bands and latch.
+        let base = CGRect(x: left, y: top, width: W, height: Hc)
+        let basePath = Path(roundedRect: base, cornerRadius: 2)
+        ctx.fill(basePath, with: .linearGradient(woodFace,
+                                                 startPoint: CGPoint(x: left, y: top),
+                                                 endPoint: CGPoint(x: left, y: bottom)))
+        let bandH: CGFloat = max(1.5, Hc * 0.14)
+        ctx.fill(Path(CGRect(x: left, y: top, width: W, height: bandH)), with: .color(goldBand))
+        let bandXs: [CGFloat] = [0.18, 0.82]
+        for fx in bandXs {
+            ctx.fill(Path(CGRect(x: left + W * fx - bandH / 2, y: top, width: bandH, height: Hc)),
+                     with: .color(goldBand))
+        }
+        let latch = CGRect(x: left + W / 2 - Hc * 0.15, y: top + bandH * 0.4,
+                           width: Hc * 0.30, height: Hc * 0.32)
+        let latchPath = Path(roundedRect: latch, cornerRadius: 1.2)
+        ctx.fill(latchPath, with: .color(goldBand))
+        ctx.stroke(latchPath, with: .color(outline), lineWidth: 0.5)
+        ctx.stroke(basePath, with: .color(outline), lineWidth: 0.8)
+
+        // Overflowing: balls spilling over the front edge and onto the ground.
+        lifeBall(&ctx, CGPoint(x: right - W * 0.30, y: top + r * 0.7), r)
+        lifeBall(&ctx, CGPoint(x: left + r * 0.3, y: bottom - r), r)
+        lifeBall(&ctx, CGPoint(x: right - r * 0.2, y: bottom - r), r)
+    }
+
+    // MARK: Diamond Balls — semi-truck trailer
+
+    private static let trailerFace = Gradient(colors: [
+        Color(red: 0.82, green: 0.86, blue: 0.92),
+        Color(red: 0.48, green: 0.53, blue: 0.61),
+    ])
+    private static let cabFace = Gradient(colors: [
+        Color(red: 0.26, green: 0.50, blue: 0.90),
+        Color(red: 0.12, green: 0.26, blue: 0.56),
+    ])
+
+    private static func drawTruck(_ ctx: inout GraphicsContext, size: CGSize, r: CGFloat) {
+        let w = size.width, h = size.height
+        let s = min(w, h)
+        let bottom: CGFloat = h - 1
+        let wr: CGFloat = max(2.5, s * 0.085)               // wheel radius
+        let deckY: CGFloat = bottom - wr * 1.25             // underside of the bodies
+        let trailer = CGRect(x: w * 0.01, y: deckY - h * 0.27, width: w * 0.73, height: h * 0.27)
+
+        // Heap of balls above the open trailer.
+        let pile = heap(baseY: trailer.minY + r * 0.55,
+                        minX: trailer.minX + 1, maxX: trailer.maxX - 1, rows: 3, r: r)
+        for p in pile { lifeBall(&ctx, p, r) }
+        let peakY: CGFloat = pile.map { $0.y }.min() ?? trailer.minY
+
+        // Trailer side: aluminum with ribs.
+        let side = Path(roundedRect: trailer, cornerRadius: 1.5)
+        ctx.fill(side, with: .linearGradient(trailerFace,
+                                             startPoint: CGPoint(x: trailer.minX, y: trailer.minY),
+                                             endPoint: CGPoint(x: trailer.minX, y: trailer.maxY)))
+        var ribs = Path()
+        for k in 1..<6 {
+            let x: CGFloat = trailer.minX + trailer.width * CGFloat(k) / 6
+            ribs.move(to: CGPoint(x: x, y: trailer.minY + 1.5))
+            ribs.addLine(to: CGPoint(x: x, y: trailer.maxY - 1.5))
+        }
+        ctx.stroke(ribs, with: .color(.black.opacity(0.18)), lineWidth: 0.6)
+        ctx.stroke(side, with: .color(outline), lineWidth: 0.8)
+
+        // Hitch and cab.
+        let hitch = CGRect(x: trailer.maxX - 1, y: deckY - h * 0.06, width: w * 0.05, height: h * 0.04)
+        ctx.fill(Path(hitch), with: .color(Color(white: 0.22)))
+        let cab = CGRect(x: w * 0.77, y: deckY - h * 0.30, width: w * 0.22, height: h * 0.30)
+        let cabPath = Path(roundedRect: cab, cornerRadius: cab.width * 0.28, style: .continuous)
+        ctx.fill(cabPath, with: .linearGradient(cabFace,
+                                                startPoint: CGPoint(x: cab.minX, y: cab.minY),
+                                                endPoint: CGPoint(x: cab.minX, y: cab.maxY)))
+        ctx.stroke(cabPath, with: .color(outline), lineWidth: 0.8)
+        let window = CGRect(x: cab.minX + cab.width * 0.30, y: cab.minY + cab.height * 0.14,
+                            width: cab.width * 0.58, height: cab.height * 0.32)
+        ctx.fill(Path(roundedRect: window, cornerRadius: 1.5),
+                 with: .color(Color(red: 0.78, green: 0.92, blue: 1.0)))
+        let lamp = CGRect(x: cab.maxX - cab.width * 0.18, y: cab.maxY - cab.height * 0.30,
+                          width: cab.width * 0.14, height: cab.height * 0.12)
+        ctx.fill(Path(ellipseIn: lamp), with: .color(Color(red: 1.0, green: 0.92, blue: 0.55)))
+
+        // Wheels: tandem under the trailer, one under the cab.
+        let wheelXs: [CGFloat] = [trailer.minX + trailer.width * 0.16,
+                                  trailer.minX + trailer.width * 0.34,
+                                  cab.midX]
+        for x in wheelXs {
+            let c = CGPoint(x: x, y: bottom - wr)
+            let tire = CGRect(x: c.x - wr, y: c.y - wr, width: wr * 2, height: wr * 2)
+            ctx.fill(Path(ellipseIn: tire), with: .color(Color(white: 0.12)))
+            let hub = tire.insetBy(dx: wr * 0.48, dy: wr * 0.48)
+            ctx.fill(Path(ellipseIn: hub), with: .color(Color(white: 0.70)))
+        }
+
+        // The one diamond ball, sitting on top of the pile.
+        diamondBall(&ctx, CGPoint(x: trailer.midX, y: peakY - r * 1.75), r * 1.35)
     }
 }
 

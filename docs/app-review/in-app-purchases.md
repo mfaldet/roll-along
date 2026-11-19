@@ -92,12 +92,14 @@ collection; retake its review screenshot.
 
 Under the "Get Lives" title, the line "You earn 1 life every 6 minutes, up to
 10." sits above the row of 10 life balls and the "x / 10" count. Lives bought
-earlier and not yet used show as a small gold jar with "+N" next to that row;
-tapping it explains that they are used when the free lives run out.
+earlier and not yet used show as a small cloth pouch of red balls with a gold
+"+N" badge next to that row; tapping it explains that they are used when the
+free lives run out.
 
-Each lives pack is one card: a "guess how many marbles" jar (a small jar with a
-few marbles for 20, a medium, fuller jar for 120, a large jar packed full for
-300), the number of lives, the percent saved per life against the 20-life
+Each lives pack is one card: a container of red life balls that gets bigger
+with the pack (a small cloth pouch with a few balls peeking out for 20, an open
+cardboard box filled with balls for 120, an open treasure chest overflowing
+with balls for 300), the number of lives, the percent saved per life against the 20-life
 pack, and the price button. With the prices above the cards read "20 Lives"
 (no savings line), "120 Lives · Save 16%" and "300 Lives · Save 33%". The
 percentages are computed from the live App Store prices, so they change if a
@@ -112,8 +114,13 @@ RUN OUT". It says "Indestructible. Unlimited lives, forever." and names the
 Diamond ball skin. It shows no savings figure. Once it is owned, the packs are
 hidden and the sheet shows only a "You own Diamond Balls" card.
 
-The lives cards, prices and product IDs changed on 2026-11-18. Any screenshot
-of the Get Lives sheet taken before that must be retaken for products 1 to 4.
+The Diamond Balls card shows a semi-truck trailer heaped with red balls and one
+diamond ball on top.
+
+The lives cards, prices and product IDs changed on 2026-11-18, and the pack
+icons changed on 2026-11-19 (pouch, box, chest and truck replaced the jars and
+the diamond ball). Any screenshot of the Get Lives sheet taken before
+2026-11-19 must be retaken for products 1 to 4.
 Take them before buying Diamond Balls on the test account, or the packs will
 not be shown.
 
@@ -143,4 +150,5 @@ not be shown.
 - The screen and button names above come from reading the code. Confirm them
   on the phone.
 - Whether the Get Lives sheet shows Diamond Balls without scrolling.
-- How the new jars and the gold reserve jar look on the phone.
+- How the pouch, box, chest and truck icons and the reserve pouch look on the
+  phone.
