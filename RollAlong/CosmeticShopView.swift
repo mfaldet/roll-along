@@ -139,7 +139,7 @@ private enum BundleFilter: String, CaseIterable, Identifiable {
         var m: [String: BundleFilter] = [:]
         func tag(_ t: BundleFilter, _ ids: [String]) { ids.forEach { m[$0] = t } }
         tag(.space,     ["planets", "space-travel", "cosmos", "eclipse", "aurora"])
-        tag(.nature,    ["winter", "nature", "ocean", "bloom", "zen-garden", "aquarium",
+        tag(.nature,    ["winter", "nature", "water", "ocean", "bloom", "zen-garden", "aquarium",
                          "dune", "abyssal-depths", "summer-2026", "winter-2026",
                          "stpatricks-2027", "spring-2027", "harvest-2026", "earthday-2027"])
         tag(.sports,    ["golf", "soccer", "full-court", "billiards-hall", "champion",
@@ -149,8 +149,8 @@ private enum BundleFilter: String, CaseIterable, Identifiable {
                          "july4-2026", "mardigras-2027", "pride-2027", "oktoberfest-2026"])
         tag(.luxe,      ["velvet-night", "golden-hour", "midas", "diamond",
                          "high-roller", "quicksilver"])
-        tag(.fire,      ["hellfire", "citrus", "lava-flow", "magma-core"])
-        tag(.mystic,    ["heavens", "noir", "realistic-marble", "glass-marbles", "tempest",
+        tag(.fire,      ["fire", "hellfire", "citrus", "lava-flow", "magma-core"])
+        tag(.mystic,    ["heavens", "noir", "realistic-marble", "glass-marbles", "tempest", "storm",
                          "haunted", "ancient-temple", "crystal-cavern", "oracle", "geode",
                          "halloween-2026", "muertos-2026", "lunar-2027"])
         tag(.sweet,     ["pastel", "candyland", "valentines-2027"])
