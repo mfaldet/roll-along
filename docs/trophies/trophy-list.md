@@ -248,8 +248,8 @@ Tiers: 42 Bronze, 25 Silver, 16 Gold, 6 Diamond, 1 Platinum.
 
 | Step | Title | What it asks |
 |---|---|---|
-| Bronze | Lifesaver | Send a life to a friend. |
-| Silver | Guardian Marble | Send 25 lives to friends and clanmates. |
+| Bronze | Lifesaver | Give a life to a clanmate. |
+| Silver | Guardian Marble | Give 25 lives to clanmates. |
 
 | Feat | Tier | What it asks | Icon | Fallback |
 |---|---|---|---|---|

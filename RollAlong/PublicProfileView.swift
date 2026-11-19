@@ -29,7 +29,6 @@ struct PublicProfileView: View {
     @State private var profile: PlayerProfile
     @State private var edges:   [Friendship] = []
     @State private var busy      = false
-    @State private var sentLife  = false
     @State private var banner:   String?
 
     /// The fetched public trophy showcase for THIS profile (nil until loaded /
@@ -120,19 +119,12 @@ struct PublicProfileView: View {
         .ppCard()
     }
 
-    // MARK: - Social actions (Add friend / Send life)
+    // MARK: - Social actions (Add friend)
+    // Lives are given only to a clanmate's open request, on the Clans screen.
 
     @ViewBuilder private var actionRow: some View {
         HStack(spacing: 10) {
             friendControl
-            Button { Task { await sendLife() } } label: {
-                actionLabel(sentLife ? "Sent ♥" : "Send life",
-                            icon: "heart.fill",
-                            tint: Color(red: 0.95, green: 0.32, blue: 0.45),
-                            busy: busy && !sentLife)
-            }
-            .disabled(busy || sentLife)
-            .buttonStyle(.plain)
         }
     }
 
@@ -349,15 +341,6 @@ struct PublicProfileView: View {
              if let e = try? await SocialClient.shared.fetchFriendships() { edges = e }
              flash("You're now friends!")
         } catch { flash("Couldn't accept — try again.") }
-    }
-
-    private func sendLife() async {
-        busy = true; defer { busy = false }
-        do { try await SocialClient.shared.sendLife(to: profile.id, amount: 1)
-             sentLife = true; flash("Life sent ♥")
-        } catch SocialError.http(_, let body) where body.contains("gift_limit") {
-            sentLife = true; flash("You already sent this player a life today.")
-        } catch { flash("Couldn't send a life — try again.") }
     }
 
     // MARK: - Small UI

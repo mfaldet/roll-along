@@ -1894,7 +1894,7 @@ final class GameState: ObservableObject {
 
     /// `social_send_life` (≥1) / `social_lives_sent_25` (≥25) — lifetime lives
     /// gifted (friend gifts AND clan fulfillments both count, per the catalog).
-    /// Called from Friends/Clans views after `SocialClient.sendLife` succeeds;
+    /// Called from the Clans view after `SocialClient.sendLife` succeeds;
     /// bumps the persisted go-forward counter, then records its current value.
     func recordLifeSent() {
         trophyStats.recordLifeSent()

@@ -766,8 +766,8 @@
       "tier": "bronze",
       "category": "social",
       "secret": false,
-      "lockedDescription": "Send a life to a friend.",
-      "unlockedDescription": "You sent a friend a life. Certified lifesaver.",
+      "lockedDescription": "Give a life to a clanmate.",
+      "unlockedDescription": "You gave a clanmate a life. Certified lifesaver.",
       "criteria": { "metric": "lives_sent", "threshold": 1 },
       "addedInVersion": "1.0"
     },
@@ -777,7 +777,7 @@
       "tier": "silver",
       "category": "social",
       "secret": false,
-      "lockedDescription": "Send 25 lives to friends and clanmates.",
+      "lockedDescription": "Give 25 lives to clanmates.",
       "unlockedDescription": "Twenty-five lives given. A true guardian marble.",
       "criteria": { "metric": "lives_sent", "threshold": 25 },
       "addedInVersion": "1.0"

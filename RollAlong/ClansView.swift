@@ -49,7 +49,6 @@ struct ClansView: View {
     @State private var errorText:  String?
     @State private var actionBusy  = false
     @State private var busyIds:     Set<UUID> = []
-    @State private var sentLifeIds: Set<UUID> = []
     @State private var thankedActorIds: Set<UUID> = []
     @State private var showCreate    = false
     @State private var settingsClan: Clan?     // non-nil → clan settings sheet
@@ -707,11 +706,9 @@ struct ClansView: View {
             } else {
                 actionButton("Give life", busy: busyIds.contains(id)) { await sendLife(to: id) }
             }
-        } else if sentLifeIds.contains(id) {
-            tag("Sent ♥", Color(red: 0.95, green: 0.32, blue: 0.45))
-        } else {
-            actionButton("Send life", busy: busyIds.contains(id)) { await sendLife(to: id) }
         }
+        // No open request: nothing to give.  Lives go only to a clanmate's
+        // open, unfilled request this player has not already given to.
     }
 
     // MARK: - Clan chat (the activity feed as a conversation)
@@ -1178,8 +1175,6 @@ struct ClansView: View {
                 UserDefaults.standard.set(clan?.name ?? "", forKey: Self.lastClanNameKey)
                 UserDefaults.standard.set(mem.playerId.uuidString, forKey: Self.lastClanPlayerKey)
                 givenRequestKeys = await SocialClient.shared.fetchMyRequestGiftKeys()
-                let sentToday = await SocialClient.shared.fetchMyGiftsToday()
-                sentLifeIds.formUnion(sentToday)
                 gameState.clanRequestBadge = openRequestCount
                 myStanding  = await SocialClient.shared.fetchClanStanding(id: mem.clanId)
                 seasonStars = await SocialClient.shared.fetchSeasonContributions(clanId: mem.clanId)
@@ -1279,32 +1274,30 @@ struct ClansView: View {
         // later clear the recipient's ask): a life to a clanmate who was asking
         // is a request FULFILLMENT (`clan_fulfill`), not just a gift.
         let wasAsking = rosterProfiles[id]?.isAskingForLives ?? false
-        let requestKey = openRequestKey(id)
+        // Lives are given only to an open request (the server refuses any
+        // other gift with `no_request`).
+        guard let requestKey = openRequestKey(id) else { return }
         do {
             try await SocialClient.shared.sendLife(to: id, amount: 1)
             // The request is now one I have given to: its badge clears.
-            if let requestKey {
-                givenRequestKeys.insert(requestKey)
-                gameState.clanRequestBadge = openRequestCount
-            }
+            givenRequestKeys.insert(requestKey)
+            gameState.clanRequestBadge = openRequestCount
             try? await SocialClient.shared.postClanEvent(clanId: clan.id, kind: "sent_life", target: id)
             // social_send_life / social_lives_sent_25 (S1-T6): every clan gift
             // counts toward lives sent, whether or not it fulfills a request.
             gameState.recordLifeSent()
             // clan_fulfill (S1-T6): additionally, a gift to an asking clanmate.
             if wasAsking { gameState.recordClanRequestFulfilled() }
-            // An ordinary gift uses up today's "Send life" to this player; a
-            // gift that answered a request does not.
-            if requestKey == nil { sentLifeIds.insert(id) }
             flash("Life sent ♥")
         } catch SocialError.http(_, let body) where body.contains("already_gave") {
             // The server refused a second gift to the same request.
-            if let requestKey { givenRequestKeys.insert(requestKey) }
+            givenRequestKeys.insert(requestKey)
             gameState.clanRequestBadge = openRequestCount
             flash("You already gave to this request.")
-        } catch SocialError.http(_, let body) where body.contains("gift_limit") {
-            sentLifeIds.insert(id)
-            flash("You already sent this player a life today.")
+        } catch SocialError.http(_, let body) where body.contains("no_request") {
+            // The request closed (filled, expired or cancelled) meanwhile.
+            await refreshRequests()
+            flash("That request is already closed.")
         } catch { flash("Couldn't send a life — try again.") }
     }
 
