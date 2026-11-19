@@ -731,14 +731,45 @@ struct CosmeticShopView: View {
     /// ScrollView (see `body`), so every cosmetic type stays visible and one tap
     /// away while the player scrolls the Catalog — no horizontal swiping to reach
     /// a filter, and the bar never scrolls off the top.
+    /// Category panel.  With music hidden there are seven categories: the
+    /// Collections tile sits in the left column at double height, and the
+    /// six slot tiles fill the other three columns in two rows (same tile
+    /// size, spacing and order as before), so no cell is left empty.  If a
+    /// category comes back (music), it falls back to the plain 4-column grid.
+    @ViewBuilder
     private var tabBar: some View {
-        // Two rows of four filter tiles (8 categories) instead of one tight row
-        // of eight — each tile is ~twice as wide, so the icon + label are bigger
-        // and easier to read.  Still no scrolling; same filter behaviour.
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4),
-                  spacing: 6) {
-            ForEach(ShopCategory.visibleCases) { cat in
-                tabButton(cat)
+        let cats = ShopCategory.visibleCases
+        Group {
+            if cats.count == 7, cats.first == .collections {
+                let rest = Array(cats.dropFirst())
+                GeometryReader { geo in
+                    let gap: CGFloat = Self.tabGap
+                    let col: CGFloat = max(0, (geo.size.width - gap * 3) / 4)
+                    HStack(alignment: .top, spacing: gap) {
+                        tabButton(.collections, height: Self.tabHeight * 2 + gap)
+                            .frame(width: col)
+                        VStack(spacing: gap) {
+                            HStack(spacing: gap) {
+                                ForEach(rest.prefix(3)) { cat in
+                                    tabButton(cat).frame(width: col)
+                                }
+                            }
+                            HStack(spacing: gap) {
+                                ForEach(rest.suffix(3)) { cat in
+                                    tabButton(cat).frame(width: col)
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(height: Self.tabHeight * 2 + Self.tabGap)
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.tabGap), count: 4),
+                          spacing: Self.tabGap) {
+                    ForEach(cats) { cat in
+                        tabButton(cat)
+                    }
+                }
             }
         }
         .padding(.horizontal, 10)
@@ -746,7 +777,10 @@ struct CosmeticShopView: View {
         .padding(.bottom, 8)
     }
 
-    private func tabButton(_ cat: ShopCategory) -> some View {
+    private static let tabHeight: CGFloat = 58
+    private static let tabGap: CGFloat = 6
+
+    private func tabButton(_ cat: ShopCategory, height: CGFloat = 58) -> some View {
         let isActive = category == cat
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) { category = cat }
@@ -761,7 +795,7 @@ struct CosmeticShopView: View {
             }
             .foregroundStyle(isActive ? .black : Color(white: 0.82))
             .frame(maxWidth: .infinity)   // equal-width tiles fill each column
-            .frame(height: 58)
+            .frame(height: height)
             .background(
                 RoundedRectangle(cornerRadius: 13)
                     .fill(isActive ? Color.white : Color(white: 0.16))
