@@ -2661,6 +2661,9 @@ struct BallGameView: View {
             // motion: gentle 15 fps while visible, frozen on its hero frame
             // under Reduce Motion, held while the list scrolls.
             GoalSkinView(goal: g)
+                // Faint light rim so dark goals stay visible on the dark
+                // card.  Reward pictures only — never the in-game goal.
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.30), lineWidth: 1))
                 .padding(6)
                 .cosmeticTileMotion(heroTime: CosmeticTileHero.goal(g))
         case let t as TrailColor:
