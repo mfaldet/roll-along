@@ -117,6 +117,19 @@ struct BallGameView: View {
     // Claim button unlocks as soon as a collection is selected.  Stores the
     // selected bundle's id.
     @State private var tutorialBundlePick: String? = nil
+    /// Where the starter-set picker is: choosing, confirming, or revealing.
+    @State private var tutorialStage: TutorialGiftStage = .choose
+    /// When the picker appeared (or the reveal began) — drives the one-time
+    /// confetti burst.
+    @State private var tutorialConfettiStart: Date? = nil
+    /// Bumped on each card tap to drive the small celebratory bounce.
+    @State private var tutorialPickPulse: Int = 0
+    /// True for a moment after a pick: the selected card's bounce.
+    @State private var tutorialBouncing: Bool = false
+    /// How many reveal tiles have popped in (staggered on the reveal step).
+    @State private var tutorialRevealCount: Int = 0
+
+    enum TutorialGiftStage { case choose, confirm, reveal }
 
     // Lives system (Sprint 4c)
     @State private var showOutOfLives:                Bool   = false
@@ -2517,99 +2530,278 @@ struct BallGameView: View {
     // replaces any prior selection (across all categories).  The picked
     // item is granted + equipped on Claim.
 
-    private var tutorialRewardOverlay: some View {
-        // The post-tutorial gift: pick ONE of the four starter element sets.
-        let bundles = CosmeticBundle.starterGift.filter { $0.isAvailable }
-        let hasPick = tutorialBundlePick != nil
-
-        return ZStack {
-            Color.black.opacity(0.88).ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Title
-                VStack(spacing: 6) {
-                    Text("Tutorial Complete!")
-                        .font(.system(size: 30, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text("Pick a free starter collection — the whole set is yours to keep.")
-                        .font(.system(size: 14, weight: .regular, design: .rounded))
-                        .foregroundStyle(Color(white: 0.70))
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 36)
-                .padding(.bottom, 18)
-
-                ScrollView {
-                    VStack(spacing: 14) {
-                        ForEach(bundles) { bundle in
-                            tutorialBundleCard(bundle, selected: tutorialBundlePick == bundle.id)
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 24)
-                }
-
-                Button {
-                    claimTutorialBundle()
-                } label: {
-                    Text(hasPick ? "Claim collection" : "Pick a collection")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(hasPick ? .black : Color(white: 0.55))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(hasPick ? Color.white : Color(white: 0.20))
-                        )
-                }
-                .disabled(!hasPick)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 28)
-            }
-        }
-        .transition(.opacity)
+    /// The starter sets offered after the tutorial: exactly Nature, Fire,
+    /// Water and Storm, in that order (`CosmeticBundle.starterGiftIDs`).
+    private var tutorialGiftBundles: [CosmeticBundle] {
+        CosmeticBundle.starterGift.filter { $0.isAvailable }
     }
 
-    /// One selectable Standard-collection card: name + rarity badge, a row of the
-    /// six contained cosmetic previews, and the tagline.
+    private var tutorialPickedBundle: CosmeticBundle? {
+        guard let id = tutorialBundlePick else { return nil }
+        return CosmeticBundle.catalogue.first { $0.id == id }
+    }
+
+    /// The set's element color, taken from its boundary (its most uniform
+    /// piece), so each card reads as its theme at a glance.
+    private func tutorialThemeColor(_ bundle: CosmeticBundle) -> Color {
+        bundle.boundaries.first?.color ?? Color(white: 0.75)
+    }
+
+    /// The starter-set picker: a one-time, free choice.  A bottom-anchored
+    /// card sized to its content (it scrolls only if it can't fit), over a
+    /// dimmed game, with a short confetti burst when it appears.
+    private var tutorialRewardOverlay: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.80).ignoresSafeArea()
+
+            if !reduceMotion, let start = tutorialConfettiStart {
+                TutorialConfettiBurst(start: start)
+                    .id(start)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+
+            VStack(spacing: 0) {
+                switch tutorialStage {
+                case .choose:  tutorialChooseStep
+                case .confirm: tutorialConfirmStep
+                case .reveal:  tutorialRevealStep
+                }
+            }
+            .padding(.top, 22)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            .background(
+                UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                    .fill(Color(white: 0.07))
+                    .overlay(
+                        UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                            .stroke(Color(white: 0.20), lineWidth: 1)
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+            )
+            .animation(.easeInOut(duration: 0.25), value: tutorialStage)
+        }
+        .transition(.opacity)
+        .onAppear {
+            tutorialStage = .choose
+            tutorialRevealCount = 0
+            tutorialConfettiStart = Date()
+            if gameState.hapticsEnabled { Haptics.success() }
+        }
+    }
+
+    private var tutorialChooseStep: some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 6) {
+                Text("TUTORIAL COMPLETE")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .kerning(2)
+                    .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.35))
+                Text("Choose your starter set")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                Text("A one-time gift. Pick one — it's free, and it's yours to keep forever.")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.72))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 24)
+
+            // Sized to its cards; scrolls only when the cards can't fit.
+            ViewThatFits(in: .vertical) {
+                tutorialCardList
+                ScrollView { tutorialCardList }
+                    .scrollBounceBehavior(.basedOnSize)
+            }
+
+            Button {
+                guard tutorialBundlePick != nil else { return }
+                if gameState.hapticsEnabled { Haptics.medium() }
+                tutorialStage = .confirm
+            } label: {
+                Text(tutorialPickedBundle.map { "Choose \($0.displayName)" } ?? "Pick a set")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(tutorialBundlePick != nil ? Color.black : Color(white: 0.55))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(RoundedRectangle(cornerRadius: 18)
+                        .fill(tutorialBundlePick != nil ? Color.white : Color(white: 0.20)))
+            }
+            .buttonStyle(.plain)
+            .disabled(tutorialBundlePick == nil)
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private var tutorialCardList: some View {
+        VStack(spacing: 10) {
+            ForEach(tutorialGiftBundles) { bundle in
+                tutorialBundleCard(bundle, selected: tutorialBundlePick == bundle.id)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 2)
+    }
+
+    /// One starter-set card: the set's name with its element color, its six
+    /// pieces, and — when selected — a live preview of the set on the board.
     private func tutorialBundleCard(_ bundle: CosmeticBundle, selected: Bool) -> some View {
-        Button {
-            tutorialBundlePick = bundle.id
+        let theme: Color = tutorialThemeColor(bundle)
+        return Button {
+            if tutorialBundlePick != bundle.id {
+                tutorialBundlePick = bundle.id
+                tutorialPickPulse += 1
+                if gameState.hapticsEnabled { Haptics.light() }
+            }
         } label: {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
+                HStack(spacing: 8) {
+                    Circle().fill(theme).frame(width: 12, height: 12)
                     Text(bundle.displayName)
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.system(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
                     Spacer()
-                    TierBadge(rarity: bundle.rarity, compact: true)
+                    if selected {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(theme)
+                    }
                 }
-                HStack(spacing: 7) {
-                    if let b = bundle.balls.first  { bundleSlotTile(b) }
-                    if let g = bundle.goals.first  { bundleSlotTile(g) }
-                    if let t = bundle.trails.first { bundleSlotTile(t) }
-                    if let f = bundle.floors.first { bundleSlotTile(f) }
-                    if let p = bundle.pits.first   { bundleSlotTile(p) }
-                    if let w = bundle.boundaries.first { bundleSlotTile(w) }
-                    if let m = bundle.offeredMusic.first  { bundleSlotTile(m) }
-                    Spacer(minLength: 0)
+                if selected {
+                    // The one live preview: this set on the board.
+                    LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(bundle: bundle))
+                        .environment(\.cosmeticMotion, .preview)
+                        .frame(height: 104)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                Text(bundle.tagline)
-                    .font(.system(size: 12, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color(white: 0.6))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                tutorialTileRow(bundle)
+                if !selected {
+                    Text(bundle.tagline)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.62))
+                        .lineLimit(1)
+                }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18)
-                .fill(selected ? Color(white: 0.17) : Color(white: 0.09)))
-            .overlay(RoundedRectangle(cornerRadius: 18)
-                .stroke(selected ? Color.white : Color(white: 0.20),
-                        lineWidth: selected ? 2 : 1))
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(colors: [theme.opacity(selected ? 0.30 : 0.14),
+                                                  Color(white: 0.10)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(selected ? theme : Color(white: 0.22), lineWidth: selected ? 2.5 : 1)
+            )
+            .shadow(color: selected ? theme.opacity(0.45) : .clear, radius: 12)
+            .scaleEffect(selected && tutorialBouncing && !reduceMotion ? 1.04 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.5), value: tutorialBouncing)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(bundle.displayName) starter set")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .onChange(of: tutorialPickPulse) { _, _ in
+            guard selected, !reduceMotion else { return }
+            tutorialBouncing = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { tutorialBouncing = false }
+        }
+    }
+
+    /// The six pieces of a set as small frozen tiles, in slot order.
+    private func tutorialTileRow(_ bundle: CosmeticBundle) -> some View {
+        HStack(spacing: 6) {
+            if let b = bundle.balls.first  { bundleSlotTile(b) }
+            if let g = bundle.goals.first  { bundleSlotTile(g) }
+            if let t = bundle.trails.first { bundleSlotTile(t) }
+            if let f = bundle.floors.first { bundleSlotTile(f) }
+            if let p = bundle.pits.first   { bundleSlotTile(p) }
+            if let w = bundle.boundaries.first { bundleSlotTile(w) }
+            Spacer(minLength: 0)
+        }
+        .environment(\.cosmeticMotion, .tileFrozen)
+    }
+
+    private var tutorialConfirmStep: some View {
+        VStack(spacing: 16) {
+            if let bundle = tutorialPickedBundle {
+                Text("Choose \(bundle.displayName)?")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Text("This is a one-time choice. The whole set is free and yours to keep forever.")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.72))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 24)
+                tutorialTileRow(bundle)
+                    .fixedSize()
+                VStack(spacing: 6) {
+                    Button { confirmTutorialBundle() } label: {
+                        Text("Confirm")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(RoundedRectangle(cornerRadius: 18)
+                                .fill(tutorialThemeColor(bundle)))
+                    }
+                    .buttonStyle(.plain)
+                    Button { tutorialStage = .choose } label: {
+                        Text("Back")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(white: 0.75))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    private var tutorialRevealStep: some View {
+        VStack(spacing: 14) {
+            if let bundle = tutorialPickedBundle {
+                Image(systemName: "gift.fill")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(tutorialThemeColor(bundle))
+                Text("\(bundle.displayName) is yours!")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Text("Equipped and ready to roll.")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(white: 0.72))
+                HStack(spacing: 6) {
+                    revealTile(0, bundle.balls.first.map { AnyView(bundleSlotTile($0)) })
+                    revealTile(1, bundle.goals.first.map { AnyView(bundleSlotTile($0)) })
+                    revealTile(2, bundle.trails.first.map { AnyView(bundleSlotTile($0)) })
+                    revealTile(3, bundle.floors.first.map { AnyView(bundleSlotTile($0)) })
+                    revealTile(4, bundle.pits.first.map { AnyView(bundleSlotTile($0)) })
+                    revealTile(5, bundle.boundaries.first.map { AnyView(bundleSlotTile($0)) })
+                }
+                .environment(\.cosmeticMotion, .tileFrozen)
+                .padding(.bottom, 8)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture { finishTutorialReward() }
+    }
+
+    /// One reveal tile: hidden until its turn, then pops in.
+    @ViewBuilder
+    private func revealTile(_ index: Int, _ tile: AnyView?) -> some View {
+        if let tile {
+            let shown: Bool = index < tutorialRevealCount
+            tile
+                .opacity(shown ? 1 : 0)
+                .scaleEffect(shown || reduceMotion ? 1 : 0.6)
+        }
     }
 
     /// A 40×40 preview tile for one of a bundle's cosmetics (reuses rewardPreview).
@@ -2860,14 +3052,11 @@ struct BallGameView: View {
         }
     }
 
-    /// Claim handler for the tutorial reward modal.  Grants + equips the
-    /// single picked cosmetic, marks the moment as seen, then advances
-    /// to Level 11.  No-op if the player somehow lands here without a
-    /// selection (Claim is disabled until then, so shouldn't happen).
-    private func claimTutorialBundle() {
-        guard let id = tutorialBundlePick,
-              let bundle = CosmeticBundle.catalogue.first(where: { $0.id == id })
-        else { return }
+    /// Confirm handler for the starter-set picker.  Grants the whole set as a
+    /// free gift (Sell Back keeps it, never refunds it), equips it, records
+    /// the pick for the Welcome Gift timing, then plays the short reveal.
+    private func confirmTutorialBundle() {
+        guard let bundle = tutorialPickedBundle else { return }
 
         // Gift the whole collection (un-redeemable — never refundable on Sell Back).
         gameState.grantBundleFree(bundle)
@@ -2881,11 +3070,39 @@ struct BallGameView: View {
         if let m = bundle.offeredMusic.first  { gameState.equippedMusic = m }
 
         gameState.seenTutorialReward = true
+        // The Welcome Gift waits for a later app open than this one.
+        gameState.markTutorialPickedThisOpen()
         AnalyticsClient.shared.track(
             "tutorial_bundle_claimed",
             properties: ["bundle": .string(bundle.id)]
         )
+        if gameState.hapticsEnabled { Haptics.success() }
+
+        tutorialRevealCount = reduceMotion ? 6 : 0
+        tutorialStage = .reveal
+        tutorialConfettiStart = Date()
+        let animate = !reduceMotion
+        Task { @MainActor in
+            if animate {
+                for n in 1...6 {
+                    try? await Task.sleep(nanoseconds: 140_000_000)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        tutorialRevealCount = n
+                    }
+                }
+            }
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            finishTutorialReward()
+        }
+    }
+
+    /// Closes the picker after the reveal and continues to level 11.  Safe to
+    /// call twice (a tap on the reveal and the timer): only the first acts.
+    private func finishTutorialReward() {
+        guard showTutorialReward, tutorialStage == .reveal else { return }
         withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = false }
+        tutorialStage = .choose
+        tutorialConfettiStart = nil
         gameState.advanceLevel()
         spawnBall(in: arenaSize)
     }
@@ -9492,5 +9709,50 @@ final class AudioManager {
             }
         }
         return buffer
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TutorialConfettiBurst — a short, one-time confetti burst for the starter-set
+// picker.  Pieces shoot up from behind the card and fall away; everything is
+// gone by ~1.8 s and the timeline then pauses.  Never shown with Reduce
+// Motion (the caller checks).
+// ---------------------------------------------------------------------------
+private struct TutorialConfettiBurst: View {
+    let start: Date
+    private static let duration: Double = 1.8
+    private static let pieces = 70
+    private static let colors: [Color] = [
+        Color(red: 1.00, green: 0.82, blue: 0.30), Color(red: 0.36, green: 0.85, blue: 0.55),
+        Color(red: 0.35, green: 0.65, blue: 1.00), Color(red: 1.00, green: 0.40, blue: 0.40),
+        Color(red: 0.75, green: 0.55, blue: 1.00), Color.white
+    ]
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0,
+                                paused: Date().timeIntervalSince(start) > Self.duration)) { tl in
+            Canvas { ctx, size in
+                let t: Double = tl.date.timeIntervalSince(start)
+                guard t >= 0, t < Self.duration else { return }
+                let fade: Double = t < Self.duration - 0.5 ? 1 : max(0, (Self.duration - t) / 0.5)
+                let w: Double = Double(size.width)
+                let h: Double = Double(size.height)
+                for i in 0..<Self.pieces {
+                    let seed: Double = Double(i) * 0.6180339887
+                    let frac: Double = seed.truncatingRemainder(dividingBy: 1)
+                    let angle: Double = (-0.5 - 0.42 + 0.84 * frac) * Double.pi   // upward fan
+                    let speed: Double = 520 + 380 * Double((i * 37) % 100) / 100
+                    let x: Double = w / 2 + cos(angle) * speed * t
+                    let y: Double = h * 0.62 + sin(angle) * speed * t + 450 * t * t
+                    let rot: Double = t * (4 + 6 * frac) + seed * 6.28
+                    var piece = Path(roundedRect: CGRect(x: -4, y: -6, width: 8, height: 12),
+                                     cornerRadius: 2)
+                    piece = piece.applying(CGAffineTransform(rotationAngle: rot)
+                        .concatenating(CGAffineTransform(translationX: x, y: y)))
+                    let color: Color = Self.colors[i % Self.colors.count]
+                    ctx.fill(piece, with: .color(color.opacity(0.95 * fade)))
+                }
+            }
+        }
     }
 }

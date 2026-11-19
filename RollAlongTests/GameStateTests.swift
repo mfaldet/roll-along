@@ -611,28 +611,77 @@ final class GameStateTests: XCTestCase {
 
     // MARK: - Starter Pack offer window
 
-    /// The one-shot trigger: fires only once coinBalance reaches the
-    /// threshold, with the offer never shown, never claimed, and the Aurora
-    /// collection incomplete.
-    func testStarterPackTrigger_firesOnceAtThreshold() {
-        let threshold = GameState.starterPackTriggerCoins
+    /// The Welcome Gift arms on the first app open AFTER the open in which
+    /// the tutorial set was picked — never in the same session.
+    func testStarterPackTrigger_waitsForTheNextOpenAfterTheTutorialPick() {
         let gs = makeGameState()
-        XCTAssertFalse(gs.shouldTriggerStarterPack, "no trigger at zero coins")
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        gs.registerAppActive(now: t0)                      // cold launch = open 1
+        XCTAssertEqual(gs.appOpenCount, 1)
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "tutorial not done yet")
 
-        gs.coinBalance = threshold - 1
-        XCTAssertFalse(gs.shouldTriggerStarterPack, "one below the threshold does not fire")
+        gs.seenTutorialReward = true
+        gs.markTutorialPickedThisOpen()                    // picked during open 1
+        XCTAssertFalse(gs.shouldTriggerStarterPack, "never in the session of the pick")
 
-        gs.coinBalance = threshold
-        XCTAssertTrue(gs.shouldTriggerStarterPack, "fires at exactly the threshold")
+        // A short trip to the background is the same open.
+        gs.registerAppBackgrounded(now: t0.addingTimeInterval(60))
+        gs.registerAppActive(now: t0.addingTimeInterval(60 + 10 * 60))
+        XCTAssertEqual(gs.appOpenCount, 1, "10 minutes away is not a new open")
+        XCTAssertFalse(gs.shouldTriggerStarterPack)
+
+        // 30+ minutes away is a new open → the offer arms.
+        gs.registerAppBackgrounded(now: t0.addingTimeInterval(3_600))
+        gs.registerAppActive(now: t0.addingTimeInterval(3_600 + GameState.appOpenGap))
+        XCTAssertEqual(gs.appOpenCount, 2)
+        XCTAssertTrue(gs.shouldTriggerStarterPack, "fires on the next open")
 
         // Presenting the sheet stamps shownAt — the trigger never re-arms.
         gs.starterPackShownAt = Date()
         XCTAssertFalse(gs.shouldTriggerStarterPack, "one-shot: shownAt disarms it")
     }
 
+    /// A cold launch is always a new open; persisted counts survive a relaunch.
+    func testAppOpens_coldLaunchCountsAndPersists() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertTrue(GameState.isNewOpen(firstActivationThisProcess: true,
+                                          backgroundedAt: nil, now: now))
+        XCTAssertFalse(GameState.isNewOpen(firstActivationThisProcess: false,
+                                           backgroundedAt: nil, now: now))
+        XCTAssertFalse(GameState.isNewOpen(firstActivationThisProcess: false,
+                                           backgroundedAt: now.addingTimeInterval(-29 * 60), now: now))
+        XCTAssertTrue(GameState.isNewOpen(firstActivationThisProcess: false,
+                                          backgroundedAt: now.addingTimeInterval(-30 * 60), now: now))
+
+        let first = makeGameState()
+        first.registerAppActive(now: now)
+        first.registerAppActive(now: now)                  // second call, same process
+        XCTAssertEqual(first.appOpenCount, 1, "no double count within one process")
+        first.seenTutorialReward = true
+        first.markTutorialPickedThisOpen()
+
+        // Relaunch: a new GameState on the same defaults is a new process.
+        let second = makeGameState()
+        XCTAssertEqual(second.appOpenCount, 1)
+        XCTAssertEqual(second.tutorialPickOpen, 1)
+        XCTAssertFalse(second.shouldTriggerStarterPack, "before the relaunch registers")
+        second.registerAppActive(now: now.addingTimeInterval(5))
+        XCTAssertEqual(second.appOpenCount, 2)
+        XCTAssertTrue(second.shouldTriggerStarterPack, "the second open shows the offer")
+    }
+
+    /// Players who finished the tutorial before opens were tracked have no
+    /// recorded pick open — they qualify on any open.
+    func testStarterPackTrigger_legacyTutorialFinishersQualify() {
+        let gs = makeGameState()
+        gs.seenTutorialReward = true
+        XCTAssertNil(gs.tutorialPickOpen)
+        XCTAssertTrue(gs.shouldTriggerStarterPack)
+    }
+
     func testStarterPackTrigger_suppressedWhenClaimedDismissedOrItemsOwned() {
         let gs = makeGameState()
-        gs.coinBalance = GameState.starterPackTriggerCoins
+        gs.seenTutorialReward = true          // tutorial done, picked in an earlier open
 
         gs.starterPackClaimed = true
         XCTAssertFalse(gs.shouldTriggerStarterPack, "delivered players never see it")

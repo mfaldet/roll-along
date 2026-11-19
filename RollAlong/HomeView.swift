@@ -430,8 +430,8 @@ struct HomeView: View {
                 // Remember the last mode/game entered so the home Play button
                 // reflects it (and later, so the home aesthetic can theme off it).
                 guard let last = path.last else {
-                    // Popped back to Home — the starter-pack offer may have
-                    // triggered mid-run (coins bank during gameplay) and been
+                    // Popped back to Home — the Welcome Gift may have armed
+                    // mid-run (a new app open while in a game) and been
                     // deferred; present it now that Home is front-most.
                     maybeAutoPresentStarterPack()
                     return
@@ -571,11 +571,13 @@ struct HomeView: View {
                     .environmentObject(gameState)
                     .environmentObject(StoreKitManager.shared)
             }
-            // Auto-present the Starter Pack sheet the first time coinBalance
-            // reaches the trigger threshold (fires once, never re-armed).  The
+            // Auto-present the Starter Pack (Welcome Gift) on the first app
+            // open after the tutorial pick (fires once, never re-armed).  The
             // 48-hour-window re-present rides the same onAppear as the daily
-            // reward; this observer catches the mid-session first trigger.
-            .onChange(of: gameState.coinBalance) { _, _ in
+            // reward.
+            // A new app open (cold launch, or back after 30+ minutes away)
+            // can arm the Welcome Gift while Home is already showing.
+            .onChange(of: gameState.appOpenCount) { _, _ in
                 maybeAutoPresentStarterPack()
             }
             // Products load asynchronously in bootstrap, usually AFTER Home's

@@ -228,6 +228,22 @@ final class GameState: ObservableObject {
     @Published var seenTutorialReward: Bool {
         didSet { defaults.set(seenTutorialReward, forKey: "ra_seenTutorialReward") }
     }
+
+    // App "opens" for the Welcome Gift (Starter Pack) timing.  An open is a
+    // cold launch, or a return to the foreground after at least
+    // `appOpenGap` in the background.  `tutorialPickOpen` records which open
+    // the tutorial set was picked in, so the offer waits for a LATER open.
+    @Published var appOpenCount: Int = 0 {
+        didSet { defaults.set(appOpenCount, forKey: "ra_appOpenCount") }
+    }
+    var tutorialPickOpen: Int? = nil {
+        didSet {
+            if let n = tutorialPickOpen { defaults.set(n, forKey: "ra_tutorialPickOpen") }
+            else { defaults.removeObject(forKey: "ra_tutorialPickOpen") }
+        }
+    }
+    private var lastBackgroundAt: Date? = nil
+    private var countedThisProcess = false
     // (`seenTutorialL1` removed — the L1 phased intro is now keyed
     //  off `time(for: 1) == nil`, so it correctly re-runs after
     //  "Reset level progress" without needing a separate flag.)
@@ -307,9 +323,10 @@ final class GameState: ObservableObject {
 
     // ── Starter Pack one-time offer ─────────────────────────────────────────
     // starterPackShownAt   : timestamp when the offer sheet was first presented.
-    //                        nil until the trigger fires (first time coinBalance
-    //                        reaches `starterPackTriggerCoins`).  Drives the
-    //                        48-hour countdown.
+    //                        nil until the trigger fires (the first app open
+    //                        after the tutorial pick — see
+    //                        `shouldTriggerStarterPack`).  Drives the 48-hour
+    //                        countdown.
     // starterPackClaimed   : true once the pack's rewards have been DELIVERED
     //                        (purchase or restore).  Gates the once-only coins
     //                        in StoreKitManager — deliberately NOT set by
@@ -972,6 +989,11 @@ final class GameState: ObservableObject {
                 music: ownedMusic)
             defaults.set(Array(freeGrantedItems), forKey: "ra_freeGrantedItems")
         }
+
+        // App-open bookkeeping for the Welcome Gift timing (see appOpenCount).
+        appOpenCount = defaults.integer(forKey: "ra_appOpenCount")
+        tutorialPickOpen = defaults.object(forKey: "ra_tutorialPickOpen") as? Int
+        lastBackgroundAt = defaults.object(forKey: "ra_lastBackgroundAt") as? Date
     }
 
     // MARK: - Trophy activation (first-launch backfill)
@@ -2728,13 +2750,42 @@ final class GameState: ObservableObject {
     // items (never the coins) on restore.  The Aurora collection itself
     // remains a coin-buyable bundle.
 
-    /// Coin balance that first arms the welcome offer.  Set past the tutorial's
-    /// natural take (~30–50 coins from L1–10 clears) plus a chunk of free play
-    /// — a few minigame wins or ~45 min of climb at current earn rates — so the
-    /// offer lands once the player is invested and has glimpsed the shop, not in
-    /// the first thirty seconds.  Still reachable within a session, so the
-    /// 48-hour window stays meaningful.
-    static let starterPackTriggerCoins = 250
+    /// Minimum time in the background before returning counts as a new open.
+    static let appOpenGap: TimeInterval = 30 * 60
+
+    /// Whether this activation is a new "open": the first activation of the
+    /// process (a cold launch), or a return after `appOpenGap` or more in the
+    /// background.
+    static func isNewOpen(firstActivationThisProcess: Bool,
+                          backgroundedAt: Date?, now: Date) -> Bool {
+        if firstActivationThisProcess { return true }
+        guard let b = backgroundedAt else { return false }
+        return now.timeIntervalSince(b) >= appOpenGap
+    }
+
+    /// Call whenever the app becomes active.  Counts a new open when
+    /// `isNewOpen` says so.
+    func registerAppActive(now: Date = Date()) {
+        let first = !countedThisProcess
+        countedThisProcess = true
+        if Self.isNewOpen(firstActivationThisProcess: first,
+                          backgroundedAt: lastBackgroundAt, now: now) {
+            appOpenCount += 1
+        }
+        lastBackgroundAt = nil
+        defaults.removeObject(forKey: "ra_lastBackgroundAt")
+    }
+
+    /// Call when the app goes to the background.
+    func registerAppBackgrounded(now: Date = Date()) {
+        lastBackgroundAt = now
+        defaults.set(now, forKey: "ra_lastBackgroundAt")
+    }
+
+    /// Records that the tutorial set was picked during the current open.
+    func markTutorialPickedThisOpen() {
+        tutorialPickOpen = appOpenCount
+    }
 
     /// What the Starter Pack grants besides its 500 coins: the Aurora ball,
     /// trail and boundary.  Not a catalogue collection (the full Aurora
@@ -2763,15 +2814,18 @@ final class GameState: ObservableObject {
             && p.boundaries.allSatisfy { isOwned($0) }
     }
 
-    /// Fires once: true the first time `coinBalance` reaches
-    /// `starterPackTriggerCoins` AND the player hasn't claimed or permanently
-    /// dismissed the offer yet.  HomeView observes `coinBalance` and checks
-    /// this to auto-present the sheet.  Suppressed when the player already owns
-    /// all three Starter Pack items (Aurora ball, trail and boundary).
+    /// Fires once: on the first app open AFTER the one in which the tutorial
+    /// set was picked (so never in the same session as the tutorial pick),
+    /// while the offer has never been shown, claimed or dismissed.  Players
+    /// who finished the tutorial before opens were tracked (no recorded pick
+    /// open) qualify on any open.  Suppressed when the player already owns all
+    /// three Starter Pack items (Aurora ball, trail and boundary).
     var shouldTriggerStarterPack: Bool {
-        !starterPackClaimed && !starterPackDismissed
-            && starterPackShownAt == nil && coinBalance >= Self.starterPackTriggerCoins
-            && !ownsStarterPackItems
+        guard !starterPackClaimed, !starterPackDismissed,
+              starterPackShownAt == nil, seenTutorialReward,
+              !ownsStarterPackItems else { return false }
+        guard let pickOpen = tutorialPickOpen else { return true }
+        return appOpenCount > pickOpen
     }
 
     /// True while the 48-hour countdown is still ticking — the offer sheet

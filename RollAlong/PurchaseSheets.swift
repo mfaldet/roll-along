@@ -1435,9 +1435,10 @@ private struct DiamondBonusLabel: View {
 // MARK: - Starter Pack Sheet
 
 /// One-time welcome offer: $1.99 → 500 coins + the Aurora ball, trail and
-/// boundary (free-granted so Sell Back keeps but never refunds them).  Presented automatically the first time the player's
-/// coin balance reaches `GameState.starterPackTriggerCoins`, and again on
-/// re-launch while the 48-hour window is open.  Purchase sets
+/// boundary (free-granted so Sell Back keeps but never refunds them).  Presented
+/// automatically on the first app open after the tutorial set was picked
+/// (`GameState.shouldTriggerStarterPack`), and again on re-launch while the
+/// 48-hour window is open.  The sheet is exactly as tall as its content.  Purchase sets
 /// `starterPackClaimed` (via reward delivery);
 /// "No thanks" sets `starterPackDismissed`.  Either one closes the sheet and
 /// keeps it from ever showing again — but ONLY delivery sets `claimed`, so an
@@ -1447,6 +1448,10 @@ struct StarterPackSheet: View {
     @EnvironmentObject var store:     StoreKitManager
     @Environment(\.dismiss) private var dismiss
     @State private var purchaseError: String? = nil
+    /// Measured height of the sheet's content.  The sheet uses it as its one
+    /// detent, so it is exactly as tall as its content, anchored to the
+    /// bottom of the screen, with no empty space below.
+    @State private var contentHeight: CGFloat = 560
 
     var body: some View {
         NavigationStack {
@@ -1576,7 +1581,12 @@ struct StarterPackSheet: View {
 
                         Spacer().frame(height: 32)
                     }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
+                        if abs(h - contentHeight) > 0.5 { contentHeight = h }
+                    }
                 }
+                // Scrolls only if the content is taller than the screen.
+                .scrollBounceBehavior(.basedOnSize)
             }
             .navigationBarHidden(true)
             .onChange(of: gameState.starterPackClaimed) { _, claimed in
@@ -1586,7 +1596,7 @@ struct StarterPackSheet: View {
                 if dismissed { dismiss() }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.height(contentHeight)])
         .presentationDragIndicator(.hidden)
         .onChange(of: store.lastError) { _, err in purchaseError = err }
         .alert("Purchase Failed", isPresented: Binding(
