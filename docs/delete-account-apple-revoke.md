@@ -5,9 +5,15 @@ Apple's account-deletion guidance says apps that use Sign in with Apple
 account is deleted. This note is the server half of that. The app half is
 already in the code.
 
-**Status: written, not deployed, not tested.** The deployed `delete-account`
-function could not be read from outside the Supabase dashboard, so this is an
-addition to paste into it, not a replacement for it.
+**Status: the complete function is now in the repo at
+`supabase/functions/delete-account/index.ts` — written, not deployed, not
+tested.** It replaces the deployed function: it verifies the caller, revokes
+the Apple token (best effort) and deletes the auth user. The database cascades
+and the `players_hand_over` trigger (social-schema-v5) do the rest, so the old
+function's manual clan hand-off is no longer needed. Deploy it with
+`supabase functions deploy delete-account` (or paste it into the dashboard's
+function editor) and set the four Apple secrets below. The snippets further
+down are kept for reference.
 
 ## How it works
 
