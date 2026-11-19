@@ -186,7 +186,23 @@ struct ChallengeTrackView: View {
             if !bundle.balls.isEmpty {
                 HStack(spacing: 8) {
                     ForEach(bundle.balls, id: \.rawValue) { skin in
-                        BallSkinView(skin: skin, diameter: 32)
+                        // Owned balls equip on tap (the Locker's path and
+                        // mark); unowned ones are just a preview.
+                        let equipped = gameState.isEquipped(skin)
+                        let ball = BallSkinView(skin: skin, diameter: 32)
+                            .overlay(Circle().stroke(equipped ? Color.white : Color.clear, lineWidth: 2))
+                            .scaleEffect(equipped ? 1.06 : 1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.65), value: equipped)
+                        if gameState.isOwned(skin) {
+                            Button {
+                                if gameState.equip(skin) { Haptics.light() }
+                            } label: { ball }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(skin.displayName)
+                            .accessibilityHint(equipped ? "Equipped." : "Double-tap to equip.")
+                        } else {
+                            ball
+                        }
                     }
                     Spacer()
                 }

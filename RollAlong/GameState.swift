@@ -3130,6 +3130,45 @@ final class GameState: ObservableObject {
         recordFullKitTrophy()
     }
 
+    /// True when `item` is what the player has on in its slot right now.  A
+    /// ball counts only when no Pack is shuffling (same rule as the Locker).
+    func isEquipped<Item: CosmeticItem>(_ item: Item) -> Bool {
+        switch item {
+        case let s as BallSkin:   return s == activeSkin && equippedPackID == nil
+        case let g as GoalSkin:   return g == equippedGoal
+        case let t as TrailColor: return t == equippedTrail
+        case let f as Floor:      return f == equippedFloor
+        case let p as Pit:        return p == equippedPit
+        case let b as Boundary:   return b == equippedBoundary
+        case let m as MusicTrack: return m == equippedMusic
+        default:                  return false
+        }
+    }
+
+    /// The one equip-on-tap entry point used everywhere a cosmetic is shown
+    /// (Locker, Shop, Catalog, collection cards and popups, the seasonal
+    /// spotlight, win-screen collection cards).  Equips an OWNED item in its
+    /// slot exactly the way the Locker does (a ball clears any equipped Pack).
+    /// Never buys anything and never touches coins.  Returns false — and
+    /// changes nothing — when the item isn't owned or is already equipped.
+    @discardableResult
+    func equip<Item: CosmeticItem>(_ item: Item) -> Bool {
+        guard isOwned(item), !isEquipped(item) else { return false }
+        switch item {
+        case let s as BallSkin:   equipBall(s)
+        case let g as GoalSkin:   equippedGoal = g
+        case let t as TrailColor: equippedTrail = t
+        case let f as Floor:      equippedFloor = f
+        case let p as Pit:        equippedPit = p
+        case let b as Boundary:   equippedBoundary = b
+        case let m as MusicTrack:
+            guard CosmeticFeatures.musicEnabled else { return false }
+            equippedMusic = m
+        default:                  return false
+        }
+        return true
+    }
+
     /// If a Pack is equipped, advance `activeSkin` to the next member via
     /// a no-repeat shuffle bag (every member appears once before any
     /// repeat).  No-op when an individual skin is equipped.  Called at

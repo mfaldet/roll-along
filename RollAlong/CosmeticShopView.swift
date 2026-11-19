@@ -128,6 +128,10 @@ private struct BundleItemRow: Identifiable {
     let name: String
     let owned: Bool
     let preview: AnyView
+    /// True when this piece is what the player has on in its slot.
+    var equipped: Bool = false
+    /// Equips the piece (owned pieces only); nil when not owned.
+    var equip: (() -> Void)? = nil
 }
 
 struct CosmeticShopView: View {
@@ -912,9 +916,10 @@ struct CosmeticShopView: View {
         // even for unowned items — only the price pill reads as greyed (you buy
         // in the Shop / a Collection, not here).  Equipped items keep the green
         // status border.
-        let border: Color? = equipped ? Color(red: 0.28, green: 0.85, blue: 0.45) : nil
+        // Same equipped mark as the Locker: white border + slight scale-up.
+        let border: Color? = equipped ? Color.white : nil
         return Button {
-            handleTap(item: item, owned: owned, equipped: equipped)
+            tapItem(item)
         } label: {
             VStack(spacing: 8) {
                 preview(for: item)
@@ -954,10 +959,29 @@ struct CosmeticShopView: View {
             .overlay(alignment: .topTrailing) {
                 RarityCornerTab(colors: item.rarityGemColors, side: 40, corner: 16)
             }
+            .scaleEffect(equipped ? 1.06 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.65), value: equipped)
         }
         .buttonStyle(.plain)
+        // Touch and hold: "try it on" for every item (owned ones equip on a
+        // plain tap, so this is how they still reach the try-on replay).
+        .contextMenu {
+            Button {
+                handleTap(item: item, owned: owned, equipped: equipped)
+            } label: {
+                Label("Try it on", systemImage: "play.circle")
+            }
+        } preview: {
+            LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(item))
+                .environment(\.cosmeticMotion, .preview)
+                .frame(width: 300, height: 300)
+                .background(Color(white: 0.08))
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(item: item, owned: owned, equipped: equipped))
+        .accessibilityAction(named: "Try it on") {
+            handleTap(item: item, owned: owned, equipped: equipped)
+        }
     }
 
     private func stateBadge<Item: CosmeticItem>(item: Item, owned: Bool, equipped: Bool) -> some View {
@@ -1026,7 +1050,7 @@ struct CosmeticShopView: View {
         let category = String(describing: type(of: item))
         let rarity = item.showsRarityBadge ? ", \(item.rarityLabel)" : ""
         if equipped { return "\(item.displayName) \(category)\(rarity), equipped." }
-        if owned    { return "\(item.displayName) \(category)\(rarity), owned. Double-tap to try it on and equip." }
+        if owned    { return "\(item.displayName) \(category)\(rarity), owned. Double-tap to equip." }
         if mode == .catalog {
             return "\(item.displayName) \(category)\(rarity), \(item.coinCost) coins. Sold as part of a bundle — double-tap to try it on."
         }
@@ -1035,8 +1059,36 @@ struct CosmeticShopView: View {
 
     // MARK: - Tap handling
 
-    /// Tapping a tile opens the "try it on" popup: the replay with this item
-    /// on the player's own loadout, and the Buy / Equip button.  The popup's
+    /// The one tap rule for every cosmetic tile: an OWNED piece equips right
+    /// away (already equipped → nothing); anything else opens "try it on".
+    private func tapItem<Item: CosmeticItem>(_ item: Item) {
+        if gameState.isOwned(item) {
+            equipOwned(item)
+        } else {
+            handleTap(item: item, owned: false, equipped: false)
+        }
+    }
+
+    /// Equip an owned piece through `GameState.equip` (the Locker's path),
+    /// with the Locker's feedback.  Never buys, never touches coins.
+    @discardableResult
+    private func equipOwned<Item: CosmeticItem>(_ item: Item) -> Bool {
+        guard gameState.equip(item) else { return false }
+        Haptics.light()
+        AnalyticsClient.shared.track(
+            "cosmetic_equipped",
+            properties: [
+                "category": .string(category.rawValue),
+                "item":     .string(item.rawValue),
+                "tier":     .string(item.tier.rawValue),
+            ]
+        )
+        return true
+    }
+
+    /// Opens the "try it on" popup: the replay with this item on the player's
+    /// own loadout, and the Buy / Equip button.  Reached by tapping an UNOWNED
+    /// tile, or by touch-and-hold → "Try it on" on any tile.  The popup's
     /// button runs `performTap`, the purchase and equip logic unchanged.
     private func handleTap<Item: CosmeticItem>(item: Item, owned: Bool, equipped: Bool) {
         let gs = gameState
@@ -1075,15 +1127,7 @@ struct CosmeticShopView: View {
     private func performTap<Item: CosmeticItem>(item: Item, owned: Bool, equipped: Bool) {
         if equipped { return }
         if owned {
-            equip(item)
-            AnalyticsClient.shared.track(
-                "cosmetic_equipped",
-                properties: [
-                    "category": .string(category.rawValue),
-                    "item":     .string(item.rawValue),
-                    "tier":     .string(item.tier.rawValue),
-                ]
-            )
+            equipOwned(item)
             return
         }
         // Catalog: individuals aren't bought directly — you buy the bundle.
@@ -1124,7 +1168,7 @@ struct CosmeticShopView: View {
                     "cost":     .int(item.coinCost),
                 ]
             )
-            equip(item)
+            gameState.equip(item)
             AnalyticsClient.shared.track(
                 "cosmetic_equipped",
                 properties: [
@@ -1137,30 +1181,8 @@ struct CosmeticShopView: View {
         }
     }
 
-    private func equip<Item: CosmeticItem>(_ item: Item) {
-        switch item {
-        case let s as BallSkin:   gameState.equipBall(s)
-        case let g as GoalSkin:   gameState.equippedGoal = g
-        case let t as TrailColor: gameState.equippedTrail = t
-        case let f as Floor:      gameState.equippedFloor = f
-        case let p as Pit:        gameState.equippedPit = p
-        case let b as Boundary:   gameState.equippedBoundary = b
-        case let m as MusicTrack: gameState.equippedMusic = m
-        default: break
-        }
-    }
-
     private func isEquipped<Item: CosmeticItem>(_ item: Item) -> Bool {
-        switch item {
-        case let s as BallSkin:   return s == gameState.activeSkin && gameState.equippedPackID == nil
-        case let g as GoalSkin:   return g == gameState.equippedGoal
-        case let t as TrailColor: return t == gameState.equippedTrail
-        case let f as Floor:      return f == gameState.equippedFloor
-        case let p as Pit:        return p == gameState.equippedPit
-        case let b as Boundary:   return b == gameState.equippedBoundary
-        case let m as MusicTrack: return m == gameState.equippedMusic
-        default: return false
-        }
+        gameState.isEquipped(item)
     }
 
     private func canAfford<Item: CosmeticItem>(_ item: Item) -> Bool {
@@ -1636,51 +1658,60 @@ struct CosmeticShopView: View {
     /// The bundle's cosmetics as loadout-style rows (every item in every category).
     private func bundleDetailRows(_ b: CosmeticBundle) -> [BundleItemRow] {
         var rows: [BundleItemRow] = []
-        for x in b.balls {
-            rows.append(BundleItemRow(category: "Ball", name: x.displayName,
+        func add<Item: CosmeticItem>(_ category: String, _ x: Item, _ preview: AnyView) {
+            rows.append(BundleItemRow(category: category, name: x.displayName,
                                       owned: gameState.isOwned(x),
-                                      preview: AnyView(CosmeticTile(item: x, diameter: 30))))
+                                      preview: preview,
+                                      equipped: isEquipped(x),
+                                      equip: slotEquip(x)))
+        }
+        for x in b.balls {
+            add("Ball", x, AnyView(CosmeticTile(item: x, diameter: 30)))
         }
         for x in b.goals {
-            rows.append(BundleItemRow(category: "Goal", name: x.displayName,
-                                      owned: gameState.isOwned(x),
-                                      preview: AnyView(CosmeticTile(item: x, diameter: 32))))
+            add("Goal", x, AnyView(CosmeticTile(item: x, diameter: 32)))
         }
         for x in b.trails {
-            rows.append(BundleItemRow(category: "Trail", name: x.displayName,
-                                      owned: gameState.isOwned(x),
-                                      preview: AnyView(CosmeticTile(item: x, trailWidth: 3.5))))
+            add("Trail", x, AnyView(CosmeticTile(item: x, trailWidth: 3.5)))
         }
         for x in b.floors {
-            rows.append(BundleItemRow(category: "Floor", name: x.displayName,
-                                      owned: gameState.isOwned(x),
-                                      preview: AnyView(CosmeticTile(item: x, corner: 6)
-                                        .frame(width: 32, height: 26))))
+            add("Floor", x, AnyView(CosmeticTile(item: x, corner: 6).frame(width: 32, height: 26)))
         }
         for x in b.pits {
-            rows.append(BundleItemRow(category: "Pit", name: x.displayName,
-                                      owned: gameState.isOwned(x),
-                                      preview: AnyView(CosmeticTile(item: x, corner: 6)
-                                        .frame(width: 32, height: 26))))
+            add("Pit", x, AnyView(CosmeticTile(item: x, corner: 6).frame(width: 32, height: 26)))
         }
         for x in b.boundaries {
-            rows.append(BundleItemRow(category: "Boundary", name: x.displayName,
-                                      owned: gameState.isOwned(x),
-                                      preview: AnyView(CosmeticTile(item: x, corner: 7)
-                                        .frame(width: 32, height: 26))))
+            add("Boundary", x, AnyView(CosmeticTile(item: x, corner: 7).frame(width: 32, height: 26)))
         }
         for x in b.offeredMusic {
-            rows.append(BundleItemRow(category: "Music", name: x.displayName,
-                                      owned: gameState.isOwned(x),
-                                      preview: AnyView(musicSwatch(x))))
+            add("Music", x, AnyView(musicSwatch(x)))
         }
         return rows
     }
 
+    /// One piece in the collection popup.  An owned piece equips on tap (the
+    /// Locker's path, with its white equipped mark); unowned rows are info.
+    @ViewBuilder
     private func collectionItemRow(_ row: BundleItemRow) -> some View {
+        if let equip = row.equip, row.owned {
+            Button(action: equip) { collectionItemRowBody(row) }
+                .buttonStyle(.plain)
+                .accessibilityHint(row.equipped ? "Equipped." : "Double-tap to equip.")
+        } else {
+            collectionItemRowBody(row)
+        }
+    }
+
+    private func collectionItemRowBody(_ row: BundleItemRow) -> some View {
         HStack(spacing: 12) {
             row.preview
                 .frame(width: 34, height: 34)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(row.equipped ? Color.white : Color.clear, lineWidth: 2)
+                )
+                .scaleEffect(row.equipped ? 1.06 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.65), value: row.equipped)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.category.uppercased())
                     .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -1690,17 +1721,22 @@ struct CosmeticShopView: View {
                     .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
-            if row.owned {
+            if row.equipped {
+                Text("Equipped").font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            } else if row.owned {
                 HStack(spacing: 3) {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
-                    Text("Owned").font(.system(size: 10, weight: .bold, design: .rounded))
+                    Text("Owned · tap to equip").font(.system(size: 10, weight: .bold, design: .rounded))
                 }
                 .foregroundStyle(Color(red: 0.24, green: 0.82, blue: 0.48))
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.09)))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
     }
+
 
     @ViewBuilder private func musicSwatch(_ track: MusicTrack) -> some View {
         Image(systemName: track == .none ? "speaker.slash.fill" : "music.note")
@@ -1792,7 +1828,8 @@ struct CosmeticShopView: View {
             // Ball
             collectionSlot(label: "Ball",
                            isOwned: bundle.balls.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.balls.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.balls.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.balls.first)) {
                 if let ball = bundle.balls.first {
                     CosmeticTile(item: ball, diameter: 34)
                 }
@@ -1808,7 +1845,8 @@ struct CosmeticShopView: View {
             // Goal
             collectionSlot(label: "Goal",
                            isOwned: bundle.goals.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.goals.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.goals.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.goals.first)) {
                 if let goal = bundle.goals.first {
                     CosmeticTile(item: goal, diameter: 36)
                 }
@@ -1816,7 +1854,8 @@ struct CosmeticShopView: View {
             // Trail
             collectionSlot(label: "Trail",
                            isOwned: bundle.trails.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.trails.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.trails.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.trails.first)) {
                 if let trail = bundle.trails.first {
                     CosmeticTile(item: trail, trailWidth: 3.5)
                         .frame(width: 40, height: 38)
@@ -1825,7 +1864,8 @@ struct CosmeticShopView: View {
             // Floor
             collectionSlot(label: "Floor",
                            isOwned: bundle.floors.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.floors.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.floors.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.floors.first)) {
                 if let floor = bundle.floors.first {
                     CosmeticTile(item: floor, corner: 6)
                         .frame(width: 38, height: 28)
@@ -1834,7 +1874,8 @@ struct CosmeticShopView: View {
             // Pit
             collectionSlot(label: "Pit",
                            isOwned: bundle.pits.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.pits.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.pits.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.pits.first)) {
                 if let pit = bundle.pits.first {
                     CosmeticTile(item: pit, corner: 6)
                         .frame(width: 38, height: 28)
@@ -1843,7 +1884,8 @@ struct CosmeticShopView: View {
             // Boundary
             collectionSlot(label: "Boundary",
                            isOwned: bundle.boundaries.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.boundaries.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.boundaries.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.boundaries.first)) {
                 if let wall = bundle.boundaries.first {
                     CosmeticTile(item: wall, corner: 7)
                         .frame(width: 36, height: 28)
@@ -1853,7 +1895,8 @@ struct CosmeticShopView: View {
             if CosmeticFeatures.musicEnabled {
             collectionSlot(label: "Music",
                            isOwned: bundle.offeredMusic.first.map { gameState.isOwned($0) },
-                           isEquipped: bundle.offeredMusic.first.map { isEquipped($0) } ?? false) {
+                           isEquipped: bundle.offeredMusic.first.map { isEquipped($0) } ?? false,
+                           onEquip: slotEquip(bundle.offeredMusic.first)) {
                 if let track = bundle.offeredMusic.first {
                     Image(systemName: track == .none ? "speaker.slash.fill" : "music.note")
                         .font(.system(size: 20, weight: .semibold))
@@ -1873,12 +1916,45 @@ struct CosmeticShopView: View {
     /// A single item slot in a collection card.  `isOwned == nil` means the
     /// bundle has no item in this category → dotted empty placeholder.
     /// `isOwned == false` → dimmed preview + lock icon.  `isOwned == true` →
-    /// full-colour preview.  The green ring appears ONLY when the item is the one
+    /// full-colour preview, and a tap equips it.  The white ring + slight
+    /// scale-up (the Locker's equipped mark) appears ONLY on the piece that is
     /// currently equipped (`isEquipped`), not merely owned.
+    /// Tap action for an OWNED piece in a collection card: equips it (the
+    /// Locker's path).  nil for unowned or missing pieces, so their taps fall
+    /// through to the card as before (popup / purchase routing).
+    private func slotEquip<Item: CosmeticItem>(_ item: Item?) -> (() -> Void)? {
+        guard let item, gameState.isOwned(item) else { return nil }
+        return { equipOwned(item) }
+    }
+
     private func collectionSlot<Content: View>(
         label: String,
         isOwned: Bool?,
         isEquipped: Bool = false,
+        onEquip: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        let tile = collectionSlotTile(label: label, isOwned: isOwned,
+                                      isEquipped: isEquipped, content: content)
+        // An owned piece is its own button, so tapping it equips and never
+        // reaches the card underneath (no purchase, no popup).
+        return Group {
+            if let onEquip, isOwned == true {
+                Button(action: onEquip) { tile }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(label), owned")
+                    .accessibilityHint(isEquipped ? "Equipped." : "Double-tap to equip.")
+            } else {
+                tile
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func collectionSlotTile<Content: View>(
+        label: String,
+        isOwned: Bool?,
+        isEquipped: Bool,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         let owned   = isOwned == true
@@ -1894,9 +1970,7 @@ struct CosmeticShopView: View {
                             .strokeBorder(
                                 isEmpty
                                     ? Color(white: 0.22).opacity(0.60)
-                                    : (isEquipped
-                                       ? Color(red: 0.24, green: 0.82, blue: 0.48).opacity(0.85)
-                                       : Color.clear),
+                                    : (isEquipped ? Color.white : Color.clear),
                                 style: isEmpty
                                     ? StrokeStyle(lineWidth: 1.0, dash: [3, 3])
                                     : StrokeStyle(lineWidth: isEquipped ? 2.0 : 1.2)
@@ -1921,6 +1995,8 @@ struct CosmeticShopView: View {
                 }
             }
             .frame(minWidth: 40, maxWidth: 52, minHeight: 52, maxHeight: 52)
+            .scaleEffect(isEquipped ? 1.06 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.65), value: isEquipped)
 
             Text(label)
                 .font(.system(size: 8, weight: .semibold, design: .rounded))

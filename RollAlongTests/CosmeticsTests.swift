@@ -132,6 +132,90 @@ final class CosmeticsTests: XCTestCase {
         return GameState(defaults: defaults)
     }
 
+    // MARK: - Equip on tap (GameState.equip — the one path every screen uses)
+
+    func testEquip_ownedPieceEquipsInEverySlot() {
+        let gs = makeCleanState()
+        gs.ownedBallSkins.insert(BallSkin.jade.rawValue)
+        gs.ownedGoals.insert(GoalSkin.meadow.rawValue)
+        gs.ownedTrails.insert(TrailColor.forest.rawValue)
+        gs.ownedFloors.insert(Floor.meadow.rawValue)
+        gs.ownedPits.insert(Pit.meadow.rawValue)
+        gs.ownedBoundaries.insert(Boundary.mint.rawValue)
+
+        XCTAssertTrue(gs.equip(BallSkin.jade));    XCTAssertEqual(gs.activeSkin, .jade)
+        XCTAssertTrue(gs.equip(GoalSkin.meadow));  XCTAssertEqual(gs.equippedGoal, .meadow)
+        XCTAssertTrue(gs.equip(TrailColor.forest)); XCTAssertEqual(gs.equippedTrail, .forest)
+        XCTAssertTrue(gs.equip(Floor.meadow));     XCTAssertEqual(gs.equippedFloor, .meadow)
+        XCTAssertTrue(gs.equip(Pit.meadow));       XCTAssertEqual(gs.equippedPit, .meadow)
+        XCTAssertTrue(gs.equip(Boundary.mint));    XCTAssertEqual(gs.equippedBoundary, .mint)
+        for ok in [gs.isEquipped(BallSkin.jade), gs.isEquipped(GoalSkin.meadow),
+                   gs.isEquipped(TrailColor.forest), gs.isEquipped(Floor.meadow),
+                   gs.isEquipped(Pit.meadow), gs.isEquipped(Boundary.mint)] {
+            XCTAssertTrue(ok)
+        }
+    }
+
+    func testEquip_unownedPieceChangesNothing() {
+        let gs = makeCleanState()
+        let before = (gs.activeSkin, gs.equippedGoal, gs.equippedBoundary, gs.coinBalance)
+        XCTAssertFalse(gs.isOwned(BallSkin.jade))
+        XCTAssertFalse(gs.equip(BallSkin.jade))
+        XCTAssertFalse(gs.equip(GoalSkin.meadow))
+        XCTAssertFalse(gs.equip(Boundary.mint))
+        XCTAssertEqual(gs.activeSkin, before.0)
+        XCTAssertEqual(gs.equippedGoal, before.1)
+        XCTAssertEqual(gs.equippedBoundary, before.2)
+        XCTAssertEqual(gs.coinBalance, before.3)
+        XCTAssertFalse(gs.isOwned(BallSkin.jade), "equipping must never grant or buy")
+    }
+
+    func testEquip_alreadyEquippedIsANoOp() {
+        let gs = makeCleanState()
+        gs.ownedTrails.insert(TrailColor.forest.rawValue)
+        XCTAssertTrue(gs.equip(TrailColor.forest))
+        XCTAssertFalse(gs.equip(TrailColor.forest), "second tap does nothing")
+        XCTAssertEqual(gs.equippedTrail, .forest)
+    }
+
+    func testEquip_ballClearsAnEquippedPack() {
+        let gs = makeCleanState()
+        guard let pack = BallPack.catalogue.first else { return XCTFail("no packs") }
+        gs.ownedPacks.insert(pack.id)
+        gs.equipPack(pack)
+        XCTAssertNotNil(gs.equippedPackID)
+        gs.ownedBallSkins.insert(BallSkin.jade.rawValue)
+        // While a pack shuffles, no single ball counts as equipped.
+        XCTAssertFalse(gs.isEquipped(BallSkin.jade))
+        XCTAssertTrue(gs.equip(BallSkin.jade))
+        XCTAssertNil(gs.equippedPackID)
+        XCTAssertEqual(gs.activeSkin, .jade)
+        XCTAssertTrue(gs.isEquipped(BallSkin.jade))
+    }
+
+    /// Tapping an owned piece of a partially owned collection equips it and
+    /// never buys the collection or touches coins.
+    func testEquip_fromPartiallyOwnedCollection_neverPurchases() {
+        let gs = makeCleanState()
+        guard let nature = CosmeticBundle.catalogue.first(where: { $0.id == "nature" }) else {
+            return XCTFail("nature collection missing")
+        }
+        gs.coinBalance = 50_000
+        gs.ownedTrails.insert(TrailColor.forest.rawValue)     // 1 of 6 pieces
+        let coins = gs.coinBalance
+        let completed = gs.completedBundleIDs
+        let ownedBalls = gs.ownedBallSkins
+
+        XCTAssertTrue(gs.equip(TrailColor.forest))
+        XCTAssertFalse(gs.equip(BallSkin.jade), "an unowned piece is not equipped here")
+
+        XCTAssertEqual(gs.coinBalance, coins)
+        XCTAssertEqual(gs.completedBundleIDs, completed)
+        XCTAssertEqual(gs.ownedBallSkins, ownedBalls)
+        XCTAssertFalse(gs.completedBundleIDs.contains(nature.id))
+        XCTAssertEqual(gs.equippedTrail, .forest)
+    }
+
     // MARK: - Reset Cosmetics (coin liquidation)
 
     func testLiquidate_refundsCoinItems_keepsExclusives_resetsLook() {

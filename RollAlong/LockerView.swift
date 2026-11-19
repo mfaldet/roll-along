@@ -39,47 +39,47 @@ struct LockerView: View {
                     cosmeticRow(
                         label: "Ball",
                         items: BallSkin.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.activeSkin && gameState.equippedPackID == nil },
-                        onTap:      { gameState.equipBall($0) }
+                        isEquipped: { gameState.isEquipped($0) },
+                        onTap:      { if gameState.equip($0) { Haptics.light() } }
                     )
                     packRow
                     cosmeticRow(
                         label: "Goal",
                         items: GoalSkin.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.equippedGoal },
-                        onTap:      { gameState.equippedGoal = $0 }
+                        isEquipped: { gameState.isEquipped($0) },
+                        onTap:      { if gameState.equip($0) { Haptics.light() } }
                     )
                     cosmeticRow(
                         label: "Trail",
                         items: TrailColor.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.equippedTrail },
-                        onTap:      { gameState.equippedTrail = $0 }
+                        isEquipped: { gameState.isEquipped($0) },
+                        onTap:      { if gameState.equip($0) { Haptics.light() } }
                     )
                     cosmeticRow(
                         label: "Floor",
                         items: Floor.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.equippedFloor },
-                        onTap:      { gameState.equippedFloor = $0 }
+                        isEquipped: { gameState.isEquipped($0) },
+                        onTap:      { if gameState.equip($0) { Haptics.light() } }
                     )
                     cosmeticRow(
                         label: "Pit",
                         items: Pit.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.equippedPit },
-                        onTap:      { gameState.equippedPit = $0 }
+                        isEquipped: { gameState.isEquipped($0) },
+                        onTap:      { if gameState.equip($0) { Haptics.light() } }
                     )
                     cosmeticRow(
                         label: "Boundary",
                         items: Boundary.allCases.filter { gameState.isOwned($0) },
-                        isEquipped: { $0 == gameState.equippedBoundary },
-                        onTap:      { gameState.equippedBoundary = $0 }
+                        isEquipped: { gameState.isEquipped($0) },
+                        onTap:      { if gameState.equip($0) { Haptics.light() } }
                     )
                     // Music is not in 1.0 (no track plays): no Music row.
                     if CosmeticFeatures.musicEnabled {
                         cosmeticRow(
                             label: "Music",
                             items: MusicTrack.allCases.filter { gameState.isOwned($0) },
-                            isEquipped: { $0 == gameState.equippedMusic },
-                            onTap:      { gameState.equippedMusic = $0 }
+                            isEquipped: { gameState.isEquipped($0) },
+                            onTap:      { if gameState.equip($0) { Haptics.light() } }
                         )
                     }
                 }
