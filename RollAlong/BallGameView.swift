@@ -5258,6 +5258,8 @@ enum PitArt {
         case .velvet:    velvet(&ctx, size)
         case .sunset:    sunset(&ctx, size)
         case .mirage:    mirage(&ctx, size)
+        case .tidePool:  tidePool(&ctx, size)
+        case .vault:     vault(&ctx, size)
         case .canyon:    canyon(&ctx, size)
         case .downpour:  downpour(&ctx, size)
         case .syrup:     syrup(&ctx, size)
@@ -5636,6 +5638,84 @@ enum PitArt {
                                        endRadius: max(size.width, size.height) * 0.62))
     }
 
+    /// Tide Pool (Citrus set): a wet-sand rim, a line of foam, then turquoise
+    /// shallows stepping down through teal to a dark deep center.  Static.
+    private static func tidePool(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        let layers: [Color] = [
+            Color(red: 0.70, green: 0.60, blue: 0.42),   // wet sand rim
+            Color(red: 0.22, green: 0.72, blue: 0.70),   // turquoise shallows
+            Color(red: 0.08, green: 0.48, blue: 0.52),   // teal
+            Color(red: 0.03, green: 0.26, blue: 0.32),   // deep
+            Color(red: 0.01, green: 0.09, blue: 0.13),   // dark center
+        ]
+        let step: CGFloat = m * 0.075
+        for (k, color) in layers.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            let layer: Path = k == 0
+                ? Path(r)
+                : raggedRect(r, step: max(3, m * 0.08), jitter: m * 0.014,
+                             seed: 0x71DE_0000 + UInt64(k))
+            ctx.fill(layer, with: .color(color))
+            if k == 1 {
+                // Foam where the water meets the sand.
+                ctx.stroke(layer, with: .color(Color.white.opacity(0.70)), lineWidth: max(1, m * 0.02))
+            }
+        }
+        // Two soft light ripples on the shallows; a pale pebble on the sand.
+        let rip = inset(size, step * 1.55)
+        ctx.stroke(Path(roundedRect: rip, cornerRadius: m * 0.14),
+                   with: .color(Color.white.opacity(0.22)), lineWidth: 0.8)
+        if m >= 30 {
+            let pr: CGFloat = max(1.2, m * 0.028)
+            let pc = CGPoint(x: size.width - step * 0.5, y: step * 0.55)
+            ctx.fill(Path(ellipseIn: CGRect(x: pc.x - pr, y: pc.y - pr * 0.8, width: pr * 2, height: pr * 1.6)),
+                     with: .color(Color(red: 0.96, green: 0.92, blue: 0.82).opacity(0.9)))
+        }
+    }
+
+    /// Vault (Midas set): a treasury shaft.  Square gold steps descend from a
+    /// bright rim, each with a lit edge and a shadowed edge, to a dark floor
+    /// where a few coins glint.  Static.
+    private static func vault(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        let steps: [Color] = [
+            Color(red: 0.98, green: 0.82, blue: 0.36),
+            Color(red: 0.80, green: 0.60, blue: 0.20),
+            Color(red: 0.56, green: 0.39, blue: 0.11),
+            Color(red: 0.32, green: 0.21, blue: 0.06),
+            Color(red: 0.07, green: 0.05, blue: 0.02),
+        ]
+        let d: CGFloat = m * 0.075
+        for (k, color) in steps.enumerated() {
+            let r = inset(size, d * CGFloat(k))
+            ctx.fill(Path(r), with: .color(color))
+            guard k < steps.count - 1 else { continue }
+            // Lit top and left edges, shadowed bottom and right edges.
+            var lit = Path()
+            lit.move(to: CGPoint(x: r.minX, y: r.maxY))
+            lit.addLine(to: CGPoint(x: r.minX, y: r.minY))
+            lit.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+            ctx.stroke(lit, with: .color(Color.white.opacity(0.30)), lineWidth: 0.8)
+            var shade = Path()
+            shade.move(to: CGPoint(x: r.maxX, y: r.minY))
+            shade.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+            shade.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+            ctx.stroke(shade, with: .color(Color.black.opacity(0.28)), lineWidth: 0.8)
+        }
+        // Coins on the vault floor: small, dim, so the center stays dark.
+        let core = inset(size, d * CGFloat(steps.count - 1))
+        var rng = SeededRNG(seed: 0x60_1D_BA_45)
+        let coins = m >= 30 ? 5 : 2
+        for _ in 0..<coins {
+            let cr: CGFloat = max(1.0, m * 0.022)
+            let x: CGFloat = core.minX + cr + CGFloat(rng.nextUnit()) * max(1, core.width - cr * 2)
+            let y: CGFloat = core.minY + cr + CGFloat(rng.nextUnit()) * max(1, core.height - cr * 2)
+            ctx.fill(Path(ellipseIn: CGRect(x: x - cr, y: y - cr * 0.7, width: cr * 2, height: cr * 1.4)),
+                     with: .color(Color(red: 1.0, green: 0.84, blue: 0.36).opacity(0.55)))
+        }
+    }
+
     /// Mirage: faint wavy heat-haze rings inside.
     private static func mirage(_ ctx: inout GraphicsContext, _ size: CGSize) {
         let w = size.width
@@ -5958,6 +6038,8 @@ struct PaperFloorOverlayView: View, Equatable {
         case .velvet:     velvetFloor
         case .sunset:     sunsetFloor
         case .mirage:     mirageFloor
+        case .grove:      groveFloor
+        case .goldLeaf:   goldLeafFloor
         case .desert:     desertFloor
         case .stormcloud: stormcloudFloor
         case .sugar:      sugarFloor
@@ -6407,6 +6489,152 @@ struct PaperFloorOverlayView: View, Equatable {
         ], startPoint: .top, endPoint: .bottom)
     }
 
+    /// Grove (Citrus set) — bright beach sand in dappled grove shade: soft
+    /// leaf shadows, pale sun flecks, faint wind ripples and, here and there,
+    /// a tiny fallen orange blossom or leaf.  Static and low contrast.
+    private var groveFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x6120_7E01)
+            // Wind ripples in the sand.
+            var y: CGFloat = 18
+            while y < size.height {
+                var w = Path()
+                var x: CGFloat = 0
+                let ph: Double = rng.nextUnit() * 6.28
+                w.move(to: CGPoint(x: 0, y: y))
+                while x <= size.width {
+                    x += 12
+                    w.addLine(to: CGPoint(x: x, y: y + CGFloat(sin(Double(x) / 34 + ph)) * 2.2))
+                }
+                ctx.stroke(w, with: .color(Color(red: 0.72, green: 0.58, blue: 0.34).opacity(0.14)), lineWidth: 1)
+                y += 30 + CGFloat(rng.nextUnit()) * 10
+            }
+            // Leaf shadows: clusters of pointed leaf shapes, soft and cool.
+            let shade = Color(red: 0.30, green: 0.36, blue: 0.20).opacity(0.11)
+            let clusters = max(5, Int(size.width * size.height / 16000))
+            for _ in 0..<clusters {
+                let cx: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let cy: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let base: Double = rng.nextUnit() * 6.28
+                for k in 0..<5 {
+                    let a: Double = base + Double(k) * 1.15 + rng.nextUnit() * 0.4
+                    let len: CGFloat = 20 + CGFloat(rng.nextUnit()) * 14
+                    let wid: CGFloat = len * 0.30
+                    let ox: CGFloat = cx + CGFloat(cos(a)) * 8
+                    let oy: CGFloat = cy + CGFloat(sin(a)) * 8
+                    let tip = CGPoint(x: ox + CGFloat(cos(a)) * len, y: oy + CGFloat(sin(a)) * len)
+                    let mid = CGPoint(x: (ox + tip.x) / 2, y: (oy + tip.y) / 2)
+                    let nx: CGFloat = CGFloat(-sin(a)) * wid
+                    let ny: CGFloat = CGFloat(cos(a)) * wid
+                    var leaf = Path()
+                    leaf.move(to: CGPoint(x: ox, y: oy))
+                    leaf.addQuadCurve(to: tip, control: CGPoint(x: mid.x + nx, y: mid.y + ny))
+                    leaf.addQuadCurve(to: CGPoint(x: ox, y: oy), control: CGPoint(x: mid.x - nx, y: mid.y - ny))
+                    ctx.fill(leaf, with: .color(shade))
+                }
+            }
+            // Sun flecks between the leaves.
+            let flecks = max(6, Int(size.width * size.height / 12000))
+            for _ in 0..<flecks {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let fy: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 10 + CGFloat(rng.nextUnit()) * 12
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: fy - r * 0.7, width: r * 2, height: r * 1.4)),
+                         with: .radialGradient(Gradient(colors: [Color.white.opacity(0.20), Color.white.opacity(0)]),
+                                               center: CGPoint(x: x, y: fy), startRadius: 0, endRadius: r))
+            }
+            // Fallen orange blossoms (five white petals, yellow heart) and a few leaves.
+            let blossoms = max(4, Int(size.width * size.height / 22000))
+            for i in 0..<blossoms {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let by: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                if i % 3 == 2 {
+                    let a: Double = rng.nextUnit() * 6.28
+                    let len: CGFloat = 7
+                    let tip = CGPoint(x: x + CGFloat(cos(a)) * len, y: by + CGFloat(sin(a)) * len)
+                    let nx: CGFloat = CGFloat(-sin(a)) * 2.2
+                    let ny: CGFloat = CGFloat(cos(a)) * 2.2
+                    var leaf = Path()
+                    leaf.move(to: CGPoint(x: x, y: by))
+                    leaf.addQuadCurve(to: tip, control: CGPoint(x: (x + tip.x) / 2 + nx, y: (by + tip.y) / 2 + ny))
+                    leaf.addQuadCurve(to: CGPoint(x: x, y: by), control: CGPoint(x: (x + tip.x) / 2 - nx, y: (by + tip.y) / 2 - ny))
+                    ctx.fill(leaf, with: .color(Color(red: 0.36, green: 0.58, blue: 0.22).opacity(0.42)))
+                    continue
+                }
+                let rot: Double = rng.nextUnit() * 6.28
+                for k in 0..<5 {
+                    let a: Double = rot + Double(k) / 5 * 6.2832
+                    let px: CGFloat = x + CGFloat(cos(a)) * 2.6
+                    let py: CGFloat = by + CGFloat(sin(a)) * 2.6
+                    ctx.fill(Path(ellipseIn: CGRect(x: px - 1.7, y: py - 1.7, width: 3.4, height: 3.4)),
+                             with: .color(Color.white.opacity(0.72)))
+                }
+                ctx.fill(Path(ellipseIn: CGRect(x: x - 1.1, y: by - 1.1, width: 2.2, height: 2.2)),
+                         with: .color(Color(red: 0.98, green: 0.76, blue: 0.20).opacity(0.85)))
+            }
+        }
+    }
+
+    /// Gold Leaf (Midas set) — burnished gold-leaf tiles: fine seams, each
+    /// tile a touch lighter or darker, hammered dimples, and a small stamped
+    /// laurel ring on a few tiles.  Kept darker than a coin so coins and the
+    /// ball stay bright against it.  Static and low contrast.
+    private var goldLeafFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x601D_1EAF)
+            let tile: CGFloat = 46
+            let seam = Color(red: 0.30, green: 0.20, blue: 0.04).opacity(0.34)
+            let lip = Color(red: 1.0, green: 0.90, blue: 0.56).opacity(0.16)
+            var row = 0
+            var y: CGFloat = 0
+            while y < size.height {
+                var x: CGFloat = (row % 2 == 0) ? 0 : -tile / 2
+                while x < size.width {
+                    let r = CGRect(x: x, y: y, width: tile, height: tile)
+                    let v: Double = rng.nextUnit()
+                    let tone: Color = v < 0.5 ? Color.white.opacity(0.07 * (0.5 - v) * 2)
+                                              : Color.black.opacity(0.08 * (v - 0.5) * 2)
+                    ctx.fill(Path(r), with: .color(tone))
+                    // Hammered dimples.
+                    for _ in 0..<3 {
+                        let dx: CGFloat = x + 6 + CGFloat(rng.nextUnit()) * (tile - 12)
+                        let dy: CGFloat = y + 6 + CGFloat(rng.nextUnit()) * (tile - 12)
+                        let dr: CGFloat = 2.5 + CGFloat(rng.nextUnit()) * 2.5
+                        ctx.fill(Path(ellipseIn: CGRect(x: dx - dr, y: dy - dr, width: dr * 2, height: dr * 2)),
+                                 with: .radialGradient(Gradient(colors: [Color(red: 1.0, green: 0.92, blue: 0.62).opacity(0.16),
+                                                                         Color.clear]),
+                                                       center: CGPoint(x: dx - dr * 0.3, y: dy - dr * 0.3),
+                                                       startRadius: 0, endRadius: dr))
+                    }
+                    // A stamped laurel ring on about one tile in six.
+                    if rng.nextUnit() < 0.17 {
+                        let c = CGPoint(x: r.midX, y: r.midY)
+                        let rr: CGFloat = tile * 0.24
+                        ctx.stroke(Path(ellipseIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)),
+                                   with: .color(Color(red: 0.34, green: 0.22, blue: 0.04).opacity(0.22)),
+                                   style: StrokeStyle(lineWidth: 2.2, lineCap: .round, dash: [3.2, 3.0]))
+                        ctx.stroke(Path(ellipseIn: CGRect(x: c.x - rr * 0.45, y: c.y - rr * 0.45, width: rr * 0.9, height: rr * 0.9)),
+                                   with: .color(Color(red: 1.0, green: 0.90, blue: 0.56).opacity(0.18)), lineWidth: 1)
+                    }
+                    // Seams: dark groove with a thin bright lip beside it.
+                    var g = Path()
+                    g.move(to: CGPoint(x: r.minX, y: r.maxY))
+                    g.addLine(to: CGPoint(x: r.minX, y: r.minY))
+                    g.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+                    ctx.stroke(g, with: .color(seam), lineWidth: 1.1)
+                    var l = Path()
+                    l.move(to: CGPoint(x: r.minX + 1.2, y: r.maxY))
+                    l.addLine(to: CGPoint(x: r.minX + 1.2, y: r.minY + 1.2))
+                    l.addLine(to: CGPoint(x: r.maxX, y: r.minY + 1.2))
+                    ctx.stroke(l, with: .color(lip), lineWidth: 0.7)
+                    x += tile
+                }
+                y += tile
+                row += 1
+            }
+        }
+    }
+
     /// Mirage — faint wavy heat-haze lines across the sand.
     private var mirageFloor: some View {
         Canvas { ctx, size in
@@ -6626,6 +6854,7 @@ struct BoundaryOverlayView: View {
         case .fairway:      fairwayBorderOverlay
         case .sunset:       sunsetBorderOverlay
         case .pastel:       pastelBorderOverlay
+        case .citrus:       citrusBorderOverlay
         case .holly:        hollyBorderOverlay
         case .autumn:       autumnBorderOverlay
         case .lantern:      lanternBorderOverlay
@@ -7059,6 +7288,32 @@ struct BoundaryOverlayView: View {
             ], center: .center), lineWidth: 4)
     }
 
+    /// Citrus — a leafy green grove hedge hung with fruit: oranges, lemons
+    /// and limes in turn, each with a small highlight.  Static.
+    private var citrusBorderOverlay: some View {
+        let period: CGFloat = 33
+        func fruit(_ color: Color, _ phase: CGFloat) -> some View {
+            borderRing()
+                .stroke(color, style: StrokeStyle(lineWidth: 4.4, lineCap: .round,
+                                                  dash: [0.1, period - 0.1], dashPhase: phase))
+        }
+        return ZStack {
+            borderRing().stroke(Color(red: 0.18, green: 0.46, blue: 0.16), lineWidth: 4)
+            // Leaf veins: short lighter ticks so the hedge reads as foliage.
+            ring(1.0)
+                .stroke(Color(red: 0.46, green: 0.74, blue: 0.30).opacity(0.75),
+                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [3, 8]))
+            fruit(Color(red: 0.98, green: 0.56, blue: 0.10), 0)
+            fruit(Color(red: 1.00, green: 0.88, blue: 0.24), period / 3)
+            fruit(Color(red: 0.62, green: 0.84, blue: 0.24), period * 2 / 3)
+            // A highlight on every fruit.
+            ring(1.2)
+                .stroke(Color.white.opacity(0.70),
+                        style: StrokeStyle(lineWidth: 1.1, lineCap: .round,
+                                           dash: [0.1, period / 3 - 0.1], dashPhase: 0.8))
+        }
+    }
+
     /// Pastel — alternating soft segments: pink, mint, lilac, lemon.
     private var pastelBorderOverlay: some View {
         let colors: [Color] = [
@@ -7404,6 +7659,7 @@ struct GoalSkinView: View {
         case .prism:       prismGoal
         case .obsidian:    obsidianGoal
         case .quasar:      quasarGoal
+        case .citrusSlice: citrusSliceGoal
         case .slate:
             bandedTargetGoal(goal.targetBands ?? [])
         case .frost, .ember, .meadow, .bullion,
@@ -7482,6 +7738,72 @@ struct GoalSkinView: View {
                         endRadius: maxR * 0.95
                     )
                 )
+            }
+        }
+    }
+
+    /// Citrus Slice (Citrus set) — a cut citrus wheel seen from above: orange
+    /// rind, pale pith, ten juicy segments, and a deep amber cup at the
+    /// center where the ball finishes.  The wheel turns very slowly (one
+    /// turn in about fifty seconds); it is still under Reduce Motion.
+    private var citrusSliceGoal: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate)
+                let spin: Double = t.truncatingRemainder(dividingBy: 3600) * 0.12
+                let cx: CGFloat = size.width / 2
+                let cy: CGFloat = size.height / 2
+                let R: CGFloat = min(size.width, size.height) / 2 * 0.95
+                let c = CGPoint(x: cx, y: cy)
+                func disc(_ r: CGFloat) -> Path {
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+                }
+                func polar(_ a: Double, _ r: CGFloat) -> CGPoint {
+                    CGPoint(x: cx + CGFloat(cos(a)) * r, y: cy + CGFloat(sin(a)) * r)
+                }
+                // Rind, then pith.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 1.00, green: 0.66, blue: 0.14), Color(red: 0.92, green: 0.46, blue: 0.06)]),
+                    center: c, startRadius: R * 0.80, endRadius: R))
+                ctx.fill(disc(R * 0.89), with: .color(Color(red: 1.00, green: 0.96, blue: 0.84)))
+                // Flesh.
+                let fleshR: CGFloat = R * 0.82
+                ctx.fill(disc(fleshR), with: .radialGradient(Gradient(colors: [
+                    Color(red: 1.00, green: 0.84, blue: 0.30), Color(red: 0.99, green: 0.62, blue: 0.12)]),
+                    center: c, startRadius: R * 0.10, endRadius: fleshR))
+                let segments = 10
+                for k in 0..<segments {
+                    let a0: Double = spin + Double(k) / Double(segments) * .pi * 2
+                    let a1: Double = a0 + .pi * 2 / Double(segments)
+                    let am: Double = (a0 + a1) / 2
+                    // Juice vesicles: three short pale strokes fanning out in each segment.
+                    for j in 0..<3 {
+                        let aa: Double = am + (Double(j) - 1) * 0.16
+                        var v = Path()
+                        v.move(to: polar(aa, fleshR * 0.42))
+                        v.addLine(to: polar(aa, fleshR * 0.86))
+                        ctx.stroke(v, with: .color(Color(red: 1.0, green: 0.93, blue: 0.62).opacity(0.55)),
+                                   style: StrokeStyle(lineWidth: max(0.6, R * 0.03), lineCap: .round))
+                    }
+                    // Membrane between segments.
+                    var mem = Path()
+                    mem.move(to: polar(a0, R * 0.20))
+                    mem.addLine(to: polar(a0, fleshR))
+                    ctx.stroke(mem, with: .color(Color(red: 1.00, green: 0.96, blue: 0.84)),
+                               style: StrokeStyle(lineWidth: max(1, R * 0.045), lineCap: .round))
+                }
+                // Rind edge and a soft top-left gloss.
+                ctx.stroke(disc(R), with: .color(Color(red: 0.70, green: 0.32, blue: 0.04)), lineWidth: max(1, R * 0.03))
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - R * 0.66, y: cy - R * 0.74, width: R * 0.70, height: R * 0.44)),
+                         with: .radialGradient(Gradient(colors: [Color.white.opacity(0.26), Color.clear]),
+                                               center: CGPoint(x: cx - R * 0.34, y: cy - R * 0.52),
+                                               startRadius: 0, endRadius: R * 0.44))
+                // The center cup: where the ball lands.
+                ctx.fill(disc(R * 0.27), with: .color(Color(red: 1.00, green: 0.96, blue: 0.84)))
+                ctx.fill(disc(R * 0.21), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.36, green: 0.14, blue: 0.02), Color(red: 0.78, green: 0.38, blue: 0.06)]),
+                    center: c, startRadius: 0, endRadius: R * 0.21))
             }
         }
     }
@@ -7620,10 +7942,33 @@ struct GoalSkinView: View {
                         startPoint: CGPoint(x: 0, y: -bh / 2), endPoint: CGPoint(x: 0, y: bh / 2)))
                     bar.stroke(ingot, with: .color(Color(red: 0.50, green: 0.34, blue: 0.08)), lineWidth: 0.7)
                 }
-                ctx.fill(disc(R * 0.28), with: .radialGradient(Gradient(colors: [
-                    Color(red: 0.40, green: 0.28, blue: 0.06), Color(red: 0.70, green: 0.50, blue: 0.14)]),
-                    center: c, startRadius: 0, endRadius: R * 0.28))
-                ctx.stroke(disc(R * 0.28), with: .color(Color(red: 1.0, green: 0.88, blue: 0.50)), lineWidth: max(1, R * 0.035))
+                // Beaded ring just inside the reeded edge, like a struck coin.
+                for k in 0..<36 {
+                    let a: Double = Double(k) / 36 * .pi * 2
+                    let bp = polar(a, R * 0.795)
+                    let br: CGFloat = max(0.6, R * 0.022)
+                    ctx.fill(Path(ellipseIn: CGRect(x: bp.x - br, y: bp.y - br, width: br * 2, height: br * 2)),
+                             with: .color(Color(red: 1.0, green: 0.95, blue: 0.70).opacity(0.85)))
+                }
+                // The treasury door at the center: a dark recessed well with a
+                // bright double rim, where the ball finishes.
+                ctx.fill(disc(R * 0.33), with: .color(Color(red: 1.0, green: 0.90, blue: 0.54)))
+                ctx.stroke(disc(R * 0.33), with: .color(Color(red: 0.50, green: 0.34, blue: 0.08)), lineWidth: max(0.8, R * 0.025))
+                ctx.fill(disc(R * 0.27), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.24, green: 0.15, blue: 0.03), Color(red: 0.62, green: 0.43, blue: 0.11)]),
+                    center: c, startRadius: 0, endRadius: R * 0.27))
+                ctx.stroke(disc(R * 0.27), with: .color(Color(red: 1.0, green: 0.88, blue: 0.50)), lineWidth: max(1, R * 0.03))
+                // Four small glints on the bars' lit corners.
+                for k in 0..<4 {
+                    let a: Double = Double(k) / 4 * .pi * 2 - 2.2
+                    let gp = polar(a, R * 0.64)
+                    let gl: CGFloat = R * 0.07
+                    var star = Path()
+                    star.move(to: CGPoint(x: gp.x - gl, y: gp.y)); star.addLine(to: CGPoint(x: gp.x + gl, y: gp.y))
+                    star.move(to: CGPoint(x: gp.x, y: gp.y - gl)); star.addLine(to: CGPoint(x: gp.x, y: gp.y + gl))
+                    ctx.stroke(star, with: .color(Color.white.opacity(0.80)),
+                               style: StrokeStyle(lineWidth: max(0.6, R * 0.02), lineCap: .round))
+                }
 
             case .amethyst:
                 // Gray rock rim, purple crystal points facing inward, a dark geode center.
@@ -9504,6 +9849,7 @@ struct PitLandingView: View {
         case .space, .eclipse, .aurora, .midnight,
              .twilight, .velvet:                       return .voidImplosion
         case .nightclub:                               return .confetti
+        case .tidePool:                                return .splash
         default:                                       return .smoke
         }
     }
@@ -9520,6 +9866,8 @@ struct PitLandingView: View {
         case .graveyard: return (Color(red: 0.45, green: 0.55, blue: 0.45), Color(red: 0.10, green: 0.14, blue: 0.10))
         case .deepEnd:   return (Color(red: 0.50, green: 0.78, blue: 1.0),  Color(red: 0.06, green: 0.20, blue: 0.48))
         case .maelstrom: return (Color(red: 0.70, green: 0.72, blue: 0.78), Color(red: 0.30, green: 0.30, blue: 0.36))
+        case .tidePool:  return (Color(red: 0.50, green: 0.90, blue: 0.86), Color(red: 0.06, green: 0.36, blue: 0.42))
+        case .vault:     return (Color(red: 1.00, green: 0.86, blue: 0.42), Color(red: 0.46, green: 0.32, blue: 0.08))
         default:         return (Color(white: 0.78),                        Color(white: 0.42))
         }
     }

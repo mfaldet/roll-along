@@ -1299,11 +1299,50 @@ final class CosmeticsTests: XCTestCase {
 
     // MARK: - Music is not in 1.0
 
+    /// Quality round: Citrus is tropical citrus and Midas is one golden set.
+    /// New pieces take the tier of the piece they replaced, so neither set's
+    /// price moves, and the displaced pieces are in no collection on sale.
+    func testQualityRound_citrusAndMidas() {
+        let citrus = CosmeticBundle.active.first { $0.id == "citrus" }!
+        XCTAssertEqual(citrus.balls, [.lemon])
+        XCTAssertEqual(citrus.goals, [.citrusSlice])
+        XCTAssertEqual(citrus.trails, [.zest])
+        XCTAssertEqual(citrus.floors, [.grove])
+        XCTAssertEqual(citrus.pits, [.tidePool])
+        XCTAssertEqual(citrus.boundaries, [.citrus])
+        XCTAssertEqual(GoalSkin.citrusSlice.tier, GoalSkin.flame.tier)
+        XCTAssertEqual(TrailColor.zest.tier, TrailColor.ember.tier)
+        XCTAssertEqual(Floor.grove.tier, Floor.dusk.tier)
+        XCTAssertEqual(Pit.tidePool.tier, Pit.sunset.tier)
+        XCTAssertEqual(citrus.fullPrice(), 5_250)
+        XCTAssertEqual(citrus.rarity, .standard)
+
+        let midas = CosmeticBundle.active.first { $0.id == "midas" }!
+        XCTAssertEqual(midas.goals, [.bullion])
+        XCTAssertEqual(midas.floors, [.goldLeaf])
+        XCTAssertEqual(midas.pits, [.vault])
+        XCTAssertEqual(Floor.goldLeaf.tier, Floor.mirage.tier)
+        XCTAssertEqual(Pit.vault.tier, Pit.mirage.tier)
+        XCTAssertEqual(midas.fullPrice(), 5_000)
+        XCTAssertEqual(midas.rarity, .standard)
+
+        // Displaced pieces sit in neither set any more.
+        for b in [citrus, midas] {
+            XCTAssertFalse(b.goals.contains(.flame))
+            XCTAssertFalse(b.trails.contains(.ember))
+            XCTAssertFalse(b.floors.contains(.dusk) || b.floors.contains(.mirage))
+            XCTAssertFalse(b.pits.contains(.sunset) || b.pits.contains(.mirage))
+        }
+    }
+
     /// Approved pit redraws: drawn art for 18 pits; only the two Rare ones
     /// (Graveyard, Aurora) move; Midnight shows as "Moonlit" with its old id.
     func testPitRedraws_tiersAndNames() {
         let drawn = Pit.allCases.filter { $0.hasDrawnArt }
-        XCTAssertEqual(drawn.count, 21)   // 18 redraws + the Fire, Water and Storm starter pits
+        // 18 redraws + the Fire, Water and Storm starter pits, plus the pits
+        // added in the quality round (Tide Pool, Vault, …).
+        XCTAssertGreaterThanOrEqual(drawn.count, 21)
+        XCTAssertTrue(Pit.tidePool.hasDrawnArt && Pit.vault.hasDrawnArt)
         XCTAssertEqual(Pit.graveyard.tier, .rare)
         XCTAssertEqual(Pit.aurora.tier, .rare)
         XCTAssertEqual(Pit.graveyard.coinCost, 1_000)
