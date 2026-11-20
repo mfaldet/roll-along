@@ -598,9 +598,7 @@ struct CosmeticShopView: View {
                 // ── Seasonal events: while a holiday window is open, the
                 //    Shop features the event's FULL collection.  Events never
                 //    sell loose pieces (CosmeticSale). ─────────────────────
-                ForEach(SeasonalEvent.open().filter { event in
-                    event.featuredCollection.map { CosmeticSchedule.isReleased($0) } ?? false
-                }) { event in
+                ForEach(openSeasonalEvents) { event in
                     seasonalSection(event)
                 }
 
@@ -658,6 +656,22 @@ struct CosmeticShopView: View {
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.18), lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Open seasonal events whose featured collection is released.  When two
+    /// open events feature the same collection (Halloween and Día de los
+    /// Muertos both feature Haunted), only the first is shown, so a
+    /// collection card never appears twice.
+    private var openSeasonalEvents: [SeasonalEvent] {
+        var seen = Set<String>()
+        var result: [SeasonalEvent] = []
+        for event in SeasonalEvent.open() {
+            guard let featured = event.featuredCollection,
+                  CosmeticSchedule.isReleased(featured),
+                  seen.insert(featured.id).inserted else { continue }
+            result.append(event)
+        }
+        return result
     }
 
     /// One open seasonal event: its name, time left and the full collection
