@@ -390,3 +390,273 @@ not shown or charged in 1.0. The evergreen cosmetic count rises by 18 (242 → 2
 No active collection used a Roll Along piece. `tools/cosmetic-calendar/defaults_scan.py` checks that none does.
 
 **Prices:** Sketchbook 4,000 → 4,750 (Graphite now counts at 750). Heavens, Back to School 2026, Diamond and Paper World are unchanged, because the removed pieces were free defaults.
+
+## On-sale rule (November 20, 2026)
+
+This replaces every earlier statement in this file that retired, seasonal or displaced pieces "stay buyable one at a time".
+
+- A cosmetic can be seen and bought only if it belongs to a **full active collection**: all six slots filled (ball, goal, trail, floor, pit, boundary) and its release day reached. Pieces are still sold one at a time, but only pieces of such a collection.
+- Every other piece is **held**: not shown, not sold, not announced. Held pieces keep their code and ids; an owner keeps them and can equip them from the Locker. The full list is in `docs/proposals/held-pieces.md`.
+- Exempt (earned or purchase-only, never sold for coins): Diamond ball, Money Ball, Trophy ball, Money Roll trail, Money Full floor.
+- Ball packs (Planets, Sports Balls, Vintage Glass Marbles) are held: each contains balls that are in no full collection.
+- Every release is one or two full collections: Feb 11, 2027 Candyland and Nightclub; Apr 1 Golf and Bloom; Jun 3 Ocean. The loose release slots and the days that only brought pieces of retired sets are removed (database step 21 tidies the server table).
+- A seasonal event sells no loose ball or boundary. While its window is open the Shop shows the one full collection it features.
+- 22 collections are on sale, all full, plus the free Roll Along set.
+
+## Quality round (November 20, 2026)
+
+Every active collection, piece by piece. *Approved* = graded and left as it was. Tiers and prices did not change: a replacement took the tier of the piece it replaced. The five collections that release later (Candyland, Nightclub, Golf, Bloom, Ocean) were not graded in this round.
+
+### Roll Along (Iconic, free)
+
+| Slot | Piece | Status |
+|---|---|---|
+| Ball | Red | approved |
+| Goal | Target | approved |
+| Trail | Classic Shadow | renamed (was Classic) |
+| Floor | Classic White | renamed (was Classic) |
+| Pit | Classic Black | renamed (was Classic) |
+| Boundary | Classic Gray | renamed (was Classic) |
+
+### Aurora (8,500 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Aurora | approved | Legendary | 1,500 |
+| Goal | Aurora | approved | Legendary | 1,500 |
+| Trail | Aurora | approved | Legendary | 1,500 |
+| Floor | Aurora | redrawn (looks swapped with the pit) | Legendary | 1,500 |
+| Pit | Aurora | redrawn (looks swapped with the floor) | Rare | 1,000 |
+| Boundary | Aurora | approved | Legendary | 1,500 |
+
+### Nature (4,500 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Jade | approved | Standard | 750 |
+| Goal | Leaf Wreath | new (replaces Meadow) | Standard | 750 |
+| Trail | Forest | approved | Standard | 750 |
+| Floor | Meadow | approved | Standard | 750 |
+| Pit | Meadow | approved | Standard | 750 |
+| Boundary | Mint | approved | Standard | 750 |
+
+### Fire (4,500 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Blaze | redrawn | Standard | 750 |
+| Goal | Flame Ring | redrawn | Standard | 750 |
+| Trail | Wildfire | redrawn | Standard | 750 |
+| Floor | Scorched | redrawn | Standard | 750 |
+| Pit | Crater | approved | Standard | 750 |
+| Boundary | Flare | redrawn | Standard | 750 |
+
+### Water (4,500 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Droplet | redrawn | Standard | 750 |
+| Goal | Whirlpool | redrawn | Standard | 750 |
+| Trail | Splash | approved | Standard | 750 |
+| Floor | Shallows | redrawn | Standard | 750 |
+| Pit | Deep End | redrawn | Standard | 750 |
+| Boundary | Breakers | redrawn | Standard | 750 |
+
+### Storm (4,500 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Thundercloud | redrawn | Standard | 750 |
+| Goal | Storm Eye | redrawn, renamed (was Thunder Ring) | Standard | 750 |
+| Trail | Squall | redrawn | Standard | 750 |
+| Floor | Overcast | redrawn | Standard | 750 |
+| Pit | Maelstrom | redrawn | Standard | 750 |
+| Boundary | Thunderhead | redrawn, renamed (was Thunderbolt) | Standard | 750 |
+
+### Citrus (5,250 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Lemon | redrawn (lemon-shaped) | Standard | 750 |
+| Goal | Citrus Slice | new (replaces Flame) | Epic | 1,250 |
+| Trail | Zest | new (replaces Ember) | Rare | 1,000 |
+| Floor | Grove | new (replaces Dusk) | Standard | 750 |
+| Pit | Tide Pool | new (replaces Sunset) | Standard | 750 |
+| Boundary | Citrus | redrawn | Standard | 750 |
+
+### Sketchbook (4,750 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Pencil | new (replaces Silver) | Standard | 750 |
+| Goal | Scribble | new (replaces Archery) | Standard | 750 |
+| Trail | Graphite | approved | Standard | 750 |
+| Floor | Paper | renamed (was Sketch), doodles added | Rare | 1,000 |
+| Pit | Sketch | approved | Standard | 750 |
+| Boundary | Slate | approved | Standard | 750 |
+
+### Midas (5,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Fool's Gold | approved | Standard | 750 |
+| Goal | Bullion | improved | Standard | 750 |
+| Trail | Gilded | approved | Rare | 1,000 |
+| Floor | Gold Leaf | new (replaces Mirage) | Standard | 750 |
+| Pit | Vault | new (replaces Mirage) | Standard | 750 |
+| Boundary | Gold | approved | Rare | 1,000 |
+
+### Winter (6,250 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Snowglobe | approved | Legendary | 1,500 |
+| Goal | Frost | redrawn | Standard | 750 |
+| Trail | Ice | redrawn | Legendary | 1,500 |
+| Floor | Snowfield | redrawn, renamed (was Twilight) | Standard | 750 |
+| Pit | Crevasse | redrawn, renamed (was Twilight) | Standard | 750 |
+| Boundary | Ice | redrawn | Rare | 1,000 |
+
+### Cosmos (7,250 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Nebula | approved | Legendary | 1,500 |
+| Goal | Galaxy | approved | Epic | 1,250 |
+| Trail | Stardust | tweaked (larger, more stars) | Legendary | 1,500 |
+| Floor | Midnight | redrawn | Standard | 750 |
+| Pit | Moonlit | redrawn | Standard | 750 |
+| Boundary | Starlight | approved | Legendary | 1,500 |
+
+### Lava Flow (8,250 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Lava | redrawn | Legendary | 1,500 |
+| Goal | Inferno | redrawn | Legendary | 1,500 |
+| Trail | Fire | approved | Legendary | 1,500 |
+| Floor | Ember | redrawn | Standard | 750 |
+| Pit | Evil | redrawn | Legendary | 1,500 |
+| Boundary | Molten | approved | Legendary | 1,500 |
+
+### Neon (7,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Neon | approved | Epic | 1,250 |
+| Goal | Neon | redrawn (calmer motion) | Legendary | 1,500 |
+| Trail | Raybeam | approved | Rare | 1,000 |
+| Floor | Grid City | slowed | Legendary | 1,500 |
+| Pit | Blackout | redrawn, renamed (was Graph) | Standard | 750 |
+| Boundary | Neon | approved | Rare | 1,000 |
+
+### Haunted (7,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Ghost | redrawn | Legendary | 1,500 |
+| Goal | Pentagram | new (replaces Obsidian) | Epic | 1,250 |
+| Trail | Smoke | approved (stays) | Legendary | 1,500 |
+| Floor | Fog | redrawn | Standard | 750 |
+| Pit | Graveyard | redrawn | Rare | 1,000 |
+| Boundary | Phantom | approved | Rare | 1,000 |
+
+### Ancient Temple (6,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Dune | redrawn | Epic | 1,250 |
+| Goal | Eclipse | approved | Epic | 1,250 |
+| Trail | Glyphs | new (replaces Snake) | Rare | 1,000 |
+| Floor | Desert | redrawn | Standard | 750 |
+| Pit | Canyon | approved | Standard | 750 |
+| Boundary | Sandstone | redrawn | Rare | 1,000 |
+
+### Abyssal Depths (7,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Trench | approved | Legendary | 1,500 |
+| Goal | Vortex | approved | Standard | 750 |
+| Trail | Ink | approved | Legendary | 1,500 |
+| Floor | Inverted | approved | Standard | 750 |
+| Pit | Sea Vent | new (replaces Space) | Legendary | 1,500 |
+| Boundary | Abyss | approved | Rare | 1,000 |
+
+### Champion (7,750 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Trophy | redrawn | Legendary | 1,500 |
+| Goal | Winner's Circle | new (replaces Quasar) | Legendary | 1,500 |
+| Trail | Victory Lap | new (replaces Comet) | Legendary | 1,500 |
+| Floor | Brass Works | approved | Legendary | 1,500 |
+| Pit | Sideline | approved | Standard | 750 |
+| Boundary | Brass | approved | Rare | 1,000 |
+
+### Space Traveler (9,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | UFO | from retired Space Travel (not redrawn) | Legendary | 1,500 |
+| Goal | Quasar | moved from Champion | Legendary | 1,500 |
+| Trail | Comet | moved from Champion | Legendary | 1,500 |
+| Floor | Moon | from retired Space Travel (not redrawn) | Legendary | 1,500 |
+| Pit | Space | moved from Abyssal Depths | Legendary | 1,500 |
+| Boundary | Starship Hull | new | Legendary | 1,500 |
+
+### Candyland (6,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Candy | not graded this round | Legendary | 1,500 |
+| Goal | Candy | not graded this round | Standard | 750 |
+| Trail | Bubblegum | not graded this round | Standard | 750 |
+| Floor | Sugar | not graded this round | Standard | 750 |
+| Pit | Syrup | not graded this round | Standard | 750 |
+| Boundary | Candy | not graded this round | Legendary | 1,500 |
+
+### Nightclub (9,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Disco Ball | not graded this round | Legendary | 1,500 |
+| Goal | Mosaic | not graded this round | Legendary | 1,500 |
+| Trail | Rainbow | not graded this round | Legendary | 1,500 |
+| Floor | Disco | not graded this round | Legendary | 1,500 |
+| Pit | Nightclub | not graded this round | Legendary | 1,500 |
+| Boundary | Marquee | not graded this round | Legendary | 1,500 |
+
+### Golf (8,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Golf Ball | not graded this round | Epic | 1,250 |
+| Goal | Hole-in-One | not graded this round | Legendary | 1,500 |
+| Trail | Air | not graded this round | Legendary | 1,500 |
+| Floor | Grass | not graded this round | Legendary | 1,500 |
+| Pit | Pond | not graded this round | Legendary | 1,500 |
+| Boundary | Fairway | not graded this round | Standard | 750 |
+
+### Bloom (6,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Rose | not graded this round | Standard | 750 |
+| Goal | Blossom | not graded this round | Epic | 1,250 |
+| Trail | Rose | not graded this round | Legendary | 1,500 |
+| Floor | Parchment | not graded this round | Rare | 1,000 |
+| Pit | Parchment | not graded this round | Standard | 750 |
+| Boundary | Rose | not graded this round | Standard | 750 |
+
+### Ocean (6,000 coins)
+
+| Slot | Piece | Status | Tier | Price |
+|---|---|---|---|---|
+| Ball | Aquarium | not graded this round | Legendary | 1,500 |
+| Goal | Ripple | not graded this round | Epic | 1,250 |
+| Trail | Sky | not graded this round | Standard | 750 |
+| Floor | Blueprint | not graded this round | Standard | 750 |
+| Pit | Blueprint | not graded this round | Standard | 750 |
+| Boundary | Tide | not graded this round | Rare | 1,000 |
+

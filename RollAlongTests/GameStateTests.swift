@@ -1684,7 +1684,7 @@ final class PayoutAuditTests: XCTestCase {
     func testSellBackRefundsHalf() {
         let gs = GameState(defaults: defaults)
         gs.addCoins(5_000)
-        guard let item = Floor.allCases.first(where: { $0.isSellable && $0.coinCost == 750 }) else {
+        guard let item = Floor.allCases.first(where: { $0.isSellable && $0.coinCost == 750 && CosmeticSale.isOnSale($0) }) else {
             return XCTFail("no 750-coin floor")
         }
         XCTAssertTrue(gs.purchase(item))

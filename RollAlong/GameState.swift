@@ -3018,6 +3018,9 @@ final class GameState: ObservableObject {
     @discardableResult
     func purchase<Item: CosmeticItem>(_ item: Item) -> Bool {
         if isOwned(item) { return false }
+        // Only a piece of a released, full, active collection can be bought
+        // (CosmeticSale).  Held pieces are never sold.
+        guard CosmeticSale.isOnSale(item), item.isCoinPurchasable else { return false }
         guard spendCoins(item.coinCost) else { return false }
         // Full price paid — clear any stale discounted-price record so Sell
         // Back refunds the full cost.
@@ -3052,6 +3055,9 @@ final class GameState: ObservableObject {
     @discardableResult
     func purchaseBundle(_ bundle: CosmeticBundle, price: Int) -> Bool {
         guard !ownedBundles.contains(bundle.id) else { return false }
+        // Only full active collections whose release day has arrived are sold.
+        guard CosmeticSale.fullCollections.contains(where: { $0.id == bundle.id }),
+              CosmeticSchedule.isReleased(bundle) else { return false }
         let base = bundle.proratedPrice(in: self)   // BEFORE granting
         guard spendCoins(price) else { return false }
         if base > 0 {
@@ -3089,6 +3095,8 @@ final class GameState: ObservableObject {
     @discardableResult
     func purchasePack(_ pack: BallPack) -> Bool {
         if ownedPacks.contains(pack.id) { return false }
+        // A pack is sold only when every ball in it is on sale (CosmeticSale).
+        guard CosmeticSale.isOnSale(pack) else { return false }
         let price = pack.price(in: self)
         // Packs charge 66% of the member-skin sum — record each granted
         // skin's paid share so Sell Back refunds what was paid, not the

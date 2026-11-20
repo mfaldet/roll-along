@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Check that the app's built-in release calendar matches database step 11.
+"""Check that the app's built-in release calendar matches the database
+(step 11 as tidied by step 21: only dated FULL collections keep a release row).
 
 Run from the repository root:
 
@@ -7,8 +8,10 @@ Run from the repository root:
 
 It reads the built-in dates in RollAlong/Cosmetics.swift (CosmeticSchedule
 and the seasonal windows in the catalogue) and the seed rows in
-docs/cosmetics/cosmetic-calendar.sql, and prints every difference.  Exit code
-0 means they agree.  Read-only; touches no database.
+docs/cosmetics/cosmetic-calendar.sql, keeps only the release rows that step 21
+(docs/cosmetics/cosmetic-calendar-full-collections.sql) leaves in place, and
+prints every difference.  Exit code 0 means they agree.  Read-only; touches no
+database.
 """
 import re
 import sys
@@ -16,17 +19,18 @@ from datetime import date
 
 SWIFT = "RollAlong/Cosmetics.swift"
 SQL = "docs/cosmetics/cosmetic-calendar.sql"
+SQL21 = "docs/cosmetics/cosmetic-calendar-full-collections.sql"
 
 
 def swift_calendar():
     src = open(SWIFT, encoding="utf-8").read()
     permanent = {}
-    block = src[src.index("static let drops:"):src.index("static let looseSlotIDs")]
+    block = src[src.index("static let drops:"):src.index("static let builtInReleaseDays")]
     for y, m, d, ids in re.findall(r"CalendarDay\((\d+),\s*(\d+),\s*(\d+)\),\s*\[([^\]]*)\]", block):
         for cid in re.findall(r'"([^"]+)"', ids):
             permanent[cid] = date(int(y), int(m), int(d))
-    for cid, y, m, d in re.findall(r'map\["(_loose-\d)"\] = CalendarDay\((\d+), (\d+), (\d+)\)', src):
-        permanent[cid] = date(int(y), int(m), int(d))
+    if "_loose" in src[src.index("enum CosmeticSchedule"):src.index("enum CosmeticSale")]:
+        raise SystemExit("the app still mentions loose release slots")
 
     # Per-year rows for moving holidays.
     rows = {}
@@ -69,6 +73,15 @@ def sql_calendar():
             perm[cid] = s
         else:
             seas[(cid, s.year)] = (s, date.fromisoformat(end[6:16]))
+    # Step 21 deletes every release row except the dated full collections.
+    src21 = open(SQL21, encoding="utf-8").read()
+    m = re.search(r"collection_id not in \(([^)]*)\)", src21)
+    keep = set(re.findall(r"'([^']+)'", m.group(1)))
+    perm = {cid: d for cid, d in perm.items() if cid in keep}
+    for cid, start in re.findall(r"\('([a-z-]+)',\s+date '(\d{4}-\d\d-\d\d)', '", src21):
+        perm.setdefault(cid, date.fromisoformat(start))
+    if set(perm) != keep:
+        raise SystemExit(f"step 21 keeps {sorted(keep)} but ends with {sorted(perm)}")
     return perm, seas
 
 
@@ -93,7 +106,7 @@ def main():
           f"seasonal collections: {len(base)}")
     for p in problems:
         print("MISMATCH", p)
-    print("OK: built-in calendar matches step 11" if not problems else f"{len(problems)} mismatch(es)")
+    print("OK: built-in calendar matches steps 11 + 21" if not problems else f"{len(problems)} mismatch(es)")
     return 1 if problems else 0
 
 

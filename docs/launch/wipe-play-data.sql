@@ -1,7 +1,7 @@
 -- ===========================================================================
 -- Roll Along — wipe test play data before App Store submission
 -- ===========================================================================
--- Run ONCE, right before submitting, after database steps 1–20 are applied
+-- Run ONCE, right before submitting, after database steps 1–21 are applied
 -- (step 20 creates analytics_installs, which this also clears).
 -- Paste each PART into the Supabase SQL editor separately, in order:
 --   PART 1  preview  (read-only: row counts now)

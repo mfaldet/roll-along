@@ -37,7 +37,7 @@ ACCOUNT DELETION
 Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
 COSMETIC RELEASE CALENDAR
-Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; nothing else is switched on remotely. 21 collections are sold as sets; other items are sold singly. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal events return each year.
+Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; nothing else is switched on remotely. 22 collections are sold, whole or one piece at a time; no other cosmetics are sold. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal events return each year.
 
 TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.
@@ -65,6 +65,9 @@ Contact: rollalongsupport@gmail.com
 - [ ] Step 19, `docs/economy/season-prize-settings.sql`, has been applied, so
       clan season prizes are exactly 1,000 / 500 / 250 / 100 coins as the
       notes say.
+- [ ] Step 21, `docs/cosmetics/cosmetic-calendar-full-collections.sql`, has
+      been applied (release rows only for full collections; optional for the
+      app, which ignores the old rows).
 - [ ] Step 20, `docs/analytics/events-retention.sql`, has been applied
       (raw analytics events older than 90 days are deleted daily at 03:47 UTC).
 - [ ] Right before submitting: delete the app on the test phones, then run

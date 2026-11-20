@@ -595,9 +595,12 @@ struct CosmeticShopView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // ── Seasonal events: spotlight items, sold one by one while
-                //    the holiday window is open (SeasonalEvent). ─────────
-                ForEach(SeasonalEvent.open()) { event in
+                // ── Seasonal events: while a holiday window is open, the
+                //    Shop features the event's FULL collection.  Events never
+                //    sell loose pieces (CosmeticSale). ─────────────────────
+                ForEach(SeasonalEvent.open().filter { event in
+                    event.featuredCollection.map { CosmeticSchedule.isReleased($0) } ?? false
+                }) { event in
                     seasonalSection(event)
                 }
 
@@ -657,30 +660,26 @@ struct CosmeticShopView: View {
         .buttonStyle(.plain)
     }
 
-    /// One open seasonal event: its spotlight items (sold one by one, in
-    /// season only) and a pointer to the collection it features.
+    /// One open seasonal event: its name, time left and the full collection
+    /// it features (the card works like any collection card).
+    @ViewBuilder
     private func seasonalSection(_ event: SeasonalEvent) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                sectionLabel(event.displayName.uppercased())
-                Spacer()
-                if let left = event.bundle.timeRemainingLabel {
-                    Text(left)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.40))
+        if let featured = event.featuredCollection {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    sectionLabel(event.displayName.uppercased())
+                    Spacer()
+                    if let left = event.bundle.timeRemainingLabel {
+                        Text(left)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.40))
+                    }
                 }
-            }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(event.spotlightBalls, id: \.id) { item in itemCell(item: item) }
-                ForEach(event.spotlightBoundaries, id: \.id) { item in itemCell(item: item) }
-            }
-            if let featured = event.featuredCollection {
-                Text("Also in season: the \(featured.displayName) collection, in the Catalog.")
+                Text("In season: the \(featured.displayName) collection.")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(white: 0.6))
                     .fixedSize(horizontal: false, vertical: true)
+                collectionCard(featured, isFeatured: false)
             }
         }
     }
@@ -840,13 +839,15 @@ struct CosmeticShopView: View {
         }
     }
 
-    /// Release-calendar filter for the Catalog grids: an item is listed once
-    /// its scheduled drop has arrived (`CosmeticSchedule`), or if the player
-    /// already owns it.  Unreleased collections are announced in the
-    /// "Coming soon" row instead.
+    /// The Catalog lists a piece only when it is ON SALE — it belongs to a
+    /// released, full, active collection (`CosmeticSale`) — plus the Roll
+    /// Along defaults, and exempt earned or purchase-only pieces the player
+    /// owns.  Held pieces are never listed here, even when owned; an owner
+    /// finds and equips them in the Locker.
     private func isListed<Item: CosmeticItem>(_ item: Item) -> Bool {
-        CosmeticSchedule.isReleased(item) || gameState.isOwned(item)
-            || SeasonalEvent.isSpotlit(item)
+        if CosmeticSale.isDefault(item) { return true }
+        if CosmeticSale.isOnSale(item) { return true }
+        return CosmeticSale.isExempt(item) && gameState.isOwned(item)
     }
 
     private func categoryGrid<Item: CosmeticItem>(items: [Item]) -> some View {
@@ -870,10 +871,10 @@ struct CosmeticShopView: View {
     @ViewBuilder
     private var ballSection: some View {
         VStack(alignment: .leading, spacing: 22) {
-            // Packs appear once every ball in them has been released.
-            let packs = BallPack.catalogue.filter {
-                CosmeticSchedule.isReleased($0) || gameState.ownsPack($0)
-            }
+            // A pack is listed only when every ball in it is on sale
+            // (CosmeticSale).  Today none qualifies, so packs are held; an
+            // owner still finds and equips a pack in the Locker.
+            let packs = BallPack.catalogue.filter { CosmeticSale.isOnSale($0) }
             if !packs.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionLabel("PACKS")
@@ -893,7 +894,7 @@ struct CosmeticShopView: View {
             // Locker-only balls (Diamond) never appear here, even when owned.
             categoryGrid(items: BallSkin.allCases.filter {
                 !$0.isLockerOnly
-                    && (!$0.isBundleExclusive || gameState.isOwned($0) || SeasonalEvent.isSpotlit($0))
+                    && (!$0.isBundleExclusive || gameState.isOwned($0))
                     && isListed($0)
             })
         }
@@ -1231,7 +1232,7 @@ struct CosmeticShopView: View {
         // Seasonal bundles still appear only while their window is open.
         // Collections not yet released (see `CosmeticSchedule`) are announced
         // in the "Coming soon" row below rather than listed.
-        let bundles = CosmeticBundle.active
+        let bundles = CosmeticSale.fullCollections
             .filter { !$0.isLimitedTime || $0.isAvailable }
             .filter { CosmeticSchedule.isReleased($0) }
             .filter { bundleFilter.matches($0) }

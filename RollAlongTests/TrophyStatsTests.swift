@@ -119,7 +119,7 @@ final class TrophyStatsTests: XCTestCase {
     func testLiquidateCoinCosmetics_refundExcludedFromPlayEarned() throws {
         let gs = makeGameState()
         let ball = try XCTUnwrap(
-            BallSkin.allCases.first { $0.isSellable },
+            BallSkin.allCases.first { $0.isSellable && $0.isCoinPurchasable && CosmeticSale.isOnSale($0) },
             "need a sellable ball skin")
         gs.addCoins(ball.coinCost)                       // play-funded
         XCTAssertTrue(gs.purchase(ball))
@@ -138,9 +138,9 @@ final class TrophyStatsTests: XCTestCase {
     func testGrantBundleFree_compensationExcludedFromPlayEarned() throws {
         let gs = makeGameState()
         let bundle = try XCTUnwrap(
-            CosmeticBundle.catalogue.first { $0.balls.contains { $0.isSellable } },
+            CosmeticSale.fullCollections.first { $0.balls.contains { $0.isSellable && $0.isCoinPurchasable && CosmeticSale.isOnSale($0) } },
             "need a bundle containing a sellable ball")
-        let ball = try XCTUnwrap(bundle.balls.first { $0.isSellable })
+        let ball = try XCTUnwrap(bundle.balls.first { $0.isSellable && $0.isCoinPurchasable })
         gs.addCoins(ball.coinCost)                       // play-funded
         XCTAssertTrue(gs.purchase(ball))
         let earnedBefore = gs.trophyStats.coinsEarnedFromPlay
@@ -406,7 +406,7 @@ final class TrophyStatsTests: XCTestCase {
         gs.currentModeID = "climb"
         gs.recordResult(level: 1, stars: 3, time: 9, coinIndices: [])
         _ = gs.claimDailyReward()
-        let ball = try XCTUnwrap(BallSkin.allCases.first { $0.isSellable })
+        let ball = try XCTUnwrap(BallSkin.allCases.first { $0.isSellable && $0.isCoinPurchasable && CosmeticSale.isOnSale($0) })
         gs.addCoins(ball.coinCost)
         XCTAssertTrue(gs.purchase(ball))
         let before = persistedTrophyKeyValues()

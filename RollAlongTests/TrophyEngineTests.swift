@@ -2530,18 +2530,24 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
 
         // A real coin purchase does.
         gs.coinBalance = 100_000
-        XCTAssertTrue(gs.purchase(BallSkin.green))
+        XCTAssertTrue(gs.purchase(BallSkin.jade))
         XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
     }
 
-    /// A pack purchase also latches `cosmetic_first_buy` (a coin spend).
-    func testPackPurchaseLatchesFirstBuy() {
+    /// Ball packs are held (their balls are in no full collection), so a
+    /// pack cannot be bought and never latches `cosmetic_first_buy`; a
+    /// collection purchase does.
+    func testHeldPackIsNotSold_collectionPurchaseLatchesFirstBuy() {
         let gs = makeGameState()
         gs.coinBalance = 100_000
         XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
 
         let pack = BallPack.catalogue.first!
-        XCTAssertTrue(gs.purchasePack(pack))
+        XCTAssertFalse(gs.purchasePack(pack))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
+
+        let nature = CosmeticSale.fullCollections.first { $0.id == "nature" }!
+        XCTAssertTrue(gs.purchaseBundle(nature, price: nature.fullPrice()))
         XCTAssertTrue(gs.trophyEngine.isUnlocked("cosmetic_first_buy"))
     }
 

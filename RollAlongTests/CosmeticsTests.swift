@@ -939,7 +939,7 @@ final class CosmeticsTests: XCTestCase {
     /// straight back must refund at most what was paid — never a profit.
     func testBundle_discountedShopPurchase_sellBackRefundsPaidNotFull() {
         let gs = makeCleanState()
-        let bundle = CosmeticBundle.catalogue[0]
+        let bundle = CosmeticSale.fullCollections[0]
         let paid = bundle.shopPrice(in: gs, discount: .legendary)   // 50% off
         gs.coinBalance = paid
         XCTAssertTrue(gs.purchaseBundle(bundle, price: paid))
@@ -957,7 +957,7 @@ final class CosmeticsTests: XCTestCase {
     /// window.  Repeating must never grow the balance past its start.
     func testBundle_discountBuySellLoop_neverProfits() {
         let gs = makeCleanState()
-        let bundle = CosmeticBundle.catalogue[0]
+        let bundle = CosmeticSale.fullCollections[0]
         let start = bundle.fullPrice()
         gs.coinBalance = start
         for pass in 1...3 {
@@ -969,41 +969,41 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
-    /// Ball Packs charge 66% of the member-skin sum — the same mint existed
-    /// there (buy pack, liquidate skins at full coinCost, +34% forever).
-    func testPack_purchase_sellBackRefundsPaidNotFull() {
+    /// Ball packs are HELD: their balls are in no full collection, so a pack
+    /// is never sold (CosmeticSale).  A refused purchase spends nothing.  An
+    /// owner keeps a pack and can still equip it.
+    func testPack_heldPacksAreNotSold() {
         let gs = makeCleanState()
+        gs.coinBalance = 1_000_000
+        for pack in BallPack.catalogue {
+            XCTAssertFalse(CosmeticSale.isOnSale(pack), "\(pack.id) holds balls outside a full collection")
+            XCTAssertFalse(gs.purchasePack(pack), "\(pack.id) must not be sold")
+        }
+        XCTAssertEqual(gs.coinBalance, 1_000_000, "a refused purchase spends nothing")
         guard let pack = BallPack.catalogue.first else { return XCTFail("expected a pack in the catalogue") }
-        let start = pack.skins.reduce(0) { $0 + $1.coinCost }
-        gs.coinBalance = start
-        let price = pack.price(in: gs)
-        XCTAssertTrue(gs.purchasePack(pack))
-        XCTAssertEqual(gs.coinBalance, start - price)
-
-        let r = gs.liquidateCoinCosmetics()
-        XCTAssertGreaterThan(r.coins, 0, "a pack purchase still refunds something")
-        XCTAssertLessThanOrEqual(r.coins, price, "pack Sell Back must refund at most the discounted price paid")
-        XCTAssertLessThanOrEqual(gs.coinBalance, start, "pack buy → Sell Back must not mint coins")
+        gs.ownedPacks.insert(pack.id)
+        gs.equipPack(pack)
+        XCTAssertEqual(gs.equippedPackID, pack.id, "an owner can still equip a held pack")
     }
 
     /// Full-price purchases take the standard rate: an individual Shop buy
     /// refunds half its current coinCost (no paid-price cap in play).
     func testFullPricePurchases_refundHalfCurrentCost() {
         let gs = makeCleanState()
-        gs.coinBalance = BallSkin.blue.coinCost
-        XCTAssertTrue(gs.purchase(BallSkin.blue))
+        gs.coinBalance = BallSkin.jade.coinCost
+        XCTAssertTrue(gs.purchase(BallSkin.jade))
         let r = gs.liquidateCoinCosmetics()
-        XCTAssertEqual(r.coins, BallSkin.blue.coinCost / 2, "full-price purchase refunds half the current cost")
+        XCTAssertEqual(r.coins, BallSkin.jade.coinCost / 2, "full-price purchase refunds half the current cost")
     }
 
     /// Re-buying an item at full price after a discounted purchase was sold
     /// back must clear the stale discounted record.
     func testRebuyAtFullPrice_clearsDiscountedRecord() {
         let gs = makeCleanState()
-        gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = 1   // stale discount record
-        gs.coinBalance = BallSkin.blue.coinCost
-        XCTAssertTrue(gs.purchase(BallSkin.blue))
-        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost / 2,
+        gs.paidPrices[GameState.paidPriceKey(BallSkin.jade)] = 1   // stale discount record
+        gs.coinBalance = BallSkin.jade.coinCost
+        XCTAssertTrue(gs.purchase(BallSkin.jade))
+        XCTAssertEqual(gs.sellBackValue(BallSkin.jade), BallSkin.jade.coinCost / 2,
                        "full-price re-purchase refunds the standard half rate again")
     }
 
@@ -1023,19 +1023,20 @@ final class CosmeticsTests: XCTestCase {
     /// corrupt/legacy record claims more was paid.
     func testSellBackValue_isCappedAtHalfCurrentCost() {
         let gs = makeCleanState()
-        gs.paidPrices[GameState.paidPriceKey(BallSkin.blue)] = BallSkin.blue.coinCost * 10
-        XCTAssertEqual(gs.sellBackValue(BallSkin.blue), BallSkin.blue.coinCost / 2)
+        gs.paidPrices[GameState.paidPriceKey(BallSkin.jade)] = BallSkin.jade.coinCost * 10
+        XCTAssertEqual(gs.sellBackValue(BallSkin.jade), BallSkin.jade.coinCost / 2)
     }
     // MARK: - Release calendar (CosmeticSchedule)
 
-    /// Every permanent collection is scheduled exactly once — at launch or in
-    /// one drop — and nothing is scheduled that isn't a permanent collection.
-    func testSchedule_everyPermanentBundleScheduledExactlyOnce() {
+    /// Every FULL active collection is scheduled exactly once — at launch or
+    /// in one drop — and nothing else is: no retired set, no loose slot.
+    func testSchedule_everyFullCollectionScheduledExactlyOnce() {
         let scheduled = CosmeticSchedule.launchBundleIDs + CosmeticSchedule.drops.flatMap { $0.ids }
         XCTAssertEqual(scheduled.count, Set(scheduled).count, "a collection is scheduled twice")
-        let permanent = Set(CosmeticBundle.catalogue.filter { !$0.isLimitedTime }.map(\.id))
-        XCTAssertEqual(Set(scheduled), permanent,
-                       "the schedule must cover exactly the permanent collections")
+        XCTAssertEqual(Set(scheduled), Set(CosmeticSale.fullCollections.map(\.id)),
+                       "the schedule must cover exactly the full active collections")
+        XCTAssertFalse(CosmeticSchedule.builtInReleaseDays.keys.contains { $0.hasPrefix("_loose") },
+                       "there are no single-piece release slots")
     }
 
     /// Collections the game gives away must be available on day one: the
@@ -1064,27 +1065,27 @@ final class CosmeticsTests: XCTestCase {
         CosmeticSchedule.easternMidnight(y, m, d).addingTimeInterval(seconds)
     }
 
-    /// The approved built-in calendar (docs/proposals/cosmetic-calendar.md,
-    /// identical to the rows in docs/cosmetics/cosmetic-calendar.sql).
-    func testSchedule_builtInDatesMatchTheApprovedCalendar() {
+    /// The built-in calendar: every release day brings one or two full
+    /// collections (database steps 11 and 21 hold the same rows).
+    func testSchedule_everyReleaseIsOneOrTwoFullCollections() {
         let expected: [(String, CalendarDay)] = [
-            ("cathedral", CalendarDay(2026, 12, 17)), ("zen-garden", CalendarDay(2027, 1, 14)),
-            ("candyland", CalendarDay(2027, 2, 11)),  ("planets", CalendarDay(2027, 3, 11)),
-            ("diamond", CalendarDay(2027, 4, 1)),     ("tempest", CalendarDay(2027, 5, 6)),
-            ("soccer", CalendarDay(2027, 6, 3)),      ("paper-world", CalendarDay(2027, 7, 1)),
-            ("eclipse", CalendarDay(2027, 7, 29)),    ("geode", CalendarDay(2027, 9, 2)),
-            ("oracle", CalendarDay(2027, 10, 7)),     ("quicksilver", CalendarDay(2027, 11, 11)),
-            ("_loose-1", CalendarDay(2027, 2, 11)),   ("_loose-2", CalendarDay(2027, 5, 6)),
-            ("_loose-3", CalendarDay(2027, 7, 29)),
+            ("candyland", CalendarDay(2027, 2, 11)), ("nightclub", CalendarDay(2027, 2, 11)),
+            ("golf", CalendarDay(2027, 4, 1)),       ("bloom", CalendarDay(2027, 4, 1)),
+            ("ocean", CalendarDay(2027, 6, 3)),
         ]
+        XCTAssertEqual(CosmeticSchedule.builtInReleaseDays.count, expected.count)
         for (id, day) in expected {
             XCTAssertEqual(CosmeticSchedule.builtInReleaseDays[id], day, id)
         }
-        XCTAssertEqual(CosmeticSchedule.drops.count, 12)
-        XCTAssertEqual(CosmeticSchedule.drops.flatMap { $0.ids }.count, 37)
+        let full = Set(CosmeticSale.fullCollections.map(\.id))
+        for drop in CosmeticSchedule.drops {
+            XCTAssertTrue((1...2).contains(drop.ids.count), "a release day brings one or two collections")
+            for id in drop.ids { XCTAssertTrue(full.contains(id), "\(id) must be a full active collection") }
+        }
         let days = CosmeticSchedule.drops.map { $0.day }
         XCTAssertEqual(days, days.sorted(), "drops are in date order")
         XCTAssertNil(CosmeticSchedule.releaseDate(of: "aurora"), "launch collections have no date")
+        XCTAssertNil(CosmeticSchedule.releaseDate(of: "cathedral"), "retired sets have no release day")
         XCTAssertEqual(CosmeticBundle.catalogue.first { $0.id == "lunar-2027" }?.displayName,
                        "Lunar New Year")
     }
@@ -1095,16 +1096,16 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "aurora",
                                                   at: eastern(2020, 1, 1), store: store),
                       "launch content is available from the first open, whenever that is")
-        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "cathedral",
-                                                   at: eastern(2026, 12, 17, plus: -1), store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "cathedral",
-                                                  at: eastern(2026, 12, 17), store: store))
-        // Midnight Eastern on Dec 17 is 05:00 UTC.
+        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "candyland",
+                                                   at: eastern(2027, 2, 11, plus: -1), store: store))
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "candyland",
+                                                  at: eastern(2027, 2, 11), store: store))
+        // Midnight Eastern on Feb 11 is 05:00 UTC.
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC")!
-        let parts = utc.dateComponents([.year, .month, .day, .hour], from: eastern(2026, 12, 17))
-        XCTAssertEqual([parts.year, parts.month, parts.day, parts.hour], [2026, 12, 17, 5])
-        XCTAssertEqual(CosmeticSchedule.dayLabel(eastern(2026, 12, 17)).contains("17"), true)
+        let parts = utc.dateComponents([.year, .month, .day, .hour], from: eastern(2027, 2, 11))
+        XCTAssertEqual([parts.year, parts.month, parts.day, parts.hour], [2027, 2, 11, 5])
+        XCTAssertEqual(CosmeticSchedule.dayLabel(eastern(2027, 2, 11)).contains("11"), true)
     }
 
     /// Every collection releases eventually; "Coming soon" names only the
@@ -1112,13 +1113,12 @@ final class CosmeticsTests: XCTestCase {
     /// and is hidden once no collection is scheduled.
     func testSchedule_comingSoonShowsTheNextCollectionDay() {
         let store = calendarStore()
-        // Dec 17 and Jan 14 release only pieces of retired sets, so the first
-        // announcement is Feb 11.
+        // There are no single-piece release days: the first release is Feb 11.
         let first = CosmeticSchedule.nextDrop(at: eastern(2026, 12, 1), store: store)
         XCTAssertEqual(first?.date, eastern(2027, 2, 11))
         XCTAssertEqual(Set(first?.bundles.map(\.id) ?? []), ["candyland", "nightclub"])
         let march = CosmeticSchedule.nextDrop(at: eastern(2027, 3, 11, plus: -1), store: store)
-        XCTAssertEqual(march?.date, eastern(2027, 4, 1), "Mar 11 brings no collection, so it is skipped")
+        XCTAssertEqual(march?.date, eastern(2027, 4, 1))
         XCTAssertEqual(Set(march?.bundles.map(\.id) ?? []), ["golf", "bloom"])
         let june = CosmeticSchedule.nextDrop(at: eastern(2027, 4, 2), store: store)
         XCTAssertEqual(june?.bundles.map(\.id), ["ocean"])
@@ -1133,28 +1133,32 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// A date in the server table overrides the built-in one, earlier or later;
-    /// unknown ids and broken rows are ignored; deleting a row restores the
-    /// built-in date.
+    /// unknown ids, retired sets, loose slots and broken rows are ignored;
+    /// deleting a row restores the built-in date.
     func testSchedule_serverDatesOverrideBuiltIn() {
         let store = calendarStore()
         typealias Row = CosmeticCalendarStore.Row
         store.apply([
-            Row(collection_id: "planets", starts_on: "2027-01-07", ends_on: nil),     // earlier
-            Row(collection_id: "cathedral", starts_on: "2027-01-21", ends_on: nil),   // later
-            Row(collection_id: "not-a-collection", starts_on: "2027-01-01", ends_on: nil),
-            Row(collection_id: "noir", starts_on: "garbage", ends_on: nil),
             Row(collection_id: "candyland", starts_on: "2027-01-07", ends_on: nil),   // earlier
+            Row(collection_id: "golf", starts_on: "2027-05-20", ends_on: nil),        // later
+            Row(collection_id: "not-a-collection", starts_on: "2027-01-01", ends_on: nil),
+            Row(collection_id: "cathedral", starts_on: "2026-12-17", ends_on: nil),   // retired: ignored
+            Row(collection_id: "_loose-1", starts_on: "2027-02-11", ends_on: nil),    // old loose slot: ignored
+            Row(collection_id: "ocean", starts_on: "garbage", ends_on: nil),
         ])
-        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "planets",
+        XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "candyland",
                                                   at: eastern(2027, 1, 7), store: store))
-        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "cathedral",
-                                                   at: eastern(2026, 12, 20), store: store))
+        XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "golf",
+                                                   at: eastern(2027, 4, 2), store: store))
         XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 12, 18), store: store)?.date,
                        eastern(2027, 1, 7), "Coming soon follows the server date")
-        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "noir", store: store),
-                       eastern(2027, 1, 14), "a broken row falls back to the built-in date")
+        XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 12, 18), store: store)?.bundles.map(\.id),
+                       ["candyland"], "a leftover row for a retired set announces nothing")
+        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "ocean", store: store),
+                       eastern(2027, 6, 3), "a broken row falls back to the built-in date")
+        XCTAssertNil(CosmeticSchedule.releaseDate(of: "cathedral", store: store))
         store.apply([])
-        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "cathedral", store: store), eastern(2026, 12, 17))
+        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "golf", store: store), eastern(2027, 4, 1))
     }
 
     /// Sticky: a collection this phone has seen released stays released when
@@ -1174,20 +1178,22 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "golf", store: fresh))
         // Questions about other moments never mark anything released.
         let probe = calendarStore(remembers: true)
-        _ = CosmeticSchedule.isReleased(collectionID: "oracle", at: eastern(2030, 1, 1), store: probe)
-        XCTAssertFalse(probe.hasSeenReleased("oracle"))
+        _ = CosmeticSchedule.isReleased(collectionID: "ocean", at: eastern(2030, 1, 1), store: probe)
+        XCTAssertFalse(probe.hasSeenReleased("ocean"))
     }
 
-    /// An unreleased collection's items are held back with it; starter items
-    /// never are.
+    /// A piece follows its full collection: not on sale before the
+    /// collection's day, on sale from it.  Defaults are never date-gated.
     func testSchedule_itemsFollowTheirCollections() {
         let store = calendarStore()
         XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.starter, at: eastern(2020, 1, 1), store: store))
-        for b in CosmeticBundle.catalogue where !b.isLimitedTime {
+        for b in CosmeticSale.fullCollections {
             guard let date = CosmeticSchedule.releaseDate(of: b.id, store: store) else { continue }
-            for ball in b.balls where ball.tier != .starter {
-                XCTAssertTrue(CosmeticSchedule.isReleased(ball, at: date, store: store),
-                              "\(ball.rawValue) must be out no later than \(b.id)")
+            for ball in b.balls {
+                XCTAssertFalse(CosmeticSale.isOnSale(ball, at: date.addingTimeInterval(-1), store: store),
+                               "\(ball.rawValue) must wait for \(b.id)")
+                XCTAssertTrue(CosmeticSale.isOnSale(ball, at: date, store: store),
+                              "\(ball.rawValue) must be out with \(b.id)")
             }
         }
     }
@@ -1232,43 +1238,116 @@ final class CosmeticsTests: XCTestCase {
         // lookups only see active ones.
         XCTAssertTrue(CosmeticBundle.bundles(containing: BallSkin.cathedral).isEmpty)
         XCTAssertEqual(CosmeticBundle.bundles(containing: TrailColor.smoke).map(\.id), ["haunted"])
+        // Every active collection is FULL (all six slots), so all are sold.
+        XCTAssertEqual(CosmeticSale.fullCollections.map(\.id), active.map(\.id))
+        for b in active { XCTAssertTrue(b.isComplete, "\(b.id) must fill all six slots") }
     }
 
-    /// Items that left a launch collection when the sets were reshaped are
-    /// still available from launch; no item arrives later than before.
-    func testReshapedItems_keepTheirLaunchAvailability() {
+    // MARK: - On-sale rule (CosmeticSale)
+
+    /// A piece is on sale only as a member of a full active collection.
+    /// Held pieces — retired sets, seasonal sets, displaced pieces, pieces in
+    /// no collection — are never in the Shop rotation and cannot be bought.
+    func testOnSaleRule_heldPiecesAreNeverShownOrSold() {
         let store = calendarStore()
-        let early = eastern(2026, 12, 1)
-        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.blueprint, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.disco, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.sunset, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(GoalSkin.blossom, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(GoalSkin.comet, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(GoalSkin.crystal, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(TrailColor.bubblegum, at: early, store: store))
-        // A retired collection still holds its items back until its day.
-        XCTAssertFalse(CosmeticSchedule.isReleased(BallSkin.cathedral, at: early, store: store))
-        XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.cathedral, at: eastern(2026, 12, 17), store: store))
+        let launch = eastern(2026, 12, 1)
+        // On sale: pieces of full active launch collections.
+        XCTAssertTrue(CosmeticSale.isOnSale(BallSkin.jade, at: launch, store: store))
+        XCTAssertTrue(CosmeticSale.isOnSale(TrailColor.forest, at: launch, store: store))
+        XCTAssertEqual(CosmeticSale.collectionID(of: TrailColor.smoke), "haunted")
+        // Held: retired set, seasonal set, displaced in the quality round, loose.
+        XCTAssertTrue(CosmeticSale.isHeld(BallSkin.cathedral), "retired set")
+        XCTAssertTrue(CosmeticSale.isHeld(BallSkin.pumpkin), "seasonal ball")
+        XCTAssertTrue(CosmeticSale.isHeld(Boundary.pumpkin), "seasonal boundary")
+        XCTAssertTrue(CosmeticSale.isHeld(GoalSkin.meadow), "displaced from Nature")
+        XCTAssertTrue(CosmeticSale.isHeld(GoalSkin.obsidian), "displaced from Haunted")
+        XCTAssertTrue(CosmeticSale.isHeld(TrailColor.snake), "displaced from Ancient Temple")
+        XCTAssertTrue(CosmeticSale.isHeld(BallSkin.blue), "in no collection")
+        for held in [BallSkin.cathedral, .pumpkin, .blue, .silver] {
+            XCTAssertFalse(CosmeticSale.isOnSale(held, at: eastern(2030, 1, 1), store: store),
+                           "\(held.rawValue) is never on sale, whatever the date")
+        }
+        // The Shop rotation holds on-sale pieces only.
+        XCTAssertTrue(ShopRotation.ballPool.allSatisfy { CosmeticSale.isOnSale($0) })
+        XCTAssertTrue(ShopRotation.goalPool.allSatisfy { CosmeticSale.isOnSale($0) })
+        XCTAssertTrue(ShopRotation.trailPool.allSatisfy { CosmeticSale.isOnSale($0) })
+        XCTAssertTrue(ShopRotation.floorPool.allSatisfy { CosmeticSale.isOnSale($0) })
+        XCTAssertTrue(ShopRotation.pitPool.allSatisfy { CosmeticSale.isOnSale($0) })
+        XCTAssertTrue(ShopRotation.boundaryPool.allSatisfy { CosmeticSale.isOnSale($0) })
+        XCTAssertFalse(ShopRotation.ballPool.contains(.cathedral))
+        XCTAssertFalse(ShopRotation.goalPool.contains(.meadow))
+        XCTAssertTrue(ShopRotation.bundlePool.allSatisfy { $0.isComplete && !$0.isRetired })
+        // Buying a held piece is refused and spends nothing.
+        let gs = makeCleanState()
+        gs.coinBalance = 100_000
+        XCTAssertFalse(gs.purchase(BallSkin.cathedral))
+        XCTAssertFalse(gs.purchase(GoalSkin.meadow))
+        XCTAssertFalse(gs.purchase(BallSkin.blue))
+        XCTAssertEqual(gs.coinBalance, 100_000)
+        XCTAssertFalse(gs.isOwned(BallSkin.cathedral))
+        // A retired set is not sold as a set either.
+        let retired = CosmeticBundle.catalogue.first { $0.id == "cathedral" }!
+        XCTAssertFalse(gs.purchaseBundle(retired, price: 0))
+        // A piece of a full collection still sells one at a time.
+        XCTAssertTrue(gs.purchase(BallSkin.jade))
     }
 
-    /// Seasonal events: every seasonal entry is retired as a set, features an
-    /// active collection, and spotlights its own ball (sold only in season).
-    func testSeasonalEvents_featureActiveCollectionsAndSpotlightItems() {
+    /// A player who already owns a held piece keeps it and can equip it.
+    func testOnSaleRule_ownersKeepAndEquipHeldPieces() {
+        let gs = makeCleanState()
+        gs.ownedBallSkins.insert(BallSkin.cathedral.rawValue)
+        gs.ownedGoals.insert(GoalSkin.meadow.rawValue)
+        XCTAssertTrue(gs.isOwned(BallSkin.cathedral))
+        XCTAssertTrue(gs.equip(BallSkin.cathedral))
+        XCTAssertEqual(gs.activeSkin, .cathedral)
+        XCTAssertTrue(gs.equip(GoalSkin.meadow))
+        XCTAssertEqual(gs.equippedGoal, .meadow)
+    }
+
+    /// Defaults and exempt pieces are not held.  Exempt = earned or
+    /// purchase-only, never sold for coins.
+    func testOnSaleRule_defaultsAndExemptPieces() {
+        XCTAssertEqual(CosmeticSale.exemptBalls, [.diamond, .moneyBall, .trophy])
+        XCTAssertEqual(CosmeticSale.exemptTrails, [.moneyRoll])
+        XCTAssertEqual(CosmeticSale.exemptFloors, [.moneyFull])
+        for ball in CosmeticSale.exemptBalls {
+            XCTAssertFalse(ball.isCoinPurchasable, "\(ball.rawValue) is never sold for coins")
+            XCTAssertFalse(CosmeticSale.isHeld(ball))
+        }
+        XCTAssertFalse(TrailColor.moneyRoll.isCoinPurchasable)
+        XCTAssertFalse(Floor.moneyFull.isCoinPurchasable)
+        for piece in CosmeticBundle.rollAlong.balls { XCTAssertFalse(CosmeticSale.isHeld(piece)) }
+        XCTAssertFalse(CosmeticSale.isHeld(TrailColor.classic))
+        XCTAssertFalse(CosmeticSale.isHeld(Floor.starter))
+        XCTAssertFalse(CosmeticSale.isHeld(Pit.starter))
+        XCTAssertFalse(CosmeticSale.isHeld(Boundary.starter))
+        XCTAssertFalse(CosmeticSale.isHeld(GoalSkin.starter))
+        // Every coin-buyable piece is either on sale in a full collection or held.
+        for ball in BallSkin.allCases where ball.isCoinPurchasable {
+            XCTAssertNotEqual(CosmeticSale.collectionID(of: ball) != nil, CosmeticSale.isHeld(ball), ball.rawValue)
+        }
+    }
+
+    /// Seasonal events: every seasonal entry is retired as a set and features
+    /// one FULL active collection.  Events sell no loose pieces: the seasonal
+    /// ball and boundary are held.
+    func testSeasonalEvents_featureFullCollectionsOnly() {
         let events = SeasonalEvent.all
         XCTAssertEqual(events.count, 16)
         for e in events {
             XCTAssertTrue(e.bundle.isRetired, "\(e.id) must not be sold as a set")
-            XCTAssertNotNil(e.featuredCollection, "\(e.id) features an active collection")
-            XCTAssertFalse(e.spotlightBalls.isEmpty, "\(e.id) spotlights its ball")
+            XCTAssertNotNil(e.featuredCollection, "\(e.id) features a full active collection")
+            XCTAssertEqual(e.featuredCollection?.isComplete, true)
+            for ball in e.bundle.balls where !CosmeticSale.isExempt(ball) && CosmeticSale.collectionID(of: ball) == nil {
+                XCTAssertTrue(CosmeticSale.isHeld(ball), "\(ball.rawValue) is not sold loose")
+            }
         }
         let halloween = events.first { $0.id == "halloween-2026" }!
         XCTAssertEqual(halloween.featuredCollection?.id, "haunted")
         let mid = eastern(2026, 10, 20)
         XCTAssertTrue(halloween.isOpen(at: mid))
-        XCTAssertTrue(SeasonalEvent.isSpotlit(BallSkin.pumpkin, at: mid))
-        XCTAssertTrue(SeasonalEvent.isSpotlit(Boundary.pumpkin, at: mid))
-        XCTAssertFalse(SeasonalEvent.isSpotlit(BallSkin.pumpkin, at: eastern(2027, 3, 1)),
-                       "the seasonal ball is sold only in season")
+        XCTAssertFalse(CosmeticSale.isOnSale(BallSkin.pumpkin, at: mid, store: calendarStore()),
+                       "the seasonal ball is not sold, even in season")
         XCTAssertTrue(SeasonalEvent.features(CosmeticBundle.active.first { $0.id == "haunted" }!, at: mid))
     }
 

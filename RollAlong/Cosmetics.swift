@@ -1930,10 +1930,10 @@ enum BundleDiscount: String, CaseIterable {
 //   • Seasonal collections follow their yearly windows (see
 //     `CosmeticBundle.currentWindow`); holidays that move get per-year rows
 //     (`builtInSeasonalWindows`, overridable by the same table).
-//   • Single items follow their collections: an item is released once any
-//     permanent collection containing it is.  Items in no permanent
-//     collection are spread across launch and three named slots
-//     (`_loose-1/2/3`) by a stable hash of the name.
+//   • Every release is one or two FULL collections.  A single piece follows
+//     the one full collection it belongs to (`CosmeticSale`); a piece in no
+//     full active collection is HELD — never shown, sold or announced — so it
+//     has no release day at all.  There are no single-piece releases.
 //   • Unreleased collections are announced in the Catalog's "Coming soon"
 //     row with their date, and App Review is told about the calendar in the
 //     review notes — nothing here is a hidden feature.
@@ -2021,32 +2021,20 @@ enum CosmeticSchedule {
         "space-traveler",
     ]
 
-    /// The drops, in date order (docs/proposals/cosmetic-calendar.md, approved).
+    /// The drops, in date order: each day brings one or two FULL collections
+    /// (docs/proposals/cosmetic-calendar.md; database steps 11 and 21).
+    /// Retired sets and loose single-piece slots have no release day: their
+    /// pieces are held (`CosmeticSale`).
     static let drops: [(day: CalendarDay, ids: [String])] = [
-        (CalendarDay(2026, 12, 17), ["cathedral", "velvet-night", "crystal-cavern"]),
-        (CalendarDay(2027,  1, 14), ["zen-garden", "clockwork", "noir"]),
-        (CalendarDay(2027,  2, 11), ["candyland", "nightclub", "heavens"]),
-        (CalendarDay(2027,  3, 11), ["full-court", "planets", "space-travel"]),
-        (CalendarDay(2027,  4,  1), ["diamond", "golf", "bloom", "pastel"]),
-        (CalendarDay(2027,  5,  6), ["arcade", "lava-lamp", "plasma-globe", "tempest"]),
-        (CalendarDay(2027,  6,  3), ["ocean", "aquarium", "soccer"]),
-        (CalendarDay(2027,  7,  1), ["golden-hour", "dune", "paper-world"]),
-        (CalendarDay(2027,  7, 29), ["eclipse", "magma-core"]),
-        (CalendarDay(2027,  9,  2), ["billiards-hall", "geode", "realistic-marble"]),
-        (CalendarDay(2027, 10,  7), ["hellfire", "midnight-carnival", "oracle"]),
-        (CalendarDay(2027, 11, 11), ["high-roller", "neon-city", "quicksilver"]),
+        (CalendarDay(2027,  2, 11), ["candyland", "nightclub"]),
+        (CalendarDay(2027,  4,  1), ["golf", "bloom"]),
+        (CalendarDay(2027,  6,  3), ["ocean"]),
     ]
 
-    /// Release slots for items that are in no permanent collection.
-    static let looseSlotIDs = ["_loose-1", "_loose-2", "_loose-3"]
-
-    /// Collection id (or loose slot) → built-in release day.
+    /// Collection id → built-in release day.
     static let builtInReleaseDays: [String: CalendarDay] = {
         var map: [String: CalendarDay] = [:]
         for drop in drops { for id in drop.ids { map[id] = drop.day } }
-        map["_loose-1"] = CalendarDay(2027, 2, 11)
-        map["_loose-2"] = CalendarDay(2027, 5, 6)
-        map["_loose-3"] = CalendarDay(2027, 7, 29)
         return map
     }()
 
@@ -2070,8 +2058,8 @@ enum CosmeticSchedule {
 
     // MARK: Effective dates (server table over built-in)
 
-    /// The release moment of a permanent collection or loose slot; nil when it
-    /// has no date (launch collections, unknown ids) — i.e. always available.
+    /// The release moment of a permanent collection; nil when it has no date
+    /// (launch collections, unknown ids) — i.e. always available.
     static func releaseDate(of id: String, store: CosmeticCalendarStore = .shared) -> Date? {
         if launchBundleIDs.contains(id) { return nil }
         if let day = store.releaseDayOverride(for: id) { return day.easternMidnight }
@@ -2099,58 +2087,19 @@ enum CosmeticSchedule {
 
     // MARK: Single items
 
-    private static func key(_ type: String, _ rawValue: String) -> String { type + "|" + rawValue }
-
-    /// "<Type>|<rawValue>" → the permanent collections that contain the item.
-    private static let itemCollections: [String: [String]] = {
-        var map: [String: [String]] = [:]
-        func note(_ type: String, _ rawValues: [String], _ id: String) {
-            for raw in rawValues { map[type + "|" + raw, default: []].append(id) }
-        }
-        for bundle in CosmeticBundle.catalogue where !bundle.isLimitedTime {
-            note(String(describing: BallSkin.self),   bundle.balls.map(\.rawValue),  bundle.id)
-            note(String(describing: GoalSkin.self),   bundle.goals.map(\.rawValue),  bundle.id)
-            note(String(describing: TrailColor.self), bundle.trails.map(\.rawValue), bundle.id)
-            note(String(describing: Floor.self),      bundle.floors.map(\.rawValue), bundle.id)
-            note(String(describing: Pit.self),        bundle.pits.map(\.rawValue),   bundle.id)
-            note(String(describing: MusicTrack.self), bundle.music.map(\.rawValue),  bundle.id)
-            note(String(describing: Boundary.self),   bundle.boundaries.map(\.rawValue), bundle.id)
-        }
-        return map
-    }()
-
-    /// Items that were available from launch before the collections were
-    /// reshaped (each left a launch collection when the active set was made
-    /// unique) — kept at launch so no item arrives later than it used to.
-    static let keptAtLaunch: Set<String> = [
-        "Floor|blueprint", "Floor|disco", "Floor|sunset",
-        "GoalSkin|blossom", "GoalSkin|comet", "GoalSkin|crystal",
-        "TrailColor|bubblegum",
-    ]
-
-    /// Items in no permanent collection: launch (nil) or one of the three
-    /// loose slots, chosen by a stable hash of the name (FNV-1a) so it never
-    /// changes between builds.
-    static func looseSlot(_ rawValue: String) -> String? {
-        var hash: UInt32 = 2_166_136_261
-        for byte in rawValue.utf8 { hash = (hash ^ UInt32(byte)) &* 16_777_619 }
-        let slot = Int(hash % 4)
-        return slot == 0 ? nil : looseSlotIDs[slot - 1]
-    }
-
-    /// The release keys an item waits on: it is released once ANY of them is.
-    /// Empty = available from launch.
+    /// The release keys an item waits on: the id of the full collection it
+    /// belongs to, when that collection has a release day.  Empty = no day to
+    /// wait for (launch collection, a default, an exempt piece, or a held
+    /// piece — which is never on sale anyway, see `CosmeticSale`).
     static func releaseKeys<Item: CosmeticItem>(of item: Item) -> [String] {
-        if item.tier == .starter || item == Item.starter { return [] }   // defaults (e.g. Graphite) are always out
-        // Locker-only balls (Diamond) are never on the calendar: they come
-        // only with a purchase, so they need no release day.
-        if let ball = item as? BallSkin, ball.isLockerOnly { return [] }
-        let k = key(String(describing: Item.self), item.rawValue)
-        if keptAtLaunch.contains(k) { return [] }
-        if let ids = itemCollections[k] { return ids }
-        return looseSlot(item.rawValue).map { [$0] } ?? []
+        guard let id = CosmeticSale.collectionID(of: item),
+              builtInReleaseDays[id] != nil else { return [] }
+        return [id]
     }
 
+    /// True once the item's collection has been released (always true for an
+    /// item with no release day).  This is about DATES only; whether a piece
+    /// may be shown or sold at all is `CosmeticSale.isOnSale`.
     static func isReleased<Item: CosmeticItem>(_ item: Item, at now: Date = Date(),
                                                store: CosmeticCalendarStore = .shared) -> Bool {
         let keys = releaseKeys(of: item)
@@ -2209,7 +2158,7 @@ enum CosmeticSchedule {
     static func nextDrop(at now: Date = Date(),
                          store: CosmeticCalendarStore = .shared) -> Upcoming? {
         var byDay: [Date: [CosmeticBundle]] = [:]
-        for bundle in CosmeticBundle.active where !bundle.isLimitedTime {
+        for bundle in CosmeticSale.fullCollections {
             guard !isReleased(collectionID: bundle.id, at: now, store: store),
                   let day = releaseDate(of: bundle.id, store: store) else { continue }
             byDay[day, default: []].append(bundle)
@@ -2405,6 +2354,117 @@ final class CosmeticCalendarStore: ObservableObject, @unchecked Sendable {
 }
 
 // ===========================================================================
+// CosmeticSale — THE rule for what may be seen and bought.
+//
+// A cosmetic is ON SALE only if it belongs to a FULL active collection: an
+// active (not retired, not seasonal) collection with all six slots filled —
+// ball, goal, trail, floor, pit and boundary (music is not in 1.0) — whose
+// release day has arrived.  Pieces are still bought one at a time, but only
+// pieces of such a collection.
+//
+// Every other piece is HELD: not shown, not sold, not announced.  That covers
+// pieces of retired and seasonal sets, pieces displaced from a collection and
+// pieces in no collection.  Held pieces keep their code and ids; a player who
+// already owns one keeps it and can equip it from the Locker.
+//
+// Not held:
+//   • the Roll Along defaults (free, owned by everyone);
+//   • EXEMPT pieces — earned or purchase-only, never sold for coins
+//     (`exemptBalls`, `exemptTrails`, `exemptFloors`).  They are shown only to
+//     a player who owns them.
+//
+// Every listing and every purchase goes through here: the Shop rotation
+// pools, the Catalog tabs, the featured bundle, Coming Soon, the seasonal
+// events and `GameState.purchase`.
+// ===========================================================================
+enum CosmeticSale {
+
+    /// The active collections with all six slots filled, in catalogue order.
+    /// Only these are sold, featured, announced or released.
+    static let fullCollections: [CosmeticBundle] =
+        CosmeticBundle.active.filter { !$0.isLimitedTime && $0.isComplete }
+
+    /// Earned or purchase-only pieces that were never sold for coins.
+    ///   • Diamond ball — comes with the Diamond Balls purchase (Locker only).
+    ///   • Money Ball — comes with the first 10,000-coin pack.
+    ///   • Trophy ball — earned by finishing the Golden Gauntlet track (it is
+    ///     also the Champion collection's ball, granted with that set).
+    static let exemptBalls: Set<BallSkin> = [.diamond, .moneyBall, .trophy]
+    /// Money Roll trail / Money floor — purchase-only Money pieces.
+    static let exemptTrails: Set<TrailColor> = [.moneyRoll]
+    static let exemptFloors: Set<Floor> = [.moneyFull]
+
+    private static func key<Item: CosmeticItem>(_ item: Item) -> String {
+        String(describing: Item.self) + "|" + item.rawValue
+    }
+
+    /// "<Type>|<rawValue>" → id of the full collection the piece belongs to.
+    private static let collectionIDs: [String: String] = {
+        var map: [String: String] = [:]
+        func note<Item: CosmeticItem>(_ items: [Item], _ id: String) {
+            for item in items where map[key(item)] == nil { map[key(item)] = id }
+        }
+        for bundle in fullCollections {
+            note(bundle.balls, bundle.id);  note(bundle.goals, bundle.id)
+            note(bundle.trails, bundle.id); note(bundle.floors, bundle.id)
+            note(bundle.pits, bundle.id);   note(bundle.boundaries, bundle.id)
+        }
+        return map
+    }()
+
+    /// The id of the full collection `item` belongs to; nil for held pieces,
+    /// defaults and exempt pieces outside a collection.
+    static func collectionID<Item: CosmeticItem>(of item: Item) -> String? {
+        collectionIDs[key(item)]
+    }
+
+    /// The full collection `item` belongs to, if any.
+    static func collection<Item: CosmeticItem>(of item: Item) -> CosmeticBundle? {
+        guard let id = collectionID(of: item) else { return nil }
+        return fullCollections.first { $0.id == id }
+    }
+
+    /// A Roll Along default (free, owned by everyone, never sold).
+    static func isDefault<Item: CosmeticItem>(_ item: Item) -> Bool {
+        item.tier == .starter || item == Item.starter
+    }
+
+    /// Earned or purchase-only, never sold for coins.
+    static func isExempt<Item: CosmeticItem>(_ item: Item) -> Bool {
+        switch item {
+        case let b as BallSkin:   return exemptBalls.contains(b)
+        case let t as TrailColor: return exemptTrails.contains(t)
+        case let f as Floor:      return exemptFloors.contains(f)
+        default:                  return false
+        }
+    }
+
+    /// True when `item` may be shown and sold now: it belongs to a full
+    /// active collection whose release day has arrived.
+    static func isOnSale<Item: CosmeticItem>(_ item: Item, at now: Date = Date(),
+                                             store: CosmeticCalendarStore = .shared) -> Bool {
+        guard let id = collectionID(of: item) else { return false }
+        return CosmeticSchedule.isReleased(collectionID: id, at: now, store: store)
+    }
+
+    /// True for a piece that is held back: in no full active collection, not
+    /// a default and not exempt.  Held pieces are never shown, sold or
+    /// announced; owners keep and can equip them.
+    static func isHeld<Item: CosmeticItem>(_ item: Item) -> Bool {
+        if item is MusicTrack { return false }          // music is off in 1.0 (CosmeticFeatures)
+        return collectionID(of: item) == nil && !isDefault(item) && !isExempt(item)
+    }
+
+    /// A ball pack is on sale only when every ball in it is.  (Today no pack
+    /// qualifies: each holds balls that are in no full collection, so all
+    /// three packs are held.  Owners keep and can equip them.)
+    static func isOnSale(_ pack: BallPack, at now: Date = Date(),
+                         store: CosmeticCalendarStore = .shared) -> Bool {
+        pack.skins.allSatisfy { isOnSale($0, at: now, store: store) }
+    }
+}
+
+// ===========================================================================
 // Shop rotation — the curated storefront refreshes every hour.  A
 // deterministic window index seeds which bundle + odds-and-ends cosmetics are
 // featured, so the selection is stable within a window and identical
@@ -2425,39 +2485,33 @@ enum ShopRotation {
         return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
     }
 
-    // Pools of coin-purchasable items eligible to be featured.  Only RELEASED
-    // items and collections (see `CosmeticSchedule`) can ever be featured.
+    // Pools of coin-purchasable items eligible to be featured.  Only pieces
+    // ON SALE — members of a released, full, active collection
+    // (`CosmeticSale.isOnSale`) — can ever be featured.  Held pieces never are.
     static var bundlePool: [CosmeticBundle] {
-        CosmeticBundle.active.filter {
+        CosmeticSale.fullCollections.filter {
             $0.isAvailable && !$0.isExpired && CosmeticSchedule.isReleased($0)
         }
     }
     static var ballPool: [BallSkin] {
-        BallSkin.allCases.filter {
-            !$0.isBundleExclusive && !$0.isLockerOnly && $0.tier != .starter
-                && CosmeticSchedule.isReleased($0)
-        }
+        BallSkin.allCases.filter { $0.isCoinPurchasable && CosmeticSale.isOnSale($0) }
     }
     static var trailPool: [TrailColor] {
-        // Exclude the free defaults (starter tier: Classic, Off), the
-        // bundle-only trails, and the IAP-secret Money Roll.
-        TrailColor.allCases.filter { $0.tier != .starter && !$0.isBundleExclusive
-            && $0 != .air && $0 != .raybeam
-            && CosmeticSchedule.isReleased($0) }
+        // Air and Raybeam are sold only with their collections (Golf, Neon).
+        TrailColor.allCases.filter { $0.isCoinPurchasable && $0 != .air && $0 != .raybeam
+            && CosmeticSale.isOnSale($0) }
     }
     static var goalPool: [GoalSkin] {
-        GoalSkin.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
+        GoalSkin.allCases.filter { $0.isCoinPurchasable && CosmeticSale.isOnSale($0) }
     }
     static var floorPool: [Floor] {
-        Floor.allCases.filter {
-            $0.tier != .starter && !$0.isBundleExclusive && CosmeticSchedule.isReleased($0)
-        }
+        Floor.allCases.filter { $0.isCoinPurchasable && CosmeticSale.isOnSale($0) }
     }
     static var pitPool: [Pit] {
-        Pit.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
+        Pit.allCases.filter { $0.isCoinPurchasable && CosmeticSale.isOnSale($0) }
     }
     static var boundaryPool: [Boundary] {
-        Boundary.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
+        Boundary.allCases.filter { $0.isCoinPurchasable && CosmeticSale.isOnSale($0) }
     }
     static var musicPool: [MusicTrack] {
         MusicTrack.allCases.filter { $0.tier != .starter && CosmeticSchedule.isReleased($0) }
@@ -2551,26 +2605,21 @@ enum ShopRotation {
 // Each retired seasonal catalogue entry keeps its window (same yearly dates,
 // per-year rows and server overrides as before: `CosmeticSchedule.
 // seasonalWindow`, Eastern midnight).  While its window is open the Shop
-// shows the event with:
-//   • its spotlight items, sold one by one: the event's own ball and
-//     boundary (the seasonal balls are sold only here, only in season);
-//   • optionally one ACTIVE collection that fits the holiday.
+// shows the event and the one FULL active collection it features.  An event
+// never sells loose pieces: its own ball and boundary are held
+// (`CosmeticSale`), like every piece outside a full collection.
 // ===========================================================================
 struct SeasonalEvent: Identifiable {
-    /// The retired seasonal catalogue entry: name, window, spotlight items.
+    /// The retired seasonal catalogue entry: name and window.
     let bundle: CosmeticBundle
     var id: String { bundle.id }
     var displayName: String { bundle.displayName }
 
-    /// The active collection featured during this event, if any.
+    /// The full active collection featured during this event, if any.
     var featuredCollection: CosmeticBundle? {
         guard let fid = Self.featuredCollectionIDs[bundle.id] else { return nil }
-        return CosmeticBundle.active.first { $0.id == fid }
+        return CosmeticSale.fullCollections.first { $0.id == fid }
     }
-
-    /// Spotlight items sold one by one while the event is open.
-    var spotlightBalls: [BallSkin] { bundle.balls.filter { !$0.isLockerOnly } }
-    var spotlightBoundaries: [Boundary] { bundle.boundaries }
 
     func isOpen(at now: Date = Date()) -> Bool { bundle.isOpen(at: now) }
 
@@ -2602,18 +2651,6 @@ struct SeasonalEvent: Identifiable {
     /// The events whose window is open now.
     static func open(at now: Date = Date()) -> [SeasonalEvent] {
         all.filter { $0.isOpen(at: now) }
-    }
-
-    /// True while `item` is a spotlight item of an open event (sold then even
-    /// if it is a seasonal-only ball or not yet on the release calendar).
-    static func isSpotlit<Item: CosmeticItem>(_ item: Item, at now: Date = Date()) -> Bool {
-        open(at: now).contains { event in
-            switch item {
-            case let b as BallSkin: return event.spotlightBalls.contains(b)
-            case let w as Boundary: return event.spotlightBoundaries.contains(w)
-            default:                return false
-            }
-        }
     }
 
     /// True when an open event features `bundle`.
@@ -2902,24 +2939,33 @@ struct CosmeticBundle: Identifiable {
         }
     }
 
+    /// True when all six slots are filled: ball, goal, trail, floor, pit and
+    /// boundary (music is not offered in 1.0).  Only complete active
+    /// collections are sold (`CosmeticSale.fullCollections`).
+    var isComplete: Bool {
+        !balls.isEmpty && !goals.isEmpty && !trails.isEmpty
+            && !floors.isEmpty && !pits.isEmpty && !boundaries.isEmpty
+    }
+
     /// Every catalogue bundle whose contents include `item` — i.e. the
     /// set(s) the item was released with.  Used by the Catalog to show
     /// each cosmetic's related bundle(s).
     static func bundles<Item: CosmeticItem>(containing item: Item) -> [CosmeticBundle] {
-        active.filter { $0.contains(item) }
+        CosmeticSale.fullCollections.filter { $0.contains(item) }
     }
 
     // ── Active vs retired collections ──────────────────────────────
     //
-    // Only these 18 collections are on sale (Shop, Catalog, featured bundle,
-    // post-tutorial gift pool, Challenge Track rewards).  Each has exactly one
-    // item per offered slot, and no item is in more than one of them
+    // Only these collections are on sale (Shop, Catalog, featured bundle,
+    // post-tutorial starter choice, Challenge Track rewards).  Each has exactly
+    // one item per offered slot, and no item is in more than one of them
     // (CosmeticsTests pins both).  Every other catalogue entry is RETIRED: it
     // is never listed or sold as a set, but its definition stays so owners'
-    // records (`ownedBundles`, completed-collection counts) keep their meaning
-    // and so its items keep the release days they had.  Retired items stay
-    // buyable one by one.  Seasonal events no longer sell a set; they feature
-    // an active collection and spotlight items (`SeasonalEvent`).
+    // records (`ownedBundles`, completed-collection counts) keep their
+    // meaning.  Pieces of retired and seasonal sets are HELD — not shown, not
+    // sold, not announced (`CosmeticSale`); owners keep and can equip them.
+    // Seasonal events sell nothing of their own; each features one full
+    // active collection (`SeasonalEvent`).
 
     static let activeIDs: [String] = [
         // Launch: the Starter Pack's Aurora, the post-tutorial starter
