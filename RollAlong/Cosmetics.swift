@@ -365,6 +365,8 @@ enum GoalSkin: String, CosmeticItem {
     // ── Citrus set (quality round) ──
     case citrusSlice    // Citrus set: a cut citrus wheel, slowly turning (replaces Flame there)
     case winnersCircle  // Champion — a gold laurel wreath around a deep-crimson winner's circle
+    // ── Standard audit: Nightclub ──
+    case vinyl          // Nightclub — a record on the turntable, slowly turning (replaces Mosaic there)
 
     var id: String { rawValue }
     var displayName: String {
@@ -411,6 +413,8 @@ enum GoalSkin: String, CosmeticItem {
         // ── Nature (quality round) ──
         case .leafWreath:  return "Leaf Wreath"
         case .winnersCircle: return "Winner's Circle"
+        // ── Standard audit: Nightclub ──
+        case .vinyl:       return "Vinyl"
         }
     }
 
@@ -540,6 +544,10 @@ enum GoalSkin: String, CosmeticItem {
                              bgColor: Color(red: 0.20, green: 0.02, blue: 0.05))
         case .pentagram:   // quality round: Haunted — bespoke renderer, placeholder only
             return HoleStyle(hueBase: 0.03, hueRange: 0.06, saturation: 1.0, bgColor: .clear)
+        // ── Standard audit: Nightclub ── (bespoke renderer; placeholder style)
+        case .vinyl:
+            return HoleStyle(hueBase: 0.86, hueRange: 0.04, saturation: 0.8,
+                             bgColor: Color(red: 0.03, green: 0.03, blue: 0.04))
         }
     }
 
@@ -765,6 +773,18 @@ enum GoalSkin: String, CosmeticItem {
                     .init(color: Color(red: 0.36, green: 0.44, blue: 0.14), location: 1.00),
                 ],
                 center: .center, startRadius: 0, endRadius: endRadius))
+        // ── Standard audit: Nightclub ──
+        case .vinyl:
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.03, green: 0.03, blue: 0.04), location: 0.00),
+                    .init(color: Color(red: 0.03, green: 0.03, blue: 0.04), location: 0.10),
+                    .init(color: Color(red: 0.92, green: 0.24, blue: 0.62), location: 0.12),
+                    .init(color: Color(red: 0.92, green: 0.24, blue: 0.62), location: 0.36),
+                    .init(color: Color(red: 0.08, green: 0.08, blue: 0.10), location: 0.38),
+                    .init(color: Color(red: 0.14, green: 0.14, blue: 0.17), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: endRadius))
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -908,6 +928,8 @@ enum GoalSkin: String, CosmeticItem {
         // ── Nature (quality round) ──
         case .leafWreath:  return Color(red: 0.46, green: 0.82, blue: 0.36)
         case .winnersCircle: return Color(red: 1.00, green: 0.84, blue: 0.36)
+        // ── Standard audit: Nightclub ──
+        case .vinyl:       return Color(red: 0.95, green: 0.30, blue: 0.66)
         }
     }
     /// Tier rule (player-facing: Standard / Epic / Legendary):
@@ -940,6 +962,9 @@ enum GoalSkin: String, CosmeticItem {
         case .leafWreath:
             return .standard
         case .winnersCircle:
+            return .exclusive
+        // ── Standard audit: Nightclub ── takes the tier of Mosaic, which it replaces there.
+        case .vinyl:
             return .exclusive
         }
     }
@@ -979,6 +1004,10 @@ enum TrailColor: String, CosmeticItem {
     case zest           // Citrus set: curls of orange and lemon peel with juice drops (replaces Ember there)
     case victoryLap     // Champion: gold ribbon with ticker-tape confetti that flutters down and settles
     case glyphs         // Ancient Temple: carved glyphs pressed into the sand along the path
+    // ── Standard audit: Nightclub / Golf / Ocean ──
+    case danceSteps     // Nightclub: dance-floor tiles that light up where the ball rolled, then dim
+    case dewLine        // Golf: the dark line a ball leaves through morning dew, with dew drops beside it
+    case wake           // Ocean: a boat's wake — two foam lines that spread apart and dissolve
 
     var id: String { rawValue }
     var displayName: String {
@@ -1011,6 +1040,10 @@ enum TrailColor: String, CosmeticItem {
         // — Quality round: Champion / Ancient Temple —
         case .victoryLap:  return "Victory Lap"
         case .glyphs:      return "Glyphs"
+        // — Standard audit: Nightclub / Golf / Ocean —
+        case .danceSteps:  return "Dance Steps"
+        case .dewLine:     return "Dew Line"
+        case .wake:        return "Wake"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -1046,6 +1079,13 @@ enum TrailColor: String, CosmeticItem {
             return .exclusive
         case .glyphs:          // Ancient Temple (replaces Snake)
             return .rare
+        // — Standard audit — each takes the tier of the trail it replaces.
+        case .danceSteps:      // Nightclub (replaces Rainbow)
+            return .exclusive
+        case .dewLine:         // Golf (replaces Air)
+            return .exclusive
+        case .wake:            // Ocean (replaces Sky)
+            return .standard
         }
     }
 
@@ -1089,6 +1129,10 @@ enum TrailColor: String, CosmeticItem {
         // — Quality round: Champion / Ancient Temple —
         case .victoryLap:  return Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.92)   // gold ribbon; confetti in renderer
         case .glyphs:      return Color(red: 0.60, green: 0.40, blue: 0.20).opacity(0.80)   // carved-sand shadow
+        // — Standard audit: Nightclub / Golf / Ocean —
+        case .danceSteps:  return Color(red: 0.98, green: 0.30, blue: 0.72).opacity(0.85)   // lit tile; tiles in renderer
+        case .dewLine:     return Color(red: 0.10, green: 0.34, blue: 0.14).opacity(0.55)   // dark line through dew
+        case .wake:        return Color(red: 0.92, green: 0.97, blue: 1.00).opacity(0.85)   // foam
         }
     }
 }
@@ -1145,6 +1189,9 @@ enum Floor: String, CosmeticItem {
     // ── Citrus and Midas sets (quality round) ──
     case grove            // Citrus set — sunlit sand under citrus-leaf shade, fallen blossoms
     case goldLeaf         // Midas set — hammered gold-leaf tiles
+    // ── Standard audit: Bloom and Ocean ──
+    case petalPath        // Bloom — a pale garden path strewn with fallen petals and tiny leaves
+    case openSea          // Ocean — deep open water seen from above: slow swell lines and drifting foam
 
     var id: String { rawValue }
     var displayName: String {
@@ -1175,6 +1222,8 @@ enum Floor: String, CosmeticItem {
         case .overcast:   return "Overcast"
         case .grove:      return "Grove"
         case .goldLeaf:   return "Gold Leaf"
+        case .petalPath:  return "Petal Path"
+        case .openSea:    return "Open Sea"
         case .aurora:     return "Aurora"
         case .disco:      return "Disco"
         case .grass:      return "Grass"
@@ -1199,9 +1248,11 @@ enum Floor: String, CosmeticItem {
              .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt,
              .scorched, .shallows, .overcast,   // starter element sets
-             .grove, .goldLeaf:                 // Citrus and Midas sets (replace Dusk / Mirage there)
+             .grove, .goldLeaf,                 // Citrus and Midas sets (replace Dusk / Mirage there)
+             .openSea:                          // Ocean (replaces Blueprint there)
             return .standard   //  750 coins
-        case .notebook, .graph, .parchment, .sketch, .origami:
+        case .notebook, .graph, .parchment, .sketch, .origami,
+             .petalPath:                        // Bloom (replaces Parchment there; takes its tier)
             // audit 2026-07 ruling 1(c): bespoke static texture overlays
             // (ruled lines / grid / vignette+specks / cross-hatch / fold
             // shadows) — exactly the Rare bar; opens the floors Rare rung.
@@ -1242,6 +1293,8 @@ enum Floor: String, CosmeticItem {
         case .overcast:   return Color(red: 0.34,  green: 0.36,  blue: 0.42 )  // dark storm cloud
         case .grove:      return Color(red: 0.96,  green: 0.89,  blue: 0.70 )  // sunlit beach sand
         case .goldLeaf:   return Color(red: 0.64,  green: 0.49,  blue: 0.18 )  // burnished gold leaf (darker than a coin)
+        case .petalPath:  return Color(red: 0.93,  green: 0.89,  blue: 0.83 )  // pale garden-path stone
+        case .openSea:    return Color(red: 0.05,  green: 0.24,  blue: 0.40 )  // deep open water
         case .aurora:     return Color(red: 0.030, green: 0.050, blue: 0.105)  // dark night sky; a few faint ribbons cross it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -1279,6 +1332,7 @@ enum Floor: String, CosmeticItem {
              .overcast: return true
         case .shallows: return true   // Water set: slow caustic light over the still sand
         case .fog, .midnight, .ember: return true   // quality round: slow fog, twinkling stars, glowing fissures
+        case .openSea: return true                  // standard audit: slow swell and drifting foam
         default: return false
         }
     }
@@ -1333,6 +1387,9 @@ enum Pit: String, CosmeticItem {
     case tidePool         // Citrus set — a shaded tide pool: wet sand rim, turquoise shallows, dark deep
     case vault            // Midas set — a treasury vault: stepped gold walls down to a dark floor of coins
     case vent             // Abyssal Depths — deep-sea vent: basalt ledges, a glowing throat, rising bubbles
+    // ── Standard audit: Bloom and Ocean ──
+    case deepRose         // Bloom — looking down into a rose: rings of petals stepping down to a dark heart
+    case reef             // Ocean — a coral reef drop-off: sunlit coral ledges stepping down into the blue
 
     var id: String { rawValue }
     var displayName: String {
@@ -1373,6 +1430,9 @@ enum Pit: String, CosmeticItem {
         case .pocket:     return "Pocket"
         // — Quality round: Abyssal Depths —
         case .vent:       return "Sea Vent"
+        // — Standard audit: Bloom and Ocean —
+        case .deepRose:   return "Deep Rose"
+        case .reef:       return "Reef"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -1388,7 +1448,8 @@ enum Pit: String, CosmeticItem {
              .origami, .mirage, .canyon, .downpour, .syrup,
              .sideline, .pocket,
              .crater, .deepEnd, .maelstrom,   // starter element sets
-             .tidePool, .vault:               // Citrus and Midas sets (replace Sunset / Mirage there)
+             .tidePool, .vault,               // Citrus and Midas sets (replace Sunset / Mirage there)
+             .deepRose, .reef:                // Bloom and Ocean (replace Parchment / Blueprint there)
             return .standard   //  750 coins — drawn art
         case .graveyard, .aurora:
             return .rare       // 1,000 coins — drawn art with gentle motion
@@ -1441,6 +1502,9 @@ enum Pit: String, CosmeticItem {
         case .pocket:     return Color(red: 0.06,  green: 0.08,  blue: 0.06 )  // near-black pool pocket
         // — Quality round: Abyssal Depths —
         case .vent:       return Color(red: 0.02,  green: 0.04,  blue: 0.07 )  // black water; basalt ledges + vent glow drawn over
+        // — Standard audit: Bloom and Ocean —
+        case .deepRose:   return Color(red: 0.10,  green: 0.01,  blue: 0.04 )  // dark heart of the rose
+        case .reef:       return Color(red: 0.01,  green: 0.06,  blue: 0.14 )  // deep blue beyond the reef
         }
     }
 
@@ -1471,6 +1535,11 @@ enum Pit: String, CosmeticItem {
         // — Quality round: Winter's Crevasse (id twilight), Abyssal Depths' Sea Vent,
         //   Lava Flow's Evil pit and Cosmos' Moonlit pit (id midnight) —
         case .twilight, .vent, .evil, .midnight:
+            return true
+        // — Standard audit: Bloom's Deep Rose, Ocean's Reef, and the redrawn
+        //   Golf Pond and Nightclub pits (drawn art now; they hold still
+        //   under Reduce Motion instead of disappearing) —
+        case .deepRose, .reef, .pond, .nightclub:
             return true
         default:
             return false
@@ -1725,6 +1794,9 @@ enum Boundary: String, CosmeticItem {
              .neon, .gold, .ice, .cloud, .tide, .phantom, .amethyst, .chrome:
             return true
         case .hull: return true        // Quality round: Space Traveler (plating stays; lights hold still)
+        // Standard audit: the redrawn Candy cane, Marquee bulbs and Rose briar
+        // are drawn textures that hold still cleanly.
+        case .candy, .marquee, .rose: return true
         default:
             return false
         }
@@ -3074,11 +3146,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "nightclub",
             displayName:    "Nightclub",
-            tagline:        "Mirror ball, rainbow lights and a sunken dance floor.",
-            contentSummary: "Disco Ball · Mosaic goal · Rainbow trail · Disco floor · Nightclub pit · Retrowave music · Marquee boundary",
+            tagline:        "Mirror ball, a spinning record and a sunken dance floor.",
+            contentSummary: "Disco Ball · Vinyl goal · Dance Steps trail · Disco floor · Nightclub pit · Retrowave music · Marquee boundary",
             balls:  [.disco],
-            goals:  [.mosaic],
-            trails: [.rainbow],
+            goals:  [.vinyl],
+            trails: [.danceSteps],
             floors: [.disco],
             pits:   [.nightclub],
             music:  [.retrowave],
@@ -3100,11 +3172,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "golf",
             displayName:    "Golf",
-            tagline:        "Dimpled ball, fairway green, lily-pad pond, hole-in-one flag.",
-            contentSummary: "Golf Ball · Hole-in-One goal · Air trail · Grass floor · Pond pit · Jazz music · Fairway boundary",
+            tagline:        "Dimpled ball, a mown green in the morning dew, a lily-pad pond and the flag.",
+            contentSummary: "Golf Ball · Hole-in-One goal · Dew Line trail · Grass floor · Pond pit · Jazz music · Fairway boundary",
             balls:  [.golfBall],
             goals:  [.holeInOne],
-            trails: [.air],
+            trails: [.dewLine],
             floors: [.grass],
             pits:   [.pond],
             music:  [.jazz],
@@ -3246,13 +3318,13 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "ocean",
             displayName:    "Ocean",
-            tagline:        "Clear water, rolling tides and a fishbowl ball.",
-            contentSummary: "Aquarium ball · Ripple goal · Sky trail · Blueprint floor · Blueprint pit · Lo-fi music · Tide boundary",
+            tagline:        "Open water, a coral reef and the tide coming in.",
+            contentSummary: "Aquarium ball · Ripple goal · Wake trail · Open Sea floor · Reef pit · Lo-fi music · Tide boundary",
             balls:  [.aquarium],
             goals:  [.ripple],
-            trails: [.sky],
-            floors: [.blueprint],
-            pits:   [.blueprint],
+            trails: [.wake],
+            floors: [.openSea],
+            pits:   [.reef],
             music:  [.lofi],
             boundaries: [.tide]
         ),
@@ -3302,13 +3374,13 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "bloom",
             displayName:    "Bloom",
-            tagline:        "Soft petals on warm parchment.",
-            contentSummary: "Rose ball · Blossom goal · Rose trail · Parchment floor · Parchment pit · Piano music · Rose boundary",
+            tagline:        "A rose garden in full bloom, petals on the path.",
+            contentSummary: "Rose ball · Blossom goal · Rose trail · Petal Path floor · Deep Rose pit · Piano music · Rose boundary",
             balls:  [.rose],
             goals:  [.blossom],
             trails: [.roseTrail],
-            floors: [.parchment],
-            pits:   [.parchment],
+            floors: [.petalPath],
+            pits:   [.deepRose],
             music:  [.piano],
             boundaries: [.rose]
         ),
@@ -4742,6 +4814,10 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     // — Quality round: Champion / Ancient Temple —
     case .victoryLap:      trailVictoryLap(ctx, fr)
     case .glyphs:          trailGlyphs(ctx, fr)
+    // — Standard audit: Nightclub / Golf / Ocean —
+    case .danceSteps:      trailDanceSteps(ctx, fr)
+    case .dewLine:         trailDewLine(ctx, fr)
+    case .wake:            trailWake(ctx, fr)
     default:
         trailTapered(ctx, fr, width: baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded)
@@ -5822,6 +5898,146 @@ private func trailGlyphs(_ ctx: GraphicsContext, _ fr: TrailFrame) {
                    style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
         ctx.stroke(glyph, with: .color(cut.opacity(0.80 * k)),
                    style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
+    }
+}
+
+// — Standard audit: Nightclub —
+/// Dance Steps — the dance floor lights up where the ball rolled.  A thin
+/// dim line shows the path; about one mark in three leaves a floor tile (a
+/// small upright square, magenta, cyan or violet) that is lit when laid and
+/// dims where it lies.  Tiles never move; with Reduce Motion they simply fade.
+private func trailDanceSteps(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    trailTapered(ctx, fr, width: fr.bw * 0.34,
+                 color: Color(red: 0.72, green: 0.30, blue: 0.86).opacity(0.50), glow: false)
+    let hues: [Color] = [Color(red: 1.00, green: 0.26, blue: 0.72),
+                         Color(red: 0.26, green: 0.86, blue: 1.00),
+                         Color(red: 0.66, green: 0.40, blue: 1.00)]
+    var glow = ctx
+    glow.blendMode = .plusLighter
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        // Never two in a row, so tiles sit apart like squares of a floor.
+        guard seed < 0.34, fr.seed(i - 1) >= 0.34 else { continue }
+        let f: Double = fr.f(i)
+        guard f < 1 else { continue }
+        // Lit at full for the first third of its life, then dims.
+        let lit: Double = f < 0.30 ? 1.0 : max(0.0, 1.0 - (f - 0.30) / 0.70)
+        guard lit > 0.02 else { continue }
+        let pick: Int = min(2, Int(seed / 0.34 * 2.999))
+        let color: Color = hues[pick]
+        let half: CGFloat = fr.bw * 0.95
+        let c: CGPoint = fr.pts[i]
+        let rect = CGRect(x: c.x - half, y: c.y - half, width: half * 2, height: half * 2)
+        let tile = Path(roundedRect: rect, cornerRadius: half * 0.16)
+        glow.fill(Path(roundedRect: rect.insetBy(dx: -half * 0.45, dy: -half * 0.45),
+                       cornerRadius: half * 0.5),
+                  with: .color(color.opacity(0.14 * lit)))
+        ctx.fill(tile, with: .color(color.opacity(0.42 * lit)))
+        ctx.stroke(tile, with: .color(Color.white.opacity(0.55 * lit)),
+                   lineWidth: max(0.6, fr.bw * 0.10))
+        // A soft sheen across the top half, as on a glass floor panel.
+        let sheen = CGRect(x: rect.minX + half * 0.22, y: rect.minY + half * 0.20,
+                           width: half * 1.56, height: half * 0.42)
+        ctx.fill(Path(roundedRect: sheen, cornerRadius: half * 0.12),
+                 with: .color(Color.white.opacity(0.22 * lit)))
+    }
+}
+
+// — Standard audit: Golf —
+/// Dew Line — the dark track a ball leaves through morning dew on a mown
+/// green: a soft dark-green line where the dew was pressed away, with small
+/// dew drops left standing along both edges.  Each drop keeps its place and
+/// catches the light with a slow glint; nothing moves.  With Reduce Motion the
+/// glint holds still.
+private func trailDewLine(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    let track = Color(red: 0.08, green: 0.30, blue: 0.12)
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        // A wide, very soft pressed band, then the darker line down its middle.
+        ctx.stroke(p, with: .color(track.opacity(0.16 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 1.05, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(track.opacity(0.46 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 0.46, lineCap: .round, lineJoin: .round))
+    }
+    let drop = Color(red: 0.86, green: 0.97, blue: 1.00)
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.52 else { continue }
+        let k: Double = fr.fresh(i)
+        guard k > 0.03 else { continue }
+        let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x
+        let dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let s2: Double = (seed * 37.7 + 0.31).truncatingRemainder(dividingBy: 1.0)
+        let side: CGFloat = s2 < 0.5 ? 1 : -1
+        let off: CGFloat = fr.bw * CGFloat(0.72 + 0.34 * s2)
+        let c = CGPoint(x: fr.pts[i].x - dy / len * off * side,
+                        y: fr.pts[i].y + dx / len * off * side)
+        let r: CGFloat = fr.bw * CGFloat(0.13 + 0.12 * (seed / 0.52))
+        // Slow glint, each drop on its own phase (about a 2.4 s period).
+        let glint: Double = fr.m > 0 ? 0.70 + 0.30 * sin(fr.tm * 2.6 + seed * 40.0) : 0.85
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r * 0.7 + r * 0.5, width: r * 2, height: r * 1.4)),
+                 with: .color(track.opacity(0.30 * k)))                      // tiny shadow under the drop
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                 with: .color(drop.opacity(0.50 * k)))
+        let hr: CGFloat = r * 0.42
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r * 0.35 - hr / 2, y: c.y - r * 0.35 - hr / 2,
+                                        width: hr, height: hr)),
+                 with: .color(Color.white.opacity(0.95 * k * glint)))
+    }
+}
+
+// — Standard audit: Ocean —
+/// Wake — the wake of a boat.  Where the ball passed, churned pale water
+/// lies down the middle and a line of foam runs along each side; as each mark
+/// ages its two foam edges ease apart and thin out, the way a wake widens
+/// behind a hull, with a few foam flecks left between.  Every mark stays
+/// where it was laid.  With Reduce Motion the edges keep one width and fade.
+private func trailWake(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    let churn = Color(red: 0.62, green: 0.90, blue: 0.96)
+    let foam = Color(red: 0.96, green: 0.99, blue: 1.00)
+    // Spread of one mark's foam edge from the path, by its age.
+    func spread(_ i: Int) -> CGFloat {
+        let f: Double = fr.m > 0 ? fr.f(i) : 0.45
+        return fr.bw * CGFloat(0.30 + 0.95 * f)
+    }
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let a: CGPoint = fr.pts[i - 1], b: CGPoint = fr.pts[i]
+        let dx: CGFloat = b.x - a.x, dy: CGFloat = b.y - a.y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let nx: CGFloat = -dy / len, ny: CGFloat = dx / len
+        var mid = Path(); mid.move(to: a); mid.addLine(to: b)
+        ctx.stroke(mid, with: .color(churn.opacity(0.20 * k)),
+                   style: StrokeStyle(lineWidth: fr.bw * 0.80, lineCap: .round, lineJoin: .round))
+        let sa: CGFloat = spread(i - 1), sb: CGFloat = spread(i)
+        let w: CGFloat = fr.bw * CGFloat(0.12 + 0.16 * k)
+        for side in [CGFloat(1), CGFloat(-1)] {
+            var edge = Path()
+            edge.move(to: CGPoint(x: a.x + nx * sa * side, y: a.y + ny * sa * side))
+            edge.addLine(to: CGPoint(x: b.x + nx * sb * side, y: b.y + ny * sb * side))
+            ctx.stroke(edge, with: .color(foam.opacity(0.80 * k)),
+                       style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        }
+    }
+    // Foam flecks left in the churned water, on about one mark in three.
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.34 else { continue }
+        let k: Double = fr.fresh(i)
+        guard k > 0.05 else { continue }
+        let s2: Double = (seed * 53.9 + 0.17).truncatingRemainder(dividingBy: 1.0)
+        let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x
+        let dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let off: CGFloat = spread(i) * CGFloat(s2 * 1.6 - 0.8)
+        let c = CGPoint(x: fr.pts[i].x - dy / len * off, y: fr.pts[i].y + dx / len * off)
+        let r: CGFloat = fr.bw * CGFloat(0.07 + 0.09 * (seed / 0.34))
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                 with: .color(foam.opacity(0.75 * k)))
     }
 }
 

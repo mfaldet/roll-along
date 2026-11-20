@@ -1458,6 +1458,95 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
+    /// Standard audit — the five scheduled sets (Candyland, Nightclub, Golf,
+    /// Bloom, Ocean): what each holds now, that every replacement took the
+    /// tier of the piece it replaced (so no price moved), that the displaced
+    /// pieces are in no set on sale, and that pieces redrawn in place kept
+    /// their ids and tiers.
+    func testStandardAudit_scheduledSetsAreOneLookAtTheSamePrice() {
+        func set(_ id: String) -> CosmeticBundle { CosmeticBundle.catalogue.first { $0.id == id }! }
+        let candyland = set("candyland"), nightclub = set("nightclub"), golf = set("golf")
+        let bloom = set("bloom"), ocean = set("ocean")
+
+        // Contents.
+        XCTAssertEqual(nightclub.goals, [.vinyl]);       XCTAssertEqual(nightclub.trails, [.danceSteps])
+        XCTAssertEqual(nightclub.balls, [.disco]);       XCTAssertEqual(nightclub.floors, [.disco])
+        XCTAssertEqual(nightclub.pits, [.nightclub]);    XCTAssertEqual(nightclub.boundaries, [.marquee])
+        XCTAssertEqual(golf.trails, [.dewLine]);         XCTAssertEqual(golf.floors, [.grass])
+        XCTAssertEqual(golf.pits, [.pond]);              XCTAssertEqual(golf.boundaries, [.fairway])
+        XCTAssertEqual(bloom.floors, [.petalPath]);      XCTAssertEqual(bloom.pits, [.deepRose])
+        XCTAssertEqual(bloom.boundaries, [.rose])
+        XCTAssertEqual(ocean.trails, [.wake]);           XCTAssertEqual(ocean.floors, [.openSea])
+        XCTAssertEqual(ocean.pits, [.reef]);             XCTAssertEqual(ocean.boundaries, [.tide])
+        XCTAssertEqual(candyland.floors, [.sugar]);      XCTAssertEqual(candyland.pits, [.syrup])
+        XCTAssertEqual(candyland.boundaries, [.candy])
+
+        // Each replacement took the replaced piece's tier.
+        XCTAssertEqual(GoalSkin.vinyl.tier, GoalSkin.mosaic.tier)
+        XCTAssertEqual(TrailColor.danceSteps.tier, TrailColor.rainbow.tier)
+        XCTAssertEqual(TrailColor.dewLine.tier, TrailColor.air.tier)
+        XCTAssertEqual(TrailColor.wake.tier, TrailColor.sky.tier)
+        XCTAssertEqual(Floor.petalPath.tier, Floor.parchment.tier)
+        XCTAssertEqual(Pit.deepRose.tier, Pit.parchment.tier)
+        XCTAssertEqual(Floor.openSea.tier, Floor.blueprint.tier)
+        XCTAssertEqual(Pit.reef.tier, Pit.blueprint.tier)
+
+        // So no price moved.
+        XCTAssertEqual(candyland.fullPrice(), 6_000)
+        XCTAssertEqual(nightclub.fullPrice(), 9_000)
+        XCTAssertEqual(golf.fullPrice(), 8_000)
+        XCTAssertEqual(bloom.fullPrice(), 6_000)
+        XCTAssertEqual(ocean.fullPrice(), 6_000)
+
+        // Names and stored ids of the new pieces.
+        XCTAssertEqual(GoalSkin.vinyl.rawValue, "vinyl");            XCTAssertEqual(GoalSkin.vinyl.displayName, "Vinyl")
+        XCTAssertEqual(TrailColor.danceSteps.rawValue, "danceSteps"); XCTAssertEqual(TrailColor.danceSteps.displayName, "Dance Steps")
+        XCTAssertEqual(TrailColor.dewLine.rawValue, "dewLine");      XCTAssertEqual(TrailColor.dewLine.displayName, "Dew Line")
+        XCTAssertEqual(TrailColor.wake.rawValue, "wake");            XCTAssertEqual(TrailColor.wake.displayName, "Wake")
+        XCTAssertEqual(Floor.petalPath.rawValue, "petalPath");       XCTAssertEqual(Floor.petalPath.displayName, "Petal Path")
+        XCTAssertEqual(Floor.openSea.rawValue, "openSea");           XCTAssertEqual(Floor.openSea.displayName, "Open Sea")
+        XCTAssertEqual(Pit.deepRose.rawValue, "deepRose");           XCTAssertEqual(Pit.deepRose.displayName, "Deep Rose")
+        XCTAssertEqual(Pit.reef.rawValue, "reef");                   XCTAssertEqual(Pit.reef.displayName, "Reef")
+
+        // The displaced pieces are in no set on sale.
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(GoalSkin.mosaic) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(TrailColor.rainbow) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(TrailColor.air) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(TrailColor.sky) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(Floor.parchment) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(Pit.parchment) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(Floor.blueprint) })
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(Pit.blueprint) })
+
+        // Redrawn in place: same ids and tiers.
+        XCTAssertEqual(Floor.sugar.rawValue, "sugar");     XCTAssertEqual(Pit.syrup.rawValue, "syrup")
+        XCTAssertEqual(Floor.disco.rawValue, "disco");     XCTAssertEqual(Floor.disco.tier, .exclusive)
+        XCTAssertEqual(Floor.grass.rawValue, "grass");     XCTAssertEqual(Floor.grass.tier, .exclusive)
+        XCTAssertEqual(Pit.pond.rawValue, "pond");         XCTAssertEqual(Pit.nightclub.rawValue, "nightclub")
+        XCTAssertEqual(Boundary.rose.rawValue, "rose");    XCTAssertEqual(Boundary.tide.rawValue, "tide")
+
+        // Every pit in the five sets is drawn art, so it shows (held still)
+        // under Reduce Motion instead of falling back to a flat fill.
+        for p in [Pit.syrup, .nightclub, .pond, .deepRose, .reef] {
+            XCTAssertTrue(p.hasDrawnArt, "\(p) should be drawn art")
+        }
+        // The redrawn Disco floor holds still under Reduce Motion instead of
+        // being hidden; Open Sea moves (slowly) and freezes its own clock.
+        XCTAssertFalse(FloorOverlayView.hiddenUnderReduceMotion(.disco))
+        XCTAssertTrue(Floor.openSea.hasAnimatedOverlay)
+        XCTAssertFalse(Floor.petalPath.hasAnimatedOverlay)
+        // The five walls keep their drawing under Reduce Motion.
+        for w in [Boundary.candy, .marquee, .fairway, .rose, .tide] {
+            XCTAssertTrue(w.textureShowsUnderReduceMotion, "\(w) keeps its texture under Reduce Motion")
+        }
+        // The five sets are still complete: one piece in each of six slots.
+        for b in [candyland, nightclub, golf, bloom, ocean] {
+            XCTAssertEqual([b.balls.count, b.goals.count, b.trails.count,
+                            b.floors.count, b.pits.count, b.boundaries.count],
+                           [1, 1, 1, 1, 1, 1], b.id)
+        }
+    }
+
     /// Space Traveler: a full six-slot set on sale from launch, built from
     /// Quasar, Comet and the Space pit plus the retired Space Travel set's
     /// UFO and Moon and a new Starship Hull wall.

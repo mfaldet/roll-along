@@ -235,8 +235,11 @@ struct BallSkinView: View {
             // Lemon-shaped, not round: drawn inside the ball's own circle
             // (no circular clip or rim), so it plays exactly like a marble.
             lemonCanvas
-        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate:
+        case .red, .blue, .green, .purple, .coral, .mint, .slate:
             plainMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
+        // Standard audit (Bloom): a rose seen from above, not a pink marble.
+        case .rose:
+            roseCanvas.clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
             metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .jade, .ruby:
@@ -353,60 +356,185 @@ struct BallSkinView: View {
     // circle by the body switch caller.
     // =========================================================================
     private var discoCanvas: some View {
-        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
+        // Standard audit (Nightclub): a mirror ball.  Rows of small square
+        // mirrors wrap the sphere along its latitudes (narrower toward the
+        // poles and the rim), and the ball turns slowly — about one row
+        // step every three seconds — so each mirror slides round, catching
+        // the light once as it passes.  Most mirrors are silver; a few hold
+        // a faint magenta or cyan reflection of the room.  No twinkling
+        // field: the only sparkle is the slow glint of a turning mirror.
+        // Under Reduce Motion the ball stands still.
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: timelinePaused) { timeline in
             Canvas { ctx, size in
-                let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
-                let w  = size.width, h = size.height
-                let cx = w / 2, cy = h / 2
-                let r  = min(w, h) / 2
+                let t: Double = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let w: CGFloat = size.width, h: CGFloat = size.height
+                let cx: CGFloat = w / 2, cy: CGFloat = h / 2
+                let r: CGFloat = min(w, h) / 2
 
-                // Base sphere — dark silvery violet.
+                // Dark core between the mirrors.
                 ctx.fill(
                     Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
                     with: .radialGradient(Gradient(colors: [
-                        Color(red: 0.55, green: 0.57, blue: 0.72),
-                        Color(red: 0.30, green: 0.32, blue: 0.46),
-                        Color(red: 0.12, green: 0.12, blue: 0.20),
+                        Color(red: 0.34, green: 0.36, blue: 0.46),
+                        Color(red: 0.16, green: 0.17, blue: 0.25),
+                        Color(red: 0.06, green: 0.06, blue: 0.11),
                     ]),
-                    center: CGPoint(x: cx - r * 0.3, y: cy - r * 0.3), startRadius: 0, endRadius: r * 1.1))
+                    center: CGPoint(x: cx - r * 0.3, y: cy - r * 0.3), startRadius: 0, endRadius: r * 1.15))
 
-                // Mirror facets — a grid of small tiles, foreshortened toward
-                // the rim, brighter near the centre, each twinkling.
-                let cols = 9, rows = 7
-                for iy in 0..<rows {
-                    for ix in 0..<cols {
-                        let u  = (CGFloat(ix) + 0.5) / CGFloat(cols)
-                        let v  = (CGFloat(iy) + 0.5) / CGFloat(rows)
-                        let px = cx - r + u * r * 2
-                        let py = cy - r + v * r * 2
-                        let dx = px - cx, dy = py - cy
-                        let dist = (dx * dx + dy * dy).squareRoot()
-                        if dist > r * 0.95 { continue }
-                        let fore  = 1 - (dist / r) * 0.55
-                        let tileW = (r * 2 / CGFloat(cols)) * 0.82 * fore
-                        let tileH = (r * 2 / CGFloat(rows)) * 0.82 * fore
-                        let seed  = Double(ix) * 1.7 + Double(iy) * 2.3
-                        let tw    = 0.5 + 0.5 * sin(t * 3 + seed)
-                        let lightFace = max(0, 1 - dist / r)
-                        let bright = 0.32 + 0.46 * lightFace + 0.20 * tw
-                        let col = Color(red: 0.85 * bright + 0.10,
-                                        green: 0.85 * bright + 0.10,
-                                        blue: 0.95 * bright + 0.12)
+                let rows: Int = 9
+                // The ball turns: mirrors advance by `turn` columns.
+                let turn: Double = t / 3.0
+                let whole: Double = turn.rounded(.down)
+                let frac: Double = turn - whole
+                let shift: Int = Int(whole.truncatingRemainder(dividingBy: 4096))
+                for j in 0..<rows {
+                    // Latitude of this row, -1 (top) … 1 (bottom).
+                    let v: Double = (Double(j) + 0.5) / Double(rows) * 2.0 - 1.0
+                    let halfW: Double = (1.0 - v * v).squareRoot()
+                    let n: Int = max(3, Int((Double(rows) * 1.25 * halfW).rounded()))
+                    let rowH: CGFloat = r * 2 / CGFloat(rows) * CGFloat(0.55 + 0.45 * halfW) * 0.84
+                    let py: CGFloat = cy + CGFloat(v) * r * 0.96
+                    for i in 0...n {
+                        // Longitude across the visible half, 0 (left rim) … π (right rim).
+                        let u: Double = (Double(i) - 0.5 + frac) / Double(n)
+                        guard u > 0.02, u < 0.98 else { continue }
+                        let theta: Double = u * .pi
+                        let facing: Double = sin(theta)                 // 1 facing us, 0 at the rim
+                        let px: CGFloat = cx - CGFloat(cos(theta) * halfW) * r * 0.96
+                        let tileW: CGFloat = CGFloat(.pi * halfW / Double(n) * facing) * r * 0.80
+                        guard tileW > 0.6 else { continue }
+                        // A mirror keeps its identity as it slides round.
+                        let col: Int = i - shift
+                        let hsh: Double = abs(sin(Double(col) * 12.9898 + Double(j) * 78.233) * 43758.5453)
+                            .truncatingRemainder(dividingBy: 1.0)
+                        // Lit from the upper left: mirrors facing that way are brighter.
+                        let lx: Double = -cos(theta) * halfW, ly: Double = v
+                        let lit: Double = max(0.0, 0.62 - (lx * 0.55 + ly * 0.55)) * facing
+                        // Each mirror glints once as it passes the light, softly.
+                        let pass: Double = 1.0 - min(1.0, abs(u - (0.30 + 0.10 * hsh)) / 0.07)
+                        let glint: Double = hsh < 0.45 ? pass * pass : 0.0
+                        let bright: Double = min(1.0, 0.24 + 0.52 * lit + 0.10 * hsh + 0.38 * glint)
+                        var red: Double = 0.84 * bright + 0.08
+                        var green: Double = 0.86 * bright + 0.08
+                        var blue: Double = 0.96 * bright + 0.10
+                        if hsh > 0.86 {           // a magenta reflection of the room
+                            red += 0.16 * bright; green -= 0.18 * bright
+                        } else if hsh > 0.72 {    // a cyan one
+                            red -= 0.20 * bright; green += 0.04 * bright
+                        }
                         ctx.fill(
-                            Path(roundedRect: CGRect(x: px - tileW / 2, y: py - tileH / 2,
-                                                     width: tileW, height: tileH),
-                                 cornerRadius: tileW * 0.18),
-                            with: .color(col.opacity(0.92)))
+                            Path(roundedRect: CGRect(x: px - tileW / 2, y: py - rowH / 2,
+                                                     width: tileW, height: rowH),
+                                 cornerRadius: min(tileW, rowH) * 0.14),
+                            with: .color(Color(red: max(0, min(1, red)), green: max(0, min(1, green)),
+                                               blue: max(0, min(1, blue))).opacity(0.94)))
                     }
                 }
 
-                // Specular highlight.
-                let hl = r * 0.5
+                // Shade toward the rim so the grid reads as a sphere.
                 ctx.fill(
-                    Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.62, width: hl, height: hl)),
-                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.55), .clear]),
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: .clear, location: 0.62),
+                        .init(color: Color.black.opacity(0.42), location: 1.0),
+                    ]), center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+
+                // One soft highlight.
+                let hl: CGFloat = r * 0.46
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.62, width: hl, height: hl)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.42), .clear]),
                         center: CGPoint(x: cx - r * 0.40, y: cy - r * 0.46), startRadius: 0, endRadius: hl))
             }
+        }
+    }
+
+    // =========================================================================
+    // MARK: - Rose (Bloom)
+    // Standard audit: a rose seen from above.  Four rings of overlapping
+    // petals step inward — wide, pale-edged outer petals, tighter and deeper
+    // toward the middle — around a small furled bud.  Each petal has a shadow
+    // under its outer edge and a light lip along it, which is what makes the
+    // rings read as layers instead of stripes.  Still.  Clipped to a circle by
+    // the body switch caller.
+    // =========================================================================
+    private var roseCanvas: some View {
+        Canvas { ctx, size in
+            let cx: CGFloat = size.width / 2
+            let cy: CGFloat = size.height / 2
+            let r: CGFloat = min(size.width, size.height) / 2
+            let c = CGPoint(x: cx, y: cy)
+            func polar(_ a: Double, _ d: CGFloat) -> CGPoint {
+                CGPoint(x: cx + CGFloat(cos(a)) * d, y: cy + CGFloat(sin(a)) * d)
+            }
+            // Deep shadowed base between the petals.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                     with: .color(Color(red: 0.36, green: 0.05, blue: 0.16)))
+
+            // (outer radius, petals, start angle, edge color, base color)
+            let rings: [(CGFloat, Int, Double, Color, Color)] = [
+                (1.02, 7, 0.20, Color(red: 1.00, green: 0.78, blue: 0.86), Color(red: 0.93, green: 0.42, blue: 0.60)),
+                (0.78, 6, 0.75, Color(red: 0.99, green: 0.66, blue: 0.78), Color(red: 0.86, green: 0.30, blue: 0.50)),
+                (0.56, 5, 0.10, Color(red: 0.96, green: 0.52, blue: 0.68), Color(red: 0.76, green: 0.20, blue: 0.40)),
+                (0.36, 4, 0.60, Color(red: 0.90, green: 0.40, blue: 0.58), Color(red: 0.62, green: 0.12, blue: 0.30)),
+            ]
+            for ring in rings {
+                let outer: CGFloat = r * ring.0
+                let inner: CGFloat = outer * 0.42
+                let count: Int = ring.1
+                let step: Double = 2.0 * .pi / Double(count)
+                // Each petal spans a little more than its share, so neighbors overlap.
+                let half: Double = step * 0.62
+                for k in 0..<count {
+                    let a: Double = ring.2 + Double(k) * step
+                    var petal = Path()
+                    petal.move(to: polar(a - half, inner))
+                    petal.addCurve(to: polar(a, outer),
+                                   control1: polar(a - half * 0.95, outer * 0.86),
+                                   control2: polar(a - half * 0.45, outer * 1.02))
+                    petal.addCurve(to: polar(a + half, inner),
+                                   control1: polar(a + half * 0.45, outer * 1.02),
+                                   control2: polar(a + half * 0.95, outer * 0.86))
+                    petal.addQuadCurve(to: polar(a - half, inner), control: c)
+                    petal.closeSubpath()
+                    // Shadow cast on the ring below.
+                    ctx.fill(petal.offsetBy(dx: r * 0.018, dy: r * 0.030),
+                             with: .color(Color(red: 0.26, green: 0.02, blue: 0.10).opacity(0.38)))
+                    ctx.fill(petal, with: .radialGradient(
+                        Gradient(colors: [ring.4, ring.4, ring.3]),
+                        center: c, startRadius: inner, endRadius: outer))
+                    // The petal's curled lip.
+                    var lip = Path()
+                    lip.move(to: polar(a - half * 0.80, outer * 0.90))
+                    lip.addQuadCurve(to: polar(a + half * 0.80, outer * 0.90),
+                                     control: polar(a, outer * 1.07))
+                    ctx.stroke(lip, with: .color(Color.white.opacity(0.36)),
+                               style: StrokeStyle(lineWidth: max(0.5, r * 0.022), lineCap: .round))
+                }
+            }
+            // The furled bud at the heart: a tight spiral.
+            let budR: CGFloat = r * 0.17
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - budR, y: cy - budR, width: budR * 2, height: budR * 2)),
+                     with: .radialGradient(Gradient(colors: [
+                        Color(red: 0.52, green: 0.07, blue: 0.22), Color(red: 0.78, green: 0.20, blue: 0.40)]),
+                        center: c, startRadius: 0, endRadius: budR))
+            var spiral = Path()
+            let turns: Int = 22
+            for q in 0...turns {
+                let u: Double = Double(q) / Double(turns)
+                let pt = polar(1.2 + u * 2.6 * .pi, budR * CGFloat(0.12 + 0.82 * u))
+                if q == 0 { spiral.move(to: pt) } else { spiral.addLine(to: pt) }
+            }
+            ctx.stroke(spiral, with: .color(Color(red: 0.34, green: 0.03, blue: 0.14).opacity(0.80)),
+                       style: StrokeStyle(lineWidth: max(0.5, r * 0.028), lineCap: .round, lineJoin: .round))
+
+            // Soft light from the upper left, shade toward the lower right.
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                     with: .radialGradient(Gradient(stops: [
+                        .init(color: Color.white.opacity(0.20), location: 0.0),
+                        .init(color: .clear, location: 0.55),
+                        .init(color: Color(red: 0.20, green: 0.0, blue: 0.08).opacity(0.38), location: 1.0),
+                     ]), center: CGPoint(x: cx - r * 0.34, y: cy - r * 0.36), startRadius: 0, endRadius: r * 1.5))
         }
     }
 
@@ -756,9 +884,9 @@ struct BallSkinView: View {
                 // ── Fish silhouette — swims left → right, wraps, gentle bob ──
                 //    (drawn behind the bubbles; gone under Reduce Motion)
                 if !reduceMotion {
-                    let lap: Double = (t * 0.11).truncatingRemainder(dividingBy: 1.0)
+                    let lap: Double = (t * 0.075).truncatingRemainder(dividingBy: 1.0)
                     let fx: CGFloat = w * (-0.25 + CGFloat(lap) * 1.5)
-                    let fy: CGFloat = h * 0.56 + CGFloat(sin(t * 1.3)) * h * 0.035
+                    let fy: CGFloat = h * 0.56 + CGFloat(sin(t * 0.8)) * h * 0.035
                     let fl: CGFloat = r * 0.26            // body length
                     let fh: CGFloat = r * 0.11            // body half-height
                     let fishInk = Color(red: 0.02, green: 0.20, blue: 0.30).opacity(0.55)
