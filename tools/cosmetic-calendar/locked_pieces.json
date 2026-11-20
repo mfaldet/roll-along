@@ -229,21 +229,21 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".vinyl",
-     "sha": "389d648ce84e3424"
+     "sha": "78f392380a68e8dd"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*static func previewGradient\\(for goal: GoalSkin, endRadius: CGFloat = 28\\) \\-> AnyShapeStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".vinyl",
-     "sha": "e5b5033cddfb95cd"
+     "sha": "49328e914e54f514"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var accentColor: Color",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".vinyl",
-     "sha": "5509aa552498e1ed"
+     "sha": "95b9ad9c7dc79052"
     }
    ]
   },
@@ -258,7 +258,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".danceSteps",
-     "sha": "16fef6536fe52ebf"
+     "sha": "2868d8b28f9b7771"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -302,7 +302,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".disco",
-     "sha": "9c7f3445a10a6a9c"
+     "sha": "e15987b53c93e2a2"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -355,7 +355,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".nightclub",
-     "sha": "3c0fae4067b32e98"
+     "sha": "3caaa8fac0d196cc"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -432,7 +432,7 @@
      "decl": "^[ \\t]*var colors: \\[Color\\]",
      "scope": "^(?:private |fileprivate |final )*enum BallSkin\\b",
      "case": ".golfBall",
-     "sha": "58114f2f5c0c33fb"
+     "sha": "a9a5f564f76e2f13"
     }
    ]
   },
@@ -460,7 +460,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".holeInOne",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -489,7 +489,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".dewLine",
-     "sha": "10e3a69e05975d48"
+     "sha": "b0be21b37a730bfc"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -533,7 +533,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".grass",
-     "sha": "f082180fcabf9857"
+     "sha": "e364f7f40d882fe5"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -603,7 +603,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".pond",
-     "sha": "679f26164e39a3a1"
+     "sha": "fdac99c53c41ccac"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -673,7 +673,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct BallSkinView\\b",
      "case": ".ufo",
-     "sha": "cb85d1451269646a"
+     "sha": "9039b307571a92ca"
     },
     {
      "file": "RollAlong/BallSkinView.swift",
@@ -703,7 +703,7 @@
      "decl": "^[ \\t]*var colors: \\[Color\\]",
      "scope": "^(?:private |fileprivate |final )*enum BallSkin\\b",
      "case": ".ufo",
-     "sha": "a7e20bd490486932"
+     "sha": "f015fdfb02a72d82"
     }
    ]
   },
@@ -771,7 +771,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".moon",
-     "sha": "2d9c4f644528d13e"
+     "sha": "f109a48088568de7"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -798,7 +798,7 @@
      "enum": "Pit",
      "decl": "^    var color: Color \\{$",
      "case": ".space",
-     "sha": "19ace5b05f3af345"
+     "sha": "e2bcbe230abac85f"
     }
    ],
    "note": "Restored to its pre-audit drawing code after the audit changed it."
@@ -814,7 +814,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct BoundaryOverlayView\\b",
      "case": ".hull",
-     "sha": "454fe6df693d74e0"
+     "sha": "b0fe7f3c4720abde"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -839,14 +839,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Boundary\\b",
      "case": ".hull",
-     "sha": "a0e4499fb3bf082f"
+     "sha": "2e5e22449299b9f5"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var textureShowsUnderReduceMotion: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Boundary\\b",
      "case": ".hull",
-     "sha": "a40ae3a1f704c8a2"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -894,7 +894,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".frost",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -962,7 +962,7 @@
      "decl": "^[ \\t]*private func paperFloorOverlay\\(geo: GeometryProxy\\) \\-> some View",
      "scope": "^(?:private |fileprivate |final )*struct PaperFloorOverlayView\\b",
      "case": ".twilight",
-     "sha": "bab04cec6d7b305d"
+     "sha": "e6ce15ed34ca3daa"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -995,7 +995,7 @@
      "decl": "^[ \\t]*static func drawStatic\\(_ pit: Pit, in ctx: inout GraphicsContext, size: CGSize\\)",
      "scope": "^(?:private |fileprivate |final )*enum PitArt\\b",
      "case": ".twilight",
-     "sha": "b592557e9bdd759e"
+     "sha": "15b0238f9f8fbcf2"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -1050,7 +1050,7 @@
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".twilight",
-     "sha": "f2120ac3ab46e64e"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -1170,14 +1170,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".midnight",
-     "sha": "31be644bf0283b35"
+     "sha": "dd3a00242e653e17"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".midnight",
-     "sha": "11211bc7cc75717d"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -1240,14 +1240,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".midnight",
-     "sha": "8c9dd2019d5a2afb"
+     "sha": "4b6eb96640084f26"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".midnight",
-     "sha": "f2120ac3ab46e64e"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -1433,7 +1433,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".flameRing",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -1524,7 +1524,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".scorched",
-     "sha": "6838174da42ca69d"
+     "sha": "ea4a5c8623b60bdf"
     }
    ]
   },
@@ -1544,7 +1544,7 @@
      "enum": "Pit",
      "decl": "^    var color: Color \\{$",
      "case": ".crater",
-     "sha": "9ee69c03a11d300e"
+     "sha": "2594af21503e8958"
     }
    ]
   },
@@ -1651,7 +1651,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
      "case": ".whirlpool",
-     "sha": "b75e2d30f4d96356"
+     "sha": "d36e2250b7888b2a"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -1664,7 +1664,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".whirlpool",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -1750,14 +1750,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".shallows",
-     "sha": "f730241998124623"
+     "sha": "321548db2e0357d8"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".shallows",
-     "sha": "4273920a3032d050"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -1797,14 +1797,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".deepEnd",
-     "sha": "d71f3982673175c1"
+     "sha": "247280bd645c07d6"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".deepEnd",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -1860,7 +1860,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct BallSkinView\\b",
      "case": ".thundercloud",
-     "sha": "aa4dcb38875eb00b"
+     "sha": "d049179d6b1ef689"
     },
     {
      "file": "RollAlong/BallSkinView.swift",
@@ -1911,7 +1911,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
      "case": ".thunderRing",
-     "sha": "ad60caf1c5ef7940"
+     "sha": "36e8bd3914c94e02"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -1934,7 +1934,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".thunderRing",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -1954,7 +1954,7 @@
      "decl": "^[ \\t]*var targetBands: \\[Color\\]\\?",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".thunderRing",
-     "sha": "e02b422b40cfbc36"
+     "sha": "baeb2ba52ad33fbe"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2002,7 +2002,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct FloorOverlayView\\b",
      "case": ".overcast",
-     "sha": "4cb1b477b8caff77"
+     "sha": "79b47977ae4e8354"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -2025,7 +2025,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".overcast",
-     "sha": "8afd4c860634402f"
+     "sha": "a7691f92af6c58e7"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2047,7 +2047,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct PitOverlayView\\b",
      "case": ".maelstrom",
-     "sha": "b3b04356fe642117"
+     "sha": "0021862bb71a1d2d"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -2094,7 +2094,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".maelstrom",
-     "sha": "cf63289bb7a00d77"
+     "sha": "f513437852a89e12"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2108,7 +2108,7 @@
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".maelstrom",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -2153,7 +2153,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Boundary\\b",
      "case": ".thunderbolt",
-     "sha": "3258a7c4dbf1eac8"
+     "sha": "53b08d6e034f8496"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2262,7 +2262,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".wake",
-     "sha": "2a2ce458c05bc1fe"
+     "sha": "0bfb77ed370e731f"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2306,14 +2306,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".openSea",
-     "sha": "d2993fa380d5df76"
+     "sha": "34b4f97ceff865b9"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".openSea",
-     "sha": "fbea065016b4e5e6"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -2370,7 +2370,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".reef",
-     "sha": "98e7ee06ed84f5ed"
+     "sha": "43a622974dd4276f"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2509,7 +2509,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".roseTrail",
-     "sha": "79b1964a2ef8ed6d"
+     "sha": "8f8ef627155ed1c8"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2540,7 +2540,7 @@
      "decl": "^[ \\t]*private func paperFloorOverlay\\(geo: GeometryProxy\\) \\-> some View",
      "scope": "^(?:private |fileprivate |final )*struct PaperFloorOverlayView\\b",
      "case": ".petalPath",
-     "sha": "b11745bc6621d9ec"
+     "sha": "8870e04b150995b2"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -2558,7 +2558,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".petalPath",
-     "sha": "7f0c058562aa2df3"
+     "sha": "6eed5a997f30b89d"
     }
    ]
   },
@@ -2604,7 +2604,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".deepRose",
-     "sha": "bf1d021154ddfc1b"
+     "sha": "0f4159d384f93ffe"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2626,7 +2626,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct BoundaryOverlayView\\b",
      "case": ".rose",
-     "sha": "9daf6670de1d87e6"
+     "sha": "ebcc5084f0feaa43"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -2711,7 +2711,7 @@
      "enum": "Floor",
      "decl": "^    var color: Color \\{$",
      "case": ".aurora",
-     "sha": "12d1ee0cd231be61"
+     "sha": "eebd06c52c5a5324"
     }
    ],
    "note": "Look swapped with the pit at the owner's direction in the quality round: dark with a few faint ribbons."
@@ -2737,7 +2737,7 @@
      "enum": "Pit",
      "decl": "^    var color: Color \\{$",
      "case": ".aurora",
-     "sha": "4d3b96af1af7d6b3"
+     "sha": "4915dc9ffd3cd345"
     }
    ],
    "note": "Look swapped with the floor at the owner's direction in the quality round: full of aurora ribbons."
@@ -2786,7 +2786,7 @@
      "decl": "^[ \\t]*var colors: \\[Color\\]",
      "scope": "^(?:private |fileprivate |final )*enum BallSkin\\b",
      "case": ".lemon",
-     "sha": "fca364f8e2de76fc"
+     "sha": "5e0495a4b9583373"
     }
    ]
   },
@@ -2814,7 +2814,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".citrusSlice",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2856,13 +2856,13 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".zest",
-     "sha": "e8d0fdb5b9a2a90c"
+     "sha": "e0e0e6540b760d6b"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*func drawRichTrail\\(_ ctx: GraphicsContext, points pts: \\[CGPoint\\],",
      "case": ".zest",
-     "sha": "12c37a3bb55875d9"
+     "sha": "a98f29efe5974d70"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -2905,7 +2905,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".grove",
-     "sha": "0ee8c94bd347c30b"
+     "sha": "2ac1328d8683596d"
     }
    ]
   },
@@ -2920,7 +2920,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct PitOverlayView\\b",
      "case": ".tidePool",
-     "sha": "d1fa83f79827cb00"
+     "sha": "98570ff5596f97d2"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -2975,21 +2975,21 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".tidePool",
-     "sha": "e591b9f3e976331c"
+     "sha": "22f0135274b431f6"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".tidePool",
-     "sha": "70a204e89d2e55cc"
+     "sha": "7e4fe8351c22e218"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".tidePool",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -3071,14 +3071,14 @@
      "decl": "^[ \\t]*private func themedStandardGoal\\(_ goal: GoalSkin\\) \\-> some View",
      "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
      "case": ".bullion",
-     "sha": "544048af3ab2155e"
+     "sha": "917e8bb60e4063c6"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".bullion",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -3158,7 +3158,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".goldLeaf",
-     "sha": "c6b12fee8c82f3a7"
+     "sha": "a32e5f43240abbb3"
     }
    ]
   },
@@ -3203,14 +3203,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".vault",
-     "sha": "75511a9469352855"
+     "sha": "fd6ce6defae7cece"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".vault",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -3273,7 +3273,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
      "case": ".scribble",
-     "sha": "57b8ef235f7742a3"
+     "sha": "9a00710b70c90ff3"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -3286,7 +3286,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".scribble",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -3482,7 +3482,7 @@
      "enum": "TrailColor",
      "decl": "^    var color: Color \\{$",
      "case": ".raybeam",
-     "sha": "07a6ef0750859581"
+     "sha": "04e8ecd0ff4c9be2"
     }
    ]
   },
@@ -3510,7 +3510,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".gridCity",
-     "sha": "88c217f4568bca1e"
+     "sha": "db1ea1d36d5df0c0"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -3532,7 +3532,7 @@
      "decl": "^[ \\t]*static func drawStatic\\(_ pit: Pit, in ctx: inout GraphicsContext, size: CGSize\\)",
      "scope": "^(?:private |fileprivate |final )*enum PitArt\\b",
      "case": ".graph",
-     "sha": "2eb60db14860a27c"
+     "sha": "0e6ab14a77923689"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -3557,14 +3557,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".graph",
-     "sha": "131ea682d40b8576"
+     "sha": "b0807eac5a8e44fd"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".graph",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -3658,7 +3658,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".candy",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -3749,7 +3749,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".sugar",
-     "sha": "6c64107cfee3ed44"
+     "sha": "08fa07f5a0b93687"
     }
    ]
   },
@@ -3800,14 +3800,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".syrup",
-     "sha": "e546e0984f85b24d"
+     "sha": "e6b6e43d8eb8216c"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".syrup",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -3869,7 +3869,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct BallSkinView\\b",
      "case": ".ghost",
-     "sha": "ffca7e22ebefcf6f"
+     "sha": "095dc350debe67fc"
     },
     {
      "file": "RollAlong/BallSkinView.swift",
@@ -3899,7 +3899,7 @@
      "decl": "^[ \\t]*var colors: \\[Color\\]",
      "scope": "^(?:private |fileprivate |final )*enum BallSkin\\b",
      "case": ".ghost",
-     "sha": "6b43d74deb7b8a3d"
+     "sha": "49fa239ece8583f5"
     }
    ]
   },
@@ -3914,7 +3914,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
      "case": ".pentagram",
-     "sha": "05584957df237293"
+     "sha": "326724c8dfea3496"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -3927,21 +3927,21 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".pentagram",
-     "sha": "e5eac84fa7a93092"
+     "sha": "090b189553738582"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*static func previewGradient\\(for goal: GoalSkin, endRadius: CGFloat = 28\\) \\-> AnyShapeStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".pentagram",
-     "sha": "8720eb84fad75f39"
+     "sha": "988a1818b8891830"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var accentColor: Color",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".pentagram",
-     "sha": "46bc48a35b78ee75"
+     "sha": "2c11fe89d786a682"
     }
    ]
   },
@@ -3994,21 +3994,21 @@
      "decl": "^[ \\t]*private func paperFloorOverlay\\(geo: GeometryProxy\\) \\-> some View",
      "scope": "^(?:private |fileprivate |final )*struct PaperFloorOverlayView\\b",
      "case": ".fog",
-     "sha": "7f21a01011c5e290"
+     "sha": "e9bb57e8d0d58a79"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".fog",
-     "sha": "e1b295ad745e7f70"
+     "sha": "58c1e1e6ca888294"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".fog",
-     "sha": "11211bc7cc75717d"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -4077,7 +4077,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".graveyard",
-     "sha": "14fabe7b8994f2c6"
+     "sha": "3f3d60b1752727d7"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -4091,7 +4091,7 @@
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".graveyard",
-     "sha": "2d5b6606e8ef7d02"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -4190,13 +4190,13 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".glyphs",
-     "sha": "f1e7ee4b5983db2d"
+     "sha": "79cbac7bd54d2029"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*func drawRichTrail\\(_ ctx: GraphicsContext, points pts: \\[CGPoint\\],",
      "case": ".glyphs",
-     "sha": "c417bc2f6bdbead2"
+     "sha": "05ceffddcf013b6d"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -4221,7 +4221,7 @@
      "enum": "Pit",
      "decl": "^    var color: Color \\{$",
      "case": ".canyon",
-     "sha": "67a8b68d620c6fd9"
+     "sha": "f8bf41ecf63e888f"
     }
    ]
   },
@@ -4338,7 +4338,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct PitOverlayView\\b",
      "case": ".vent",
-     "sha": "dcdb30059e8d69a0"
+     "sha": "13e08f70a7713653"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -4386,21 +4386,21 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".vent",
-     "sha": "701bfab2bee74ecb"
+     "sha": "9ae21c3fd380657d"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".vent",
-     "sha": "d9db2c98886690a6"
+     "sha": "7e4fe8351c22e218"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".vent",
-     "sha": "f2120ac3ab46e64e"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -4435,7 +4435,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct BallSkinView\\b",
      "case": ".trophy",
-     "sha": "3c4c1c8d0168a9c6"
+     "sha": "486b8fbc51de3948"
     },
     {
      "file": "RollAlong/BallSkinView.swift",
@@ -4471,7 +4471,7 @@
      "decl": "^[ \\t]*var colors: \\[Color\\]",
      "scope": "^(?:private |fileprivate |final )*enum BallSkin\\b",
      "case": ".trophy",
-     "sha": "f12afab91860ba9b"
+     "sha": "73031820ccaa6bd6"
     }
    ]
   },
@@ -4486,7 +4486,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
      "case": ".winnersCircle",
-     "sha": "4d1f0dfe59622dbf"
+     "sha": "6beccb8d50ae244f"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -4506,14 +4506,14 @@
      "decl": "^[ \\t]*static func previewGradient\\(for goal: GoalSkin, endRadius: CGFloat = 28\\) \\-> AnyShapeStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".winnersCircle",
-     "sha": "31f5d4bce345b088"
+     "sha": "48ee05f4c20460e2"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var accentColor: Color",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".winnersCircle",
-     "sha": "e9552baafd907df5"
+     "sha": "76e43c8f46b32d64"
     }
    ]
   },
@@ -4528,7 +4528,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum TrailColor\\b",
      "case": ".victoryLap",
-     "sha": "f2af7c32502ed269"
+     "sha": "b8e929369c2482c8"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -4559,7 +4559,7 @@
      "enum": "Floor",
      "decl": "^    var color: Color \\{$",
      "case": ".brass",
-     "sha": "943716b3a4dec39d"
+     "sha": "fc7004d45c114b1c"
     }
    ]
   },
@@ -4579,7 +4579,7 @@
      "enum": "Pit",
      "decl": "^    var color: Color \\{$",
      "case": ".sideline",
-     "sha": "a3ddd6cd26465d4a"
+     "sha": "d59b4675a772fb7d"
     }
    ]
   },
@@ -4672,7 +4672,7 @@
      "decl": "^[ \\t]*var holeStyle: HoleStyle",
      "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
      "case": ".inferno",
-     "sha": "924567216f2e592b"
+     "sha": "c2b12d4c7e34160a"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -4714,7 +4714,7 @@
      "decl": "^[ \\t]*var body: some View",
      "scope": "^(?:private |fileprivate |final )*struct FloorOverlayView\\b",
      "case": ".ember",
-     "sha": "c9d2b9ac867cc7cc"
+     "sha": "90c2fc32982d3df7"
     },
     {
      "file": "RollAlong/BallGameView.swift",
@@ -4745,14 +4745,14 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".ember",
-     "sha": "85afb621dedcc37a"
+     "sha": "f58ec6a01b538aaf"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*var hasAnimatedOverlay: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
      "case": ".ember",
-     "sha": "11211bc7cc75717d"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },
@@ -4809,7 +4809,7 @@
      "decl": "^[ \\t]*var color: Color",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".evil",
-     "sha": "51464f7e14189ed0"
+     "sha": "57a1871ec21cae38"
     },
     {
      "file": "RollAlong/Cosmetics.swift",
@@ -4823,7 +4823,7 @@
      "decl": "^[ \\t]*var hasDrawnArt: Bool",
      "scope": "^(?:private |fileprivate |final )*enum Pit\\b",
      "case": ".evil",
-     "sha": "f2120ac3ab46e64e"
+     "sha": "7e4fe8351c22e218"
     }
    ]
   },

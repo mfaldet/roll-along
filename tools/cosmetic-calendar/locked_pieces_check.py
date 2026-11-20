@@ -127,7 +127,11 @@ def case_body(block, name):
         if not m:
             continue
         if token.search(m.group(1)):
-            found.append(seg[m.end():])
+            # Comment lines at the end of a case introduce the NEXT case, so a
+            # new neighbor (with its own heading comment) is not a change here.
+            # Closing braces at the end are dropped too, so the last case of a
+            # switch reads the same once another case is added after it.
+            found.append(re.sub(r'(?:\s*(?://[^\n]*|\}))+\s*$', '', seg[m.end():]))
     return found
 
 
