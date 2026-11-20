@@ -29,7 +29,7 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 
 ## Every held piece
 
-"Approved?" is from the quality round: only pieces in the collections on sale were graded. A piece marked *displaced* was replaced inside an active collection in that round; *not graded* means it was never reviewed.
+"Approved?" is from the quality round: only pieces in the collections on sale were graded. A piece marked *displaced* was replaced inside an active collection in that round or in the later audit; *not graded* means it was never reviewed.
 
 "Verdict vs standard" is an audit against `docs/cosmetics/quality-standard.md` (rules R1 to R9), made by reading each piece's drawing code, not by looking at it on screen. The verdicts live in `tools/cosmetic-calendar/held_verdicts.json`. Held pieces were **not changed**; a piece that is borderline or fails needs a redraw before it can anchor a collection.
 
@@ -91,7 +91,7 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Ball | Oktoberfest | `oktoberfest` | Legendary | 1,500 | Oktoberfest (seasonal) | Not graded | Borderline (R1) | Bavarian pattern with foam; not clearly a stein |
 | Ball | Teacher's Apple | `apple` | Legendary | 1,500 | Back to School (seasonal) | Not graded | Borderline (R1) | Leaf and stem are right; an apple should be apple-shaped |
 
-### Goals held: 18
+### Goals held: 19
 
 | Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
 |---|---|---|---|---|---|---|---|---|
@@ -103,6 +103,7 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Goal | Wormhole | `wormhole` | Standard | 750 | in no collection | Not graded | Meets | Rings in perspective fall to a bright vanishing point |
 | Goal | Crystal | `crystal` | Epic | 1,250 | Realistic Marble (retired); Winter Wonderland (seasonal); Billiards Hall (retired); Geode (retired) | Not graded | Borderline (R1, R6) | Eight flat pie facets shimmering every 3 seconds |
 | Goal | Flame | `flame` | Epic | 1,250 | Citrus (displaced in the quality round); Harvest Moon (seasonal); Lunar New Year (seasonal) | No: displaced (replaced in the quality round) | Fails (R6, R8) | Fast flame flicker; twin of the Flame Ring goal |
+| Goal | Mosaic | `mosaic` | Legendary | 1,500 | Nightclub (displaced in the audit); Spring Fling (seasonal) | No: displaced (replaced in the audit) | Fails (R3, R6) | Full-spectrum tiles twinkling 40% every 3 seconds; no clear subject |
 | Goal | Comet | `comet` | Epic | 1,250 | Arcade (retired) | Not graded | Fails (R6) | Streaks whirl a full turn in under 6 seconds |
 | Goal | Rainbow | `rainbow` | Legendary | 1,500 | Zen Garden (retired); Countdown (seasonal); Star-Spangled (seasonal); Spectrum (seasonal) | Not graded | Fails (R6) | Fast spinning rainbow swirl; disorienting |
 | Goal | Plasma | `plasma` | Epic | 1,250 | Velvet Night (retired); Tempest (retired); Mardi Gras (seasonal); Lava Lamp (retired) | Not graded | Fails (R6) | Jagged arcs turn in 8 seconds with fast jitter |
@@ -114,20 +115,25 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Goal | Doodle | `doodle` | Legendary | 1,500 | Paper World (retired) | Not graded | Meets | Wobbly pencil rings crowding to a deep center |
 | Goal | Soccer Net | `soccerNet` | Legendary | 1,500 | Soccer (retired) | Not graded | Meets | Goal mouth with posts, net and grass strip |
 
-### Trails held: 2
+### Trails held: 5
 
 | Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
 |---|---|---|---|---|---|---|---|---|
 | Trail | Ember | `ember` | Rare | 1,000 | Citrus (displaced in the quality round); Harvest Moon (seasonal); Oktoberfest (seasonal); Lava Lamp (retired) | No: displaced (replaced in the quality round) | Borderline (R8) | Good sparks, but a third fire-colored trail |
+| Trail | Sky | `sky` | Standard | 750 | Ocean (displaced in the audit); Summer Vibes (seasonal) | No: displaced (replaced in the audit) | Fails (R1, R5) | A plain pale-blue line; a color with a name |
+| Trail | Rainbow | `rainbow` | Legendary | 1,500 | Nightclub (displaced in the audit); Velvet Night (retired); Spectrum (seasonal) | No: displaced (replaced in the audit) | Meets | Spectrum line; each mark keeps its hue, then sparkles out |
 | Trail | Snake | `snake` | Rare | 1,000 | Ancient Temple (displaced in the quality round); Zen Garden (retired) | No: displaced (replaced in the quality round) | Meets | Scaled body laid on the path, sheds from the tail |
+| Trail | Air | `air` | Legendary | 1,500 | Golf (displaced in the audit); Dune (retired) | No: displaced (replaced in the audit) | Borderline (R8) | Soft puffs that swell and lift; close twin of the Smoke trail |
 
-### Floors held: 11
+### Floors held: 13
 
 | Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
 |---|---|---|---|---|---|---|---|---|
 | Floor | Notebook | `notebook` | Rare | 1,000 | Paper World (retired); Back to School (seasonal) | Not graded | Meets | Ruled lines and a red margin; it is notebook paper |
 | Floor | Graph | `graph` | Rare | 1,000 | Arcade (retired) | Not graded | Meets | Pale graph-paper grid; quiet and true to name |
+| Floor | Blueprint | `blueprint` | Standard | 750 | Ocean (displaced in the audit); Summer Vibes (seasonal) | No: displaced (replaced in the audit) | Meets | Faint drafting grid with a dimension line and compass arc |
 | Floor | Dusk | `dusk` | Standard | 750 | Citrus (displaced in the quality round) | No: displaced (replaced in the quality round) | Fails (R5, R1) | Flat fill; no detail at all |
+| Floor | Parchment | `parchment` | Rare | 1,000 | Bloom (displaced in the audit) | No: displaced (replaced in the audit) | Borderline (R5) | Only an edge vignette and ink specks; needs real parchment detail |
 | Floor | Velvet | `velvet` | Standard | 750 | Velvet Night (retired); Realistic Marble (retired); Sweetheart (seasonal); Día de los Muertos (seasonal); Lunar New Year (seasonal); Geode (retired); Cathedral (retired) | Not graded | Borderline (R5) | Sheen bands only; nothing to find on a close look |
 | Floor | Sunset | `sunset` | Standard | 750 | Golden Hour (retired) | Not graded | Fails (R1, R5) | Three wide color bands; a gradient, not a sunset |
 | Floor | Origami | `origami` | Rare | 1,000 | Zen Garden (retired) | Not graded | Borderline (R1, R5) | Diagonal fold lines only; no folded shapes |
@@ -137,14 +143,16 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Floor | Court | `court` | Standard | 750 | Full Court (retired) | Not graded | Meets | Hardwood planks with grain and a painted court line |
 | Floor | Felt | `felt` | Standard | 750 | Billiards Hall (retired); High Roller (retired) | Not graded | Fails (R5) | Flat green fill; no nap, chalk or wear |
 
-### Pits held: 12
+### Pits held: 14
 
 | Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
 |---|---|---|---|---|---|---|---|---|
 | Pit | Inverted | `inverted` | Standard | 750 | Noir (retired); Quicksilver (retired) | Not graded | Fails (R5) | Flat fill; no layers |
 | Pit | Ember | `ember` | Standard | 750 | in no collection | Not graded | Borderline (R5, R7) | Two layers; glow sits in the core, which should be dark |
 | Pit | Notebook | `notebook` | Standard | 750 | Paper World (retired); Back to School (seasonal) | Not graded | Borderline (R5) | Torn edge and rules, but no stepped depth |
+| Pit | Blueprint | `blueprint` | Standard | 750 | Ocean (displaced in the audit) | No: displaced (replaced in the audit) | Fails (R5, R7) | Perspective grid with no ledges or dark core; noise at small sizes |
 | Pit | Dusk | `dusk` | Standard | 750 | Golden Hour (retired); Sweetheart (seasonal) | Not graded | Fails (R5) | Flat fill; no layers |
+| Pit | Parchment | `parchment` | Standard | 750 | Bloom (displaced in the audit); Pastel (retired) | No: displaced (replaced in the audit) | Borderline (R5) | Scorched ragged hole reads well, but only one step of depth |
 | Pit | Velvet | `velvet` | Standard | 750 | Velvet Night (retired); Realistic Marble (retired); Lunar New Year (seasonal); Midnight Carnival (retired); Geode (retired); Cathedral (retired) | Not graded | Borderline (R5) | Soft sheen on one wall; shallow |
 | Pit | Sunset | `sunset` | Standard | 750 | Citrus (displaced in the quality round) | No: displaced (replaced in the quality round) | Fails (R5, R1) | Single red-to-purple gradient |
 | Pit | Origami | `origami` | Standard | 750 | Zen Garden (retired) | Not graded | Meets | Folded-paper creases stepping down into a funnel |
@@ -193,26 +201,26 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Slot | Held pieces |
 |---|---|
 | Ball | 53 |
-| Goal | 18 |
-| Trail | 2 |
-| Floor | 11 |
-| Pit | 12 |
+| Goal | 19 |
+| Trail | 5 |
+| Floor | 13 |
+| Pit | 14 |
 | Boundary | 29 |
-| **Total** | **125** |
+| **Total** | **133** |
 
-The scarcest slot is **Trail** with 2 held piece(s), so at most **2** new full collection(s) could be built from held pieces alone. Each further collection needs new art in every slot that has run out, in this order of scarcity: Trail (2), Floor (11), Pit (12), Goal (18), Boundary (29), Ball (53).
+The scarcest slot is **Trail** with 5 held piece(s), so at most **5** new full collection(s) could be built from held pieces alone. Each further collection needs new art in every slot that has run out, in this order of scarcity: Trail (5), Floor (13), Pit (14), Goal (19), Boundary (29), Ball (53).
 
 ## Verdicts per slot
 
 | Slot | Held | Meets | Borderline | Fails | Not audited |
 |---|---|---|---|---|---|
 | Ball | 53 | 19 | 19 | 15 | 0 |
-| Goal | 18 | 7 | 6 | 5 | 0 |
-| Trail | 2 | 1 | 1 | 0 | 0 |
-| Floor | 11 | 3 | 4 | 4 | 0 |
-| Pit | 12 | 2 | 6 | 4 | 0 |
+| Goal | 19 | 7 | 6 | 6 | 0 |
+| Trail | 5 | 2 | 2 | 1 | 0 |
+| Floor | 13 | 4 | 5 | 4 | 0 |
+| Pit | 14 | 2 | 7 | 5 | 0 |
 | Boundary | 29 | 12 | 9 | 8 | 0 |
-| **Total** | **125** | **44** | **45** | **36** | **0** |
+| **Total** | **133** | **46** | **48** | **39** | **0** |
 
 ## Ready to build collections around
 
@@ -220,7 +228,7 @@ Held pieces that already meet the standard, grouped by a theme they could serve.
 
 | Theme | Ball | Goal | Trail | Floor | Pit | Boundary | Slots still missing |
 |---|---|---|---|---|---|---|---|
-| Paper and school | Paper | Doodle | — | Notebook, Graph | Origami | Notebook | Trail |
+| Paper and school | Paper | Doodle | — | Notebook, Graph, Blueprint | Origami | Notebook | Trail |
 | Sports | Soccer Ball, Basketball, 8-Ball, Baseball | Soccer Net | — | Court | Pocket | — | Trail, Boundary |
 | Cathedral and heavens | Cathedral | Halo | — | — | — | Cloud, Stained Glass | Trail, Floor, Pit |
 | Gems and crystal | Opal, Oracle, Geode | Amethyst | — | — | — | Marble, Amethyst | Trail, Floor, Pit |
@@ -230,16 +238,17 @@ Held pieces that already meet the standard, grouped by a theme they could serve.
 | Metal and machines | Quicksilver, Clockwork | — | — | — | — | Chrome | Goal, Trail, Floor, Pit |
 | Winter holiday | Ornament | — | — | — | — | Holly | Goal, Trail, Floor, Pit |
 | Jungle and animals | — | — | Snake | — | — | — | Ball, Goal, Floor, Pit, Boundary |
+| Rainbow and pride | — | — | Rainbow | — | — | — | Ball, Goal, Floor, Pit, Boundary |
 | Retro | Lava Lamp | — | — | — | — | — | Goal, Trail, Floor, Pit, Boundary |
 | Summer and beach | Beach Ball | — | — | — | — | — | Goal, Trail, Floor, Pit, Boundary |
 
-**New art needed.** Counting only held pieces that meet the standard, and ignoring whether their themes match, each slot has: Ball 19, Goal 7, Trail 1, Floor 3, Pit 2, Boundary 12. To build N new collections from them:
+**New art needed.** Counting only held pieces that meet the standard, and ignoring whether their themes match, each slot has: Ball 19, Goal 7, Trail 2, Floor 4, Pit 2, Boundary 12. To build N new collections from them:
 
 | New collections | Ball | Goal | Trail | Floor | Pit | Boundary |
 |---|---|---|---|---|---|---|
 | 1 | enough | enough | enough | enough | enough | enough |
-| 2 | enough | enough | 1 new | enough | enough | enough |
-| 3 | enough | enough | 2 new | enough | 1 new | enough |
-| 5 | enough | enough | 4 new | 2 new | 3 new | enough |
+| 2 | enough | enough | enough | enough | enough | enough |
+| 3 | enough | enough | 1 new | enough | 1 new | enough |
+| 5 | enough | enough | 3 new | 1 new | 3 new | enough |
 
 Themes rarely line up across slots, so in practice most new collections will need new trails, floors and pits drawn for them, with held balls, goals and boundaries as the starting point.

@@ -566,6 +566,12 @@
   ],
   "verdict": "borderline"
  },
+ "Floor:blueprint": {
+  "reason": "Faint drafting grid with a dimension line and compass arc",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
  "Floor:court": {
   "reason": "Hardwood planks with grain and a painted court line",
   "rules": [],
@@ -617,6 +623,13 @@
   "reason": "Diagonal fold lines only; no folded shapes",
   "rules": [
    "R1",
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Floor:parchment": {
+  "reason": "Only an edge vignette and ink specks; needs real parchment detail",
+  "rules": [
    "R5"
   ],
   "verdict": "borderline"
@@ -713,6 +726,14 @@
   ],
   "verdict": "borderline"
  },
+ "Goal:mosaic": {
+  "reason": "Full-spectrum tiles twinkling 40% every 3 seconds; no clear subject",
+  "rules": [
+   "R3",
+   "R6"
+  ],
+  "verdict": "fails"
+ },
  "Goal:obsidian": {
   "reason": "Dark glass on dark floors; center hard to find",
   "rules": [
@@ -765,6 +786,14 @@
   "rules": [],
   "theme": "Planets and space",
   "verdict": "meets"
+ },
+ "Pit:blueprint": {
+  "reason": "Perspective grid with no ledges or dark core; noise at small sizes",
+  "rules": [
+   "R5",
+   "R7"
+  ],
+  "verdict": "fails"
  },
  "Pit:downpour": {
   "reason": "Still rain streaks; rain should fall, depth is thin",
@@ -824,6 +853,13 @@
   "theme": "Paper and school",
   "verdict": "meets"
  },
+ "Pit:parchment": {
+  "reason": "Scorched ragged hole reads well, but only one step of depth",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
  "Pit:pocket": {
   "reason": "Stitched leather rim with net falling into the dark",
   "rules": [],
@@ -852,12 +888,33 @@
   ],
   "verdict": "borderline"
  },
+ "Trail:air": {
+  "reason": "Soft puffs that swell and lift; close twin of the Smoke trail",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
  "Trail:ember": {
   "reason": "Good sparks, but a third fire-colored trail",
   "rules": [
    "R8"
   ],
   "verdict": "borderline"
+ },
+ "Trail:rainbow": {
+  "reason": "Spectrum line; each mark keeps its hue, then sparkles out",
+  "rules": [],
+  "theme": "Rainbow and pride",
+  "verdict": "meets"
+ },
+ "Trail:sky": {
+  "reason": "A plain pale-blue line; a color with a name",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
  },
  "Trail:snake": {
   "reason": "Scaled body laid on the path, sheds from the tail",

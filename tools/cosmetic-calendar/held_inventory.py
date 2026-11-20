@@ -44,6 +44,11 @@ DISPLACED = {("GoalSkin", "meadow"): "Nature", ("BallSkin", "silver"): "Sketchbo
              ("Pit", "sunset"): "Citrus", ("Floor", "mirage"): "Midas",
              ("Pit", "mirage"): "Midas", ("GoalSkin", "obsidian"): "Haunted",
              ("TrailColor", "snake"): "Ancient Temple"}
+# Replaced inside a scheduled collection during the audit against the quality standard.
+AUDIT_DISPLACED = {("GoalSkin", "mosaic"): "Nightclub", ("TrailColor", "rainbow"): "Nightclub",
+                   ("TrailColor", "air"): "Golf", ("TrailColor", "sky"): "Ocean",
+                   ("Floor", "parchment"): "Bloom", ("Pit", "parchment"): "Bloom",
+                   ("Floor", "blueprint"): "Ocean", ("Pit", "blueprint"): "Ocean"}
 
 
 VERDICTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "held_verdicts.json")
@@ -175,7 +180,7 @@ def main():
     out("## Every held piece")
     out("")
     out("\"Approved?\" is from the quality round: only pieces in the collections on sale were graded. "
-        "A piece marked *displaced* was replaced inside an active collection in that round; "
+        "A piece marked *displaced* was replaced inside an active collection in that round or in the later audit; "
         "*not graded* means it was never reviewed.")
     out("")
     out("\"Verdict vs standard\" is an audit against `docs/cosmetics/quality-standard.md` (rules R1 to R9), "
@@ -199,6 +204,9 @@ def main():
             if (enum, c) in DISPLACED:
                 src.insert(0, f"{DISPLACED[(enum, c)]} (displaced in the quality round)")
                 approved = "No: displaced (replaced in the quality round)"
+            elif (enum, c) in AUDIT_DISPLACED:
+                src.insert(0, f"{AUDIT_DISPLACED[(enum, c)]} (displaced in the audit)")
+                approved = "No: displaced (replaced in the audit)"
             else:
                 approved = "Not graded"
             v = verdicts.get(f"{label}:{c}")

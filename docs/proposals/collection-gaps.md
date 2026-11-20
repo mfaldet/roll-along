@@ -405,7 +405,7 @@ This replaces every earlier statement in this file that retired, seasonal or dis
 
 ## Quality round (November 20, 2026)
 
-Every active collection, piece by piece. *Approved* = graded and left as it was. Tiers and prices did not change: a replacement took the tier of the piece it replaced. The five collections that release later (Candyland, Nightclub, Golf, Bloom, Ocean) were not graded in this round.
+Every active collection, piece by piece. *Approved* = graded and left as it was. Tiers and prices did not change: a replacement took the tier of the piece it replaced. The five collections that release later (Candyland, Nightclub, Golf, Bloom, Ocean) were not graded in this round; they were audited and rebuilt afterward (their tables below show the result).
 
 ### Roll Along (Iconic, free)
 
@@ -607,56 +607,66 @@ Every active collection, piece by piece. *Approved* = graded and left as it was.
 
 ### Candyland (6,000 coins)
 
+Audited against the quality standard after the quality round (see `docs/cosmetics/quality-audit-2026-11.md`).
+
 | Slot | Piece | Status | Tier | Price |
 |---|---|---|---|---|
-| Ball | Candy | not graded this round | Legendary | 1,500 |
-| Goal | Candy | not graded this round | Standard | 750 |
-| Trail | Bubblegum | not graded this round | Standard | 750 |
-| Floor | Sugar | not graded this round | Standard | 750 |
-| Pit | Syrup | not graded this round | Standard | 750 |
-| Boundary | Candy | not graded this round | Legendary | 1,500 |
+| Ball | Candy | audited: meets | Legendary | 1,500 |
+| Goal | Candy | audited: redrawn | Standard | 750 |
+| Trail | Bubblegum | audited: meets | Standard | 750 |
+| Floor | Sugar | audited: redrawn | Standard | 750 |
+| Pit | Syrup | audited: redrawn | Standard | 750 |
+| Boundary | Candy | audited: redrawn (slower) | Legendary | 1,500 |
 
 ### Nightclub (9,000 coins)
 
 | Slot | Piece | Status | Tier | Price |
 |---|---|---|---|---|
-| Ball | Disco Ball | not graded this round | Legendary | 1,500 |
-| Goal | Mosaic | not graded this round | Legendary | 1,500 |
-| Trail | Rainbow | not graded this round | Legendary | 1,500 |
-| Floor | Disco | not graded this round | Legendary | 1,500 |
-| Pit | Nightclub | not graded this round | Legendary | 1,500 |
-| Boundary | Marquee | not graded this round | Legendary | 1,500 |
+| Ball | Disco Ball | audited: redrawn | Legendary | 1,500 |
+| Goal | Vinyl | new in the audit (replaces Mosaic) | Legendary | 1,500 |
+| Trail | Dance Steps | new in the audit (replaces Rainbow) | Legendary | 1,500 |
+| Floor | Disco | audited: redrawn | Legendary | 1,500 |
+| Pit | Nightclub | audited: redrawn | Legendary | 1,500 |
+| Boundary | Marquee | audited: redrawn | Legendary | 1,500 |
 
 ### Golf (8,000 coins)
 
 | Slot | Piece | Status | Tier | Price |
 |---|---|---|---|---|
-| Ball | Golf Ball | not graded this round | Epic | 1,250 |
-| Goal | Hole-in-One | not graded this round | Legendary | 1,500 |
-| Trail | Air | not graded this round | Legendary | 1,500 |
-| Floor | Grass | not graded this round | Legendary | 1,500 |
-| Pit | Pond | not graded this round | Legendary | 1,500 |
-| Boundary | Fairway | not graded this round | Standard | 750 |
+| Ball | Golf Ball | audited: meets | Epic | 1,250 |
+| Goal | Hole-in-One | audited: redrawn | Legendary | 1,500 |
+| Trail | Dew Line | new in the audit (replaces Air) | Legendary | 1,500 |
+| Floor | Grass | audited: redrawn | Legendary | 1,500 |
+| Pit | Pond | audited: redrawn | Legendary | 1,500 |
+| Boundary | Fairway | audited: redrawn | Standard | 750 |
 
 ### Bloom (6,000 coins)
 
 | Slot | Piece | Status | Tier | Price |
 |---|---|---|---|---|
-| Ball | Rose | not graded this round | Standard | 750 |
-| Goal | Blossom | not graded this round | Epic | 1,250 |
-| Trail | Rose | not graded this round | Legendary | 1,500 |
-| Floor | Parchment | not graded this round | Rare | 1,000 |
-| Pit | Parchment | not graded this round | Standard | 750 |
-| Boundary | Rose | not graded this round | Standard | 750 |
+| Ball | Rose | audited: redrawn | Standard | 750 |
+| Goal | Blossom | audited: redrawn | Epic | 1,250 |
+| Trail | Rose | audited: meets | Legendary | 1,500 |
+| Floor | Petal Path | new in the audit (replaces Parchment) | Rare | 1,000 |
+| Pit | Deep Rose | new in the audit (replaces Parchment) | Standard | 750 |
+| Boundary | Rose | audited: redrawn | Standard | 750 |
 
 ### Ocean (6,000 coins)
 
 | Slot | Piece | Status | Tier | Price |
 |---|---|---|---|---|
-| Ball | Aquarium | not graded this round | Legendary | 1,500 |
-| Goal | Ripple | not graded this round | Epic | 1,250 |
-| Trail | Sky | not graded this round | Standard | 750 |
-| Floor | Blueprint | not graded this round | Standard | 750 |
-| Pit | Blueprint | not graded this round | Standard | 750 |
-| Boundary | Tide | not graded this round | Rare | 1,000 |
+| Ball | Aquarium | audited: meets (slowed slightly) | Legendary | 1,500 |
+| Goal | Ripple | audited: redrawn | Epic | 1,250 |
+| Trail | Wake | new in the audit (replaces Sky) | Standard | 750 |
+| Floor | Open Sea | new in the audit (replaces Blueprint) | Standard | 750 |
+| Pit | Reef | new in the audit (replaces Blueprint) | Standard | 750 |
+| Boundary | Tide | audited: redrawn | Rare | 1,000 |
 
+## Audit against the quality standard (November 20, 2026)
+
+After the quality round, every piece of the 22 collections on sale or scheduled was audited against `docs/cosmetics/quality-standard.md`, and every fail and borderline piece was fixed. The audit by collection, with verdicts and what changed, is in `docs/cosmetics/quality-audit-2026-11.md`.
+
+- No collection price, tier or id changed.
+- Eight pieces left their sets and are now held: Mosaic goal and Rainbow trail (Nightclub), Air trail (Golf), Parchment floor and pit (Bloom), Sky trail and Blueprint floor and pit (Ocean).
+- Eight new pieces replaced them at the same tier: Vinyl goal, Dance Steps trail, Dew Line trail, Petal Path floor, Deep Rose pit, Wake trail, Open Sea floor, Reef pit.
+- Held pieces now total 133; each has a verdict in `docs/proposals/held-pieces.md`.
