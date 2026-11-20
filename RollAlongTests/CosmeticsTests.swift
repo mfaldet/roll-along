@@ -193,6 +193,37 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(gs.isEquipped(BallSkin.jade))
     }
 
+    /// Quality round: the Roll Along pieces carry their color in the name
+    /// (ids unchanged), and Nature's goal is the new Leaf Wreath — a Standard
+    /// piece like the Meadow goal it replaced, which is in no collection now.
+    func testQualityRound_rollAlongNamesAndNatureGoal() {
+        XCTAssertEqual(TrailColor.classic.displayName, "Classic Shadow")
+        XCTAssertEqual(Floor.classic.displayName, "Classic White")
+        XCTAssertEqual(Pit.classic.displayName, "Classic Black")
+        XCTAssertEqual(Boundary.classic.displayName, "Classic Gray")
+        XCTAssertEqual(TrailColor.classic.rawValue, "classic")
+        XCTAssertEqual(Floor.classic.rawValue, "classic")
+        XCTAssertEqual(Pit.classic.rawValue, "classic")
+        XCTAssertEqual(Boundary.classic.rawValue, "classic")
+
+        guard let nature = CosmeticBundle.catalogue.first(where: { $0.id == "nature" }) else {
+            return XCTFail("nature collection missing")
+        }
+        XCTAssertEqual(nature.goals, [.leafWreath])
+        XCTAssertEqual(GoalSkin.leafWreath.displayName, "Leaf Wreath")
+        XCTAssertEqual(GoalSkin.leafWreath.tier, GoalSkin.meadow.tier)
+        XCTAssertEqual(nature.fullPrice(), 4_500, "Nature's price is unchanged")
+        for b in CosmeticBundle.catalogue {
+            XCTAssertFalse(b.goals.contains(.meadow), "\(b.id) still holds the displaced Meadow goal")
+            if b.id != "nature" {
+                XCTAssertFalse(b.goals.contains(.leafWreath), "\(b.id) shares Nature's goal")
+            }
+        }
+        // The Water floor now carries slow moving light; Fire's stays still.
+        XCTAssertTrue(Floor.shallows.hasAnimatedOverlay)
+        XCTAssertFalse(Floor.scorched.hasAnimatedOverlay)
+    }
+
     /// Tapping an owned piece of a partially owned collection equips it and
     /// never buys the collection or touches coins.
     func testEquip_fromPartiallyOwnedCollection_neverPurchases() {
@@ -463,8 +494,9 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// Fire, Water and Storm: new complete Standard sets, every piece new art
-    /// that belongs to no other collection, still (no animated overlay),
-    /// priced by the normal rule (6 × 750) and on sale from launch.
+    /// that belongs to no other collection, priced by the normal rule
+    /// (6 × 750) and on sale from launch.  (Pieces of any rarity may move
+    /// gently since the quality round, so stillness is no longer asserted.)
     func testStarterElementSets_areNewCompleteStandardSets() {
         let ids = ["fire", "water", "storm"]
         let others = CosmeticBundle.catalogue.filter { !ids.contains($0.id) }
@@ -481,8 +513,6 @@ final class CosmeticsTests: XCTestCase {
             let tiers: [CosmeticTier] = [b.balls[0].tier, b.goals[0].tier, b.trails[0].tier,
                                          b.floors[0].tier, b.pits[0].tier, b.boundaries[0].tier]
             XCTAssertTrue(tiers.allSatisfy { $0 == .standard }, "\(id): every piece is Standard")
-            XCTAssertFalse(b.floors[0].hasAnimatedOverlay)
-            XCTAssertFalse(b.pits[0].hasAnimatedOverlay)
             XCTAssertTrue(b.pits[0].hasDrawnArt)
             for o in others {
                 XCTAssertFalse(o.balls.contains(b.balls[0]), "\(id) ball is also in \(o.id)")

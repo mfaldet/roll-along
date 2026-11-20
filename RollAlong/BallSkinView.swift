@@ -1861,76 +1861,156 @@ struct BallSkinView: View {
         }
     }
 
-    // MARK: Starter element balls (Standard, static)
+    // MARK: Starter element balls
 
-    /// Blaze (Fire set) — a glowing red-orange core with dark cooled cracks
-    /// running over it, like a coal split open.  No motion.
+    /// Blaze (Fire set) — a ball of living fire.  A dark ember shell holds
+    /// three layers of flame tongues (deep red, orange, yellow) rising from a
+    /// white-hot bed at the bottom, each tongue swaying and breathing slowly,
+    /// with a few sparks drifting up.  Everything is drawn inside the ball's
+    /// own circle (the caller clips it), so it plays exactly as before.
+    /// Reduce Motion / still tiles: the same flames, frozen.
     private var blazeCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width, h = size.height
-            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
-            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                Gradient(colors: [Color(red: 1.00, green: 0.86, blue: 0.46),
-                                  Color(red: 0.98, green: 0.44, blue: 0.14),
-                                  Color(red: 0.74, green: 0.12, blue: 0.06),
-                                  Color(red: 0.32, green: 0.03, blue: 0.02)]),
-                center: CGPoint(x: cx - r * 0.12, y: cy - r * 0.10), startRadius: 0, endRadius: r * 1.15))
-            // Cooled-crust cracks: fixed jagged polylines.
-            let cracks: [[(CGFloat, CGFloat)]] = [
-                [(-0.95, -0.20), (-0.55, -0.05), (-0.30, -0.30), (0.05, -0.18), (0.40, -0.45), (0.85, -0.40)],
-                [(-0.70, 0.55), (-0.35, 0.30), (0.00, 0.42), (0.30, 0.18), (0.70, 0.30), (0.95, 0.10)],
-                [(-0.20, -0.95), (-0.10, -0.60), (-0.30, -0.30)],
-                [(0.30, 0.18), (0.20, 0.55), (0.35, 0.92)],
-            ]
-            for c in cracks {
-                var p = Path()
-                for (i, pt) in c.enumerated() {
-                    let q = CGPoint(x: cx + pt.0 * r, y: cy + pt.1 * r)
-                    if i == 0 { p.move(to: q) } else { p.addLine(to: q) }
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 24.0), paused: timelinePaused) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w: CGFloat = size.width, h: CGFloat = size.height
+                let cx: CGFloat = w / 2, cy: CGFloat = h / 2, r: CGFloat = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                // Ember shell: almost black at the top, glowing toward the fire bed.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.98, green: 0.36, blue: 0.08),
+                                      Color(red: 0.58, green: 0.08, blue: 0.03),
+                                      Color(red: 0.20, green: 0.02, blue: 0.02),
+                                      Color(red: 0.07, green: 0.01, blue: 0.01)]),
+                    center: CGPoint(x: cx, y: cy + r * 0.85), startRadius: 0, endRadius: r * 2.0))
+
+                // One layer of flame tongues standing on the bottom of the ball.
+                func flames(_ g: GraphicsContext, _ count: Int, _ height: CGFloat, _ color: Color,
+                            _ phase: Double, _ speed: Double) {
+                    let baseY: CGFloat = cy + r * 1.05
+                    let span: CGFloat = r * 2.1
+                    let step: CGFloat = span / CGFloat(count)
+                    var p = Path()
+                    p.move(to: CGPoint(x: cx - span / 2, y: baseY))
+                    for i in 0..<count {
+                        let fi: Double = Double(i)
+                        let x0: CGFloat = cx - span / 2 + step * CGFloat(i)
+                        let x1: CGFloat = x0 + step
+                        // Taller toward the middle, so the fire has one crown.
+                        let mid: Double = 1.0 - abs((fi + 0.5) / Double(count) - 0.5) * 1.1
+                        let breathe: Double = 0.80 + 0.20 * sin(t * speed + phase + fi * 1.9)
+                        let hh: CGFloat = height * CGFloat(mid * breathe)
+                        let sway: CGFloat = r * 0.10 * CGFloat(sin(t * speed * 0.7 + phase * 1.3 + fi * 2.7))
+                        let tip = CGPoint(x: (x0 + x1) / 2 + sway, y: baseY - hh)
+                        p.addQuadCurve(to: tip, control: CGPoint(x: x0 + step * 0.05, y: baseY - hh * 0.55))
+                        p.addQuadCurve(to: CGPoint(x: x1, y: baseY),
+                                       control: CGPoint(x: x1 - step * 0.05 + sway * 0.5, y: baseY - hh * 0.45))
+                    }
+                    p.closeSubpath()
+                    g.fill(p, with: .color(color))
                 }
-                ctx.stroke(p, with: .color(Color(red: 0.22, green: 0.04, blue: 0.02).opacity(0.80)),
-                           style: StrokeStyle(lineWidth: r * 0.09, lineCap: .round, lineJoin: .round))
-                ctx.stroke(p, with: .color(Color(red: 1.00, green: 0.80, blue: 0.30).opacity(0.35)),
-                           style: StrokeStyle(lineWidth: r * 0.025, lineCap: .round, lineJoin: .round))
+                flames(ctx, 4, r * 1.95, Color(red: 0.78, green: 0.10, blue: 0.04).opacity(0.95), 0.0, 1.5)
+                flames(ctx, 5, r * 1.60, Color(red: 0.98, green: 0.36, blue: 0.06), 1.7, 1.9)
+                flames(ctx, 4, r * 1.20, Color(red: 1.00, green: 0.66, blue: 0.14), 3.1, 2.3)
+                flames(ctx, 3, r * 0.78, Color(red: 1.00, green: 0.92, blue: 0.52), 4.4, 2.7)
+
+                // White-hot bed at the very bottom.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.70, y: cy + r * 0.52, width: r * 1.40, height: r * 0.80)),
+                    with: .radialGradient(Gradient(colors: [Color.white.opacity(0.85),
+                                                            Color(red: 1.0, green: 0.90, blue: 0.50).opacity(0.0)]),
+                        center: CGPoint(x: cx, y: cy + r * 0.95), startRadius: 0, endRadius: r * 0.62))
+
+                // A few sparks drifting up (frozen in place with Reduce Motion).
+                for i in 0..<5 {
+                    let fi: Double = Double(i)
+                    let prog: Double = (t * 0.22 + fi * 0.21).truncatingRemainder(dividingBy: 1.0)
+                    let sx: CGFloat = cx + r * CGFloat(-0.55 + 0.27 * fi)
+                        + r * 0.06 * CGFloat(sin(t * 1.3 + fi * 2.0))
+                    let sy: CGFloat = cy + r * CGFloat(0.35 - 1.05 * prog)
+                    let sr: CGFloat = max(0.5, r * 0.045)
+                    let fade: Double = sin(prog * Double.pi)
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr, width: sr * 2, height: sr * 2)),
+                             with: .color(Color(red: 1.0, green: 0.86, blue: 0.40).opacity(0.85 * fade)))
+                }
+
+                // Dark rim so the fire reads as held inside a ball.
+                ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.04, dy: r * 0.04)),
+                           with: .color(Color(red: 0.10, green: 0.01, blue: 0.01).opacity(0.55)),
+                           lineWidth: r * 0.08)
             }
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
-                with: .radialGradient(Gradient(colors: [.white.opacity(0.22), .clear]),
-                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
         }
     }
 
-    /// Droplet (Water set) — deep blue marble crossed by a bright wave band
-    /// with a white crest, and a glassy highlight.  No motion.
+    /// Droplet (Water set) — a clear drop of water.  Light passes through it:
+    /// the top is deep blue, the far (lower-right) side glows where the light
+    /// gathers, and a bright crescent rides the bottom edge.  Inside, two
+    /// soft wave lines drift slowly and tiny bubbles rise; a crisp highlight
+    /// sits top-left.  Reduce Motion / still tiles: the same drop, frozen.
     private var dropletCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width, h = size.height
-            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
-            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                Gradient(colors: [Color(red: 0.62, green: 0.84, blue: 1.00),
-                                  Color(red: 0.22, green: 0.54, blue: 0.94),
-                                  Color(red: 0.08, green: 0.28, blue: 0.70),
-                                  Color(red: 0.03, green: 0.11, blue: 0.32)]),
-                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32), startRadius: 0, endRadius: r * 1.25))
-            for k in 0..<2 {
-                let y0: CGFloat = cy + r * (k == 0 ? 0.10 : 0.42)
-                var wave = Path()
-                let steps = 20
-                for j in 0...steps {
-                    let u = Double(j) / Double(steps)
-                    let x: CGFloat = cx - r + CGFloat(u) * r * 2
-                    let y: CGFloat = y0 + CGFloat(sin(u * Double.pi * 3.0 + Double(k))) * r * 0.10
-                    if j == 0 { wave.move(to: CGPoint(x: x, y: y)) } else { wave.addLine(to: CGPoint(x: x, y: y)) }
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 24.0), paused: timelinePaused) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w: CGFloat = size.width, h: CGFloat = size.height
+                let cx: CGFloat = w / 2, cy: CGFloat = h / 2, r: CGFloat = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.74, green: 0.94, blue: 1.00),
+                                      Color(red: 0.30, green: 0.68, blue: 0.98),
+                                      Color(red: 0.10, green: 0.36, blue: 0.82),
+                                      Color(red: 0.03, green: 0.13, blue: 0.42)]),
+                    center: CGPoint(x: cx + r * 0.28, y: cy + r * 0.36), startRadius: 0, endRadius: r * 1.55))
+
+                // Slow water lines inside the drop.
+                for k in 0..<2 {
+                    let fk: Double = Double(k)
+                    let y0: CGFloat = cy + r * CGFloat(-0.05 + 0.34 * fk)
+                    var wave = Path()
+                    let steps: Int = 18
+                    for j in 0...steps {
+                        let u: Double = Double(j) / Double(steps)
+                        let x: CGFloat = cx - r + CGFloat(u) * r * 2
+                        let y: CGFloat = y0 + CGFloat(sin(u * Double.pi * 2.6 + t * (0.55 + 0.2 * fk) + fk * 1.7)) * r * 0.08
+                        if j == 0 { wave.move(to: CGPoint(x: x, y: y)) } else { wave.addLine(to: CGPoint(x: x, y: y)) }
+                    }
+                    ctx.stroke(wave, with: .color(Color.white.opacity(k == 0 ? 0.30 : 0.20)),
+                               style: StrokeStyle(lineWidth: r * 0.06, lineCap: .round, lineJoin: .round))
                 }
-                ctx.stroke(wave, with: .color(Color(red: 0.04, green: 0.16, blue: 0.46).opacity(0.45)),
-                           lineWidth: r * 0.14)
-                ctx.stroke(wave.offsetBy(dx: 0, dy: -r * 0.05),
-                           with: .color(Color.white.opacity(k == 0 ? 0.70 : 0.45)), lineWidth: r * 0.045)
+
+                // Light gathered on the far side: a bright crescent along the bottom edge.
+                var crescent = Path()
+                crescent.addArc(center: CGPoint(x: cx, y: cy), radius: r * 0.80,
+                                startAngle: .degrees(18), endAngle: .degrees(128), clockwise: false)
+                let glow: Double = 0.50 + 0.10 * sin(t * 0.9)
+                ctx.stroke(crescent, with: .color(Color(red: 0.86, green: 0.98, blue: 1.0).opacity(glow)),
+                           style: StrokeStyle(lineWidth: r * 0.13, lineCap: .round))
+
+                // Tiny bubbles rising slowly.
+                for i in 0..<4 {
+                    let fi: Double = Double(i)
+                    let prog: Double = (t * 0.16 + fi * 0.27).truncatingRemainder(dividingBy: 1.0)
+                    let bx: CGFloat = cx + r * CGFloat(-0.42 + 0.28 * fi) + r * 0.04 * CGFloat(sin(t * 1.1 + fi * 1.9))
+                    let by: CGFloat = cy + r * CGFloat(0.62 - 1.10 * prog)
+                    let br: CGFloat = max(0.5, r * CGFloat(0.045 + 0.02 * (fi.truncatingRemainder(dividingBy: 2.0))))
+                    let fade: Double = sin(prog * Double.pi)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                               with: .color(Color.white.opacity(0.65 * fade)), lineWidth: max(0.5, r * 0.025))
+                }
+
+                // Deep edge at the top, where the drop is darkest.
+                ctx.stroke(Path(ellipseIn: sphere.insetBy(dx: r * 0.05, dy: r * 0.05)),
+                           with: .linearGradient(Gradient(colors: [Color(red: 0.02, green: 0.10, blue: 0.36).opacity(0.60),
+                                                                   Color(red: 0.02, green: 0.10, blue: 0.36).opacity(0.0)]),
+                                                 startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r * 0.3)),
+                           lineWidth: r * 0.10)
+
+                // Crisp highlight, top-left, plus a small second glint.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.58, y: cy - r * 0.72, width: r * 0.46, height: r * 0.30)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.95), .white.opacity(0.0)]),
+                        center: CGPoint(x: cx - r * 0.36, y: cy - r * 0.58), startRadius: 0, endRadius: r * 0.30))
+                let gr: CGFloat = r * 0.07
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.10 - gr, y: cy - r * 0.70 - gr, width: gr * 2, height: gr * 2)),
+                         with: .color(Color.white.opacity(0.85)))
             }
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.55, y: cy - r * 0.74, width: r * 0.50, height: r * 0.36)),
-                with: .radialGradient(Gradient(colors: [.white.opacity(0.55), .clear]),
-                    center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.56), startRadius: 0, endRadius: r * 0.34))
         }
     }
 

@@ -271,8 +271,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case apple       = "Teacher's Apple"
 
     // ── Starter element sets (Standard, static; post-tutorial choice) ──
-    //   • blaze — Fire set: glowing red-orange core with dark cooled cracks.
-    //   • droplet — Water set: deep blue marble with a bright wave band.
+    //   • blaze — Fire set: a ball of living fire (layered flames rising inside an ember shell).
+    //   • droplet — Water set: a clear drop of water (light gathered on the far side, slow waves, bubbles).
     //   • thundercloud — Storm set: gray cloud marble with a yellow bolt.
     case blaze        = "Blaze"
     case droplet      = "Droplet"

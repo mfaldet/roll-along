@@ -324,8 +324,8 @@ enum GoalSkin: String, CosmeticItem {
     case vortex         // cosmic-blue glowing portal
     case wormhole       // violet/magenta glowing portal
     // Standard (750 coins) — starter element sets, static drawn goals.
-    case flameRing      // Fire set: flame tongues ringing a white-hot center
-    case whirlpool      // Water set: spiral water arms into a deep blue center
+    case flameRing      // Fire set: a burning hoop of flickering flames around a white-hot center
+    case whirlpool      // Water set: slowly turning spiral water arms into a deep blue center
     case thunderRing    // Storm set: gray cloud ring with yellow bolts
 
     // Epic / Legendary — particle portals (animated)
@@ -355,6 +355,8 @@ enum GoalSkin: String, CosmeticItem {
     case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
     case soccerNet      // Soccer bundle — goal mouth with white netting
     case aurora         // Aurora bundle — glowing northern-lights portal
+    // ── Nature (quality round) ──
+    case leafWreath     // Nature set: a woven ring of leaves and tiny blossoms (replaces Meadow in the set)
 
     var id: String { rawValue }
     var displayName: String {
@@ -395,6 +397,8 @@ enum GoalSkin: String, CosmeticItem {
         case .halo:        return "Halo"
         case .doodle:      return "Doodle"
         case .soccerNet:   return "Soccer Net"
+        // ── Nature (quality round) ──
+        case .leafWreath:  return "Leaf Wreath"
         }
     }
 
@@ -423,6 +427,9 @@ enum GoalSkin: String, CosmeticItem {
              .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing:
             // Not actually consumed (their renderers are bespoke / static), but
             // we keep a placeholder so callers can read it uniformly.
+            return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
+        // ── Nature (quality round) ── bespoke static renderer, placeholder only.
+        case .leafWreath:
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
 
         case .rainbow:
@@ -716,6 +723,9 @@ enum GoalSkin: String, CosmeticItem {
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .vortex, .wormhole:
             return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? [], endRadius: endRadius))
+        // ── Nature (quality round) ──
+        case .leafWreath:
+            return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -756,6 +766,10 @@ enum GoalSkin: String, CosmeticItem {
         case .thunderRing: return [Color(red: 0.26, green: 0.27, blue: 0.32),
                                    Color(red: 1.00, green: 0.86, blue: 0.20),
                                    Color(red: 0.12, green: 0.12, blue: 0.16)]
+        // ── Nature (quality round) ──
+        case .leafWreath:  return [Color(red: 0.12, green: 0.38, blue: 0.16),
+                                   Color(red: 0.50, green: 0.80, blue: 0.38),
+                                   Color(red: 0.05, green: 0.20, blue: 0.08)]
         default:        return nil
         }
     }
@@ -843,6 +857,8 @@ enum GoalSkin: String, CosmeticItem {
         case .halo:        return Color(red: 1.00, green: 0.86, blue: 0.42)
         case .doodle:      return Color(red: 0.55, green: 0.60, blue: 0.75)
         case .soccerNet:   return Color(red: 0.85, green: 0.92, blue: 1.00)
+        // ── Nature (quality round) ──
+        case .leafWreath:  return Color(red: 0.46, green: 0.82, blue: 0.36)
         }
     }
     /// Tier rule (player-facing: Standard / Epic / Legendary):
@@ -867,6 +883,9 @@ enum GoalSkin: String, CosmeticItem {
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora:
             return .exclusive  // 1,500 coins — animated, full-spectrum, or bespoke
+        // ── Nature (quality round) ── takes Meadow's tier (it replaces Meadow in the set).
+        case .leafWreath:
+            return .standard
         }
     }
 }
@@ -898,7 +917,7 @@ enum TrailColor: String, CosmeticItem {
     case moneyRoll      // ★ top-coin-pack ($49.99) IAP secret — green trail + fluttering bills
     case aurora         // Aurora bundle — teal→cyan→violet shimmer ribbon
     // Standard — starter element sets (static marks that fade where laid).
-    case wildfire       // Fire set: red line with flame tongues
+    case wildfire       // Fire set: a charred line under tall, forked, deep-red flames
     case splash         // Water set: blue line with droplets and ripple rings
     case squall         // Storm set: gray cloud puffs with small yellow zig-zags
 
@@ -906,7 +925,7 @@ enum TrailColor: String, CosmeticItem {
     var displayName: String {
         switch self {
         case .none:        return "Off"
-        case .classic:     return "Classic"
+        case .classic:     return "Classic Shadow"
         case .aurora:      return "Aurora"
         case .graphite:    return "Graphite"
         case .moneyRoll:   return "Money Roll"
@@ -1029,8 +1048,8 @@ enum Floor: String, CosmeticItem {
     case stormcloud       // Round-5 Tempest bundle — slate storm
     case sugar            // Round-5 Candyland bundle — pale candy-pink
     case fog              // Round-5 Haunted bundle — cold grey mist
-    case scorched         // Fire starter set — scorched red flagstones with ember specks
-    case shallows         // Water starter set — blue water with ripple rings
+    case scorched         // Fire starter set — burnt flagstones: soot, cracks, faintly glowing seams, embers
+    case shallows         // Water starter set — sandy bottom under clear water, slow sunlight moving over it
     case overcast         // Storm starter set — slate cloud cover with a faint yellow streak
 
     // Exclusive / Legendary (1,500 coins) — animated floor overlays
@@ -1054,7 +1073,7 @@ enum Floor: String, CosmeticItem {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .classic:    return "Classic"
+        case .classic:    return "Classic White"
         case .moneyFull:  return "Money Full"
         case .inverted:   return "Inverted"
         case .twilight:   return "Twilight"
@@ -1140,7 +1159,7 @@ enum Floor: String, CosmeticItem {
         case .sugar:      return Color(red: 0.99,  green: 0.92,  blue: 0.95 )  // pale candy-pink
         case .fog:        return Color(red: 0.66,  green: 0.69,  blue: 0.70 )  // cold grey mist
         case .scorched:   return Color(red: 0.62,  green: 0.26,  blue: 0.20 )  // scorched red stone
-        case .shallows:   return Color(red: 0.42,  green: 0.64,  blue: 0.86 )  // clear blue water
+        case .shallows:   return Color(red: 0.40,  green: 0.70,  blue: 0.86 )  // clear, sunlit shallow water
         case .overcast:   return Color(red: 0.52,  green: 0.54,  blue: 0.60 )  // slate cloud cover
         case .aurora:     return Color(red: 0.045, green: 0.075, blue: 0.150)  // deep night sky; aurora glows over it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
@@ -1176,6 +1195,7 @@ enum Floor: String, CosmeticItem {
     var hasAnimatedOverlay: Bool {
         switch self {
         case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass, .moneyFull: return true
+        case .shallows: return true   // Water set: slow caustic light over the still sand
         default: return false
         }
     }
@@ -1212,7 +1232,7 @@ enum Pit: String, CosmeticItem {
     case syrup            // Round-5 Candyland bundle — dark molasses
     case graveyard        // Rare — gravestones and a gently drifting ghost (Haunted bundle)
     case crater           // Fire starter set — glowing red rim falling to a dark core
-    case deepEnd          // Water starter set — deep blue water, ripple rings to a dark center
+    case deepEnd          // Water starter set — a pool stepping down from a sunlit shelf to a dark middle
     case maelstrom        // Storm starter set — dark storm vortex with a yellow flash rim
 
     // Exclusive / Legendary (1,500 coins) — animated pit overlays
@@ -1230,7 +1250,7 @@ enum Pit: String, CosmeticItem {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .classic:    return "Classic"
+        case .classic:    return "Classic Black"
         case .inverted:   return "Inverted"
         case .twilight:   return "Twilight"
         case .ember:      return "Ember"
@@ -1407,8 +1427,8 @@ enum Boundary: String, CosmeticItem {
     case autumn         // Harvest Moon, Oktoberfest — russet
     case lantern        // Lunar New Year — lacquer red
     case hardwood       // Full Court — court maple
-    case flare          // Fire starter set — red wall with flame tips
-    case breakers       // Water starter set — blue wall with white wave crests
+    case flare          // Fire starter set — a burning wall: flame licks creeping round a charred rim
+    case breakers       // Water starter set — swells rolling round the rim, each led by a foam crest
     case thunderbolt    // Storm starter set — gray wall with yellow bolts
     // Rare (1,000 coins)
     case cloud          // Heavens — pale cloud white-blue
@@ -1437,7 +1457,7 @@ enum Boundary: String, CosmeticItem {
     var id: String { rawValue }
     var displayName: String {
         switch self {
-        case .classic:  return "Classic"
+        case .classic:  return "Classic Gray"
         case .slate:    return "Slate"
         case .ember:    return "Ember"
         case .mint:     return "Mint"
@@ -2822,7 +2842,7 @@ struct CosmeticBundle: Identifiable {
         id:             rollAlongID,
         displayName:    "Roll Along",
         tagline:        "The classic look every player starts with. Yours forever.",
-        contentSummary: "Red ball · Target goal · Classic trail · Classic floor · Classic pit · Classic boundary",
+        contentSummary: "Red ball · Target goal · Classic Shadow trail · Classic White floor · Classic Black pit · Classic Gray boundary",
         balls:  [BallSkin.starter],
         goals:  [GoalSkin.starter],
         trails: [TrailColor.starter],
@@ -2985,10 +3005,10 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "nature",
             displayName:    "Nature",
-            tagline:        "Daisies, long grass and a mint-green rim.",
-            contentSummary: "Jade ball · Meadow goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
+            tagline:        "A leaf wreath, long grass and a mint-green rim.",
+            contentSummary: "Jade ball · Leaf Wreath goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
             balls:  [.jade],
-            goals:  [.meadow],
+            goals:  [.leafWreath],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],
@@ -5047,39 +5067,74 @@ private func trailForest(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     }
 }
 
-/// Wildfire (Standard, Fire set) — a red line with small flame tongues
-/// standing off it.  Each tongue stays where it was laid and only fades.
+/// Wildfire (Standard, Fire set) — the ball leaves a burning scorch.  A
+/// charred black line with a hot seam down the middle stays on the ground,
+/// and tall, ragged, forked red flames stand on it: each leans its own way,
+/// flickers where it was lit, then sinks and throws an ember upward as it
+/// dies.  Unlike the Fire trail (small upright orange flames of light), this
+/// is a taller, wilder, deep-red blaze over burnt ground.  Under Reduce
+/// Motion the flames stand still and only fade.
 private func trailWildfire(_ ctx: GraphicsContext, _ fr: TrailFrame) {
-    trailTapered(ctx, fr, width: fr.bw * 0.50, color: TrailColor.wildfire.color, glow: false)
-    let outer = Color(red: 0.96, green: 0.30, blue: 0.08)
-    let inner = Color(red: 1.00, green: 0.80, blue: 0.28)
+    // Burnt ground and its glowing seam.
+    trailTapered(ctx, fr, width: fr.bw * 0.72,
+                 color: Color(red: 0.10, green: 0.04, blue: 0.03).opacity(0.80), glow: false)
+    trailTapered(ctx, fr, width: fr.bw * 0.22,
+                 color: Color(red: 1.00, green: 0.40, blue: 0.08).opacity(0.90), glow: false)
+    let crimson = Color(red: 0.84, green: 0.10, blue: 0.05)
+    let orange = Color(red: 1.00, green: 0.48, blue: 0.08)
+    let yellow = Color(red: 1.00, green: 0.86, blue: 0.36)
     for i in 1..<fr.n {
         let seed: Double = fr.seed(i)
-        guard seed < 0.6 else { continue }
-        let k: Double = fr.fresh(i)
-        guard k > 0.01 else { continue }
-        let p = fr.pts[i], a = fr.pts[i - 1]
-        let dir: Double = atan2(Double(p.y - a.y), Double(p.x - a.x))
-        let side: Double = (seed * 20).truncatingRemainder(dividingBy: 2) < 1 ? 1 : -1
-        let ang: Double = dir + side * 1.25
-        let len: CGFloat = fr.bw * CGFloat(0.9 + 0.7 * ((seed * 7).truncatingRemainder(dividingBy: 1)))
-        let wid: CGFloat = len * 0.42
-        let tip = CGPoint(x: p.x + CGFloat(cos(ang)) * len, y: p.y + CGFloat(sin(ang)) * len)
-        let nx: CGFloat = CGFloat(-sin(ang)) * wid
-        let ny: CGFloat = CGFloat(cos(ang)) * wid
-        let dx: CGFloat = (tip.x - p.x) * 0.6
-        let dy: CGFloat = (tip.y - p.y) * 0.6
-        var tongue = Path()
-        tongue.move(to: CGPoint(x: p.x + nx, y: p.y + ny))
-        tongue.addQuadCurve(to: tip, control: CGPoint(x: p.x + nx * 0.4 + dx, y: p.y + ny * 0.4 + dy))
-        tongue.addQuadCurve(to: CGPoint(x: p.x - nx, y: p.y - ny),
-                            control: CGPoint(x: p.x - nx * 0.4 + dx, y: p.y - ny * 0.4 + dy))
-        tongue.closeSubpath()
-        ctx.fill(tongue, with: .color(outer.opacity(0.92 * k)))
-        let core = CGPoint(x: p.x + (tip.x - p.x) * 0.35, y: p.y + (tip.y - p.y) * 0.35)
-        let cr: CGFloat = wid * 0.45
-        ctx.fill(Path(ellipseIn: CGRect(x: core.x - cr, y: core.y - cr, width: cr * 2, height: cr * 2)),
-                 with: .color(inner.opacity(0.85 * k)))
+        guard seed < 0.55 else { continue }                      // a flame at about half the marks
+        let life: Double = fr.f(i)
+        guard life < 1 else { continue }
+        let age: Double = fr.age(i)
+        let rise: Double = fr.m > 0 ? min(1.0, age / 0.07) : 1.0
+        let env: Double = life < 0.50 ? 1.0 : 1.0 - (life - 0.50) / 0.50
+        let k: Double = rise * max(0.0, env)
+        guard k > 0.02 else { continue }
+        let p = fr.pts[i]
+        let s2: Double = (seed * 7.0).truncatingRemainder(dividingBy: 1.0)
+        let s3: Double = (seed * 13.0).truncatingRemainder(dividingBy: 1.0)
+        let flick: Double = 0.78 + 0.22 * sin(fr.tm * 6.0 + seed * 40.0)
+        let h: CGFloat = fr.bw * CGFloat((2.6 + 1.8 * s2) * flick * (0.55 + 0.45 * k))
+        let w: CGFloat = fr.bw * 0.95
+        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 3.0 + seed * 17.0) * 0.12 * fr.m) * h * 0.5
+        let baseY: CGFloat = p.y + w * 0.30
+        let tall = CGPoint(x: p.x + lean, y: p.y - h)
+        let fork = CGPoint(x: p.x - w * 0.55 + lean * 0.45, y: p.y - h * 0.62)
+        let notch = CGPoint(x: p.x - w * 0.10 + lean * 0.40, y: p.y - h * 0.42)
+        var flame = Path()
+        flame.move(to: CGPoint(x: p.x - w, y: baseY))
+        flame.addQuadCurve(to: fork, control: CGPoint(x: p.x - w * 1.15, y: p.y - h * 0.28))
+        flame.addLine(to: notch)
+        flame.addQuadCurve(to: tall, control: CGPoint(x: p.x + w * 0.15 + lean * 0.5, y: p.y - h * 0.72))
+        flame.addQuadCurve(to: CGPoint(x: p.x + w, y: baseY),
+                           control: CGPoint(x: p.x + w * 1.20 + lean * 0.6, y: p.y - h * 0.30))
+        flame.closeSubpath()
+        ctx.fill(flame, with: .color(crimson.opacity(0.92 * k)))
+        // Orange body inside the red.
+        var body = Path()
+        body.move(to: CGPoint(x: p.x - w * 0.55, y: baseY))
+        body.addQuadCurve(to: CGPoint(x: p.x + lean * 0.75, y: p.y - h * 0.68),
+                          control: CGPoint(x: p.x - w * 0.60, y: p.y - h * 0.30))
+        body.addQuadCurve(to: CGPoint(x: p.x + w * 0.55, y: baseY),
+                          control: CGPoint(x: p.x + w * 0.70 + lean * 0.4, y: p.y - h * 0.26))
+        body.closeSubpath()
+        ctx.fill(body, with: .color(orange.opacity(0.95 * k)))
+        // Yellow heart at the foot.
+        let hr: CGFloat = w * 0.34
+        ctx.fill(Path(ellipseIn: CGRect(x: p.x - hr, y: p.y - hr * 1.6, width: hr * 2, height: hr * 2.2)),
+                 with: .color(yellow.opacity(0.90 * k)))
+        // An ember thrown up as the flame dies.
+        if life > 0.50 {
+            let up: Double = (life - 0.50) / 0.50
+            let ex: CGFloat = p.x + lean * 0.8 + CGFloat(sin(seed * 90.0)) * w * 0.6
+            let ey: CGFloat = p.y - h * 0.7 - CGFloat(up * fr.m) * fr.bw * 3.0
+            let er: CGFloat = max(0.6, fr.bw * 0.14)
+            ctx.fill(Path(ellipseIn: CGRect(x: ex - er, y: ey - er, width: er * 2, height: er * 2)),
+                     with: .color(yellow.opacity(0.85 * (1.0 - up))))
+        }
     }
 }
 
