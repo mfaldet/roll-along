@@ -401,7 +401,8 @@ struct BallSkinView: View {
                         let theta: Double = u * .pi
                         let facing: Double = sin(theta)                 // 1 facing us, 0 at the rim
                         let px: CGFloat = cx - CGFloat(cos(theta) * halfW) * r * 0.96
-                        let tileW: CGFloat = CGFloat(.pi * halfW / Double(n) * facing) * r * 0.80
+                        let tileArc: Double = Double.pi * halfW / Double(n) * facing
+                        let tileW: CGFloat = CGFloat(tileArc) * r * 0.80
                         guard tileW > 0.6 else { continue }
                         // A mirror keeps its identity as it slides round.
                         let col: Int = i - shift

@@ -8572,7 +8572,8 @@ struct BoundaryOverlayView: View {
             let bulb: Color = Color(red: 1.00, green: 0.86, blue: 0.46)
             ZStack {
                 ForEach(0..<3, id: \.self) { i in
-                    let wave: Double = 0.5 + 0.5 * sin(t * 2.0 * .pi / 6.0 - Double(i) * 2.0 * .pi / 3.0)
+                    let wavePhase: Double = t * 2.0 * Double.pi / 6.0 - Double(i) * 2.0 * Double.pi / 3.0
+                    let wave: Double = 0.5 + 0.5 * sin(wavePhase)
                     let level: Double = 0.50 + 0.50 * wave
                     borderRing()
                         .stroke(bulb.opacity(level),
