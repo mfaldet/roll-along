@@ -1077,9 +1077,9 @@ final class CosmeticsTests: XCTestCase {
     /// collections (database steps 11 and 21 hold the same rows).
     func testSchedule_everyReleaseIsOneOrTwoFullCollections() {
         let expected: [(String, CalendarDay)] = [
-            ("candyland", CalendarDay(2027, 2, 11)), ("nightclub", CalendarDay(2027, 2, 11)),
-            ("golf", CalendarDay(2027, 4, 1)),       ("bloom", CalendarDay(2027, 4, 1)),
-            ("ocean", CalendarDay(2027, 6, 3)),
+            ("candyland", CalendarDay(2026, 12, 17)), ("nightclub", CalendarDay(2026, 12, 17)),
+            ("golf", CalendarDay(2027, 1, 14)),       ("bloom", CalendarDay(2027, 1, 14)),
+            ("ocean", CalendarDay(2027, 2, 11)),
         ]
         XCTAssertEqual(CosmeticSchedule.builtInReleaseDays.count, expected.count)
         for (id, day) in expected {
@@ -1105,15 +1105,15 @@ final class CosmeticsTests: XCTestCase {
                                                   at: eastern(2020, 1, 1), store: store),
                       "launch content is available from the first open, whenever that is")
         XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "candyland",
-                                                   at: eastern(2027, 2, 11, plus: -1), store: store))
+                                                   at: eastern(2026, 12, 17, plus: -1), store: store))
         XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "candyland",
-                                                  at: eastern(2027, 2, 11), store: store))
-        // Midnight Eastern on Feb 11 is 05:00 UTC.
+                                                  at: eastern(2026, 12, 17), store: store))
+        // Midnight Eastern on Dec 17 is 05:00 UTC (standard time).
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC")!
-        let parts = utc.dateComponents([.year, .month, .day, .hour], from: eastern(2027, 2, 11))
-        XCTAssertEqual([parts.year, parts.month, parts.day, parts.hour], [2027, 2, 11, 5])
-        XCTAssertEqual(CosmeticSchedule.dayLabel(eastern(2027, 2, 11)).contains("11"), true)
+        let parts = utc.dateComponents([.year, .month, .day, .hour], from: eastern(2026, 12, 17))
+        XCTAssertEqual([parts.year, parts.month, parts.day, parts.hour], [2026, 12, 17, 5])
+        XCTAssertEqual(CosmeticSchedule.dayLabel(eastern(2026, 12, 17)).contains("17"), true)
     }
 
     /// Every collection releases eventually; "Coming soon" names only the
@@ -1121,16 +1121,17 @@ final class CosmeticsTests: XCTestCase {
     /// and is hidden once no collection is scheduled.
     func testSchedule_comingSoonShowsTheNextCollectionDay() {
         let store = calendarStore()
-        // There are no single-piece release days: the first release is Feb 11.
+        // There are no single-piece release days: the first release is Dec 17, 2026.
         let first = CosmeticSchedule.nextDrop(at: eastern(2026, 12, 1), store: store)
-        XCTAssertEqual(first?.date, eastern(2027, 2, 11))
+        XCTAssertEqual(first?.date, eastern(2026, 12, 17))
         XCTAssertEqual(Set(first?.bundles.map(\.id) ?? []), ["candyland", "nightclub"])
-        let march = CosmeticSchedule.nextDrop(at: eastern(2027, 3, 11, plus: -1), store: store)
-        XCTAssertEqual(march?.date, eastern(2027, 4, 1))
-        XCTAssertEqual(Set(march?.bundles.map(\.id) ?? []), ["golf", "bloom"])
-        let june = CosmeticSchedule.nextDrop(at: eastern(2027, 4, 2), store: store)
-        XCTAssertEqual(june?.bundles.map(\.id), ["ocean"])
-        XCTAssertNil(CosmeticSchedule.nextDrop(at: eastern(2027, 6, 3), store: store),
+        let january = CosmeticSchedule.nextDrop(at: eastern(2026, 12, 17), store: store)
+        XCTAssertEqual(january?.date, eastern(2027, 1, 14))
+        XCTAssertEqual(Set(january?.bundles.map(\.id) ?? []), ["golf", "bloom"])
+        let february = CosmeticSchedule.nextDrop(at: eastern(2027, 1, 14), store: store)
+        XCTAssertEqual(february?.date, eastern(2027, 2, 11))
+        XCTAssertEqual(february?.bundles.map(\.id), ["ocean"])
+        XCTAssertNil(CosmeticSchedule.nextDrop(at: eastern(2027, 2, 11), store: store),
                      "no collection scheduled after Ocean: the tile is hidden")
         let afterAll = eastern(2027, 11, 11)
         XCTAssertNil(CosmeticSchedule.nextDrop(at: afterAll, store: store),
@@ -1147,26 +1148,26 @@ final class CosmeticsTests: XCTestCase {
         let store = calendarStore()
         typealias Row = CosmeticCalendarStore.Row
         store.apply([
-            Row(collection_id: "candyland", starts_on: "2027-01-07", ends_on: nil),   // earlier
-            Row(collection_id: "golf", starts_on: "2027-05-20", ends_on: nil),        // later
+            Row(collection_id: "candyland", starts_on: "2026-12-03", ends_on: nil),   // earlier
+            Row(collection_id: "golf", starts_on: "2027-03-20", ends_on: nil),        // later
             Row(collection_id: "not-a-collection", starts_on: "2027-01-01", ends_on: nil),
             Row(collection_id: "cathedral", starts_on: "2026-12-17", ends_on: nil),   // retired: ignored
-            Row(collection_id: "_loose-1", starts_on: "2027-02-11", ends_on: nil),    // old loose slot: ignored
+            Row(collection_id: "_loose-1", starts_on: "2026-11-26", ends_on: nil),    // old loose slot: ignored
             Row(collection_id: "ocean", starts_on: "garbage", ends_on: nil),
         ])
         XCTAssertTrue(CosmeticSchedule.isReleased(collectionID: "candyland",
-                                                  at: eastern(2027, 1, 7), store: store))
+                                                  at: eastern(2026, 12, 3), store: store))
         XCTAssertFalse(CosmeticSchedule.isReleased(collectionID: "golf",
-                                                   at: eastern(2027, 4, 2), store: store))
-        XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 12, 18), store: store)?.date,
-                       eastern(2027, 1, 7), "Coming soon follows the server date")
-        XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 12, 18), store: store)?.bundles.map(\.id),
-                       ["candyland"], "a leftover row for a retired set announces nothing")
+                                                   at: eastern(2027, 1, 15), store: store))
+        XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 11, 25), store: store)?.date,
+                       eastern(2026, 12, 3), "Coming soon follows the server date")
+        XCTAssertEqual(CosmeticSchedule.nextDrop(at: eastern(2026, 11, 25), store: store)?.bundles.map(\.id),
+                       ["candyland"], "a leftover row for a retired set or loose slot announces nothing")
         XCTAssertEqual(CosmeticSchedule.releaseDate(of: "ocean", store: store),
-                       eastern(2027, 6, 3), "a broken row falls back to the built-in date")
+                       eastern(2027, 2, 11), "a broken row falls back to the built-in date")
         XCTAssertNil(CosmeticSchedule.releaseDate(of: "cathedral", store: store))
         store.apply([])
-        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "golf", store: store), eastern(2027, 4, 1))
+        XCTAssertEqual(CosmeticSchedule.releaseDate(of: "golf", store: store), eastern(2027, 1, 14))
     }
 
     /// Sticky: a collection this phone has seen released stays released when

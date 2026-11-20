@@ -1,5 +1,8 @@
 # Cosmetic calendar on fixed dates (proposal, not built)
 
+> **Superseded (November 20, 2026).** This is the original proposal. The calendar that ships is much smaller: every release is one or two full collections, and the owner set the dates to **Dec 17, 2026** (Candyland and Nightclub), **Jan 14, 2027** (Golf and Bloom) and **Feb 11, 2027** (Ocean). See `docs/proposals/collection-gaps.md` ("Release dates moved") and database step 21 (`docs/cosmetics/cosmetic-calendar-full-collections.sql`). The tables below are kept as history.
+
+
 Status: **approved and built** (November 18, 2026). Decisions: dates and groups as below; seasonal changes as below with "Year of the Dragon" renamed "Lunar New Year"; releases at midnight Eastern (America/New_York); a collection already released on a phone stays released if its date is later moved back. Built in `CosmeticSchedule` / `CosmeticCalendarStore` (`RollAlong/Cosmetics.swift`) and database step 11 (`docs/cosmetics/cosmetic-calendar.sql`). Section (a) below describes the old schedule. Note: Marble Baron (section d) is not in the shipped trophy catalog; no trophy depends on the calendar.
 
 ## (a) How the schedule works today

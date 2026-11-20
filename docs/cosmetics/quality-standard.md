@@ -37,60 +37,155 @@ The rules above say what the owner wants. The design numbers further down are on
 - A locked piece stays in the collection the owner approved it in, unless the owner moves it.
 - **Guard:** `python3 tools/cosmetic-calendar/locked_pieces_check.py` compares the drawing code of every locked piece with the version recorded in `tools/cosmetic-calendar/locked_pieces.json` and fails if any differs. Run it before committing any cosmetic change. Re-record the hashes (`--update`) only after the owner approves a change, and add each newly approved piece to the list.
 
-The 50 locked pieces, as of November 20, 2026 (approved in the quality round, plus the three confirmed in the audit correction):
+The 136 locked pieces, as of November 20, 2026. The owner has now seen and approved **every piece of the 22 collections on sale or scheduled, and of Roll Along**, with two exceptions that are waiting for approval (listed after the table). "Quality round" marks the 50 pieces approved first (the quality round, plus the three confirmed in the audit correction); "Full review" marks the 86 approved on November 20, 2026, in the form they had that day (after the quality round and the audit).
 
-| Collection | Slot | Piece | id | Note |
-|---|---|---|---|---|
-| Roll Along | Ball | Red | `red` |  |
-| Roll Along | Goal | Target | `target` |  |
-| Roll Along | Trail | Classic Shadow | `classic` |  |
-| Roll Along | Floor | Classic White | `classic` |  |
-| Roll Along | Pit | Classic Black | `classic` |  |
-| Roll Along | Boundary | Classic Gray | `classic` |  |
-| Nature | Ball | Jade | `jade` |  |
-| Nature | Trail | Forest | `forest` |  |
-| Nature | Floor | Meadow | `meadow` |  |
-| Nature | Pit | Meadow | `meadow` |  |
-| Nature | Boundary | Mint | `mint` |  |
-| Fire | Pit | Crater | `crater` |  |
-| Water | Trail | Splash | `splash` |  |
-| Sketchbook | Trail | Graphite | `graphite` |  |
-| Sketchbook | Pit | Sketch | `sketch` |  |
-| Sketchbook | Boundary | Slate | `slate` |  |
-| Neon | Ball | Neon | `neon` |  |
-| Neon | Trail | Raybeam | `raybeam` |  |
-| Neon | Boundary | Neon | `neon` |  |
-| Haunted | Trail | Smoke | `smoke` |  |
-| Haunted | Boundary | Phantom | `phantom` |  |
-| Cosmos | Ball | Nebula | `nebula` |  |
-| Cosmos | Goal | Galaxy | `galaxy` |  |
-| Cosmos | Trail | Stardust | `stardust` | As adjusted at the owner's direction in the quality round (stars slightly larger and more numerous). |
-| Cosmos | Boundary | Starlight | `starlight` |  |
-| Aurora | Ball | Aurora | `aurora` |  |
-| Aurora | Goal | Aurora | `aurora` |  |
-| Aurora | Trail | Aurora | `aurora` |  |
-| Aurora | Floor | Aurora | `aurora` | Look swapped with the pit at the owner's direction in the quality round: dark with a few faint ribbons. |
-| Aurora | Pit | Aurora | `aurora` | Look swapped with the floor at the owner's direction in the quality round: full of aurora ribbons. |
-| Aurora | Boundary | Aurora | `aurora` |  |
-| Champion | Floor | Brass Works | `brass` |  |
-| Champion | Pit | Sideline | `sideline` |  |
-| Champion | Boundary | Brass | `brass` |  |
-| Lava Flow | Trail | Fire | `fire` |  |
-| Lava Flow | Boundary | Molten | `molten` |  |
-| Winter | Ball | Snowglobe | `snowglobe` |  |
-| Ancient Temple | Goal | Eclipse | `eclipse` |  |
-| Ancient Temple | Pit | Canyon | `canyon` |  |
-| Midas | Ball | Fool's Gold | `gold` |  |
-| Midas | Trail | Gilded | `gilded` |  |
-| Midas | Boundary | Gold | `gold` |  |
-| Abyssal Depths | Ball | Trench | `trench` |  |
-| Abyssal Depths | Goal | Vortex | `vortex` |  |
-| Abyssal Depths | Trail | Ink | `ink` |  |
-| Abyssal Depths | Floor | Inverted | `inverted` |  |
-| Abyssal Depths | Boundary | Abyss | `abyss` |  |
-| Space Traveler | Goal | Quasar | `quasar` | Restored to its pre-audit drawing code after the audit changed it. |
-| Space Traveler | Trail | Comet | `cometTrail` | Restored to its pre-audit drawing code after the audit changed it. |
-| Space Traveler | Pit | Space | `space` | Restored to its pre-audit drawing code after the audit changed it. |
+| Collection | Slot | Piece | id | Approved in | Note |
+|---|---|---|---|---|---|
+| Roll Along | Ball | Red | `red` | Quality round |  |
+| Roll Along | Goal | Target | `target` | Quality round |  |
+| Roll Along | Trail | Classic Shadow | `classic` | Quality round |  |
+| Roll Along | Floor | Classic White | `classic` | Quality round |  |
+| Roll Along | Pit | Classic Black | `classic` | Quality round |  |
+| Roll Along | Boundary | Classic Gray | `classic` | Quality round |  |
+| Nightclub | Ball | Disco Ball | `disco` | Full review |  |
+| Nightclub | Goal | Vinyl | `vinyl` | Full review |  |
+| Nightclub | Trail | Dance Steps | `danceSteps` | Full review |  |
+| Nightclub | Floor | Disco | `disco` | Full review |  |
+| Nightclub | Pit | Nightclub | `nightclub` | Full review |  |
+| Nightclub | Boundary | Marquee | `marquee` | Full review |  |
+| Golf | Ball | Golf Ball | `golfBall` | Full review |  |
+| Golf | Goal | Hole-in-One | `holeInOne` | Full review |  |
+| Golf | Trail | Dew Line | `dewLine` | Full review |  |
+| Golf | Floor | Grass | `grass` | Full review |  |
+| Golf | Pit | Pond | `pond` | Full review |  |
+| Golf | Boundary | Fairway | `fairway` | Full review |  |
+| Space Traveler | Ball | UFO | `ufo` | Full review |  |
+| Space Traveler | Goal | Quasar | `quasar` | Quality round | Restored to its pre-audit drawing code after the audit changed it. |
+| Space Traveler | Trail | Comet | `cometTrail` | Quality round | Restored to its pre-audit drawing code after the audit changed it. |
+| Space Traveler | Floor | Moon | `moon` | Full review |  |
+| Space Traveler | Pit | Space | `space` | Quality round | Restored to its pre-audit drawing code after the audit changed it. |
+| Space Traveler | Boundary | Starship Hull | `hull` | Full review |  |
+| Winter | Ball | Snowglobe | `snowglobe` | Quality round |  |
+| Winter | Goal | Frost | `frost` | Full review |  |
+| Winter | Trail | Ice | `ice` | Full review |  |
+| Winter | Floor | Snowfield | `twilight` | Full review |  |
+| Winter | Pit | Crevasse | `twilight` | Full review |  |
+| Winter | Boundary | Ice | `ice` | Full review |  |
+| Cosmos | Ball | Nebula | `nebula` | Quality round |  |
+| Cosmos | Goal | Galaxy | `galaxy` | Quality round |  |
+| Cosmos | Trail | Stardust | `stardust` | Quality round | As adjusted at the owner's direction in the quality round (stars slightly larger and more numerous). |
+| Cosmos | Floor | Midnight | `midnight` | Full review |  |
+| Cosmos | Pit | Moonlit | `midnight` | Full review |  |
+| Cosmos | Boundary | Starlight | `starlight` | Quality round |  |
+| Nature | Ball | Jade | `jade` | Quality round |  |
+| Nature | Trail | Forest | `forest` | Quality round |  |
+| Nature | Floor | Meadow | `meadow` | Quality round |  |
+| Nature | Pit | Meadow | `meadow` | Quality round |  |
+| Nature | Boundary | Mint | `mint` | Quality round |  |
+| Fire | Ball | Blaze | `blaze` | Full review |  |
+| Fire | Goal | Flame Ring | `flameRing` | Full review |  |
+| Fire | Trail | Wildfire | `wildfire` | Full review |  |
+| Fire | Floor | Scorched | `scorched` | Full review |  |
+| Fire | Pit | Crater | `crater` | Quality round |  |
+| Fire | Boundary | Flare | `flare` | Full review |  |
+| Water | Ball | Droplet | `droplet` | Full review |  |
+| Water | Goal | Whirlpool | `whirlpool` | Full review |  |
+| Water | Trail | Splash | `splash` | Quality round |  |
+| Water | Floor | Shallows | `shallows` | Full review |  |
+| Water | Pit | Deep End | `deepEnd` | Full review |  |
+| Water | Boundary | Breakers | `breakers` | Full review |  |
+| Storm | Ball | Thundercloud | `thundercloud` | Full review |  |
+| Storm | Goal | Storm Eye | `thunderRing` | Full review |  |
+| Storm | Trail | Squall | `squall` | Full review |  |
+| Storm | Floor | Overcast | `overcast` | Full review |  |
+| Storm | Pit | Maelstrom | `maelstrom` | Full review |  |
+| Storm | Boundary | Thunderhead | `thunderbolt` | Full review |  |
+| Ocean | Ball | Aquarium | `aquarium` | Full review |  |
+| Ocean | Goal | Ripple | `ripple` | Full review |  |
+| Ocean | Trail | Wake | `wake` | Full review |  |
+| Ocean | Floor | Open Sea | `openSea` | Full review |  |
+| Ocean | Pit | Reef | `reef` | Full review |  |
+| Ocean | Boundary | Tide | `tide` | Full review |  |
+| Bloom | Ball | Rose | `rose` | Full review |  |
+| Bloom | Goal | Blossom | `blossom` | Full review |  |
+| Bloom | Trail | Rose | `roseTrail` | Full review |  |
+| Bloom | Floor | Petal Path | `petalPath` | Full review |  |
+| Bloom | Pit | Deep Rose | `deepRose` | Full review |  |
+| Bloom | Boundary | Rose | `rose` | Full review |  |
+| Aurora | Ball | Aurora | `aurora` | Quality round |  |
+| Aurora | Goal | Aurora | `aurora` | Quality round |  |
+| Aurora | Trail | Aurora | `aurora` | Quality round |  |
+| Aurora | Floor | Aurora | `aurora` | Quality round | Look swapped with the pit at the owner's direction in the quality round: dark with a few faint ribbons. |
+| Aurora | Pit | Aurora | `aurora` | Quality round | Look swapped with the floor at the owner's direction in the quality round: full of aurora ribbons. |
+| Aurora | Boundary | Aurora | `aurora` | Quality round |  |
+| Citrus | Ball | Lemon | `lemon` | Full review |  |
+| Citrus | Goal | Citrus Slice | `citrusSlice` | Full review |  |
+| Citrus | Trail | Zest | `zest` | Full review |  |
+| Citrus | Floor | Grove | `grove` | Full review |  |
+| Citrus | Pit | Tide Pool | `tidePool` | Full review |  |
+| Citrus | Boundary | Citrus | `citrus` | Full review |  |
+| Midas | Ball | Fool's Gold | `gold` | Quality round |  |
+| Midas | Goal | Bullion | `bullion` | Full review |  |
+| Midas | Trail | Gilded | `gilded` | Quality round |  |
+| Midas | Floor | Gold Leaf | `goldLeaf` | Full review |  |
+| Midas | Pit | Vault | `vault` | Full review |  |
+| Midas | Boundary | Gold | `gold` | Quality round |  |
+| Sketchbook | Ball | Pencil | `pencil` | Full review |  |
+| Sketchbook | Goal | Scribble | `scribble` | Full review |  |
+| Sketchbook | Trail | Graphite | `graphite` | Quality round |  |
+| Sketchbook | Floor | Paper | `sketch` | Full review |  |
+| Sketchbook | Pit | Sketch | `sketch` | Quality round |  |
+| Sketchbook | Boundary | Slate | `slate` | Quality round |  |
+| Neon | Ball | Neon | `neon` | Quality round |  |
+| Neon | Goal | Neon | `neon` | Full review |  |
+| Neon | Trail | Raybeam | `raybeam` | Quality round |  |
+| Neon | Floor | Grid City | `gridCity` | Full review |  |
+| Neon | Pit | Blackout | `graph` | Full review |  |
+| Neon | Boundary | Neon | `neon` | Quality round |  |
+| Candyland | Ball | Candy | `candy` | Full review |  |
+| Candyland | Goal | Candy | `candy` | Full review |  |
+| Candyland | Trail | Bubblegum | `bubblegum` | Full review |  |
+| Candyland | Floor | Sugar | `sugar` | Full review |  |
+| Candyland | Pit | Syrup | `syrup` | Full review |  |
+| Candyland | Boundary | Candy | `candy` | Full review |  |
+| Haunted | Ball | Ghost | `ghost` | Full review |  |
+| Haunted | Goal | Pentagram | `pentagram` | Full review |  |
+| Haunted | Trail | Smoke | `smoke` | Quality round |  |
+| Haunted | Floor | Fog | `fog` | Full review |  |
+| Haunted | Pit | Graveyard | `graveyard` | Full review |  |
+| Haunted | Boundary | Phantom | `phantom` | Quality round |  |
+| Ancient Temple | Ball | Dune | `dune` | Full review |  |
+| Ancient Temple | Goal | Eclipse | `eclipse` | Quality round |  |
+| Ancient Temple | Trail | Glyphs | `glyphs` | Full review |  |
+| Ancient Temple | Pit | Canyon | `canyon` | Quality round |  |
+| Ancient Temple | Boundary | Sandstone | `sandstone` | Full review |  |
+| Abyssal Depths | Ball | Trench | `trench` | Quality round |  |
+| Abyssal Depths | Goal | Vortex | `vortex` | Quality round |  |
+| Abyssal Depths | Trail | Ink | `ink` | Quality round |  |
+| Abyssal Depths | Floor | Inverted | `inverted` | Quality round |  |
+| Abyssal Depths | Pit | Sea Vent | `vent` | Full review |  |
+| Abyssal Depths | Boundary | Abyss | `abyss` | Quality round |  |
+| Champion | Ball | Trophy | `trophy` | Full review |  |
+| Champion | Goal | Winner's Circle | `winnersCircle` | Full review |  |
+| Champion | Trail | Victory Lap | `victoryLap` | Full review |  |
+| Champion | Floor | Brass Works | `brass` | Quality round |  |
+| Champion | Pit | Sideline | `sideline` | Quality round |  |
+| Champion | Boundary | Brass | `brass` | Quality round |  |
+| Lava Flow | Ball | Lava | `lava` | Full review |  |
+| Lava Flow | Goal | Inferno | `inferno` | Full review |  |
+| Lava Flow | Trail | Fire | `fire` | Quality round |  |
+| Lava Flow | Floor | Ember | `ember` | Full review |  |
+| Lava Flow | Pit | Evil | `evil` | Full review |  |
+| Lava Flow | Boundary | Molten | `molten` | Quality round |  |
+
+**Pending the owner's approval (not locked yet):**
+
+| Collection | Slot | Piece | Why |
+|---|---|---|---|
+| Nature | Goal | the new tree-stump goal (replaces Leaf Wreath) | Being drawn; it is locked once the owner approves it. |
+| Ancient Temple | Floor | Desert (`desert`) | Being redrawn; it is locked once the owner approves it. |
+
+To lock a pending piece after approval: `python3 tools/cosmetic-calendar/locked_pieces_check.py --lock "Nature:Goal"` (or `"Ancient Temple:Floor"`), then add its row to the table above. The check fails if any piece of these collections is neither locked nor pending, so a new or replaced piece cannot ship unreviewed.
 
 Approved names: Roll Along's trail, floor, pit and boundary are named Classic Shadow, Classic White, Classic Black and Classic Gray.
 

@@ -9,7 +9,8 @@ Run from the repository root:
 It reads the built-in dates in RollAlong/Cosmetics.swift (CosmeticSchedule
 and the seasonal windows in the catalogue) and the seed rows in
 docs/cosmetics/cosmetic-calendar.sql, keeps only the release rows that step 21
-(docs/cosmetics/cosmetic-calendar-full-collections.sql) leaves in place, and
+(docs/cosmetics/cosmetic-calendar-full-collections.sql) leaves in place, applies
+the release dates step 21 sets for them (it overwrites the step 11 dates), and
 prints every difference.  Exit code 0 means they agree.  Read-only; touches no
 database.
 """
@@ -78,8 +79,9 @@ def sql_calendar():
     m = re.search(r"collection_id not in \(([^)]*)\)", src21)
     keep = set(re.findall(r"'([^']+)'", m.group(1)))
     perm = {cid: d for cid, d in perm.items() if cid in keep}
+    # ...and SETS the dates of those it keeps (it overwrites the step 11 dates).
     for cid, start in re.findall(r"\('([a-z-]+)',\s+date '(\d{4}-\d\d-\d\d)', '", src21):
-        perm.setdefault(cid, date.fromisoformat(start))
+        perm[cid] = date.fromisoformat(start)
     if set(perm) != keep:
         raise SystemExit(f"step 21 keeps {sorted(keep)} but ends with {sorted(perm)}")
     return perm, seas

@@ -240,7 +240,7 @@ The owner approved the Quasar goal, Comet trail and Space pit as they were. The 
 
 The owner had not graded these five, and the quality round did not touch them. Several were assembled from leftover pieces when collections were made unique, so each was rebuilt as one look.
 
-### Candyland (6,000 coins; Feb 11, 2027)
+### Candyland (6,000 coins; Dec 17, 2026)
 
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|
@@ -251,7 +251,7 @@ The owner had not graded these five, and the quality round did not touch them. S
 | Pit | Syrup | Standard, 750 | Fails R5, R7: one gradient, drips on the top edge only | Redrawn | Cut-cake steps from a pink frosting rim through caramel, toffee and chocolate to near-black; drips all round | No |
 | Boundary | Candy | Legendary, 1,500 | Borderline R6: stripes scrolled at 16 pt/s; glint pulsed twice a second | Redrawn | Same candy cane; stripes creep at 5 pt/s; glint laps in about 35 s | Yes; frozen but striped under Reduce Motion |
 
-### Nightclub (9,000 coins; Feb 11, 2027)
+### Nightclub (9,000 coins; Dec 17, 2026)
 
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|
@@ -262,7 +262,7 @@ The owner had not graded these five, and the quality round did not touch them. S
 | Pit | Nightclub | Legendary, 1,500 | Fails R5, R6: big twinkling blobs, no depth | Redrawn | Dark plum steps to a black middle, each step edged with small warm bulbs | Yes, bulbs breathe on 5.5 s |
 | Boundary | Marquee | Legendary, 1,500 | Fails R6: bulbs jumped six times a second | Redrawn | Fixed warm bulbs glowing in three groups in turn | Yes, 6 s cycle |
 
-### Golf (8,000 coins; Apr 1, 2027)
+### Golf (8,000 coins; Jan 14, 2027)
 
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|
@@ -273,7 +273,7 @@ The owner had not graded these five, and the quality round did not touch them. S
 | Pit | Pond | Legendary, 1,500 | Fails R5, R7: flat gradient, busy caustics, no dark middle | Redrawn | Grass bank, sand shelf, teal steps to near-black, a lily pad by the bank | One dim ripple every 8 s |
 | Boundary | Fairway | Standard, 750 | Borderline R1, R5: read as a plain green line | Redrawn | Dark rough with mown stripes and white out-of-bounds stakes with red tops | No |
 
-### Bloom (6,000 coins; Apr 1, 2027)
+### Bloom (6,000 coins; Jan 14, 2027)
 
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|
@@ -284,7 +284,7 @@ The owner had not graded these five, and the quality round did not touch them. S
 | Pit | Deep Rose | Standard, 750 | Parchment failed R2: wrong theme | Replaced Parchment | Rings of petal lobes from a pale pink rim to a near-black maroon heart | No |
 | Boundary | Rose | Standard, 750 | Fails R1, R5: flat pink line, no drawing at all | Redrawn | Green briar hedge with leaves, thorns, pink roses and buds | No |
 
-### Ocean (6,000 coins; Jun 3, 2027)
+### Ocean (6,000 coins; Feb 11, 2027)
 
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|

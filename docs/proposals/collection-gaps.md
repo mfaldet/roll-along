@@ -70,7 +70,7 @@ The 16 seasonal collections are no longer sold as sets. Their yearly windows are
 ### Other calendar changes
 
 - **Drop days:** unchanged. The 12 days and every server row stay. A retired collection's id now only names the day its items are released; an active collection's id is also the day its set goes on sale.
-- **"Coming soon":** names only the collections that arrive on the next release day that has any, with the date. Single items are never listed. A release day with no collection is skipped (Dec 17, 2026 and Jan 14, 2027 release only pieces of retired sets, so the first announcement is Feb 11, 2027: Candyland and Nightclub). The tile is hidden when no collection is scheduled (after Ocean, Jun 3, 2027).
+- **"Coming soon":** names only the collections that arrive on the next release day that has any, with the date. Single items are never listed. A release day with no collection is skipped. With the dates set on November 20, 2026, the first announcement is Dec 17, 2026: Candyland and Nightclub; then Jan 14, 2027: Golf and Bloom; then Feb 11, 2027: Ocean. The tile is hidden when no collection is scheduled (after Ocean).
 - **Database:** no change. The app still reads the same `cosmetic_calendar` rows (collection ids and seasonal windows), and `check_calendar.py` still matches. No step 20.
 
 ### Item release days
@@ -399,7 +399,7 @@ This replaces every earlier statement in this file that retired, seasonal or dis
 - Every other piece is **held**: not shown, not sold, not announced. Held pieces keep their code and ids; an owner keeps them and can equip them from the Locker. The full list is in `docs/proposals/held-pieces.md`.
 - Exempt (earned or purchase-only, never sold for coins): Diamond ball, Money Ball, Trophy ball, Money Roll trail, Money Full floor.
 - Ball packs (Planets, Sports Balls, Vintage Glass Marbles) are held: each contains balls that are in no full collection.
-- Every release is one or two full collections: Feb 11, 2027 Candyland and Nightclub; Apr 1 Golf and Bloom; Jun 3 Ocean. The loose release slots and the days that only brought pieces of retired sets are removed (database step 21 tidies the server table).
+- Every release is one or two full collections: Dec 17, 2026 Candyland and Nightclub; Jan 14, 2027 Golf and Bloom; Feb 11, 2027 Ocean (dates moved on November 20, 2026; they were Feb 11, Apr 1 and Jun 3, 2027). The loose release slots and the days that only brought pieces of retired sets are removed (database step 21 tidies the server table).
 - A seasonal event sells no loose ball or boundary. While its window is open the Shop shows the one full collection it features.
 - 22 collections are on sale, all full, plus the free Roll Along set.
 
@@ -670,3 +670,19 @@ After the quality round, every piece of the 22 collections on sale or scheduled 
 - Eight pieces left their sets and are now held: Mosaic goal and Rainbow trail (Nightclub), Air trail (Golf), Parchment floor and pit (Bloom), Sky trail and Blueprint floor and pit (Ocean).
 - Eight new pieces replaced them at the same tier: Vinyl goal, Dance Steps trail, Dew Line trail, Petal Path floor, Deep Rose pit, Wake trail, Open Sea floor, Reef pit.
 - Held pieces now total 133; each has a verdict in `docs/proposals/held-pieces.md`.
+
+## Release dates moved (November 20, 2026)
+
+The owner moved the five scheduled collections earlier. These are the current dates; older tables in this document that show Feb 11, Apr 1 or Jun 3, 2027 for these collections are history.
+
+| Collection | Was | Now |
+|---|---|---|
+| Candyland | Feb 11, 2027 | **Dec 17, 2026** |
+| Nightclub | Feb 11, 2027 | **Dec 17, 2026** |
+| Golf | Apr 1, 2027 | **Jan 14, 2027** |
+| Bloom | Apr 1, 2027 | **Jan 14, 2027** |
+| Ocean | Jun 3, 2027 | **Feb 11, 2027** |
+
+- The dates are built into the app and set on the server by database step 21 (`docs/cosmetics/cosmetic-calendar-full-collections.sql`, not applied yet).
+- **Until step 21 is applied, the app shows the old dates.** The live table still holds them from step 11, and the app prefers the server's dates over its built-in ones. Apply step 21 before Dec 17, 2026.
+- "Coming soon" shows Candyland and Nightclub for Dec 17, 2026, once the server has the new dates (or on a phone that has never reached the server).

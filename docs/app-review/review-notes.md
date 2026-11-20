@@ -66,8 +66,11 @@ Contact: rollalongsupport@gmail.com
       clan season prizes are exactly 1,000 / 500 / 250 / 100 coins as the
       notes say.
 - [ ] Step 21, `docs/cosmetics/cosmetic-calendar-full-collections.sql`, has
-      been applied (release rows only for full collections; optional for the
-      app, which ignores the old rows).
+      been applied (release rows only for full collections, and the release
+      dates set on November 20, 2026: Candyland and Nightclub Dec 17, 2026;
+      Golf and Bloom Jan 14, 2027; Ocean Feb 11, 2027).  REQUIRED before
+      Dec 17, 2026: until it is applied the app shows the old dates, because
+      it prefers the server's dates over its built-in ones.
 - [ ] Step 20, `docs/analytics/events-retention.sql`, has been applied
       (raw analytics events older than 90 days are deleted daily at 03:47 UTC).
 - [ ] Right before submitting: delete the app on the test phones, then run

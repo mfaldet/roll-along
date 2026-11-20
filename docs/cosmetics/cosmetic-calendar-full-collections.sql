@@ -10,18 +10,31 @@
 --   sets and pieces in no collection are held, so they have no release day:
 --     • the 32 retired permanent collections no longer release anything;
 --     • the three loose single-piece slots (_loose-1/2/3) are gone.
---   The only dated releases left are full collections:
---     Feb 11, 2027  Candyland + Nightclub
---     Apr  1, 2027  Golf + Bloom
---     Jun  3, 2027  Ocean
+--   The only dated releases left are full collections, on the dates the owner
+--   set on November 20, 2026:
+--     Dec 17, 2026  Candyland + Nightclub
+--     Jan 14, 2027  Golf + Bloom
+--     Feb 11, 2027  Ocean
 --   Launch collections have no row (always available), as before.
 --   Seasonal rows (ends_on not null) are KEPT unchanged: seasonal events keep
 --   their yearly windows; an event now only features a full collection.
 --
--- THE APP DOES NOT NEED THIS STEP TO BEHAVE CORRECTLY: it ignores rows whose
---   id is not a dated full collection.  The step only tidies the table so it
---   shows exactly what is scheduled.  Dates you have edited for the five
---   collections above are kept.
+-- THIS STEP SETS THE FIVE DATES.  Step 11 seeded the live table with the OLD
+--   dates for these five (Candyland and Nightclub Feb 11, 2027; Golf and Bloom
+--   Apr 1, 2027; Ocean Jun 3, 2027).  This step overwrites them with the dates
+--   above, on purpose, and inserts a row if one is missing.
+--
+-- UNTIL THIS STEP IS APPLIED the app keeps showing the OLD dates: the app
+--   prefers the dates in this table over the ones built into it, and the live
+--   table still holds the old ones.  The new dates are built into the app, but
+--   they only apply when the server has no row for a collection or cannot be
+--   reached.  Apply this step before Dec 17, 2026, or Candyland and Nightclub
+--   will not release that day.  (A phone that has never reached the server
+--   uses the built-in dates and releases them on Dec 17 regardless.)
+--
+-- RE-RUNNING: safe, but it sets the five dates back to the ones in this file.
+--   To change a date later, edit the row in the dashboard and do not re-run
+--   this file (or change the date here first).
 -- =============================================================================
 
 begin;
@@ -31,20 +44,30 @@ delete from public.cosmetic_calendar
  where ends_on is null
    and collection_id not in ('candyland', 'nightclub', 'golf', 'bloom', 'ocean');
 
--- 2. Make sure the five dated full collections have a row (insert only if
---    missing, so a date edited in the dashboard is never overwritten).
+-- 2. Set the five dated full collections to their release days: move the row
+--    if it holds another date, insert it if it is missing.
+with wanted(collection_id, starts_on, note) as (
+    values
+        ('candyland', date '2026-12-17', 'Dec 17 2026 release (with Nightclub)'),
+        ('nightclub', date '2026-12-17', 'Dec 17 2026 release (with Candyland)'),
+        ('golf',      date '2027-01-14', 'Jan 14 2027 release (with Bloom)'),
+        ('bloom',     date '2027-01-14', 'Jan 14 2027 release (with Golf)'),
+        ('ocean',     date '2027-02-11', 'Feb 11 2027 release')
+), moved as (
+    update public.cosmetic_calendar c
+       set starts_on = w.starts_on, note = w.note
+      from wanted w
+     where c.collection_id = w.collection_id
+       and c.ends_on is null
+       and (c.starts_on <> w.starts_on or c.note is distinct from w.note)
+    returning c.collection_id
+)
 insert into public.cosmetic_calendar (collection_id, starts_on, ends_on, note)
-select v.collection_id, v.starts_on, null, v.note
-  from (values
-        ('candyland', date '2027-02-11', 'Feb 11 2027 release (with Nightclub)'),
-        ('nightclub', date '2027-02-11', 'Feb 11 2027 release (with Candyland)'),
-        ('golf',      date '2027-04-01', 'Apr 1 2027 release (with Bloom)'),
-        ('bloom',     date '2027-04-01', 'Apr 1 2027 release (with Golf)'),
-        ('ocean',     date '2027-06-03', 'Jun 3 2027 release')
-       ) as v(collection_id, starts_on, note)
+select w.collection_id, w.starts_on, null, w.note
+  from wanted w
  where not exists (
         select 1 from public.cosmetic_calendar c
-         where c.collection_id = v.collection_id and c.ends_on is null);
+         where c.collection_id = w.collection_id and c.ends_on is null);
 
 commit;
 
@@ -63,6 +86,11 @@ commit;
 --                  and collection_id not in ('candyland','nightclub','golf','bloom','ocean'))
 --                                                                                  as only_full_collections,
 --   (select count(*) from public.cosmetic_calendar where ends_on is null) = 5      as five_release_rows,
+--   (select count(*) from public.cosmetic_calendar
+--     where ends_on is null
+--       and (collection_id, starts_on) in (('candyland', date '2026-12-17'), ('nightclub', date '2026-12-17'),
+--                                          ('golf', date '2027-01-14'), ('bloom', date '2027-01-14'),
+--                                          ('ocean', date '2027-02-11'))) = 5       as five_dates_set,
 --   (select count(*) from public.cosmetic_calendar where ends_on is not null) >= 48 as seasonal_rows_kept,
 --   has_table_privilege('anon', 'public.cosmetic_calendar', 'select')
 --     and not has_table_privilege('anon', 'public.cosmetic_calendar', 'insert')

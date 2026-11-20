@@ -2099,9 +2099,9 @@ enum CosmeticSchedule {
     /// Retired sets and loose single-piece slots have no release day: their
     /// pieces are held (`CosmeticSale`).
     static let drops: [(day: CalendarDay, ids: [String])] = [
-        (CalendarDay(2027,  2, 11), ["candyland", "nightclub"]),
-        (CalendarDay(2027,  4,  1), ["golf", "bloom"]),
-        (CalendarDay(2027,  6,  3), ["ocean"]),
+        (CalendarDay(2026, 12, 17), ["candyland", "nightclub"]),
+        (CalendarDay(2027,  1, 14), ["golf", "bloom"]),
+        (CalendarDay(2027,  2, 11), ["ocean"]),
     ]
 
     /// Collection id → built-in release day.
