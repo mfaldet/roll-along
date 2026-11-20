@@ -226,6 +226,10 @@ struct BallSkinView: View {
             dropletCanvas.clipShape(Circle()).overlay(planetRim)
         case .thundercloud:
             thundercloudCanvas.clipShape(Circle()).overlay(planetRim)
+        // Sketchbook — a pencil seen from above.  Its hexagon sits inside the
+        // ball's circle (the ball plays as round as ever); no round rim.
+        case .pencil:
+            pencilCanvas
         case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon:
             plainMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
@@ -1934,40 +1938,124 @@ struct BallSkinView: View {
         }
     }
 
-    /// Thundercloud (Storm set) — billowing gray cloud shading with a single
-    /// yellow lightning bolt across the front.  No motion.
+    /// Thundercloud (Storm set) — a dark storm cloud that rolls slowly inside
+    /// the ball, with a few faint rain streaks under it.  Rarely (every 7–12 s)
+    /// real forked lightning flashes inside the cloud and lights it from
+    /// within.  Under Reduce Motion (and on still tiles) the cloud is frozen
+    /// and there is no flash.
     private var thundercloudCanvas: some View {
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: timelinePaused) { tl in
+            Canvas { ctx, size in
+                let t: Double = reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.50, green: 0.52, blue: 0.58),
+                                      Color(red: 0.30, green: 0.31, blue: 0.37),
+                                      Color(red: 0.15, green: 0.16, blue: 0.20),
+                                      Color(red: 0.05, green: 0.05, blue: 0.08)]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.36), startRadius: 0, endRadius: r * 1.30))
+                // Rolling cloud: billows drifting slowly across the upper two thirds.
+                let cloudBand = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 1.45)
+                StormArt.clouds(ctx, in: cloudBand, t: t, seed: 0x7C10_0D01, count: 9,
+                                blob: r * 0.50, speed: Double(r) * 0.07,
+                                lightAlpha: 0.30, darkAlpha: 0.34)
+                // A heavy dark underbelly.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 1.1, y: cy + r * 0.20, width: r * 2.2, height: r * 1.3)),
+                         with: .radialGradient(Gradient(colors: [Color.black.opacity(0.50), .clear]),
+                                               center: CGPoint(x: cx, y: cy + r * 0.95), startRadius: 0, endRadius: r * 1.05))
+                // Rain falling out of the cloud.
+                StormArt.rain(ctx, in: CGRect(x: cx - r, y: cy + r * 0.05, width: r * 2, height: r * 0.95),
+                              t: t, seed: 0x7C10_0D02, count: 7, length: r * 0.26,
+                              alpha: 0.40, speed: Double(r) * 1.6, width: max(0.6, r * 0.035))
+                // Rare forked lightning inside the cloud.
+                let strike = StormArt.strike(t, seed: 0.31, frozen: false, still: reduceMotion)
+                if strike.level > 0.02 {
+                    var rng = SeededRNG(seed: strike.id &* 7919 &+ 11)
+                    let ox: CGFloat = CGFloat(rng.nextUnit() - 0.5) * r * 0.9
+                    let top = CGPoint(x: cx + ox, y: cy - r * 0.55)
+                    let bottom = CGPoint(x: cx + ox + CGFloat(rng.nextUnit() - 0.5) * r * 0.7, y: cy + r * 0.70)
+                    ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                        Gradient(colors: [StormArt.glow.opacity(0.45 * strike.level), .clear]),
+                        center: CGPoint(x: top.x, y: cy - r * 0.25), startRadius: 0, endRadius: r * 1.1))
+                    StormArt.drawBolt(ctx, from: top, to: bottom, seed: strike.id,
+                                      level: strike.level, width: max(0.8, r * 0.055))
+                }
+                // Glassy highlight, so it still reads as a marble.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.56, y: cy - r * 0.76, width: r * 0.50, height: r * 0.34)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.26), .clear]),
+                        center: CGPoint(x: cx - r * 0.32, y: cy - r * 0.58), startRadius: 0, endRadius: r * 0.34))
+            }
+        }
+    }
+
+    /// Pencil (Sketchbook) — a yellow pencil standing on its tip, seen from
+    /// straight above: the six painted faces of the barrel, the crimped metal
+    /// ferrule and the pink eraser.  The hexagon's corners touch the ball's
+    /// circle, so the ball is exactly as big as ever.  No motion.
+    private var pencilCanvas: some View {
         Canvas { ctx, size in
             let w = size.width, h = size.height
             let cx = w / 2, cy = h / 2, r = min(w, h) / 2
-            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                Gradient(colors: [Color(red: 0.78, green: 0.80, blue: 0.85),
-                                  Color(red: 0.50, green: 0.52, blue: 0.58),
-                                  Color(red: 0.27, green: 0.28, blue: 0.33),
-                                  Color(red: 0.11, green: 0.11, blue: 0.15)]),
-                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32), startRadius: 0, endRadius: r * 1.25))
-            // Cloud billows: soft lighter puffs along the top half.
-            let puffs: [(CGFloat, CGFloat, CGFloat)] = [(-0.45, -0.30, 0.42), (0.05, -0.45, 0.46),
-                                                        (0.50, -0.25, 0.38), (-0.10, -0.05, 0.36)]
-            for p in puffs {
-                let pr = p.2 * r
-                ctx.fill(Path(ellipseIn: CGRect(x: cx + p.0 * r - pr, y: cy + p.1 * r - pr,
-                                                width: pr * 2, height: pr * 2)),
-                         with: .radialGradient(Gradient(colors: [Color(white: 0.92).opacity(0.38), .clear]),
-                            center: CGPoint(x: cx + p.0 * r, y: cy + p.1 * r), startRadius: 0, endRadius: pr))
+            let c = CGPoint(x: cx, y: cy)
+            func corner(_ k: Int, _ rad: CGFloat) -> CGPoint {
+                let a: Double = Double(k) * Double.pi / 3.0 - Double.pi / 2.0
+                return CGPoint(x: cx + CGFloat(cos(a)) * rad, y: cy + CGFloat(sin(a)) * rad)
             }
-            // Lightning bolt.
-            let bolt: [(CGFloat, CGFloat)] = [(0.10, -0.55), (-0.20, 0.05), (0.02, 0.05),
-                                              (-0.16, 0.62), (0.26, -0.08), (0.04, -0.08), (0.24, -0.55)]
-            var b = Path()
-            for (i, pt) in bolt.enumerated() {
-                let q = CGPoint(x: cx + pt.0 * r, y: cy + pt.1 * r)
-                if i == 0 { b.move(to: q) } else { b.addLine(to: q) }
+            // Barrel: six faces, each lit by how much it faces the top-left light.
+            let R: CGFloat = r * 0.99
+            let faceShade: [Double] = [0.74, 0.56, 0.62, 0.84, 1.00, 0.94]
+            for k in 0..<6 {
+                var face = Path()
+                face.move(to: c)
+                face.addLine(to: corner(k, R))
+                face.addLine(to: corner(k + 1, R))
+                face.closeSubpath()
+                let sh: Double = faceShade[k]
+                ctx.fill(face, with: .color(Color(red: 1.00 * sh, green: 0.80 * sh, blue: 0.16 * sh)))
             }
-            b.closeSubpath()
-            ctx.fill(b, with: .color(Color(red: 1.00, green: 0.86, blue: 0.20)))
-            ctx.stroke(b, with: .color(Color(red: 0.55, green: 0.40, blue: 0.02).opacity(0.75)), lineWidth: r * 0.035)
+            // Face edges and outline.
+            var edges = Path()
+            for k in 0..<6 {
+                edges.move(to: corner(k, r * 0.60))
+                edges.addLine(to: corner(k, R))
+            }
+            ctx.stroke(edges, with: .color(Color(red: 0.50, green: 0.33, blue: 0.02).opacity(0.55)),
+                       lineWidth: max(0.5, r * 0.035))
+            var hex = Path()
+            hex.move(to: corner(0, R))
+            for k in 1..<6 { hex.addLine(to: corner(k, R)) }
+            hex.closeSubpath()
+            ctx.stroke(hex, with: .color(Color(red: 0.42, green: 0.27, blue: 0.02).opacity(0.80)),
+                       style: StrokeStyle(lineWidth: max(0.6, r * 0.05), lineJoin: .round))
+            // Ferrule: a crimped metal ring.
+            let fr: CGFloat = r * 0.66
+            let ferrule = Path(ellipseIn: CGRect(x: cx - fr, y: cy - fr, width: fr * 2, height: fr * 2))
+            ctx.fill(ferrule, with: .linearGradient(
+                Gradient(colors: [Color(red: 0.96, green: 0.97, blue: 0.99),
+                                  Color(red: 0.62, green: 0.65, blue: 0.70),
+                                  Color(red: 0.86, green: 0.88, blue: 0.92),
+                                  Color(red: 0.42, green: 0.45, blue: 0.50)]),
+                startPoint: CGPoint(x: cx - fr, y: cy - fr), endPoint: CGPoint(x: cx + fr, y: cy + fr)))
+            let crimpR: CGFloat = r * 0.585
+            ctx.stroke(Path(ellipseIn: CGRect(x: cx - crimpR, y: cy - crimpR, width: crimpR * 2, height: crimpR * 2)),
+                       with: .color(Color(red: 0.30, green: 0.32, blue: 0.36).opacity(0.70)),
+                       style: StrokeStyle(lineWidth: max(0.5, r * 0.05), dash: [r * 0.06, r * 0.06]))
+            ctx.stroke(ferrule, with: .color(Color(red: 0.26, green: 0.28, blue: 0.32).opacity(0.70)),
+                       lineWidth: max(0.5, r * 0.03))
+            // Eraser.
+            let er: CGFloat = r * 0.47
+            let eraser = Path(ellipseIn: CGRect(x: cx - er, y: cy - er, width: er * 2, height: er * 2))
+            ctx.fill(eraser, with: .radialGradient(
+                Gradient(colors: [Color(red: 1.00, green: 0.78, blue: 0.80),
+                                  Color(red: 0.96, green: 0.52, blue: 0.58),
+                                  Color(red: 0.76, green: 0.32, blue: 0.40)]),
+                center: CGPoint(x: cx - er * 0.35, y: cy - er * 0.40), startRadius: 0, endRadius: er * 1.35))
+            ctx.stroke(eraser, with: .color(Color(red: 0.52, green: 0.18, blue: 0.24).opacity(0.60)),
+                       lineWidth: max(0.5, r * 0.03))
+            ctx.fill(Path(ellipseIn: CGRect(x: cx - er * 0.62, y: cy - er * 0.70, width: er * 0.60, height: er * 0.40)),
+                     with: .color(Color.white.opacity(0.35)))
         }
     }
 

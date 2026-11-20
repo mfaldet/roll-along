@@ -243,7 +243,8 @@ extension BallSkin: CosmeticItem {
             return .starter
         case .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon,
              .gold, .silver, .copper, .jade, .ruby,
-             .blaze, .droplet, .thundercloud:   // starter element sets (drawn, static)
+             .blaze, .droplet, .thundercloud,   // starter element sets
+             .pencil:                           // Sketchbook (replaces Silver in the set)
             return .standard   //  750 coins — all mono-shaded
         case .opal,
              .pastel, .neon, .dune, .paper,
@@ -326,7 +327,9 @@ enum GoalSkin: String, CosmeticItem {
     // Standard (750 coins) — starter element sets, static drawn goals.
     case flameRing      // Fire set: flame tongues ringing a white-hot center
     case whirlpool      // Water set: spiral water arms into a deep blue center
-    case thunderRing    // Storm set: gray cloud ring with yellow bolts
+    case thunderRing    // Storm set ("Storm Eye"): rolling cloud wall around a calm eye
+    // ── Sketchbook (quality round) — Standard (750 coins), static ──
+    case scribble       // hand-drawn pencil target on paper (replaces Archery in the set)
 
     // Epic / Legendary — particle portals (animated)
     case galaxy         // deep-space spiral
@@ -373,7 +376,8 @@ enum GoalSkin: String, CosmeticItem {
         case .wormhole:  return "Wormhole"
         case .flameRing:   return "Flame Ring"
         case .whirlpool:   return "Whirlpool"
-        case .thunderRing: return "Thunder Ring"
+        case .thunderRing: return "Storm Eye"
+        case .scribble:    return "Scribble"
         case .galaxy:    return "Galaxy"
         case .crystal:   return "Crystal"
         case .flame:     return "Flame"
@@ -420,7 +424,8 @@ enum GoalSkin: String, CosmeticItem {
         case .target, .archery, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora,
              .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
-             .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing:
+             .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing,
+             .scribble:
             // Not actually consumed (their renderers are bespoke / static), but
             // we keep a placeholder so callers can read it uniformly.
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
@@ -712,7 +717,7 @@ enum GoalSkin: String, CosmeticItem {
                 ],
                 center: .center, startRadius: 0, endRadius: endRadius))
         case .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
-             .flameRing, .whirlpool, .thunderRing:
+             .flameRing, .whirlpool, .thunderRing, .scribble:
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .vortex, .wormhole:
             return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? [], endRadius: endRadius))
@@ -753,9 +758,12 @@ enum GoalSkin: String, CosmeticItem {
         case .whirlpool:   return [Color(red: 0.06, green: 0.22, blue: 0.56),
                                    Color(red: 0.30, green: 0.62, blue: 0.96),
                                    Color(red: 0.02, green: 0.08, blue: 0.24)]
-        case .thunderRing: return [Color(red: 0.26, green: 0.27, blue: 0.32),
-                                   Color(red: 1.00, green: 0.86, blue: 0.20),
-                                   Color(red: 0.12, green: 0.12, blue: 0.16)]
+        case .thunderRing: return [Color(red: 0.16, green: 0.17, blue: 0.22),
+                                   Color(red: 0.46, green: 0.48, blue: 0.55),
+                                   Color(red: 0.82, green: 0.86, blue: 0.92)]
+        case .scribble:    return [Color(red: 0.96, green: 0.96, blue: 0.94),
+                                   Color(red: 0.62, green: 0.62, blue: 0.64),
+                                   Color(red: 0.20, green: 0.20, blue: 0.22)]
         default:        return nil
         }
     }
@@ -821,7 +829,8 @@ enum GoalSkin: String, CosmeticItem {
         case .wormhole:    return Color(red: 0.92, green: 0.35, blue: 0.92)
         case .flameRing:   return Color(red: 1.00, green: 0.40, blue: 0.14)
         case .whirlpool:   return Color(red: 0.36, green: 0.66, blue: 1.00)
-        case .thunderRing: return Color(red: 1.00, green: 0.86, blue: 0.22)
+        case .thunderRing: return Color(red: 1.00, green: 0.90, blue: 0.45)
+        case .scribble:    return Color(red: 0.42, green: 0.42, blue: 0.46)
         case .galaxy:      return Color(red: 0.55, green: 0.55, blue: 1.00)
         case .crystal:     return Color(red: 0.55, green: 0.88, blue: 1.00)
         case .flame:       return Color(red: 1.00, green: 0.50, blue: 0.12)
@@ -858,7 +867,8 @@ enum GoalSkin: String, CosmeticItem {
             return .starter
         case .archery,
              .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
-             .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing:
+             .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing,
+             .scribble:
             return .standard   //  750 coins — static targets + static ring-portals
         case .galaxy, .crystal, .flame, .blossom,
              .ripple, .comet, .eclipse, .plasma,
@@ -900,7 +910,7 @@ enum TrailColor: String, CosmeticItem {
     // Standard — starter element sets (static marks that fade where laid).
     case wildfire       // Fire set: red line with flame tongues
     case splash         // Water set: blue line with droplets and ripple rings
-    case squall         // Storm set: gray cloud puffs with small yellow zig-zags
+    case squall         // Storm set: driving rain — mist, slanted streaks, splash rings
 
     var id: String { rawValue }
     var displayName: String {
@@ -1065,7 +1075,7 @@ enum Floor: String, CosmeticItem {
         case .dusk:       return "Dusk"
         case .meadow:     return "Meadow"
         case .parchment:  return "Parchment"
-        case .sketch:     return "Sketch"
+        case .sketch:     return "Paper"
         case .velvet:     return "Velvet"
         case .midnight:   return "Midnight"
         case .sunset:     return "Sunset"
@@ -1141,7 +1151,7 @@ enum Floor: String, CosmeticItem {
         case .fog:        return Color(red: 0.66,  green: 0.69,  blue: 0.70 )  // cold grey mist
         case .scorched:   return Color(red: 0.62,  green: 0.26,  blue: 0.20 )  // scorched red stone
         case .shallows:   return Color(red: 0.42,  green: 0.64,  blue: 0.86 )  // clear blue water
-        case .overcast:   return Color(red: 0.52,  green: 0.54,  blue: 0.60 )  // slate cloud cover
+        case .overcast:   return Color(red: 0.34,  green: 0.36,  blue: 0.42 )  // dark storm cloud
         case .aurora:     return Color(red: 0.045, green: 0.075, blue: 0.150)  // deep night sky; aurora glows over it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -1175,7 +1185,8 @@ enum Floor: String, CosmeticItem {
     /// tufts, etc.).
     var hasAnimatedOverlay: Bool {
         switch self {
-        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass, .moneyFull: return true
+        case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass, .moneyFull,
+             .overcast: return true
         default: return false
         }
     }
@@ -1235,7 +1246,7 @@ enum Pit: String, CosmeticItem {
         case .twilight:   return "Twilight"
         case .ember:      return "Ember"
         case .notebook:   return "Notebook"
-        case .graph:      return "Graph"
+        case .graph:      return "Blackout"
         case .blueprint:  return "Blueprint"
         case .dusk:       return "Dusk"
         case .meadow:     return "Meadow"
@@ -1295,7 +1306,7 @@ enum Pit: String, CosmeticItem {
         case .twilight:   return Color(red: 0.047, green: 0.059, blue: 0.122)
         case .ember:      return Color(red: 0.102, green: 0.039, blue: 0.039)
         case .notebook:   return Color(red: 0.169, green: 0.122, blue: 0.071)
-        case .graph:      return Color(red: 0.055, green: 0.102, blue: 0.180)
+        case .graph:      return Color(red: 0.020, green: 0.020, blue: 0.045)   // "Blackout": pitch black under a neon rim
         case .blueprint:  return Color(red: 0.04,  green: 0.10,  blue: 0.22 )
         case .dusk:       return Color(red: 0.18,  green: 0.06,  blue: 0.08 )
         case .meadow:     return Color(red: 0.06,  green: 0.18,  blue: 0.08 )
@@ -1331,7 +1342,7 @@ enum Pit: String, CosmeticItem {
     var hasAnimatedOverlay: Bool {
         switch self {
         case .evil, .sky, .pond, .space, .eclipse, .nightclub,
-             .graveyard, .aurora: return true
+             .graveyard, .aurora, .maelstrom: return true
         default: return false
         }
     }
@@ -1487,7 +1498,7 @@ enum Boundary: String, CosmeticItem {
         case .stainedGlass:  return "Stained Glass"
         case .flare:         return "Flare"
         case .breakers:      return "Breakers"
-        case .thunderbolt:   return "Thunderbolt"
+        case .thunderbolt:   return "Thunderhead"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -1574,7 +1585,7 @@ enum Boundary: String, CosmeticItem {
         case .stainedGlass:  return Color(red: 0.10, green: 0.12, blue: 0.24)
         case .flare:         return Color(red: 0.78, green: 0.14, blue: 0.08)
         case .breakers:      return Color(red: 0.16, green: 0.42, blue: 0.86)
-        case .thunderbolt:   return Color(red: 0.40, green: 0.42, blue: 0.48)
+        case .thunderbolt:   return Color(red: 0.22, green: 0.23, blue: 0.28)
         }
     }
 
@@ -3027,8 +3038,8 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "storm",
             displayName:    "Storm",
-            tagline:        "Gray skies split by bolts of yellow lightning.",
-            contentSummary: "Thundercloud ball · Thunder Ring goal · Squall trail · Overcast floor · Maelstrom pit · Orchestral music · Thunderbolt boundary",
+            tagline:        "Dark rolling cloud, driving rain and rare forked lightning.",
+            contentSummary: "Thundercloud ball · Storm Eye goal · Squall trail · Overcast floor · Maelstrom pit · Orchestral music · Thunderhead boundary",
             balls:  [.thundercloud],
             goals:  [.thunderRing],
             trails: [.squall],
@@ -3084,7 +3095,7 @@ struct CosmeticBundle: Identifiable {
             id:             "arcade",
             displayName:    "Arcade",
             tagline:        "Pixel-perfect retro on a grid.",
-            contentSummary: "Copper ball · Comet goal · Comet trail · Graph floor · Graph pit · Chiptune music · Neon boundary",
+            contentSummary: "Copper ball · Comet goal · Comet trail · Graph floor · Blackout pit · Chiptune music · Neon boundary",
             balls:  [.copper],
             goals:  [.comet],
             trails: [.cometTrail],
@@ -3167,10 +3178,10 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "sketchbook",
             displayName:    "Sketchbook",
-            tagline:        "Pencil lines, cross-hatching and a silver ball.",
-            contentSummary: "Silver ball · Archery goal · Graphite trail · Sketch floor · Sketch pit · Classical music · Slate boundary",
-            balls:  [.silver],
-            goals:  [.archery],
+            tagline:        "A pencil, a page of doodles and a hand-drawn target.",
+            contentSummary: "Pencil ball · Scribble goal · Graphite trail · Paper floor · Sketch pit · Classical music · Slate boundary",
+            balls:  [.pencil],
+            goals:  [.scribble],
             trails: [.graphite],
             floors: [.sketch],
             pits:   [.sketch],
@@ -3222,7 +3233,7 @@ struct CosmeticBundle: Identifiable {
             id:             "neon",
             displayName:    "Neon",
             tagline:        "Electric pink and laser green on a glowing grid.",
-            contentSummary: "Neon ball · Neon goal · Raybeam trail · Grid City floor · Graph pit · Electronic music · Neon boundary",
+            contentSummary: "Neon ball · Neon goal · Raybeam trail · Grid City floor · Blackout pit · Electronic music · Neon boundary",
             balls:  [.neon],
             goals:  [.neon],
             trails: [.raybeam],
@@ -5114,35 +5125,62 @@ private func trailSplash(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     }
 }
 
-/// Squall (Standard, Storm set) — soft gray cloud puffs along the path with
-/// an occasional small yellow zig-zag.  Static marks that fade where laid.
+/// Squall (Standard, Storm set) — driving rain.  Each mark leaves a faint
+/// patch of mist; slanted rain streaks fall onto the path and burst into small
+/// splash rings where they land.  Everything happens where the mark was laid
+/// (nothing follows the ball).  Under Reduce Motion the streaks and rings are
+/// still and simply fade.
 private func trailSquall(_ ctx: GraphicsContext, _ fr: TrailFrame) {
-    let gray = Color(red: 0.58, green: 0.60, blue: 0.66)
-    let yellow = Color(red: 1.00, green: 0.86, blue: 0.20)
+    let mist = Color(red: 0.50, green: 0.53, blue: 0.60)
+    let rain = Color(red: 0.82, green: 0.87, blue: 0.96)
+    let slantX: CGFloat = -0.34                      // driven down and to the left
+    let slantY: CGFloat = 0.94
     for i in 0..<fr.n {
         let k: Double = fr.fresh(i)
         guard k > 0.01 else { continue }
         let seed: Double = fr.seed(i)
-        let r: CGFloat = fr.bw * CGFloat(0.55 + 0.45 * seed)
+        let r: CGFloat = fr.bw * CGFloat(0.50 + 0.35 * seed)
         let c = fr.pts[i]
         ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
-                 with: .radialGradient(Gradient(colors: [gray.opacity(0.70 * k), gray.opacity(0)]),
+                 with: .radialGradient(Gradient(colors: [mist.opacity(0.40 * k), mist.opacity(0)]),
                                        center: c, startRadius: 0, endRadius: r))
     }
-    for i in 1..<fr.n {
+    let hitAt: Double = 0.30                         // share of the lifetime spent falling
+    let streakWidth: CGFloat = max(0.7, fr.bw * 0.14)
+    let ringWidth: CGFloat = max(0.6, fr.bw * 0.10)
+    for i in 0..<fr.n {
         let seed: Double = fr.seed(i)
-        guard seed < 0.12 else { continue }                     // about one mark in eight
-        let k: Double = fr.fresh(i)
-        guard k > 0.01 else { continue }
-        let c = fr.pts[i]
-        let s: CGFloat = fr.bw * 0.7
-        var z = Path()
-        z.move(to: CGPoint(x: c.x - s * 0.2, y: c.y - s))
-        z.addLine(to: CGPoint(x: c.x + s * 0.25, y: c.y - s * 0.15))
-        z.addLine(to: CGPoint(x: c.x - s * 0.15, y: c.y + s * 0.05))
-        z.addLine(to: CGPoint(x: c.x + s * 0.2, y: c.y + s))
-        ctx.stroke(z, with: .color(yellow.opacity(0.95 * k)),
-                   style: StrokeStyle(lineWidth: max(0.8, fr.bw * 0.14), lineCap: .round, lineJoin: .round))
+        guard seed < 0.55 else { continue }          // about one mark in two
+        let f: Double = fr.f(i)
+        guard f < 1 else { continue }
+        let side: CGFloat = CGFloat(sin(seed * 71.0)) * fr.bw * 0.9
+        let land = CGPoint(x: fr.pts[i].x + side, y: fr.pts[i].y + side * 0.3)
+        if fr.m > 0 && f < hitAt {
+            let u: CGFloat = CGFloat(1.0 - f / hitAt)            // 1 far away → 0 landed
+            let fall: CGFloat = fr.bw * 3.2 * u
+            let len: CGFloat = fr.bw * 1.5
+            let tip = CGPoint(x: land.x - slantX * fall, y: land.y - slantY * fall)
+            let tail = CGPoint(x: tip.x - slantX * len, y: tip.y - slantY * len)
+            var streak = Path()
+            streak.move(to: tail)
+            streak.addLine(to: tip)
+            ctx.stroke(streak, with: .color(rain.opacity(0.75)),
+                       style: StrokeStyle(lineWidth: streakWidth, lineCap: .round))
+        } else {
+            let u: Double = fr.m > 0 ? (f - hitAt) / (1.0 - hitAt) : 0.35
+            let rr: CGFloat = fr.bw * CGFloat(0.25 + 0.75 * u)
+            let a: Double = fr.m > 0 ? 0.65 * (1.0 - u) : 0.55 * fr.fresh(i)
+            let ring = Path(ellipseIn: CGRect(x: land.x - rr, y: land.y - rr * 0.55,
+                                              width: rr * 2, height: rr * 1.1))
+            ctx.stroke(ring, with: .color(rain.opacity(a)), lineWidth: ringWidth)
+            if fr.m == 0 {
+                var streak = Path()
+                streak.move(to: CGPoint(x: land.x - slantX * fr.bw * 1.7, y: land.y - slantY * fr.bw * 1.7))
+                streak.addLine(to: CGPoint(x: land.x - slantX * fr.bw * 0.4, y: land.y - slantY * fr.bw * 0.4))
+                ctx.stroke(streak, with: .color(rain.opacity(0.50 * fr.fresh(i))),
+                           style: StrokeStyle(lineWidth: streakWidth, lineCap: .round))
+            }
+        }
     }
 }
 
