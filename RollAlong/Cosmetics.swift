@@ -1241,7 +1241,7 @@ enum Floor: String, CosmeticItem {
         case .shallows:   return Color(red: 0.40,  green: 0.70,  blue: 0.86 )  // clear, sunlit shallow water
         case .overcast:   return Color(red: 0.34,  green: 0.36,  blue: 0.42 )  // dark storm cloud
         case .grove:      return Color(red: 0.96,  green: 0.89,  blue: 0.70 )  // sunlit beach sand
-        case .goldLeaf:   return Color(red: 0.64,  green: 0.49,  blue: 0.18 )  // burnished gold leaf (darker than a coin)
+        case .goldLeaf:   return Color(red: 0.46,  green: 0.34,  blue: 0.11 )  // antique gold leaf: well darker than a coin and than the Vault pit's rim
         case .aurora:     return Color(red: 0.030, green: 0.050, blue: 0.105)  // dark night sky; a few faint ribbons cross it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -5342,10 +5342,11 @@ private func trailWildfire(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         let p = fr.pts[i]
         let s2: Double = (seed * 7.0).truncatingRemainder(dividingBy: 1.0)
         let s3: Double = (seed * 13.0).truncatingRemainder(dividingBy: 1.0)
-        let flick: Double = 0.78 + 0.22 * sin(fr.tm * 6.0 + seed * 40.0)
+        // A slow waver (about a 2-second period, a tenth of the height), not a flicker.
+        let flick: Double = 0.90 + 0.10 * sin(fr.tm * 3.0 + seed * 40.0)
         let h: CGFloat = fr.bw * CGFloat((2.6 + 1.8 * s2) * flick * (0.55 + 0.45 * k))
         let w: CGFloat = fr.bw * 0.95
-        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 3.0 + seed * 17.0) * 0.12 * fr.m) * h * 0.5
+        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 1.8 + seed * 17.0) * 0.10 * fr.m) * h * 0.5
         let baseY: CGFloat = p.y + w * 0.30
         let tall = CGPoint(x: p.x + lean, y: p.y - h)
         let fork = CGPoint(x: p.x - w * 0.55 + lean * 0.45, y: p.y - h * 0.62)
