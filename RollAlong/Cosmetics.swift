@@ -355,6 +355,8 @@ enum GoalSkin: String, CosmeticItem {
     case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
     case soccerNet      // Soccer bundle — goal mouth with white netting
     case aurora         // Aurora bundle — glowing northern-lights portal
+    // ── Citrus set (quality round) ──
+    case citrusSlice    // Citrus set: a cut citrus wheel, slowly turning (replaces Flame there)
 
     var id: String { rawValue }
     var displayName: String {
@@ -374,6 +376,7 @@ enum GoalSkin: String, CosmeticItem {
         case .flameRing:   return "Flame Ring"
         case .whirlpool:   return "Whirlpool"
         case .thunderRing: return "Thunder Ring"
+        case .citrusSlice: return "Citrus Slice"
         case .galaxy:    return "Galaxy"
         case .crystal:   return "Crystal"
         case .flame:     return "Flame"
@@ -420,7 +423,8 @@ enum GoalSkin: String, CosmeticItem {
         case .target, .archery, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora,
              .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
-             .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing:
+             .vortex, .wormhole, .flameRing, .whirlpool, .thunderRing,
+             .citrusSlice:
             // Not actually consumed (their renderers are bespoke / static), but
             // we keep a placeholder so callers can read it uniformly.
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
@@ -712,7 +716,7 @@ enum GoalSkin: String, CosmeticItem {
                 ],
                 center: .center, startRadius: 0, endRadius: endRadius))
         case .frost, .ember, .meadow, .bullion, .amethyst, .candy, .slate,
-             .flameRing, .whirlpool, .thunderRing:
+             .flameRing, .whirlpool, .thunderRing, .citrusSlice:
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .vortex, .wormhole:
             return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? [], endRadius: endRadius))
@@ -756,6 +760,9 @@ enum GoalSkin: String, CosmeticItem {
         case .thunderRing: return [Color(red: 0.26, green: 0.27, blue: 0.32),
                                    Color(red: 1.00, green: 0.86, blue: 0.20),
                                    Color(red: 0.12, green: 0.12, blue: 0.16)]
+        case .citrusSlice: return [Color(red: 0.98, green: 0.62, blue: 0.10),
+                                   Color(red: 1.00, green: 0.95, blue: 0.80),
+                                   Color(red: 1.00, green: 0.80, blue: 0.22)]
         default:        return nil
         }
     }
@@ -822,6 +829,7 @@ enum GoalSkin: String, CosmeticItem {
         case .flameRing:   return Color(red: 1.00, green: 0.40, blue: 0.14)
         case .whirlpool:   return Color(red: 0.36, green: 0.66, blue: 1.00)
         case .thunderRing: return Color(red: 1.00, green: 0.86, blue: 0.22)
+        case .citrusSlice: return Color(red: 1.00, green: 0.72, blue: 0.16)
         case .galaxy:      return Color(red: 0.55, green: 0.55, blue: 1.00)
         case .crystal:     return Color(red: 0.55, green: 0.88, blue: 1.00)
         case .flame:       return Color(red: 1.00, green: 0.50, blue: 0.12)
@@ -862,7 +870,8 @@ enum GoalSkin: String, CosmeticItem {
             return .standard   //  750 coins — static targets + static ring-portals
         case .galaxy, .crystal, .flame, .blossom,
              .ripple, .comet, .eclipse, .plasma,
-             .mirage, .obsidian:
+             .mirage, .obsidian,
+             .citrusSlice:     // Citrus set — takes the tier of the Flame goal it replaced there
             return .premium    // 1,250 coins — animated, tight palette
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora:
@@ -901,6 +910,8 @@ enum TrailColor: String, CosmeticItem {
     case wildfire       // Fire set: red line with flame tongues
     case splash         // Water set: blue line with droplets and ripple rings
     case squall         // Storm set: gray cloud puffs with small yellow zig-zags
+    // ── Citrus set (quality round) ──
+    case zest           // Citrus set: curls of orange and lemon peel with juice drops (replaces Ember there)
 
     var id: String { rawValue }
     var displayName: String {
@@ -929,6 +940,7 @@ enum TrailColor: String, CosmeticItem {
         case .wildfire:    return "Wildfire"
         case .splash:      return "Splash"
         case .squall:      return "Squall"
+        case .zest:        return "Zest"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -951,6 +963,7 @@ enum TrailColor: String, CosmeticItem {
              .graphite:        // Sketchbook's pencil trail — priced like its set's other pieces
             return .standard   //  750 coins — solid mono colour
         case .snake, .raybeam, .gilded,
+             .zest,            // Citrus set — takes the tier of the Ember trail it replaced there
              .ember:           // audit 2026-07 ruling 1(c): rides the plusLighter glow path — Rare
             return .rare       // 1,000 coins — distinctive textured trails
         case .fire, .cometTrail, .stardust, .smoke, .ice, .rainbow, .air, .aurora,
@@ -997,6 +1010,7 @@ enum TrailColor: String, CosmeticItem {
         case .wildfire:    return Color(red: 0.86, green: 0.16, blue: 0.08).opacity(0.85)
         case .splash:      return Color(red: 0.22, green: 0.52, blue: 0.95).opacity(0.80)
         case .squall:      return Color(red: 0.46, green: 0.48, blue: 0.54).opacity(0.80)
+        case .zest:        return Color(red: 0.98, green: 0.62, blue: 0.12).opacity(0.85)
         }
     }
 }
@@ -1050,6 +1064,9 @@ enum Floor: String, CosmeticItem {
 
     // top-coin-pack ($49.99) IAP secret — overlapping stack of $100 bills
     case moneyFull
+    // ── Citrus and Midas sets (quality round) ──
+    case grove            // Citrus set — sunlit sand under citrus-leaf shade, fallen blossoms
+    case goldLeaf         // Midas set — hammered gold-leaf tiles
 
     var id: String { rawValue }
     var displayName: String {
@@ -1078,6 +1095,8 @@ enum Floor: String, CosmeticItem {
         case .scorched:   return "Scorched"
         case .shallows:   return "Shallows"
         case .overcast:   return "Overcast"
+        case .grove:      return "Grove"
+        case .goldLeaf:   return "Gold Leaf"
         case .aurora:     return "Aurora"
         case .disco:      return "Disco"
         case .grass:      return "Grass"
@@ -1101,7 +1120,8 @@ enum Floor: String, CosmeticItem {
              .velvet, .midnight, .sunset,
              .mirage, .desert, .stormcloud, .sugar, .fog,
              .court, .felt,
-             .scorched, .shallows, .overcast:   // starter element sets
+             .scorched, .shallows, .overcast,   // starter element sets
+             .grove, .goldLeaf:                 // Citrus and Midas sets (replace Dusk / Mirage there)
             return .standard   //  750 coins
         case .notebook, .graph, .parchment, .sketch, .origami:
             // audit 2026-07 ruling 1(c): bespoke static texture overlays
@@ -1142,6 +1162,8 @@ enum Floor: String, CosmeticItem {
         case .scorched:   return Color(red: 0.62,  green: 0.26,  blue: 0.20 )  // scorched red stone
         case .shallows:   return Color(red: 0.42,  green: 0.64,  blue: 0.86 )  // clear blue water
         case .overcast:   return Color(red: 0.52,  green: 0.54,  blue: 0.60 )  // slate cloud cover
+        case .grove:      return Color(red: 0.96,  green: 0.89,  blue: 0.70 )  // sunlit beach sand
+        case .goldLeaf:   return Color(red: 0.64,  green: 0.49,  blue: 0.18 )  // burnished gold leaf (darker than a coin)
         case .aurora:     return Color(red: 0.045, green: 0.075, blue: 0.150)  // deep night sky; aurora glows over it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -1226,6 +1248,9 @@ enum Pit: String, CosmeticItem {
     // Sports bundles (new)
     case sideline         // Full Court bundle — dark-grey out-of-bounds edge
     case pocket           // Billiards Hall bundle — near-black pool pocket
+    // ── Citrus and Midas sets (quality round) ──
+    case tidePool         // Citrus set — a shaded tide pool: wet sand rim, turquoise shallows, dark deep
+    case vault            // Midas set — a treasury vault: stepped gold walls down to a dark floor of coins
 
     var id: String { rawValue }
     var displayName: String {
@@ -1254,6 +1279,8 @@ enum Pit: String, CosmeticItem {
         case .crater:     return "Crater"
         case .deepEnd:    return "Deep End"
         case .maelstrom:  return "Maelstrom"
+        case .tidePool:   return "Tide Pool"
+        case .vault:      return "Vault"
         case .evil:       return "Evil"
         case .sky:        return "Sky"
         case .pond:       return "Pond"
@@ -1276,8 +1303,9 @@ enum Pit: String, CosmeticItem {
              .parchment, .sketch, .velvet, .midnight, .sunset,
              .origami, .mirage, .canyon, .downpour, .syrup,
              .sideline, .pocket,
-             .crater, .deepEnd, .maelstrom:   // starter element sets
-            return .standard   //  750 coins — drawn art, never animates
+             .crater, .deepEnd, .maelstrom,   // starter element sets
+             .tidePool, .vault:               // Citrus and Midas sets (replace Sunset / Mirage there)
+            return .standard   //  750 coins — drawn art
         case .graveyard, .aurora:
             return .rare       // 1,000 coins — drawn art with gentle motion
         case .evil, .sky, .pond, .space, .eclipse, .nightclub:
@@ -1314,6 +1342,8 @@ enum Pit: String, CosmeticItem {
         case .crater:     return Color(red: 0.12,  green: 0.02,  blue: 0.01 )  // dark core; glowing rim drawn over
         case .deepEnd:    return Color(red: 0.02,  green: 0.07,  blue: 0.20 )  // deep water
         case .maelstrom:  return Color(red: 0.06,  green: 0.06,  blue: 0.09 )  // dark storm center
+        case .tidePool:   return Color(red: 0.02,  green: 0.12,  blue: 0.16 )  // deep pool water
+        case .vault:      return Color(red: 0.07,  green: 0.05,  blue: 0.02 )  // dark vault floor
         case .evil:       return Color(red: 0.10,  green: 0.02,  blue: 0.00 )  // dark base; flames paint over
         case .sky:        return Color(red: 0.55,  green: 0.78,  blue: 0.95 )  // pale blue base; clouds drift on top
         case .pond:       return Color(red: 0.08,  green: 0.30,  blue: 0.42 )  // deep water; ripples + lily pad on top
@@ -1345,7 +1375,8 @@ enum Pit: String, CosmeticItem {
         case .meadow, .graveyard, .ember, .notebook, .graph, .blueprint,
              .parchment, .sketch, .origami, .velvet, .sunset, .mirage,
              .aurora, .canyon, .downpour, .syrup, .sideline, .pocket,
-             .crater, .deepEnd, .maelstrom:
+             .crater, .deepEnd, .maelstrom,
+             .tidePool, .vault:
             return true
         default:
             return false
@@ -1398,7 +1429,7 @@ enum Boundary: String, CosmeticItem {
     case sunset         // Golden Hour — warm amber-coral
     case rose           // Bloom, Sweetheart — rose pink
     case ink            // Noir — inky charcoal
-    case citrus         // Citrus — lemon-lime
+    case citrus         // Citrus — rind wall set with lemon, lime and orange slices
     case pastel         // Pastel, Spring Fling — soft lilac
     case pumpkin        // Halloween — pumpkin orange
     case holly          // Winter Wonderland — holly green
@@ -1585,7 +1616,7 @@ enum Boundary: String, CosmeticItem {
     var textureShowsUnderReduceMotion: Bool {
         switch self {
         case .ember, .notebook, .fairway, .sunset, .pastel, .holly, .autumn,
-             .lantern, .hardwood, .flare, .breakers, .thunderbolt,
+             .lantern, .hardwood, .flare, .breakers, .thunderbolt, .citrus,
              .velvet, .marble, .mahogany, .sandstone, .abyss, .brass,
              .neon, .gold, .ice, .cloud, .tide, .phantom, .amethyst, .chrome:
             return true
@@ -3139,13 +3170,13 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "citrus",
             displayName:    "Citrus",
-            tagline:        "Zest and warmth from dawn to dusk.",
-            contentSummary: "Lemon ball · Flame goal · Ember trail · Dusk floor · Sunset pit · Jazz music · Citrus boundary",
+            tagline:        "Tropical groves, cut fruit and bright beach light.",
+            contentSummary: "Lemon ball · Citrus Slice goal · Zest trail · Grove floor · Tide Pool pit · Jazz music · Citrus boundary",
             balls:  [.lemon],
-            goals:  [.flame],
-            trails: [.ember],
-            floors: [.dusk],
-            pits:   [.sunset],
+            goals:  [.citrusSlice],
+            trails: [.zest],
+            floors: [.grove],
+            pits:   [.tidePool],
             music:  [.jazz],
             boundaries: [.citrus]
         ),
@@ -3154,12 +3185,12 @@ struct CosmeticBundle: Identifiable {
             id:             "midas",
             displayName:    "Midas",
             tagline:        "Everything you touch turns to gold.",
-            contentSummary: "Fool's Gold ball · Bullion goal · Gilded trail · Mirage floor · Mirage pit · Orchestral music · Gold boundary",
+            contentSummary: "Fool's Gold ball · Bullion goal · Gilded trail · Gold Leaf floor · Vault pit · Orchestral music · Gold boundary",
             balls:  [.gold],
             goals:  [.bullion],
             trails: [.gilded],
-            floors: [.mirage],
-            pits:   [.mirage],
+            floors: [.goldLeaf],
+            pits:   [.vault],
             music:  [.orchestral],
             boundaries: [.gold]
         ),
@@ -4533,6 +4564,7 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .wildfire:        trailWildfire(ctx, fr)
     case .splash:          trailSplash(ctx, fr)
     case .squall:          trailSquall(ctx, fr)
+    case .zest:            trailZest(ctx, fr)
     default:
         trailTapered(ctx, fr, width: baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded)
@@ -5143,6 +5175,62 @@ private func trailSquall(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         z.addLine(to: CGPoint(x: c.x + s * 0.2, y: c.y + s))
         ctx.stroke(z, with: .color(yellow.opacity(0.95 * k)),
                    style: StrokeStyle(lineWidth: max(0.8, fr.bw * 0.14), lineCap: .round, lineJoin: .round))
+    }
+}
+
+/// Zest (Citrus set) — a thin juice line with curls of orange and lemon peel
+/// laid beside it and a few juice drops.  Each curl stays where it fell and
+/// fades there; nothing moves.
+private func trailZest(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    trailTapered(ctx, fr, width: fr.bw * 0.30, color: TrailColor.zest.color, glow: false)
+    let orange = Color(red: 0.98, green: 0.56, blue: 0.10)
+    let lemon  = Color(red: 1.00, green: 0.86, blue: 0.22)
+    let lime   = Color(red: 0.56, green: 0.80, blue: 0.22)
+    let pith   = Color(red: 1.00, green: 0.96, blue: 0.84)
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.42 else { continue }
+        let k: Double = fr.fresh(i)
+        guard k > 0.01 else { continue }
+        let p = fr.pts[i], a = fr.pts[i - 1]
+        let dir: Double = atan2(Double(p.y - a.y), Double(p.x - a.x))
+        let pick: Double = (seed * 37).truncatingRemainder(dividingBy: 1)
+        if seed < 0.10 {
+            // A juice drop.
+            let off: CGFloat = fr.bw * CGFloat(0.5 + pick)
+            let sideSign: CGFloat = pick < 0.5 ? 1 : -1
+            let c = CGPoint(x: p.x + CGFloat(-sin(dir)) * off * sideSign,
+                            y: p.y + CGFloat(cos(dir)) * off * sideSign)
+            let r: CGFloat = fr.bw * CGFloat(0.16 + 0.14 * pick)
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                     with: .color(lemon.opacity(0.85 * k)))
+            let hr: CGFloat = r * 0.4
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - r * 0.4 - hr / 2, y: c.y - r * 0.4 - hr / 2,
+                                            width: hr, height: hr)),
+                     with: .color(Color.white.opacity(0.7 * k)))
+            continue
+        }
+        // A curl of peel: a short spiral arc, rind color outside, pale pith inside.
+        let rind: Color = pick < 0.45 ? orange : (pick < 0.8 ? lemon : lime)
+        let side: Double = (seed * 20).truncatingRemainder(dividingBy: 2) < 1 ? 1 : -1
+        let off: CGFloat = fr.bw * 0.75
+        let c = CGPoint(x: p.x + CGFloat(-sin(dir) * side) * off,
+                        y: p.y + CGFloat(cos(dir) * side) * off)
+        let r0: CGFloat = fr.bw * CGFloat(0.42 + 0.30 * pick)
+        var curl = Path()
+        let steps = 9
+        for j in 0...steps {
+            let u: Double = Double(j) / Double(steps)
+            let ang: Double = dir + side * (0.4 + u * 4.2)
+            let rr: CGFloat = r0 * CGFloat(1.0 - 0.62 * u)
+            let q = CGPoint(x: c.x + CGFloat(cos(ang)) * rr, y: c.y + CGFloat(sin(ang)) * rr)
+            if j == 0 { curl.move(to: q) } else { curl.addLine(to: q) }
+        }
+        let w: CGFloat = max(1.2, fr.bw * 0.24)
+        ctx.stroke(curl, with: .color(rind.opacity(0.92 * k)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        ctx.stroke(curl, with: .color(pith.opacity(0.55 * k)),
+                   style: StrokeStyle(lineWidth: w * 0.34, lineCap: .round, lineJoin: .round))
     }
 }
 

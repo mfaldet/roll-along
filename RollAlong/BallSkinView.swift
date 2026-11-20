@@ -226,7 +226,11 @@ struct BallSkinView: View {
             dropletCanvas.clipShape(Circle()).overlay(planetRim)
         case .thundercloud:
             thundercloudCanvas.clipShape(Circle()).overlay(planetRim)
-        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate, .lemon:
+        case .lemon:
+            // Lemon-shaped, not round: drawn inside the ball's own circle
+            // (no circular clip or rim), so it plays exactly like a marble.
+            lemonCanvas
+        case .red, .blue, .green, .purple, .rose, .coral, .mint, .slate:
             plainMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
         case .gold, .silver, .copper:
             metalMarble(skin.colors).clipShape(Circle()).overlay(planetRim)
@@ -1997,6 +2001,72 @@ struct BallSkinView: View {
             ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
                 with: .radialGradient(Gradient(colors: [.white.opacity(0.20), .clear]),
                     center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+        }
+    }
+
+    /// Lemon (Citrus set) — a real lemon, seen from above and lying on a
+    /// slant: a plump oval with a pointed nub at each end, dimpled rind, a
+    /// glossy highlight and a small green stem scar.  It is drawn entirely
+    /// inside the ball's circle; the collision shape is still that circle.
+    /// No motion.
+    private var lemonCanvas: some View {
+        Canvas { ctx, size in
+            let cx: CGFloat = size.width / 2
+            let cy: CGFloat = size.height / 2
+            let r: CGFloat = min(size.width, size.height) / 2
+            var g = ctx
+            g.translateBy(x: cx, y: cy)
+            g.rotate(by: .degrees(-32))
+            // Outline in the lemon's own axes: x along its length.
+            let tipX: CGFloat = r * 0.98
+            let shX: CGFloat = r * 0.74      // shoulder where the nub begins
+            let shY: CGFloat = r * 0.26
+            let belly: CGFloat = r * 0.86    // control height for the belly curve
+            var body = Path()
+            body.move(to: CGPoint(x: tipX, y: 0))
+            body.addQuadCurve(to: CGPoint(x: shX, y: shY), control: CGPoint(x: r * 0.86, y: r * 0.05))
+            body.addCurve(to: CGPoint(x: -shX, y: shY),
+                          control1: CGPoint(x: r * 0.40, y: belly), control2: CGPoint(x: -r * 0.40, y: belly))
+            body.addQuadCurve(to: CGPoint(x: -tipX, y: 0), control: CGPoint(x: -r * 0.86, y: r * 0.05))
+            body.addQuadCurve(to: CGPoint(x: -shX, y: -shY), control: CGPoint(x: -r * 0.86, y: -r * 0.05))
+            body.addCurve(to: CGPoint(x: shX, y: -shY),
+                          control1: CGPoint(x: -r * 0.40, y: -belly), control2: CGPoint(x: r * 0.40, y: -belly))
+            body.addQuadCurve(to: CGPoint(x: tipX, y: 0), control: CGPoint(x: r * 0.86, y: -r * 0.05))
+            body.closeSubpath()
+            g.fill(body, with: .radialGradient(
+                Gradient(colors: [Color(red: 1.00, green: 0.97, blue: 0.56),
+                                  Color(red: 1.00, green: 0.88, blue: 0.22),
+                                  Color(red: 0.94, green: 0.72, blue: 0.10),
+                                  Color(red: 0.74, green: 0.52, blue: 0.06)]),
+                center: CGPoint(x: -r * 0.22, y: -r * 0.24), startRadius: 0, endRadius: r * 1.15))
+            // Rind dimples: fixed, tiny, a shade darker — only inside the body.
+            var inside = g
+            inside.clip(to: body)
+            var rng = SeededRNG(seed: 0x1E_30_4E_01)
+            for _ in 0..<46 {
+                let px: CGFloat = CGFloat(rng.nextUnit() * 2 - 1) * r * 0.80
+                let py: CGFloat = CGFloat(rng.nextUnit() * 2 - 1) * r * 0.58
+                let pr: CGFloat = r * CGFloat(0.018 + rng.nextUnit() * 0.016)
+                inside.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr, width: pr * 2, height: pr * 2)),
+                            with: .color(Color(red: 0.70, green: 0.50, blue: 0.04).opacity(0.22)))
+                inside.fill(Path(ellipseIn: CGRect(x: px - pr - pr * 0.5, y: py - pr - pr * 0.5,
+                                                   width: pr * 1.2, height: pr * 1.2)),
+                            with: .color(Color.white.opacity(0.16)))
+            }
+            // Shade along the lower edge so it reads as round fruit.
+            inside.fill(Path(ellipseIn: CGRect(x: -r * 1.0, y: r * 0.10, width: r * 2.0, height: r * 1.0)),
+                        with: .radialGradient(Gradient(colors: [Color.clear,
+                                                                Color(red: 0.55, green: 0.36, blue: 0.02).opacity(0.30)]),
+                                              center: CGPoint(x: 0, y: -r * 0.10), startRadius: r * 0.55, endRadius: r * 1.05))
+            // Glossy highlight.
+            inside.fill(Path(ellipseIn: CGRect(x: -r * 0.60, y: -r * 0.50, width: r * 0.62, height: r * 0.30)),
+                        with: .radialGradient(Gradient(colors: [Color.white.opacity(0.55), Color.clear]),
+                                              center: CGPoint(x: -r * 0.32, y: -r * 0.38), startRadius: 0, endRadius: r * 0.34))
+            // Outline, then the green stem scar on one nub.
+            g.stroke(body, with: .color(Color(red: 0.56, green: 0.38, blue: 0.02).opacity(0.55)), lineWidth: max(0.5, r * 0.03))
+            let sr: CGFloat = r * 0.07
+            g.fill(Path(ellipseIn: CGRect(x: -tipX + r * 0.02, y: -sr, width: sr * 2, height: sr * 2)),
+                   with: .color(Color(red: 0.36, green: 0.50, blue: 0.14)))
         }
     }
 

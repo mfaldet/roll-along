@@ -15,6 +15,10 @@ struct SettingsView: View {
     @State private var restoreResultMessage = ""
     @State private var isRestoring = false
     @State private var showFeedback = false
+    #if DEBUG
+    /// Debug builds only: the "All Collections" review gallery.
+    @State private var showCollectionGallery = false
+    #endif
     /// The screen Settings was opened from, recorded with feedback.
     var openedFrom: String = "Home"
 
@@ -31,6 +35,9 @@ struct SettingsView: View {
                     purchasesSection
                     aboutSection
                     resetSection
+                    #if DEBUG
+                    debugSection
+                    #endif
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
@@ -501,6 +508,27 @@ struct SettingsView: View {
                 .foregroundStyle(Color(white: 0.45))
         }
     }
+
+    #if DEBUG
+    /// Debug builds only — never compiled into a release build.
+    private var debugSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Debug")
+            Button { showCollectionGallery = true } label: {
+                aboutRow(icon: "square.grid.3x3.fill", title: "All Collections", trailing: "chevron.right")
+            }
+            .buttonStyle(.plain)
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            Text("Review gallery: every collection with its real art. Nothing here buys, grants or equips anything.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+        }
+        .fullScreenCover(isPresented: $showCollectionGallery) {
+            CollectionReviewGallery()
+                .environmentObject(gameState)
+        }
+    }
+    #endif
 
     private func aboutRow(icon: String, title: String,
                           trailing: String = "arrow.up.right") -> some View {
@@ -979,3 +1007,128 @@ struct FeedbackSheet: View {
         }
     }
 }
+
+#if DEBUG
+// ---------------------------------------------------------------------------
+// CollectionReviewGallery — DEBUG BUILDS ONLY (Settings → Debug → All
+// Collections).  A review tool for looking at every collection's real art.
+//
+// It lists Roll Along plus every catalogue collection — on sale, retired and
+// seasonal, released or not — straight from `CosmeticBundle` data, so new or
+// changed pieces show up with no edits here.  Every piece is drawn large by
+// the same code the game uses, with its live animation, and "Try full set"
+// plays the gameplay replay with the whole set on.
+//
+// READ-ONLY: it never buys, grants, equips or changes ownership.
+// ---------------------------------------------------------------------------
+struct CollectionReviewGallery: View {
+    @EnvironmentObject var gameState: GameState
+    @Environment(\.dismiss) private var dismiss
+    @State private var tryOnID: String?
+
+    private var bundles: [CosmeticBundle] { [CosmeticBundle.rollAlong] + CosmeticBundle.catalogue }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    Text("\(bundles.count) collections · debug build only · nothing here changes what you own")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.55))
+                    ForEach(bundles) { bundle in
+                        card(bundle)
+                    }
+                }
+                .padding(16)
+            }
+            .background(Color(white: 0.08).ignoresSafeArea())
+            .navigationTitle("All Collections")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+        // Pieces animate as they do in a Shop preview (and stop under Reduce Motion).
+        .environment(\.cosmeticMotion, .preview)
+        .preferredColorScheme(.dark)
+    }
+
+    private func status(_ b: CosmeticBundle) -> String {
+        if b.isRollAlong { return "Iconic · owned by everyone" }
+        var parts: [String] = []
+        parts.append(b.isLimitedTime ? "Seasonal" : (b.isRetired ? "Retired" : "On sale"))
+        if b.isLimitedTime && b.isRetired { parts.append("retired as a set") }
+        parts.append(CosmeticSchedule.isReleased(b) ? "released" : "not released yet")
+        return parts.joined(separator: " · ")
+    }
+
+    private func card(_ b: CosmeticBundle) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(b.displayName)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(b.isRollAlong ? "Free" : "\(b.fullPrice()) coins")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(white: 0.75))
+            }
+            Text("id \(b.id) · \(b.rarity.label) · \(status(b))")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(Color(white: 0.55))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(b.balls) { piece("Ball", $0) }
+                    ForEach(b.goals) { piece("Goal", $0) }
+                    ForEach(b.trails) { piece("Trail", $0) }
+                    ForEach(b.floors) { piece("Floor", $0) }
+                    ForEach(b.pits) { piece("Pit", $0) }
+                    ForEach(b.boundaries) { piece("Boundary", $0) }
+                }
+            }
+
+            if tryOnID == b.id {
+                // The live gameplay replay with the whole set swapped in.
+                // Slots the set leaves empty keep the equipped piece.
+                LoadoutDiorama(loadout: Loadout(equippedIn: gameState).trying(bundle: b))
+                    .frame(height: 300)
+                    .frame(maxWidth: .infinity)
+            }
+            Button {
+                tryOnID = (tryOnID == b.id) ? nil : b.id
+            } label: {
+                Label(tryOnID == b.id ? "Hide preview" : "Try full set",
+                      systemImage: tryOnID == b.id ? "eye.slash.fill" : "play.fill")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(Capsule().fill(Color(white: 0.20)))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.13)))
+    }
+
+    private func piece<Item: CosmeticItem>(_ slot: String, _ item: Item) -> some View {
+        VStack(spacing: 6) {
+            CosmeticTile(item: item, diameter: 104, corner: 14, trailWidth: 9)
+                .frame(width: 112, height: 112)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.09)))
+            Text(item.displayName)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Text("\(slot) · \(item.rarityLabel) · \(item.coinCost)")
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(Color(white: 0.5))
+                .lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(width: 112)
+    }
+}
+#endif
