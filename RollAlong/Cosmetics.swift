@@ -1292,7 +1292,7 @@ enum Floor: String, CosmeticItem {
         case .shallows:   return Color(red: 0.40,  green: 0.70,  blue: 0.86 )  // clear, sunlit shallow water
         case .overcast:   return Color(red: 0.34,  green: 0.36,  blue: 0.42 )  // dark storm cloud
         case .grove:      return Color(red: 0.96,  green: 0.89,  blue: 0.70 )  // sunlit beach sand
-        case .goldLeaf:   return Color(red: 0.64,  green: 0.49,  blue: 0.18 )  // burnished gold leaf (darker than a coin)
+        case .goldLeaf:   return Color(red: 0.46,  green: 0.34,  blue: 0.11 )  // antique gold leaf: well darker than a coin and than the Vault pit's rim
         case .petalPath:  return Color(red: 0.93,  green: 0.89,  blue: 0.83 )  // pale garden-path stone
         case .openSea:    return Color(red: 0.05,  green: 0.24,  blue: 0.40 )  // deep open water
         case .aurora:     return Color(red: 0.030, green: 0.050, blue: 0.105)  // dark night sky; a few faint ribbons cross it
@@ -1516,6 +1516,7 @@ enum Pit: String, CosmeticItem {
         case .evil, .sky, .pond, .space, .eclipse, .nightclub,
              .graveyard, .aurora, .maelstrom: return true
         case .vent: return true        // Quality round: Abyssal Depths
+        case .tidePool: return true    // Quality-standard audit: Citrus tide
         default: return false
         }
     }
@@ -1540,6 +1541,9 @@ enum Pit: String, CosmeticItem {
         //   Golf Pond and Nightclub pits (drawn art now; they hold still
         //   under Reduce Motion instead of disappearing) —
         case .deepRose, .reef, .pond, .nightclub:
+            return true
+        // — Quality-standard audit: Space Traveler's Space pit is layered drawn art —
+        case .space:
             return true
         default:
             return false
@@ -4935,42 +4939,60 @@ private func trailSnake(_ ctx: GraphicsContext, _ fr: TrailFrame) {
                style: StrokeStyle(lineWidth: max(0.8, hr * 0.16), lineCap: .round))
 }
 
-/// Comet — each mark burns bright yellow-white when laid, cools through orange
-/// to deep red, then turns into a grey smoke puff that swells, rises a little
-/// and thins away where it was laid.
+/// Comet (Space Traveler) — a comet is ice, so it burns cold: each mark is
+/// laid white-hot, cools through cyan to deep blue (the bright coma line),
+/// leaves a wide, very faint dust haze that spreads where it was laid, and
+/// sheds short dust streaks that lie along the path and fade in place.  No
+/// orange and no smoke (the Fire and Smoke trails), no stars (Stardust).
 private func trailComet(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     var ctx = ctx
-    // Smoke: marks past 30 % of their life, every other mark (by seed).
+    ctx.blendMode = .plusLighter
+    // Dust haze: every mark, widening a little with age, never rising.
     for i in 0..<fr.n {
         let f: Double = fr.f(i)
-        guard f > 0.30, f < 1 else { continue }
-        let seed: Double = fr.seed(i)
-        guard seed < 0.55 else { continue }
-        let s: Double = (f - 0.30) / 0.70                       // 0 → 1 across the smoke phase
-        let env: Double = min(1, s / 0.15) * (1 - s)
+        guard f < 1 else { continue }
+        let env: Double = min(1, f / 0.12) * (1 - f)
         guard env > 0.02 else { continue }
         let p = fr.pts[i]
-        let pr: CGFloat = fr.bw * CGFloat(1.6 + 2.4 * s * fr.m)
-        let lift: CGFloat = CGFloat(s * fr.m) * fr.bw * 1.4
-        let drift: CGFloat = CGFloat(sin(seed * 6.283 + fr.tm * 1.2) * fr.m * s) * fr.bw * 0.5
-        let c = CGPoint(x: p.x + drift, y: p.y - lift)
-        ctx.fill(Path(ellipseIn: CGRect(x: c.x - pr, y: c.y - pr, width: pr * 2, height: pr * 2)),
-            with: .radialGradient(Gradient(colors: [Color(white: 0.55).opacity(0.22 * env), .clear]),
-                center: c, startRadius: 0, endRadius: pr))
+        let pr: CGFloat = fr.bw * CGFloat(1.3 + 1.5 * f)
+        ctx.fill(Path(ellipseIn: CGRect(x: p.x - pr, y: p.y - pr, width: pr * 2, height: pr * 2)),
+            with: .radialGradient(Gradient(colors: [Color(red: 0.55, green: 0.78, blue: 1.0).opacity(0.10 * env), .clear]),
+                center: p, startRadius: 0, endRadius: pr))
     }
-    // Fire: the young half of each mark's life.
-    ctx.blendMode = .plusLighter
+    // Coma line: the young 55 % of each mark's life.
     for i in 1..<fr.n {
         let f: Double = fr.f(i - 1)
-        guard f < 0.5 else { continue }
-        let k: Double = 1 - f / 0.5                              // 1 fresh → 0 cooled
-        let col: Color = k > 0.7 ? Color(red: 1, green: 0.96, blue: 0.65)
-                : (k > 0.4 ? Color(red: 1, green: 0.55, blue: 0.12)
-                           : Color(red: 0.82, green: 0.12, blue: 0.05))
-        let w: CGFloat = fr.bw * CGFloat(0.5 + 1.7 * k)
+        guard f < 0.55 else { continue }
+        let k: Double = 1 - f / 0.55                              // 1 fresh → 0 cooled
+        let col: Color = k > 0.7 ? Color(red: 0.95, green: 0.99, blue: 1.0)
+                : (k > 0.35 ? Color(red: 0.45, green: 0.88, blue: 1.0)
+                            : Color(red: 0.16, green: 0.36, blue: 0.95))
+        let w: CGFloat = fr.bw * CGFloat(0.35 + 0.75 * k)
         var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
-        ctx.stroke(p, with: .color(col.opacity(0.25 + 0.6 * k)),
+        ctx.stroke(p, with: .color(col.opacity(0.22 + 0.60 * k)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+    // Dust streaks: about a third of the marks shed a short streak that lies
+    // along the path, just off the line — a comet's tail is streaked, not
+    // starry (that is the Stardust trail's look).
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.34 else { continue }
+        let f: Double = fr.f(i)
+        guard f < 1 else { continue }
+        let a = fr.pts[i - 1], b = fr.pts[i]
+        let dx: CGFloat = b.x - a.x, dy: CGFloat = b.y - a.y
+        let len: CGFloat = max(0.001, sqrt(dx * dx + dy * dy))
+        let ux: CGFloat = dx / len, uy: CGFloat = dy / len
+        let side: CGFloat = seed < 0.17 ? 1 : -1
+        let off: CGFloat = fr.bw * CGFloat(0.55 + 0.9 * (seed * 3).truncatingRemainder(dividingBy: 1.0)) * side
+        let c = CGPoint(x: b.x - uy * off, y: b.y + ux * off)
+        let half: CGFloat = fr.bw * CGFloat(0.5 + 0.5 * f)
+        var streak = Path()
+        streak.move(to: CGPoint(x: c.x - ux * half, y: c.y - uy * half))
+        streak.addLine(to: CGPoint(x: c.x + ux * half, y: c.y + uy * half))
+        ctx.stroke(streak, with: .color(Color(red: 0.80, green: 0.94, blue: 1.0).opacity(0.55 * (1 - f))),
+                   style: StrokeStyle(lineWidth: max(0.5, fr.bw * 0.12), lineCap: .round))
     }
 }
 
@@ -5396,10 +5418,11 @@ private func trailWildfire(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         let p = fr.pts[i]
         let s2: Double = (seed * 7.0).truncatingRemainder(dividingBy: 1.0)
         let s3: Double = (seed * 13.0).truncatingRemainder(dividingBy: 1.0)
-        let flick: Double = 0.78 + 0.22 * sin(fr.tm * 6.0 + seed * 40.0)
+        // A slow waver (about a 2-second period, a tenth of the height), not a flicker.
+        let flick: Double = 0.90 + 0.10 * sin(fr.tm * 3.0 + seed * 40.0)
         let h: CGFloat = fr.bw * CGFloat((2.6 + 1.8 * s2) * flick * (0.55 + 0.45 * k))
         let w: CGFloat = fr.bw * 0.95
-        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 3.0 + seed * 17.0) * 0.12 * fr.m) * h * 0.5
+        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 1.8 + seed * 17.0) * 0.10 * fr.m) * h * 0.5
         let baseY: CGFloat = p.y + w * 0.30
         let tall = CGPoint(x: p.x + lean, y: p.y - h)
         let fork = CGPoint(x: p.x - w * 0.55 + lean * 0.45, y: p.y - h * 0.62)
@@ -5790,7 +5813,8 @@ private func trailVictoryLap(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     for i in 1..<fr.n {
         let k: Double = fr.fresh(i - 1)
         guard k > 0.01 else { continue }
-        let w: CGFloat = fr.bw * CGFloat(0.55 + 0.45 * k)
+        // About half the base width (quality standard), so the ball is never hidden.
+        let w: CGFloat = fr.bw * CGFloat(0.42 + 0.22 * k)
         var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
         ctx.stroke(p, with: .color(crimson.opacity(0.85 * k)),
                    style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
@@ -5806,8 +5830,8 @@ private func trailVictoryLap(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         let k: Double = fr.fresh(i)
         guard k > 0.03 else { continue }
         let age: Double = fr.age(i)
-        // 0 just thrown -> 1 settled (0.45 s); settled at once under Reduce Motion.
-        let settle: Double = fr.m > 0 ? min(1.0, age / 0.45) : 1.0
+        // 0 just thrown -> 1 settled (0.8 s, a slow half-turn); settled at once under Reduce Motion.
+        let settle: Double = fr.m > 0 ? min(1.0, age / 0.80) : 1.0
         let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x, dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
         let len: CGFloat = max(0.001, hypot(dx, dy))
         let px: CGFloat = -dy / len, py: CGFloat = dx / len
@@ -5820,7 +5844,7 @@ private func trailVictoryLap(_ ctx: GraphicsContext, _ fr: TrailFrame) {
             let lift: CGFloat = fr.bw * 0.9 * CGFloat(1.0 - settle)
             let cx: CGFloat = fr.pts[i].x + px * out * side
             let cy: CGFloat = fr.pts[i].y + py * out * side - lift
-            let spin: Double = s2 * 6.283 + (1.0 - settle) * 5.0
+            let spin: Double = s2 * 6.283 + (1.0 - settle) * 2.2
             let hw: CGFloat = fr.bw * 0.34, hh: CGFloat = fr.bw * 0.14
             let ca: CGFloat = CGFloat(cos(spin)), sa: CGFloat = CGFloat(sin(spin))
             var rect = Path()

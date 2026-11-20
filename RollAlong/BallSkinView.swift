@@ -657,12 +657,15 @@ struct BallSkinView: View {
 
     // =========================================================================
     // MARK: - UFO
-    // Metallic flying saucer with a glowing green dome and belly lights that
-    // pulse in sequence (reads as rotating running lights).  Animated via
-    // TimelineView; under Reduce Motion the lights hold steady.
+    // Metallic flying saucer (Space Traveler): a soft cyan glow under the
+    // hull, the brushed-metal saucer with a lit upper rim, a cyan glass dome
+    // (the same cyan as the Starship Hull's running lights) and five belly
+    // lights.  The lights stay lit and one soft swell passes along them about
+    // every 6 seconds (quality standard R6: no flicker).  Capped at 20 fps;
+    // under Reduce Motion the lights hold steady.
     // =========================================================================
     private var ufoCanvas: some View {
-        SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: timelinePaused) { timeline in
             Canvas { ctx, size in
                 let t  = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let w  = size.width
@@ -675,6 +678,17 @@ struct BallSkinView: View {
                 let hullH = h * 0.42
                 let hullRect = CGRect(x: cx - hullW / 2, y: cy - hullH * 0.10,
                                       width: hullW, height: hullH)
+                // Under-glow: the drive light spilling below the saucer.
+                let glowW: CGFloat = hullW * 0.62
+                let glowH: CGFloat = hullH * 0.70
+                let glowRect = CGRect(x: cx - glowW / 2, y: hullRect.maxY - glowH * 0.55,
+                                      width: glowW, height: glowH)
+                let glowLevel: Double = 0.20 + 0.04 * sin(t * 0.9)
+                ctx.fill(Path(ellipseIn: glowRect),
+                         with: .radialGradient(
+                            Gradient(colors: [Color(red: 0.30, green: 0.90, blue: 1.00).opacity(glowLevel), .clear]),
+                            center: CGPoint(x: glowRect.midX, y: glowRect.midY),
+                            startRadius: 0, endRadius: glowW / 2))
                 ctx.fill(Path(ellipseIn: hullRect),
                          with: .linearGradient(
                             Gradient(stops: [
@@ -687,6 +701,20 @@ struct BallSkinView: View {
                             endPoint:   CGPoint(x: cx, y: hullRect.maxY)))
                 ctx.stroke(Path(ellipseIn: hullRect),
                            with: .color(.black.opacity(0.30)), lineWidth: 0.6)
+                // Lit upper rim and a seam line, so the saucer reads as two
+                // metal shells and not one gray oval.
+                var rimLight = Path()
+                rimLight.addArc(center: CGPoint(x: hullRect.midX, y: hullRect.midY),
+                                radius: hullW / 2, startAngle: .degrees(200), endAngle: .degrees(340),
+                                clockwise: false,
+                                transform: CGAffineTransform(translationX: hullRect.midX, y: hullRect.midY)
+                                    .scaledBy(x: 1, y: hullH / hullW)
+                                    .translatedBy(x: -hullRect.midX, y: -hullRect.midY))
+                ctx.stroke(rimLight, with: .color(Color.white.opacity(0.55)), lineWidth: max(0.6, w * 0.018))
+                let seamRect = hullRect.insetBy(dx: hullW * 0.10, dy: hullH * 0.30)
+                ctx.stroke(Path(ellipseIn: seamRect),
+                           with: .color(Color(red: 0.10, green: 0.14, blue: 0.20).opacity(0.45)),
+                           lineWidth: max(0.5, w * 0.012))
 
                 // Glass dome
                 let domeW = w * 0.50
@@ -697,9 +725,9 @@ struct BallSkinView: View {
                 ctx.fill(Path(ellipseIn: domeRect),
                          with: .radialGradient(
                             Gradient(colors: [
-                                Color(red: 0.70, green: 1.00, blue: 0.80),
-                                Color(red: 0.20, green: 0.85, blue: 0.55),
-                                Color(red: 0.05, green: 0.45, blue: 0.30),
+                                Color(red: 0.80, green: 0.98, blue: 1.00),
+                                Color(red: 0.25, green: 0.78, blue: 0.95),
+                                Color(red: 0.05, green: 0.32, blue: 0.50),
                             ]),
                             center: CGPoint(x: domeRect.midX - domeW * 0.18,
                                             y: domeRect.midY - domeH * 0.18),
@@ -714,10 +742,12 @@ struct BallSkinView: View {
                 for i in 0..<lightCount {
                     let frac   = (Double(i) + 0.5) / Double(lightCount)
                     let lx     = hullRect.minX + hullW * 0.14 + (hullW * 0.72) * CGFloat(frac)
-                    let pulse  = 0.40 + 0.60 * (0.5 + 0.5 * sin(t * 6 - Double(i) * 1.1))
+                    // One soft swell passes along the row about every 6 s;
+                    // every lamp stays at least 60 % lit.
+                    let pulse: Double = 0.60 + 0.30 * (0.5 + 0.5 * sin(t * 1.05 - Double(i) * 1.26))
                     ctx.fill(Path(ellipseIn: CGRect(x: lx - lightR, y: lightY - lightR,
                                                     width: lightR * 2, height: lightR * 2)),
-                             with: .color(Color(red: 1.00, green: 0.92, blue: 0.45)
+                             with: .color(Color(red: 0.80, green: 0.98, blue: 1.00)
                                 .opacity(pulse)))
                 }
             }
@@ -1120,9 +1150,10 @@ struct BallSkinView: View {
                         startRadius: 0, endRadius: w * 0.38))
                 ctx.clip(to: outline)
 
-                // Blink — the eyes squash shut for a beat every ~3.8 s.
+                // Blink — the eyes squash shut for a beat about every 8 s
+                // (a rare event; was every 3.8 s).
                 // 1.0 (fully open) reproduces the original static eyes.
-                let blinkCycle: Double = (t * 0.26).truncatingRemainder(dividingBy: 1.0)
+                let blinkCycle: Double = (t * 0.125).truncatingRemainder(dividingBy: 1.0)
                 let blinkP: Double = blinkCycle / 0.08
                 let blinkRaw: Double = blinkCycle < 0.08 ? abs(blinkP * 2.0 - 1.0) : 1.0
                 let eyeOpen: Double = reduceMotion ? 1.0 : max(0.12, blinkRaw)
@@ -2126,9 +2157,9 @@ struct BallSkinView: View {
                         let x1: CGFloat = x0 + step
                         // Taller toward the middle, so the fire has one crown.
                         let mid: Double = 1.0 - abs((fi + 0.5) / Double(count) - 0.5) * 1.1
-                        let breathe: Double = 0.80 + 0.20 * sin(t * speed + phase + fi * 1.9)
+                        let breathe: Double = 0.88 + 0.12 * sin(t * speed + phase + fi * 1.9)
                         let hh: CGFloat = height * CGFloat(mid * breathe)
-                        let sway: CGFloat = r * 0.10 * CGFloat(sin(t * speed * 0.7 + phase * 1.3 + fi * 2.7))
+                        let sway: CGFloat = r * 0.08 * CGFloat(sin(t * speed * 0.7 + phase * 1.3 + fi * 2.7))
                         let tip = CGPoint(x: (x0 + x1) / 2 + sway, y: baseY - hh)
                         p.addQuadCurve(to: tip, control: CGPoint(x: x0 + step * 0.05, y: baseY - hh * 0.55))
                         p.addQuadCurve(to: CGPoint(x: x1, y: baseY),
@@ -2137,10 +2168,12 @@ struct BallSkinView: View {
                     p.closeSubpath()
                     g.fill(p, with: .color(color))
                 }
-                flames(ctx, 4, r * 1.95, Color(red: 0.78, green: 0.10, blue: 0.04).opacity(0.95), 0.0, 1.5)
-                flames(ctx, 5, r * 1.60, Color(red: 0.98, green: 0.36, blue: 0.06), 1.7, 1.9)
-                flames(ctx, 4, r * 1.20, Color(red: 1.00, green: 0.66, blue: 0.14), 3.1, 2.3)
-                flames(ctx, 3, r * 0.78, Color(red: 1.00, green: 0.92, blue: 0.52), 4.4, 2.7)
+                // Breathing periods of 5 to 8 seconds: living fire held in a
+                // ball, slow enough that it never flickers.
+                flames(ctx, 4, r * 1.95, Color(red: 0.78, green: 0.10, blue: 0.04).opacity(0.95), 0.0, 0.80)
+                flames(ctx, 5, r * 1.60, Color(red: 0.98, green: 0.36, blue: 0.06), 1.7, 0.95)
+                flames(ctx, 4, r * 1.20, Color(red: 1.00, green: 0.66, blue: 0.14), 3.1, 1.10)
+                flames(ctx, 3, r * 0.78, Color(red: 1.00, green: 0.92, blue: 0.52), 4.4, 1.25)
 
                 // White-hot bed at the very bottom.
                 ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.70, y: cy + r * 0.52, width: r * 1.40, height: r * 0.80)),
@@ -2151,9 +2184,9 @@ struct BallSkinView: View {
                 // A few sparks drifting up (frozen in place with Reduce Motion).
                 for i in 0..<5 {
                     let fi: Double = Double(i)
-                    let prog: Double = (t * 0.22 + fi * 0.21).truncatingRemainder(dividingBy: 1.0)
+                    let prog: Double = (t * 0.14 + fi * 0.21).truncatingRemainder(dividingBy: 1.0)
                     let sx: CGFloat = cx + r * CGFloat(-0.55 + 0.27 * fi)
-                        + r * 0.06 * CGFloat(sin(t * 1.3 + fi * 2.0))
+                        + r * 0.06 * CGFloat(sin(t * 0.9 + fi * 2.0))
                     let sy: CGFloat = cy + r * CGFloat(0.35 - 1.05 * prog)
                     let sr: CGFloat = max(0.5, r * 0.045)
                     let fade: Double = sin(prog * Double.pi)
@@ -2272,7 +2305,7 @@ struct BallSkinView: View {
                 // Rain falling out of the cloud.
                 StormArt.rain(ctx, in: CGRect(x: cx - r, y: cy + r * 0.05, width: r * 2, height: r * 0.95),
                               t: t, seed: 0x7C10_0D02, count: 7, length: r * 0.26,
-                              alpha: 0.40, speed: Double(r) * 1.6, width: max(0.6, r * 0.035))
+                              alpha: 0.32, speed: Double(r) * 0.65, width: max(0.6, r * 0.035))
                 // Rare forked lightning inside the cloud.
                 let strike = StormArt.strike(t, seed: 0.31, frozen: false, still: reduceMotion)
                 if strike.level > 0.02 {
@@ -4889,213 +4922,147 @@ struct BallSkinView: View {
     }
 
     // ── Trophy ───────────────────────────────────────────────────────────────
-    // The Golden Gauntlet's exclusive prize — a lustrous prize-gold sphere with a
-    // trophy cup embossed on a burnished, beaded medallion at its heart (bowl,
-    // two handles, stem and stepped foot, with laurel sprigs either side), a
-    // soft victory halo that breathes behind it, a gleam that slides slowly
-    // across the cup, a specular highlight that orbits the surface like light
-    // catching polished metal as it rolls, and sparkle glints.  All gold — no
-    // rainbow.  Made to feel earned, not bought.
-    //
-    // Rendering layers:
-    //   1. Polished gold base (bright crown highlight → deep bronze rim)
-    //   2. Victory halo behind the emblem (gentle breathing pulse)
-    //   3. The trophy: medallion, laurel sprigs, embossed cup with handles,
-    //      a slow sliding gleam, bevel and sparkles
-    //   4. Orbiting mirror specular
-    //   5. Twinkling gold sparkle glints
-    //   6. Warm reflected rim light (lower-right)
-    //
-    // Freezes at t = 0 when reduceMotion is on (halo at mid-breath, light fixed
-    // upper-left, sparkles held at a steady gleam).
+    // The Golden Gauntlet's exclusive prize.  Quality-standard audit (R4): the
+    // ball is no longer a gold sphere with a cup pictured on it — the ball IS
+    // the trophy, a gold cup seen from straight above:
+    //   1. two handles, left and right, inside the ball's circle
+    //   2. the cup's outer wall falling away under the lip (dark bronze)
+    //   3. the rolled lip: a broad ring of polished gold with a laurel wreath
+    //      engraved around it (leaves cut into the metal, darker than the lip)
+    //   4. the bowl: deep bronze stepping down to a dark base with a small
+    //      round boss at the very bottom
+    //   5. light: one soft gleam that travels round the lip once in about 26 s,
+    //      a fixed crescent of reflected light inside the bowl, two tiny glints
+    // All gold, one hue.  Freezes at t = 0 under Reduce Motion.  20 fps cap.
     private var trophyCanvas: some View {
-        return SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { timeline in
+        return SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: timelinePaused) { timeline in
             let rawT = timeline.date.timeIntervalSinceReferenceDate
             let t: Double = reduceMotion ? 0.0 : rawT
 
             Canvas { ctx, size in
-                let r  = min(size.width, size.height) * 0.5
-                let cx = size.width  * 0.5
-                let cy = size.height * 0.5
+                let r: CGFloat = min(size.width, size.height) * 0.5
+                let cx: CGFloat = size.width * 0.5
+                let cy: CGFloat = size.height * 0.5
                 let center = CGPoint(x: cx, y: cy)
-                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-
-                // ── 1. Polished gold base ────────────────────────────────
-                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                    Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.98, blue: 0.80), location: 0.00),
-                        .init(color: Color(red: 0.99, green: 0.84, blue: 0.34), location: 0.34),
-                        .init(color: Color(red: 0.82, green: 0.57, blue: 0.11), location: 0.66),
-                        .init(color: Color(red: 0.44, green: 0.28, blue: 0.04), location: 0.90),
-                        .init(color: Color(red: 0.19, green: 0.11, blue: 0.01), location: 1.00),
-                    ]),
-                    center: CGPoint(x: cx - r * 0.22, y: cy - r * 0.26),
-                    startRadius: 0, endRadius: r * 1.15))
-
-                // ── 2. Victory halo behind the emblem (breathing pulse) ──
-                let pulse = reduceMotion ? 0.5 : 0.5 + 0.5 * sin(t * 1.5)
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: cx - r * 0.80, y: cy - r * 0.80,
-                                           width: r * 1.60, height: r * 1.60)),
-                    with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(red: 1.0, green: 0.93, blue: 0.62).opacity(0.0), location: 0.30),
-                            .init(color: Color(red: 1.0, green: 0.90, blue: 0.54).opacity(0.10 + 0.13 * pulse), location: 0.60),
-                            .init(color: .clear, location: 0.92),
-                        ]),
-                        center: center, startRadius: 0, endRadius: r * 0.80))
-
-                // ── 3. The trophy: a cup embossed on a burnished medallion ──
-                // (Quality round: replaces the rainbow star.  All gold, no hue cycle.)
-                // 3a. medallion — a darker burnished disc with a beaded edge, so
-                //     the pale cup reads against the polished ball.
-                let medR: CGFloat = r * 0.72
-                let med = CGRect(x: cx - medR, y: cy - medR, width: medR * 2, height: medR * 2)
-                ctx.fill(Path(ellipseIn: med), with: .radialGradient(
-                    Gradient(colors: [Color(red: 0.66, green: 0.43, blue: 0.08),
-                                      Color(red: 0.42, green: 0.25, blue: 0.03)]),
-                    center: CGPoint(x: cx - medR * 0.25, y: cy - medR * 0.30), startRadius: 0, endRadius: medR * 1.2))
-                ctx.stroke(Path(ellipseIn: med), with: .color(Color(red: 1.0, green: 0.92, blue: 0.60).opacity(0.9)),
-                           lineWidth: max(0.6, r * 0.028))
-                for k in 0..<28 {
-                    let a: Double = Double(k) / 28.0 * 2.0 * Double.pi
-                    let bp = CGPoint(x: cx + CGFloat(cos(a)) * medR * 0.92, y: cy + CGFloat(sin(a)) * medR * 0.92)
-                    let br: CGFloat = max(0.4, r * 0.020)
-                    ctx.fill(Path(ellipseIn: CGRect(x: bp.x - br, y: bp.y - br, width: br * 2, height: br * 2)),
-                             with: .color(Color(red: 1.0, green: 0.90, blue: 0.56).opacity(0.85)))
-                }
-                // 3b. laurel sprigs low on either side of the cup.
-                for side in [-1.0, 1.0] {
-                    for k in 0..<4 {
-                        let a: Double = Double.pi / 2.0 + side * (0.62 + 0.30 * Double(k))
-                        let lp = CGPoint(x: cx + CGFloat(cos(a)) * medR * 0.70, y: cy + CGFloat(sin(a)) * medR * 0.70)
-                        var lctx = ctx
-                        lctx.translateBy(x: lp.x, y: lp.y)
-                        lctx.rotate(by: .radians(a + side * 1.05))
-                        let leaf = Path(ellipseIn: CGRect(x: -r * 0.10, y: -r * 0.038, width: r * 0.20, height: r * 0.076))
-                        lctx.fill(leaf, with: .color(Color(red: 0.98, green: 0.84, blue: 0.40)))
-                        lctx.stroke(leaf, with: .color(Color(red: 0.36, green: 0.22, blue: 0.03).opacity(0.8)),
-                                    lineWidth: max(0.4, r * 0.012))
-                    }
-                }
-                // 3c. the cup — bowl, stem and stepped foot — and its two handles.
-                func cupPoint(_ x: CGFloat, _ y: CGFloat, _ ox: CGFloat, _ oy: CGFloat) -> CGPoint {
-                    CGPoint(x: cx + ox + x * r, y: cy + oy + y * r)
-                }
-                func cupPath(_ ox: CGFloat, _ oy: CGFloat) -> Path {
-                    var p = Path()
-                    p.move(to: cupPoint(-0.30, -0.38, ox, oy))
-                    p.addLine(to: cupPoint(0.30, -0.38, ox, oy))
-                    p.addQuadCurve(to: cupPoint(0.06, 0.08, ox, oy), control: cupPoint(0.30, 0.03, ox, oy))
-                    p.addLine(to: cupPoint(0.06, 0.22, ox, oy))
-                    p.addLine(to: cupPoint(0.20, 0.28, ox, oy))
-                    p.addLine(to: cupPoint(0.20, 0.38, ox, oy))
-                    p.addLine(to: cupPoint(-0.20, 0.38, ox, oy))
-                    p.addLine(to: cupPoint(-0.20, 0.28, ox, oy))
-                    p.addLine(to: cupPoint(-0.06, 0.22, ox, oy))
-                    p.addLine(to: cupPoint(-0.06, 0.08, ox, oy))
-                    p.addQuadCurve(to: cupPoint(-0.30, -0.38, ox, oy), control: cupPoint(-0.30, 0.03, ox, oy))
-                    p.closeSubpath()
-                    return p
-                }
-                func handlePath(_ sgn: CGFloat, _ ox: CGFloat, _ oy: CGFloat) -> Path {
-                    var p = Path()
-                    p.move(to: cupPoint(sgn * 0.29, -0.30, ox, oy))
-                    p.addCurve(to: cupPoint(sgn * 0.19, -0.03, ox, oy),
-                               control1: cupPoint(sgn * 0.54, -0.32, ox, oy),
-                               control2: cupPoint(sgn * 0.46, -0.02, ox, oy))
-                    return p
-                }
                 let shadowInk = Color(red: 0.16, green: 0.09, blue: 0.01)
-                let sox: CGFloat = r * 0.035, soy: CGFloat = r * 0.045
+                let gold = Color(red: 0.99, green: 0.84, blue: 0.34)
+
+                // ── 1. Handles: two loops left and right, under the lip ──
+                let cupR: CGFloat = r * 0.80
                 for sgn in [CGFloat(-1), 1] {
-                    ctx.stroke(handlePath(sgn, sox, soy), with: .color(shadowInk.opacity(0.55)),
-                               style: StrokeStyle(lineWidth: r * 0.085, lineCap: .round))
-                    ctx.stroke(handlePath(sgn, 0, 0), with: .color(Color(red: 0.99, green: 0.86, blue: 0.42)),
-                               style: StrokeStyle(lineWidth: r * 0.070, lineCap: .round))
-                    ctx.stroke(handlePath(sgn, 0, 0), with: .color(Color.white.opacity(0.55)),
-                               style: StrokeStyle(lineWidth: max(0.4, r * 0.018), lineCap: .round))
+                    let hc = CGPoint(x: cx + sgn * cupR * 0.98, y: cy)
+                    let hw: CGFloat = r * 0.19, hh: CGFloat = r * 0.30
+                    let loop = Path(ellipseIn: CGRect(x: hc.x - hw, y: hc.y - hh, width: hw * 2, height: hh * 2))
+                    ctx.stroke(loop, with: .color(shadowInk.opacity(0.85)), lineWidth: r * 0.115)
+                    ctx.stroke(loop, with: .linearGradient(
+                        Gradient(colors: [Color(red: 1.0, green: 0.94, blue: 0.62), Color(red: 0.74, green: 0.50, blue: 0.10)]),
+                        startPoint: CGPoint(x: hc.x, y: hc.y - hh), endPoint: CGPoint(x: hc.x, y: hc.y + hh)),
+                        lineWidth: r * 0.080)
                 }
-                let cup = cupPath(0, 0)
-                ctx.fill(cupPath(sox, soy), with: .color(shadowInk.opacity(0.55)))
-                ctx.fill(cup, with: .linearGradient(
+
+                // ── 2. Outer wall of the cup, in shade below the lip ──
+                let wall = CGRect(x: cx - cupR, y: cy - cupR, width: cupR * 2, height: cupR * 2)
+                ctx.fill(Path(ellipseIn: wall), with: .radialGradient(
                     Gradient(stops: [
-                        .init(color: Color(red: 1.00, green: 0.98, blue: 0.84), location: 0.00),
-                        .init(color: Color(red: 1.00, green: 0.88, blue: 0.44), location: 0.38),
-                        .init(color: Color(red: 0.84, green: 0.60, blue: 0.14), location: 0.80),
-                        .init(color: Color(red: 0.62, green: 0.40, blue: 0.06), location: 1.00),
+                        .init(color: Color(red: 0.62, green: 0.40, blue: 0.06), location: 0.80),
+                        .init(color: Color(red: 0.30, green: 0.18, blue: 0.02), location: 1.00),
+                    ]), center: center, startRadius: 0, endRadius: cupR))
+
+                // ── 3. The rolled lip: a broad polished ring ──
+                let lipOuter: CGFloat = cupR * 0.97
+                let lipInner: CGFloat = cupR * 0.66
+                var lip = Path()
+                lip.addEllipse(in: CGRect(x: cx - lipOuter, y: cy - lipOuter, width: lipOuter * 2, height: lipOuter * 2))
+                lip.addEllipse(in: CGRect(x: cx - lipInner, y: cy - lipInner, width: lipInner * 2, height: lipInner * 2))
+                ctx.fill(lip, with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: Color(red: 1.00, green: 0.97, blue: 0.78), location: 0.00),
+                        .init(color: gold, location: 0.40),
+                        .init(color: Color(red: 0.80, green: 0.56, blue: 0.12), location: 0.78),
+                        .init(color: Color(red: 0.56, green: 0.36, blue: 0.05), location: 1.00),
                     ]),
-                    startPoint: CGPoint(x: cx - r * 0.30, y: cy), endPoint: CGPoint(x: cx + r * 0.30, y: cy)))
-                // the open mouth of the bowl
-                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.27, y: cy - r * 0.415, width: r * 0.54, height: r * 0.075)),
-                         with: .color(Color(red: 0.44, green: 0.27, blue: 0.04)))
-                // a band around the foot
-                ctx.stroke(Path { p in
-                    p.move(to: cupPoint(-0.20, 0.33, 0, 0)); p.addLine(to: cupPoint(0.20, 0.33, 0, 0))
-                }, with: .color(shadowInk.opacity(0.45)), lineWidth: max(0.4, r * 0.016))
-                // 3d. a soft gleam sliding slowly across the cup (clipped to it).
+                    startPoint: CGPoint(x: cx - lipOuter * 0.7, y: cy - lipOuter * 0.7),
+                    endPoint: CGPoint(x: cx + lipOuter * 0.7, y: cy + lipOuter * 0.7)),
+                    style: FillStyle(eoFill: true))
+                // Laurel wreath engraved around the lip: paired leaves cut into
+                // the metal, running up both sides to meet at the top.
+                let leafRing: CGFloat = (lipOuter + lipInner) / 2
+                let leafCount = 22
+                for k in 0..<leafCount {
+                    let side: Double = k < leafCount / 2 ? 1.0 : -1.0
+                    let idx: Double = Double(k % (leafCount / 2))
+                    // From the bottom (π/2) round each side to just short of the top.
+                    let a: Double = Double.pi / 2.0 + side * (0.22 + idx * 0.245)
+                    let lp = CGPoint(x: cx + CGFloat(cos(a)) * leafRing, y: cy + CGFloat(sin(a)) * leafRing)
+                    var lctx = ctx
+                    lctx.translateBy(x: lp.x, y: lp.y)
+                    lctx.rotate(by: .radians(a + side * 2.05))
+                    let lw: CGFloat = r * 0.150, lh: CGFloat = r * 0.058
+                    var leaf = Path()
+                    leaf.move(to: CGPoint(x: -lw / 2, y: 0))
+                    leaf.addQuadCurve(to: CGPoint(x: lw / 2, y: 0), control: CGPoint(x: 0, y: -lh))
+                    leaf.addQuadCurve(to: CGPoint(x: -lw / 2, y: 0), control: CGPoint(x: 0, y: lh))
+                    lctx.fill(leaf, with: .color(Color(red: 0.52, green: 0.33, blue: 0.05).opacity(0.80)))
+                    // Lower edge catches the light: an engraved cut, not a sticker.
+                    var cut = Path()
+                    cut.move(to: CGPoint(x: -lw / 2, y: 0))
+                    cut.addQuadCurve(to: CGPoint(x: lw / 2, y: 0), control: CGPoint(x: 0, y: lh))
+                    lctx.stroke(cut, with: .color(Color(red: 1.0, green: 0.95, blue: 0.70).opacity(0.70)),
+                                lineWidth: max(0.35, r * 0.012))
+                }
+                // Lip edges: bright outer bevel, dark inner edge where the bowl drops.
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - lipOuter, y: cy - lipOuter, width: lipOuter * 2, height: lipOuter * 2)),
+                           with: .color(Color(red: 1.0, green: 0.96, blue: 0.74).opacity(0.85)), lineWidth: max(0.5, r * 0.020))
+                ctx.stroke(Path(ellipseIn: CGRect(x: cx - lipInner, y: cy - lipInner, width: lipInner * 2, height: lipInner * 2)),
+                           with: .color(shadowInk.opacity(0.75)), lineWidth: max(0.6, r * 0.030))
+
+                // ── 4. The bowl: three steps down to a dark base ──
+                let bowlSteps: [(CGFloat, Color)] = [
+                    (1.00, Color(red: 0.60, green: 0.38, blue: 0.06)),
+                    (0.78, Color(red: 0.42, green: 0.25, blue: 0.03)),
+                    (0.54, Color(red: 0.27, green: 0.15, blue: 0.02)),
+                    (0.30, Color(red: 0.15, green: 0.08, blue: 0.01)),
+                ]
+                for (frac, color) in bowlSteps {
+                    let br: CGFloat = lipInner * frac
+                    // Each step sits a little toward the lower right, as a bowl lit
+                    // from the upper left looks from above.
+                    let off: CGFloat = lipInner * (1 - frac) * 0.10
+                    ctx.fill(Path(ellipseIn: CGRect(x: cx - br + off, y: cy - br + off, width: br * 2, height: br * 2)),
+                             with: .color(color))
+                }
+                // The boss at the bottom of the bowl.
+                let bossR: CGFloat = lipInner * 0.11
+                let bossC = CGPoint(x: cx + lipInner * 0.07, y: cy + lipInner * 0.07)
+                ctx.fill(Path(ellipseIn: CGRect(x: bossC.x - bossR, y: bossC.y - bossR, width: bossR * 2, height: bossR * 2)),
+                         with: .radialGradient(Gradient(colors: [Color(red: 0.90, green: 0.70, blue: 0.24), Color(red: 0.36, green: 0.22, blue: 0.03)]),
+                                               center: CGPoint(x: bossC.x - bossR * 0.3, y: bossC.y - bossR * 0.3),
+                                               startRadius: 0, endRadius: bossR))
+
+                // ── 5. Light ──
+                // Reflected crescent on the far (lower-right) wall of the bowl.
+                var crescent = Path()
+                crescent.addArc(center: center, radius: lipInner * 0.86,
+                                startAngle: .degrees(15), endAngle: .degrees(80), clockwise: false)
+                ctx.stroke(crescent, with: .color(Color(red: 1.0, green: 0.90, blue: 0.56).opacity(0.38)),
+                           style: StrokeStyle(lineWidth: lipInner * 0.10, lineCap: .round))
+                // One soft gleam travelling round the lip, once in about 26 s.
+                let ga: Double = t * 0.24 - 2.2
+                let gp = CGPoint(x: cx + CGFloat(cos(ga)) * leafRing, y: cy + CGFloat(sin(ga)) * leafRing)
                 var gleamCtx = ctx
-                gleamCtx.clip(to: cup)
-                let gx: CGFloat = cx + CGFloat(sin(t * 0.55)) * r * 0.26
-                gleamCtx.fill(Path(CGRect(x: gx - r * 0.10, y: cy - r * 0.45, width: r * 0.20, height: r * 0.90)),
-                              with: .linearGradient(
-                                Gradient(colors: [.clear, Color.white.opacity(0.55), .clear]),
-                                startPoint: CGPoint(x: gx - r * 0.10, y: cy), endPoint: CGPoint(x: gx + r * 0.10, y: cy)))
-                // 3e. bright bevel edge
-                ctx.stroke(cup, with: .color(Color.white.opacity(0.80)), lineWidth: max(0.5, r * 0.020))
-                // 3f. sparkles on the rim and foot of the cup
-                let cupGlints: [(CGFloat, CGFloat, Double)] = [
-                    (-0.27, -0.39, 0.0), (0.24, -0.16, 2.1), (0.0, 0.36, 4.0),
-                ]
-                for (sx0, sy0, ph) in cupGlints {
-                    let tw: Double = reduceMotion ? 0.7 : max(0.0, sin(t * 1.6 + ph))
+                gleamCtx.clip(to: lip, style: FillStyle(eoFill: true))
+                let gr: CGFloat = r * 0.34
+                gleamCtx.fill(Path(ellipseIn: CGRect(x: gp.x - gr, y: gp.y - gr, width: gr * 2, height: gr * 2)),
+                              with: .radialGradient(Gradient(colors: [Color.white.opacity(0.60), .clear]),
+                                                    center: gp, startRadius: 0, endRadius: gr))
+                // Two tiny glints on the lip (each under 2 % of the piece).
+                let glints: [(Double, Double)] = [(-2.35, 0.0), (0.55, 2.6)]
+                for (angle, phase) in glints {
+                    let tw: Double = reduceMotion ? 0.6 : max(0.0, sin(t * 2.4 + phase))
                     if tw <= 0.05 { continue }
-                    let sp = CGPoint(x: cx + sx0 * r, y: cy + sy0 * r)
-                    trophyGlint(ctx, at: sp, size: r * 0.10 * CGFloat(0.55 + 0.5 * tw), opacity: tw)
+                    let sp = CGPoint(x: cx + CGFloat(cos(angle)) * lipOuter * 0.93, y: cy + CGFloat(sin(angle)) * lipOuter * 0.93)
+                    trophyGlint(ctx, at: sp, size: r * 0.085 * CGFloat(0.6 + 0.4 * tw), opacity: tw)
                 }
-
-                // ── 4. Orbiting mirror specular ──────────────────────────
-                let orbit = t * 0.6 - 2.2
-                let sx = cx + r * 0.34 * CGFloat(cos(orbit))
-                let sy = cy + r * 0.34 * CGFloat(sin(orbit)) - r * 0.28
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: sx - r * 0.30, y: sy - r * 0.16,
-                                           width: r * 0.60, height: r * 0.32)),
-                    with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: .white.opacity(0.78), location: 0.0),
-                            .init(color: .white.opacity(0.22), location: 0.45),
-                            .init(color: .clear, location: 1.0),
-                        ]),
-                        center: CGPoint(x: sx, y: sy), startRadius: 0, endRadius: r * 0.32))
-
-                // ── 5. Twinkling gold sparkle glints ─────────────────────
-                let glints: [(CGFloat, CGFloat, Double)] = [
-                    (0.30, 0.30, 0.0), (0.74, 0.40, 1.9), (0.60, 0.74, 3.6), (0.34, 0.64, 5.1),
-                ]
-                for (gx, gy, ph) in glints {
-                    let tw = reduceMotion ? 0.5 : max(0.0, sin(t * 2.1 + ph))
-                    if tw <= 0.02 { continue }
-                    let ox: CGFloat = (gx - 0.5) * 2 * r * 0.82
-                    let oy: CGFloat = (gy - 0.5) * 2 * r * 0.82
-                    let p = CGPoint(x: cx + ox, y: cy + oy)
-                    if hypot(p.x - cx, p.y - cy) > r * 0.92 { continue }
-                    let glintSize: CGFloat = r * 0.13 * CGFloat(0.6 + 0.4 * tw)
-                    trophyGlint(ctx, at: p, size: glintSize, opacity: tw)
-                }
-
-                // ── 6. Warm reflected rim light (lower-right) ────────────
-                ctx.stroke(
-                    Path(ellipseIn: sphere.insetBy(dx: r * 0.04, dy: r * 0.04)),
-                    with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: .clear, location: 0.30),
-                            .init(color: Color(red: 1.0, green: 0.90, blue: 0.55).opacity(0.5), location: 0.62),
-                            .init(color: .clear, location: 0.85),
-                        ]),
-                        startPoint: CGPoint(x: cx - r, y: cy - r),
-                        endPoint:   CGPoint(x: cx + r, y: cy + r)),
-                    lineWidth: max(0.6, r * 0.03))
             }
         }
     }
