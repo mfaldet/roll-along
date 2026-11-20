@@ -7,7 +7,7 @@ app changes.
 ---
 
 ```
-Roll Along is a tilt-controlled marble game and needs a physical iPhone. The main mode, Adventure, starts from "Play" on the Home screen.
+Roll Along is a tilt-controlled marble game; it needs a physical iPhone. The main mode, Adventure, starts from "Play" on the Home screen.
 
 SIGN-IN (NO DEMO ACCOUNT NEEDED)
 Fully playable without an account. Sign in with Apple is optional, the only method, and needed only for Leaderboard, Clans and Friends; please use your own Apple ID. No name or email is requested. Home > Settings > Account > Sign in with Apple.
@@ -20,7 +20,7 @@ Solo minigames pay no coins. Competitive minigames pay 1, 2 or 3 coins on Easy, 
 
 IN-APP PURCHASES (10)
 Lives (tap the lives counter, top-left of Home): 20, 120, 300 Lives (consumable); Diamond Balls, unlimited lives plus the Diamond ball skin (non-consumable).
-Coins (Shop, tap the coin balance): 100, 600, 1,300, 3,000, 10,000 (consumable); the first 10,000 pack also includes the fixed "Money Ball" skin shown on its card. No randomized purchases.
+Coins (Shop, tap the coin balance): 100, 600, 1,300, 3,000, 10,000 (consumable); the first 10,000 pack also includes the "Money Ball" skin shown on its card. No randomized purchases.
 Starter Pack (non-consumable): 500 coins plus the Aurora ball, trail and boundary, once; shown on Home at the next app open after the tutorial (levels 1–10), for 48 hours.
 Restore: Settings > Purchases > Restore Purchases.
 
@@ -31,22 +31,22 @@ NO USER-WRITTEN CONTENT
 Players cannot type text other players see. Nicknames are two preset words; clan names are two preset words plus a number (no tags); clan descriptions and clan chat are fixed phrases. The server rejects anything else. The only free-text field is Send Feedback, which goes privately to the developer.
 
 CLANS, FRIENDS AND THE MONTHLY CLAN BATTLE
-Clans hold up to 12 players. Each player has a server-assigned friend code others can type on the Friends screen; it is shown only if shared. Each calendar month, a clan's score is the new stars its members earn in the main game, counted by our server. At month end, contributing members of ranked clans receive 100 to 1,000 in-game coins, claimed on the Clans screen. December 2026 is a warm-up with no prizes. No entry fee, nothing to buy; coins buy cosmetics only and have no cash value. An owner can remove a member or hand over ownership. Players can ask their clan for lives (up to 6, one per clanmate, free to givers); lives can only be given to such requests.
+Clans hold up to 12 players. Players add friends by typing a server-assigned friend code, shown only if its owner shares it. Each calendar month, a clan's score is the new stars its members earn in the main game, counted by our server. At month end, contributing members of ranked clans can claim 100 to 1,000 in-game coins on the Clans screen. December 2026 is a warm-up with no prizes. No entry fee, nothing to buy; coins buy cosmetics only and have no cash value. An owner can remove a member or hand over ownership. Players can ask their clan for lives (up to 6, one per clanmate, free to givers); lives can only be given to such requests.
 
 ACCOUNT DELETION
 Settings > Account > Delete Account (when signed in). After confirming, the account and all its server data are deleted immediately and the player is signed out.
 
-COSMETIC RELEASE CALENDAR
-Collections release on fixed dates kept on our server (also built into the app), so a date can change without an app update; nothing else is switched on remotely. 22 collections are sold, whole or one piece at a time; no other cosmetics are sold. The next collections are shown by name and date in Shop > Catalog > "Coming soon". Seasonal events return each year.
+COSMETICS
+22 collections are sold for coins, whole or one piece at a time; no other cosmetics are sold. A free default set, Roll Along, is owned from the start. 17 collections are available at launch; Candyland and Nightclub release Dec 17, 2026, Golf and Bloom Jan 14, 2027, Ocean Feb 11, 2027. Release dates are kept on our server and built into the app, so a date can change without an update; nothing else is switched on remotely. Shop > Catalog > "Coming soon" names the next collections.
 
 TROPHIES
 86 display-only trophies earned by playing; they never grant coins or purchasable items.
 
 SEND FEEDBACK
-Settings > About > Send Feedback: Bug, Idea, Question or Compliment, up to 1,000 characters, private to the developer (players cannot read it back). Adds app version, iOS version, phone model, source screen, and account ID if signed in. 5 per phone per day; sent later if offline.
+Settings > About > Send Feedback: Bug, Idea, Question or Compliment, up to 1,000 characters. Adds app version, iOS version, phone model, source screen, and account ID if signed in. 5 per phone per day; sent later if offline.
 
 NOTIFICATIONS
-Two optional local notifications (shop restock, lives full), off until turned on in Settings.
+Two optional local notifications (shop restock, lives full), off by default.
 
 PRIVACY POLICY AND CONTACT
 Settings > About, and https://mfaldet.github.io/roll-along/privacy.html
@@ -57,22 +57,9 @@ Contact: rollalongsupport@gmail.com
 
 ## Before pasting, check these are true
 
-- [ ] Steps 1–17 are applied (confirmed: every check query true).  Step 16
-      was applied in its original form, which also added
-      `rollup_best_seconds`; step 18 removes it.
-- [ ] Step 18, `docs/social/rollup-height-only.sql`, has been applied
-      (Roll Up is scored by height only).
-- [ ] Step 19, `docs/economy/season-prize-settings.sql`, has been applied, so
-      clan season prizes are exactly 1,000 / 500 / 250 / 100 coins as the
-      notes say.
-- [ ] Step 21, `docs/cosmetics/cosmetic-calendar-full-collections.sql`, has
-      been applied (release rows only for full collections, and the release
-      dates set on November 20, 2026: Candyland and Nightclub Dec 17, 2026;
-      Golf and Bloom Jan 14, 2027; Ocean Feb 11, 2027).  REQUIRED before
-      Dec 17, 2026: until it is applied the app shows the old dates, because
-      it prefers the server's dates over its built-in ones.
-- [ ] Step 20, `docs/analytics/events-retention.sql`, has been applied
-      (raw analytics events older than 90 days are deleted daily at 03:47 UTC).
+- [x] Database steps 1–21 are all applied to the live database, every check
+      query true (confirmed by the owner on November 20, 2026).  No database
+      step is pending.
 - [ ] Right before submitting: delete the app on the test phones, then run
       `docs/launch/wipe-play-data.sql` (preview, wipe, check all true).  A
       test phone that opens the app afterwards re-uploads its scores.

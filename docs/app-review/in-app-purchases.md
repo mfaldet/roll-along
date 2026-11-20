@@ -87,12 +87,14 @@ three items' shop prices added up by the app) and "500 coins — Spend in the
 cosmetics shop". Then the 48-hour countdown, the price button "$1.99 — Claim
 Offer", and "No thanks".
 
-When it appears and stops appearing is unchanged: on Home, the first time the
-coin balance reaches 250, open for 48 hours. It never appears again once
+When it appears: on Home, at the first app open after the player finishes the
+tutorial (levels 1–10) and picks a starter set — never in the same session as
+that pick — and it stays open for 48 hours. (An "open" is a fresh launch or a
+return after 30 minutes in the background.) It never appears again once
 bought or after "No thanks", and it is not offered to a player who already owns
 the Aurora ball, trail and boundary. The three items are gifts: Sell Back keeps
-them and never refunds them. The rest of the Aurora collection stays on sale
-for coins. Changed on 2026-11-18 from 3,750 coins and the full Aurora
+them and never refunds them. The rest of the Aurora collection stays available
+in the Shop for coins. Changed on 2026-11-18 from 3,750 coins and the full Aurora
 collection; retake its review screenshot.
 
 ## What the Get Lives sheet shows
@@ -151,6 +153,22 @@ not be shown.
   Use the "Paste into App Store Connect" table above.
 - Non-consumables (4 and 10) are restored by Settings → Purchases → Restore
   Purchases.
+
+## Final build facts (version 1.0, build 2026112002)
+
+- **Cosmetics:** 22 collections are sold for coins, as whole sets or one piece
+  at a time. No other cosmetic is sold: a piece is in the Shop only as part of
+  a full six-piece collection. The free default set, Roll Along, is owned by
+  every player from the first launch.
+- **Release dates:** 17 collections are available at launch. Candyland and
+  Nightclub release Dec 17, 2026; Golf and Bloom Jan 14, 2027; Ocean
+  Feb 11, 2027.
+- **Pieces that come only with a purchase:** the Diamond ball (Diamond Balls)
+  and the Money Ball (first 10,000-coin pack). Neither is sold for coins.
+- **Ads:** one rewarded video, non-personalized, content capped at Google's
+  "Parental guidance" (PG) rating. No tracking prompt.
+- **Database:** steps 1–21 are applied. Only `docs/launch/wipe-play-data.sql`
+  remains, run right before submitting.
 
 ## Not verified
 

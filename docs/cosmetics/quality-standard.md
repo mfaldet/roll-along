@@ -37,7 +37,7 @@ The rules above say what the owner wants. The design numbers further down are on
 - A locked piece stays in the collection the owner approved it in, unless the owner moves it.
 - **Guard:** `python3 tools/cosmetic-calendar/locked_pieces_check.py` compares the drawing code of every locked piece with the version recorded in `tools/cosmetic-calendar/locked_pieces.json` and fails if any differs. Run it before committing any cosmetic change. Re-record the hashes (`--update`) only after the owner approves a change, and add each newly approved piece to the list.
 
-The 136 locked pieces, as of November 20, 2026. The owner has now seen and approved **every piece of the 22 collections on sale or scheduled, and of Roll Along**, with two exceptions that are waiting for approval (listed after the table). "Quality round" marks the 50 pieces approved first (the quality round, plus the three confirmed in the audit correction); "Full review" marks the 86 approved on November 20, 2026, in the form they had that day (after the quality round and the audit).
+The 138 locked pieces, as of November 20, 2026. The owner has seen and approved **every piece of the 22 collections on sale or scheduled, and of Roll Along**. "Quality round" marks the 50 pieces approved first (the quality round, plus the three confirmed in the audit correction); "Full review" marks the 86 approved on November 20, 2026, in the form they had that day (after the quality round and the audit); "Approved 2026-11-20" marks the Tree Stump goal and the redrawn Desert floor, approved and locked last.
 
 | Collection | Slot | Piece | id | Approved in | Note |
 |---|---|---|---|---|---|
@@ -78,6 +78,7 @@ The 136 locked pieces, as of November 20, 2026. The owner has now seen and appro
 | Cosmos | Pit | Moonlit | `midnight` | Full review |  |
 | Cosmos | Boundary | Starlight | `starlight` | Quality round |  |
 | Nature | Ball | Jade | `jade` | Quality round |  |
+| Nature | Goal | Tree Stump | `treeStump` | Approved 2026-11-20 |  |
 | Nature | Trail | Forest | `forest` | Quality round |  |
 | Nature | Floor | Meadow | `meadow` | Quality round |  |
 | Nature | Pit | Meadow | `meadow` | Quality round |  |
@@ -157,6 +158,7 @@ The 136 locked pieces, as of November 20, 2026. The owner has now seen and appro
 | Ancient Temple | Ball | Dune | `dune` | Full review |  |
 | Ancient Temple | Goal | Eclipse | `eclipse` | Quality round |  |
 | Ancient Temple | Trail | Glyphs | `glyphs` | Full review |  |
+| Ancient Temple | Floor | Desert | `desert` | Approved 2026-11-20 |  |
 | Ancient Temple | Pit | Canyon | `canyon` | Quality round |  |
 | Ancient Temple | Boundary | Sandstone | `sandstone` | Full review |  |
 | Abyssal Depths | Ball | Trench | `trench` | Quality round |  |
@@ -178,14 +180,9 @@ The 136 locked pieces, as of November 20, 2026. The owner has now seen and appro
 | Lava Flow | Pit | Evil | `evil` | Full review |  |
 | Lava Flow | Boundary | Molten | `molten` | Quality round |  |
 
-**Pending the owner's approval (not locked yet):**
+**Pending the owner's approval:** none. Every piece of Roll Along and of the 22 collections is locked (138 pieces).
 
-| Collection | Slot | Piece | Why |
-|---|---|---|---|
-| Nature | Goal | the new tree-stump goal (replaces Leaf Wreath) | Being drawn; it is locked once the owner approves it. |
-| Ancient Temple | Floor | Desert (`desert`) | Being redrawn; it is locked once the owner approves it. |
-
-To lock a pending piece after approval: `python3 tools/cosmetic-calendar/locked_pieces_check.py --lock "Nature:Goal"` (or `"Ancient Temple:Floor"`), then add its row to the table above. The check fails if any piece of these collections is neither locked nor pending, so a new or replaced piece cannot ship unreviewed.
+To lock a pending piece after approval: `python3 tools/cosmetic-calendar/locked_pieces_check.py --lock "Nature:Goal"` (the key is `"<Collection>:<Slot>"`), then add its row to the table above. The check fails if any piece of these collections is neither locked nor pending, so a new or replaced piece cannot ship unreviewed.
 
 Approved names: Roll Along's trail, floor, pit and boundary are named Classic Shadow, Classic White, Classic Black and Classic Gray.
 

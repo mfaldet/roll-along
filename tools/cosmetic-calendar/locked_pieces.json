@@ -1,17 +1,6 @@
 {
  "about": "Owner-approved cosmetic pieces. See docs/cosmetics/quality-standard.md, \"Locked pieces\". Checked by tools/cosmetic-calendar/locked_pieces_check.py. Re-record hashes (--update) only after the owner approves a change. \"pending\" lists the catalog slots waiting for the owner's approval; every other piece of Roll Along and of the collections on sale or scheduled must be locked.",
- "pending": [
-  {
-   "collection": "Nature",
-   "slot": "Goal",
-   "note": "being replaced by a tree-stump goal; lock after the owner approves it"
-  },
-  {
-   "collection": "Ancient Temple",
-   "slot": "Floor",
-   "note": "the Desert floor is being redrawn; lock after the owner approves it"
-  }
- ],
+ "pending": [],
  "shared": [
   {
    "name": "Trail marks (spacing, lifetime, cap)",
@@ -1287,6 +1276,66 @@
      "decl": "^    var colors: \\[Color\\] \\{$",
      "case": ".jade",
      "sha": "640cc5b07f7c66ab"
+    }
+   ]
+  },
+  {
+   "collection": "Nature",
+   "slot": "Goal",
+   "name": "Tree Stump",
+   "id": "treeStump",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^[ \\t]*var body: some View",
+     "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
+     "case": ".treeStump",
+     "sha": "3ae21febb4cdcb9f"
+    },
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^[ \\t]*private var treeStumpGoal: some View",
+     "scope": "^(?:private |fileprivate |final )*struct GoalSkinView\\b",
+     "sha": "d1451d130b44aa03"
+    },
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^[ \\t]*struct SeededRNG",
+     "sha": "410612baf288219d"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^[ \\t]*var holeStyle: HoleStyle",
+     "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
+     "case": ".treeStump",
+     "sha": "f0f574138f4fa9b5"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^[ \\t]*static func previewGradient\\(for goal: GoalSkin, endRadius: CGFloat = 28\\) \\-> AnyShapeStyle",
+     "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
+     "case": ".treeStump",
+     "sha": "9961d867b0a0e8cb"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^[ \\t]*static func bandedTargetPreview\\(_ bands: \\[Color\\], endRadius: CGFloat = 28\\) \\-> RadialGradient",
+     "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
+     "sha": "7f5f18627d980041"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^[ \\t]*var targetBands: \\[Color\\]\\?",
+     "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
+     "case": ".treeStump",
+     "sha": "50050e073041ea73"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^[ \\t]*var accentColor: Color",
+     "scope": "^(?:private |fileprivate |final )*enum GoalSkin\\b",
+     "case": ".treeStump",
+     "sha": "eac3dbf0e4149ac6"
     }
    ]
   },
@@ -4202,6 +4251,39 @@
      "file": "RollAlong/Cosmetics.swift",
      "decl": "^[ \\t]*private func trailGlyphs\\(_ ctx: GraphicsContext, _ fr: TrailFrame\\)",
      "sha": "38ff03e73ca013ec"
+    }
+   ]
+  },
+  {
+   "collection": "Ancient Temple",
+   "slot": "Floor",
+   "name": "Desert",
+   "id": "desert",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^[ \\t]*private func paperFloorOverlay\\(geo: GeometryProxy\\) \\-> some View",
+     "scope": "^(?:private |fileprivate |final )*struct PaperFloorOverlayView\\b",
+     "case": ".desert",
+     "sha": "e32e3f72329299a9"
+    },
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^[ \\t]*private var desertFloor: some View",
+     "scope": "^(?:private |fileprivate |final )*struct PaperFloorOverlayView\\b",
+     "sha": "6bd4404f5946074d"
+    },
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^[ \\t]*struct SeededRNG",
+     "sha": "410612baf288219d"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^[ \\t]*var color: Color",
+     "scope": "^(?:private |fileprivate |final )*enum Floor\\b",
+     "case": ".desert",
+     "sha": "b2cf4210bc3d0a6e"
     }
    ]
   },
