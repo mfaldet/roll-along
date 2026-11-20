@@ -1,147 +1,98 @@
 # Roll Along
 
-A tilt-controlled marble game for iPhone. Tilt the phone to roll a marble through the endless Adventure mode, 10 minigames and 8 challenge tracks; collect cosmetics; earn trophies; compete on leaderboards.
+**A tilt-to-roll marble game for iPhone, built end to end: game, backend, in-app purchases, ads, and App Store release.**
 
-**Platform:** iPhone, iOS 18 or later · **Language:** Swift / SwiftUI · **Build:** Xcode 26 or later
+Tilt your phone, roll the marble, dodge the holes, reach the goal. An endless Adventure mode, 10 minigames, clans with monthly seasons, and a shop of animated cosmetics.
 
-Version 1.0 is being prepared for TestFlight and the App Store. This file says what works, what has known faults and what is planned.
+**Status:** version 1.0 is in App Store review (submitted November 20, 2026). · [Support page](https://mfaldet.github.io/roll-along/) · [Privacy](https://mfaldet.github.io/roll-along/privacy.html)
+
+![Roll Along screenshots: three Adventure levels, the minigames menu, and a clan](docs/readme/screens.jpg)
 
 ---
 
-## What works
+## At a glance
 
-The main mode is called **Adventure** in the game. In the code it is still named `climb` (ids, file comments, database columns); those internal names are unchanged.
-
-### Game modes
-
-| Mode | What you do |
+| | |
 |---|---|
-| **Adventure** (the main mode) | Tilt to the goal past the holes. The first 100 levels are authored (`LevelOverrides.json`); after that levels are generated, so Adventure does not end. Stars, coins and lives. |
-| **Challenge Tracks** (8) | Themed 100-level tracks generated from a seed. Finishing one grants a cosmetic collection. |
-| **Competitive minigames** (6, against AI rivals) | Snacky, Sumo Survival, Paint Ball, Smash and Grab, Marble Cup, King of the Hill |
-| **Solo minigames** (4) | Zen Garden, Gold Rush, Roll Up, Disco Ball |
-
-All game art is drawn in code with SwiftUI `Canvas`; there are no image assets apart from the app icon.
-
-**Where things are.** Home → Game Modes has Adventure, the Challenge Packs and one **Minigames** button, which opens a two-column grid of every minigame (order: `MinigamesGridView.minigameOrder` in `GameMenuView.swift`). Pressing and holding a minigame tile plays its preview clip, if one has been added (`RollAlong/MinigameClips/`, spec in [`docs/minigame-clips.md`](docs/minigame-clips.md)). The Trophy Room opens from the Trophies card on Profile; Home has no Trophies button.
-
-### Everything else
-
-- **Cosmetics.** 74 ball skins plus goals, trails, floors, pits and boundaries, bought with coins. (Music tracks exist in the code but are switched off for 1.0: none plays yet.) Sold through a shop that rotates hourly and through collections. See *Release calendar* below.
-- **Trophies.** 86 trophies in v1.0, shown in the Trophy Room as 44 tiles in four sections (Adventure, Challenges, Minigames, Personal). A *stack* tile holds the steps of one measure and evolves as steps are earned; a *feat* tile is a one-off. Platinum, the header badge, needs the 68 visible Bronze/Silver/Gold trophies outside Friends & Clans and Secrets. Trophies never grant coins. The full list is in [`docs/trophies/trophy-list.md`](docs/trophies/trophy-list.md).
-- **In-app purchases** (StoreKit 2). Eight consumables (lives and coins) and two one-time unlocks (Diamond Balls for unlimited lives, Starter Pack). The top coin pack also includes the Money Ball skin, stated on the purchase card. Restore Purchases is in Settings.
-- **Ads.** One rewarded video ("watch an ad for a life") through Google AdMob. Requests are always non-personalized; there is no tracking prompt because the app does not track. Ad content is capped at Google's "Parental guidance" (PG) rating.
-- **Sign-in.** Optional Sign in with Apple, needed only for leaderboards, friends and clans. The app does not ask for a name or email address. Delete Account is in Settings.
-- **Friends, clans, leaderboards.** Friend requests, giving lives to clanmates who ask, clans with a fixed-phrase chat, and leaderboards for Adventure and the minigames (per difficulty where a game has difficulty levels). A player's Adventure level shows as a badge next to their name; clan lists also show each member's stars this season. A clan holds up to 12 players. A clanmate's life request collects up to 6 lives, one per clanmate, at no cost to the giver; it closes after 24 hours, and the asker waits 6 hours before the next. Open requests show as a red count on Home's Clans button. Lives can only be given to a clanmate's open request (database step 14, `docs/social/drop-friend-gifts.sql`, enforces it on the server). Every player has a friend code on their profile; Friends → Add by code finds that exact player. All social clocks (seasons, daily limits, cosmetic releases) run on Eastern time. The weekly pace ("+N this week") was removed; database step 12 (`docs/social/drop-weekly-pace.sql`) drops its columns.
-- **Monthly clan battle.** A season is a calendar month. A clan's season score is the new Adventure stars its members earn that month, counted by the server. Clans → Rankings sorts by season score (also total levels and total stars) and shows the days left. At month end the server ranks the clans and awards coins by tier to members who contributed; the clan that finishes first gets a win. A player claims their coins on the Clans screen. December 2026 is a rehearsal with no prizes. Design: `docs/social/social-revision-proposal.md`.
-- **Clan look.** A clan's owner picks an icon (24 preset symbols) and a color (12 preset colors) in Clan settings → Personalization; no typed text. They show in the clan header, Rankings and Browse. Stored on the server by database step 13 (`docs/social/clan-look.sql`). Roll Up is scored by height only: the board's `rollup_best` column is ensured by step 16 (`docs/social/rollup-columns.sql`), and step 18 (`docs/social/rollup-height-only.sql`) removes the old run-time column. My Clan shows the header, then two tiles: Social (chat and "Ask for a life", with a dot for unread messages) and Members (roster, Give life, invite, with the red request count).
-- **How a level starts.** Settings → Tap to Start (the default: a level waits for a tap) or Auto Start. Applies to Adventure and Challenge Tracks. The level clock starts when play starts.
-- **No free text.** A nickname is two preset words (35,638 combinations, not unique; the player's Adventure level is shown beside it everywhere as part of the name). A clan name is two preset words plus a number (about 44 million). Players and clans never share a second word, in singular or plural. Lists are in `docs/social/preset-names.md`. Clans are identified by name only (database step 15, `docs/social/drop-clan-tags.sql`, removes the old tag column), and clan descriptions come from a fixed list (`PresetNames` in `SocialClient.swift`). Nothing a player types is ever shown to another player.
-- **Notifications.** Two local notifications (shop restock, lives full), each switched on by the player in Settings. No push server.
-- **Analytics.** The app's own anonymous event log. See *Services*.
-
-### Release calendar
-
-**Quality standard.** Every cosmetic that is drawn or changed must meet `docs/cosmetics/quality-standard.md` (nine rules, the reference pieces and the numbers to design to). It is binding. The owner's direction overrides its numbers, and pieces the owner approved are locked: an audit may report a concern but never changes them. Run `python3 tools/cosmetic-calendar/locked_pieces_check.py` before committing any cosmetic change; it fails if a locked piece's drawing code differs from the approved version. The November 2026 audit of every collection on sale or scheduled against it is in `docs/cosmetics/quality-audit-2026-11.md`; verdicts for held pieces are in `docs/proposals/held-pieces.md`.
-
-Most cosmetics are held back at launch and released on fixed calendar dates (`CosmeticSchedule` in `Cosmetics.swift`). There is no launch date.
-
-- **A cosmetic is on sale only as part of a full active collection** (`CosmeticSale` in `Cosmetics.swift`): an active collection with all six slots filled (ball, goal, trail, floor, pit, boundary) whose release day has arrived. Pieces are still bought one at a time, but only pieces of such a collection. Every other piece is **held**: not shown, not sold, not announced. That covers pieces of retired and seasonal sets, pieces displaced in the quality round and pieces in no collection. Held pieces keep their code and ids; an owner keeps them and equips them from the Locker. Exempt (earned or purchase-only, never sold for coins): the Diamond ball, the Money Ball, the Trophy ball and the Money Roll trail and Money Full floor. The three ball packs are held too, because each contains balls that are in no full collection. `docs/proposals/held-pieces.md` lists every held piece (`python3 tools/cosmetic-calendar/held_inventory.py --write` regenerates it).
-- 22 collections are on sale (`CosmeticBundle.activeIDs`), plus the free Roll Along set; each has one item per slot and no item is in two of them. 17 are available from the first time the app is opened (including everything the game gives away). The other catalogue entries are retired as sets and kept only so owners' records stay meaningful.
-- **Every release is one or two full collections**, at midnight Eastern: Candyland and Nightclub on Dec 17, 2026; Golf and Bloom on Jan 14, 2027; Ocean on Feb 11, 2027. There are no single-piece releases: the loose release slots and the days that only brought pieces of retired sets are gone. Database step 21 (`docs/cosmetics/cosmetic-calendar-full-collections.sql`) removes those rows from the server table and sets these five dates. Step 21 is applied, so the server table holds these dates.
-- 16 seasonal events open for their window each year (Lunar New Year, Mardi Gras and Oktoberfest have per-year windows). An open event sells nothing of its own: the Shop shows the one full collection it features (`SeasonalEvent`).
-- The dates live in the server table `cosmetic_calendar` (`docs/cosmetics/cosmetic-calendar.sql`, database step 11). The app reads it at launch and on return (at most every 6 hours), caches it, and falls back to the same dates built into the app. Change a date in the table, no app update needed. A release a phone has already seen stays released there.
-- The Catalog shows the next release day in a "Coming soon" row: only the collections that arrive on the next release day that has any, by name and date (never single items; hidden when no collection is scheduled). It sits under the category buttons, above the rarity filter. The equipped piece is marked with one green border everywhere (Shop, Catalog, Locker, collection cards and popup rows).
-- `python3 tools/cosmetic-calendar/check_calendar.py` confirms the built-in dates match the SQL rows (step 11 as tidied by step 21).
+| **Platform** | iOS 18+, iPhone |
+| **App** | Swift, SwiftUI, CoreMotion, StoreKit 2, Sign in with Apple, Google AdMob |
+| **Backend** | Supabase: Postgres, row-level security, scheduled jobs (pg_cron), one edge function |
+| **Size** | About 87,000 lines of Swift (71,500 app, 15,700 tests) and 4,900 lines of SQL |
+| **Tests** | 634 unit tests, plus snapshot tests for the renderers |
+| **Art** | Every marble, floor, trail, and effect is drawn in code with SwiftUI `Canvas`. The only image file is the app icon |
 
 ---
 
-## Known faults
+## What's in the game
 
-- **Pinball is not in v1.0.** It is unfinished, so it has been removed from the build along with its leaderboard and trophies. The work in progress is kept in `tools/pinball/` (not part of the app).
-- **Leaderboards are kept per difficulty.** Every board for a game with difficulty levels (the six competitive games and Disco Ball) has three tabs, Easy / Normal / Hard (Disco Ball: Hardcore), and a run counts only on its own difficulty's board. Competitive boards rank by wins, then best score; Disco Ball by most crossings in one run, then the faster average time per crossing. The Disco Ball boards need `docs/leaderboard-discoball.sql`; until it is run they say "not available yet", and nothing else is affected. Disco Ball has no time limit on any difficulty.
-- **Roll Out is not in v1.0.** Its mazes need rebuilding (maze 4 has no route from start to goal), so it is switched off in the mode registry (`GameModeCatalogue`) like Pinball: in no menu, no leaderboard and no trophies. `RollOutView.swift` and its route stay in the code for later.
-- **The Challenge of the Day is not in v1.0.** It is switched off in the mode registry (`GameModeCatalogue`) like Roll Out: in no menu, no notification and no trophies (its four trophies and two tiles are out of the catalog), and it no longer follows the Tap to Start setting. Its code, saved completions and trophy funnel are kept. The daily reward and its streak are separate and unchanged.
-- **Adventure sound effects are system placeholder sounds.**
-- **Five authored levels** (78, 83, 89, 92, 97) have a coin on the rim of a hole. `node scripts/verify-levels.mjs` lists them.
-- **Leaderboard and season scores are only lightly checked by the server.** `docs/social-schema-v5.sql` refuses impossible values (more than three stars per level), caps the stars that count toward a season per day, and adds a switch to exclude a player or clan. It does not stop a determined cheater.
-- **Database:** steps 1–21 are all applied to the live database, with every check query true (confirmed by the owner on 2026-11-20). Nothing is pending except `docs/launch/wipe-play-data.sql`, which the owner runs right before submitting.
-- **The month-end job has never run on the live database.** It was tested on a local database only. If the Supabase project is paused the scheduled jobs do not run; the month-end job catches up the day after it wakes.
-- **Clans have an owner and members only.** The owner can remove a member and hand over ownership; there are no promote or demote ranks.
-- **Account deletion** removes all server data. The app asks Apple for a one-time code and sends it to the `delete-account` function, which revokes the Sign in with Apple token. The live function already does this (confirmed by the owner); the copy in `supabase/functions/delete-account/` is a reference only.
-- **iCloud trophy backup** is written but switched off for v1.0 (`UbiquitousTrophyKVStore.isEnabledInThisBuild`). Nothing in the game is backed up to iCloud: deleting the app, or moving to a new phone without restoring a backup, loses local progress. Purchases restore from Apple, and signed-in players get their trophies back from the server once the trophy tables exist.
-- **Invite links use the `rollalong://` scheme**, which most messaging apps do not turn into a tappable link.
-- **Automated tests cover** trophies, game state, purchases and cosmetics. Minigame play, sign-in and the social screens are tested by hand only. There is no CI.
+**Adventure.** An endless run of generated levels that get harder as you climb. Each level is scored on stars. Lives refill at one every 6 minutes, up to 10.
 
-## Planned
+**10 minigames.**
 
-- Pinball, rebuilt, in a later update, with its own trophies.
-- Roll Out, with hand-built mazes and its two trophies.
-- The Challenge of the Day, with its four trophies, if it comes back.
-- Real sound effects.
-- iPad support.
-- iCloud trophy backup and a Game Center mirror for trophies.
-- Moving the release calendar to the server if dates need to change without an app update.
+| Kind | Games |
+|---|---|
+| Solo, played for a best score | Roll Up, Disco Ball, Zen Garden, Snacky |
+| Competitive, against computer players on Easy, Normal, or Hard | Sumo Survival, Paint Ball, Smash and Grab, Marble Cup, King of the Hill, Snacky |
+| Reward | Gold Rush, paid for with tickets won in competitive games |
+
+**Clans and seasons.** Clans of up to 12, clan chat built from preset phrases, life requests between clanmates, and a monthly season that ranks every clan and pays coin prizes by tier.
+
+**Cosmetics.** 17 full collections at launch and more on a release calendar. A collection is six pieces designed to be worn together: ball, goal, trail, floor, pit, and boundary. Many are animated, and all of them hold still when Reduce Motion is on.
+
+**Trophies, leaderboards, friends.** Trophies with rarity based on how many players hold each one, global leaderboards for Adventure and each minigame, and friend codes.
 
 ---
 
-## Services
+## The economy
 
-| Service | Used for | Notes |
-|---|---|---|
-| **Apple** | Sign in with Apple, in-app purchases | |
-| **Supabase** | Sign-in sessions, database (profiles, leaderboards, friends, clans, trophies), the `delete-account` function, analytics events | One project. The keys in the source are Supabase's public client keys; data is protected by the row-level rules in `docs/*.sql`. |
-| **Google AdMob** | Rewarded video ads | Non-personalized only. |
-| **GitHub Pages** | The privacy policy page | Published from the `gh-pages` branch. `docs/site/privacy.html` is the working copy. |
+The game runs on three currencies, each with one job.
 
-Nothing else is contacted. In particular the app does not use Vercel, Game Center or a push-notification server.
+| Currency | Comes from | Goes to | Job |
+|---|---|---|---|
+| **Coins** | Level clears, the daily reward, Gold Rush, clan season prizes, coin packs | Cosmetics | The long-term chase |
+| **Lives** | Time, a rewarded ad, clanmates, life packs | Adventure attempts | Pacing |
+| **Tickets** | Winning competitive minigames | Gold Rush rounds | Turns skill into coins |
 
-**Analytics, in plain words.** Each install gets a random ID. Events record what happened in the game (levels, minigame rounds, purchases, ad steps, screens opened) with the app version, iOS version and phone model. They are not tied to the player's account, Apple ID or advertising ID.
+The numbers are set in a few places on purpose, so the balance between free play and paid can be changed without touching the rest of the game:
+
+- **Prices** come from one tier ladder (750, 1,000, 1,250, 1,500 coins). Changing a tier reprices every item in it.
+- **Payouts** come from one table in code (`CoinPayouts`). Nothing else computes a reward.
+- **Clan prizes, life-request rules, and season thresholds** are settings in the database, so they change without an app update.
+- **Cosmetic releases** follow a calendar table in the database.
+
+Every reward and price was checked against what the screen promises before release: 33 items, 7 mismatches found and fixed. See [`docs/economy/2026-11-payout-audit.md`](docs/economy/2026-11-payout-audit.md), and the earn-rate math in [`docs/economy/2026-11-coin-rebalance.md`](docs/economy/2026-11-coin-rebalance.md).
 
 ---
 
-## Building
+## How it's built
 
-1. Open `RollAlong.xcodeproj` in Xcode 26 or later.
-2. Run on a **physical iPhone** with iOS 18 or later. The simulator does not report device motion, so the marble will not move there.
-3. For purchase testing without App Store Connect, the scheme's Run action uses `RollAlong/Products.storekit`.
+**Physics and input.** `CMMotionManager` publishes a 2D gravity vector at 60 Hz with a small dead zone. A display-link clock drives a custom tick engine at 60 fps and pauses when the app leaves the foreground.
 
-Tests: Product → Test (unit tests in `RollAlongTests`, a UI smoke test in `RollAlongUITests`).
+**Rendering.** All game art is SwiftUI `Canvas`. One renderer draws every ball, so a skin looks the same on the home screen, in the shop, and in play. Animated pieces use `TimelineView`.
 
-Package versions are pinned by `Package.resolved`, which is committed.
+**Accounts.** Sign in with Apple, optional. Player and clan names are built from preset word lists, so there is no free-text name to moderate. Account deletion runs in an edge function that also revokes the Apple sign-in.
 
-## Project layout
+**Backend.** Postgres on Supabase. Row-level security on player data, server functions for anything that pays out, and scheduled jobs that close seasons, expire life requests, roll up trophy rarity, and trim old analytics.
 
-```
-RollAlong/
-├── RollAlongApp.swift            app entry, launch tasks
-├── HomeView.swift                routing hub
-├── GameMode.swift                mode registry and tutorial text
-├── BallGameView.swift            Adventure engine (also Zen, Gold Rush, daily, tracks)
-├── *View.swift                   one file per self-contained minigame
-├── GameState.swift               all saved player state
-├── Cosmetics.swift               cosmetic catalogue, shop rotation, release calendar
-├── StoreKitManager.swift         purchases and restore
-├── AdManager.swift               rewarded ads
-├── AppleAuthManager.swift        Sign in with Apple → Supabase session
-├── SocialClient.swift            friends, clans, leaderboards; preset names
-├── AnalyticsClient.swift         anonymous event log
-├── Trophy*.swift, TrophyCatalog.json   trophy system
-└── PrivacyInfo.xcprivacy         privacy manifest
-docs/
-├── *.sql                         database schema and access rules (apply in order; v4 = preset names, v5 = pace, cap, guards, life requests, monthly clan battle; then social-schedule.sql)
-├── delete-account-apple-revoke.md   server change for revoking the Apple token on deletion
-├── app-review/                   review notes, purchase table and App Privacy answers for App Store Connect
-├── site/privacy.html             working copy of the published privacy policy
-├── social/                       preset name lists; social and clans design (monthly clan battle)
-├── minigame-ai-tuning-proposal.md   how the opponents work and how to tune them
-├── trophies/, economy/, research/   design notes
-└── AppStore.md, TestFlight.md    OUT OF DATE — see the note at the top of each
-tools/pinball/                    held-back Pinball work, not built into the app
-```
+**Purchases and ads.** StoreKit 2 with 10 products (coin packs, life packs, a starter pack, and unlimited lives), including restore. Rewarded ads only, through AdMob, limited to general-audience content.
 
-Saved state lives in `UserDefaults`, except the sign-in session token (Keychain) and signed-in social data (Supabase).
+**Analytics.** The app batches its own events to the database, with 90-day retention. No third-party analytics SDK.
 
-## License
+---
 
-Personal project — all rights reserved.
+## Running it
+
+Open `RollAlong.xcodeproj` in Xcode 16 or later and run on a physical iPhone with iOS 18 or later. The simulator does not report device motion.
+
+To test purchases locally, select `Products.storekit` under the scheme's **Run → Options → StoreKit Configuration**.
+
+---
+
+## More
+
+- [`docs/economy/`](docs/economy/): the coin economy, pricing, and audits
+- [`docs/cosmetics/quality-standard.md`](docs/cosmetics/quality-standard.md): the standard every cosmetic is held to
+- [`docs/trophies/`](docs/trophies/): trophy design
+- [`docs/app-review/`](docs/app-review/): App Store review notes and in-app purchase reference
+
+© 2026 Mackenzie Faldet. All rights reserved.
