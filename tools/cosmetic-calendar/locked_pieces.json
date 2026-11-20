@@ -1661,7 +1661,7 @@
      "file": "RollAlong/BallSkinView.swift",
      "decl": "^[ \\t]*private var dropletCanvas: some View",
      "scope": "^(?:private |fileprivate |final )*struct BallSkinView\\b",
-     "sha": "05ba024bbb21e8f9"
+     "sha": "499a5e4ca9e00094"
     },
     {
      "file": "RollAlong/BallSkinView.swift",
