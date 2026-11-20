@@ -2602,10 +2602,7 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
     /// only while music is offered (not in 1.0).  Counted from the catalogue
     /// so a new piece never needs this number edited by hand.
     static var evergreenTotal: Int {
-        // Computed from the catalog, so adding a cosmetic never needs this
-        // number edited: every case in every slot, minus the 4 purchase-only
-        // secrets and the 7 seasonal balls (261 before the quality round).
-        let all = BallSkin.allCases.count + GoalSkin.allCases.count + TrailColor.allCases.count
+        let all: Int = BallSkin.allCases.count + GoalSkin.allCases.count + TrailColor.allCases.count
             + Floor.allCases.count + Pit.allCases.count + Boundary.allCases.count
             + MusicTrack.allCases.count
         return all - 11 - (CosmeticFeatures.musicEnabled ? 0 : MusicTrack.allCases.count)
