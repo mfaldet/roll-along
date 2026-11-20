@@ -358,6 +358,8 @@ enum GoalSkin: String, CosmeticItem {
     case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
     case soccerNet      // Soccer bundle — goal mouth with white netting
     case aurora         // Aurora bundle — glowing northern-lights portal
+    // ── Quality round: Haunted ──
+    case pentagram      // Haunted — a fiery pentagram burning on charred stone
     // ── Nature (quality round) ──
     case leafWreath     // Nature set: a woven ring of leaves and tiny blossoms (replaces Meadow in the set)
     // ── Citrus set (quality round) ──
@@ -405,6 +407,7 @@ enum GoalSkin: String, CosmeticItem {
         case .halo:        return "Halo"
         case .doodle:      return "Doodle"
         case .soccerNet:   return "Soccer Net"
+        case .pentagram:   return "Pentagram"   // quality round: Haunted
         // ── Nature (quality round) ──
         case .leafWreath:  return "Leaf Wreath"
         case .winnersCircle: return "Winner's Circle"
@@ -535,6 +538,8 @@ enum GoalSkin: String, CosmeticItem {
         case .winnersCircle:
             return HoleStyle(hueBase: 0.12, hueRange: 0.05, saturation: 0.9,
                              bgColor: Color(red: 0.20, green: 0.02, blue: 0.05))
+        case .pentagram:   // quality round: Haunted — bespoke renderer, placeholder only
+            return HoleStyle(hueBase: 0.03, hueRange: 0.06, saturation: 1.0, bgColor: .clear)
         }
     }
 
@@ -737,6 +742,16 @@ enum GoalSkin: String, CosmeticItem {
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .vortex, .wormhole:
             return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? [], endRadius: endRadius))
+        case .pentagram:
+            // Quality round (Haunted): charred disc, ember star glow, ring of fire.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.03, green: 0.01, blue: 0.01), location: 0.00),
+                    .init(color: Color(red: 0.16, green: 0.03, blue: 0.02), location: 0.50),
+                    .init(color: Color(red: 0.92, green: 0.26, blue: 0.06), location: 0.80),
+                    .init(color: Color(red: 1.00, green: 0.66, blue: 0.20), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: endRadius))
         // ── Nature (quality round) ──
         case .leafWreath:
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
@@ -889,6 +904,7 @@ enum GoalSkin: String, CosmeticItem {
         case .halo:        return Color(red: 1.00, green: 0.86, blue: 0.42)
         case .doodle:      return Color(red: 0.55, green: 0.60, blue: 0.75)
         case .soccerNet:   return Color(red: 0.85, green: 0.92, blue: 1.00)
+        case .pentagram:   return Color(red: 1.00, green: 0.36, blue: 0.10)   // quality round: Haunted
         // ── Nature (quality round) ──
         case .leafWreath:  return Color(red: 0.46, green: 0.82, blue: 0.36)
         case .winnersCircle: return Color(red: 1.00, green: 0.84, blue: 0.36)
@@ -918,6 +934,8 @@ enum GoalSkin: String, CosmeticItem {
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora:
             return .exclusive  // 1,500 coins — animated, full-spectrum, or bespoke
+        case .pentagram:
+            return .premium    // quality round: takes the tier of Obsidian, which it replaces in Haunted
         // ── Nature (quality round) ── takes Meadow's tier (it replaces Meadow in the set).
         case .leafWreath:
             return .standard
@@ -1102,7 +1120,7 @@ enum Floor: String, CosmeticItem {
     case desert           // Round-5 Dune bundle — warm sand
     case stormcloud       // Round-5 Tempest bundle — slate storm
     case sugar            // Round-5 Candyland bundle — pale candy-pink
-    case fog              // Round-5 Haunted bundle — cold grey mist
+    case fog              // Haunted bundle — dark flagstones with fog drifting over them
     case scorched         // Fire starter set — burnt flagstones: soot, cracks, faintly glowing seams, embers
     case shallows         // Water starter set — sandy bottom under clear water, slow sunlight moving over it
     case overcast         // Storm starter set — slate cloud cover with a faint yellow streak
@@ -1202,7 +1220,7 @@ enum Floor: String, CosmeticItem {
         case .classic:    return Color(red: 0.941, green: 0.937, blue: 0.925)
         case .inverted:   return Color(red: 0.039, green: 0.039, blue: 0.039)
         case .twilight:   return Color(red: 0.835, green: 0.824, blue: 0.890)
-        case .ember:      return Color(red: 0.910, green: 0.835, blue: 0.753)
+        case .ember:      return Color(red: 0.115, green: 0.090, blue: 0.090)  // cooled basalt crust; fissures glow over it
         case .notebook:   return Color(red: 0.980, green: 0.961, blue: 0.902)
         case .graph:      return Color(red: 0.984, green: 0.984, blue: 0.984)
         case .blueprint:  return Color(red: 0.18,  green: 0.36,  blue: 0.62 )
@@ -1211,20 +1229,20 @@ enum Floor: String, CosmeticItem {
         case .parchment:  return Color(red: 0.914, green: 0.863, blue: 0.753)
         case .sketch:     return Color(red: 0.980, green: 0.980, blue: 0.965)
         case .velvet:     return Color(red: 0.35,  green: 0.12,  blue: 0.45 )
-        case .midnight:   return Color(red: 0.04,  green: 0.06,  blue: 0.16 )
+        case .midnight:   return Color(red: 0.012, green: 0.016, blue: 0.045)  // space black; stars twinkle over it
         case .sunset:     return Color(red: 0.98,  green: 0.55,  blue: 0.25 )
         case .origami:    return Color(red: 0.961, green: 0.937, blue: 0.878)
         case .mirage:     return Color(red: 0.92,  green: 0.82,  blue: 0.55 )
         case .desert:     return Color(red: 0.90,  green: 0.78,  blue: 0.55 )  // warm sand
         case .stormcloud: return Color(red: 0.32,  green: 0.36,  blue: 0.44 )  // slate storm
         case .sugar:      return Color(red: 0.99,  green: 0.92,  blue: 0.95 )  // pale candy-pink
-        case .fog:        return Color(red: 0.66,  green: 0.69,  blue: 0.70 )  // cold grey mist
+        case .fog:        return Color(red: 0.085, green: 0.105, blue: 0.115)  // dark, damp flagstones; fog drifts over them
         case .scorched:   return Color(red: 0.62,  green: 0.26,  blue: 0.20 )  // scorched red stone
         case .shallows:   return Color(red: 0.40,  green: 0.70,  blue: 0.86 )  // clear, sunlit shallow water
         case .overcast:   return Color(red: 0.34,  green: 0.36,  blue: 0.42 )  // dark storm cloud
         case .grove:      return Color(red: 0.96,  green: 0.89,  blue: 0.70 )  // sunlit beach sand
         case .goldLeaf:   return Color(red: 0.64,  green: 0.49,  blue: 0.18 )  // burnished gold leaf (darker than a coin)
-        case .aurora:     return Color(red: 0.045, green: 0.075, blue: 0.150)  // deep night sky; aurora glows over it
+        case .aurora:     return Color(red: 0.030, green: 0.050, blue: 0.105)  // dark night sky; a few faint ribbons cross it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
         case .moon:       return Color(red: 0.62,  green: 0.62,  blue: 0.66 )  // pale regolith; craters paint over
@@ -1260,6 +1278,7 @@ enum Floor: String, CosmeticItem {
         case .aurora, .disco, .grass, .moon, .eclipse, .gridCity, .brass, .moneyFull,
              .overcast: return true
         case .shallows: return true   // Water set: slow caustic light over the still sand
+        case .fog, .midnight, .ember: return true   // quality round: slow fog, twinkling stars, glowing fissures
         default: return false
         }
     }
@@ -1290,11 +1309,11 @@ enum Pit: String, CosmeticItem {
     case sunset
     case origami
     case mirage
-    case aurora           // Rare — gently moving aurora band
+    case aurora           // Rare — full of slowly swaying aurora curtains
     case canyon           // Round-5 Dune bundle — deep rust gorge
     case downpour         // Round-5 Tempest bundle — dark rainy blue
     case syrup            // Round-5 Candyland bundle — dark molasses
-    case graveyard        // Rare — gravestones and a gently drifting ghost (Haunted bundle)
+    case graveyard        // Rare — an open dirt grave with smoke rising from it (Haunted bundle)
     case crater           // Fire starter set — glowing red rim falling to a dark core
     case deepEnd          // Water starter set — a pool stepping down from a sunlit shelf to a dark middle
     case maelstrom        // Storm starter set — dark storm vortex with a yellow flash rim
@@ -1398,7 +1417,7 @@ enum Pit: String, CosmeticItem {
         case .parchment:  return Color(red: 0.102, green: 0.059, blue: 0.031)
         case .sketch:     return Color(red: 0.12,  green: 0.12,  blue: 0.14 )
         case .velvet:     return Color(red: 0.08,  green: 0.02,  blue: 0.12 )
-        case .midnight:   return Color(red: 0.82,  green: 0.85,  blue: 0.92 )
+        case .midnight:   return Color(red: 0.62,  green: 0.68,  blue: 0.82 )  // moonlit stone; the drawn well steps down to dark
         case .sunset:     return Color(red: 0.30,  green: 0.06,  blue: 0.04 )
         case .origami:    return Color(red: 0.094, green: 0.078, blue: 0.063)
         case .mirage:     return Color(red: 0.22,  green: 0.14,  blue: 0.05 )
@@ -1406,7 +1425,7 @@ enum Pit: String, CosmeticItem {
         case .canyon:     return Color(red: 0.32,  green: 0.14,  blue: 0.08 )  // deep rust gorge
         case .downpour:   return Color(red: 0.10,  green: 0.16,  blue: 0.26 )  // dark rainy blue
         case .syrup:      return Color(red: 0.20,  green: 0.06,  blue: 0.10 )  // dark molasses
-        case .graveyard:  return Color(red: 0.04,  green: 0.07,  blue: 0.05 )  // near-black graveyard earth
+        case .graveyard:  return Color(red: 0.07,  green: 0.05,  blue: 0.035)  // dark grave soil
         case .crater:     return Color(red: 0.12,  green: 0.02,  blue: 0.01 )  // dark core; glowing rim drawn over
         case .deepEnd:    return Color(red: 0.02,  green: 0.07,  blue: 0.20 )  // deep water
         case .maelstrom:  return Color(red: 0.06,  green: 0.06,  blue: 0.09 )  // dark storm center
@@ -1449,8 +1468,9 @@ enum Pit: String, CosmeticItem {
              .crater, .deepEnd, .maelstrom,
              .tidePool, .vault:
             return true
-        // — Quality round: Winter's Crevasse (id twilight) and Abyssal Depths' Sea Vent —
-        case .twilight, .vent:
+        // — Quality round: Winter's Crevasse (id twilight), Abyssal Depths' Sea Vent,
+        //   Lava Flow's Evil pit and Cosmos' Moonlit pit (id midnight) —
+        case .twilight, .vent, .evil, .midnight:
             return true
         default:
             return false
@@ -3454,9 +3474,9 @@ struct CosmeticBundle: Identifiable {
             id:             "haunted",
             displayName:    "Haunted",
             tagline:        "A restless spirit drifting through the dark.",
-            contentSummary: "Ghost ball · Obsidian goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music · Phantom boundary",
+            contentSummary: "Ghost ball · Pentagram goal · Smoke trail · Fog floor · Graveyard pit · Downtempo music · Phantom boundary",
             balls:  [.ghost],
-            goals:  [.obsidian],
+            goals:  [.pentagram],
             trails: [.smoke],
             floors: [.fog],
             pits:   [.graveyard],
@@ -5179,7 +5199,7 @@ private func trailStardust(_ ctx: GraphicsContext, _ fr: TrailFrame) {
     ctx.blendMode = .plusLighter
     for i in 0..<fr.n {
         let seed: Double = fr.seed(i)
-        guard seed < 0.5 else { continue }
+        guard seed < 0.62 else { continue }                      // slightly more stars
         let k: Double = fr.fresh(i)
         guard k > 0.01 else { continue }
         let tw: Double = fr.m > 0 ? 0.4 + 0.6 * sin(fr.tm * 4 + seed * 37.0) : 0.8
@@ -5187,7 +5207,7 @@ private func trailStardust(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         let ang: Double = seed * 6.283 * 3
         let off: CGFloat = fr.bw * CGFloat(0.6 + 1.6 * ((seed * 7.0).truncatingRemainder(dividingBy: 1.0)))
         let c = CGPoint(x: fr.pts[i].x + CGFloat(cos(ang)) * off, y: fr.pts[i].y + CGFloat(sin(ang)) * off)
-        let sz: CGFloat = fr.bw * CGFloat(0.22 + 0.30 * k)
+        let sz: CGFloat = fr.bw * CGFloat(0.28 + 0.34 * k)   // slightly larger stars
         trailStar(ctx, c, sz, Color(red: 1, green: 0.98, blue: 0.85).opacity(tw * 0.9 * k))
     }
 }

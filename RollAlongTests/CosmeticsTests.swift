@@ -1452,6 +1452,43 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(haunted.fullPrice(), 7_000)
     }
 
+    /// Quality round — Haunted, Cosmos, Aurora and Lava Flow: pieces redrawn
+    /// in place keep their ids, tiers and prices; Haunted's goal is the new
+    /// Pentagram (taking Obsidian's tier), and Obsidian is in no active set.
+    func testQualityRound_hauntedCosmosAuroraLavaFlow() {
+        func set(_ id: String) -> CosmeticBundle { CosmeticBundle.catalogue.first { $0.id == id }! }
+        let haunted = set("haunted")
+        XCTAssertEqual(haunted.goals, [.pentagram])
+        XCTAssertEqual(GoalSkin.pentagram.tier, GoalSkin.obsidian.tier)
+        XCTAssertEqual(GoalSkin.pentagram.displayName, "Pentagram")
+        XCTAssertEqual(GoalSkin.pentagram.rawValue, "pentagram")
+        XCTAssertEqual(haunted.fullPrice(), 7_000)
+        XCTAssertFalse(CosmeticBundle.active.contains { $0.contains(GoalSkin.obsidian) },
+                       "Obsidian left Haunted and is in no collection on sale")
+        XCTAssertEqual(CosmeticBundle.bundles(containing: GoalSkin.pentagram).map(\.id), ["haunted"])
+        // Redrawn in place: same ids, tiers and so prices.
+        XCTAssertEqual(Floor.fog.rawValue, "fog");           XCTAssertEqual(Floor.fog.tier, .standard)
+        XCTAssertEqual(Floor.midnight.rawValue, "midnight"); XCTAssertEqual(Floor.midnight.tier, .standard)
+        XCTAssertEqual(Floor.ember.rawValue, "ember");       XCTAssertEqual(Floor.ember.tier, .standard)
+        XCTAssertEqual(Pit.evil.rawValue, "evil");           XCTAssertEqual(Pit.evil.tier, .exclusive)
+        XCTAssertEqual(Pit.midnight.tier, .standard)
+        XCTAssertEqual(Floor.aurora.tier, .exclusive)
+        // Drawn pits show under Reduce Motion too (frozen), never a flat fill.
+        for p in [Pit.evil, .midnight, .graveyard, .aurora] {
+            XCTAssertTrue(p.hasDrawnArt, "\(p) should be drawn art")
+        }
+        // The Aurora floor is no longer hidden under Reduce Motion: its faint
+        // ribbons hold still instead.
+        XCTAssertFalse(FloorOverlayView.hiddenUnderReduceMotion(.aurora))
+        // The four sets are still complete (one piece per slot).
+        for id in ["haunted", "cosmos", "aurora", "lava-flow"] {
+            let b = set(id)
+            XCTAssertEqual([b.balls.count, b.goals.count, b.trails.count,
+                            b.floors.count, b.pits.count, b.boundaries.count],
+                           [1, 1, 1, 1, 1, 1], "\(id) is not a complete set")
+        }
+    }
+
     /// While music is off, no collection offers, prices, grants or requires a
     /// music track, and no player-facing summary names one — but the music
     /// data stays in place so it can return in an update.
