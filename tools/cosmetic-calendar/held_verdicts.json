@@ -1,0 +1,868 @@
+{
+ "Ball:apple": {
+  "reason": "Leaf and stem are right; an apple should be apple-shaped",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:baseball": {
+  "reason": "Leather with two stitched seams near opposite sides",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Ball:basketball": {
+  "reason": "Orange leather with the real seam pattern",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Ball:beachBall": {
+  "reason": "Six glossy inflatable panels, lazy slow drift",
+  "rules": [],
+  "theme": "Summer and beach",
+  "verdict": "meets"
+ },
+ "Ball:blue": {
+  "reason": "Plain shaded sphere; a color with a name, no subject",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:cathedral": {
+  "reason": "Leaded rose window with a slow passing light",
+  "rules": [],
+  "theme": "Cathedral and heavens",
+  "verdict": "meets"
+ },
+ "Ball:clockwork": {
+  "reason": "Brass gears that mesh and turn slowly",
+  "rules": [],
+  "theme": "Metal and machines",
+  "verdict": "meets"
+ },
+ "Ball:confetti": {
+  "reason": "Gold sphere with tumbling flecks; pieces spin fast",
+  "rules": [
+   "R1",
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:copper": {
+  "reason": "Generic metal-sheen sphere; no recognizable object",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:coral": {
+  "reason": "Plain shaded sphere; a color with a name, no subject",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:earth": {
+  "reason": "Mottled blobs, no recognizable continents; shared planet recipe",
+  "rules": [
+   "R1",
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:eightBall": {
+  "reason": "Black ball with its numbered white spot; the real thing",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Ball:fireworks": {
+  "reason": "Bursts bloom fully in and out every 2.6 seconds",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:galaxy": {
+  "reason": "All 55 stars twinkle at once; near twin of Galaxy goal",
+  "rules": [
+   "R6",
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:geode": {
+  "reason": "Agate bands opening to a sparkling crystal center",
+  "rules": [],
+  "theme": "Gems and crystal",
+  "verdict": "meets"
+ },
+ "Ball:green": {
+  "reason": "Plain shaded sphere; a color with a name, no subject",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:harvest": {
+  "reason": "Leaf silhouettes on amber; not clearly a harvest moon",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:heartstone": {
+  "reason": "Gold heart symbol stamped on a pink sphere",
+  "rules": [
+   "R4"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:highRoller": {
+  "reason": "Roulette wheel whips round and snaps to a stop",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:hologram": {
+  "reason": "Deliberate glitch jitter and flicker; disorienting",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:jupiter": {
+  "reason": "Cloud bands and the red spot make it Jupiter",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Ball:lavaLamp": {
+  "reason": "Wax blobs rising slowly through colored fluid",
+  "rules": [],
+  "theme": "Retro",
+  "verdict": "meets"
+ },
+ "Ball:lunarDragon": {
+  "reason": "Gold scales and filigree; no dragon to recognize",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:magmaCore": {
+  "reason": "Good, but now a near twin of the redrawn Lava ball",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:marble": {
+  "reason": "Cat's-eye vane turns once in under 4 seconds",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:mardiGras": {
+  "reason": "Harlequin pattern, not an object (mask or beads)",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:mars": {
+  "reason": "Mottle and polar caps read as Mars; shared planet recipe",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:mercury": {
+  "reason": "Gray mottle without craters; shared planet recipe",
+  "rules": [
+   "R1",
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:mint": {
+  "reason": "Plain shaded sphere; a color with a name, no subject",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:neptune": {
+  "reason": "Blue bands with the dark spot read as Neptune",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Ball:oktoberfest": {
+  "reason": "Bavarian pattern with foam; not clearly a stein",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:opal": {
+  "reason": "Slow shifting play-of-color on milky stone; calm",
+  "rules": [],
+  "theme": "Gems and crystal",
+  "verdict": "meets"
+ },
+ "Ball:oracle": {
+  "reason": "Crystal ball: drifting fog around a small star core",
+  "rules": [],
+  "theme": "Gems and crystal",
+  "verdict": "meets"
+ },
+ "Ball:ornament": {
+  "reason": "Mirror-glass bauble with gold cap and stripe",
+  "rules": [],
+  "theme": "Winter holiday",
+  "verdict": "meets"
+ },
+ "Ball:paper": {
+  "reason": "Crumpled paper with fold creases and facets",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
+ "Ball:pastel": {
+  "reason": "Glossy pastel gradient; a color scheme, not a thing",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:plasmaGlobe": {
+  "reason": "Tendrils are right; they flicker and jump too fast",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:pluto": {
+  "reason": "Tan dwarf planet with its cream heart; distinctive",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Ball:pumpkin": {
+  "reason": "Carved face is right; candle flicker is too fast",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:purple": {
+  "reason": "Plain shaded sphere; a color with a name, no subject",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:quicksilver": {
+  "reason": "Liquid chrome reflections flowing slowly",
+  "rules": [],
+  "theme": "Metal and machines",
+  "verdict": "meets"
+ },
+ "Ball:ruby": {
+  "reason": "Gem-tinted gradient sphere; no facets, not a cut ruby",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:saturn": {
+  "reason": "Tilted rings pass in front and behind; unmistakable",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Ball:shamrock": {
+  "reason": "White clover symbol stamped on a green sphere",
+  "rules": [
+   "R4"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:silver": {
+  "reason": "Generic metal-sheen sphere; no recognizable object",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:slate": {
+  "reason": "Plain shaded sphere; a color with a name, no subject",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:soccer": {
+  "reason": "Classic pentagon panels wrapping the sphere",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Ball:speckledEgg": {
+  "reason": "Speckles are right; an egg should be egg-shaped",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:spectrum": {
+  "reason": "Rainbow bands scroll across the whole ball",
+  "rules": [
+   "R1",
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:storm": {
+  "reason": "Jagged bolt symbol on cloud; twin of Thundercloud ball",
+  "rules": [
+   "R4",
+   "R8"
+  ],
+  "verdict": "fails"
+ },
+ "Ball:sugarSkull": {
+  "reason": "Ornate calavera with marigold eyes; festive, calm",
+  "rules": [],
+  "theme": "Holidays",
+  "verdict": "meets"
+ },
+ "Ball:uranus": {
+  "reason": "Plain pale bands; no tilt or ring; twin of Venus",
+  "rules": [
+   "R1",
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Ball:venus": {
+  "reason": "Plain cream bands; twin of the Uranus recipe",
+  "rules": [
+   "R1",
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:amethyst": {
+  "reason": "Crystal facets with a slow passing glint",
+  "rules": [],
+  "theme": "Gems and crystal",
+  "verdict": "meets"
+ },
+ "Boundary:autumn": {
+  "reason": "Fallen leaves in red, orange and gold",
+  "rules": [],
+  "theme": "Holidays",
+  "verdict": "meets"
+ },
+ "Boundary:chrome": {
+  "reason": "Mirror metal with a slow gliding reflection",
+  "rules": [],
+  "theme": "Metal and machines",
+  "verdict": "meets"
+ },
+ "Boundary:circuit": {
+  "reason": "Signals race round the rim; nodes blink",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:cloud": {
+  "reason": "Puffy cloud edge drifting very slowly",
+  "rules": [],
+  "theme": "Cathedral and heavens",
+  "verdict": "meets"
+ },
+ "Boundary:confetti": {
+  "reason": "Colored dashes scroll round the rim without pause",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:corona": {
+  "reason": "Black rim, thin gold halo, one slow flare",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Boundary:ember": {
+  "reason": "Ash ring with scattered glowing coal specks",
+  "rules": [],
+  "theme": "Fire and embers",
+  "verdict": "meets"
+ },
+ "Boundary:hardwood": {
+  "reason": "Wood grain; twin of the Mahogany boundary",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:holly": {
+  "reason": "Holly leaves and red berries along a green wall",
+  "rules": [],
+  "theme": "Winter holiday",
+  "verdict": "meets"
+ },
+ "Boundary:ink": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:lantern": {
+  "reason": "Red paper lanterns hung along a dark cord",
+  "rules": [],
+  "theme": "Holidays",
+  "verdict": "meets"
+ },
+ "Boundary:mahogany": {
+  "reason": "Polished wood grain; twin of the Hardwood boundary",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:marble": {
+  "reason": "Gray veining through white stone",
+  "rules": [],
+  "theme": "Gems and crystal",
+  "verdict": "meets"
+ },
+ "Boundary:marigold": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:notebook": {
+  "reason": "Ruled-paper band with blue rules and red margin",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
+ "Boundary:obsidian": {
+  "reason": "Black glass with a slow purple sheen, 25 s lap",
+  "rules": [],
+  "theme": "Fire and embers",
+  "verdict": "meets"
+ },
+ "Boundary:orchid": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:pastel": {
+  "reason": "Blocks of pastel color; not a thing",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:pumpkin": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:rainbow": {
+  "reason": "Spectrum laps the rim in 12 seconds; slightly fast",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:sand": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:shamrock": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:sky": {
+  "reason": "Flat color wall with a name; no art",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:stainedGlass": {
+  "reason": "Jewel panes that brighten in turn, slowly",
+  "rules": [],
+  "theme": "Cathedral and heavens",
+  "verdict": "meets"
+ },
+ "Boundary:starSpangled": {
+  "reason": "Scrolling bunting with a star symbol twinkling",
+  "rules": [
+   "R6",
+   "R4"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:storm": {
+  "reason": "Sharp flash every 3 seconds; twin of Thunderhead",
+  "rules": [
+   "R6",
+   "R8"
+  ],
+  "verdict": "fails"
+ },
+ "Boundary:sunset": {
+  "reason": "A color gradient round the ring; no sun or sky",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Boundary:velvet": {
+  "reason": "Plum sheen bands only",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Floor:court": {
+  "reason": "Hardwood planks with grain and a painted court line",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Floor:dusk": {
+  "reason": "Flat fill; no detail at all",
+  "rules": [
+   "R5",
+   "R1"
+  ],
+  "verdict": "fails"
+ },
+ "Floor:eclipse": {
+  "reason": "Large glowing corona on the floor competes with play",
+  "rules": [
+   "R7"
+  ],
+  "verdict": "borderline"
+ },
+ "Floor:felt": {
+  "reason": "Flat green fill; no nap, chalk or wear",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Floor:graph": {
+  "reason": "Pale graph-paper grid; quiet and true to name",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
+ "Floor:mirage": {
+  "reason": "Wavy lines on sand; owner replaced it",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Floor:notebook": {
+  "reason": "Ruled lines and a red margin; it is notebook paper",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
+ "Floor:origami": {
+  "reason": "Diagonal fold lines only; no folded shapes",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Floor:stormcloud": {
+  "reason": "Still cloud blobs; twin of the Overcast floor",
+  "rules": [
+   "R6",
+   "R8"
+  ],
+  "verdict": "fails"
+ },
+ "Floor:sunset": {
+  "reason": "Three wide color bands; a gradient, not a sunset",
+  "rules": [
+   "R1",
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Floor:velvet": {
+  "reason": "Sheen bands only; nothing to find on a close look",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:amethyst": {
+  "reason": "Rock rim, inward crystal points, dark geode center",
+  "rules": [],
+  "theme": "Gems and crystal",
+  "verdict": "meets"
+ },
+ "Goal:archery": {
+  "reason": "A real archery face, but twin of the Target goal",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:comet": {
+  "reason": "Streaks whirl a full turn in under 6 seconds",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "fails"
+ },
+ "Goal:crystal": {
+  "reason": "Eight flat pie facets shimmering every 3 seconds",
+  "rules": [
+   "R1",
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:doodle": {
+  "reason": "Wobbly pencil rings crowding to a deep center",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
+ "Goal:ember": {
+  "reason": "Ash rings, glowing coals, hot core as the target",
+  "rules": [],
+  "theme": "Fire and embers",
+  "verdict": "meets"
+ },
+ "Goal:flame": {
+  "reason": "Fast flame flicker; twin of the Flame Ring goal",
+  "rules": [
+   "R6",
+   "R8"
+  ],
+  "verdict": "fails"
+ },
+ "Goal:halo": {
+  "reason": "Golden halo with rays turning once in 25 seconds",
+  "rules": [],
+  "theme": "Cathedral and heavens",
+  "verdict": "meets"
+ },
+ "Goal:meadow": {
+  "reason": "Daisy ring is thin; owner asked for a better one",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:mirage": {
+  "reason": "Wavy bands; nothing recognizable as a mirage",
+  "rules": [
+   "R1",
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:obsidian": {
+  "reason": "Dark glass on dark floors; center hard to find",
+  "rules": [
+   "R7"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:plasma": {
+  "reason": "Jagged arcs turn in 8 seconds with fast jitter",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "fails"
+ },
+ "Goal:prism": {
+  "reason": "Prism and spectrum read; no clear center to aim for",
+  "rules": [
+   "R7"
+  ],
+  "verdict": "borderline"
+ },
+ "Goal:rainbow": {
+  "reason": "Fast spinning rainbow swirl; disorienting",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "fails"
+ },
+ "Goal:slate": {
+  "reason": "Generic banded rings in gray; nothing to recognize",
+  "rules": [
+   "R1"
+  ],
+  "verdict": "fails"
+ },
+ "Goal:soccerNet": {
+  "reason": "Goal mouth with posts, net and grass strip",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Goal:tractorBeam": {
+  "reason": "Saucer, light cone and a glowing landing pad",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Goal:wormhole": {
+  "reason": "Rings in perspective fall to a bright vanishing point",
+  "rules": [],
+  "theme": "Planets and space",
+  "verdict": "meets"
+ },
+ "Pit:downpour": {
+  "reason": "Still rain streaks; rain should fall, depth is thin",
+  "rules": [
+   "R6",
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Pit:dusk": {
+  "reason": "Flat fill; no layers",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Pit:eclipse": {
+  "reason": "Good dark core and corona; vanishes under Reduce Motion",
+  "rules": [
+   "R6"
+  ],
+  "verdict": "borderline"
+ },
+ "Pit:ember": {
+  "reason": "Two layers; glow sits in the core, which should be dark",
+  "rules": [
+   "R5",
+   "R7"
+  ],
+  "verdict": "borderline"
+ },
+ "Pit:inverted": {
+  "reason": "Flat fill; no layers",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "fails"
+ },
+ "Pit:mirage": {
+  "reason": "Wavy rings; no ledges; owner replaced it",
+  "rules": [
+   "R5",
+   "R1"
+  ],
+  "verdict": "borderline"
+ },
+ "Pit:notebook": {
+  "reason": "Torn edge and rules, but no stepped depth",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Pit:origami": {
+  "reason": "Folded-paper creases stepping down into a funnel",
+  "rules": [],
+  "theme": "Paper and school",
+  "verdict": "meets"
+ },
+ "Pit:pocket": {
+  "reason": "Stitched leather rim with net falling into the dark",
+  "rules": [],
+  "theme": "Sports",
+  "verdict": "meets"
+ },
+ "Pit:sky": {
+  "reason": "Bright blue sky with clouds; does not read as a hole",
+  "rules": [
+   "R7"
+  ],
+  "verdict": "fails"
+ },
+ "Pit:sunset": {
+  "reason": "Single red-to-purple gradient",
+  "rules": [
+   "R5",
+   "R1"
+  ],
+  "verdict": "fails"
+ },
+ "Pit:velvet": {
+  "reason": "Soft sheen on one wall; shallow",
+  "rules": [
+   "R5"
+  ],
+  "verdict": "borderline"
+ },
+ "Trail:ember": {
+  "reason": "Good sparks, but a third fire-colored trail",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
+ "Trail:snake": {
+  "reason": "Scaled body laid on the path, sheds from the tail",
+  "rules": [],
+  "theme": "Jungle and animals",
+  "verdict": "meets"
+ }
+}

@@ -31,160 +31,162 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 
 "Approved?" is from the quality round: only pieces in the collections on sale were graded. A piece marked *displaced* was replaced inside an active collection in that round; *not graded* means it was never reviewed.
 
+"Verdict vs standard" is an audit against `docs/cosmetics/quality-standard.md` (rules R1 to R9), made by reading each piece's drawing code, not by looking at it on screen. The verdicts live in `tools/cosmetic-calendar/held_verdicts.json`. Held pieces were **not changed**; a piece that is borderline or fails needs a redraw before it can anchor a collection.
+
 ### Balls held: 53
 
-| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? |
-|---|---|---|---|---|---|---|
-| Ball | Ocean Blue | `blue` | Standard | 750 | Eclipse (retired) | Not graded |
-| Ball | Jade Green | `green` | Standard | 750 | Zen Garden (retired) | Not graded |
-| Ball | Deep Purple | `purple` | Standard | 750 | Velvet Night (retired) | Not graded |
-| Ball | Coral | `coral` | Standard | 750 | Golden Hour (retired) | Not graded |
-| Ball | Mint | `mint` | Standard | 750 | in no collection | Not graded |
-| Ball | Slate | `slate` | Standard | 750 | Noir (retired) | Not graded |
-| Ball | Silver | `silver` | Standard | 750 | Sketchbook (displaced in the quality round) | No: displaced (replaced in the quality round) |
-| Ball | Copper | `copper` | Standard | 750 | Arcade (retired); Midnight Carnival (retired) | Not graded |
-| Ball | Ruby | `ruby` | Standard | 750 | Hellfire (retired) | Not graded |
-| Ball | Galaxy | `galaxy` | Legendary | 1,500 | in no collection | Not graded |
-| Ball | Opal | `opal` | Epic | 1,250 | Heavens (retired); Crystal Cavern (retired); Vintage Glass Marbles pack | Not graded |
-| Ball | Earth | `earth` | Legendary | 1,500 | Planets (retired); Earth Day (seasonal); Planets pack | Not graded |
-| Ball | Mars | `mars` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Saturn | `saturn` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Mercury | `mercury` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Neptune | `neptune` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Jupiter | `jupiter` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Venus | `venus` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Uranus | `uranus` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded |
-| Ball | Pluto | `pluto` | Legendary | 1,500 | Planets (retired) | Not graded |
-| Ball | Pastel | `pastel` | Epic | 1,250 | Pastel (retired) | Not graded |
-| Ball | Soccer Ball | `soccer` | Epic | 1,250 | Soccer (retired); Sports Balls pack | Not graded |
-| Ball | Marble | `marble` | Legendary | 1,500 | Realistic Marble (retired); Vintage Glass Marbles pack | Not graded |
-| Ball | Storm | `storm` | Legendary | 1,500 | Tempest (retired) | Not graded |
-| Ball | Paper | `paper` | Epic | 1,250 | Paper World (retired) | Not graded |
-| Ball | Basketball | `basketball` | Epic | 1,250 | Full Court (retired); Sports Balls pack | Not graded |
-| Ball | 8-Ball | `eightBall` | Epic | 1,250 | Billiards Hall (retired) | Not graded |
-| Ball | Baseball | `baseball` | Epic | 1,250 | Diamond (retired); Sports Balls pack | Not graded |
-| Ball | Beach Ball | `beachBall` | Legendary | 1,500 | Summer Vibes (seasonal) | Not graded |
-| Ball | Pumpkin | `pumpkin` | Legendary | 1,500 | Trick or Roll (seasonal) | Not graded |
-| Ball | Ornament | `ornament` | Legendary | 1,500 | Winter Wonderland (seasonal) | Not graded |
-| Ball | Heartstone | `heartstone` | Legendary | 1,500 | Sweetheart (seasonal) | Not graded |
-| Ball | Shamrock | `shamrock` | Legendary | 1,500 | Luck of the Roll (seasonal) | Not graded |
-| Ball | Confetti | `confetti` | Legendary | 1,500 | Countdown (seasonal) | Not graded |
-| Ball | Speckled Egg | `speckledEgg` | Legendary | 1,500 | Spring Fling (seasonal) | Not graded |
-| Ball | High Roller | `highRoller` | Legendary | 1,500 | High Roller (retired) | Not graded |
-| Ball | Quicksilver | `quicksilver` | Legendary | 1,500 | Quicksilver (retired) | Not graded |
-| Ball | Oracle | `oracle` | Legendary | 1,500 | Oracle (retired) | Not graded |
-| Ball | Geode | `geode` | Epic | 1,250 | Geode (retired) | Not graded |
-| Ball | Lava Lamp | `lavaLamp` | Legendary | 1,500 | Lava Lamp (retired) | Not graded |
-| Ball | Plasma Globe | `plasmaGlobe` | Legendary | 1,500 | Plasma Globe (retired) | Not graded |
-| Ball | Cathedral | `cathedral` | Epic | 1,250 | Cathedral (retired) | Not graded |
-| Ball | Magma Core | `magmaCore` | Legendary | 1,500 | Magma Core (retired) | Not graded |
-| Ball | Hologram | `hologram` | Legendary | 1,500 | Neon City (retired) | Not graded |
-| Ball | Clockwork | `clockwork` | Legendary | 1,500 | Clockwork (retired) | Not graded |
-| Ball | Fireworks | `fireworks` | Legendary | 1,500 | Star-Spangled (seasonal) | Not graded |
-| Ball | Sugar Skull | `sugarSkull` | Legendary | 1,500 | Día de los Muertos (seasonal) | Not graded |
-| Ball | Harvest Moon | `harvest` | Legendary | 1,500 | Harvest Moon (seasonal) | Not graded |
-| Ball | Golden Dragon | `lunarDragon` | Legendary | 1,500 | Lunar New Year (seasonal) | Not graded |
-| Ball | Mardi Gras | `mardiGras` | Legendary | 1,500 | Mardi Gras (seasonal) | Not graded |
-| Ball | Spectrum | `spectrum` | Legendary | 1,500 | Spectrum (seasonal) | Not graded |
-| Ball | Oktoberfest | `oktoberfest` | Legendary | 1,500 | Oktoberfest (seasonal) | Not graded |
-| Ball | Teacher's Apple | `apple` | Legendary | 1,500 | Back to School (seasonal) | Not graded |
+| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
+|---|---|---|---|---|---|---|---|---|
+| Ball | Ocean Blue | `blue` | Standard | 750 | Eclipse (retired) | Not graded | Fails (R1, R5) | Plain shaded sphere; a color with a name, no subject |
+| Ball | Jade Green | `green` | Standard | 750 | Zen Garden (retired) | Not graded | Fails (R1, R5) | Plain shaded sphere; a color with a name, no subject |
+| Ball | Deep Purple | `purple` | Standard | 750 | Velvet Night (retired) | Not graded | Fails (R1, R5) | Plain shaded sphere; a color with a name, no subject |
+| Ball | Coral | `coral` | Standard | 750 | Golden Hour (retired) | Not graded | Fails (R1, R5) | Plain shaded sphere; a color with a name, no subject |
+| Ball | Mint | `mint` | Standard | 750 | in no collection | Not graded | Fails (R1, R5) | Plain shaded sphere; a color with a name, no subject |
+| Ball | Slate | `slate` | Standard | 750 | Noir (retired) | Not graded | Fails (R1, R5) | Plain shaded sphere; a color with a name, no subject |
+| Ball | Silver | `silver` | Standard | 750 | Sketchbook (displaced in the quality round) | No: displaced (replaced in the quality round) | Fails (R1) | Generic metal-sheen sphere; no recognizable object |
+| Ball | Copper | `copper` | Standard | 750 | Arcade (retired); Midnight Carnival (retired) | Not graded | Fails (R1) | Generic metal-sheen sphere; no recognizable object |
+| Ball | Ruby | `ruby` | Standard | 750 | Hellfire (retired) | Not graded | Fails (R1) | Gem-tinted gradient sphere; no facets, not a cut ruby |
+| Ball | Galaxy | `galaxy` | Legendary | 1,500 | in no collection | Not graded | Borderline (R6, R8) | All 55 stars twinkle at once; near twin of Galaxy goal |
+| Ball | Opal | `opal` | Epic | 1,250 | Heavens (retired); Crystal Cavern (retired); Vintage Glass Marbles pack | Not graded | Meets | Slow shifting play-of-color on milky stone; calm |
+| Ball | Earth | `earth` | Legendary | 1,500 | Planets (retired); Earth Day (seasonal); Planets pack | Not graded | Borderline (R1, R8) | Mottled blobs, no recognizable continents; shared planet recipe |
+| Ball | Mars | `mars` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Borderline (R8) | Mottle and polar caps read as Mars; shared planet recipe |
+| Ball | Saturn | `saturn` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Meets | Tilted rings pass in front and behind; unmistakable |
+| Ball | Mercury | `mercury` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Borderline (R1, R8) | Gray mottle without craters; shared planet recipe |
+| Ball | Neptune | `neptune` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Meets | Blue bands with the dark spot read as Neptune |
+| Ball | Jupiter | `jupiter` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Meets | Cloud bands and the red spot make it Jupiter |
+| Ball | Venus | `venus` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Borderline (R1, R8) | Plain cream bands; twin of the Uranus recipe |
+| Ball | Uranus | `uranus` | Legendary | 1,500 | Planets (retired); Planets pack | Not graded | Borderline (R1, R8) | Plain pale bands; no tilt or ring; twin of Venus |
+| Ball | Pluto | `pluto` | Legendary | 1,500 | Planets (retired) | Not graded | Meets | Tan dwarf planet with its cream heart; distinctive |
+| Ball | Pastel | `pastel` | Epic | 1,250 | Pastel (retired) | Not graded | Fails (R1, R5) | Glossy pastel gradient; a color scheme, not a thing |
+| Ball | Soccer Ball | `soccer` | Epic | 1,250 | Soccer (retired); Sports Balls pack | Not graded | Meets | Classic pentagon panels wrapping the sphere |
+| Ball | Marble | `marble` | Legendary | 1,500 | Realistic Marble (retired); Vintage Glass Marbles pack | Not graded | Borderline (R6) | Cat's-eye vane turns once in under 4 seconds |
+| Ball | Storm | `storm` | Legendary | 1,500 | Tempest (retired) | Not graded | Fails (R4, R8) | Jagged bolt symbol on cloud; twin of Thundercloud ball |
+| Ball | Paper | `paper` | Epic | 1,250 | Paper World (retired) | Not graded | Meets | Crumpled paper with fold creases and facets |
+| Ball | Basketball | `basketball` | Epic | 1,250 | Full Court (retired); Sports Balls pack | Not graded | Meets | Orange leather with the real seam pattern |
+| Ball | 8-Ball | `eightBall` | Epic | 1,250 | Billiards Hall (retired) | Not graded | Meets | Black ball with its numbered white spot; the real thing |
+| Ball | Baseball | `baseball` | Epic | 1,250 | Diamond (retired); Sports Balls pack | Not graded | Meets | Leather with two stitched seams near opposite sides |
+| Ball | Beach Ball | `beachBall` | Legendary | 1,500 | Summer Vibes (seasonal) | Not graded | Meets | Six glossy inflatable panels, lazy slow drift |
+| Ball | Pumpkin | `pumpkin` | Legendary | 1,500 | Trick or Roll (seasonal) | Not graded | Borderline (R6) | Carved face is right; candle flicker is too fast |
+| Ball | Ornament | `ornament` | Legendary | 1,500 | Winter Wonderland (seasonal) | Not graded | Meets | Mirror-glass bauble with gold cap and stripe |
+| Ball | Heartstone | `heartstone` | Legendary | 1,500 | Sweetheart (seasonal) | Not graded | Fails (R4) | Gold heart symbol stamped on a pink sphere |
+| Ball | Shamrock | `shamrock` | Legendary | 1,500 | Luck of the Roll (seasonal) | Not graded | Fails (R4) | White clover symbol stamped on a green sphere |
+| Ball | Confetti | `confetti` | Legendary | 1,500 | Countdown (seasonal) | Not graded | Borderline (R1, R6) | Gold sphere with tumbling flecks; pieces spin fast |
+| Ball | Speckled Egg | `speckledEgg` | Legendary | 1,500 | Spring Fling (seasonal) | Not graded | Borderline (R1) | Speckles are right; an egg should be egg-shaped |
+| Ball | High Roller | `highRoller` | Legendary | 1,500 | High Roller (retired) | Not graded | Fails (R6) | Roulette wheel whips round and snaps to a stop |
+| Ball | Quicksilver | `quicksilver` | Legendary | 1,500 | Quicksilver (retired) | Not graded | Meets | Liquid chrome reflections flowing slowly |
+| Ball | Oracle | `oracle` | Legendary | 1,500 | Oracle (retired) | Not graded | Meets | Crystal ball: drifting fog around a small star core |
+| Ball | Geode | `geode` | Epic | 1,250 | Geode (retired) | Not graded | Meets | Agate bands opening to a sparkling crystal center |
+| Ball | Lava Lamp | `lavaLamp` | Legendary | 1,500 | Lava Lamp (retired) | Not graded | Meets | Wax blobs rising slowly through colored fluid |
+| Ball | Plasma Globe | `plasmaGlobe` | Legendary | 1,500 | Plasma Globe (retired) | Not graded | Borderline (R6) | Tendrils are right; they flicker and jump too fast |
+| Ball | Cathedral | `cathedral` | Epic | 1,250 | Cathedral (retired) | Not graded | Meets | Leaded rose window with a slow passing light |
+| Ball | Magma Core | `magmaCore` | Legendary | 1,500 | Magma Core (retired) | Not graded | Borderline (R8) | Good, but now a near twin of the redrawn Lava ball |
+| Ball | Hologram | `hologram` | Legendary | 1,500 | Neon City (retired) | Not graded | Fails (R6) | Deliberate glitch jitter and flicker; disorienting |
+| Ball | Clockwork | `clockwork` | Legendary | 1,500 | Clockwork (retired) | Not graded | Meets | Brass gears that mesh and turn slowly |
+| Ball | Fireworks | `fireworks` | Legendary | 1,500 | Star-Spangled (seasonal) | Not graded | Borderline (R6) | Bursts bloom fully in and out every 2.6 seconds |
+| Ball | Sugar Skull | `sugarSkull` | Legendary | 1,500 | Día de los Muertos (seasonal) | Not graded | Meets | Ornate calavera with marigold eyes; festive, calm |
+| Ball | Harvest Moon | `harvest` | Legendary | 1,500 | Harvest Moon (seasonal) | Not graded | Borderline (R1) | Leaf silhouettes on amber; not clearly a harvest moon |
+| Ball | Golden Dragon | `lunarDragon` | Legendary | 1,500 | Lunar New Year (seasonal) | Not graded | Borderline (R1) | Gold scales and filigree; no dragon to recognize |
+| Ball | Mardi Gras | `mardiGras` | Legendary | 1,500 | Mardi Gras (seasonal) | Not graded | Borderline (R1) | Harlequin pattern, not an object (mask or beads) |
+| Ball | Spectrum | `spectrum` | Legendary | 1,500 | Spectrum (seasonal) | Not graded | Borderline (R1, R6) | Rainbow bands scroll across the whole ball |
+| Ball | Oktoberfest | `oktoberfest` | Legendary | 1,500 | Oktoberfest (seasonal) | Not graded | Borderline (R1) | Bavarian pattern with foam; not clearly a stein |
+| Ball | Teacher's Apple | `apple` | Legendary | 1,500 | Back to School (seasonal) | Not graded | Borderline (R1) | Leaf and stem are right; an apple should be apple-shaped |
 
 ### Goals held: 18
 
-| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? |
-|---|---|---|---|---|---|---|
-| Goal | Archery | `archery` | Standard | 750 | Sketchbook (displaced in the quality round) | No: displaced (replaced in the quality round) |
-| Goal | Ember | `ember` | Standard | 750 | in no collection | Not graded |
-| Goal | Meadow | `meadow` | Standard | 750 | Nature (displaced in the quality round) | No: displaced (replaced in the quality round) |
-| Goal | Amethyst | `amethyst` | Standard | 750 | in no collection | Not graded |
-| Goal | Slate | `slate` | Standard | 750 | in no collection | Not graded |
-| Goal | Wormhole | `wormhole` | Standard | 750 | in no collection | Not graded |
-| Goal | Crystal | `crystal` | Epic | 1,250 | Realistic Marble (retired); Winter Wonderland (seasonal); Billiards Hall (retired); Geode (retired) | Not graded |
-| Goal | Flame | `flame` | Epic | 1,250 | Citrus (displaced in the quality round); Harvest Moon (seasonal); Lunar New Year (seasonal) | No: displaced (replaced in the quality round) |
-| Goal | Comet | `comet` | Epic | 1,250 | Arcade (retired) | Not graded |
-| Goal | Rainbow | `rainbow` | Legendary | 1,500 | Zen Garden (retired); Countdown (seasonal); Star-Spangled (seasonal); Spectrum (seasonal) | Not graded |
-| Goal | Plasma | `plasma` | Epic | 1,250 | Velvet Night (retired); Tempest (retired); Mardi Gras (seasonal); Lava Lamp (retired) | Not graded |
-| Goal | Mirage | `mirage` | Epic | 1,250 | Golden Hour (retired); Dune (retired); Luck of the Roll (seasonal); Oktoberfest (seasonal) | Not graded |
-| Goal | Prism | `prism` | Legendary | 1,500 | Crystal Cavern (retired); Quicksilver (retired); Cathedral (retired) | Not graded |
-| Goal | Obsidian | `obsidian` | Epic | 1,250 | Haunted (displaced in the quality round); Noir (retired); Trick or Roll (seasonal) | No: displaced (replaced in the quality round) |
-| Goal | Tractor Beam | `tractorBeam` | Legendary | 1,500 | Space Travel (retired) | Not graded |
-| Goal | Halo | `halo` | Legendary | 1,500 | Heavens (retired) | Not graded |
-| Goal | Doodle | `doodle` | Legendary | 1,500 | Paper World (retired) | Not graded |
-| Goal | Soccer Net | `soccerNet` | Legendary | 1,500 | Soccer (retired) | Not graded |
+| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
+|---|---|---|---|---|---|---|---|---|
+| Goal | Archery | `archery` | Standard | 750 | Sketchbook (displaced in the quality round) | No: displaced (replaced in the quality round) | Borderline (R8) | A real archery face, but twin of the Target goal |
+| Goal | Ember | `ember` | Standard | 750 | in no collection | Not graded | Meets | Ash rings, glowing coals, hot core as the target |
+| Goal | Meadow | `meadow` | Standard | 750 | Nature (displaced in the quality round) | No: displaced (replaced in the quality round) | Borderline (R1) | Daisy ring is thin; owner asked for a better one |
+| Goal | Amethyst | `amethyst` | Standard | 750 | in no collection | Not graded | Meets | Rock rim, inward crystal points, dark geode center |
+| Goal | Slate | `slate` | Standard | 750 | in no collection | Not graded | Fails (R1) | Generic banded rings in gray; nothing to recognize |
+| Goal | Wormhole | `wormhole` | Standard | 750 | in no collection | Not graded | Meets | Rings in perspective fall to a bright vanishing point |
+| Goal | Crystal | `crystal` | Epic | 1,250 | Realistic Marble (retired); Winter Wonderland (seasonal); Billiards Hall (retired); Geode (retired) | Not graded | Borderline (R1, R6) | Eight flat pie facets shimmering every 3 seconds |
+| Goal | Flame | `flame` | Epic | 1,250 | Citrus (displaced in the quality round); Harvest Moon (seasonal); Lunar New Year (seasonal) | No: displaced (replaced in the quality round) | Fails (R6, R8) | Fast flame flicker; twin of the Flame Ring goal |
+| Goal | Comet | `comet` | Epic | 1,250 | Arcade (retired) | Not graded | Fails (R6) | Streaks whirl a full turn in under 6 seconds |
+| Goal | Rainbow | `rainbow` | Legendary | 1,500 | Zen Garden (retired); Countdown (seasonal); Star-Spangled (seasonal); Spectrum (seasonal) | Not graded | Fails (R6) | Fast spinning rainbow swirl; disorienting |
+| Goal | Plasma | `plasma` | Epic | 1,250 | Velvet Night (retired); Tempest (retired); Mardi Gras (seasonal); Lava Lamp (retired) | Not graded | Fails (R6) | Jagged arcs turn in 8 seconds with fast jitter |
+| Goal | Mirage | `mirage` | Epic | 1,250 | Golden Hour (retired); Dune (retired); Luck of the Roll (seasonal); Oktoberfest (seasonal) | Not graded | Borderline (R1, R6) | Wavy bands; nothing recognizable as a mirage |
+| Goal | Prism | `prism` | Legendary | 1,500 | Crystal Cavern (retired); Quicksilver (retired); Cathedral (retired) | Not graded | Borderline (R7) | Prism and spectrum read; no clear center to aim for |
+| Goal | Obsidian | `obsidian` | Epic | 1,250 | Haunted (displaced in the quality round); Noir (retired); Trick or Roll (seasonal) | No: displaced (replaced in the quality round) | Borderline (R7) | Dark glass on dark floors; center hard to find |
+| Goal | Tractor Beam | `tractorBeam` | Legendary | 1,500 | Space Travel (retired) | Not graded | Meets | Saucer, light cone and a glowing landing pad |
+| Goal | Halo | `halo` | Legendary | 1,500 | Heavens (retired) | Not graded | Meets | Golden halo with rays turning once in 25 seconds |
+| Goal | Doodle | `doodle` | Legendary | 1,500 | Paper World (retired) | Not graded | Meets | Wobbly pencil rings crowding to a deep center |
+| Goal | Soccer Net | `soccerNet` | Legendary | 1,500 | Soccer (retired) | Not graded | Meets | Goal mouth with posts, net and grass strip |
 
 ### Trails held: 2
 
-| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? |
-|---|---|---|---|---|---|---|
-| Trail | Ember | `ember` | Rare | 1,000 | Citrus (displaced in the quality round); Harvest Moon (seasonal); Oktoberfest (seasonal); Lava Lamp (retired) | No: displaced (replaced in the quality round) |
-| Trail | Snake | `snake` | Rare | 1,000 | Ancient Temple (displaced in the quality round); Zen Garden (retired) | No: displaced (replaced in the quality round) |
+| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
+|---|---|---|---|---|---|---|---|---|
+| Trail | Ember | `ember` | Rare | 1,000 | Citrus (displaced in the quality round); Harvest Moon (seasonal); Oktoberfest (seasonal); Lava Lamp (retired) | No: displaced (replaced in the quality round) | Borderline (R8) | Good sparks, but a third fire-colored trail |
+| Trail | Snake | `snake` | Rare | 1,000 | Ancient Temple (displaced in the quality round); Zen Garden (retired) | No: displaced (replaced in the quality round) | Meets | Scaled body laid on the path, sheds from the tail |
 
 ### Floors held: 11
 
-| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? |
-|---|---|---|---|---|---|---|
-| Floor | Notebook | `notebook` | Rare | 1,000 | Paper World (retired); Back to School (seasonal) | Not graded |
-| Floor | Graph | `graph` | Rare | 1,000 | Arcade (retired) | Not graded |
-| Floor | Dusk | `dusk` | Standard | 750 | Citrus (displaced in the quality round) | No: displaced (replaced in the quality round) |
-| Floor | Velvet | `velvet` | Standard | 750 | Velvet Night (retired); Realistic Marble (retired); Sweetheart (seasonal); Día de los Muertos (seasonal); Lunar New Year (seasonal); Geode (retired); Cathedral (retired) | Not graded |
-| Floor | Sunset | `sunset` | Standard | 750 | Golden Hour (retired) | Not graded |
-| Floor | Origami | `origami` | Rare | 1,000 | Zen Garden (retired) | Not graded |
-| Floor | Mirage | `mirage` | Standard | 750 | Midas (displaced in the quality round); Aquarium (retired) | No: displaced (replaced in the quality round) |
-| Floor | Stormcloud | `stormcloud` | Standard | 750 | Tempest (retired); Magma Core (retired) | Not graded |
-| Floor | Eclipse | `eclipse` | Legendary | 1,500 | Eclipse (retired) | Not graded |
-| Floor | Court | `court` | Standard | 750 | Full Court (retired) | Not graded |
-| Floor | Felt | `felt` | Standard | 750 | Billiards Hall (retired); High Roller (retired) | Not graded |
+| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
+|---|---|---|---|---|---|---|---|---|
+| Floor | Notebook | `notebook` | Rare | 1,000 | Paper World (retired); Back to School (seasonal) | Not graded | Meets | Ruled lines and a red margin; it is notebook paper |
+| Floor | Graph | `graph` | Rare | 1,000 | Arcade (retired) | Not graded | Meets | Pale graph-paper grid; quiet and true to name |
+| Floor | Dusk | `dusk` | Standard | 750 | Citrus (displaced in the quality round) | No: displaced (replaced in the quality round) | Fails (R5, R1) | Flat fill; no detail at all |
+| Floor | Velvet | `velvet` | Standard | 750 | Velvet Night (retired); Realistic Marble (retired); Sweetheart (seasonal); Día de los Muertos (seasonal); Lunar New Year (seasonal); Geode (retired); Cathedral (retired) | Not graded | Borderline (R5) | Sheen bands only; nothing to find on a close look |
+| Floor | Sunset | `sunset` | Standard | 750 | Golden Hour (retired) | Not graded | Fails (R1, R5) | Three wide color bands; a gradient, not a sunset |
+| Floor | Origami | `origami` | Rare | 1,000 | Zen Garden (retired) | Not graded | Borderline (R1, R5) | Diagonal fold lines only; no folded shapes |
+| Floor | Mirage | `mirage` | Standard | 750 | Midas (displaced in the quality round); Aquarium (retired) | No: displaced (replaced in the quality round) | Borderline (R1) | Wavy lines on sand; owner replaced it |
+| Floor | Stormcloud | `stormcloud` | Standard | 750 | Tempest (retired); Magma Core (retired) | Not graded | Fails (R6, R8) | Still cloud blobs; twin of the Overcast floor |
+| Floor | Eclipse | `eclipse` | Legendary | 1,500 | Eclipse (retired) | Not graded | Borderline (R7) | Large glowing corona on the floor competes with play |
+| Floor | Court | `court` | Standard | 750 | Full Court (retired) | Not graded | Meets | Hardwood planks with grain and a painted court line |
+| Floor | Felt | `felt` | Standard | 750 | Billiards Hall (retired); High Roller (retired) | Not graded | Fails (R5) | Flat green fill; no nap, chalk or wear |
 
 ### Pits held: 12
 
-| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? |
-|---|---|---|---|---|---|---|
-| Pit | Inverted | `inverted` | Standard | 750 | Noir (retired); Quicksilver (retired) | Not graded |
-| Pit | Ember | `ember` | Standard | 750 | in no collection | Not graded |
-| Pit | Notebook | `notebook` | Standard | 750 | Paper World (retired); Back to School (seasonal) | Not graded |
-| Pit | Dusk | `dusk` | Standard | 750 | Golden Hour (retired); Sweetheart (seasonal) | Not graded |
-| Pit | Velvet | `velvet` | Standard | 750 | Velvet Night (retired); Realistic Marble (retired); Lunar New Year (seasonal); Midnight Carnival (retired); Geode (retired); Cathedral (retired) | Not graded |
-| Pit | Sunset | `sunset` | Standard | 750 | Citrus (displaced in the quality round) | No: displaced (replaced in the quality round) |
-| Pit | Origami | `origami` | Standard | 750 | Zen Garden (retired) | Not graded |
-| Pit | Mirage | `mirage` | Standard | 750 | Midas (displaced in the quality round) | No: displaced (replaced in the quality round) |
-| Pit | Downpour | `downpour` | Standard | 750 | Tempest (retired); Magma Core (retired) | Not graded |
-| Pit | Sky | `sky` | Legendary | 1,500 | Heavens (retired); Spring Fling (seasonal) | Not graded |
-| Pit | Eclipse | `eclipse` | Legendary | 1,500 | Eclipse (retired) | Not graded |
-| Pit | Pocket | `pocket` | Standard | 750 | Billiards Hall (retired); High Roller (retired) | Not graded |
+| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
+|---|---|---|---|---|---|---|---|---|
+| Pit | Inverted | `inverted` | Standard | 750 | Noir (retired); Quicksilver (retired) | Not graded | Fails (R5) | Flat fill; no layers |
+| Pit | Ember | `ember` | Standard | 750 | in no collection | Not graded | Borderline (R5, R7) | Two layers; glow sits in the core, which should be dark |
+| Pit | Notebook | `notebook` | Standard | 750 | Paper World (retired); Back to School (seasonal) | Not graded | Borderline (R5) | Torn edge and rules, but no stepped depth |
+| Pit | Dusk | `dusk` | Standard | 750 | Golden Hour (retired); Sweetheart (seasonal) | Not graded | Fails (R5) | Flat fill; no layers |
+| Pit | Velvet | `velvet` | Standard | 750 | Velvet Night (retired); Realistic Marble (retired); Lunar New Year (seasonal); Midnight Carnival (retired); Geode (retired); Cathedral (retired) | Not graded | Borderline (R5) | Soft sheen on one wall; shallow |
+| Pit | Sunset | `sunset` | Standard | 750 | Citrus (displaced in the quality round) | No: displaced (replaced in the quality round) | Fails (R5, R1) | Single red-to-purple gradient |
+| Pit | Origami | `origami` | Standard | 750 | Zen Garden (retired) | Not graded | Meets | Folded-paper creases stepping down into a funnel |
+| Pit | Mirage | `mirage` | Standard | 750 | Midas (displaced in the quality round) | No: displaced (replaced in the quality round) | Borderline (R5, R1) | Wavy rings; no ledges; owner replaced it |
+| Pit | Downpour | `downpour` | Standard | 750 | Tempest (retired); Magma Core (retired) | Not graded | Borderline (R6, R5) | Still rain streaks; rain should fall, depth is thin |
+| Pit | Sky | `sky` | Legendary | 1,500 | Heavens (retired); Spring Fling (seasonal) | Not graded | Fails (R7) | Bright blue sky with clouds; does not read as a hole |
+| Pit | Eclipse | `eclipse` | Legendary | 1,500 | Eclipse (retired) | Not graded | Borderline (R6) | Good dark core and corona; vanishes under Reduce Motion |
+| Pit | Pocket | `pocket` | Standard | 750 | Billiards Hall (retired); High Roller (retired) | Not graded | Meets | Stitched leather rim with net falling into the dark |
 
 ### Boundaries held: 29
 
-| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? |
-|---|---|---|---|---|---|---|
-| Boundary | Ember | `ember` | Standard | 750 | in no collection | Not graded |
-| Boundary | Sky | `sky` | Standard | 750 | Summer Vibes (seasonal) | Not graded |
-| Boundary | Orchid | `orchid` | Standard | 750 | Mardi Gras (seasonal); Lava Lamp (retired) | Not graded |
-| Boundary | Sand | `sand` | Standard | 750 | Zen Garden (retired); Dune (retired) | Not graded |
-| Boundary | Obsidian | `obsidian` | Legendary | 1,500 | in no collection | Not graded |
-| Boundary | Circuit | `circuit` | Legendary | 1,500 | Neon City (retired) | Not graded |
-| Boundary | Notebook | `notebook` | Standard | 750 | Paper World (retired); Back to School (seasonal) | Not graded |
-| Boundary | Sunset | `sunset` | Standard | 750 | Golden Hour (retired) | Not graded |
-| Boundary | Ink | `ink` | Standard | 750 | Noir (retired) | Not graded |
-| Boundary | Pastel | `pastel` | Standard | 750 | Pastel (retired); Spring Fling (seasonal) | Not graded |
-| Boundary | Pumpkin | `pumpkin` | Standard | 750 | Trick or Roll (seasonal) | Not graded |
-| Boundary | Holly | `holly` | Standard | 750 | Winter Wonderland (seasonal) | Not graded |
-| Boundary | Shamrock | `shamrock` | Standard | 750 | Luck of the Roll (seasonal) | Not graded |
-| Boundary | Marigold | `marigold` | Standard | 750 | Día de los Muertos (seasonal) | Not graded |
-| Boundary | Autumn | `autumn` | Standard | 750 | Harvest Moon (seasonal); Oktoberfest (seasonal) | Not graded |
-| Boundary | Lantern | `lantern` | Standard | 750 | Lunar New Year (seasonal) | Not graded |
-| Boundary | Hardwood | `hardwood` | Standard | 750 | Full Court (retired) | Not graded |
-| Boundary | Cloud | `cloud` | Rare | 1,000 | Heavens (retired) | Not graded |
-| Boundary | Velvet | `velvet` | Rare | 1,000 | Velvet Night (retired) | Not graded |
-| Boundary | Marble | `marble` | Rare | 1,000 | Realistic Marble (retired) | Not graded |
-| Boundary | Mahogany | `mahogany` | Rare | 1,000 | Billiards Hall (retired); High Roller (retired) | Not graded |
-| Boundary | Amethyst | `amethyst` | Rare | 1,000 | Crystal Cavern (retired); Geode (retired) | Not graded |
-| Boundary | Chrome | `chrome` | Rare | 1,000 | Quicksilver (retired) | Not graded |
-| Boundary | Corona | `corona` | Legendary | 1,500 | Eclipse (retired) | Not graded |
-| Boundary | Storm | `storm` | Legendary | 1,500 | Tempest (retired); Plasma Globe (retired) | Not graded |
-| Boundary | Confetti | `confetti` | Legendary | 1,500 | Countdown (seasonal) | Not graded |
-| Boundary | Star-Spangled | `starSpangled` | Legendary | 1,500 | Star-Spangled (seasonal) | Not graded |
-| Boundary | Rainbow | `rainbow` | Legendary | 1,500 | Spectrum (seasonal) | Not graded |
-| Boundary | Stained Glass | `stainedGlass` | Legendary | 1,500 | Cathedral (retired) | Not graded |
+| Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
+|---|---|---|---|---|---|---|---|---|
+| Boundary | Ember | `ember` | Standard | 750 | in no collection | Not graded | Meets | Ash ring with scattered glowing coal specks |
+| Boundary | Sky | `sky` | Standard | 750 | Summer Vibes (seasonal) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Orchid | `orchid` | Standard | 750 | Mardi Gras (seasonal); Lava Lamp (retired) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Sand | `sand` | Standard | 750 | Zen Garden (retired); Dune (retired) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Obsidian | `obsidian` | Legendary | 1,500 | in no collection | Not graded | Meets | Black glass with a slow purple sheen, 25 s lap |
+| Boundary | Circuit | `circuit` | Legendary | 1,500 | Neon City (retired) | Not graded | Borderline (R6) | Signals race round the rim; nodes blink |
+| Boundary | Notebook | `notebook` | Standard | 750 | Paper World (retired); Back to School (seasonal) | Not graded | Meets | Ruled-paper band with blue rules and red margin |
+| Boundary | Sunset | `sunset` | Standard | 750 | Golden Hour (retired) | Not graded | Borderline (R1) | A color gradient round the ring; no sun or sky |
+| Boundary | Ink | `ink` | Standard | 750 | Noir (retired) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Pastel | `pastel` | Standard | 750 | Pastel (retired); Spring Fling (seasonal) | Not graded | Borderline (R1) | Blocks of pastel color; not a thing |
+| Boundary | Pumpkin | `pumpkin` | Standard | 750 | Trick or Roll (seasonal) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Holly | `holly` | Standard | 750 | Winter Wonderland (seasonal) | Not graded | Meets | Holly leaves and red berries along a green wall |
+| Boundary | Shamrock | `shamrock` | Standard | 750 | Luck of the Roll (seasonal) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Marigold | `marigold` | Standard | 750 | Día de los Muertos (seasonal) | Not graded | Fails (R1, R5) | Flat color wall with a name; no art |
+| Boundary | Autumn | `autumn` | Standard | 750 | Harvest Moon (seasonal); Oktoberfest (seasonal) | Not graded | Meets | Fallen leaves in red, orange and gold |
+| Boundary | Lantern | `lantern` | Standard | 750 | Lunar New Year (seasonal) | Not graded | Meets | Red paper lanterns hung along a dark cord |
+| Boundary | Hardwood | `hardwood` | Standard | 750 | Full Court (retired) | Not graded | Borderline (R8) | Wood grain; twin of the Mahogany boundary |
+| Boundary | Cloud | `cloud` | Rare | 1,000 | Heavens (retired) | Not graded | Meets | Puffy cloud edge drifting very slowly |
+| Boundary | Velvet | `velvet` | Rare | 1,000 | Velvet Night (retired) | Not graded | Borderline (R5) | Plum sheen bands only |
+| Boundary | Marble | `marble` | Rare | 1,000 | Realistic Marble (retired) | Not graded | Meets | Gray veining through white stone |
+| Boundary | Mahogany | `mahogany` | Rare | 1,000 | Billiards Hall (retired); High Roller (retired) | Not graded | Borderline (R8) | Polished wood grain; twin of the Hardwood boundary |
+| Boundary | Amethyst | `amethyst` | Rare | 1,000 | Crystal Cavern (retired); Geode (retired) | Not graded | Meets | Crystal facets with a slow passing glint |
+| Boundary | Chrome | `chrome` | Rare | 1,000 | Quicksilver (retired) | Not graded | Meets | Mirror metal with a slow gliding reflection |
+| Boundary | Corona | `corona` | Legendary | 1,500 | Eclipse (retired) | Not graded | Meets | Black rim, thin gold halo, one slow flare |
+| Boundary | Storm | `storm` | Legendary | 1,500 | Tempest (retired); Plasma Globe (retired) | Not graded | Fails (R6, R8) | Sharp flash every 3 seconds; twin of Thunderhead |
+| Boundary | Confetti | `confetti` | Legendary | 1,500 | Countdown (seasonal) | Not graded | Borderline (R6) | Colored dashes scroll round the rim without pause |
+| Boundary | Star-Spangled | `starSpangled` | Legendary | 1,500 | Star-Spangled (seasonal) | Not graded | Borderline (R6, R4) | Scrolling bunting with a star symbol twinkling |
+| Boundary | Rainbow | `rainbow` | Legendary | 1,500 | Spectrum (seasonal) | Not graded | Borderline (R6) | Spectrum laps the rim in 12 seconds; slightly fast |
+| Boundary | Stained Glass | `stainedGlass` | Legendary | 1,500 | Cathedral (retired) | Not graded | Meets | Jewel panes that brighten in turn, slowly |
 
 ## Counts per slot
 
@@ -199,3 +201,45 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | **Total** | **125** |
 
 The scarcest slot is **Trail** with 2 held piece(s), so at most **2** new full collection(s) could be built from held pieces alone. Each further collection needs new art in every slot that has run out, in this order of scarcity: Trail (2), Floor (11), Pit (12), Goal (18), Boundary (29), Ball (53).
+
+## Verdicts per slot
+
+| Slot | Held | Meets | Borderline | Fails | Not audited |
+|---|---|---|---|---|---|
+| Ball | 53 | 19 | 19 | 15 | 0 |
+| Goal | 18 | 7 | 6 | 5 | 0 |
+| Trail | 2 | 1 | 1 | 0 | 0 |
+| Floor | 11 | 3 | 4 | 4 | 0 |
+| Pit | 12 | 2 | 6 | 4 | 0 |
+| Boundary | 29 | 12 | 9 | 8 | 0 |
+| **Total** | **125** | **44** | **45** | **36** | **0** |
+
+## Ready to build collections around
+
+Held pieces that already meet the standard, grouped by a theme they could serve. A new collection needs one piece in every slot; a theme with gaps needs new art for the missing slots.
+
+| Theme | Ball | Goal | Trail | Floor | Pit | Boundary | Slots still missing |
+|---|---|---|---|---|---|---|---|
+| Paper and school | Paper | Doodle | — | Notebook, Graph | Origami | Notebook | Trail |
+| Sports | Soccer Ball, Basketball, 8-Ball, Baseball | Soccer Net | — | Court | Pocket | — | Trail, Boundary |
+| Cathedral and heavens | Cathedral | Halo | — | — | — | Cloud, Stained Glass | Trail, Floor, Pit |
+| Gems and crystal | Opal, Oracle, Geode | Amethyst | — | — | — | Marble, Amethyst | Trail, Floor, Pit |
+| Planets and space | Saturn, Neptune, Jupiter, Pluto | Wormhole, Tractor Beam | — | — | — | Corona | Trail, Floor, Pit |
+| Fire and embers | — | Ember | — | — | — | Ember, Obsidian | Ball, Trail, Floor, Pit |
+| Holidays | Sugar Skull | — | — | — | — | Autumn, Lantern | Goal, Trail, Floor, Pit |
+| Metal and machines | Quicksilver, Clockwork | — | — | — | — | Chrome | Goal, Trail, Floor, Pit |
+| Winter holiday | Ornament | — | — | — | — | Holly | Goal, Trail, Floor, Pit |
+| Jungle and animals | — | — | Snake | — | — | — | Ball, Goal, Floor, Pit, Boundary |
+| Retro | Lava Lamp | — | — | — | — | — | Goal, Trail, Floor, Pit, Boundary |
+| Summer and beach | Beach Ball | — | — | — | — | — | Goal, Trail, Floor, Pit, Boundary |
+
+**New art needed.** Counting only held pieces that meet the standard, and ignoring whether their themes match, each slot has: Ball 19, Goal 7, Trail 1, Floor 3, Pit 2, Boundary 12. To build N new collections from them:
+
+| New collections | Ball | Goal | Trail | Floor | Pit | Boundary |
+|---|---|---|---|---|---|---|
+| 1 | enough | enough | enough | enough | enough | enough |
+| 2 | enough | enough | 1 new | enough | enough | enough |
+| 3 | enough | enough | 2 new | enough | 1 new | enough |
+| 5 | enough | enough | 4 new | 2 new | 3 new | enough |
+
+Themes rarely line up across slots, so in practice most new collections will need new trails, floors and pits drawn for them, with held balls, goals and boundaries as the starting point.
