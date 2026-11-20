@@ -355,6 +355,8 @@ enum GoalSkin: String, CosmeticItem {
     case doodle         // Paper World bundle — hand-drawn pencil bullseye on paper
     case soccerNet      // Soccer bundle — goal mouth with white netting
     case aurora         // Aurora bundle — glowing northern-lights portal
+    // — Quality round: Champion —
+    case winnersCircle  // Champion — a gold laurel wreath around a deep-crimson winner's circle
 
     var id: String { rawValue }
     var displayName: String {
@@ -395,6 +397,8 @@ enum GoalSkin: String, CosmeticItem {
         case .halo:        return "Halo"
         case .doodle:      return "Doodle"
         case .soccerNet:   return "Soccer Net"
+        // — Quality round: Champion —
+        case .winnersCircle: return "Winner's Circle"
         }
     }
 
@@ -514,6 +518,10 @@ enum GoalSkin: String, CosmeticItem {
                 hueBase: 0.90, hueRange: 0.30, saturation: 1.0,
                 bgColor: Color(red: 0.02, green: 0.00, blue: 0.04)
             )
+        // — Quality round: Champion — (bespoke renderer; placeholder style)
+        case .winnersCircle:
+            return HoleStyle(hueBase: 0.12, hueRange: 0.05, saturation: 0.9,
+                             bgColor: Color(red: 0.20, green: 0.02, blue: 0.05))
         }
     }
 
@@ -716,6 +724,18 @@ enum GoalSkin: String, CosmeticItem {
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .vortex, .wormhole:
             return AnyShapeStyle(Self.ringPortalPreview(goal.portalStops ?? [], endRadius: endRadius))
+        // — Quality round: Champion —
+        case .winnersCircle:
+            // Deep crimson center inside a gold wreath ring.
+            return AnyShapeStyle(RadialGradient(
+                stops: [
+                    .init(color: Color(red: 0.42, green: 0.04, blue: 0.08), location: 0.00),
+                    .init(color: Color(red: 0.62, green: 0.08, blue: 0.12), location: 0.42),
+                    .init(color: Color(red: 1.00, green: 0.90, blue: 0.52), location: 0.46),
+                    .init(color: Color(red: 0.86, green: 0.64, blue: 0.16), location: 0.78),
+                    .init(color: Color(red: 0.36, green: 0.44, blue: 0.14), location: 1.00),
+                ],
+                center: .center, startRadius: 0, endRadius: endRadius))
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -843,6 +863,8 @@ enum GoalSkin: String, CosmeticItem {
         case .halo:        return Color(red: 1.00, green: 0.86, blue: 0.42)
         case .doodle:      return Color(red: 0.55, green: 0.60, blue: 0.75)
         case .soccerNet:   return Color(red: 0.85, green: 0.92, blue: 1.00)
+        // — Quality round: Champion —
+        case .winnersCircle: return Color(red: 1.00, green: 0.84, blue: 0.36)
         }
     }
     /// Tier rule (player-facing: Standard / Epic / Legendary):
@@ -867,6 +889,9 @@ enum GoalSkin: String, CosmeticItem {
         case .rainbow, .neon, .mosaic, .prism, .quasar, .holeInOne, .tractorBeam,
              .inferno, .halo, .doodle, .soccerNet, .aurora:
             return .exclusive  // 1,500 coins — animated, full-spectrum, or bespoke
+        // — Quality round: Champion — (takes Quasar's tier)
+        case .winnersCircle:
+            return .exclusive
         }
     }
 }
@@ -901,6 +926,9 @@ enum TrailColor: String, CosmeticItem {
     case wildfire       // Fire set: red line with flame tongues
     case splash         // Water set: blue line with droplets and ripple rings
     case squall         // Storm set: gray cloud puffs with small yellow zig-zags
+    // — Quality round: Champion / Ancient Temple —
+    case victoryLap     // Champion: gold ribbon with ticker-tape confetti that flutters down and settles
+    case glyphs         // Ancient Temple: carved glyphs pressed into the sand along the path
 
     var id: String { rawValue }
     var displayName: String {
@@ -929,6 +957,9 @@ enum TrailColor: String, CosmeticItem {
         case .wildfire:    return "Wildfire"
         case .splash:      return "Splash"
         case .squall:      return "Squall"
+        // — Quality round: Champion / Ancient Temple —
+        case .victoryLap:  return "Victory Lap"
+        case .glyphs:      return "Glyphs"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -958,6 +989,11 @@ enum TrailColor: String, CosmeticItem {
              .roseTrail,       // audit 2026-07 ruling 1(c): full trailAge petal lifecycle — Legendary
              .moneyRoll:       // top-coin-pack ($49.99) IAP secret — Legendary, never coin-bought
             return .exclusive  // 1,500 coins — animated / special-effect
+        // — Quality round — each takes the tier of the trail it replaces.
+        case .victoryLap:      // Champion (replaces Comet)
+            return .exclusive
+        case .glyphs:          // Ancient Temple (replaces Snake)
+            return .rare
         }
     }
 
@@ -997,6 +1033,9 @@ enum TrailColor: String, CosmeticItem {
         case .wildfire:    return Color(red: 0.86, green: 0.16, blue: 0.08).opacity(0.85)
         case .splash:      return Color(red: 0.22, green: 0.52, blue: 0.95).opacity(0.80)
         case .squall:      return Color(red: 0.46, green: 0.48, blue: 0.54).opacity(0.80)
+        // — Quality round: Champion / Ancient Temple —
+        case .victoryLap:  return Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.92)   // gold ribbon; confetti in renderer
+        case .glyphs:      return Color(red: 0.60, green: 0.40, blue: 0.20).opacity(0.80)   // carved-sand shadow
         }
     }
 }
@@ -1057,7 +1096,7 @@ enum Floor: String, CosmeticItem {
         case .classic:    return "Classic"
         case .moneyFull:  return "Money Full"
         case .inverted:   return "Inverted"
-        case .twilight:   return "Twilight"
+        case .twilight:   return "Snowfield"   // id stays "twilight" (Winter set: blue-hour snow)
         case .ember:      return "Ember"
         case .notebook:   return "Notebook"
         case .graph:      return "Graph"
@@ -1226,13 +1265,15 @@ enum Pit: String, CosmeticItem {
     // Sports bundles (new)
     case sideline         // Full Court bundle — dark-grey out-of-bounds edge
     case pocket           // Billiards Hall bundle — near-black pool pocket
+    // — Quality round: Abyssal Depths —
+    case vent             // Abyssal Depths — deep-sea vent: basalt ledges, a glowing throat, rising bubbles
 
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .classic:    return "Classic"
         case .inverted:   return "Inverted"
-        case .twilight:   return "Twilight"
+        case .twilight:   return "Crevasse"    // id stays "twilight" (Winter set: a crack in the ice)
         case .ember:      return "Ember"
         case .notebook:   return "Notebook"
         case .graph:      return "Graph"
@@ -1262,6 +1303,8 @@ enum Pit: String, CosmeticItem {
         case .nightclub:  return "Nightclub"
         case .sideline:   return "Sideline"
         case .pocket:     return "Pocket"
+        // — Quality round: Abyssal Depths —
+        case .vent:       return "Sea Vent"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -1282,6 +1325,9 @@ enum Pit: String, CosmeticItem {
             return .rare       // 1,000 coins — drawn art with gentle motion
         case .evil, .sky, .pond, .space, .eclipse, .nightclub:
             return .exclusive  // 1,500 coins — animated overlay
+        // — Quality round: Abyssal Depths — (takes the Space pit's tier)
+        case .vent:
+            return .exclusive
         }
     }
 
@@ -1322,6 +1368,8 @@ enum Pit: String, CosmeticItem {
         case .nightclub:  return Color(red: 0.06,  green: 0.04,  blue: 0.10 )  // dark; disco lights drift on top
         case .sideline:   return Color(red: 0.14,  green: 0.14,  blue: 0.16 )  // dark court edge / out-of-bounds
         case .pocket:     return Color(red: 0.06,  green: 0.08,  blue: 0.06 )  // near-black pool pocket
+        // — Quality round: Abyssal Depths —
+        case .vent:       return Color(red: 0.02,  green: 0.04,  blue: 0.07 )  // black water; basalt ledges + vent glow drawn over
         }
     }
 
@@ -1332,6 +1380,7 @@ enum Pit: String, CosmeticItem {
         switch self {
         case .evil, .sky, .pond, .space, .eclipse, .nightclub,
              .graveyard, .aurora: return true
+        case .vent: return true        // Quality round: Abyssal Depths
         default: return false
         }
     }
@@ -1346,6 +1395,9 @@ enum Pit: String, CosmeticItem {
              .parchment, .sketch, .origami, .velvet, .sunset, .mirage,
              .aurora, .canyon, .downpour, .syrup, .sideline, .pocket,
              .crater, .deepEnd, .maelstrom:
+            return true
+        // — Quality round: Winter's Crevasse (id twilight) and Abyssal Depths' Sea Vent —
+        case .twilight, .vent:
             return true
         default:
             return false
@@ -1433,6 +1485,8 @@ enum Boundary: String, CosmeticItem {
     case rainbow        // Pride — the full spectrum cycling around the rim
     case marquee        // Midnight Carnival — chasing marquee bulbs
     case stainedGlass   // Cathedral — slowly glowing colored panes
+    // — Quality round: Space Traveler —
+    case hull           // Space Traveler — starship hull plating with slow running lights
 
     var id: String { rawValue }
     var displayName: String {
@@ -1488,6 +1542,8 @@ enum Boundary: String, CosmeticItem {
         case .flare:         return "Flare"
         case .breakers:      return "Breakers"
         case .thunderbolt:   return "Thunderbolt"
+        // — Quality round: Space Traveler —
+        case .hull:          return "Starship Hull"
         }
     }
     var coinCost: Int { tier.basePrice }
@@ -1513,6 +1569,10 @@ enum Boundary: String, CosmeticItem {
         case .molten, .starlight, .aurora, .corona, .storm, .confetti,
              .starSpangled, .rainbow, .marquee, .stainedGlass:
             return .exclusive  // 1,500 coins — animated border renderer
+        // — Quality round: Space Traveler — (takes Starlight's tier, the
+        //   wall of the retired Space Travel set)
+        case .hull:
+            return .exclusive
         }
     }
 
@@ -1575,6 +1635,8 @@ enum Boundary: String, CosmeticItem {
         case .flare:         return Color(red: 0.78, green: 0.14, blue: 0.08)
         case .breakers:      return Color(red: 0.16, green: 0.42, blue: 0.86)
         case .thunderbolt:   return Color(red: 0.40, green: 0.42, blue: 0.48)
+        // — Quality round: Space Traveler —
+        case .hull:          return Color(red: 0.30, green: 0.33, blue: 0.40)
         }
     }
 
@@ -1589,6 +1651,7 @@ enum Boundary: String, CosmeticItem {
              .velvet, .marble, .mahogany, .sandstone, .abyss, .brass,
              .neon, .gold, .ice, .cloud, .tide, .phantom, .amethyst, .chrome:
             return true
+        case .hull: return true        // Quality round: Space Traveler (plating stays; lights hold still)
         default:
             return false
         }
@@ -1881,6 +1944,8 @@ enum CosmeticSchedule {
         // Challenge-track rewards (ChallengeTrackMode.rewardBundleID)
         "winter", "cosmos", "lava-flow", "neon", "haunted",
         "ancient-temple", "abyssal-depths", "champion",
+        // Quality round: the new Space Traveler set is on sale from launch.
+        "space-traveler",
     ]
 
     /// The drops, in date order (docs/proposals/cosmetic-calendar.md, approved).
@@ -2791,6 +2856,8 @@ struct CosmeticBundle: Identifiable {
         "citrus", "sketchbook", "midas",
         "winter", "cosmos", "lava-flow", "neon", "haunted",
         "ancient-temple", "abyssal-depths", "champion",
+        // Quality round: Space Traveler (Quasar, Comet and the Space pit moved here).
+        "space-traveler",
         // Calendar drops.
         "candyland", "nightclub", "golf", "bloom", "ocean",
     ]
@@ -2954,11 +3021,30 @@ struct CosmeticBundle: Identifiable {
             boundaries: [.starlight]
         ),
 
+        // Quality round: the active space set.  UFO and Moon come from the
+        // retired "space-travel" set above (kept for owners); Quasar and Comet
+        // came from Champion and the Space pit from Abyssal Depths.  On sale
+        // from launch (see CosmeticSchedule.launchBundleIDs), so it needs no
+        // calendar row.
+        CosmeticBundle(
+            id:             "space-traveler",
+            displayName:    "Space Traveler",
+            tagline:        "A saucer, a comet's wake and a quasar to steer by.",
+            contentSummary: "UFO ball · Quasar goal · Comet trail · Moon floor · Space pit · Retrowave music · Starship Hull boundary",
+            balls:  [.ufo],
+            goals:  [.quasar],
+            trails: [.cometTrail],
+            floors: [.moon],
+            pits:   [.space],
+            music:  [.retrowave],
+            boundaries: [.hull]
+        ),
+
         CosmeticBundle(
             id:             "winter",
             displayName:    "Winter",
-            tagline:        "Frost, fresh snow and a snowglobe ball.",
-            contentSummary: "Snowglobe ball · Frost goal · Ice trail · Twilight floor · Twilight pit · Classical music · Ice boundary",
+            tagline:        "A frozen pond, deep snow and a snowglobe ball.",
+            contentSummary: "Snowglobe ball · Frost goal · Ice trail · Snowfield floor · Crevasse pit · Classical music · Ice boundary",
             balls:  [.snowglobe],
             goals:  [.frost],
             trails: [.ice],
@@ -3633,11 +3719,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "ancient-temple",
             displayName:    "Ancient Temple",
-            tagline:        "A serpent's trail through sun-baked stone.",
-            contentSummary: "Dune ball · Eclipse goal · Snake trail · Desert floor · Canyon pit · Orchestral music · Sandstone boundary",
+            tagline:        "Carved glyphs, drifting sand and sun-baked stone.",
+            contentSummary: "Dune ball · Eclipse goal · Glyphs trail · Desert floor · Canyon pit · Orchestral music · Sandstone boundary",
             balls:  [.dune],
             goals:  [.eclipse],
-            trails: [.snake],
+            trails: [.glyphs],
             floors: [.desert],
             pits:   [.canyon],
             music:  [.orchestral],
@@ -3648,13 +3734,13 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "abyssal-depths",
             displayName:    "Abyssal Depths",
-            tagline:        "Squid ink and a whirlpool at the bottom of the sea.",
-            contentSummary: "Trench ball · Vortex goal · Ink trail · Inverted floor · Space pit · Dreamscape music · Abyss boundary",
+            tagline:        "Squid ink, a whirlpool and a glowing vent at the bottom of the sea.",
+            contentSummary: "Trench ball · Vortex goal · Ink trail · Inverted floor · Sea Vent pit · Dreamscape music · Abyss boundary",
             balls:  [.trench],
             goals:  [.vortex],
             trails: [.ink],
             floors: [.inverted],
-            pits:   [.space],
+            pits:   [.vent],
             music:  [.dreamscape],
             boundaries: [.abyss]
         ),
@@ -3664,11 +3750,11 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "champion",
             displayName:    "Champion",
-            tagline:        "Polished brass, a blazing comet and the trophy itself.",
-            contentSummary: "Trophy ball · Quasar goal · Comet trail · Brass Works floor · Sideline pit · Orchestral music · Brass boundary",
+            tagline:        "Polished brass, a laurel wreath and the trophy itself.",
+            contentSummary: "Trophy ball · Winner's Circle goal · Victory Lap trail · Brass Works floor · Sideline pit · Orchestral music · Brass boundary",
             balls:  [.trophy],
-            goals:  [.quasar],
-            trails: [.cometTrail],
+            goals:  [.winnersCircle],
+            trails: [.victoryLap],
             floors: [.brass],
             pits:   [.sideline],
             music:  [.orchestral],
@@ -4533,6 +4619,9 @@ func drawRichTrail(_ ctx: GraphicsContext, points pts: [CGPoint],
     case .wildfire:        trailWildfire(ctx, fr)
     case .splash:          trailSplash(ctx, fr)
     case .squall:          trailSquall(ctx, fr)
+    // — Quality round: Champion / Ancient Temple —
+    case .victoryLap:      trailVictoryLap(ctx, fr)
+    case .glyphs:          trailGlyphs(ctx, fr)
     default:
         trailTapered(ctx, fr, width: baseWidth, color: trail.color,
                      glow: trail == .raybeam || trail == .gilded)
@@ -4698,6 +4787,41 @@ private func trailIce(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
         ctx.stroke(p, with: .color(Color(red: 0.62, green: 0.84, blue: 1.0).opacity(0.22 * k)),
                    style: StrokeStyle(lineWidth: fr.bw * 0.7, lineCap: .round, lineJoin: .round))
+        // A thin bright skate-cut down the middle of the frozen track.
+        ctx.stroke(p, with: .color(Color.white.opacity(0.55 * k)),
+                   style: StrokeStyle(lineWidth: max(0.8, fr.bw * 0.16), lineCap: .round, lineJoin: .round))
+    }
+    // Frost flakes: a small six-armed crystal beside about one mark in five.
+    // Each sits where it was laid, glints slowly in place and melts with age.
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed >= 0.60, seed < 0.80 else { continue }
+        let k: Double = fr.fresh(i)
+        guard k > 0.03 else { continue }
+        let s2: Double = (seed * 13.7).truncatingRemainder(dividingBy: 1.0)
+        let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x, dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let side: CGFloat = s2 < 0.5 ? 1 : -1
+        let off: CGFloat = fr.bw * CGFloat(1.5 + 0.9 * s2)
+        let c = CGPoint(x: fr.pts[i].x - dy / len * off * side, y: fr.pts[i].y + dx / len * off * side)
+        let glint: Double = 0.75 + 0.25 * sin(fr.tm * 1.6 + seed * 40.0)
+        let fr6: CGFloat = fr.bw * CGFloat(0.55 + 0.45 * s2) * CGFloat(0.5 + 0.5 * k)
+        var flake = Path()
+        for arm in 0..<6 {
+            let a: Double = Double(arm) / 6.0 * 2.0 * Double.pi + s2 * 1.0
+            let ex: CGFloat = c.x + CGFloat(cos(a)) * fr6, ey: CGFloat = c.y + CGFloat(sin(a)) * fr6
+            flake.move(to: c)
+            flake.addLine(to: CGPoint(x: ex, y: ey))
+            // Two short barbs two-thirds of the way out.
+            let mx: CGFloat = c.x + CGFloat(cos(a)) * fr6 * 0.62, my: CGFloat = c.y + CGFloat(sin(a)) * fr6 * 0.62
+            for sgn in [0.55, -0.55] {
+                flake.move(to: CGPoint(x: mx, y: my))
+                flake.addLine(to: CGPoint(x: mx + CGFloat(cos(a + sgn)) * fr6 * 0.30,
+                                          y: my + CGFloat(sin(a + sgn)) * fr6 * 0.30))
+            }
+        }
+        ctx.stroke(flake, with: .color(Color.white.opacity(0.90 * k * glint)),
+                   style: StrokeStyle(lineWidth: max(0.6, fr.bw * 0.11), lineCap: .round))
     }
     for i in 1..<fr.n {
         let seed: Double = fr.seed(i)
@@ -5339,6 +5463,129 @@ private func trailStar(_ ctx: GraphicsContext, _ c: CGPoint, _ s: CGFloat, _ col
 // ResultShareButton; the card rasterises to an image and goes out the system
 // share sheet, carrying the player's cosmetics + a "beat me" hook.
 // ---------------------------------------------------------------------------
+
+// — Quality round: Champion —
+/// Victory Lap — a winner's ribbon laid flat along the path (crimson edges,
+/// a gold body, a pale center stripe) with ticker-tape confetti tossed out to
+/// either side.  Each piece flutters down for a moment where it was thrown,
+/// settles, and fades with its mark; under Reduce Motion it is simply settled.
+private func trailVictoryLap(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    let crimson = Color(red: 0.70, green: 0.08, blue: 0.14)
+    let gold    = Color(red: 0.98, green: 0.80, blue: 0.30)
+    let pale    = Color(red: 1.00, green: 0.95, blue: 0.72)
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        let w: CGFloat = fr.bw * CGFloat(0.55 + 0.45 * k)
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        ctx.stroke(p, with: .color(crimson.opacity(0.85 * k)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(gold.opacity(0.95 * k)),
+                   style: StrokeStyle(lineWidth: w * 0.66, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(pale.opacity(0.70 * k)),
+                   style: StrokeStyle(lineWidth: max(0.6, w * 0.16), lineCap: .round, lineJoin: .round))
+    }
+    let colors: [Color] = [gold, Color.white, crimson, pale]
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        guard seed < 0.55 else { continue }                      // confetti at about half the marks
+        let k: Double = fr.fresh(i)
+        guard k > 0.03 else { continue }
+        let age: Double = fr.age(i)
+        // 0 just thrown -> 1 settled (0.45 s); settled at once under Reduce Motion.
+        let settle: Double = fr.m > 0 ? min(1.0, age / 0.45) : 1.0
+        let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x, dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let px: CGFloat = -dy / len, py: CGFloat = dx / len
+        for piece in 0..<2 {
+            let s2: Double = (seed * (piece == 0 ? 17.3 : 29.1) + 0.21).truncatingRemainder(dividingBy: 1.0)
+            let side: CGFloat = piece == 0 ? 1 : -1
+            let reach: CGFloat = fr.bw * CGFloat(1.1 + 1.5 * s2)
+            // Thrown from the ribbon outward, dropping a little as it lands.
+            let out: CGFloat = reach * CGFloat(0.35 + 0.65 * settle)
+            let lift: CGFloat = fr.bw * 0.9 * CGFloat(1.0 - settle)
+            let cx: CGFloat = fr.pts[i].x + px * out * side
+            let cy: CGFloat = fr.pts[i].y + py * out * side - lift
+            let spin: Double = s2 * 6.283 + (1.0 - settle) * 5.0
+            let hw: CGFloat = fr.bw * 0.34, hh: CGFloat = fr.bw * 0.14
+            let ca: CGFloat = CGFloat(cos(spin)), sa: CGFloat = CGFloat(sin(spin))
+            var rect = Path()
+            rect.move(to: CGPoint(x: cx - ca * hw + sa * hh, y: cy - sa * hw - ca * hh))
+            rect.addLine(to: CGPoint(x: cx + ca * hw + sa * hh, y: cy + sa * hw - ca * hh))
+            rect.addLine(to: CGPoint(x: cx + ca * hw - sa * hh, y: cy + sa * hw + ca * hh))
+            rect.addLine(to: CGPoint(x: cx - ca * hw - sa * hh, y: cy - sa * hw + ca * hh))
+            rect.closeSubpath()
+            let color: Color = colors[Int(s2 * 3.999)]
+            ctx.fill(rect, with: .color(color.opacity(0.92 * k)))
+        }
+    }
+}
+
+// — Quality round: Ancient Temple —
+/// Glyphs — a shallow groove pressed into the sand with small carved glyphs
+/// (a sun disc, a water zig-zag, an eye, a stepped pyramid) to either side.
+/// Each glyph is carved where the ball passed, keeps its place and shape, and
+/// fades as the sand fills it in.  No motion.
+private func trailGlyphs(_ ctx: GraphicsContext, _ fr: TrailFrame) {
+    let cut  = Color(red: 0.42, green: 0.26, blue: 0.12)        // shadowed side of a cut
+    let lip  = Color(red: 1.00, green: 0.93, blue: 0.74)        // sunlit lip
+    for i in 1..<fr.n {
+        let k: Double = fr.fresh(i - 1)
+        guard k > 0.01 else { continue }
+        var p = Path(); p.move(to: fr.pts[i - 1]); p.addLine(to: fr.pts[i])
+        let w: CGFloat = fr.bw * CGFloat(0.30 + 0.25 * k)
+        ctx.stroke(p.offsetBy(dx: 0.8, dy: 0.8), with: .color(lip.opacity(0.42 * k)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+        ctx.stroke(p, with: .color(cut.opacity(0.55 * k)),
+                   style: StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round))
+    }
+    for i in 1..<fr.n {
+        let seed: Double = fr.seed(i)
+        // About one mark in five, never two in a row, so glyphs don't pile up.
+        guard seed < 0.22, fr.seed(i - 1) >= 0.22 else { continue }
+        let k: Double = fr.fresh(i)
+        guard k > 0.03 else { continue }
+        let s2: Double = (seed * 41.3 + 0.13).truncatingRemainder(dividingBy: 1.0)
+        let dx: CGFloat = fr.pts[i].x - fr.pts[i - 1].x, dy: CGFloat = fr.pts[i].y - fr.pts[i - 1].y
+        let len: CGFloat = max(0.001, hypot(dx, dy))
+        let side: CGFloat = s2 < 0.5 ? 1 : -1
+        let off: CGFloat = fr.bw * 1.9
+        let c = CGPoint(x: fr.pts[i].x - dy / len * off * side, y: fr.pts[i].y + dx / len * off * side)
+        let g: CGFloat = fr.bw * 0.95                               // glyph half-size
+        var glyph = Path()
+        switch Int(seed / 0.22 * 3.999) {
+        case 0:   // sun disc: a ring with a center dot
+            glyph.addEllipse(in: CGRect(x: c.x - g, y: c.y - g, width: g * 2, height: g * 2))
+            glyph.addEllipse(in: CGRect(x: c.x - g * 0.22, y: c.y - g * 0.22, width: g * 0.44, height: g * 0.44))
+        case 1:   // water: a zig-zag line
+            glyph.move(to: CGPoint(x: c.x - g, y: c.y + g * 0.35))
+            glyph.addLine(to: CGPoint(x: c.x - g * 0.5, y: c.y - g * 0.35))
+            glyph.addLine(to: CGPoint(x: c.x, y: c.y + g * 0.35))
+            glyph.addLine(to: CGPoint(x: c.x + g * 0.5, y: c.y - g * 0.35))
+            glyph.addLine(to: CGPoint(x: c.x + g, y: c.y + g * 0.35))
+        case 2:   // eye: an almond with a pupil
+            glyph.move(to: CGPoint(x: c.x - g, y: c.y))
+            glyph.addQuadCurve(to: CGPoint(x: c.x + g, y: c.y), control: CGPoint(x: c.x, y: c.y - g * 1.0))
+            glyph.addQuadCurve(to: CGPoint(x: c.x - g, y: c.y), control: CGPoint(x: c.x, y: c.y + g * 1.0))
+            glyph.addEllipse(in: CGRect(x: c.x - g * 0.25, y: c.y - g * 0.25, width: g * 0.5, height: g * 0.5))
+        default:  // stepped pyramid
+            glyph.move(to: CGPoint(x: c.x - g, y: c.y + g * 0.7))
+            glyph.addLine(to: CGPoint(x: c.x - g, y: c.y + g * 0.2))
+            glyph.addLine(to: CGPoint(x: c.x - g * 0.5, y: c.y + g * 0.2))
+            glyph.addLine(to: CGPoint(x: c.x - g * 0.5, y: c.y - g * 0.3))
+            glyph.addLine(to: CGPoint(x: c.x + g * 0.5, y: c.y - g * 0.3))
+            glyph.addLine(to: CGPoint(x: c.x + g * 0.5, y: c.y + g * 0.2))
+            glyph.addLine(to: CGPoint(x: c.x + g, y: c.y + g * 0.2))
+            glyph.addLine(to: CGPoint(x: c.x + g, y: c.y + g * 0.7))
+            glyph.closeSubpath()
+        }
+        let lw: CGFloat = max(0.8, fr.bw * 0.17)
+        ctx.stroke(glyph.offsetBy(dx: 0.7, dy: 0.7), with: .color(lip.opacity(0.55 * k)),
+                   style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
+        ctx.stroke(glyph, with: .color(cut.opacity(0.80 * k)),
+                   style: StrokeStyle(lineWidth: lw, lineCap: .round, lineJoin: .round))
+    }
+}
 
 /// The data a round-over share card needs.  Mode-agnostic so every competitive
 /// (and solo) overlay can build one from its own final state + the player's gear.

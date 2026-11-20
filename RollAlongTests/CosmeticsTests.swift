@@ -1069,12 +1069,12 @@ final class CosmeticsTests: XCTestCase {
         }
     }
 
-    /// Only 21 collections are on sale.  Each is one item per offered slot,
+    /// Only 22 collections are on sale (21 plus Space Traveler).  Each is one item per offered slot,
     /// and no item is in two of them.  Gift pool, Starter Pack and track
     /// rewards all point at active collections.
     func testActiveCollections_areCompleteAndUnique() {
         let active = CosmeticBundle.active
-        XCTAssertEqual(active.count, 21)
+        XCTAssertEqual(active.count, 22)
         XCTAssertEqual(Set(active.map(\.id)), Set(CosmeticBundle.activeIDs))
         var seen: [String: String] = [:]
         func check(_ b: CosmeticBundle, _ keys: [String]) {
@@ -1205,19 +1205,86 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(w?.until, eastern(2027, 2, 12))
     }
 
+    // MARK: - Quality round: Champion, Winter, Ancient Temple, Abyssal Depths, Space Traveler
+
+    /// The reshaped sets: what each holds now, that replacements took the
+    /// tier of the piece they replaced (so no price moved), and that pieces
+    /// redrawn in place kept their ids.
+    func testQualityRound_reshapedSetsKeepTiersAndPrices() {
+        func set(_ id: String) -> CosmeticBundle { CosmeticBundle.active.first { $0.id == id }! }
+
+        let champion = set("champion")
+        XCTAssertEqual(champion.balls, [.trophy])
+        XCTAssertEqual(champion.goals, [.winnersCircle])
+        XCTAssertEqual(champion.trails, [.victoryLap])
+        XCTAssertEqual(GoalSkin.winnersCircle.tier, GoalSkin.quasar.tier)
+        XCTAssertEqual(TrailColor.victoryLap.tier, TrailColor.cometTrail.tier)
+        XCTAssertEqual(champion.rarity, .legendary)
+
+        let temple = set("ancient-temple")
+        XCTAssertEqual(temple.trails, [.glyphs])
+        XCTAssertEqual(TrailColor.glyphs.tier, TrailColor.snake.tier)
+        XCTAssertTrue(CosmeticBundle.bundles(containing: TrailColor.snake).isEmpty,
+                      "Snake left Ancient Temple and is in no set on sale")
+
+        let abyss = set("abyssal-depths")
+        XCTAssertEqual(abyss.pits, [.vent])
+        XCTAssertEqual(Pit.vent.tier, Pit.space.tier)
+        XCTAssertTrue(Pit.vent.hasDrawnArt)
+
+        let winter = set("winter")
+        XCTAssertEqual(winter.floors, [.twilight]); XCTAssertEqual(winter.pits, [.twilight])
+        XCTAssertEqual(Floor.twilight.rawValue, "twilight"); XCTAssertEqual(Floor.twilight.displayName, "Snowfield")
+        XCTAssertEqual(Pit.twilight.rawValue, "twilight");   XCTAssertEqual(Pit.twilight.displayName, "Crevasse")
+        XCTAssertEqual(Floor.twilight.tier, .standard); XCTAssertEqual(Pit.twilight.tier, .standard)
+
+        // Prices are the sum of unchanged tiers (music is not charged in 1.0).
+        func sum(_ b: CosmeticBundle) -> Int {
+            b.balls[0].coinCost + b.goals[0].coinCost + b.trails[0].coinCost
+                + b.floors[0].coinCost + b.pits[0].coinCost + b.boundaries[0].coinCost
+        }
+        for b in [champion, temple, abyss, winter] {
+            XCTAssertEqual(b.fullPrice(), sum(b), "\(b.id)")
+        }
+    }
+
+    /// Space Traveler: a full six-slot set on sale from launch, built from
+    /// Quasar, Comet and the Space pit plus the retired Space Travel set's
+    /// UFO and Moon and a new Starship Hull wall.
+    func testQualityRound_spaceTravelerIsAFullLaunchSet() {
+        guard let b = CosmeticBundle.active.first(where: { $0.id == "space-traveler" }) else {
+            return XCTFail("Space Traveler must be on sale")
+        }
+        XCTAssertEqual(b.balls, [.ufo]);          XCTAssertEqual(b.goals, [.quasar])
+        XCTAssertEqual(b.trails, [.cometTrail]);  XCTAssertEqual(b.floors, [.moon])
+        XCTAssertEqual(b.pits, [.space]);         XCTAssertEqual(b.boundaries, [.hull])
+        XCTAssertFalse(b.isLimitedTime)
+        XCTAssertTrue(CosmeticSchedule.launchBundleIDs.contains(b.id), "on sale at launch: no calendar row")
+        XCTAssertTrue(CosmeticSchedule.isReleased(b, at: eastern(2026, 12, 1), store: calendarStore()))
+        XCTAssertEqual(b.rarity, .legendary)
+        XCTAssertEqual(Boundary.hull.tier, Boundary.starlight.tier)
+        // Its pieces are out at launch too (the retired set's March date no longer holds them back).
+        XCTAssertTrue(CosmeticSchedule.isReleased(BallSkin.ufo, at: eastern(2026, 12, 1), store: calendarStore()))
+        XCTAssertTrue(CosmeticSchedule.isReleased(Floor.moon, at: eastern(2026, 12, 1), store: calendarStore()))
+        // The retired "space-travel" set is kept for owners but never sold.
+        XCTAssertFalse(CosmeticBundle.activeIDs.contains("space-travel"))
+        XCTAssertNotNil(CosmeticBundle.catalogue.first { $0.id == "space-travel" })
+    }
+
     // MARK: - Music is not in 1.0
 
     /// Approved pit redraws: drawn art for 18 pits; only the two Rare ones
     /// (Graveyard, Aurora) move; Midnight shows as "Moonlit" with its old id.
     func testPitRedraws_tiersAndNames() {
         let drawn = Pit.allCases.filter { $0.hasDrawnArt }
-        XCTAssertEqual(drawn.count, 21)   // 18 redraws + the Fire, Water and Storm starter pits
+        // 18 redraws + the Fire, Water and Storm starter pits, plus the
+        // quality round's drawn pits (Winter's Crevasse, the Sea Vent, …).
+        // A drawn pit may now be any tier and may move gently.
+        XCTAssertGreaterThanOrEqual(drawn.count, 23)
+        XCTAssertTrue(drawn.contains(.twilight) && drawn.contains(.vent))
         XCTAssertEqual(Pit.graveyard.tier, .rare)
         XCTAssertEqual(Pit.aurora.tier, .rare)
         XCTAssertEqual(Pit.graveyard.coinCost, 1_000)
-        for p in drawn where p != .graveyard && p != .aurora {
-            XCTAssertEqual(p.tier, .standard, "\(p) should stay Standard and still")
-        }
         XCTAssertEqual(Pit.midnight.displayName, "Moonlit")
         XCTAssertEqual(Pit.midnight.rawValue, "midnight")
         let haunted = CosmeticBundle.catalogue.first { $0.id == "haunted" }!

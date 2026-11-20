@@ -4584,6 +4584,7 @@ struct PitOverlayView: View {
         case .nightclub: nightclubPitOverlay
         case .graveyard: graveyardPitOverlay
         case .aurora:    auroraPitOverlay
+        case .vent:      ventPitOverlay       // Quality round: Abyssal Depths
         default:
             if pit.hasDrawnArt { staticPitArt } else { EmptyView() }
         }
@@ -5205,6 +5206,7 @@ enum PitArt {
         case .crater:    crater(&ctx, size)
         case .deepEnd:   deepEnd(&ctx, size)
         case .maelstrom: maelstrom(&ctx, size)
+        case .twilight:  crevasse(&ctx, size)     // Quality round: Winter's Crevasse
         default:         break
         }
     }
@@ -5782,6 +5784,122 @@ enum PitArt {
         bright.opacity = 0.55
         bright.fill(band, with: across)
     }
+
+    // — Quality round: Winter —
+    /// Crevasse (Winter; id `twilight`): a crack in deep snow.  A bright snow
+    /// lip, then ledges of ice stepping down from pale blue through glacier
+    /// blue to black, with a few icicles hanging in from the rim.  Still.
+    private static func crevasse(_ ctx: inout GraphicsContext, _ size: CGSize) {
+        let m = min(size.width, size.height)
+        let layers: [Color] = [
+            Color(red: 0.93, green: 0.96, blue: 1.00), Color(red: 0.70, green: 0.85, blue: 0.98),
+            Color(red: 0.42, green: 0.66, blue: 0.92), Color(red: 0.20, green: 0.42, blue: 0.74),
+            Color(red: 0.08, green: 0.20, blue: 0.46), Color(red: 0.02, green: 0.06, blue: 0.18),
+        ]
+        let step: CGFloat = m * 0.062
+        for (k, color) in layers.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            let layer: Path = k == 0
+                ? Path(r)
+                : raggedRect(r, step: max(3, m * 0.08), jitter: m * 0.016,
+                             seed: 0xC2E7_A550 + UInt64(k))
+            ctx.fill(layer, with: .color(color))
+        }
+        // Icicles: thin pale spikes from the snow lip toward the dark.
+        var rng = SeededRNG(seed: 0x1C1C_1E05)
+        for spot in edgeSpots(size, spacing: max(7, m * 0.20), seed: 0x1C1C_0001) {
+            let len: CGFloat = m * CGFloat(0.10 + 0.10 * rng.nextUnit())
+            let half: CGFloat = max(0.8, m * 0.016)
+            let base = CGPoint(x: spot.point.x + spot.inward.dx * step * 0.6,
+                               y: spot.point.y + spot.inward.dy * step * 0.6)
+            let tip = CGPoint(x: base.x + spot.inward.dx * len, y: base.y + spot.inward.dy * len)
+            let icicle = polygon([
+                CGPoint(x: base.x - spot.along.dx * half, y: base.y - spot.along.dy * half),
+                CGPoint(x: base.x + spot.along.dx * half, y: base.y + spot.along.dy * half),
+                tip,
+            ])
+            ctx.fill(icicle, with: .color(Color.white.opacity(0.80)))
+        }
+    }
+
+    // — Quality round: Abyssal Depths —
+    /// Sea Vent (Abyssal Depths): ledges of black basalt stepping down to a
+    /// vent whose mouth glows dull orange around a black throat.  Specks of
+    /// blue-green sea-glow sit on the ledges and pulse slowly, and a few small
+    /// bubbles drift up out of the vent.  `t` = 0 gives the still frame.
+    static func drawVent(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        let m = min(size.width, size.height)
+        let cx: CGFloat = size.width / 2, cy: CGFloat = size.height / 2
+        fill(&ctx, size, Color(red: 0.02, green: 0.04, blue: 0.07))
+        let ledges: [Color] = [
+            Color(red: 0.17, green: 0.21, blue: 0.27), Color(red: 0.12, green: 0.15, blue: 0.20),
+            Color(red: 0.08, green: 0.10, blue: 0.14), Color(red: 0.04, green: 0.06, blue: 0.09),
+        ]
+        let step: CGFloat = m * 0.075
+        for (k, color) in ledges.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            let layer: Path = k == 0
+                ? Path(r)
+                : raggedRect(r, step: max(3, m * 0.09), jitter: m * 0.018,
+                             seed: 0x5EA0_7E00 + UInt64(k))
+            ctx.fill(layer, with: .color(color))
+        }
+        // Sea-glow specks on the upper ledges.
+        var rng = SeededRNG(seed: 0x5EA0_0B10)
+        var glow = ctx
+        glow.blendMode = .plusLighter
+        for spot in edgeSpots(size, spacing: max(8, m * 0.26), seed: 0x5EA0_0001) {
+            let depth: CGFloat = step * CGFloat(0.5 + 1.4 * rng.nextUnit())
+            let phase: Double = rng.nextUnit() * 6.283
+            let pt = CGPoint(x: spot.point.x + spot.inward.dx * depth, y: spot.point.y + spot.inward.dy * depth)
+            let a: Double = 0.40 + 0.25 * sin(t * 0.8 + phase)
+            let r: CGFloat = max(0.8, m * 0.016)
+            glow.fill(Path(ellipseIn: CGRect(x: pt.x - r * 2.4, y: pt.y - r * 2.4, width: r * 4.8, height: r * 4.8)),
+                      with: .radialGradient(Gradient(colors: [Color(red: 0.20, green: 0.95, blue: 0.80).opacity(a * 0.5), .clear]),
+                                            center: pt, startRadius: 0, endRadius: r * 2.4))
+            glow.fill(Path(ellipseIn: CGRect(x: pt.x - r, y: pt.y - r, width: r * 2, height: r * 2)),
+                      with: .color(Color(red: 0.55, green: 1.00, blue: 0.90).opacity(a)))
+        }
+        // The vent mouth: a dull orange glow around a black throat.
+        let vr: CGFloat = m * 0.24
+        let pulse: Double = 0.80 + 0.20 * sin(t * 0.9)
+        ctx.fill(Path(ellipseIn: CGRect(x: cx - vr, y: cy - vr, width: vr * 2, height: vr * 2)),
+                 with: .radialGradient(Gradient(stops: [
+                    .init(color: Color.black, location: 0.00),
+                    .init(color: Color.black, location: 0.42),
+                    .init(color: Color(red: 0.98, green: 0.46, blue: 0.10).opacity(0.80 * pulse), location: 0.58),
+                    .init(color: Color(red: 0.70, green: 0.14, blue: 0.04).opacity(0.45 * pulse), location: 0.78),
+                    .init(color: Color.clear, location: 1.00),
+                 ]), center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: vr))
+        // Bubbles drifting up out of the throat.
+        for i in 0..<6 {
+            let seed: Double = Double(i) * 0.618
+            let u: Double = (t * 0.16 + seed).truncatingRemainder(dividingBy: 1.0)
+            let sway: CGFloat = CGFloat(sin(seed * 9.0 + u * 5.0)) * m * 0.07 * CGFloat(u)
+            let bx: CGFloat = cx + sway + CGFloat(seed.truncatingRemainder(dividingBy: 0.3) - 0.15) * m * 0.2
+            let by: CGFloat = cy - CGFloat(u) * m * 0.40
+            let br: CGFloat = max(0.7, m * CGFloat(0.014 + 0.012 * seed.truncatingRemainder(dividingBy: 1.0)))
+            let a: Double = (1.0 - u) * 0.65
+            ctx.stroke(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
+                       with: .color(Color(red: 0.70, green: 0.95, blue: 1.00).opacity(a)), lineWidth: max(0.5, m * 0.008))
+        }
+    }
+}
+
+// — Quality round: Abyssal Depths —
+extension PitOverlayView {
+    /// Sea Vent: basalt ledges, slow sea-glow, a glowing vent mouth and
+    /// rising bubbles (see `PitArt.drawVent`).  Held still under Reduce Motion.
+    var ventPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                PitArt.drawVent(in: &ctx, size: size, t: t)
+            }
+        }
+        .allowsHitTesting(false)
+    }
 }
 
 /// Inset-shadow + centre-pooling overlay that gives a hole visual depth.
@@ -5857,6 +5975,7 @@ struct PaperFloorOverlayView: View, Equatable {
         case .scorched:   scorchedFloor
         case .shallows:   shallowsFloor
         case .overcast:   overcastFloor
+        case .twilight:   snowfieldFloor       // Quality round: Winter's Snowfield (id twilight)
         default:         EmptyView()
         }
     }
@@ -6263,13 +6382,124 @@ struct PaperFloorOverlayView: View, Equatable {
         }
     }
 
-    /// Desert — wind ripples in the sand: gently curved crests with a
-    /// light top edge and a soft shadow just below.
+    // — Quality round: Winter —
+    /// Snowfield (Winter; id `twilight`) — deep snow at blue hour: long soft
+    /// drifts with a lit crest and a blue shadow, a scatter of ice sparkles,
+    /// a few fallen snowflakes, and one or two lines of small bird tracks
+    /// crossing the field.  Static and low-contrast, so pits, coins and the
+    /// goal stay clear.
+    private var snowfieldFloor: some View {
+        Canvas { ctx, size in
+            var rng = SeededRNG(seed: 0x5A0F_1E1D)
+            let area: CGFloat = size.width * size.height
+            // Drifts.
+            for _ in 0..<max(6, Int(area / 9000)) {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let y: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let rx: CGFloat = 30 + CGFloat(rng.nextUnit()) * 44
+                let ry: CGFloat = 6 + CGFloat(rng.nextUnit()) * 7
+                ctx.fill(Path(ellipseIn: CGRect(x: x - rx, y: y - ry + 3, width: rx * 2, height: ry * 2)),
+                         with: .radialGradient(Gradient(colors: [Color(red: 0.50, green: 0.58, blue: 0.86).opacity(0.14), .clear]),
+                                               center: CGPoint(x: x, y: y + 3), startRadius: 0, endRadius: rx))
+                ctx.fill(Path(ellipseIn: CGRect(x: x - rx * 0.9, y: y - ry, width: rx * 1.8, height: ry * 1.2)),
+                         with: .radialGradient(Gradient(colors: [Color.white.opacity(0.34), .clear]),
+                                               center: CGPoint(x: x, y: y - ry * 0.4), startRadius: 0, endRadius: rx * 0.9))
+            }
+            // Bird tracks: a line of small three-toed prints.
+            for _ in 0..<max(1, Int(area / 70000)) {
+                var px: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                var py: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let heading: Double = rng.nextUnit() * 2.0 * Double.pi
+                let ink = Color(red: 0.44, green: 0.50, blue: 0.76).opacity(0.34)
+                for step in 0..<11 {
+                    let wob: Double = heading + (rng.nextUnit() - 0.5) * 0.3
+                    let side: CGFloat = step % 2 == 0 ? 2.2 : -2.2
+                    let fx: CGFloat = px + CGFloat(cos(wob + Double.pi / 2.0)) * side
+                    let fy: CGFloat = py + CGFloat(sin(wob + Double.pi / 2.0)) * side
+                    var track = Path()
+                    for toe in [-0.5, 0.0, 0.5] {
+                        track.move(to: CGPoint(x: fx, y: fy))
+                        track.addLine(to: CGPoint(x: fx + CGFloat(cos(wob + toe)) * 3.2, y: fy + CGFloat(sin(wob + toe)) * 3.2))
+                    }
+                    ctx.stroke(track, with: .color(ink), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
+                    px += CGFloat(cos(wob)) * 11
+                    py += CGFloat(sin(wob)) * 11
+                }
+            }
+            // Fallen snowflakes.
+            for _ in 0..<max(4, Int(area / 15000)) {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let y: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 2.2 + CGFloat(rng.nextUnit()) * 1.6
+                let turn: Double = rng.nextUnit()
+                var flake = Path()
+                for arm in 0..<3 {
+                    let a: Double = Double(arm) / 3.0 * Double.pi + turn
+                    flake.move(to: CGPoint(x: x - CGFloat(cos(a)) * r, y: y - CGFloat(sin(a)) * r))
+                    flake.addLine(to: CGPoint(x: x + CGFloat(cos(a)) * r, y: y + CGFloat(sin(a)) * r))
+                }
+                ctx.stroke(flake, with: .color(Color(red: 0.52, green: 0.62, blue: 0.90).opacity(0.42)),
+                           style: StrokeStyle(lineWidth: 0.7, lineCap: .round))
+            }
+            // Ice sparkles.
+            for _ in 0..<Int(area / 1500) {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let y: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let r: CGFloat = 0.5 + CGFloat(rng.nextUnit()) * 0.6
+                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                         with: .color(Color.white.opacity(0.85)))
+            }
+        }
+    }
+
+    /// Desert (Ancient Temple) — a sanded-over temple court: wind ripples in
+    /// the sand (a lit crest with a soft shadow below), worn paving stones
+    /// showing through here and there, some with a faint carved mark, and a
+    /// scatter of pebbles.  Static and low-contrast.
     private var desertFloor: some View {
         Canvas { ctx, size in
             var rng = SeededRNG(seed: 0xDE5E_27)
-            let shadow = Color(red: 0.55, green: 0.40, blue: 0.20).opacity(0.16)
-            let light = Color.white.opacity(0.22)
+            let area: CGFloat = size.width * size.height
+            // Half-buried paving stones (drawn first, so sand ripples cross them).
+            let stone = Color(red: 0.78, green: 0.63, blue: 0.40)
+            let cut = Color(red: 0.48, green: 0.34, blue: 0.16)
+            for _ in 0..<max(3, Int(area / 24000)) {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let y: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let hw: CGFloat = 15 + CGFloat(rng.nextUnit()) * 9
+                let hh: CGFloat = 10 + CGFloat(rng.nextUnit()) * 6
+                let turn: Double = (rng.nextUnit() - 0.5) * 0.5
+                let mark: Int = Int(rng.nextUnit() * 3.999)
+                var sctx = ctx
+                sctx.translateBy(x: x, y: y)
+                sctx.rotate(by: .radians(turn))
+                let slab = Path(roundedRect: CGRect(x: -hw, y: -hh, width: hw * 2, height: hh * 2), cornerRadius: 2.5)
+                sctx.fill(slab.offsetBy(dx: 1.0, dy: 1.2), with: .color(cut.opacity(0.16)))
+                sctx.fill(slab, with: .color(stone.opacity(0.42)))
+                sctx.stroke(slab, with: .color(Color.white.opacity(0.22)), lineWidth: 0.7)
+                var glyph = Path()
+                switch mark {
+                case 0:   // sun disc
+                    glyph.addEllipse(in: CGRect(x: -4.5, y: -4.5, width: 9, height: 9))
+                    glyph.addEllipse(in: CGRect(x: -1, y: -1, width: 2, height: 2))
+                case 1:   // water zig-zag
+                    glyph.move(to: CGPoint(x: -7, y: 2)); glyph.addLine(to: CGPoint(x: -3.5, y: -2))
+                    glyph.addLine(to: CGPoint(x: 0, y: 2)); glyph.addLine(to: CGPoint(x: 3.5, y: -2))
+                    glyph.addLine(to: CGPoint(x: 7, y: 2))
+                case 2:   // eye
+                    glyph.move(to: CGPoint(x: -6, y: 0))
+                    glyph.addQuadCurve(to: CGPoint(x: 6, y: 0), control: CGPoint(x: 0, y: -5.5))
+                    glyph.addQuadCurve(to: CGPoint(x: -6, y: 0), control: CGPoint(x: 0, y: 5.5))
+                    glyph.addEllipse(in: CGRect(x: -1.4, y: -1.4, width: 2.8, height: 2.8))
+                default:  // a worn, blank slab
+                    break
+                }
+                sctx.stroke(glyph, with: .color(cut.opacity(0.30)),
+                            style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
+            }
+            // Wind ripples.
+            let shadow = Color(red: 0.55, green: 0.40, blue: 0.20).opacity(0.18)
+            let light = Color.white.opacity(0.26)
             var y: CGFloat = 8
             while y < size.height + 10 {
                 let amp: CGFloat = 3 + CGFloat(rng.nextUnit()) * 3
@@ -6286,6 +6516,16 @@ struct PaperFloorOverlayView: View, Equatable {
                 ctx.stroke(crest.offsetBy(dx: 0, dy: 1.6), with: .color(shadow), lineWidth: 1.6)
                 ctx.stroke(crest, with: .color(light), lineWidth: 0.9)
                 y += 14 + CGFloat(rng.nextUnit()) * 8
+            }
+            // Pebbles, each with a small shadow.
+            for _ in 0..<Int(area / 3600) {
+                let px: CGFloat = CGFloat(rng.nextUnit()) * size.width
+                let py: CGFloat = CGFloat(rng.nextUnit()) * size.height
+                let pr: CGFloat = 0.9 + CGFloat(rng.nextUnit()) * 1.3
+                ctx.fill(Path(ellipseIn: CGRect(x: px - pr + 0.6, y: py - pr * 0.7 + 0.8, width: pr * 2, height: pr * 1.4)),
+                         with: .color(cut.opacity(0.20)))
+                ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr * 0.7, width: pr * 2, height: pr * 1.4)),
+                         with: .color(Color(red: 0.66, green: 0.52, blue: 0.34).opacity(0.55)))
             }
         }
     }
@@ -6480,6 +6720,7 @@ struct BoundaryOverlayView: View {
         case .phantom:      phantomBorderOverlay
         case .amethyst:     amethystBorderOverlay
         case .chrome:       chromeBorderOverlay
+        case .hull:         hullBorderOverlay        // Quality round: Space Traveler
         default:            EmptyView()
         }
     }
@@ -7032,12 +7273,65 @@ struct BoundaryOverlayView: View {
         }
     }
 
-    /// Sandstone — layered strata in terracotta tones.
+    /// Sandstone (Ancient Temple) — a wall of cut temple blocks: terracotta
+    /// strata, dark mortar joints every block, a chiseled key pattern along
+    /// the middle course, and a slow band of sunlight sliding along the
+    /// stone.  The stone is still; only the light moves (not under Reduce
+    /// Motion).
     private var sandstoneBorderOverlay: some View {
-        ZStack {
-            ring(0.7).stroke(Color(red: 0.88, green: 0.62, blue: 0.44), lineWidth: 1.4)
-            ring(2.0).stroke(Color(red: 0.66, green: 0.38, blue: 0.24), lineWidth: 1.3)
-            ring(3.3).stroke(Color(red: 0.92, green: 0.72, blue: 0.52), lineWidth: 1.3)
+        motionClock { t in
+            ZStack {
+                ring(0.7).stroke(Color(red: 0.92, green: 0.68, blue: 0.48), lineWidth: 1.4)
+                ring(2.0).stroke(Color(red: 0.66, green: 0.38, blue: 0.24), lineWidth: 1.3)
+                ring(3.3).stroke(Color(red: 0.94, green: 0.74, blue: 0.54), lineWidth: 1.3)
+                // Chiseled key pattern on the middle course.
+                ring(2.0)
+                    .stroke(Color(red: 0.98, green: 0.84, blue: 0.64).opacity(0.80),
+                            style: StrokeStyle(lineWidth: 0.9, dash: [2.4, 2.4, 0.9, 5.3], dashPhase: 1))
+                // Mortar joints: one across the band every block.
+                borderRing()
+                    .stroke(Color(red: 0.34, green: 0.18, blue: 0.10).opacity(0.70),
+                            style: StrokeStyle(lineWidth: 4, dash: [0.9, 21.1]))
+                // Sunlight sliding slowly along the wall.
+                borderTrimSegment(at: t * 0.012, length: 0.07,
+                                  color: Color(red: 1.00, green: 0.93, blue: 0.74).opacity(0.38),
+                                  lineWidth: 4, blur: 2.0)
+            }
+        }
+    }
+
+    // — Quality round: Space Traveler —
+    /// Starship Hull (Space Traveler) — gunmetal hull plating: a lit upper
+    /// edge and shadowed lower edge, panel seams with rivets, and small cyan
+    /// running lights that glow steadily while one soft pulse travels slowly
+    /// around the ship.  Under Reduce Motion the plating and lamps hold still.
+    private var hullBorderOverlay: some View {
+        motionClock { t in
+            let lamp = Color(red: 0.30, green: 0.90, blue: 1.00)
+            let breathe: Double = 0.40 + 0.15 * sin(t * 1.1)
+            ZStack {
+                borderRing().stroke(LinearGradient(colors: [Color(red: 0.48, green: 0.52, blue: 0.60),
+                                                            Color(red: 0.22, green: 0.24, blue: 0.30)],
+                                                   startPoint: .top, endPoint: .bottom), lineWidth: 4)
+                ring(0.5).stroke(Color.white.opacity(0.30), lineWidth: 0.8)
+                ring(3.5).stroke(Color.black.opacity(0.45), lineWidth: 0.8)
+                // Panel seams and the rivets either side of each seam.
+                borderRing()
+                    .stroke(Color.black.opacity(0.55), style: StrokeStyle(lineWidth: 4, dash: [0.8, 27.2]))
+                borderRing()
+                    .stroke(Color(red: 0.74, green: 0.78, blue: 0.86).opacity(0.85),
+                            style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [0.1, 5.9, 0.1, 21.9], dashPhase: 3.4))
+                // Running lights: one lamp every other panel.
+                borderRing()
+                    .stroke(lamp.opacity(breathe),
+                            style: StrokeStyle(lineWidth: 3.0, lineCap: .round, dash: [0.1, 55.9], dashPhase: 14))
+                    .blur(radius: 1.6)
+                borderRing()
+                    .stroke(Color(red: 0.80, green: 0.98, blue: 1.00),
+                            style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [0.1, 55.9], dashPhase: 14))
+                borderTrimSegment(at: t * 0.030, length: 0.05,
+                                  color: lamp.opacity(0.45), lineWidth: 4, blur: 2.5)
+            }
         }
     }
 
@@ -7093,17 +7387,34 @@ struct BoundaryOverlayView: View {
         }
     }
 
-    /// Ice — frosted wall with small crystal spikes and a faint glint.
+    /// Ice (Winter) — a wall of glacier ice: blue ice capped with a line of
+    /// snow on its outer edge, hairline cracks, and a row of icicles hanging
+    /// in toward the play area.  Two faint glints wander slowly along it.
     private var iceBorderOverlay: some View {
         motionClock { t in
             let glint: Double = pow(max(0.0, sin(t * 0.7)), 3.0)
+            let glint2: Double = pow(max(0.0, sin(t * 0.5 + 2.1)), 3.0)
             ZStack {
-                borderRing().stroke(Color.white.opacity(0.35), lineWidth: 4)
+                borderRing().stroke(LinearGradient(colors: [Color(red: 0.84, green: 0.94, blue: 1.00),
+                                                            Color(red: 0.44, green: 0.68, blue: 0.94)],
+                                                   startPoint: .top, endPoint: .bottom), lineWidth: 4)
+                // Hairline cracks across the ice.
                 borderRing()
-                    .stroke(Color.white.opacity(0.70),
-                            style: StrokeStyle(lineWidth: 4, dash: [1.2, 7, 0.8, 11, 1.4, 9]))
+                    .stroke(Color(red: 0.24, green: 0.46, blue: 0.82).opacity(0.50),
+                            style: StrokeStyle(lineWidth: 3.2, dash: [0.6, 13.4, 0.6, 8.4]))
+                // Snow cap on the outer edge.
+                ring(0.6).stroke(Color.white.opacity(0.95), lineWidth: 1.3)
+                // Icicles hanging in from the inner edge, uneven lengths.
+                ring(4.4)
+                    .stroke(Color.white.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 2.4, dash: [1.2, 6, 0.8, 11, 1.4, 9]))
+                ring(5.6)
+                    .stroke(Color(red: 0.86, green: 0.95, blue: 1.00).opacity(0.75),
+                            style: StrokeStyle(lineWidth: 1.6, dash: [0.7, 16.2, 0.7, 20.6], dashPhase: -0.25))
                 borderTrimSegment(at: t * 0.025, length: 0.03,
                                   color: Color.white.opacity(0.85 * glint), lineWidth: 4, blur: 1.5)
+                borderTrimSegment(at: 0.55 - t * 0.018, length: 0.025,
+                                  color: Color.white.opacity(0.70 * glint2), lineWidth: 4, blur: 1.5)
             }
         }
     }
@@ -7219,11 +7530,14 @@ struct GoalSkinView: View {
         case .quasar:      quasarGoal
         case .slate:
             bandedTargetGoal(goal.targetBands ?? [])
-        case .frost, .ember, .meadow, .bullion,
+        case .ember, .meadow, .bullion,
              .amethyst, .candy, .vortex, .wormhole,
              .flameRing, .whirlpool, .thunderRing:
             themedStandardGoal(goal)
         case .aurora:      auroraGoal
+        // — Quality round: Winter / Champion —
+        case .frost:         frostGoal
+        case .winnersCircle: winnersCircleGoal
         default:           rainbowHole   // .rainbow + any future goal
         }
     }
@@ -8083,6 +8397,202 @@ struct GoalSkinView: View {
             let dotR = r * 0.12
             ctx.fill(Path(ellipseIn: CGRect(x: cx - dotR, y: cy - dotR, width: dotR * 2, height: dotR * 2)),
                      with: .color(lead.opacity(0.9)))
+        }
+    }
+
+    // — Quality round: Winter —
+    /// Frost goal (Winter) — a frozen pond seen from above: a lumpy snow bank
+    /// around the rim, a ring of blue ice scored with cracks and a large
+    /// six-armed frost crystal, and a round hole of dark open water in the
+    /// middle where the ball finishes.  A few glints twinkle slowly on the
+    /// ice; nothing else moves.  Still under Reduce Motion.
+    private var frostGoal: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate)
+                let cx: CGFloat = size.width / 2, cy: CGFloat = size.height / 2
+                let R: CGFloat = min(size.width, size.height) / 2 * 0.95
+                let c = CGPoint(x: cx, y: cy)
+                func disc(_ r: CGFloat) -> Path {
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+                }
+                func polar(_ a: Double, _ r: CGFloat) -> CGPoint {
+                    CGPoint(x: cx + CGFloat(cos(a)) * r, y: cy + CGFloat(sin(a)) * r)
+                }
+
+                // Snow bank: a soft white rim built from overlapping drifts.
+                ctx.fill(disc(R * 0.94), with: .color(Color(red: 0.86, green: 0.91, blue: 0.99)))
+                for k in 0..<14 {
+                    let a: Double = Double(k) / 14.0 * 2.0 * Double.pi + 0.2
+                    let lump: CGFloat = R * CGFloat(0.13 + 0.03 * Double((k * 7) % 3))
+                    let pt = polar(a, R * 0.86)
+                    ctx.fill(Path(ellipseIn: CGRect(x: pt.x - lump, y: pt.y - lump, width: lump * 2, height: lump * 2)),
+                             with: .radialGradient(Gradient(colors: [.white, Color(red: 0.84, green: 0.90, blue: 0.99)]),
+                                                   center: CGPoint(x: pt.x - lump * 0.3, y: pt.y - lump * 0.3),
+                                                   startRadius: 0, endRadius: lump))
+                }
+
+                // The ice sheet.
+                ctx.fill(disc(R * 0.76), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.36, green: 0.62, blue: 0.90), Color(red: 0.62, green: 0.82, blue: 0.98),
+                    Color(red: 0.84, green: 0.94, blue: 1.00)]), center: c, startRadius: R * 0.30, endRadius: R * 0.76))
+                ctx.stroke(disc(R * 0.76), with: .color(Color(red: 0.50, green: 0.70, blue: 0.94).opacity(0.8)),
+                           lineWidth: max(0.8, R * 0.025))
+
+                // Hairline cracks running out from the hole.
+                for k in 0..<7 {
+                    let a: Double = Double(k) / 7.0 * 2.0 * Double.pi + 0.45
+                    var crack = Path()
+                    crack.move(to: polar(a, R * 0.40))
+                    crack.addLine(to: polar(a + 0.10, R * 0.54))
+                    crack.addLine(to: polar(a - 0.04, R * 0.64))
+                    crack.addLine(to: polar(a + 0.07, R * 0.74))
+                    ctx.stroke(crack, with: .color(Color.white.opacity(0.55)), lineWidth: max(0.5, R * 0.014))
+                }
+
+                // The frost crystal: six arms with barbs, lying on the ice.
+                var crystal = Path()
+                for k in 0..<6 {
+                    let a: Double = Double(k) / 6.0 * 2.0 * Double.pi - Double.pi / 2.0
+                    crystal.move(to: polar(a, R * 0.40))
+                    crystal.addLine(to: polar(a, R * 0.72))
+                    for f: CGFloat in [0.52, 0.63] {
+                        let base = polar(a, R * f)
+                        for sgn in [0.9, -0.9] {
+                            crystal.move(to: base)
+                            crystal.addLine(to: CGPoint(x: base.x + CGFloat(cos(a + sgn)) * R * 0.10,
+                                                        y: base.y + CGFloat(sin(a + sgn)) * R * 0.10))
+                        }
+                    }
+                }
+                ctx.stroke(crystal, with: .color(Color(red: 0.30, green: 0.52, blue: 0.86).opacity(0.35)),
+                           style: StrokeStyle(lineWidth: max(1.6, R * 0.07), lineCap: .round))
+                ctx.stroke(crystal, with: .color(Color.white.opacity(0.95)),
+                           style: StrokeStyle(lineWidth: max(0.9, R * 0.035), lineCap: .round))
+
+                // Open water: the clear round center where the ball finishes.
+                ctx.fill(disc(R * 0.36), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.03, green: 0.09, blue: 0.24), Color(red: 0.08, green: 0.24, blue: 0.52)]),
+                    center: c, startRadius: 0, endRadius: R * 0.36))
+                ctx.stroke(disc(R * 0.36), with: .color(Color.white.opacity(0.95)), lineWidth: max(1, R * 0.05))
+                ctx.stroke(disc(R * 0.30), with: .color(Color(red: 0.55, green: 0.80, blue: 1.0).opacity(0.35)),
+                           lineWidth: max(0.5, R * 0.015))
+
+                // Slow glints on the ice (each on its own phase).
+                let glints: [(Double, CGFloat, Double)] = [(0.6, 0.60, 0.0), (2.5, 0.66, 1.7), (4.1, 0.56, 3.3), (5.4, 0.68, 4.6)]
+                for (a, rr, ph) in glints {
+                    let tw: Double = pow(max(0.0, sin(t * 0.9 + ph)), 2.0)
+                    guard tw > 0.03 else { continue }
+                    let g = polar(a, R * rr)
+                    let gs: CGFloat = R * 0.10 * CGFloat(0.5 + 0.5 * tw)
+                    var star = Path()
+                    star.move(to: CGPoint(x: g.x - gs, y: g.y)); star.addLine(to: CGPoint(x: g.x + gs, y: g.y))
+                    star.move(to: CGPoint(x: g.x, y: g.y - gs)); star.addLine(to: CGPoint(x: g.x, y: g.y + gs))
+                    ctx.stroke(star, with: .color(Color.white.opacity(0.95 * tw)),
+                               style: StrokeStyle(lineWidth: max(0.6, R * 0.02), lineCap: .round))
+                }
+            }
+        }
+    }
+
+    // — Quality round: Champion —
+    /// Winner's Circle goal (Champion) — a gold laurel wreath (two branches
+    /// tied with a crimson ribbon at the foot, open at the crown) around a
+    /// polished gold ring and a round crimson-velvet center where the ball
+    /// finishes.  A soft gleam travels slowly around the wreath; the wreath
+    /// itself never moves.  Still under Reduce Motion.
+    private var winnersCircleGoal: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate)
+                let cx: CGFloat = size.width / 2, cy: CGFloat = size.height / 2
+                let R: CGFloat = min(size.width, size.height) / 2 * 0.95
+                let c = CGPoint(x: cx, y: cy)
+                func disc(_ r: CGFloat) -> Path {
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+                }
+                let goldHi = Color(red: 1.00, green: 0.92, blue: 0.56)
+                let goldMid = Color(red: 0.92, green: 0.72, blue: 0.24)
+                let goldLo = Color(red: 0.56, green: 0.38, blue: 0.08)
+
+                // Dark bronze bed the wreath lies on.
+                ctx.fill(disc(R), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.34, green: 0.22, blue: 0.06), Color(red: 0.15, green: 0.09, blue: 0.03)]),
+                    center: c, startRadius: R * 0.4, endRadius: R))
+
+                // The wreath: two branches of nine leaves climbing from the
+                // foot (bottom) to the crown (top), leaves alternating in/out.
+                let gleamAngle: Double = t * 0.35
+                let leafLen: CGFloat = R * 0.24, leafWid: CGFloat = R * 0.095
+                for branch in 0..<2 {
+                    let dir: Double = branch == 0 ? 1.0 : -1.0
+                    for k in 0..<9 {
+                        // 90° is the foot (y grows downward); climb ±158° to the crown.
+                        let f: Double = (Double(k) + 0.6) / 9.6
+                        let a: Double = Double.pi / 2.0 + dir * f * 2.76
+                        let inward: Bool = k % 2 == 1
+                        let rr: CGFloat = R * (inward ? 0.74 : 0.84)
+                        let pos = CGPoint(x: cx + CGFloat(cos(a)) * rr, y: cy + CGFloat(sin(a)) * rr)
+                        // Leaves point along the climb, tipped in or out.
+                        let heading: Double = a + dir * (Double.pi / 2.0) + (inward ? dir * 0.55 : -dir * 0.45)
+                        var leafCtx = ctx
+                        leafCtx.translateBy(x: pos.x, y: pos.y)
+                        leafCtx.rotate(by: .radians(heading))
+                        var leaf = Path()
+                        leaf.move(to: CGPoint(x: -leafLen * 0.5, y: 0))
+                        leaf.addQuadCurve(to: CGPoint(x: leafLen * 0.5, y: 0), control: CGPoint(x: 0, y: -leafWid))
+                        leaf.addQuadCurve(to: CGPoint(x: -leafLen * 0.5, y: 0), control: CGPoint(x: 0, y: leafWid))
+                        // Gleam: brighter where the travelling light is.
+                        let d: Double = abs(atan2(sin(a - gleamAngle), cos(a - gleamAngle)))
+                        let gleam: Double = max(0.0, 1.0 - d / 0.9)
+                        leafCtx.fill(leaf, with: .linearGradient(Gradient(colors: [goldHi, goldMid, goldLo]),
+                                                                 startPoint: CGPoint(x: 0, y: -leafWid),
+                                                                 endPoint: CGPoint(x: 0, y: leafWid)))
+                        leafCtx.fill(leaf, with: .color(Color.white.opacity(0.35 * gleam)))
+                        leafCtx.stroke(leaf, with: .color(goldLo.opacity(0.9)), lineWidth: max(0.5, R * 0.014))
+                        var vein = Path()
+                        vein.move(to: CGPoint(x: -leafLen * 0.42, y: 0))
+                        vein.addLine(to: CGPoint(x: leafLen * 0.42, y: 0))
+                        leafCtx.stroke(vein, with: .color(goldLo.opacity(0.55)), lineWidth: max(0.4, R * 0.010))
+                    }
+                }
+
+                // Crimson ribbon knot at the foot of the wreath.
+                let foot = CGPoint(x: cx, y: cy + R * 0.80)
+                let kw: CGFloat = R * 0.13
+                for sgn in [CGFloat(-1), 1] {
+                    var tail = Path()
+                    tail.move(to: foot)
+                    tail.addLine(to: CGPoint(x: foot.x + sgn * kw * 1.5, y: foot.y + kw * 0.9))
+                    tail.addLine(to: CGPoint(x: foot.x + sgn * kw * 0.6, y: foot.y + kw * 1.2))
+                    tail.closeSubpath()
+                    ctx.fill(tail, with: .color(Color(red: 0.60, green: 0.06, blue: 0.12)))
+                }
+                ctx.fill(Path(ellipseIn: CGRect(x: foot.x - kw * 0.55, y: foot.y - kw * 0.45, width: kw * 1.1, height: kw * 0.9)),
+                         with: .color(Color(red: 0.82, green: 0.12, blue: 0.18)))
+
+                // Polished gold ring.
+                ctx.stroke(disc(R * 0.56), with: .linearGradient(Gradient(colors: [goldHi, goldMid, goldLo, goldMid]),
+                                                                 startPoint: CGPoint(x: cx - R * 0.56, y: cy - R * 0.56),
+                                                                 endPoint: CGPoint(x: cx + R * 0.56, y: cy + R * 0.56)),
+                           lineWidth: max(1.5, R * 0.09))
+                ctx.stroke(disc(R * 0.605), with: .color(goldLo.opacity(0.8)), lineWidth: max(0.5, R * 0.012))
+
+                // The winner's circle: crimson velvet, the clear center.
+                ctx.fill(disc(R * 0.515), with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.78, green: 0.12, blue: 0.18), Color(red: 0.52, green: 0.05, blue: 0.10),
+                    Color(red: 0.30, green: 0.02, blue: 0.06)]),
+                    center: CGPoint(x: cx - R * 0.10, y: cy - R * 0.12), startRadius: 0, endRadius: R * 0.56))
+                ctx.stroke(disc(R * 0.515), with: .color(Color.black.opacity(0.35)), lineWidth: max(0.5, R * 0.014))
+                // A soft sheen on the velvet that breathes very slightly.
+                let sheen: Double = 0.16 + 0.05 * sin(t * 0.8)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - R * 0.34, y: cy - R * 0.40, width: R * 0.44, height: R * 0.26)),
+                         with: .radialGradient(Gradient(colors: [Color.white.opacity(sheen), .clear]),
+                                               center: CGPoint(x: cx - R * 0.12, y: cy - R * 0.27),
+                                               startRadius: 0, endRadius: R * 0.26))
+            }
         }
     }
 
@@ -9056,6 +9566,7 @@ struct PitLandingView: View {
     private var style: Style {
         switch event.pit {
         case .pond, .downpour, .syrup, .deepEnd:       return .splash
+        case .vent:                                    return .splash   // Quality round: Abyssal Depths
         case .evil, .ember, .sunset, .dusk, .crater:   return .embers
         case .space, .eclipse, .aurora, .midnight,
              .twilight, .velvet:                       return .voidImplosion
@@ -9076,6 +9587,8 @@ struct PitLandingView: View {
         case .graveyard: return (Color(red: 0.45, green: 0.55, blue: 0.45), Color(red: 0.10, green: 0.14, blue: 0.10))
         case .deepEnd:   return (Color(red: 0.50, green: 0.78, blue: 1.0),  Color(red: 0.06, green: 0.20, blue: 0.48))
         case .maelstrom: return (Color(red: 0.70, green: 0.72, blue: 0.78), Color(red: 0.30, green: 0.30, blue: 0.36))
+        // — Quality round: Abyssal Depths —
+        case .vent:      return (Color(red: 0.55, green: 0.92, blue: 0.95), Color(red: 0.05, green: 0.14, blue: 0.24))
         default:         return (Color(white: 0.78),                        Color(white: 0.42))
         }
     }

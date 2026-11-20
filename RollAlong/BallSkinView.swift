@@ -1813,51 +1813,92 @@ struct BallSkinView: View {
     // gem facets.  Clipped to a circle by the caller.
     // =========================================================================
 
-    /// Dune (Epic, static) — wind-rippled sand: warm tan bands curving across
-    /// the ball like dune ridges, each with a lit crest and a soft shadow on
-    /// its lee side, over the existing desert-dusk shading.  No motion.
+    /// Dune (Ancient Temple; Epic) — a ball of wind-blown desert: dune ridges
+    /// curving across it, each with a bright sunlit windward face, a knife
+    /// edge crest and a deep shadow in its lee, under a low warm sun.  The
+    /// ridges creep very slowly downwind, a little sand smokes off two crests,
+    /// and a few grains catch the light.  Frozen under Reduce Motion.
     private var duneCanvas: some View {
-        Canvas { ctx, size in
-            let w = size.width, h = size.height
-            let cx = w / 2, cy = h / 2, r = min(w, h) / 2
-            let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-            let sand  = Color(red: 0.93, green: 0.78, blue: 0.52)
-            let ochre = Color(red: 0.82, green: 0.60, blue: 0.32)
-            let shade = Color(red: 0.55, green: 0.32, blue: 0.22)
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 15.0), paused: timelinePaused) { timeline in
+            let t: Double = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                let w = size.width, h = size.height
+                let cx = w / 2, cy = h / 2, r = min(w, h) / 2
+                let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
+                let sand  = Color(red: 0.95, green: 0.80, blue: 0.52)
+                let ochre = Color(red: 0.84, green: 0.60, blue: 0.30)
+                let shade = Color(red: 0.50, green: 0.27, blue: 0.18)
+                let lit   = Color(red: 1.00, green: 0.95, blue: 0.78)
 
-            // Base: sunlit sand to a warm dusk shadow.
-            ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-                Gradient(colors: [Color(red: 0.99, green: 0.90, blue: 0.70), sand, ochre, shade]),
-                center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.34), startRadius: 0, endRadius: r * 1.25))
+                // Base: sunlit sand falling to a warm dusk shadow.
+                ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
+                    Gradient(colors: [Color(red: 1.00, green: 0.92, blue: 0.70), sand, ochre, shade]),
+                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.34), startRadius: 0, endRadius: r * 1.25))
 
-            // Ripple bands: gentle S-curves stacked down the ball.
-            let bands = 7
-            for k in 0..<bands {
-                let f  = (Double(k) + 0.5) / Double(bands)          // 0 top … 1 bottom
-                let y0 = cy - r + CGFloat(f) * r * 2
-                let amp = r * 0.10
-                var crest = Path()
-                let steps = 18
-                for j in 0...steps {
-                    let u = Double(j) / Double(steps)
-                    let x = cx - r + CGFloat(u) * r * 2
-                    let phase: Double = u * Double.pi * 2.0 + Double(k) * 0.9
-                    let wave: CGFloat = CGFloat(sin(phase)) * amp
-                    let tilt: CGFloat = CGFloat(u - 0.5) * r * 0.18   // ridges tilt with the wind
-                    let y: CGFloat = y0 + wave - tilt
-                    if j == 0 { crest.move(to: CGPoint(x: x, y: y)) } else { crest.addLine(to: CGPoint(x: x, y: y)) }
+                // Dune ridges: stacked S-curves creeping slowly downwind.
+                let bands = 7
+                let creep: Double = t * 0.22
+                var crests: [Path] = []
+                crests.reserveCapacity(bands)
+                for k in 0..<bands {
+                    let f: Double = (Double(k) + 0.5) / Double(bands)          // 0 top … 1 bottom
+                    let y0: CGFloat = cy - r + CGFloat(f) * r * 2
+                    let amp: CGFloat = r * 0.11
+                    var crest = Path()
+                    let steps = 18
+                    for j in 0...steps {
+                        let u: Double = Double(j) / Double(steps)
+                        let x: CGFloat = cx - r + CGFloat(u) * r * 2
+                        let phase: Double = u * Double.pi * 2.0 + Double(k) * 0.9 + creep
+                        let wave: CGFloat = CGFloat(sin(phase)) * amp
+                        let tilt: CGFloat = CGFloat(u - 0.5) * r * 0.18   // ridges tilt with the wind
+                        let y: CGFloat = y0 + wave - tilt
+                        if j == 0 { crest.move(to: CGPoint(x: x, y: y)) } else { crest.addLine(to: CGPoint(x: x, y: y)) }
+                    }
+                    crests.append(crest)
+                    // Windward face (above the crest) in full sun, lee face in deep shadow.
+                    ctx.stroke(crest.offsetBy(dx: 0, dy: -r * 0.040),
+                               with: .color(lit.opacity(0.22)), lineWidth: r * 0.075)
+                    ctx.stroke(crest.offsetBy(dx: 0, dy: r * 0.050),
+                               with: .color(shade.opacity(0.42)), lineWidth: r * 0.085)
+                    ctx.stroke(crest, with: .color(lit.opacity(0.75)), lineWidth: max(0.5, r * 0.026))
                 }
-                // Lee-side shadow just below the crest, then the lit crest line.
-                ctx.stroke(crest.offsetBy(dx: 0, dy: r * 0.045),
-                           with: .color(shade.opacity(0.30)), lineWidth: r * 0.07)
-                ctx.stroke(crest, with: .color(Color(red: 1.0, green: 0.94, blue: 0.78).opacity(0.55)),
-                           lineWidth: r * 0.028)
-            }
 
-            // Soft top-left sheen, as on the other Epic marbles.
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
-                with: .radialGradient(Gradient(colors: [.white.opacity(0.20), .clear]),
-                    center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+                // Fine grain: fixed specks of darker sand between the ridges.
+                var rng = SeededRNG(seed: 0xD0E5_A2D1)
+                for _ in 0..<26 {
+                    let gx: CGFloat = cx + CGFloat(rng.nextUnit() * 2.0 - 1.0) * r * 0.9
+                    let gy: CGFloat = cy + CGFloat(rng.nextUnit() * 2.0 - 1.0) * r * 0.9
+                    let gr: CGFloat = max(0.3, r * 0.014)
+                    ctx.fill(Path(ellipseIn: CGRect(x: gx - gr, y: gy - gr, width: gr * 2, height: gr * 2)),
+                             with: .color(shade.opacity(0.28)))
+                }
+
+                // Sand smoking off two crests: a faint pale wisp drifting downwind.
+                for (idx, ph) in [(2, 0.0), (4, 0.5)] {
+                    let u: Double = (t * 0.07 + ph).truncatingRemainder(dividingBy: 1.0)
+                    let alpha: Double = reduceMotion ? 0.0 : sin(u * Double.pi) * 0.30
+                    guard alpha > 0.01 else { continue }
+                    ctx.stroke(crests[idx].offsetBy(dx: CGFloat(u) * r * 0.25, dy: -r * (0.06 + 0.10 * CGFloat(u))),
+                               with: .color(lit.opacity(alpha)),
+                               style: StrokeStyle(lineWidth: r * 0.035, lineCap: .round, dash: [r * 0.22, r * 0.30]))
+                }
+
+                // Grains catching the low sun.
+                let glints: [(CGFloat, CGFloat, Double)] = [(-0.36, -0.20, 0.0), (0.22, -0.42, 1.6), (0.40, 0.18, 3.1), (-0.14, 0.44, 4.4)]
+                for (gx, gy, ph) in glints {
+                    let tw: Double = reduceMotion ? 0.35 : pow(max(0.0, sin(t * 0.9 + ph)), 2.0)
+                    guard tw > 0.03 else { continue }
+                    let gr: CGFloat = r * 0.035 * CGFloat(0.6 + 0.4 * tw)
+                    ctx.fill(Path(ellipseIn: CGRect(x: cx + gx * r - gr, y: cy + gy * r - gr, width: gr * 2, height: gr * 2)),
+                             with: .color(Color.white.opacity(0.85 * tw)))
+                }
+
+                // Soft top-left sheen, as on the other Epic marbles.
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.52, y: cy - r * 0.72, width: r * 0.58, height: r * 0.40)),
+                    with: .radialGradient(Gradient(colors: [.white.opacity(0.22), .clear]),
+                        center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.46), startRadius: 0, endRadius: r * 0.46))
+            }
         }
     }
 
@@ -4427,17 +4468,18 @@ struct BallSkinView: View {
 
     // ── Trophy ───────────────────────────────────────────────────────────────
     // The Golden Gauntlet's exclusive prize — a lustrous prize-gold sphere with a
-    // raised, iridescent CHAMPION STAR at its heart that shimmers through every
-    // hue of the rainbow, a soft victory halo that breathes behind it, a specular
-    // highlight that orbits the surface like light catching polished metal as it
-    // rolls, and sparkle glints that twinkle across the finish.  Made to feel
-    // earned, not bought.
+    // trophy cup embossed on a burnished, beaded medallion at its heart (bowl,
+    // two handles, stem and stepped foot, with laurel sprigs either side), a
+    // soft victory halo that breathes behind it, a gleam that slides slowly
+    // across the cup, a specular highlight that orbits the surface like light
+    // catching polished metal as it rolls, and sparkle glints.  All gold — no
+    // rainbow.  Made to feel earned, not bought.
     //
     // Rendering layers:
     //   1. Polished gold base (bright crown highlight → deep bronze rim)
     //   2. Victory halo behind the emblem (gentle breathing pulse)
-    //   3. Iridescent champion star (drifting rainbow fill + pearlescent sheen +
-    //      bevel + twinkling sparkles riding on the star)
+    //   3. The trophy: medallion, laurel sprigs, embossed cup with handles,
+    //      a slow sliding gleam, bevel and sparkles
     //   4. Orbiting mirror specular
     //   5. Twinkling gold sparkle glints
     //   6. Warm reflected rim light (lower-right)
@@ -4481,52 +4523,113 @@ struct BallSkinView: View {
                         ]),
                         center: center, startRadius: 0, endRadius: r * 0.80))
 
-                // ── 3. Iridescent champion star ──────────────────────────
-                let starR  = r * 0.55
-                let starIn = r * 0.225
-                let rot    = -Double.pi / 2          // one point up
-                let star   = Self.starPath(center: center, outer: starR, inner: starIn, rotation: rot)
-                // 3a. engraved drop-shadow (down-right → raised toward the light)
-                ctx.fill(Self.starPath(center: CGPoint(x: cx + r * 0.045, y: cy + r * 0.055),
-                                       outer: starR, inner: starIn, rotation: rot),
-                         with: .color(Color(red: 0.07, green: 0.06, blue: 0.10).opacity(0.55)))
-                // 3b. dark base under the star so the iridescence reads vividly
-                ctx.fill(star, with: .color(Color(red: 0.09, green: 0.07, blue: 0.13)))
-                // 3c. iridescent rainbow — a hue band drifts through the star while
-                //     the gradient direction slowly rotates (prismatic shimmer).
-                let hueShift = reduceMotion ? 0.0 : (t * 0.11).truncatingRemainder(dividingBy: 1.0)
-                let irisStops: [Gradient.Stop] = (0...6).map { i in
-                    let loc = Double(i) / 6.0
-                    let hue = (loc + hueShift).truncatingRemainder(dividingBy: 1.0)
-                    return .init(color: Color(hue: hue, saturation: 0.82, brightness: 1.0), location: loc)
+                // ── 3. The trophy: a cup embossed on a burnished medallion ──
+                // (Quality round: replaces the rainbow star.  All gold, no hue cycle.)
+                // 3a. medallion — a darker burnished disc with a beaded edge, so
+                //     the pale cup reads against the polished ball.
+                let medR: CGFloat = r * 0.72
+                let med = CGRect(x: cx - medR, y: cy - medR, width: medR * 2, height: medR * 2)
+                ctx.fill(Path(ellipseIn: med), with: .radialGradient(
+                    Gradient(colors: [Color(red: 0.66, green: 0.43, blue: 0.08),
+                                      Color(red: 0.42, green: 0.25, blue: 0.03)]),
+                    center: CGPoint(x: cx - medR * 0.25, y: cy - medR * 0.30), startRadius: 0, endRadius: medR * 1.2))
+                ctx.stroke(Path(ellipseIn: med), with: .color(Color(red: 1.0, green: 0.92, blue: 0.60).opacity(0.9)),
+                           lineWidth: max(0.6, r * 0.028))
+                for k in 0..<28 {
+                    let a: Double = Double(k) / 28.0 * 2.0 * Double.pi
+                    let bp = CGPoint(x: cx + CGFloat(cos(a)) * medR * 0.92, y: cy + CGFloat(sin(a)) * medR * 0.92)
+                    let br: CGFloat = max(0.4, r * 0.020)
+                    ctx.fill(Path(ellipseIn: CGRect(x: bp.x - br, y: bp.y - br, width: br * 2, height: br * 2)),
+                             with: .color(Color(red: 1.0, green: 0.90, blue: 0.56).opacity(0.85)))
                 }
-                let irisAng = reduceMotion ? 0.7 : t * 0.22
-                let idx = CGFloat(cos(irisAng)) * starR
-                let idy = CGFloat(sin(irisAng)) * starR
-                ctx.fill(star, with: .linearGradient(
-                    Gradient(stops: irisStops),
-                    startPoint: CGPoint(x: cx - idx, y: cy - idy),
-                    endPoint:   CGPoint(x: cx + idx, y: cy + idy)))
-                // 3d. pearlescent sheen on the upper half (glossy lacquer)
-                ctx.fill(star, with: .linearGradient(
+                // 3b. laurel sprigs low on either side of the cup.
+                for side in [-1.0, 1.0] {
+                    for k in 0..<4 {
+                        let a: Double = Double.pi / 2.0 + side * (0.62 + 0.30 * Double(k))
+                        let lp = CGPoint(x: cx + CGFloat(cos(a)) * medR * 0.70, y: cy + CGFloat(sin(a)) * medR * 0.70)
+                        var lctx = ctx
+                        lctx.translateBy(x: lp.x, y: lp.y)
+                        lctx.rotate(by: .radians(a + side * 1.05))
+                        let leaf = Path(ellipseIn: CGRect(x: -r * 0.10, y: -r * 0.038, width: r * 0.20, height: r * 0.076))
+                        lctx.fill(leaf, with: .color(Color(red: 0.98, green: 0.84, blue: 0.40)))
+                        lctx.stroke(leaf, with: .color(Color(red: 0.36, green: 0.22, blue: 0.03).opacity(0.8)),
+                                    lineWidth: max(0.4, r * 0.012))
+                    }
+                }
+                // 3c. the cup — bowl, stem and stepped foot — and its two handles.
+                func cupPoint(_ x: CGFloat, _ y: CGFloat, _ ox: CGFloat, _ oy: CGFloat) -> CGPoint {
+                    CGPoint(x: cx + ox + x * r, y: cy + oy + y * r)
+                }
+                func cupPath(_ ox: CGFloat, _ oy: CGFloat) -> Path {
+                    var p = Path()
+                    p.move(to: cupPoint(-0.30, -0.38, ox, oy))
+                    p.addLine(to: cupPoint(0.30, -0.38, ox, oy))
+                    p.addQuadCurve(to: cupPoint(0.06, 0.08, ox, oy), control: cupPoint(0.30, 0.03, ox, oy))
+                    p.addLine(to: cupPoint(0.06, 0.22, ox, oy))
+                    p.addLine(to: cupPoint(0.20, 0.28, ox, oy))
+                    p.addLine(to: cupPoint(0.20, 0.38, ox, oy))
+                    p.addLine(to: cupPoint(-0.20, 0.38, ox, oy))
+                    p.addLine(to: cupPoint(-0.20, 0.28, ox, oy))
+                    p.addLine(to: cupPoint(-0.06, 0.22, ox, oy))
+                    p.addLine(to: cupPoint(-0.06, 0.08, ox, oy))
+                    p.addQuadCurve(to: cupPoint(-0.30, -0.38, ox, oy), control: cupPoint(-0.30, 0.03, ox, oy))
+                    p.closeSubpath()
+                    return p
+                }
+                func handlePath(_ sgn: CGFloat, _ ox: CGFloat, _ oy: CGFloat) -> Path {
+                    var p = Path()
+                    p.move(to: cupPoint(sgn * 0.29, -0.30, ox, oy))
+                    p.addCurve(to: cupPoint(sgn * 0.19, -0.03, ox, oy),
+                               control1: cupPoint(sgn * 0.54, -0.32, ox, oy),
+                               control2: cupPoint(sgn * 0.46, -0.02, ox, oy))
+                    return p
+                }
+                let shadowInk = Color(red: 0.16, green: 0.09, blue: 0.01)
+                let sox: CGFloat = r * 0.035, soy: CGFloat = r * 0.045
+                for sgn in [CGFloat(-1), 1] {
+                    ctx.stroke(handlePath(sgn, sox, soy), with: .color(shadowInk.opacity(0.55)),
+                               style: StrokeStyle(lineWidth: r * 0.085, lineCap: .round))
+                    ctx.stroke(handlePath(sgn, 0, 0), with: .color(Color(red: 0.99, green: 0.86, blue: 0.42)),
+                               style: StrokeStyle(lineWidth: r * 0.070, lineCap: .round))
+                    ctx.stroke(handlePath(sgn, 0, 0), with: .color(Color.white.opacity(0.55)),
+                               style: StrokeStyle(lineWidth: max(0.4, r * 0.018), lineCap: .round))
+                }
+                let cup = cupPath(0, 0)
+                ctx.fill(cupPath(sox, soy), with: .color(shadowInk.opacity(0.55)))
+                ctx.fill(cup, with: .linearGradient(
                     Gradient(stops: [
-                        .init(color: .white.opacity(0.55), location: 0.0),
-                        .init(color: .white.opacity(0.06), location: 0.42),
-                        .init(color: .clear, location: 0.62),
+                        .init(color: Color(red: 1.00, green: 0.98, blue: 0.84), location: 0.00),
+                        .init(color: Color(red: 1.00, green: 0.88, blue: 0.44), location: 0.38),
+                        .init(color: Color(red: 0.84, green: 0.60, blue: 0.14), location: 0.80),
+                        .init(color: Color(red: 0.62, green: 0.40, blue: 0.06), location: 1.00),
                     ]),
-                    startPoint: CGPoint(x: cx, y: cy - starR),
-                    endPoint:   CGPoint(x: cx, y: cy + starR)))
-                // 3e. bright white bevel edge
-                ctx.stroke(star, with: .color(.white.opacity(0.92)), lineWidth: max(0.5, r * 0.022))
-                // 3f. twinkling sparkles riding on the star
-                let starGlints: [(CGFloat, CGFloat, Double)] = [
-                    (0.0, -0.60, 0.0), (-0.30, 0.18, 2.1), (0.32, 0.10, 4.0),
+                    startPoint: CGPoint(x: cx - r * 0.30, y: cy), endPoint: CGPoint(x: cx + r * 0.30, y: cy)))
+                // the open mouth of the bowl
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.27, y: cy - r * 0.415, width: r * 0.54, height: r * 0.075)),
+                         with: .color(Color(red: 0.44, green: 0.27, blue: 0.04)))
+                // a band around the foot
+                ctx.stroke(Path { p in
+                    p.move(to: cupPoint(-0.20, 0.33, 0, 0)); p.addLine(to: cupPoint(0.20, 0.33, 0, 0))
+                }, with: .color(shadowInk.opacity(0.45)), lineWidth: max(0.4, r * 0.016))
+                // 3d. a soft gleam sliding slowly across the cup (clipped to it).
+                var gleamCtx = ctx
+                gleamCtx.clip(to: cup)
+                let gx: CGFloat = cx + CGFloat(sin(t * 0.55)) * r * 0.26
+                gleamCtx.fill(Path(CGRect(x: gx - r * 0.10, y: cy - r * 0.45, width: r * 0.20, height: r * 0.90)),
+                              with: .linearGradient(
+                                Gradient(colors: [.clear, Color.white.opacity(0.55), .clear]),
+                                startPoint: CGPoint(x: gx - r * 0.10, y: cy), endPoint: CGPoint(x: gx + r * 0.10, y: cy)))
+                // 3e. bright bevel edge
+                ctx.stroke(cup, with: .color(Color.white.opacity(0.80)), lineWidth: max(0.5, r * 0.020))
+                // 3f. sparkles on the rim and foot of the cup
+                let cupGlints: [(CGFloat, CGFloat, Double)] = [
+                    (-0.27, -0.39, 0.0), (0.24, -0.16, 2.1), (0.0, 0.36, 4.0),
                 ]
-                for (gx, gy, ph) in starGlints {
-                    let tw = reduceMotion ? 0.7 : max(0.0, sin(t * 3.0 + ph))
+                for (sx0, sy0, ph) in cupGlints {
+                    let tw: Double = reduceMotion ? 0.7 : max(0.0, sin(t * 1.6 + ph))
                     if tw <= 0.05 { continue }
-                    let p = CGPoint(x: cx + gx * starR, y: cy + gy * starR)
-                    trophyGlint(ctx, at: p, size: r * 0.11 * CGFloat(0.55 + 0.5 * tw), opacity: tw)
+                    let sp = CGPoint(x: cx + sx0 * r, y: cy + sy0 * r)
+                    trophyGlint(ctx, at: sp, size: r * 0.10 * CGFloat(0.55 + 0.5 * tw), opacity: tw)
                 }
 
                 // ── 4. Orbiting mirror specular ──────────────────────────
