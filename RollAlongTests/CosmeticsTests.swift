@@ -1481,6 +1481,20 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertNotNil(CosmeticBundle.catalogue.first { $0.id == "space-travel" })
     }
 
+    /// Quality-standard audit: the Space pit and the Tide Pool pit are layered
+    /// drawn art, so they stay visible (frozen) under Reduce Motion, and both
+    /// carry a slow animated overlay.  Ids, tiers and prices are unchanged.
+    func testQualityAudit_spaceAndTidePoolPitsAreDrawnArt() {
+        XCTAssertTrue(Pit.space.hasDrawnArt)
+        XCTAssertTrue(Pit.space.hasAnimatedOverlay)
+        XCTAssertTrue(Pit.tidePool.hasDrawnArt)
+        XCTAssertTrue(Pit.tidePool.hasAnimatedOverlay)
+        XCTAssertEqual(Pit.space.rawValue, "space")
+        XCTAssertEqual(Pit.space.tier, .exclusive)
+        XCTAssertEqual(Pit.tidePool.tier, .standard)
+        XCTAssertEqual(TrailColor.cometTrail.displayName, "Comet")
+    }
+
     // MARK: - Music is not in 1.0
 
     /// Quality round: Citrus is tropical citrus and Midas is one golden set.

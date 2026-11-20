@@ -1020,7 +1020,7 @@ struct BallGameView: View {
                     // (.evil is drawn art now — see `hasDrawnArt` below.)
                     case .sky:       skyPitOverlay
                     case .pond:      pondPitOverlay
-                    case .space:     spacePitOverlay
+                    // (.space is drawn art now too — quality-standard audit.)
                     case .eclipse:   eclipsePitOverlay
                     case .nightclub: nightclubPitOverlay
                     default:         EmptyView()
@@ -4171,7 +4171,7 @@ struct FloorOverlayView: View {
     /// exactly the old static crater field.  Deterministic seeded
     /// placement so craters don't shift between frames.
     private var moonFloorOverlay: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 12.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
                 var rng = SeededRNG(seed: 0x5EED_0C24)
@@ -4181,7 +4181,9 @@ struct FloorOverlayView: View {
                 for _ in 0..<craterCount {
                     let cx = CGFloat(rng.nextUnit()) * size.width
                     let cy = CGFloat(rng.nextUnit()) * size.height
-                    let r  = 6 + CGFloat(rng.nextUnit()) * 22
+                    // Small craters only (quality standard R7): a crater must never be
+                    // mistaken for a pit, so they stay shallow, pale and under ~38 pt.
+                    let r  = 5 + CGFloat(rng.nextUnit()) * 14
                     // Slow shadow drift — phase from position (not rand())
                     // so the RNG sequence, and thus the crater layout,
                     // matches the old static render exactly.  Zero at t=0.
@@ -4194,7 +4196,7 @@ struct FloorOverlayView: View {
                         with: .radialGradient(
                             Gradient(colors: [
                                 floorBase.opacity(0.0),
-                                Color(red: 0.42, green: 0.42, blue: 0.46).opacity(0.55),
+                                Color(red: 0.44, green: 0.44, blue: 0.48).opacity(0.40),
                             ]),
                             center: CGPoint(x: cx + shadeDX, y: cy),
                             startRadius: r * 0.30,
@@ -4204,8 +4206,8 @@ struct FloorOverlayView: View {
                     // Dark inner shadow (upper-left, where the wall faces away).
                     ctx.stroke(
                         Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
-                        with: .color(Color(red: 0.30, green: 0.30, blue: 0.34).opacity(0.40)),
-                        lineWidth: 1.2
+                        with: .color(Color(red: 0.34, green: 0.34, blue: 0.38).opacity(0.28)),
+                        lineWidth: 1.0
                     )
                     // Bright lower-right rim crescent (sunlit far wall) —
                     // its arc swings gently with the drifting sun angle.
@@ -4213,6 +4215,38 @@ struct FloorOverlayView: View {
                     rim.addArc(center: CGPoint(x: cx, y: cy), radius: r * 0.96,
                                startAngle: .degrees(20 + drift), endAngle: .degrees(150 + drift), clockwise: false)
                     ctx.stroke(rim, with: .color(Color.white.opacity(0.30)), lineWidth: 1.0)
+                }
+
+                // Small loose rocks with a short shadow, and a few fine
+                // surface cracks — details that reward a close look.
+                var rrng = SeededRNG(seed: 0x400D_0C24)
+                let rockCount = max(6, Int(size.width * size.height / 9000))
+                for _ in 0..<rockCount {
+                    let rx: CGFloat = CGFloat(rrng.nextUnit()) * size.width
+                    let ry: CGFloat = CGFloat(rrng.nextUnit()) * size.height
+                    let rr: CGFloat = 1.2 + CGFloat(rrng.nextUnit()) * 1.8
+                    ctx.fill(Path(ellipseIn: CGRect(x: rx - rr + 1.4, y: ry - rr * 0.5 + 1.2, width: rr * 2.4, height: rr * 1.1)),
+                             with: .color(Color(red: 0.25, green: 0.25, blue: 0.30).opacity(0.22)))
+                    ctx.fill(Path(ellipseIn: CGRect(x: rx - rr, y: ry - rr * 0.8, width: rr * 2, height: rr * 1.6)),
+                             with: .color(Color(red: 0.50, green: 0.50, blue: 0.54).opacity(0.85)))
+                    ctx.fill(Path(ellipseIn: CGRect(x: rx - rr * 0.6, y: ry - rr * 0.7, width: rr, height: rr * 0.7)),
+                             with: .color(Color.white.opacity(0.30)))
+                }
+                let crackCount = max(3, Int(size.width * size.height / 26000))
+                for _ in 0..<crackCount {
+                    var px: CGFloat = CGFloat(rrng.nextUnit()) * size.width
+                    var py: CGFloat = CGFloat(rrng.nextUnit()) * size.height
+                    var crack = Path()
+                    crack.move(to: CGPoint(x: px, y: py))
+                    let heading: Double = rrng.nextUnit() * 6.283
+                    for _ in 0..<4 {
+                        let turn: Double = heading + (rrng.nextUnit() - 0.5) * 1.2
+                        px += CGFloat(cos(turn)) * 9
+                        py += CGFloat(sin(turn)) * 9
+                        crack.addLine(to: CGPoint(x: px, y: py))
+                    }
+                    ctx.stroke(crack, with: .color(Color(red: 0.36, green: 0.36, blue: 0.40).opacity(0.30)),
+                               style: StrokeStyle(lineWidth: 0.7, lineCap: .round, lineJoin: .round))
                 }
 
                 // Star-glint dust — tiny bright specks in the regolith that
@@ -4229,7 +4263,7 @@ struct FloorOverlayView: View {
                         let gPhase: Double = drng.nextUnit() * 6.28
                         let gx: CGFloat = gx0 + CGFloat(sin(t * 0.05 + gPhase)) * 6
                         let gy: CGFloat = gy0 + CGFloat(cos(t * 0.04 + gPhase)) * 4
-                        let twinkle: Double = 0.5 + 0.5 * sin(t * 1.8 + Double(i) * 2.3)
+                        let twinkle: Double = 0.5 + 0.5 * sin(t * 2.4 + Double(i) * 2.3)
                         let gr: CGFloat = 0.7 + CGFloat(drng.nextUnit()) * 0.9
                         dust.fill(
                             Path(ellipseIn: CGRect(x: gx - gr, y: gy - gr, width: gr * 2, height: gr * 2)),
@@ -4983,6 +5017,7 @@ struct PitOverlayView: View {
         case .midnight:  moonlitPitOverlay
         case .maelstrom: maelstromPitOverlay      // Storm set
         case .vent:      ventPitOverlay       // Quality round: Abyssal Depths
+        case .tidePool:  tidePoolPitOverlay   // Quality-standard audit: Citrus
         default:
             if pit.hasDrawnArt { staticPitArt } else { EmptyView() }
         }
@@ -5178,89 +5213,16 @@ struct PitOverlayView: View {
     /// stars are larger "bright" stars with a cross-glint.  Star
     /// positions are seeded so they stay put; only brightness animates.
     private var spacePitOverlay: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+        // Quality-standard audit: layered depth, dark core, 20 fps cap, a
+        // shooting star at most every 11 s (see `PitArt.drawSpace`).
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
-
-                // Void background — near-black with a faint purple/blue
-                // nebula wash diagonally across.
-                ctx.fill(
-                    Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
-                    with: .linearGradient(
-                        Gradient(colors: [
-                            Color(red: 0.02, green: 0.02, blue: 0.08),
-                            Color(red: 0.08, green: 0.04, blue: 0.16),
-                            Color(red: 0.02, green: 0.03, blue: 0.10),
-                        ]),
-                        startPoint: .zero,
-                        endPoint:   CGPoint(x: size.width, y: size.height)
-                    )
-                )
-
-                // Starfield — seeded positions, animated twinkle.
-                var rng = SeededRNG(seed: 0x57A4_F1E1)
-                let starCount = max(20, Int(size.width * size.height / 900))
-                for i in 0..<starCount {
-                    let sx = CGFloat(rng.nextUnit()) * size.width
-                    let sy = CGFloat(rng.nextUnit()) * size.height
-                    let baseR = 0.6 + CGFloat(rng.nextUnit()) * 1.4
-                    let phase = rng.nextUnit() * 6.28
-                    let twinkle = 0.45 + 0.55 * (0.5 + 0.5 * sin(t * 2.2 + phase))
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(x: sx - baseR, y: sy - baseR,
-                                               width: baseR * 2, height: baseR * 2)),
-                        with: .color(Color.white.opacity(twinkle))
-                    )
-                    // Every ~7th star gets a soft glow + glint cross.
-                    if i % 7 == 0 {
-                        let glowR = baseR * 4
-                        ctx.fill(
-                            Path(ellipseIn: CGRect(x: sx - glowR, y: sy - glowR,
-                                                   width: glowR * 2, height: glowR * 2)),
-                            with: .radialGradient(
-                                Gradient(colors: [
-                                    Color(red: 0.70, green: 0.85, blue: 1.00).opacity(0.35 * twinkle),
-                                    .clear,
-                                ]),
-                                center: CGPoint(x: sx, y: sy),
-                                startRadius: 0, endRadius: glowR
-                            )
-                        )
-                    }
-                }
-
-                // Shooting star — every ~3.5s a streak crosses the void on a
-                // diagonal, leaving a fading tail.  `cycle` is the time since
-                // the last launch; we only draw during its brief flight.
-                let period = 3.5
-                let cycle  = t.truncatingRemainder(dividingBy: period)
-                if cycle < 0.9 {
-                    let prog = CGFloat(cycle / 0.9)
-                    // Seed start position off the launch index so successive
-                    // shooting stars take different paths.
-                    var sRng = SeededRNG(seed: UInt64(t / period) &* 0x2545_F491 | 1)
-                    let startX = CGFloat(sRng.nextUnit()) * size.width
-                    let startY = CGFloat(sRng.nextUnit()) * size.height * 0.4
-                    let dx = size.width * 0.7, dy = size.height * 0.5
-                    let hx = startX + dx * prog
-                    let hy = startY + dy * prog
-                    var streak = ctx
-                    streak.blendMode = .plusLighter
-                    // Tail — a short line behind the head.
-                    var tail = Path()
-                    tail.move(to: CGPoint(x: hx - dx * 0.10, y: hy - dy * 0.10))
-                    tail.addLine(to: CGPoint(x: hx, y: hy))
-                    streak.stroke(tail,
-                        with: .color(Color.white.opacity(Double(0.8 * (1 - prog)))),
-                        lineWidth: 1.6)
-                    // Head glow.
-                    let hr: CGFloat = 2.2
-                    streak.fill(
-                        Path(ellipseIn: CGRect(x: hx - hr, y: hy - hr, width: hr * 2, height: hr * 2)),
-                        with: .color(Color.white.opacity(Double(1 - prog))))
-                }
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                PitArt.drawSpace(in: &ctx, size: size, t: t)
             }
         }
+        .allowsHitTesting(false)
     }
 
     /// Eclipse pit (Eclipse bundle) — a mini eclipse in the death zone: a dark
@@ -5993,6 +5955,31 @@ enum PitArt {
         }
     }
 
+    // — Quality-standard audit: Citrus —
+    /// Tide Pool with its tide (R6: water should move).  Draws the still pool,
+    /// then lets the foam line breathe on a 7-second period and sends one
+    /// faint ripple ring slowly inward over the shallows every 9 seconds.
+    /// `t` = 0 gives exactly the still pool.
+    static func drawTidePool(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        tidePool(&ctx, size)
+        guard t > 0 else { return }
+        let m = min(size.width, size.height)
+        let step: CGFloat = m * 0.075
+        // Foam breathing where the water meets the sand.
+        let breathe: Double = 0.5 + 0.5 * sin(t * 0.9)
+        let foamRect = inset(size, step * CGFloat(1.0 + 0.10 * breathe))
+        guard foamRect.width > 0, foamRect.height > 0 else { return }
+        let foam = raggedRect(foamRect, step: max(3, m * 0.08), jitter: m * 0.014, seed: 0x71DE_0001)
+        ctx.stroke(foam, with: .color(Color.white.opacity(0.10 + 0.18 * breathe)), lineWidth: max(0.8, m * 0.016))
+        // One ripple ring travelling inward, fading as it goes.
+        let u: Double = (t / 9.0).truncatingRemainder(dividingBy: 1.0)
+        let rr = inset(size, step * CGFloat(1.3 + 1.2 * u))
+        if rr.width > 0, rr.height > 0 {
+            ctx.stroke(Path(roundedRect: rr, cornerRadius: m * 0.14),
+                       with: .color(Color.white.opacity(0.20 * sin(u * .pi))), lineWidth: 0.8)
+        }
+    }
+
     /// Vault (Midas set): a treasury shaft.  Square gold steps descend from a
     /// bright rim, each with a lit edge and a shadowed edge, to a dark floor
     /// where a few coins glint.  Static.
@@ -6518,6 +6505,69 @@ enum PitArt {
         }
     }
 
+    // — Quality-standard audit: Space Traveler —
+    /// Space (Space Traveler): a hole that opens onto deep space.  A thin
+    /// pale-violet lip (the brightest part), then four smooth steps of indigo
+    /// falling to a pure black core that is 40 % of the width.  Dim stars sit
+    /// only on the two outer steps and twinkle slowly; about every 11 seconds
+    /// one faint shooting star crosses an outer step with a soft rise and
+    /// fall.  `t` = 0 gives the still frame.
+    static func drawSpace(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        let m = min(size.width, size.height)
+        fill(&ctx, size, Color(red: 0.0, green: 0.0, blue: 0.015))
+        let steps: [Color] = [
+            Color(red: 0.20, green: 0.16, blue: 0.42), Color(red: 0.12, green: 0.10, blue: 0.28),
+            Color(red: 0.06, green: 0.05, blue: 0.16), Color(red: 0.025, green: 0.02, blue: 0.07),
+            Color(red: 0.0, green: 0.0, blue: 0.015),
+        ]
+        let step: CGFloat = m * 0.075
+        for (k, color) in steps.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            guard r.width > 0, r.height > 0 else { break }
+            let layer: Path = k == 0 ? Path(r) : Path(roundedRect: r, cornerRadius: m * CGFloat(0.05 + 0.03 * Double(k)))
+            ctx.fill(layer, with: .color(color))
+            if k > 0 {
+                // A thin dark line under each step turns bands into ledges.
+                ctx.stroke(layer, with: .color(Color.black.opacity(0.45)), lineWidth: max(0.5, m * 0.012))
+            }
+        }
+        // The lip: the brightest part of the pit.
+        ctx.stroke(Path(inset(size, 0.7)), with: .color(Color(red: 0.72, green: 0.66, blue: 1.00).opacity(0.85)),
+                   lineWidth: max(1.0, m * 0.03))
+        // Dim stars on the two outer steps only; the core stays black.
+        var rng = SeededRNG(seed: 0x57A4_F1E1)
+        var glow = ctx
+        glow.blendMode = .plusLighter
+        let spots = edgeSpots(size, spacing: max(7, m * 0.20), seed: 0x57A4_0002)
+        for spot in spots {
+            let depth: CGFloat = step * CGFloat(0.35 + 1.3 * rng.nextUnit())
+            let phase: Double = rng.nextUnit() * 6.283
+            let sr: CGFloat = max(0.5, m * CGFloat(0.008 + 0.008 * rng.nextUnit()))
+            let pt = CGPoint(x: spot.point.x + spot.inward.dx * depth, y: spot.point.y + spot.inward.dy * depth)
+            let a: Double = 0.45 + 0.20 * sin(t * 2.4 + phase)
+            glow.fill(Path(ellipseIn: CGRect(x: pt.x - sr, y: pt.y - sr, width: sr * 2, height: sr * 2)),
+                      with: .color(Color(red: 0.90, green: 0.92, blue: 1.00).opacity(a)))
+        }
+        // A rare, soft shooting star along the top step.
+        let period: Double = 11.0
+        let cycle: Double = t.truncatingRemainder(dividingBy: period)
+        let flight: Double = 1.6
+        if t > 0, cycle < flight {
+            let u: Double = cycle / flight
+            let level: Double = sin(u * .pi) * 0.55
+            let y: CGFloat = step * 0.9
+            let x0: CGFloat = size.width * 0.12, x1: CGFloat = size.width * 0.88
+            let hx: CGFloat = x0 + (x1 - x0) * CGFloat(u)
+            var tail = Path()
+            tail.move(to: CGPoint(x: hx - m * 0.16, y: y))
+            tail.addLine(to: CGPoint(x: hx, y: y))
+            glow.stroke(tail, with: .linearGradient(Gradient(colors: [.clear, Color.white.opacity(level)]),
+                                                    startPoint: CGPoint(x: hx - m * 0.16, y: y),
+                                                    endPoint: CGPoint(x: hx, y: y)),
+                        style: StrokeStyle(lineWidth: max(0.8, m * 0.014), lineCap: .round))
+        }
+    }
+
     // — Quality round: Abyssal Depths —
     /// Sea Vent (Abyssal Depths): ledges of black basalt stepping down to a
     /// vent whose mouth glows dull orange around a black throat.  Specks of
@@ -6579,6 +6629,22 @@ enum PitArt {
             ctx.stroke(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
                        with: .color(Color(red: 0.70, green: 0.95, blue: 1.00).opacity(a)), lineWidth: max(0.5, m * 0.008))
         }
+    }
+}
+
+// — Quality-standard audit: Citrus —
+extension PitOverlayView {
+    /// Tide Pool: the still pool plus a slow tide (see `PitArt.drawTidePool`).
+    /// Held still under Reduce Motion.
+    var tidePoolPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                PitArt.drawTidePool(in: &ctx, size: size, t: t)
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -10776,14 +10842,16 @@ struct GoalSkinView: View {
     /// and shimmer are motion-only; at t=0 (Reduce Motion) the frozen frame
     /// is the original core + jets + plain ring.
     private var quasarGoal: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double  = heroTime ?? (reduceMotion ? 0 : tl.date.timeIntervalSinceReferenceDate)
                 let cx = size.width / 2, cy = size.height / 2
                 let r  = min(size.width, size.height) / 2 * 0.95
                 ctx.fill(Path(ellipseIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)), with: .color(Color(red:0.02,green:0.0,blue:0.05)))
                 var g = ctx; g.blendMode = .plusLighter
-                let ang = t * 0.5
+                // One turn of the jets in about 26 s (quality standard: a goal
+                // turns once in 20 s or more).
+                let ang = t * 0.24
                 for dir in [CGFloat(1), -1] {
                     let ax = cx + CGFloat(cos(ang)) * r * dir
                     let ay = cy + CGFloat(sin(ang)) * r * dir
@@ -10796,16 +10864,16 @@ struct GoalSkinView: View {
                     if !reduceMotion {
                         for s in 0..<5 {
                             let sPhase: Double = Double(s) * 0.2
-                            let prog: Double = (t * 0.45 + sPhase).truncatingRemainder(dividingBy: 1.0)
+                            let prog: Double = (t * 0.12 + sPhase).truncatingRemainder(dividingBy: 1.0)
                             let f: CGFloat = CGFloat(prog)
                             // Perpendicular scatter off the beam centreline.
-                            let jog: Double = sin(t * 6.0 + Double(s) * 2.6) * 0.05
+                            let jog: Double = sin(t * 0.9 + Double(s) * 2.6) * 0.04
                             let px: CGFloat = cx + (ax - cx) * f + CGFloat(cos(ang + .pi / 2) * jog) * r * dir
                             let py: CGFloat = cy + (ay - cy) * f + CGFloat(sin(ang + .pi / 2) * jog) * r * dir
                             let fade: Double = sin(prog * .pi)
                             let sr: CGFloat = 1.2 + 1.2 * (1 - f)
                             g.fill(Path(ellipseIn: CGRect(x: px - sr, y: py - sr, width: sr * 2, height: sr * 2)),
-                                   with: .color(Color(red: 0.75, green: 0.95, blue: 1.0).opacity(0.8 * fade)))
+                                   with: .color(Color(red: 0.75, green: 0.95, blue: 1.0).opacity(0.55 * fade)))
                         }
                     }
                 }
@@ -10818,18 +10886,20 @@ struct GoalSkinView: View {
                 if !reduceMotion {
                     let segs = 8
                     for k in 0..<segs {
-                        let a0: Double = Double(k) / Double(segs) * 2 * .pi + t * 0.35
-                        let glint: Double = 0.5 + 0.5 * sin(t * 2.6 + Double(k) * 1.3)
+                        let a0: Double = Double(k) / Double(segs) * 2 * .pi - t * 0.12
+                        let glint: Double = 0.5 + 0.5 * sin(t * 1.0 + Double(k) * 1.3)
                         var seg = Path()
                         seg.addArc(center: CGPoint(x: cx, y: cy), radius: rr,
                                    startAngle: .radians(a0), endAngle: .radians(a0 + 0.34),
                                    clockwise: false)
                         g.stroke(seg,
-                                 with: .color(Color(red: 0.85, green: 0.98, blue: 1.0).opacity(0.15 + 0.45 * glint)),
+                                 with: .color(Color(red: 0.85, green: 0.98, blue: 1.0).opacity(0.18 + 0.22 * glint)),
                                  style: StrokeStyle(lineWidth: r * 0.06, lineCap: .round))
                     }
                 }
-                let cr = r * 0.22
+                // The white-hot core is the target: 30 % of the radius, breathing
+                // by a few percent on a 6 s period.
+                let cr = r * (0.30 + 0.012 * CGFloat(sin(t * 1.05)))
                 g.fill(Path(ellipseIn: CGRect(x: cx-cr, y: cy-cr, width: cr*2, height: cr*2)),
                     with: .radialGradient(Gradient(colors: [Color.white, Color(red:1.0,green:0.4,blue:0.9).opacity(0.4), .clear]),
                         center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: cr))
