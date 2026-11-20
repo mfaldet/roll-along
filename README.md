@@ -42,6 +42,8 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 
 ### Release calendar
 
+**Quality standard.** Every cosmetic that is drawn or changed must meet `docs/cosmetics/quality-standard.md` (nine rules, the reference pieces and the numbers to design to). It is binding.
+
 Most cosmetics are held back at launch and released on fixed calendar dates (`CosmeticSchedule` in `Cosmetics.swift`). There is no launch date.
 
 - **A cosmetic is on sale only as part of a full active collection** (`CosmeticSale` in `Cosmetics.swift`): an active collection with all six slots filled (ball, goal, trail, floor, pit, boundary) whose release day has arrived. Pieces are still bought one at a time, but only pieces of such a collection. Every other piece is **held**: not shown, not sold, not announced. That covers pieces of retired and seasonal sets, pieces displaced in the quality round and pieces in no collection. Held pieces keep their code and ids; an owner keeps them and equips them from the Locker. Exempt (earned or purchase-only, never sold for coins): the Diamond ball, the Money Ball, the Trophy ball and the Money Roll trail and Money Full floor. The three ball packs are held too, because each contains balls that are in no full collection. `docs/proposals/held-pieces.md` lists every held piece (`python3 tools/cosmetic-calendar/held_inventory.py --write` regenerates it).
