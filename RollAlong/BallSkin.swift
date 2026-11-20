@@ -271,12 +271,19 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case apple       = "Teacher's Apple"
 
     // ── Starter element sets (Standard, static; post-tutorial choice) ──
-    //   • blaze — Fire set: glowing red-orange core with dark cooled cracks.
-    //   • droplet — Water set: deep blue marble with a bright wave band.
-    //   • thundercloud — Storm set: gray cloud marble with a yellow bolt.
+    //   • blaze — Fire set: a ball of living fire (layered flames rising inside an ember shell).
+    //   • droplet — Water set: a clear drop of water (light gathered on the far side, slow waves, bubbles).
+    //   • thundercloud — Storm set: a dark, slowly rolling storm cloud lit from
+    //     inside by rare forked lightning.
     case blaze        = "Blaze"
     case droplet      = "Droplet"
     case thundercloud = "Thundercloud"
+
+    // ── Sketchbook (quality round) ──
+    //   • pencil — a yellow pencil standing on its tip, seen from above: the
+    //     hexagonal barrel, the metal ferrule and the pink eraser.  Static.
+    //     Standard; replaces Silver in the Sketchbook set.
+    case pencil       = "Pencil"
 
     var id: String { rawValue }
 
@@ -413,10 +420,17 @@ enum BallSkin: String, CaseIterable, Identifiable {
             ]
         case .thundercloud:
             return [
-                Color(red: 0.80, green: 0.82, blue: 0.86),
-                Color(red: 0.50, green: 0.52, blue: 0.58),
-                Color(red: 0.28, green: 0.29, blue: 0.34),
-                Color(red: 0.12, green: 0.12, blue: 0.16),
+                Color(red: 0.56, green: 0.58, blue: 0.64),
+                Color(red: 0.34, green: 0.36, blue: 0.42),
+                Color(red: 0.18, green: 0.19, blue: 0.24),
+                Color(red: 0.07, green: 0.07, blue: 0.10),
+            ]
+        case .pencil:
+            return [
+                Color(red: 1.00, green: 0.70, blue: 0.74),
+                Color(red: 1.00, green: 0.82, blue: 0.22),
+                Color(red: 0.92, green: 0.66, blue: 0.10),
+                Color(red: 0.55, green: 0.36, blue: 0.04),
             ]
         case .lemon:
             return [

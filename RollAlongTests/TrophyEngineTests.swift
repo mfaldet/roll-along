@@ -2597,11 +2597,15 @@ final class TrophyCosmeticEconomyWiringTests: XCTestCase {
                        "the evergreen denominator must be exactly \(evergreenTotal)")
     }
 
-    /// The evergreen set: 261 items with music, 242 while music is off
-    /// (1.0 — the 19 music tracks aren't offered, so they don't count).
-    /// (242 + the 18 Fire / Water / Storm starter-set pieces.)
+    /// The evergreen set: every cosmetic in every slot, minus the 4 IAP
+    /// secrets and the 7 seasonal-exclusive balls; the music tracks count
+    /// only while music is offered (not in 1.0).  Counted from the catalogue
+    /// so a new piece never needs this number edited by hand.
     static var evergreenTotal: Int {
-        261 - (CosmeticFeatures.musicEnabled ? 0 : MusicTrack.allCases.count)
+        let all: Int = BallSkin.allCases.count + GoalSkin.allCases.count + TrailColor.allCases.count
+            + Floor.allCases.count + Pit.allCases.count + Boundary.allCases.count
+            + MusicTrack.allCases.count
+        return all - 11 - (CosmeticFeatures.musicEnabled ? 0 : MusicTrack.allCases.count)
     }
 
     /// The evergreen count NEVER exceeds 261 even when every IAP secret and
