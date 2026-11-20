@@ -1570,17 +1570,18 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertNotNil(CosmeticBundle.catalogue.first { $0.id == "space-travel" })
     }
 
-    /// Quality-standard audit: the Space pit and the Tide Pool pit are layered
-    /// drawn art, so they stay visible (frozen) under Reduce Motion, and both
-    /// carry a slow animated overlay.  Ids, tiers and prices are unchanged.
-    func testQualityAudit_spaceAndTidePoolPitsAreDrawnArt() {
-        XCTAssertTrue(Pit.space.hasDrawnArt)
-        XCTAssertTrue(Pit.space.hasAnimatedOverlay)
+    /// Quality-standard audit: the Tide Pool pit is layered drawn art with a
+    /// slow animated overlay.  The Space pit is an owner-approved, locked
+    /// piece: it was restored to its pre-audit look (an animated starfield
+    /// overlay, not drawn art), with its id and tier unchanged.
+    func testQualityAudit_tidePoolIsDrawnArt_spacePitIsRestored() {
         XCTAssertTrue(Pit.tidePool.hasDrawnArt)
         XCTAssertTrue(Pit.tidePool.hasAnimatedOverlay)
+        XCTAssertEqual(Pit.tidePool.tier, .standard)
+        XCTAssertFalse(Pit.space.hasDrawnArt, "locked: the Space pit keeps its approved starfield overlay")
+        XCTAssertTrue(Pit.space.hasAnimatedOverlay)
         XCTAssertEqual(Pit.space.rawValue, "space")
         XCTAssertEqual(Pit.space.tier, .exclusive)
-        XCTAssertEqual(Pit.tidePool.tier, .standard)
         XCTAssertEqual(TrailColor.cometTrail.displayName, "Comet")
     }
 

@@ -1,6 +1,6 @@
 # Quality audit, November 2026
 
-Every piece of the 22 collections on sale or scheduled, plus the free Roll Along set, judged against `docs/cosmetics/quality-standard.md` (rules R1 to R9) after the quality round. Every fail and borderline piece was fixed.
+Every piece of the 22 collections on sale or scheduled, plus the free Roll Along set, judged against `docs/cosmetics/quality-standard.md` (rules R1 to R9) after the quality round. Every fail and borderline piece was fixed, with one correction made afterwards: the owner's approvals are final, so three approved pieces the audit had changed (Comet trail, Quasar goal, Space pit) were restored exactly (see "Locked pieces changed").
 
 **How the verdicts were made.** By reading each piece's drawing code, not by looking at it on screen: this work was done without Xcode, so nothing here has been compiled or seen. Treat each verdict as a first pass to confirm in the debug gallery (Settings, Debug, All Collections, in a Debug build).
 
@@ -14,10 +14,11 @@ Every piece of the 22 collections on sale or scheduled, plus the free Roll Along
 |---|---|
 | Audited (22 collections x 6) | 132 |
 | Met the standard, no change | 76 |
-| Borderline, fixed in place | 37 |
-| Failed, fixed in place | 11 |
+| Borderline, fixed in place | 36 |
+| Failed, fixed in place | 9 |
 | Wrong theme or failed, replaced by a new piece | 8 |
-| **Changed in the audit** | **56** |
+| Owner-approved pieces the audit changed, since restored exactly | 3 |
+| **Changed in the audit and kept** | **53** |
 
 Roll Along's six pieces were checked and not changed. Eight pieces left their sets and are now held: Mosaic goal, Rainbow trail, Air trail, Sky trail, Parchment floor, Parchment pit, Blueprint floor, Blueprint pit.
 
@@ -224,15 +225,15 @@ Audit only. Nothing changed and no concerns.
 
 ### Space Traveler (9,000 coins)
 
-The owner had not graded this set. The Space pit now stays visible, frozen, under Reduce Motion; it used to disappear.
+The owner approved the Quasar goal, Comet trail and Space pit as they were. The audit changed all three; they have been restored to exactly their drawing code and motion from before the audit, and are locked. The UFO ball and Moon floor were not graded and keep the audit's fixes.
 
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|
 | Ball | UFO | Legendary, 1,500 | Fails R3, R6: belly lights flickered about once a second; green dome matched nothing in the set | Redrawn | Saucer with a cyan under-glow, lit rim and cyan dome matching the hull lights; lights stay at least 60% lit | One soft swell about every 6 s; 20 fps |
-| Goal | Quasar | Legendary, 1,500 | Borderline R6: jets turned in 12.6 s, sparks jittered, core 22% of the radius | Redrawn in place | Same look; core 30% of the radius; shimmer dimmer | Jets turn once in about 26 s; 20 fps |
-| Trail | Comet | Legendary, 1,500 | Fails R3, R8: orange fire cooling to gray smoke, a twin of the Fire and Smoke trails and off the set's palette | Redrawn | A cold comet: white to cyan to deep blue line, faint dust haze, short dust streaks | Fade only |
+| Goal | Quasar | Legendary, 1,500 | Meets (approved by owner). Audit concern, not acted on: jets turn in 12.6 s, core 22% of the radius (R6) | Changed by the audit, then **restored exactly** | As approved: spinning jets and sparks around a bright core | As before the audit |
+| Trail | Comet | Legendary, 1,500 | Meets (approved by owner). Audit concern, not acted on: fire-to-smoke colors close to the Fire and Smoke trails (R8) | Changed by the audit, then **restored exactly** | As approved: burns yellow-white, cools through orange to deep red, then gray smoke | As before the audit |
 | Floor | Moon | Legendary, 1,500 | Borderline R6, R7: craters up to 56 pt wide could read as pits; 30 fps | Redrawn in place | Smaller, paler craters (under 38 pt), small rocks with shadows, fine cracks | Slow light drift; 12 fps |
-| Pit | Space | Legendary, 1,500 | Fails R5, R6, R7: flat starfield with no ledges, stars across the core, a shooting star every 3.5 s | Redrawn | Pale-violet lip, four indigo steps, black core 40% of the width, dim stars on the outer steps only | Slow twinkle; one faint shooting star every 11 s; 20 fps |
+| Pit | Space | Legendary, 1,500 | Meets (approved by owner). Audit concern, not acted on: flat starfield with no ledges; shooting star every 3.5 s; hidden under Reduce Motion (R5, R6, R7) | Changed by the audit, then **restored exactly** | As approved: deep-void starfield with twinkling stars and a shooting star | As before the audit, 30 fps |
 | Boundary | Starship Hull | Legendary, 1,500 | Meets | None | Gunmetal plating with slow cyan running lights | Slow lamp pulse, 33 s lap |
 
 ## Scheduled collections
@@ -309,12 +310,40 @@ These pieces were approved in the quality round, so the audit did not change the
 | Scribble goal | Sketchbook | The held Doodle goal is also wobbly pencil rings (R8). Fine while Doodle stays held |
 | Rose boundary | Bloom | Built like the Holly and Citrus hedges (hedge plus dots), with larger pink blooms; worth a look for R8 |
 | Inverted floor | Abyssal Depths | A flat near-black fill; recorded in the standard as the one approved exception to R5 |
-| Storm rain | Storm | Slowed to meet R6; may now read as drizzle, not driving rain |
+| Storm rain | Storm | Slowed to meet R6; may now read as drizzle, not driving rain. The owner's direction (powerful, frightening, driving rain) overrides the numbers; left as it is for the owner to judge on screen |
+| Fire motion | Fire | Flames slowed to meet R6 (5 to 8 s periods). Left as it is for the owner to judge on screen |
+| Quasar goal, Comet trail, Space pit | Space Traveler | Approved and locked; the audit's concerns are recorded in the Space Traveler table and were not acted on |
+
+## Locked pieces changed
+
+The owner's approvals are final (see "Locked pieces" in `quality-standard.md`). After the audit, every locked piece was checked by script: the drawing code of all 50 locked pieces, and the shared code they depend on, was compared before the audit (commit `d59f86b`), after it (`8c862d6`) and before the quality round (`924b06e`).
+
+**Changed by the audit** (all three restored exactly; nothing else was restored)
+
+| Piece | What the audit had changed | Now |
+|---|---|---|
+| Comet trail (Space Traveler) | Look: orange fire cooling to gray smoke became a cold white-to-blue line with a dust haze and dust streaks | Restored: identical to before the audit |
+| Quasar goal (Space Traveler) | Motion and look: jets slowed from one turn in 12.6 s to about 26 s, shimmer dimmed, core enlarged from 22% to 30% of the radius, 20 fps cap | Restored: identical to before the audit |
+| Space pit (Space Traveler) | Look and motion: the starfield became four stepped indigo ledges with a black core; shooting star every 11 s instead of 3.5 s; 20 fps instead of 30; shown frozen under Reduce Motion instead of hidden | Restored: identical to before the audit |
+
+**No other locked piece was changed by the audit.** The script finds no difference in any other locked piece or shared helper between `d59f86b` and the audit's result.
+
+**Changed by the quality round** (each at the owner's direction; listed so the owner can confirm)
+
+| Piece | What changed | Why |
+|---|---|---|
+| Stardust trail (Cosmos) | Stars about 20% larger and about a quarter more of them | Owner asked: "slightly larger and slightly more numerous" |
+| Aurora floor (Aurora) | Was the bright shimmering aurora; now dark with three faint, sparse ribbons. Base color changed to match. It now shows, frozen, under Reduce Motion (it used to be hidden). Runs at 15 fps | Owner asked to swap the floor and pit looks |
+| Aurora pit (Aurora) | Was dark with a faint band; now full of green-to-violet curtains around a dark middle. Frame cap 30 to 20 fps | Owner asked to swap the floor and pit looks |
+
+Two details of the Aurora swap go beyond "swap the looks" and are the owner's to keep or reverse: the floor now showing under Reduce Motion, and the pit's lower frame cap. No other locked piece differs between `924b06e` and `d59f86b`.
+
+**Guard against a repeat.** `python3 tools/cosmetic-calendar/locked_pieces_check.py` now fails if any locked piece's drawing code differs from the approved version recorded in `tools/cosmetic-calendar/locked_pieces.json`.
 
 ## Side effects to know
 
 - Darker base colors: the Gold Leaf floor is darker, as are the Fog, Midnight and Ember floors from the quality round. Screens that use only the floor color (minigame arenas) are darker too.
-- Reduce Motion: the Disco floor, Nightclub pit and Space pit used to disappear under Reduce Motion; they now show, frozen.
+- Reduce Motion: the Disco floor and Nightclub pit used to disappear under Reduce Motion; they now show, frozen. The Space pit is restored to its approved behavior, so its starfield is hidden under Reduce Motion as it was before the audit (only its base color shows).
 - The Grass floor is now still.
 
 ## Held pieces

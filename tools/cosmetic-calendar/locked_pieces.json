@@ -1,0 +1,908 @@
+{
+ "about": "Owner-approved cosmetic pieces. See docs/cosmetics/quality-standard.md, \"Locked pieces\". Checked by tools/cosmetic-calendar/locked_pieces_check.py. Re-record hashes (--update) only after the owner approves a change.",
+ "shared": [
+  {
+   "name": "Trail marks (spacing, lifetime, cap)",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^struct TrailMarks: Equatable",
+     "sha": "6ecfc7ffa7841b75"
+    }
+   ]
+  },
+  {
+   "name": "Trail frame (age and fade of each mark)",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private struct TrailFrame",
+     "sha": "077bd701e3bf50e4"
+    }
+   ]
+  },
+  {
+   "name": "Pit depth shading",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private func pitDepthShade\\(",
+     "sha": "cca70cae2556adbf"
+    }
+   ]
+  },
+  {
+   "name": "Boundary motion clock and ring shape",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private func motionClock<V: View>\\(",
+     "sha": "f92f7942e89c6c1f"
+    },
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private func borderRing\\(\\)",
+     "sha": "d6a3e77421b2292a"
+    }
+   ]
+  },
+  {
+   "name": "Shop tile freeze moments for goals",
+   "anchors": [
+    {
+     "file": "RollAlong/CosmeticShopView.swift",
+     "decl": "^enum CosmeticTileHero",
+     "sha": "0c05d340c672fccf"
+    }
+   ]
+  }
+ ],
+ "pieces": [
+  {
+   "collection": "Roll Along",
+   "slot": "Ball",
+   "name": "Red",
+   "id": "red",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private func plainMarble\\(",
+     "sha": "a603621ea53cd0af"
+    },
+    {
+     "file": "RollAlong/BallSkin.swift",
+     "decl": "^    var colors: \\[Color\\] \\{$",
+     "case": ".red",
+     "sha": "75ca57854725b492"
+    }
+   ]
+  },
+  {
+   "collection": "Roll Along",
+   "slot": "Goal",
+   "name": "Target",
+   "id": "target",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var simpleBullseyeTarget: some View \\{$",
+     "sha": "1ede442a314beb0c"
+    }
+   ]
+  },
+  {
+   "collection": "Roll Along",
+   "slot": "Trail",
+   "name": "Classic Shadow",
+   "id": "classic",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailClassic\\(",
+     "sha": "c3a7fffa691a7ba4"
+    }
+   ]
+  },
+  {
+   "collection": "Roll Along",
+   "slot": "Floor",
+   "name": "Classic White",
+   "id": "classic",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Floor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".classic",
+     "sha": "21bc84898e892538"
+    }
+   ]
+  },
+  {
+   "collection": "Roll Along",
+   "slot": "Pit",
+   "name": "Classic Black",
+   "id": "classic",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".classic",
+     "sha": "ce121b653d24a952"
+    }
+   ]
+  },
+  {
+   "collection": "Roll Along",
+   "slot": "Boundary",
+   "name": "Classic Gray",
+   "id": "classic",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".classic",
+     "sha": "c46bda44d2ec25bb"
+    }
+   ]
+  },
+  {
+   "collection": "Nature",
+   "slot": "Ball",
+   "name": "Jade",
+   "id": "jade",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private func gemMarble\\(",
+     "sha": "2e09ecbe21af82d6"
+    },
+    {
+     "file": "RollAlong/BallSkin.swift",
+     "decl": "^    var colors: \\[Color\\] \\{$",
+     "case": ".jade",
+     "sha": "640cc5b07f7c66ab"
+    }
+   ]
+  },
+  {
+   "collection": "Nature",
+   "slot": "Trail",
+   "name": "Forest",
+   "id": "forest",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailForest\\(",
+     "sha": "505d42b378c793cf"
+    }
+   ]
+  },
+  {
+   "collection": "Nature",
+   "slot": "Floor",
+   "name": "Meadow",
+   "id": "meadow",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var meadowFloor: some View \\{$",
+     "sha": "096bbcd5bf245b75"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Floor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".meadow",
+     "sha": "8a13ab0f7be0d9af"
+    }
+   ]
+  },
+  {
+   "collection": "Nature",
+   "slot": "Pit",
+   "name": "Meadow",
+   "id": "meadow",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private static func meadow\\(_ ctx: inout GraphicsContext, _ size: CGSize\\)",
+     "sha": "0f77f83d91033ed5"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".meadow",
+     "sha": "c4561023d01223fe"
+    }
+   ]
+  },
+  {
+   "collection": "Nature",
+   "slot": "Boundary",
+   "name": "Mint",
+   "id": "mint",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".mint",
+     "sha": "159e05dfa029e121"
+    }
+   ]
+  },
+  {
+   "collection": "Fire",
+   "slot": "Pit",
+   "name": "Crater",
+   "id": "crater",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private static func crater\\(_ ctx: inout GraphicsContext, _ size: CGSize\\)",
+     "sha": "c32ed8f91fd2f8fb"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".crater",
+     "sha": "9ee69c03a11d300e"
+    }
+   ]
+  },
+  {
+   "collection": "Water",
+   "slot": "Trail",
+   "name": "Splash",
+   "id": "splash",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailSplash\\(",
+     "sha": "2d90cdf5d2056c5a"
+    }
+   ]
+  },
+  {
+   "collection": "Sketchbook",
+   "slot": "Trail",
+   "name": "Graphite",
+   "id": "graphite",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailGraphite\\(",
+     "sha": "dc1671c71a9c1d1b"
+    }
+   ]
+  },
+  {
+   "collection": "Sketchbook",
+   "slot": "Pit",
+   "name": "Sketch",
+   "id": "sketch",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private static func sketch\\(_ ctx: inout GraphicsContext, _ size: CGSize\\)",
+     "sha": "85570e7c95d50106"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".sketch",
+     "sha": "9a5a92804bcb383f"
+    }
+   ]
+  },
+  {
+   "collection": "Sketchbook",
+   "slot": "Boundary",
+   "name": "Slate",
+   "id": "slate",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".slate",
+     "sha": "0b3b08e0aabe2188"
+    }
+   ]
+  },
+  {
+   "collection": "Neon",
+   "slot": "Ball",
+   "name": "Neon",
+   "id": "neon",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private var neonCanvas: some View \\{$",
+     "sha": "a8bcd81e9a37d281"
+    }
+   ]
+  },
+  {
+   "collection": "Neon",
+   "slot": "Trail",
+   "name": "Raybeam",
+   "id": "raybeam",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailTapered\\(",
+     "sha": "25fccfcdb3c87662"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "TrailColor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".raybeam",
+     "sha": "07a6ef0750859581"
+    }
+   ]
+  },
+  {
+   "collection": "Neon",
+   "slot": "Boundary",
+   "name": "Neon",
+   "id": "neon",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var neonBorderOverlay: some View \\{$",
+     "sha": "1f0e646bf059e242"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".neon",
+     "sha": "7efcfb504f8975e4"
+    }
+   ]
+  },
+  {
+   "collection": "Haunted",
+   "slot": "Trail",
+   "name": "Smoke",
+   "id": "smoke",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailMist\\(",
+     "sha": "374885376da84f42"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "TrailColor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".smoke",
+     "sha": "950abcfa3c64f25b"
+    }
+   ]
+  },
+  {
+   "collection": "Haunted",
+   "slot": "Boundary",
+   "name": "Phantom",
+   "id": "phantom",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var phantomBorderOverlay: some View \\{$",
+     "sha": "4fdddc4d890f3e13"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".phantom",
+     "sha": "a4e4d8005b3ebd7a"
+    }
+   ]
+  },
+  {
+   "collection": "Cosmos",
+   "slot": "Ball",
+   "name": "Nebula",
+   "id": "nebula",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private var nebulaCanvas: some View \\{$",
+     "sha": "2db083cdcc2b23b5"
+    }
+   ]
+  },
+  {
+   "collection": "Cosmos",
+   "slot": "Goal",
+   "name": "Galaxy",
+   "id": "galaxy",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var galaxyGoal: some View \\{$",
+     "sha": "de8eaaec4bd50d23"
+    }
+   ]
+  },
+  {
+   "collection": "Cosmos",
+   "slot": "Trail",
+   "name": "Stardust",
+   "id": "stardust",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailStardust\\(",
+     "sha": "1b7b49142e85b193"
+    }
+   ],
+   "note": "As adjusted at the owner's direction in the quality round (stars slightly larger and more numerous)."
+  },
+  {
+   "collection": "Cosmos",
+   "slot": "Boundary",
+   "name": "Starlight",
+   "id": "starlight",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var starlightBorderOverlay: some View \\{$",
+     "sha": "80052afd0af2ff05"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".starlight",
+     "sha": "15805f81859988b0"
+    }
+   ]
+  },
+  {
+   "collection": "Aurora",
+   "slot": "Ball",
+   "name": "Aurora",
+   "id": "aurora",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private var auroraCanvas: some View \\{$",
+     "sha": "b3db42e2c9f7ead7"
+    }
+   ]
+  },
+  {
+   "collection": "Aurora",
+   "slot": "Goal",
+   "name": "Aurora",
+   "id": "aurora",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var auroraGoal: some View \\{$",
+     "sha": "78615821958d7316"
+    }
+   ]
+  },
+  {
+   "collection": "Aurora",
+   "slot": "Trail",
+   "name": "Aurora",
+   "id": "aurora",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailAurora\\(",
+     "sha": "83bfece9548fa6da"
+    }
+   ]
+  },
+  {
+   "collection": "Aurora",
+   "slot": "Floor",
+   "name": "Aurora",
+   "id": "aurora",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var auroraShimmerOverlay: some View \\{$",
+     "sha": "23261f61c0994ac0"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Floor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".aurora",
+     "sha": "12d1ee0cd231be61"
+    }
+   ],
+   "note": "Look swapped with the pit at the owner's direction in the quality round: dark with a few faint ribbons."
+  },
+  {
+   "collection": "Aurora",
+   "slot": "Pit",
+   "name": "Aurora",
+   "id": "aurora",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "static func drawAurora\\(",
+     "sha": "b655bb83303c3f7c"
+    },
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "^    var auroraPitOverlay: some View \\{$",
+     "sha": "b564930bc4dcd458"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".aurora",
+     "sha": "4d3b96af1af7d6b3"
+    }
+   ],
+   "note": "Look swapped with the floor at the owner's direction in the quality round: full of aurora ribbons."
+  },
+  {
+   "collection": "Aurora",
+   "slot": "Boundary",
+   "name": "Aurora",
+   "id": "aurora",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var auroraBorderOverlay: some View \\{$",
+     "sha": "c85690721ed46eab"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".aurora",
+     "sha": "0270b7a53354fde1"
+    }
+   ]
+  },
+  {
+   "collection": "Champion",
+   "slot": "Floor",
+   "name": "Brass Works",
+   "id": "brass",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var brassFloorOverlay: some View \\{$",
+     "sha": "6ba2e57860fdd524"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Floor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".brass",
+     "sha": "943716b3a4dec39d"
+    }
+   ]
+  },
+  {
+   "collection": "Champion",
+   "slot": "Pit",
+   "name": "Sideline",
+   "id": "sideline",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private static func sideline\\(_ ctx: inout GraphicsContext, _ size: CGSize\\)",
+     "sha": "aea6b4f330182601"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".sideline",
+     "sha": "a3ddd6cd26465d4a"
+    }
+   ]
+  },
+  {
+   "collection": "Champion",
+   "slot": "Boundary",
+   "name": "Brass",
+   "id": "brass",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var brassBorderOverlay: some View \\{$",
+     "sha": "4531b74cde17a8aa"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".brass",
+     "sha": "68ed673b11fcdb26"
+    }
+   ]
+  },
+  {
+   "collection": "Lava Flow",
+   "slot": "Trail",
+   "name": "Fire",
+   "id": "fire",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailFire\\(",
+     "sha": "a434e21da22fd212"
+    }
+   ]
+  },
+  {
+   "collection": "Lava Flow",
+   "slot": "Boundary",
+   "name": "Molten",
+   "id": "molten",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var moltenBorderOverlay: some View \\{$",
+     "sha": "579e886930d9a6f5"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".molten",
+     "sha": "2b65085080f350c5"
+    }
+   ]
+  },
+  {
+   "collection": "Winter",
+   "slot": "Ball",
+   "name": "Snowglobe",
+   "id": "snowglobe",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private var snowglobeCanvas: some View \\{$",
+     "sha": "e5c048782f23a0f2"
+    }
+   ]
+  },
+  {
+   "collection": "Ancient Temple",
+   "slot": "Goal",
+   "name": "Eclipse",
+   "id": "eclipse",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var eclipseGoal: some View \\{$",
+     "sha": "c731d55d2e43f3b3"
+    }
+   ]
+  },
+  {
+   "collection": "Ancient Temple",
+   "slot": "Pit",
+   "name": "Canyon",
+   "id": "canyon",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private static func canyon\\(_ ctx: inout GraphicsContext, _ size: CGSize\\)",
+     "sha": "3dbb0a95f1bbb636"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".canyon",
+     "sha": "67a8b68d620c6fd9"
+    }
+   ]
+  },
+  {
+   "collection": "Midas",
+   "slot": "Ball",
+   "name": "Fool's Gold",
+   "id": "gold",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private func metalMarble\\(",
+     "sha": "232f28eb3683c30f"
+    },
+    {
+     "file": "RollAlong/BallSkin.swift",
+     "decl": "^    var colors: \\[Color\\] \\{$",
+     "case": ".gold",
+     "sha": "f28ce1ed736fca1f"
+    }
+   ]
+  },
+  {
+   "collection": "Midas",
+   "slot": "Trail",
+   "name": "Gilded",
+   "id": "gilded",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailTapered\\(",
+     "sha": "25fccfcdb3c87662"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "TrailColor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".gilded",
+     "sha": "cb9180e6b8bf1064"
+    }
+   ]
+  },
+  {
+   "collection": "Midas",
+   "slot": "Boundary",
+   "name": "Gold",
+   "id": "gold",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var goldBorderOverlay: some View \\{$",
+     "sha": "2fd097bed661cea2"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".gold",
+     "sha": "6ab76d9c7a2e9673"
+    }
+   ]
+  },
+  {
+   "collection": "Abyssal Depths",
+   "slot": "Ball",
+   "name": "Trench",
+   "id": "trench",
+   "anchors": [
+    {
+     "file": "RollAlong/BallSkinView.swift",
+     "decl": "private var trenchCanvas: some View \\{$",
+     "sha": "f6ab9be8dfdc2b53"
+    }
+   ]
+  },
+  {
+   "collection": "Abyssal Depths",
+   "slot": "Goal",
+   "name": "Vortex",
+   "id": "vortex",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private func themedStandardGoal\\(_ goal: GoalSkin\\)",
+     "case": ".vortex",
+     "sha": "bd3d2a8eaa0c42d1"
+    }
+   ]
+  },
+  {
+   "collection": "Abyssal Depths",
+   "slot": "Trail",
+   "name": "Ink",
+   "id": "ink",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailInk\\(",
+     "sha": "d376d813d2c307dd"
+    }
+   ]
+  },
+  {
+   "collection": "Abyssal Depths",
+   "slot": "Floor",
+   "name": "Inverted",
+   "id": "inverted",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Floor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".inverted",
+     "sha": "ce121b653d24a952"
+    }
+   ]
+  },
+  {
+   "collection": "Abyssal Depths",
+   "slot": "Boundary",
+   "name": "Abyss",
+   "id": "abyss",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var abyssBorderOverlay: some View \\{$",
+     "sha": "63df6f5c0ee04e54"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Boundary",
+     "decl": "^    var color: Color \\{$",
+     "case": ".abyss",
+     "sha": "053083e81d7bf438"
+    }
+   ]
+  },
+  {
+   "collection": "Space Traveler",
+   "slot": "Goal",
+   "name": "Quasar",
+   "id": "quasar",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var quasarGoal: some View \\{$",
+     "sha": "048de76f7c228f1f"
+    }
+   ],
+   "note": "Restored to its pre-audit drawing code after the audit changed it."
+  },
+  {
+   "collection": "Space Traveler",
+   "slot": "Trail",
+   "name": "Comet",
+   "id": "cometTrail",
+   "anchors": [
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "decl": "^private func trailComet\\(",
+     "sha": "29e0ab569a2d6cf6"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "TrailColor",
+     "decl": "^    var color: Color \\{$",
+     "case": ".cometTrail",
+     "sha": "67f9682b3272b85b"
+    }
+   ],
+   "note": "Restored to its pre-audit drawing code after the audit changed it."
+  },
+  {
+   "collection": "Space Traveler",
+   "slot": "Pit",
+   "name": "Space",
+   "id": "space",
+   "anchors": [
+    {
+     "file": "RollAlong/BallGameView.swift",
+     "decl": "private var spacePitOverlay: some View \\{$",
+     "sha": "08fbb68f93698e99"
+    },
+    {
+     "file": "RollAlong/Cosmetics.swift",
+     "enum": "Pit",
+     "decl": "^    var color: Color \\{$",
+     "case": ".space",
+     "sha": "19ace5b05f3af345"
+    }
+   ],
+   "note": "Restored to its pre-audit drawing code after the audit changed it."
+  }
+ ]
+}

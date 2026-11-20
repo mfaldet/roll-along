@@ -42,7 +42,7 @@ All game art is drawn in code with SwiftUI `Canvas`; there are no image assets a
 
 ### Release calendar
 
-**Quality standard.** Every cosmetic that is drawn or changed must meet `docs/cosmetics/quality-standard.md` (nine rules, the reference pieces and the numbers to design to). It is binding. The November 2026 audit of every collection on sale or scheduled against it is in `docs/cosmetics/quality-audit-2026-11.md`; verdicts for held pieces are in `docs/proposals/held-pieces.md`.
+**Quality standard.** Every cosmetic that is drawn or changed must meet `docs/cosmetics/quality-standard.md` (nine rules, the reference pieces and the numbers to design to). It is binding. The owner's direction overrides its numbers, and pieces the owner approved are locked: an audit may report a concern but never changes them. Run `python3 tools/cosmetic-calendar/locked_pieces_check.py` before committing any cosmetic change; it fails if a locked piece's drawing code differs from the approved version. The November 2026 audit of every collection on sale or scheduled against it is in `docs/cosmetics/quality-audit-2026-11.md`; verdicts for held pieces are in `docs/proposals/held-pieces.md`.
 
 Most cosmetics are held back at launch and released on fixed calendar dates (`CosmeticSchedule` in `Cosmetics.swift`). There is no launch date.
 

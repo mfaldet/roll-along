@@ -1,6 +1,6 @@
 # Cosmetic quality standard
 
-This standard is **binding for every cosmetic that is drawn or changed from now on**: balls, goals, trails, floors, pits and boundaries, in every collection, on sale or held. A piece that does not meet it is fixed, moved or held. It is not shipped as it is.
+This standard is **binding for every cosmetic that is drawn or changed from now on**: balls, goals, trails, floors, pits and boundaries, in every collection, on sale or held. A piece that does not meet it is fixed, moved or held. It is not shipped as it is. Two things come before every rule and number here: the owner's own direction, and the owner's approvals (see "The owner's direction comes first" and "Locked pieces").
 
 Audits cite the rules by number (R1 to R9) and give each piece one verdict: **meets**, **borderline** or **fails**.
 
@@ -17,6 +17,82 @@ Audits cite the rules by number (R1 to R9) and give each piece one verdict: **me
 | **R7** | **Every piece stays readable in play**, including pits on levels with many small pits. Coins, the goal and the ball are always easy to see. |
 | **R8** | **No two pieces look alike.** Two trails that differ only in color, or two pits that share one drawing, fail. |
 | **R9** | **A collection carries its feeling.** A storm is frightening. A haunted set is eerie. Winter is cold and deep. |
+
+## The owner's direction comes first
+
+The rules above say what the owner wants. The design numbers further down are only a way to reach it.
+
+- **Where a design number conflicts with a piece the owner approved, or with a direction the owner gave, the owner's direction wins.** Example: the owner asked for a Storm that feels powerful and frightening, with driving rain. If the motion numbers say rain that fast is too fast, the numbers lose.
+- **The numbers are guidance for pieces the owner has not graded.** They are not a test an approved piece must pass.
+- **An auditor flags a conflict; an auditor does not resolve it by changing the piece.** Write the concern down, say which number or rule it touches, and leave the piece as it is for the owner to judge on screen.
+- The owner judges on screen. A verdict made by reading code is a first pass, never the last word.
+
+## Locked pieces
+
+**A piece the owner has approved is locked.**
+
+- An audit may **report a concern** about a locked piece. It must **never change** the piece's look or motion: no redraw, no recolor, no slower or faster motion, no new frame cap, no change to how it behaves under Reduce Motion.
+- Only the owner can unlock a piece, by asking for a change to it. After the change, the piece is locked again in its new form.
+- Shared drawing code that a locked piece depends on (the trail mark rules, pit depth shading, the boundary clock) is treated the same way: a change that would alter a locked piece needs the owner's say-so.
+- A locked piece stays in the collection the owner approved it in, unless the owner moves it.
+- **Guard:** `python3 tools/cosmetic-calendar/locked_pieces_check.py` compares the drawing code of every locked piece with the version recorded in `tools/cosmetic-calendar/locked_pieces.json` and fails if any differs. Run it before committing any cosmetic change. Re-record the hashes (`--update`) only after the owner approves a change, and add each newly approved piece to the list.
+
+The 50 locked pieces, as of November 20, 2026 (approved in the quality round, plus the three confirmed in the audit correction):
+
+| Collection | Slot | Piece | id | Note |
+|---|---|---|---|---|
+| Roll Along | Ball | Red | `red` |  |
+| Roll Along | Goal | Target | `target` |  |
+| Roll Along | Trail | Classic Shadow | `classic` |  |
+| Roll Along | Floor | Classic White | `classic` |  |
+| Roll Along | Pit | Classic Black | `classic` |  |
+| Roll Along | Boundary | Classic Gray | `classic` |  |
+| Nature | Ball | Jade | `jade` |  |
+| Nature | Trail | Forest | `forest` |  |
+| Nature | Floor | Meadow | `meadow` |  |
+| Nature | Pit | Meadow | `meadow` |  |
+| Nature | Boundary | Mint | `mint` |  |
+| Fire | Pit | Crater | `crater` |  |
+| Water | Trail | Splash | `splash` |  |
+| Sketchbook | Trail | Graphite | `graphite` |  |
+| Sketchbook | Pit | Sketch | `sketch` |  |
+| Sketchbook | Boundary | Slate | `slate` |  |
+| Neon | Ball | Neon | `neon` |  |
+| Neon | Trail | Raybeam | `raybeam` |  |
+| Neon | Boundary | Neon | `neon` |  |
+| Haunted | Trail | Smoke | `smoke` |  |
+| Haunted | Boundary | Phantom | `phantom` |  |
+| Cosmos | Ball | Nebula | `nebula` |  |
+| Cosmos | Goal | Galaxy | `galaxy` |  |
+| Cosmos | Trail | Stardust | `stardust` | As adjusted at the owner's direction in the quality round (stars slightly larger and more numerous). |
+| Cosmos | Boundary | Starlight | `starlight` |  |
+| Aurora | Ball | Aurora | `aurora` |  |
+| Aurora | Goal | Aurora | `aurora` |  |
+| Aurora | Trail | Aurora | `aurora` |  |
+| Aurora | Floor | Aurora | `aurora` | Look swapped with the pit at the owner's direction in the quality round: dark with a few faint ribbons. |
+| Aurora | Pit | Aurora | `aurora` | Look swapped with the floor at the owner's direction in the quality round: full of aurora ribbons. |
+| Aurora | Boundary | Aurora | `aurora` |  |
+| Champion | Floor | Brass Works | `brass` |  |
+| Champion | Pit | Sideline | `sideline` |  |
+| Champion | Boundary | Brass | `brass` |  |
+| Lava Flow | Trail | Fire | `fire` |  |
+| Lava Flow | Boundary | Molten | `molten` |  |
+| Winter | Ball | Snowglobe | `snowglobe` |  |
+| Ancient Temple | Goal | Eclipse | `eclipse` |  |
+| Ancient Temple | Pit | Canyon | `canyon` |  |
+| Midas | Ball | Fool's Gold | `gold` |  |
+| Midas | Trail | Gilded | `gilded` |  |
+| Midas | Boundary | Gold | `gold` |  |
+| Abyssal Depths | Ball | Trench | `trench` |  |
+| Abyssal Depths | Goal | Vortex | `vortex` |  |
+| Abyssal Depths | Trail | Ink | `ink` |  |
+| Abyssal Depths | Floor | Inverted | `inverted` |  |
+| Abyssal Depths | Boundary | Abyss | `abyss` |  |
+| Space Traveler | Goal | Quasar | `quasar` | Restored to its pre-audit drawing code after the audit changed it. |
+| Space Traveler | Trail | Comet | `cometTrail` | Restored to its pre-audit drawing code after the audit changed it. |
+| Space Traveler | Pit | Space | `space` | Restored to its pre-audit drawing code after the audit changed it. |
+
+Approved names: Roll Along's trail, floor, pit and boundary are named Classic Shadow, Classic White, Classic Black and Classic Gray.
 
 ## Standing technical rules
 
@@ -153,6 +229,8 @@ One idea: **black water with a little living light**. Blue-black everywhere, wit
 
 Run this for every piece. Record the verdict and the rule numbers.
 
+**First: is the piece locked?** If it is in the "Locked pieces" list, write down any concern and stop. Do not change it. If a number below conflicts with something the owner asked for, write the conflict down and leave the piece alone.
+
 1. **Name test (R1, R4).** Cover the name. Would a player say what it is? If it only works with the label, or it relies on a symbol, it **fails**.
 2. **Theme test (R2, R9).** Does it belong to this collection's subject and feeling? If it is good but belongs elsewhere, mark it **move**.
 3. **Set test (R3).** Picture all six equipped. Same palette family? Same light? Is one piece much louder or much plainer than the rest?
@@ -169,7 +247,7 @@ Run this for every piece. Record the verdict and the rule numbers.
 
 ## Numbers to design to
 
-These come from the reference pieces.
+These come from the reference pieces. They are guidance for pieces the owner has not graded; the owner's direction and approvals override them (see "The owner's direction comes first").
 
 **Motion periods**
 
