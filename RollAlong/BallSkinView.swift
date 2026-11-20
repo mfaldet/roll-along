@@ -1998,9 +1998,9 @@ struct BallSkinView: View {
                         let x1: CGFloat = x0 + step
                         // Taller toward the middle, so the fire has one crown.
                         let mid: Double = 1.0 - abs((fi + 0.5) / Double(count) - 0.5) * 1.1
-                        let breathe: Double = 0.80 + 0.20 * sin(t * speed + phase + fi * 1.9)
+                        let breathe: Double = 0.88 + 0.12 * sin(t * speed + phase + fi * 1.9)
                         let hh: CGFloat = height * CGFloat(mid * breathe)
-                        let sway: CGFloat = r * 0.10 * CGFloat(sin(t * speed * 0.7 + phase * 1.3 + fi * 2.7))
+                        let sway: CGFloat = r * 0.08 * CGFloat(sin(t * speed * 0.7 + phase * 1.3 + fi * 2.7))
                         let tip = CGPoint(x: (x0 + x1) / 2 + sway, y: baseY - hh)
                         p.addQuadCurve(to: tip, control: CGPoint(x: x0 + step * 0.05, y: baseY - hh * 0.55))
                         p.addQuadCurve(to: CGPoint(x: x1, y: baseY),
@@ -2009,10 +2009,12 @@ struct BallSkinView: View {
                     p.closeSubpath()
                     g.fill(p, with: .color(color))
                 }
-                flames(ctx, 4, r * 1.95, Color(red: 0.78, green: 0.10, blue: 0.04).opacity(0.95), 0.0, 1.5)
-                flames(ctx, 5, r * 1.60, Color(red: 0.98, green: 0.36, blue: 0.06), 1.7, 1.9)
-                flames(ctx, 4, r * 1.20, Color(red: 1.00, green: 0.66, blue: 0.14), 3.1, 2.3)
-                flames(ctx, 3, r * 0.78, Color(red: 1.00, green: 0.92, blue: 0.52), 4.4, 2.7)
+                // Breathing periods of 5 to 8 seconds: living fire held in a
+                // ball, slow enough that it never flickers.
+                flames(ctx, 4, r * 1.95, Color(red: 0.78, green: 0.10, blue: 0.04).opacity(0.95), 0.0, 0.80)
+                flames(ctx, 5, r * 1.60, Color(red: 0.98, green: 0.36, blue: 0.06), 1.7, 0.95)
+                flames(ctx, 4, r * 1.20, Color(red: 1.00, green: 0.66, blue: 0.14), 3.1, 1.10)
+                flames(ctx, 3, r * 0.78, Color(red: 1.00, green: 0.92, blue: 0.52), 4.4, 1.25)
 
                 // White-hot bed at the very bottom.
                 ctx.fill(Path(ellipseIn: CGRect(x: cx - r * 0.70, y: cy + r * 0.52, width: r * 1.40, height: r * 0.80)),
@@ -2023,9 +2025,9 @@ struct BallSkinView: View {
                 // A few sparks drifting up (frozen in place with Reduce Motion).
                 for i in 0..<5 {
                     let fi: Double = Double(i)
-                    let prog: Double = (t * 0.22 + fi * 0.21).truncatingRemainder(dividingBy: 1.0)
+                    let prog: Double = (t * 0.14 + fi * 0.21).truncatingRemainder(dividingBy: 1.0)
                     let sx: CGFloat = cx + r * CGFloat(-0.55 + 0.27 * fi)
-                        + r * 0.06 * CGFloat(sin(t * 1.3 + fi * 2.0))
+                        + r * 0.06 * CGFloat(sin(t * 0.9 + fi * 2.0))
                     let sy: CGFloat = cy + r * CGFloat(0.35 - 1.05 * prog)
                     let sr: CGFloat = max(0.5, r * 0.045)
                     let fade: Double = sin(prog * Double.pi)
@@ -2144,7 +2146,7 @@ struct BallSkinView: View {
                 // Rain falling out of the cloud.
                 StormArt.rain(ctx, in: CGRect(x: cx - r, y: cy + r * 0.05, width: r * 2, height: r * 0.95),
                               t: t, seed: 0x7C10_0D02, count: 7, length: r * 0.26,
-                              alpha: 0.40, speed: Double(r) * 1.6, width: max(0.6, r * 0.035))
+                              alpha: 0.32, speed: Double(r) * 0.65, width: max(0.6, r * 0.035))
                 // Rare forked lightning inside the cloud.
                 let strike = StormArt.strike(t, seed: 0.31, frozen: false, still: reduceMotion)
                 if strike.level > 0.02 {

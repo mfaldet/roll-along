@@ -5320,10 +5320,11 @@ private func trailWildfire(_ ctx: GraphicsContext, _ fr: TrailFrame) {
         let p = fr.pts[i]
         let s2: Double = (seed * 7.0).truncatingRemainder(dividingBy: 1.0)
         let s3: Double = (seed * 13.0).truncatingRemainder(dividingBy: 1.0)
-        let flick: Double = 0.78 + 0.22 * sin(fr.tm * 6.0 + seed * 40.0)
+        // A slow waver (about a 2-second period, a tenth of the height), not a flicker.
+        let flick: Double = 0.90 + 0.10 * sin(fr.tm * 3.0 + seed * 40.0)
         let h: CGFloat = fr.bw * CGFloat((2.6 + 1.8 * s2) * flick * (0.55 + 0.45 * k))
         let w: CGFloat = fr.bw * 0.95
-        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 3.0 + seed * 17.0) * 0.12 * fr.m) * h * 0.5
+        let lean: CGFloat = CGFloat((s3 - 0.5) * 0.9 + sin(fr.tm * 1.8 + seed * 17.0) * 0.10 * fr.m) * h * 0.5
         let baseY: CGFloat = p.y + w * 0.30
         let tall = CGPoint(x: p.x + lean, y: p.y - h)
         let fork = CGPoint(x: p.x - w * 0.55 + lean * 0.45, y: p.y - h * 0.62)
