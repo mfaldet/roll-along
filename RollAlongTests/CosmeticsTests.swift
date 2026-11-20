@@ -193,6 +193,37 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertTrue(gs.isEquipped(BallSkin.jade))
     }
 
+    /// Quality round: the Roll Along pieces carry their color in the name
+    /// (ids unchanged), and Nature's goal is the new Leaf Wreath — a Standard
+    /// piece like the Meadow goal it replaced, which is in no collection now.
+    func testQualityRound_rollAlongNamesAndNatureGoal() {
+        XCTAssertEqual(TrailColor.classic.displayName, "Classic Shadow")
+        XCTAssertEqual(Floor.classic.displayName, "Classic White")
+        XCTAssertEqual(Pit.classic.displayName, "Classic Black")
+        XCTAssertEqual(Boundary.classic.displayName, "Classic Gray")
+        XCTAssertEqual(TrailColor.classic.rawValue, "classic")
+        XCTAssertEqual(Floor.classic.rawValue, "classic")
+        XCTAssertEqual(Pit.classic.rawValue, "classic")
+        XCTAssertEqual(Boundary.classic.rawValue, "classic")
+
+        guard let nature = CosmeticBundle.catalogue.first(where: { $0.id == "nature" }) else {
+            return XCTFail("nature collection missing")
+        }
+        XCTAssertEqual(nature.goals, [.leafWreath])
+        XCTAssertEqual(GoalSkin.leafWreath.displayName, "Leaf Wreath")
+        XCTAssertEqual(GoalSkin.leafWreath.tier, GoalSkin.meadow.tier)
+        XCTAssertEqual(nature.fullPrice(), 4_500, "Nature's price is unchanged")
+        for b in CosmeticBundle.catalogue {
+            XCTAssertFalse(b.goals.contains(.meadow), "\(b.id) still holds the displaced Meadow goal")
+            if b.id != "nature" {
+                XCTAssertFalse(b.goals.contains(.leafWreath), "\(b.id) shares Nature's goal")
+            }
+        }
+        // The Water floor now carries slow moving light; Fire's stays still.
+        XCTAssertTrue(Floor.shallows.hasAnimatedOverlay)
+        XCTAssertFalse(Floor.scorched.hasAnimatedOverlay)
+    }
+
     /// Tapping an owned piece of a partially owned collection equips it and
     /// never buys the collection or touches coins.
     func testEquip_fromPartiallyOwnedCollection_neverPurchases() {
@@ -463,8 +494,9 @@ final class CosmeticsTests: XCTestCase {
     }
 
     /// Fire, Water and Storm: new complete Standard sets, every piece new art
-    /// that belongs to no other collection, still (no animated overlay),
-    /// priced by the normal rule (6 × 750) and on sale from launch.
+    /// that belongs to no other collection, priced by the normal rule
+    /// (6 × 750) and on sale from launch.  (Pieces of any rarity may move
+    /// gently since the quality round, so stillness is no longer asserted.)
     func testStarterElementSets_areNewCompleteStandardSets() {
         let ids = ["fire", "water", "storm"]
         let others = CosmeticBundle.catalogue.filter { !ids.contains($0.id) }
@@ -481,8 +513,6 @@ final class CosmeticsTests: XCTestCase {
             let tiers: [CosmeticTier] = [b.balls[0].tier, b.goals[0].tier, b.trails[0].tier,
                                          b.floors[0].tier, b.pits[0].tier, b.boundaries[0].tier]
             XCTAssertTrue(tiers.allSatisfy { $0 == .standard }, "\(id): every piece is Standard")
-            XCTAssertFalse(b.floors[0].hasAnimatedOverlay)
-            XCTAssertFalse(b.pits[0].hasAnimatedOverlay)
             XCTAssertTrue(b.pits[0].hasDrawnArt)
             for o in others {
                 XCTAssertFalse(o.balls.contains(b.balls[0]), "\(id) ball is also in \(o.id)")
@@ -706,6 +736,99 @@ final class CosmeticsTests: XCTestCase {
         XCTAssertEqual(TrailColor.rollAlongFirst(TrailColor.allCases).first, .classic)
         XCTAssertEqual(BallSkin.rollAlongFirst(BallSkin.allCases.reversed()).first, .red)
         XCTAssertEqual(Floor.rollAlongFirst(Array(Floor.allCases.reversed())).first, .classic)
+    }
+
+    // MARK: Quality round — Storm, Sketchbook, Neon
+
+    /// Storm: the same six ids, redrawn.  Three display names changed with
+    /// the art; tiers and the price did not.  The floor and pit now move.
+    func testQualityRound_stormKeepsIdsTiersAndPrice() {
+        guard let storm = CosmeticBundle.active.first(where: { $0.id == "storm" }) else {
+            return XCTFail("Storm is not on sale")
+        }
+        XCTAssertEqual(storm.balls, [.thundercloud])
+        XCTAssertEqual(storm.goals, [.thunderRing])
+        XCTAssertEqual(storm.trails, [.squall])
+        XCTAssertEqual(storm.floors, [.overcast])
+        XCTAssertEqual(storm.pits, [.maelstrom])
+        XCTAssertEqual(storm.boundaries, [.thunderbolt])
+        XCTAssertEqual(GoalSkin.thunderRing.displayName, "Storm Eye")
+        XCTAssertEqual(Boundary.thunderbolt.displayName, "Thunderhead")
+        XCTAssertEqual(storm.fullPrice(), 4_500)
+        XCTAssertEqual(storm.rarity, .standard)
+        XCTAssertTrue(Floor.overcast.hasAnimatedOverlay)
+        XCTAssertTrue(Pit.maelstrom.hasAnimatedOverlay)
+        XCTAssertTrue(Pit.maelstrom.hasDrawnArt, "the pit art stays visible (frozen) under Reduce Motion")
+        XCTAssertTrue(Boundary.thunderbolt.textureShowsUnderReduceMotion)
+    }
+
+    /// Storm lightning is rare and soft: dark for most of every cycle, never
+    /// brighter than 1, a new bolt each strike, and absent under Reduce Motion.
+    func testQualityRound_stormLightningIsRareAndNeverUnderReduceMotion() {
+        for seed in [0.17, 0.31, 0.45, 0.62, 0.87] {
+            let period = StormArt.period(seed)
+            XCTAssertGreaterThanOrEqual(period, 7.0)
+            XCTAssertLessThanOrEqual(period, 12.0)
+            var lit = 0
+            let samples = 2_000
+            for k in 0..<samples {
+                let t = 800_000_000.0 + Double(k) * period * 3.0 / Double(samples)
+                let f = StormArt.flash(t, seed: seed)
+                XCTAssertGreaterThanOrEqual(f.level, 0)
+                XCTAssertLessThanOrEqual(f.level, 1)
+                if f.level > 0.02 { lit += 1 }
+                XCTAssertEqual(StormArt.strike(t, seed: seed, frozen: false, still: true).level, 0)
+            }
+            XCTAssertGreaterThan(lit, 0, "seed \(seed) never flashes")
+            XCTAssertLessThan(Double(lit) / Double(samples), 0.10,
+                              "seed \(seed): the sky is dark at least 90% of the time")
+            let a = StormArt.flash(800_000_000.0, seed: seed).id
+            let b = StormArt.flash(800_000_000.0 + period, seed: seed).id
+            XCTAssertNotEqual(a, b, "each strike draws a different fork")
+        }
+    }
+
+    /// Sketchbook: the Pencil ball and Scribble goal replace Silver and
+    /// Archery (which belong to no collection on sale any more); the floor is
+    /// named "Paper" under its old id; the price is unchanged.
+    func testQualityRound_sketchbookHasPencilAndScribble() {
+        guard let book = CosmeticBundle.active.first(where: { $0.id == "sketchbook" }) else {
+            return XCTFail("Sketchbook is not on sale")
+        }
+        XCTAssertEqual(book.balls, [.pencil])
+        XCTAssertEqual(book.goals, [.scribble])
+        XCTAssertEqual(book.trails, [.graphite])
+        XCTAssertEqual(book.floors, [.sketch])
+        XCTAssertEqual(book.pits, [.sketch])
+        XCTAssertEqual(book.boundaries, [.slate])
+        XCTAssertEqual(BallSkin.pencil.tier, BallSkin.silver.tier, "a replacement takes the old piece's tier")
+        XCTAssertEqual(GoalSkin.scribble.tier, GoalSkin.archery.tier)
+        XCTAssertEqual(Floor.sketch.displayName, "Paper")
+        XCTAssertEqual(Floor.sketch.rawValue, Floor(rawValue: Floor.sketch.rawValue)?.rawValue)
+        XCTAssertEqual(Pit.sketch.displayName, "Sketch")
+        XCTAssertEqual(book.fullPrice(), 4_750)
+        for other in CosmeticBundle.active where other.id != "sketchbook" {
+            XCTAssertFalse(other.balls.contains(.pencil), "Pencil is also in \(other.id)")
+            XCTAssertFalse(other.goals.contains(.scribble), "Scribble is also in \(other.id)")
+        }
+        for b in CosmeticBundle.active {
+            XCTAssertFalse(b.balls.contains(.silver), "Silver left the sets on sale (\(b.id))")
+            XCTAssertFalse(b.goals.contains(.archery), "Archery left the sets on sale (\(b.id))")
+        }
+    }
+
+    /// Neon: same six ids; the pit is redrawn in place and renamed "Blackout".
+    func testQualityRound_neonPitIsBlackout() {
+        guard let neon = CosmeticBundle.active.first(where: { $0.id == "neon" }) else {
+            return XCTFail("Neon is not on sale")
+        }
+        XCTAssertEqual(neon.pits, [.graph])
+        XCTAssertEqual(Pit.graph.displayName, "Blackout")
+        XCTAssertEqual(Floor.graph.displayName, "Graph", "the Graph floor keeps its name")
+        XCTAssertEqual(Pit.graph.tier, .standard)
+        XCTAssertTrue(Pit.graph.hasDrawnArt)
+        XCTAssertEqual(neon.floors, [.gridCity])
+        XCTAssertEqual(neon.goals, [.neon])
     }
 
     /// Every boundary added for a collection belongs to at least one
@@ -1273,14 +1396,52 @@ final class CosmeticsTests: XCTestCase {
 
     // MARK: - Music is not in 1.0
 
+    /// Quality round: Citrus is tropical citrus and Midas is one golden set.
+    /// New pieces take the tier of the piece they replaced, so neither set's
+    /// price moves, and the displaced pieces are in no collection on sale.
+    func testQualityRound_citrusAndMidas() {
+        let citrus = CosmeticBundle.active.first { $0.id == "citrus" }!
+        XCTAssertEqual(citrus.balls, [.lemon])
+        XCTAssertEqual(citrus.goals, [.citrusSlice])
+        XCTAssertEqual(citrus.trails, [.zest])
+        XCTAssertEqual(citrus.floors, [.grove])
+        XCTAssertEqual(citrus.pits, [.tidePool])
+        XCTAssertEqual(citrus.boundaries, [.citrus])
+        XCTAssertEqual(GoalSkin.citrusSlice.tier, GoalSkin.flame.tier)
+        XCTAssertEqual(TrailColor.zest.tier, TrailColor.ember.tier)
+        XCTAssertEqual(Floor.grove.tier, Floor.dusk.tier)
+        XCTAssertEqual(Pit.tidePool.tier, Pit.sunset.tier)
+        XCTAssertEqual(citrus.fullPrice(), 5_250)
+        XCTAssertEqual(citrus.rarity, .standard)
+
+        let midas = CosmeticBundle.active.first { $0.id == "midas" }!
+        XCTAssertEqual(midas.goals, [.bullion])
+        XCTAssertEqual(midas.floors, [.goldLeaf])
+        XCTAssertEqual(midas.pits, [.vault])
+        XCTAssertEqual(Floor.goldLeaf.tier, Floor.mirage.tier)
+        XCTAssertEqual(Pit.vault.tier, Pit.mirage.tier)
+        XCTAssertEqual(midas.fullPrice(), 5_000)
+        XCTAssertEqual(midas.rarity, .standard)
+
+        // Displaced pieces sit in neither set any more.
+        for b in [citrus, midas] {
+            XCTAssertFalse(b.goals.contains(.flame))
+            XCTAssertFalse(b.trails.contains(.ember))
+            XCTAssertFalse(b.floors.contains(.dusk) || b.floors.contains(.mirage))
+            XCTAssertFalse(b.pits.contains(.sunset) || b.pits.contains(.mirage))
+        }
+    }
+
     /// Approved pit redraws: drawn art for 18 pits; only the two Rare ones
     /// (Graveyard, Aurora) move; Midnight shows as "Moonlit" with its old id.
     func testPitRedraws_tiersAndNames() {
         let drawn = Pit.allCases.filter { $0.hasDrawnArt }
-        // 18 redraws + the Fire, Water and Storm starter pits, plus the
-        // quality round's drawn pits (Winter's Crevasse, the Sea Vent, …).
-        // A drawn pit may now be any tier and may move gently.
-        XCTAssertGreaterThanOrEqual(drawn.count, 23)
+        // 18 redraws + the Fire, Water and Storm starter pits, plus the pits
+        // added or redrawn in the quality round (Tide Pool, Vault, Winter's
+        // Crevasse, the Sea Vent, …).  A drawn pit may now be any tier and may
+        // move gently.
+        XCTAssertGreaterThanOrEqual(drawn.count, 21)
+        XCTAssertTrue(Pit.tidePool.hasDrawnArt && Pit.vault.hasDrawnArt)
         XCTAssertTrue(drawn.contains(.twilight) && drawn.contains(.vent))
         XCTAssertEqual(Pit.graveyard.tier, .rare)
         XCTAssertEqual(Pit.aurora.tier, .rare)

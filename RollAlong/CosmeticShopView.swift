@@ -2569,7 +2569,7 @@ enum CosmeticTileHero {
         case .halo:             return peak(2.0)   // halo at its widest
         case .crystal:          return peak(2.0)   // first facet at full shimmer
         case .flame:            return peak(7.0)   // lead flame at full height
-        case .neon:             return peak(8.0)   // tubes at full glow
+        case .neon:             return peak(1.1)   // tubes at full glow
         case .prism:            return peak(0.6)   // beams at widest spread
         case .obsidian:         return peak(0.8)   // sheen swung furthest out
         case .quasar:           return peak(2.6)   // first glints at full
