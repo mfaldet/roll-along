@@ -537,10 +537,19 @@ struct BallGameView: View {
                 // Themed floor
                 floor.color.ignoresSafeArea()
 
-                // Aurora theme: animated shimmer overlay on top of the base.
-                // Skipped under Reduce Motion to avoid continuous background drift.
-                if floor == .aurora && !reduceMotion {
+                // Aurora theme: a few faint ribbons of light over the dark base.
+                // Renders under Reduce Motion too (the ribbons hold still).
+                if floor == .aurora {
                     auroraShimmerOverlay
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
+                // Quality round (Haunted / Cosmos / Lava Flow): Fog, Midnight
+                // and Ember floors draw a slow overlay of their own; each
+                // freezes its clock under Reduce Motion.
+                if floor == .fog || floor == .midnight || floor == .ember {
+                    FloorOverlayView(floor: floor)
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                 }
@@ -990,7 +999,7 @@ struct BallGameView: View {
                 // suppresses the animation; the static base remains.
                 if !reduceMotion {
                     switch pit {
-                    case .evil:      evilPitOverlay
+                    // (.evil is drawn art now — see `hasDrawnArt` below.)
                     case .sky:       skyPitOverlay
                     case .pond:      pondPitOverlay
                     case .space:     spacePitOverlay
@@ -3961,6 +3970,10 @@ struct FloorOverlayView: View {
         case .brass:     brassFloorOverlay
         case .eclipse:   eclipseFloorOverlay
         case .aurora:    auroraShimmerOverlay
+        // ── Quality round: Haunted / Cosmos / Lava Flow ──
+        case .fog:       fogFloorOverlay
+        case .midnight:  midnightStarsOverlay
+        case .ember:     emberGlowOverlay
         default:         EmptyView()
         }
     }
@@ -3968,7 +3981,7 @@ struct FloorOverlayView: View {
     /// True for floors whose overlay the game hides under Reduce Motion
     /// (the others freeze their own clocks instead).
     static func hiddenUnderReduceMotion(_ floor: Floor) -> Bool {
-        floor == .aurora || floor == .disco || floor == .eclipse
+        floor == .disco || floor == .eclipse
     }
 
 
@@ -4467,100 +4480,354 @@ struct FloorOverlayView: View {
         }
     }
 
-    /// Aurora-theme floor shimmer.  Renders a slow drift of soft green/blue/
-    /// purple gradient blobs on top of the floor base color.  Drawn at 30Hz
-    /// (minimumInterval) to keep CPU cost modest — physics still runs at 60Hz
-    /// via the CADisplayLink.
-    // Aurora floor — a living northern-lights sky: a broad colour wash of soft
-    // hue-drifting glow blobs, four wavy vertical light CURTAINS that undulate
-    // and slide (the signature aurora ribbons), and a twinkling starfield.  All
-    // additive over the deep-night floor base so the colours luminesce.
+    // ── Quality round ───────────────────────────────────────────────────────
+    // Aurora floor (Aurora set) — a DARK night sky crossed by a few faint,
+    // sparse ribbons of light that undulate very slowly, over a handful of
+    // dim still stars.  (The full curtains of light now fill the Aurora pit.)
+    // Under Reduce Motion the ribbons hold still.
     private var auroraShimmerOverlay: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 15.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
-                let w = size.width, h = size.height
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                let w: CGFloat = size.width
+                let h: CGFloat = size.height
 
-                // ── 1. Soft aurora glow wash ───────────────────────────────
-                ctx.blendMode = .plusLighter
-                let blobs: [(Double, Double, Double, Double)] = [
-                    (0.0, 0.0, 0.42, 0.07),   // teal-green
-                    (1.7, 2.4, 0.52, 0.09),   // cyan
-                    (3.5, 1.1, 0.74, 0.06),   // violet
-                    (5.2, 4.0, 0.46, 0.08),   // aqua
-                    (2.4, 5.1, 0.66, 0.07),   // indigo-violet
-                ]
-                let r = w * 0.9
-                for (xSeed, ySeed, hueSeed, speed) in blobs {
-                    let bxFrac: Double = 0.5 + 0.55 * sin(t * speed       + xSeed)
-                    let byFrac: Double = 0.40 + 0.40 * sin(t * speed * 1.3 + ySeed)
-                    let bx = w * CGFloat(bxFrac)
-                    let by = h * CGFloat(byFrac)
-                    let hue = (hueSeed + t * 0.010).truncatingRemainder(dividingBy: 1.0)
-                    let color = Color(hue: hue, saturation: 0.60, brightness: 0.95)
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(x: bx - r, y: by - r, width: r * 2, height: r * 2)),
-                        with: .radialGradient(
-                            Gradient(colors: [color.opacity(0.20), .clear]),
-                            center: CGPoint(x: bx, y: by), startRadius: 0, endRadius: r))
+                // Dim, still stars.
+                var rng = SeededRNG(seed: 0xA020_0F10)
+                let starCount: Int = max(10, Int(w * h / 9000))
+                for _ in 0..<starCount {
+                    let sx: CGFloat = CGFloat(rng.nextUnit()) * w
+                    let sy: CGFloat = CGFloat(rng.nextUnit()) * h
+                    let sr: CGFloat = 0.5 + CGFloat(rng.nextUnit()) * 0.6
+                    let sa: Double = 0.18 + rng.nextUnit() * 0.22
+                    ctx.fill(Path(ellipseIn: CGRect(x: sx - sr, y: sy - sr, width: sr * 2, height: sr * 2)),
+                             with: .color(Color.white.opacity(sa)))
                 }
 
-                // ── 2. Aurora curtains — wavy vertical light ribbons ───────
-                // x-fraction, base hue, phase, drift speed.
-                let curtains: [(CGFloat, Double, Double, Double)] = [
-                    (0.18, 0.40, 0.0, 0.45),
-                    (0.42, 0.52, 1.9, 0.32),
-                    (0.66, 0.74, 3.4, 0.38),
-                    (0.85, 0.46, 5.0, 0.28),
+                // Three sparse ribbons: (y fraction, hue, phase, speed, tilt).
+                let ribbons: [(Double, Double, Double, Double, Double)] = [
+                    (0.20, 0.42, 0.0, 0.11, 0.10),
+                    (0.52, 0.50, 2.1, 0.08, -0.14),
+                    (0.80, 0.74, 4.4, 0.10, 0.06),
                 ]
-                let steps = 16
-                for (xf, hue0, ph, spd) in curtains {
-                    let hue = (hue0 + t * 0.008).truncatingRemainder(dividingBy: 1.0)
-                    let col = Color(hue: hue, saturation: 0.72, brightness: 1.0)
-                    let baseSway: CGFloat = CGFloat(sin(t * spd + ph)) * w * 0.06
-                    let baseX = w * xf + baseSway
-                    let bandW = w * 0.14
-                    var leftPts: [CGPoint] = [], rightPts: [CGPoint] = []
-                    for s in 0...steps {
-                        let yf = Double(s) / Double(steps)
-                        let y  = h * CGFloat(yf)
-                        let swayArg: Double = t * spd * 1.4 + ph + yf * 3.4
-                        let sway:  CGFloat = CGFloat(sin(swayArg) * Double(w) * 0.05)
-                        let halfFrac: Double = 0.35 + 0.65 * sin(yf * Double.pi)  // pinch top & bottom
-                        let half:  CGFloat = bandW * CGFloat(halfFrac)
-                        leftPts.append(CGPoint(x: baseX + sway - half, y: y))
-                        rightPts.append(CGPoint(x: baseX + sway + half, y: y))
-                    }
+                var glow = ctx
+                glow.blendMode = .plusLighter
+                let steps: Int = 28
+                for (yf, hue, ph, spd, tilt) in ribbons {
                     var path = Path()
-                    path.move(to: leftPts[0])
-                    for p in leftPts.dropFirst() { path.addLine(to: p) }
-                    for p in rightPts.reversed() { path.addLine(to: p) }
-                    path.closeSubpath()
-                    ctx.fill(path, with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: col.opacity(0.0),  location: 0.0),
-                            .init(color: col.opacity(0.30), location: 0.32),
-                            .init(color: col.opacity(0.12), location: 0.68),
-                            .init(color: .clear,            location: 1.0),
-                        ]),
-                        startPoint: CGPoint(x: baseX, y: 0), endPoint: CGPoint(x: baseX, y: h)))
-                }
-                ctx.blendMode = .normal
-
-                // ── 3. Twinkling starfield ─────────────────────────────────
-                for i in 0..<24 {
-                    let fx = abs((sin(Double(i) * 12.9898) * 43758.5453).truncatingRemainder(dividingBy: 1.0))
-                    let fy = abs((sin(Double(i) * 78.2330) * 12543.1234).truncatingRemainder(dividingBy: 1.0))
-                    let tw = 0.4 + 0.6 * sin(t * 1.8 + Double(i) * 1.3)
-                    if tw < 0.2 { continue }
-                    let px = w * CGFloat(fx), py = h * CGFloat(fy) * 0.72
-                    let s  = CGFloat(0.7 + 1.1 * tw)
-                    ctx.fill(Path(ellipseIn: CGRect(x: px - s, y: py - s, width: s * 2, height: s * 2)),
-                             with: .color(.white.opacity(0.45 * tw)))
+                    for sIdx in 0...steps {
+                        let xf: Double = Double(sIdx) / Double(steps)
+                        let wave1: Double = sin(xf * 5.2 + t * spd + ph) * 0.045
+                        let wave2: Double = sin(xf * 11.0 - t * spd * 0.7 + ph * 1.7) * 0.015
+                        let yy: Double = yf + (xf - 0.5) * tilt + wave1 + wave2
+                        let pt = CGPoint(x: w * CGFloat(xf), y: h * CGFloat(yy))
+                        if sIdx == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+                    }
+                    let col = Color(hue: hue, saturation: 0.70, brightness: 1.0)
+                    let breathe: Double = 0.75 + 0.25 * sin(t * spd * 1.9 + ph)
+                    let fade = Gradient(stops: [
+                        .init(color: col.opacity(0.0), location: 0.0),
+                        .init(color: col.opacity(1.0), location: 0.3),
+                        .init(color: col.opacity(0.7), location: 0.7),
+                        .init(color: col.opacity(0.0), location: 1.0),
+                    ])
+                    let shade = GraphicsContext.Shading.linearGradient(
+                        fade, startPoint: .zero, endPoint: CGPoint(x: w, y: 0))
+                    var wide = glow
+                    wide.opacity = 0.05 * breathe
+                    wide.stroke(path, with: shade,
+                                style: StrokeStyle(lineWidth: 26, lineCap: .round, lineJoin: .round))
+                    var mid = glow
+                    mid.opacity = 0.09 * breathe
+                    mid.stroke(path, with: shade,
+                               style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
+                    var core = glow
+                    core.opacity = 0.16 * breathe
+                    core.stroke(path, with: shade,
+                                style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
                 }
             }
         }
+        .allowsHitTesting(false)
     }
+
+    // Midnight floor (Cosmos set) — space black scattered with small stars
+    // that twinkle slowly, each on its own lazy clock, over two very faint
+    // clouds of dust.  Stars stay small and dim so coins, pits and the goal
+    // read clearly.  Under Reduce Motion the stars hold still.
+    private var midnightStarsOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 10.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                let w: CGFloat = size.width
+                let h: CGFloat = size.height
+
+                // Faint dust clouds: (x, y, radius fraction, color).
+                let clouds: [(CGFloat, CGFloat, CGFloat, Color)] = [
+                    (0.28, 0.30, 0.55, Color(red: 0.30, green: 0.22, blue: 0.60)),
+                    (0.74, 0.72, 0.60, Color(red: 0.12, green: 0.28, blue: 0.55)),
+                ]
+                for (fx, fy, fr, col) in clouds {
+                    let c = CGPoint(x: w * fx, y: h * fy)
+                    let cr: CGFloat = max(w, h) * fr * 0.5
+                    ctx.fill(Path(ellipseIn: CGRect(x: c.x - cr, y: c.y - cr * 0.7, width: cr * 2, height: cr * 1.4)),
+                             with: .radialGradient(Gradient(colors: [col.opacity(0.10), .clear]),
+                                                   center: c, startRadius: 0, endRadius: cr))
+                }
+
+                var rng = SeededRNG(seed: 0x51A2_5001)
+                let count: Int = max(24, Int(w * h / 1500))
+                let cool = Color(red: 0.72, green: 0.82, blue: 1.00)
+                let warm = Color(red: 1.00, green: 0.90, blue: 0.76)
+                for i in 0..<count {
+                    let x: CGFloat = CGFloat(rng.nextUnit()) * w
+                    let y: CGFloat = CGFloat(rng.nextUnit()) * h
+                    let kind: Double = rng.nextUnit()
+                    let phase: Double = rng.nextUnit() * 6.283
+                    let speed: Double = 0.25 + rng.nextUnit() * 0.55
+                    let base: Double = 0.25 + rng.nextUnit() * 0.40
+                    let twinkle: Double = 0.62 + 0.38 * sin(t * speed + phase)
+                    let alpha: Double = base * twinkle
+                    let r: CGFloat = kind > 0.94 ? 1.25 : (kind > 0.60 ? 0.80 : 0.55)
+                    let pick: Double = (Double(i) * 0.618).truncatingRemainder(dividingBy: 1.0)
+                    let col: Color = pick < 0.60 ? Color.white : (pick < 0.85 ? cool : warm)
+                    ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                             with: .color(col.opacity(alpha)))
+                    if kind > 0.94 {
+                        // The few brighter stars carry a thin four-point glint.
+                        let len: CGFloat = r * 3.2
+                        var glint = Path()
+                        glint.move(to: CGPoint(x: x - len, y: y))
+                        glint.addLine(to: CGPoint(x: x + len, y: y))
+                        glint.move(to: CGPoint(x: x, y: y - len))
+                        glint.addLine(to: CGPoint(x: x, y: y + len))
+                        ctx.stroke(glint, with: .color(col.opacity(alpha * 0.55)), lineWidth: 0.5)
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    // Fog floor (Haunted set) — dark, damp flagstones with moss in the
+    // joints, a few fallen leaves, hairline cracks and a cobweb in two
+    // corners; pale fog drifts slowly over parts of it.  Under Reduce Motion
+    // the fog holds still.
+    private var fogFloorOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 15.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                let w: CGFloat = size.width
+                let h: CGFloat = size.height
+                var rng = SeededRNG(seed: 0xF06_F100)
+
+                // Flagstones: rows of uneven stones, each joint a faint light
+                // line with a dark shadow beside it.
+                let jointLight = Color(white: 0.80).opacity(0.055)
+                let jointDark = Color.black.opacity(0.30)
+                let rowH: CGFloat = 54
+                var y: CGFloat = 0
+                while y < h + rowH {
+                    var row = Path()
+                    row.move(to: CGPoint(x: 0, y: y))
+                    row.addLine(to: CGPoint(x: w, y: y))
+                    ctx.stroke(row, with: .color(jointDark), lineWidth: 1.4)
+                    var rowLight = Path()
+                    rowLight.move(to: CGPoint(x: 0, y: y + 1.2))
+                    rowLight.addLine(to: CGPoint(x: w, y: y + 1.2))
+                    ctx.stroke(rowLight, with: .color(jointLight), lineWidth: 0.8)
+                    var x: CGFloat = -CGFloat(rng.nextUnit()) * 60
+                    while x < w {
+                        x += 58 + CGFloat(rng.nextUnit()) * 52
+                        let lean: CGFloat = CGFloat(rng.nextUnit() - 0.5) * 5
+                        var joint = Path()
+                        joint.move(to: CGPoint(x: x, y: y))
+                        joint.addLine(to: CGPoint(x: x + lean, y: y + rowH))
+                        ctx.stroke(joint, with: .color(jointDark), lineWidth: 1.2)
+                        var jl = Path()
+                        jl.move(to: CGPoint(x: x + 1.1, y: y))
+                        jl.addLine(to: CGPoint(x: x + lean + 1.1, y: y + rowH))
+                        ctx.stroke(jl, with: .color(jointLight), lineWidth: 0.7)
+                    }
+                    y += rowH
+                }
+
+                // Moss blotches along the joints.
+                let moss = Color(red: 0.20, green: 0.34, blue: 0.22)
+                let mossCount: Int = max(6, Int(w * h / 14000))
+                let rowCount: Double = Double(h / rowH)
+                for _ in 0..<mossCount {
+                    let mx: CGFloat = CGFloat(rng.nextUnit()) * w
+                    let rowIndex: Int = Int(rng.nextUnit() * rowCount)
+                    let my: CGFloat = CGFloat(rowIndex + 1) * rowH
+                    let mr: CGFloat = 5 + CGFloat(rng.nextUnit()) * 9
+                    ctx.fill(Path(ellipseIn: CGRect(x: mx - mr, y: my - mr * 0.45, width: mr * 2, height: mr * 0.9)),
+                             with: .color(moss.opacity(0.24)))
+                }
+
+                // Hairline cracks.
+                let crackCount: Int = max(3, Int(w * h / 60000))
+                for _ in 0..<crackCount {
+                    var cx: CGFloat = CGFloat(rng.nextUnit()) * w
+                    var cy: CGFloat = CGFloat(rng.nextUnit()) * h
+                    var crack = Path()
+                    crack.move(to: CGPoint(x: cx, y: cy))
+                    for _ in 0..<4 {
+                        cx += CGFloat(rng.nextUnit() - 0.3) * 14
+                        cy += 4 + CGFloat(rng.nextUnit()) * 9
+                        crack.addLine(to: CGPoint(x: cx, y: cy))
+                    }
+                    ctx.stroke(crack, with: .color(Color.black.opacity(0.38)), lineWidth: 0.7)
+                }
+
+                // Fallen leaves.
+                let leafCount: Int = max(5, Int(w * h / 26000))
+                let leafA = Color(red: 0.42, green: 0.30, blue: 0.20)
+                let leafB = Color(red: 0.32, green: 0.31, blue: 0.24)
+                for i in 0..<leafCount {
+                    let lx: CGFloat = CGFloat(rng.nextUnit()) * w
+                    let ly: CGFloat = CGFloat(rng.nextUnit()) * h
+                    let ang: Double = rng.nextUnit() * 6.283
+                    let len: CGFloat = 6 + CGFloat(rng.nextUnit()) * 4
+                    let tip = CGPoint(x: lx + CGFloat(cos(ang)) * len, y: ly + CGFloat(sin(ang)) * len)
+                    let nx: CGFloat = CGFloat(-sin(ang)) * len * 0.36
+                    let ny: CGFloat = CGFloat(cos(ang)) * len * 0.36
+                    let midPt = CGPoint(x: (lx + tip.x) / 2, y: (ly + tip.y) / 2)
+                    var leaf = Path()
+                    leaf.move(to: CGPoint(x: lx, y: ly))
+                    leaf.addQuadCurve(to: tip, control: CGPoint(x: midPt.x + nx, y: midPt.y + ny))
+                    leaf.addQuadCurve(to: CGPoint(x: lx, y: ly), control: CGPoint(x: midPt.x - nx, y: midPt.y - ny))
+                    let leafColor: Color = i % 2 == 0 ? leafA : leafB
+                    ctx.fill(leaf, with: .color(leafColor.opacity(0.55)))
+                }
+
+                // A cobweb in the top-left and bottom-right corners.
+                let web = Color.white.opacity(0.11)
+                let corners: [(CGPoint, Double)] = [
+                    (CGPoint(x: 0, y: 0), 0.0),
+                    (CGPoint(x: w, y: h), Double.pi),
+                ]
+                for (corner, turn) in corners {
+                    let spokes: Int = 5
+                    let reach: CGFloat = 52
+                    var ends: [CGPoint] = []
+                    for k in 0..<spokes {
+                        let a: Double = turn + Double(k) / Double(spokes - 1) * Double.pi / 2
+                        let e = CGPoint(x: corner.x + CGFloat(cos(a)) * reach, y: corner.y + CGFloat(sin(a)) * reach)
+                        ends.append(e)
+                        var spoke = Path()
+                        spoke.move(to: corner)
+                        spoke.addLine(to: e)
+                        ctx.stroke(spoke, with: .color(web), lineWidth: 0.5)
+                    }
+                    for ring in 1...3 {
+                        let f: CGFloat = CGFloat(ring) / 3.4
+                        var thread = Path()
+                        for k in 0..<spokes {
+                            let pt = CGPoint(x: corner.x + (ends[k].x - corner.x) * f,
+                                             y: corner.y + (ends[k].y - corner.y) * f)
+                            if k == 0 {
+                                thread.move(to: pt)
+                            } else {
+                                let prev = CGPoint(x: corner.x + (ends[k - 1].x - corner.x) * f,
+                                                   y: corner.y + (ends[k - 1].y - corner.y) * f)
+                                let mx: CGFloat = (prev.x + pt.x) / 2
+                                let my: CGFloat = (prev.y + pt.y) / 2
+                                let sag = CGPoint(x: mx + (corner.x - mx) * 0.16, y: my + (corner.y - my) * 0.16)
+                                thread.addQuadCurve(to: pt, control: sag)
+                            }
+                        }
+                        ctx.stroke(thread, with: .color(web), lineWidth: 0.5)
+                    }
+                }
+
+                // Drifting fog — a few wide, soft banks that slide slowly
+                // across, some one way and some the other, breathing a little.
+                let fogColor = Color(red: 0.72, green: 0.80, blue: 0.78)
+                var frng = SeededRNG(seed: 0xF06_F200)
+                let banks: Int = max(5, min(9, Int(h / 110)))
+                for i in 0..<banks {
+                    let lane: CGFloat = (CGFloat(i) + CGFloat(frng.nextUnit())) / CGFloat(banks) * h
+                    let rx: CGFloat = 95 + CGFloat(frng.nextUnit()) * 80
+                    let ry: CGFloat = rx * (0.28 + CGFloat(frng.nextUnit()) * 0.12)
+                    let direction: Double = i % 2 == 0 ? 1.0 : -1.0
+                    let speed: Double = (3.0 + frng.nextUnit() * 5.0) * direction
+                    let span: Double = Double(w + rx * 2)
+                    let start: Double = frng.nextUnit() * span
+                    var travel: Double = (start + t * speed).truncatingRemainder(dividingBy: span)
+                    if travel < 0 { travel += span }
+                    let fx: CGFloat = CGFloat(travel) - rx
+                    let breath: Double = 0.13 + 0.05 * sin(t * 0.21 + Double(i) * 1.9)
+                    for lobe in 0..<2 {
+                        let ox: CGFloat = lobe == 0 ? 0 : rx * 0.55
+                        let oy: CGFloat = lobe == 0 ? 0 : -ry * 0.35
+                        let lr: CGFloat = lobe == 0 ? rx : rx * 0.62
+                        let c = CGPoint(x: fx + ox, y: lane + oy)
+                        ctx.fill(Path(ellipseIn: CGRect(x: c.x - lr, y: c.y - ry, width: lr * 2, height: ry * 2)),
+                                 with: .radialGradient(Gradient(colors: [fogColor.opacity(breath), .clear]),
+                                                       center: c, startRadius: 0, endRadius: lr))
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    // Ember floor (Lava Flow set) — the glow under the cooled crust: soft
+    // pools of orange light at some of the fissure junctions, each pulsing
+    // on its own slow clock.  The crust and the fissures themselves are the
+    // still texture in PaperFloorOverlayView (same geometry: EmberFloorArt).
+    // Under Reduce Motion the glow holds still.
+    private var emberGlowOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 10.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                let cell: CGFloat = EmberFloorArt.cell
+                let cols: Int = Int(size.width / cell) + 2
+                let rows: Int = Int(size.height / cell) + 2
+                var glow = ctx
+                glow.blendMode = .plusLighter
+                let hot = Color(red: 1.00, green: 0.42, blue: 0.08)
+                for j in 0...rows {
+                    for i in 0...cols where EmberFloorArt.glows(i, j) {
+                        let v = EmberFloorArt.vertex(i, j)
+                        let pulse: Double = 0.12 + 0.07 * sin(t * 0.45 + EmberFloorArt.phase(i, j))
+                        let gr: CGFloat = cell * 0.58
+                        glow.fill(Path(ellipseIn: CGRect(x: v.x - gr, y: v.y - gr, width: gr * 2, height: gr * 2)),
+                                  with: .radialGradient(Gradient(colors: [hot.opacity(pulse), .clear]),
+                                                        center: v, startRadius: 0, endRadius: gr))
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// Shared geometry for the Ember floor (Lava Flow): a jittered grid whose
+/// edges are the fissures between cooled basalt plates.  Pure functions of
+/// the grid position, so the still crust and the moving glow always agree.
+enum EmberFloorArt {
+    static let cell: CGFloat = 78
+
+    static func hash(_ i: Int, _ j: Int, _ k: Int) -> Double {
+        let v: Double = sin(Double(i) * 127.1 + Double(j) * 311.7 + Double(k) * 74.7) * 43758.5453
+        return v - v.rounded(.down)
+    }
+    static func vertex(_ i: Int, _ j: Int) -> CGPoint {
+        let jx: CGFloat = CGFloat(hash(i, j, 1) - 0.5) * cell * 0.62
+        let jy: CGFloat = CGFloat(hash(i, j, 2) - 0.5) * cell * 0.62
+        return CGPoint(x: CGFloat(i - 1) * cell + jx, y: CGFloat(j - 1) * cell + jy)
+    }
+    /// Whether the edge leaving (i, j) to the right (dir 0) or downward
+    /// (dir 1) is an open, glowing fissure (otherwise a hairline crack).
+    static func open(_ i: Int, _ j: Int, _ dir: Int) -> Bool { hash(i, j, 3 + dir) < 0.50 }
+    static func glows(_ i: Int, _ j: Int) -> Bool { hash(i, j, 7) < 0.30 }
+    static func phase(_ i: Int, _ j: Int) -> Double { hash(i, j, 9) * 6.283 }
 }
 
 /// The animated overlay a pit draws over its base color (flames, clouds,
@@ -4584,91 +4851,42 @@ struct PitOverlayView: View {
         case .nightclub: nightclubPitOverlay
         case .graveyard: graveyardPitOverlay
         case .aurora:    auroraPitOverlay
+        // ── Quality round: Cosmos ──
+        case .midnight:  moonlitPitOverlay
         default:
             if pit.hasDrawnArt { staticPitArt } else { EmptyView() }
         }
     }
 
 
-    /// Evil pit — fire pit animation inside a single hole rect.  A
-    /// vertical heat gradient at the back, then 3-5 flickering flame
-    /// shapes (overlapping radial gradients) animated by independent
-    /// sine offsets.  Each flame's height + width pulse so the fire
-    /// breathes.
+    /// Evil pit (Lava Flow) — a demon's pit.  Basalt ledges step down into
+    /// the dark, each lip lined with a glowing lava seam; deep in the
+    /// blackness a pair of ember eyes blinks slowly and a few sparks rise.
+    /// Drawn art (PitArt.drawEvil), so it shows under Reduce Motion too,
+    /// holding still.
     private var evilPitOverlay: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
-                let t: Double = (heroTime ?? tl.date.timeIntervalSinceReferenceDate)
-
-                // Back gradient — coal → ember → flame tip.
-                ctx.fill(
-                    Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
-                    with: .linearGradient(
-                        Gradient(stops: [
-                            .init(color: Color(red: 0.05, green: 0.00, blue: 0.00), location: 0.00),
-                            .init(color: Color(red: 0.42, green: 0.05, blue: 0.00), location: 0.55),
-                            .init(color: Color(red: 1.00, green: 0.50, blue: 0.05), location: 0.92),
-                            .init(color: Color(red: 1.00, green: 0.85, blue: 0.20), location: 1.00),
-                        ]),
-                        startPoint: .zero,
-                        endPoint:   CGPoint(x: 0, y: size.height)
-                    )
-                )
-
-                // Flickering flame plumes.
-                let flameCount = max(3, Int(size.width / 28))
-                for i in 0..<flameCount {
-                    let seed = Double(i) * 0.73 + 0.11
-                    let baseX = size.width * CGFloat(Double(i) + 0.5) / CGFloat(flameCount)
-                    let flicker: Double = sin(t * 7 + seed * 4) * 0.30
-                                        + sin(t * 13 + seed * 1.6) * 0.15
-                    let flickScale: CGFloat = 0.70 + 0.50 * CGFloat(flicker.magnitude)
-                    let flameW = size.width / CGFloat(flameCount) * flickScale
-                    let flameHFrac: Double = 0.55 + 0.25 * sin(t * 4 + seed * 2)
-                    let flameH = size.height * CGFloat(flameHFrac)
-                    let flameX = baseX - flameW / 2
-                    let flameY = size.height - flameH
-                    let centre = CGPoint(x: flameX + flameW / 2, y: flameY + flameH * 0.75)
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(x: flameX, y: flameY,
-                                               width: flameW, height: flameH * 1.4)),
-                        with: .radialGradient(
-                            Gradient(stops: [
-                                .init(color: Color(red: 1.00, green: 0.95, blue: 0.30).opacity(0.95), location: 0.00),
-                                .init(color: Color(red: 1.00, green: 0.45, blue: 0.05).opacity(0.65), location: 0.50),
-                                .init(color: Color(red: 0.85, green: 0.10, blue: 0.00).opacity(0.00), location: 1.00),
-                            ]),
-                            center: centre,
-                            startRadius: 0,
-                            endRadius:   max(flameW, flameH) * 0.80
-                        )
-                    )
-                }
-
-                // Rising embers — sparks that drift up from the fire, wobble
-                // side to side, and burn out near the top.  Additive so they
-                // glow over the flames.  Seeded so each spark keeps its lane.
-                var emberCtx = ctx
-                emberCtx.blendMode = .plusLighter
-                var rng = SeededRNG(seed: 0xE3B1_0F1A)
-                let emberCount = max(6, Int(size.width / 16))
-                for _ in 0..<emberCount {
-                    let lane  = CGFloat(rng.nextUnit())
-                    let speed = 0.10 + rng.nextUnit() * 0.12
-                    let phase = rng.nextUnit()
-                    // 0 = bottom, 1 = top, looping.
-                    let rise  = (t * speed + phase).truncatingRemainder(dividingBy: 1.0)
-                    let ex    = lane * size.width + CGFloat(sin(t * 2 + phase * 10)) * size.width * 0.04
-                    let ey    = size.height * (1.0 - CGFloat(rise))
-                    let fade  = sin(rise * .pi)          // dim at both ends
-                    let er    = CGFloat(0.8 + rng.nextUnit() * 1.6)
-                    emberCtx.fill(
-                        Path(ellipseIn: CGRect(x: ex - er, y: ey - er, width: er * 2, height: er * 2)),
-                        with: .color(Color(red: 1.0, green: 0.6, blue: 0.2).opacity(0.7 * fade))
-                    )
-                }
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                PitArt.drawEvil(in: &ctx, size: size, t: t, still: reduceMotion)
             }
         }
+        .allowsHitTesting(false)
+    }
+
+    /// Moonlit pit (Cosmos) — a moonlit well: pale stone at the rim stepping
+    /// down through blue shadow to still, dark water where a crescent of
+    /// moonlight shimmers.  Holds still under Reduce Motion.
+    private var moonlitPitOverlay: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 15.0),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            Canvas { ctx, size in
+                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
+                PitArt.drawMoonlit(in: &ctx, size: size, t: t)
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     /// Sky pit — vertical sky-blue gradient with white cloud blobs
@@ -5050,12 +5268,12 @@ extension PitOverlayView {
         .allowsHitTesting(false)
     }
 
-    /// Graveyard (Rare): gravestones on the far rim and a faint ghost that
-    /// drifts slowly across the depth.
+    /// Graveyard (Rare): an open dirt grave with a headstone at the far end
+    /// and thin smoke rising slowly out of it.
     var graveyardPitOverlay: some View {
         // Paused outright under Reduce Motion (even in play, where the motion
         // mode is `.live` and never pauses), frozen at t = 0.
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
                                 paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
@@ -5065,12 +5283,12 @@ extension PitOverlayView {
         .allowsHitTesting(false)
     }
 
-    /// Aurora (Rare): a green-to-violet aurora band rippling slowly in the
-    /// depth under a few still stars.
+    /// Aurora (Rare): the pit is full of northern lights — tall curtains of
+    /// green, teal and violet swaying slowly over a dark depth.
     var auroraPitOverlay: some View {
         // Paused outright under Reduce Motion (even in play, where the motion
         // mode is `.live` and never pauses), frozen at t = 0.
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
                                 paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
             Canvas { ctx, size in
                 let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
@@ -5670,117 +5888,307 @@ enum PitArt {
                    style: StrokeStyle(lineWidth: 0.8, dash: [3, 2.5]))
     }
 
-    // MARK: Rare pits (gentle motion)
+    // MARK: Pits with gentle motion
 
-    /// Graveyard: gravestones on the far rim; a faint ghost drifts slowly
-    /// side to side in the depth and fades in and out a little.
+    /// Graveyard (Haunted): an open grave.  A rim of turned earth with loose
+    /// clods, soil walls stepping down into the dark, a headstone at the far
+    /// end, and thin smoke rising slowly out of the hole.
     static func drawGraveyard(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
         let w = size.width
         let h = size.height
         let m = min(w, h)
-        fill(&ctx, size, Color(red: 0.035, green: 0.055, blue: 0.045))
-        // Low mist pooled in the depth.
-        ctx.fill(Path(CGRect(origin: .zero, size: size)),
-                 with: .radialGradient(Gradient(colors: [
-                    Color(red: 0.45, green: 0.55, blue: 0.50).opacity(0.14), .clear]),
-                    center: CGPoint(x: w / 2, y: h * 0.6), startRadius: 0, endRadius: m * 0.6))
-        // Gravestones along the far (top) rim.
-        var rng = SeededRNG(seed: 0x6EA7_0001)
-        let sw: CGFloat = m * 0.13
-        let count = max(2, min(6, Int(w / (m * 0.28))))
-        let engraving = Color.black.opacity(0.45)
-        for i in 0..<count {
-            let jitter: CGFloat = (CGFloat(rng.nextUnit()) - 0.5) * sw * 0.6
-            let x: CGFloat = w * (CGFloat(i) + 0.5) / CGFloat(count) - sw / 2 + jitter
-            let sh: CGFloat = m * (0.15 + 0.06 * CGFloat(rng.nextUnit()))
-            let y: CGFloat = m * 0.02
+        // Turned earth around the opening.
+        fill(&ctx, size, Color(red: 0.36, green: 0.26, blue: 0.17))
+        var rng = SeededRNG(seed: 0x6EA7_0002)
+        let clodLight = Color(red: 0.50, green: 0.38, blue: 0.26)
+        let clodDark = Color(red: 0.22, green: 0.15, blue: 0.09)
+        let clodCount: Int = max(8, Int((w + h) * 2 / max(4, m * 0.16)))
+        for _ in 0..<clodCount {
+            let edge: Int = Int(rng.nextUnit() * 4)
+            let f: CGFloat = CGFloat(rng.nextUnit())
+            let d: CGFloat = m * 0.055 * CGFloat(rng.nextUnit())
+            let cr: CGFloat = m * (0.018 + 0.024 * CGFloat(rng.nextUnit()))
+            let light: Bool = rng.nextUnit() < 0.5
+            var pt = CGPoint(x: f * w, y: d)
+            if edge == 1 { pt = CGPoint(x: f * w, y: h - d) }
+            if edge == 2 { pt = CGPoint(x: d, y: f * h) }
+            if edge == 3 { pt = CGPoint(x: w - d, y: f * h) }
+            ctx.fill(Path(ellipseIn: CGRect(x: pt.x - cr, y: pt.y - cr * 0.8, width: cr * 2, height: cr * 1.6)),
+                     with: .color(light ? clodLight : clodDark))
+        }
+        // Soil walls stepping down.
+        let soil: [Color] = [
+            Color(red: 0.24, green: 0.16, blue: 0.10), Color(red: 0.16, green: 0.105, blue: 0.065),
+            Color(red: 0.10, green: 0.065, blue: 0.04), Color(red: 0.045, green: 0.03, blue: 0.022),
+        ]
+        let step: CGFloat = m * 0.075
+        for (k, color) in soil.enumerated() {
+            let r = inset(size, m * 0.07 + step * CGFloat(k))
+            let wall = raggedRect(r, step: max(3, m * 0.07), jitter: m * 0.014,
+                                  seed: 0x6EA7_1000 + UInt64(k))
+            ctx.fill(wall, with: .color(color))
+        }
+        // Pale roots poking out of the first wall.
+        if m >= 24 {
+            let rootColor = Color(red: 0.62, green: 0.54, blue: 0.40).opacity(0.55)
+            for spot in edgeSpots(size, spacing: max(10, m * 0.34), seed: 0x6EA7_2000) {
+                let start = CGPoint(x: spot.point.x + spot.inward.dx * m * 0.08,
+                                    y: spot.point.y + spot.inward.dy * m * 0.08)
+                let reach: CGFloat = m * (0.05 + 0.05 * CGFloat(rng.nextUnit()))
+                let slip: CGFloat = (CGFloat(rng.nextUnit()) - 0.5) * m * 0.06
+                let end = CGPoint(x: start.x + spot.inward.dx * reach + spot.along.dx * slip,
+                                  y: start.y + spot.inward.dy * reach + spot.along.dy * slip)
+                line(&ctx, start, end, rootColor, 0.7)
+            }
+        }
+        // Headstone at the far (top) end.
+        if w >= 22 {
+            let sw: CGFloat = min(w * 0.34, m * 0.30)
+            let sh: CGFloat = m * 0.20
+            let x: CGFloat = w / 2 - sw / 2
+            let y: CGFloat = m * 0.012
             var stone = Path()
-            stone.addRect(CGRect(x: x, y: y + sw / 2, width: sw, height: sh - sw / 2))
-            stone.addEllipse(in: CGRect(x: x, y: y, width: sw, height: sw))
+            stone.addRect(CGRect(x: x, y: y + sw * 0.35, width: sw, height: max(1, sh - sw * 0.35)))
+            stone.addEllipse(in: CGRect(x: x, y: y, width: sw, height: sw * 0.7))
             ctx.fill(stone, with: .linearGradient(Gradient(colors: [
-                        Color(red: 0.52, green: 0.54, blue: 0.56),
-                        Color(red: 0.30, green: 0.32, blue: 0.34)]),
+                        Color(red: 0.62, green: 0.64, blue: 0.66),
+                        Color(red: 0.34, green: 0.36, blue: 0.38)]),
                         startPoint: CGPoint(x: x, y: y), endPoint: CGPoint(x: x + sw, y: y + sh)))
-            let cx: CGFloat = x + sw / 2
-            line(&ctx, CGPoint(x: cx, y: y + sh * 0.30), CGPoint(x: cx, y: y + sh * 0.62), engraving, 0.9)
-            line(&ctx, CGPoint(x: cx - sw * 0.22, y: y + sh * 0.40),
-                 CGPoint(x: cx + sw * 0.22, y: y + sh * 0.40), engraving, 0.9)
+            // Two worn lines of engraving.
+            let engraving = Color.black.opacity(0.40)
+            line(&ctx, CGPoint(x: x + sw * 0.24, y: y + sh * 0.42),
+                 CGPoint(x: x + sw * 0.76, y: y + sh * 0.42), engraving, 0.8)
+            line(&ctx, CGPoint(x: x + sw * 0.32, y: y + sh * 0.62),
+                 CGPoint(x: x + sw * 0.68, y: y + sh * 0.62), engraving, 0.8)
         }
-        // The ghost.
-        let gx: CGFloat = w * 0.5 + CGFloat(sin(t * 0.31)) * w * 0.22
-        let gy: CGFloat = h * 0.60 + CGFloat(sin(t * 0.73)) * m * 0.04
-        let gr: CGFloat = m * 0.11
-        let alpha: Double = 0.22 + 0.07 * sin(t * 0.9)
-        let gc = CGPoint(x: gx, y: gy)
-        ctx.fill(Path(ellipseIn: CGRect(x: gx - gr * 2, y: gy - gr * 2, width: gr * 4, height: gr * 4)),
-                 with: .radialGradient(Gradient(colors: [Color.white.opacity(alpha * 0.5), .clear]),
-                    center: gc, startRadius: 0, endRadius: gr * 2))
-        var ghost = Path()
-        ghost.addArc(center: gc, radius: gr, startAngle: .degrees(180), endAngle: .degrees(0),
-                     clockwise: false)
-        let bottom: CGFloat = gy + gr * 1.5
-        ghost.addLine(to: CGPoint(x: gx + gr, y: bottom))
-        let sway: CGFloat = CGFloat(sin(t * 1.4)) * gr * 0.12
-        for k in 0..<3 {
-            let x1: CGFloat = gx + gr - CGFloat(k) * gr * 2 / 3
-            let x2: CGFloat = x1 - gr * 2 / 3
-            ghost.addQuadCurve(to: CGPoint(x: x2, y: bottom),
-                               control: CGPoint(x: (x1 + x2) / 2 + sway, y: bottom - gr * 0.35))
-        }
-        ghost.closeSubpath()
-        ctx.fill(ghost, with: .color(Color.white.opacity(alpha)))
-        let eye = Color.black.opacity(min(1, alpha * 1.8))
-        for dx in [-gr * 0.35, gr * 0.35] {
-            ctx.fill(Path(ellipseIn: CGRect(x: gx + dx - gr * 0.12, y: gy - gr * 0.15,
-                                             width: gr * 0.24, height: gr * 0.3)),
-                     with: .color(eye))
+        // Smoke rising slowly out of the grave.
+        let smoke = Color(red: 0.80, green: 0.84, blue: 0.82)
+        for i in 0..<3 {
+            let seed: Double = Double(i) * 0.37 + 0.11
+            for j in 0..<4 {
+                let cycle: Double = (t * 0.09 + seed + Double(j) * 0.25).truncatingRemainder(dividingBy: 1.0)
+                let drift: Double = sin(cycle * 5.0 + seed * 9.0 + t * 0.3)
+                let px: CGFloat = w * CGFloat(0.35 + 0.15 * Double(i)) + CGFloat(drift) * m * 0.06
+                let py: CGFloat = h * CGFloat(0.74 - 0.62 * cycle)
+                let pr: CGFloat = m * CGFloat(0.07 + 0.10 * cycle)
+                let alpha: Double = 0.22 * sin(cycle * Double.pi)
+                let c = CGPoint(x: px, y: py)
+                ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr, width: pr * 2, height: pr * 2)),
+                         with: .radialGradient(Gradient(colors: [smoke.opacity(alpha), .clear]),
+                                               center: c, startRadius: 0, endRadius: pr))
+            }
         }
     }
 
-    /// Aurora: a green-to-violet band rippling slowly in the depth.
+    /// Aurora (Aurora set): the pit is full of northern lights — tall
+    /// curtains of green, teal and violet swaying slowly side by side over a
+    /// dark indigo depth with a few stars.  The middle stays dark, so it still
+    /// reads as a hole.
     static func drawAurora(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
         let w = size.width
         let h = size.height
+        let m = min(w, h)
         fill(&ctx, size, Color(red: 0.02, green: 0.03, blue: 0.09))
         var rng = SeededRNG(seed: 0xA0E0_0001)
-        for _ in 0..<14 {
+        for _ in 0..<10 {
             let p = CGPoint(x: CGFloat(rng.nextUnit()) * w, y: CGFloat(rng.nextUnit()) * h)
-            let r: CGFloat = 0.5 + 0.6 * CGFloat(rng.nextUnit())
+            let r: CGFloat = 0.5 + 0.5 * CGFloat(rng.nextUnit())
             ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
-                     with: .color(Color.white.opacity(0.5)))
+                     with: .color(Color.white.opacity(0.45)))
         }
-        let n = 24
-        var top: [CGPoint] = []
-        var bottom: [CGPoint] = []
-        for i in 0...n {
-            let fx: Double = Double(i) / Double(n)
-            let x: CGFloat = CGFloat(fx) * w
-            let y1: CGFloat = h * 0.44 + CGFloat(sin(fx * 2 * .pi * 1.2 + t * 0.5)) * h * 0.10
-            let thick: CGFloat = h * (0.10 + 0.05 * CGFloat(sin(fx * 2 * .pi * 0.8 + t * 0.35)))
-            top.append(CGPoint(x: x, y: y1))
-            bottom.append(CGPoint(x: x, y: y1 + thick))
-        }
-        let colors = Gradient(colors: [Color(red: 0.25, green: 0.95, blue: 0.60),
-                                       Color(red: 0.20, green: 0.80, blue: 0.85),
-                                       Color(red: 0.65, green: 0.35, blue: 1.00)])
-        let across = GraphicsContext.Shading.linearGradient(colors, startPoint: .zero,
-                                                            endPoint: CGPoint(x: w, y: 0))
-        // Soft curtain rising above the band.
-        let lift: CGFloat = h * 0.20
-        let raised: [CGPoint] = top.map { CGPoint(x: $0.x, y: $0.y - lift) }
-        let topBack: [CGPoint] = Array(top.reversed())
-        let bottomBack: [CGPoint] = Array(bottom.reversed())
-        let curtain = polygon(raised + topBack)
+        let count: Int = max(3, min(7, Int(w / max(1, m * 0.30))))
         var glow = ctx
         glow.blendMode = .plusLighter
-        glow.opacity = 0.22
-        glow.fill(curtain, with: across)
-        // The band itself.
-        let band = polygon(top + bottomBack)
-        var bright = ctx
-        bright.blendMode = .plusLighter
-        bright.opacity = 0.55
-        bright.fill(band, with: across)
+        let steps: Int = 10
+        for i in 0..<count {
+            let f: Double = (Double(i) + 0.5) / Double(count)
+            let hue: Double = 0.38 + 0.40 * f                    // green → teal → violet across the pit
+            let col = Color(hue: hue, saturation: 0.75, brightness: 1.0)
+            let ph: Double = Double(i) * 1.7
+            let baseX: CGFloat = w * CGFloat(f) + CGFloat(sin(t * 0.35 + ph)) * w * 0.04
+            let bandW: CGFloat = w / CGFloat(count) * 0.72
+            var left: [CGPoint] = []
+            var right: [CGPoint] = []
+            var spine: [CGPoint] = []
+            for sIdx in 0...steps {
+                let yf: Double = Double(sIdx) / Double(steps)
+                let sway: CGFloat = CGFloat(sin(t * 0.5 + ph + yf * 3.2)) * bandW * 0.30
+                let pinch: Double = 0.30 + 0.70 * sin(yf * Double.pi)
+                let half: CGFloat = bandW * 0.5 * CGFloat(pinch)
+                let y: CGFloat = h * CGFloat(yf)
+                left.append(CGPoint(x: baseX + sway - half, y: y))
+                right.append(CGPoint(x: baseX + sway + half, y: y))
+                spine.append(CGPoint(x: baseX + sway, y: y))
+            }
+            let rightBack: [CGPoint] = Array(right.reversed())
+            let band = polygon(left + rightBack)
+            let fade = Gradient(stops: [
+                .init(color: col.opacity(0.0), location: 0.0),
+                .init(color: col.opacity(0.55), location: 0.25),
+                .init(color: col.opacity(0.32), location: 0.70),
+                .init(color: col.opacity(0.0), location: 1.0),
+            ])
+            glow.fill(band, with: .linearGradient(fade, startPoint: CGPoint(x: baseX, y: 0),
+                                                  endPoint: CGPoint(x: baseX, y: h)))
+            var thread = Path()
+            thread.addLines(spine)
+            glow.stroke(thread, with: .color(col.opacity(0.38)), lineWidth: max(0.8, bandW * 0.10))
+        }
+        // Keep the middle dark.
+        let c = CGPoint(x: w / 2, y: h / 2)
+        ctx.fill(Path(ellipseIn: inset(size, m * 0.14)),
+                 with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.01, green: 0.015, blue: 0.05).opacity(0.78), .clear]),
+                    center: c, startRadius: 0, endRadius: max(w, h) * 0.42))
+    }
+
+    /// Evil (Lava Flow): a demon's pit.  Basalt ledges step down into the
+    /// dark, each lip lined with a lava seam that glows and dims slowly; in
+    /// the blackness at the bottom a pair of ember eyes blinks now and then,
+    /// and a few sparks drift up.  `still` (Reduce Motion) skips the sparks
+    /// and keeps the eyes open.
+    static func drawEvil(in ctx: inout GraphicsContext, size: CGSize, t: Double, still: Bool) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        fill(&ctx, size, Color(red: 0.20, green: 0.085, blue: 0.06))
+        let rock: [Color] = [
+            Color(red: 0.24, green: 0.105, blue: 0.075), Color(red: 0.15, green: 0.06, blue: 0.045),
+            Color(red: 0.085, green: 0.032, blue: 0.028), Color(red: 0.035, green: 0.012, blue: 0.012),
+        ]
+        let step: CGFloat = m * 0.085
+        let seamWide = Color(red: 1.00, green: 0.40, blue: 0.06)
+        let seamCore = Color(red: 1.00, green: 0.80, blue: 0.32)
+        for (k, color) in rock.enumerated() {
+            let r = inset(size, step * (CGFloat(k) + 0.5))
+            let ledge = raggedRect(r, step: max(3, m * 0.08), jitter: m * 0.016,
+                                   seed: 0xE71_0000 + UInt64(k))
+            ctx.fill(ledge, with: .color(color))
+            let pulse: Double = 0.75 + 0.25 * sin(t * 0.8 - Double(k) * 0.9)
+            let seam: Double = (0.85 - 0.20 * Double(k)) * pulse
+            ctx.stroke(ledge, with: .color(seamWide.opacity(seam * 0.45)), lineWidth: max(1.6, m * 0.035))
+            ctx.stroke(ledge, with: .color(seamCore.opacity(seam)), lineWidth: max(0.7, m * 0.012))
+        }
+        // A faint red glow far below.
+        let c = CGPoint(x: w / 2, y: h / 2)
+        let deepR: CGFloat = m * 0.26
+        ctx.fill(Path(ellipseIn: CGRect(x: c.x - deepR, y: c.y - deepR, width: deepR * 2, height: deepR * 2)),
+                 with: .radialGradient(Gradient(colors: [
+                    Color(red: 0.75, green: 0.10, blue: 0.02).opacity(0.28), .clear]),
+                    center: c, startRadius: 0, endRadius: deepR))
+        // The eyes.
+        if m >= 22 {
+            let blinkCycle: Double = (t * 0.17).truncatingRemainder(dividingBy: 1.0)
+            let blinking: Double = abs(blinkCycle / 0.06 * 2.0 - 1.0)
+            let open: Double = (still || blinkCycle >= 0.06) ? 1.0 : max(0.15, blinking)
+            let ew: CGFloat = m * 0.085
+            let eh: CGFloat = m * 0.040 * CGFloat(open)
+            let gap: CGFloat = m * 0.075
+            let iris = Color(red: 1.00, green: 0.62, blue: 0.10)
+            for side in [CGFloat(-1), CGFloat(1)] {
+                let ex: CGFloat = c.x + side * gap
+                let outer = CGPoint(x: ex + side * ew / 2, y: c.y - eh * 0.7)
+                let inner = CGPoint(x: ex - side * ew / 2, y: c.y + eh * 0.7)
+                var eye = Path()
+                eye.move(to: outer)
+                eye.addQuadCurve(to: inner, control: CGPoint(x: ex, y: c.y - eh * 1.3))
+                eye.addQuadCurve(to: outer, control: CGPoint(x: ex, y: c.y + eh * 1.3))
+                let halo: CGFloat = ew * 0.9
+                ctx.fill(Path(ellipseIn: CGRect(x: ex - halo, y: c.y - halo, width: halo * 2, height: halo * 2)),
+                         with: .radialGradient(Gradient(colors: [iris.opacity(0.30), .clear]),
+                                               center: CGPoint(x: ex, y: c.y), startRadius: 0, endRadius: halo))
+                ctx.fill(eye, with: .color(iris))
+                let slitW: CGFloat = ew * 0.14
+                ctx.fill(Path(ellipseIn: CGRect(x: ex - slitW / 2, y: c.y - eh * 0.6, width: slitW, height: eh * 1.2)),
+                         with: .color(Color.black.opacity(0.85)))
+            }
+        }
+        // A few sparks drifting up.
+        if !still {
+            var sparkCtx = ctx
+            sparkCtx.blendMode = .plusLighter
+            var rng = SeededRNG(seed: 0xE3B1_0F1A)
+            let sparks: Int = max(3, min(7, Int(w / 18)))
+            for _ in 0..<sparks {
+                let lane: CGFloat = 0.2 + 0.6 * CGFloat(rng.nextUnit())
+                let speed: Double = 0.06 + rng.nextUnit() * 0.06
+                let phase: Double = rng.nextUnit()
+                let rise: Double = (t * speed + phase).truncatingRemainder(dividingBy: 1.0)
+                let ex: CGFloat = lane * w + CGFloat(sin(t * 0.9 + phase * 10)) * w * 0.03
+                let ey: CGFloat = h * (0.85 - 0.75 * CGFloat(rise))
+                let fade: Double = sin(rise * Double.pi)
+                let er: CGFloat = 0.7 + CGFloat(rng.nextUnit()) * 0.9
+                sparkCtx.fill(Path(ellipseIn: CGRect(x: ex - er, y: ey - er, width: er * 2, height: er * 2)),
+                              with: .color(Color(red: 1.0, green: 0.60, blue: 0.20).opacity(0.65 * fade)))
+            }
+        }
+    }
+
+    /// Moonlit (Cosmos): a moonlit well.  Pale masonry at the rim steps down
+    /// through blue shadow to dark, still water, where a small crescent of
+    /// moonlight and a few stars are reflected and shimmer slowly.
+    static func drawMoonlit(in ctx: inout GraphicsContext, size: CGSize, t: Double) {
+        let w = size.width
+        let h = size.height
+        let m = min(w, h)
+        let layers: [Color] = [
+            Color(red: 0.80, green: 0.85, blue: 0.95), Color(red: 0.52, green: 0.60, blue: 0.80),
+            Color(red: 0.28, green: 0.35, blue: 0.58), Color(red: 0.12, green: 0.16, blue: 0.34),
+            Color(red: 0.035, green: 0.05, blue: 0.13),
+        ]
+        let step: CGFloat = m * 0.07
+        for (k, color) in layers.enumerated() {
+            let r = inset(size, step * CGFloat(k))
+            let ring: Path = k == 0 ? Path(r) : Path(roundedRect: r, cornerRadius: m * 0.05)
+            ctx.fill(ring, with: .color(color))
+            if k > 0 {
+                ctx.stroke(ring, with: .color(Color.white.opacity(0.20 - 0.03 * Double(k))), lineWidth: 0.7)
+            }
+        }
+        // Mortar joints across the pale rim.
+        let joint = Color(red: 0.40, green: 0.46, blue: 0.62).opacity(0.55)
+        for spot in edgeSpots(size, spacing: max(8, m * 0.24), seed: 0x300_1175) {
+            let end = CGPoint(x: spot.point.x + spot.inward.dx * step, y: spot.point.y + spot.inward.dy * step)
+            line(&ctx, spot.point, end, joint, 0.7)
+        }
+        let c = CGPoint(x: w / 2, y: h / 2)
+        // Star reflections on the water.
+        var rng = SeededRNG(seed: 0x300_1176)
+        let core = inset(size, step * 4.4)
+        for i in 0..<5 {
+            let sx: CGFloat = core.minX + CGFloat(rng.nextUnit()) * core.width
+            let sy: CGFloat = core.minY + CGFloat(rng.nextUnit()) * core.height
+            let tw: Double = 0.35 + 0.25 * sin(t * 0.7 + Double(i) * 1.9)
+            ctx.fill(Path(ellipseIn: CGRect(x: sx - 0.5, y: sy - 0.5, width: 1.0, height: 1.0)),
+                     with: .color(Color.white.opacity(tw)))
+        }
+        // The crescent of moonlight.
+        if m >= 18 {
+            let cr: CGFloat = m * 0.085
+            let shimmer: Double = 0.78 + 0.22 * sin(t * 0.9)
+            let wobble: CGFloat = CGFloat(sin(t * 0.6)) * cr * 0.10
+            let mc = CGPoint(x: c.x + wobble, y: c.y)
+            let haloR: CGFloat = cr * 2.4
+            ctx.fill(Path(ellipseIn: CGRect(x: mc.x - haloR, y: mc.y - haloR, width: haloR * 2, height: haloR * 2)),
+                     with: .radialGradient(Gradient(colors: [
+                        Color(red: 0.75, green: 0.84, blue: 1.00).opacity(0.22 * shimmer), .clear]),
+                        center: mc, startRadius: 0, endRadius: haloR))
+            let moonDisc = Path(ellipseIn: CGRect(x: mc.x - cr, y: mc.y - cr, width: cr * 2, height: cr * 2))
+            let bite: CGFloat = cr * 0.88
+            let biteDisc = Path(ellipseIn: CGRect(x: mc.x + cr * 0.42 - bite, y: mc.y - cr * 0.12 - bite,
+                                                  width: bite * 2, height: bite * 2))
+            // Inside the moon's disc: pale light, then the water color bites
+            // it into a crescent.
+            var moon = ctx
+            moon.clip(to: moonDisc)
+            moon.fill(moonDisc, with: .color(Color(red: 0.93, green: 0.96, blue: 1.00).opacity(0.90 * shimmer)))
+            moon.fill(biteDisc, with: .color(layers[4]))
+            // One soft ripple under it.
+            var ripple = Path()
+            ripple.addEllipse(in: CGRect(x: mc.x - cr * 1.5, y: mc.y + cr * 1.15, width: cr * 3.0, height: cr * 0.5))
+            ctx.stroke(ripple, with: .color(Color(red: 0.75, green: 0.84, blue: 1.00).opacity(0.16 * shimmer)),
+                       lineWidth: 0.6)
+        }
     }
 }
 
@@ -5852,7 +6260,7 @@ struct PaperFloorOverlayView: View, Equatable {
         case .desert:     desertFloor
         case .stormcloud: stormcloudFloor
         case .sugar:      sugarFloor
-        case .fog:        fogFloor
+        case .fog:        EmptyView()   // drawn by FloorOverlayView (flagstones + drifting fog)
         case .court:      courtFloor
         case .scorched:   scorchedFloor
         case .shallows:   shallowsFloor
@@ -6124,29 +6532,87 @@ struct PaperFloorOverlayView: View, Equatable {
         }
     }
 
-    /// Ember — warm gray ash with scattered dim orange coal specks.
+    /// Ember (Lava Flow) — cooled basalt crust: dark plates, each a slightly
+    /// different shade with a few pores and rope-like cooling ripples, split
+    /// by fissures.  Open fissures glow orange; the rest are hairline cracks.
+    /// The slow glow beneath them comes from FloorOverlayView, which uses the
+    /// same geometry (EmberFloorArt).  Still: drawn once, no clock.
     private var emberFloor: some View {
         Canvas { ctx, size in
-            var rng = SeededRNG(seed: 0xE3B_E401)
-            let ash = Color(red: 0.45, green: 0.42, blue: 0.40)
-            for _ in 0..<Int(size.width * size.height / 900) {
-                let x = CGFloat(rng.nextUnit()) * size.width
-                let y = CGFloat(rng.nextUnit()) * size.height
-                let r: CGFloat = 6 + CGFloat(rng.nextUnit()) * 16
-                let a: Double = 0.06 + rng.nextUnit() * 0.05
-                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r * 0.7, width: r * 2, height: r * 1.4)),
-                         with: .color(ash.opacity(a)))
+            let cell: CGFloat = EmberFloorArt.cell
+            let cols: Int = Int(size.width / cell) + 2
+            let rows: Int = Int(size.height / cell) + 2
+
+            // Plates.
+            for j in 0..<rows {
+                for i in 0..<cols {
+                    let a = EmberFloorArt.vertex(i, j)
+                    let b = EmberFloorArt.vertex(i + 1, j)
+                    let c = EmberFloorArt.vertex(i + 1, j + 1)
+                    let d = EmberFloorArt.vertex(i, j + 1)
+                    var plate = Path()
+                    plate.addLines([a, b, c, d])
+                    plate.closeSubpath()
+                    let shade: Double = EmberFloorArt.hash(i, j, 11)
+                    ctx.fill(plate, with: .color(Color.white.opacity(0.012 + 0.045 * shade)))
+                    let mx: CGFloat = (a.x + b.x + c.x + d.x) / 4
+                    let my: CGFloat = (a.y + b.y + c.y + d.y) / 4
+                    // Rope-like cooling ripples on some plates.
+                    if EmberFloorArt.hash(i, j, 13) < 0.30 {
+                        for k in 0..<3 {
+                            let rr: CGFloat = cell * (0.14 + 0.07 * CGFloat(k))
+                            var arc = Path()
+                            arc.addArc(center: CGPoint(x: mx, y: my + cell * 0.10), radius: rr,
+                                       startAngle: .degrees(200), endAngle: .degrees(340), clockwise: false)
+                            ctx.stroke(arc, with: .color(Color.white.opacity(0.055)), lineWidth: 0.8)
+                        }
+                    }
+                    // Pores.
+                    for k in 0..<4 {
+                        let px: CGFloat = mx + CGFloat(EmberFloorArt.hash(i, j, 20 + k) - 0.5) * cell * 0.6
+                        let py: CGFloat = my + CGFloat(EmberFloorArt.hash(i, j, 30 + k) - 0.5) * cell * 0.6
+                        let pr: CGFloat = 0.6 + CGFloat(EmberFloorArt.hash(i, j, 40 + k)) * 0.9
+                        ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr, width: pr * 2, height: pr * 2)),
+                                 with: .color(Color.black.opacity(0.35)))
+                    }
+                }
             }
-            let glow = Color(red: 1.0, green: 0.45, blue: 0.10).opacity(0.10)
-            let coal = Color(red: 0.95, green: 0.42, blue: 0.12).opacity(0.55)
-            for _ in 0..<Int(size.width * size.height / 2200) {
-                let x = CGFloat(rng.nextUnit()) * size.width
-                let y = CGFloat(rng.nextUnit()) * size.height
-                let r: CGFloat = 0.8 + CGFloat(rng.nextUnit()) * 1.2
-                ctx.fill(Path(ellipseIn: CGRect(x: x - r * 2.2, y: y - r * 2.2, width: r * 4.4, height: r * 4.4)),
-                         with: .color(glow))
-                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
-                         with: .color(coal))
+
+            // Fissures (glowing) and hairline cracks along the plate edges.
+            let deep = Color(red: 0.62, green: 0.08, blue: 0.02)
+            let lava = Color(red: 1.00, green: 0.42, blue: 0.08)
+            let core = Color(red: 1.00, green: 0.86, blue: 0.42)
+            for j in 0...rows {
+                for i in 0...cols {
+                    let a = EmberFloorArt.vertex(i, j)
+                    for dir in 0..<2 {
+                        let b: CGPoint = dir == 0 ? EmberFloorArt.vertex(i + 1, j) : EmberFloorArt.vertex(i, j + 1)
+                        let len: CGFloat = max(0.001, hypot(b.x - a.x, b.y - a.y))
+                        let nx: CGFloat = -(b.y - a.y) / len
+                        let ny: CGFloat = (b.x - a.x) / len
+                        let bend: CGFloat = CGFloat(EmberFloorArt.hash(i, j, 50 + dir) - 0.5) * cell * 0.14
+                        let m1 = CGPoint(x: a.x + (b.x - a.x) * 0.38 + nx * bend,
+                                         y: a.y + (b.y - a.y) * 0.38 + ny * bend)
+                        let m2 = CGPoint(x: a.x + (b.x - a.x) * 0.70 - nx * bend * 0.6,
+                                         y: a.y + (b.y - a.y) * 0.70 - ny * bend * 0.6)
+                        var seg = Path()
+                        seg.addLines([a, m1, m2, b])
+                        let joined = StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round)
+                        if EmberFloorArt.open(i, j, dir) {
+                            var wide = joined
+                            wide.lineWidth = 4.5
+                            ctx.stroke(seg, with: .color(deep.opacity(0.40)), style: wide)
+                            var mid = joined
+                            mid.lineWidth = 1.6
+                            ctx.stroke(seg, with: .color(lava.opacity(0.70)), style: mid)
+                            var thin = joined
+                            thin.lineWidth = 0.6
+                            ctx.stroke(seg, with: .color(core.opacity(0.60)), style: thin)
+                        } else {
+                            ctx.stroke(seg, with: .color(Color.black.opacity(0.45)), style: joined)
+                        }
+                    }
+                }
             }
         }
     }
@@ -6343,25 +6809,6 @@ struct PaperFloorOverlayView: View, Equatable {
                     star.addLine(to: CGPoint(x: x, y: y + 2.4))
                     ctx.stroke(star, with: .color(glint), lineWidth: 0.5)
                 }
-            }
-        }
-    }
-
-    /// Fog — soft lighter patches of mist (static).
-    private var fogFloor: some View {
-        Canvas { ctx, size in
-            var rng = SeededRNG(seed: 0xF0_6F06)
-            let mist = Color.white.opacity(0.16)
-            let patches: Int = max(6, Int(size.width * size.height / 9000))
-            for _ in 0..<patches {
-                let cx: CGFloat = CGFloat(rng.nextUnit()) * size.width
-                let cy: CGFloat = CGFloat(rng.nextUnit()) * size.height
-                let rx: CGFloat = 50 + CGFloat(rng.nextUnit()) * 70
-                let ry: CGFloat = rx * (0.35 + CGFloat(rng.nextUnit()) * 0.2)
-                ctx.fill(Path(ellipseIn: CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2)),
-                         with: .radialGradient(Gradient(colors: [mist, .clear]),
-                                               center: CGPoint(x: cx, y: cy),
-                                               startRadius: 0, endRadius: rx))
             }
         }
     }
@@ -7224,6 +7671,8 @@ struct GoalSkinView: View {
              .flameRing, .whirlpool, .thunderRing:
             themedStandardGoal(goal)
         case .aurora:      auroraGoal
+        // ── Quality round: Haunted ──
+        case .pentagram:   pentagramGoal
         default:           rainbowHole   // .rainbow + any future goal
         }
     }
@@ -7937,53 +8386,206 @@ struct GoalSkinView: View {
         }
     }
 
-    /// Inferno goal (Hellfire bundle) — a molten lava ring around a dark core
-    /// with flame tongues licking outward.  Animated flicker; Reduce Motion
-    /// freezes the flames.
+    /// Inferno goal (Lava Flow) — a volcano's throat seen from above: a ring
+    /// of molten lava around a dark vent, with slabs of cooled crust riding
+    /// slowly round on the melt, a bright lip at the vent's edge and low
+    /// flames licking lazily off the rim.  Slow and calm; Reduce Motion
+    /// holds everything still.
     private var infernoGoal: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(nil), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
             Canvas { ctx, size in
                 let t: Double  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
-                let w  = size.width, h = size.height
-                let cx = w / 2, cy = h / 2
-                let r  = min(w, h) / 2 * 0.95
+                let w: CGFloat = size.width
+                let h: CGFloat = size.height
+                let cx: CGFloat = w / 2
+                let cy: CGFloat = h / 2
+                let r: CGFloat = min(w, h) / 2 * 0.95
+                let center = CGPoint(x: cx, y: cy)
 
-                // Molten ring — dark centre bleeding out to a bright rim.
+                // Molten ring — dark vent bleeding out to a bright rim.
                 ctx.fill(
                     Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
                     with: .radialGradient(Gradient(stops: [
                         .init(color: Color(red: 0.03, green: 0.00, blue: 0.00), location: 0.00),
-                        .init(color: Color(red: 0.08, green: 0.01, blue: 0.00), location: 0.42),
-                        .init(color: Color(red: 0.95, green: 0.28, blue: 0.04), location: 0.74),
-                        .init(color: Color(red: 1.00, green: 0.74, blue: 0.20), location: 0.93),
+                        .init(color: Color(red: 0.07, green: 0.01, blue: 0.00), location: 0.38),
+                        .init(color: Color(red: 0.90, green: 0.22, blue: 0.03), location: 0.52),
+                        .init(color: Color(red: 1.00, green: 0.52, blue: 0.10), location: 0.74),
+                        .init(color: Color(red: 1.00, green: 0.78, blue: 0.26), location: 0.92),
                         .init(color: Color(red: 1.00, green: 0.45, blue: 0.08).opacity(0.0), location: 1.00),
                     ]),
-                    center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
+                    center: center, startRadius: 0, endRadius: r))
 
-                // Flame tongues around the rim — additive so they glow.
+                // Slabs of cooled crust drifting round on the melt, in two
+                // lanes turning opposite ways.
+                let crust = Color(red: 0.13, green: 0.04, blue: 0.025)
+                let crustEdge = Color(red: 0.42, green: 0.12, blue: 0.05)
+                for lane in 0..<2 {
+                    let laneR: CGFloat = r * (lane == 0 ? 0.64 : 0.80)
+                    let slabs: Int = lane == 0 ? 5 : 7
+                    let turn: Double = t * (lane == 0 ? 0.10 : -0.07)
+                    let thick: CGFloat = r * (lane == 0 ? 0.11 : 0.09)
+                    for k in 0..<slabs {
+                        let a0: Double = turn + Double(k) / Double(slabs) * 2 * Double.pi
+                        let spanFrac: Double = 0.50 + 0.25 * sin(Double(k) * 2.3 + Double(lane))
+                        let span: Double = 2 * Double.pi / Double(slabs) * spanFrac
+                        var slab = Path()
+                        slab.addArc(center: center, radius: laneR,
+                                    startAngle: .radians(a0), endAngle: .radians(a0 + span), clockwise: false)
+                        ctx.stroke(slab, with: .color(crustEdge.opacity(0.85)),
+                                   style: StrokeStyle(lineWidth: thick + 1.2, lineCap: .round))
+                        ctx.stroke(slab, with: .color(crust.opacity(0.92)),
+                                   style: StrokeStyle(lineWidth: thick, lineCap: .round))
+                    }
+                }
+
+                // Low flames around the rim — additive so they glow.
                 var fctx = ctx
                 fctx.blendMode = .plusLighter
-                let flames = 12
+                let flames: Int = 14
                 for i in 0..<flames {
-                    let a     = Double(i) / Double(flames) * 2 * .pi
-                    let flick = 0.6 + 0.4 * sin(t * 6 + Double(i) * 1.7)
-                    let baseR = r * 0.78
-                    let tipR  = r * (0.92 + 0.26 * flick)
-                    let perp  = a + .pi / 2
-                    let wdt   = r * 0.10
-                    let bx = cx + CGFloat(cos(a)) * baseR
-                    let by = cy + CGFloat(sin(a)) * baseR
-                    let tx = cx + CGFloat(cos(a)) * tipR
-                    let ty = cy + CGFloat(sin(a)) * tipR
+                    let a: Double = Double(i) / Double(flames) * 2 * Double.pi
+                    let flick: Double = 0.6 + 0.4 * sin(t * 2.4 + Double(i) * 1.7)
+                    let baseR: CGFloat = r * 0.86
+                    let tipR: CGFloat = r * CGFloat(0.94 + 0.10 * flick)
+                    let perp: Double = a + Double.pi / 2
+                    let wdt: CGFloat = r * 0.09
+                    let bx: CGFloat = cx + CGFloat(cos(a)) * baseR
+                    let by: CGFloat = cy + CGFloat(sin(a)) * baseR
+                    let tx: CGFloat = cx + CGFloat(cos(a)) * tipR
+                    let ty: CGFloat = cy + CGFloat(sin(a)) * tipR
+                    let px: CGFloat = CGFloat(cos(perp)) * wdt
+                    let py: CGFloat = CGFloat(sin(perp)) * wdt
                     var fl = Path()
-                    fl.move(to: CGPoint(x: bx + CGFloat(cos(perp)) * wdt, y: by + CGFloat(sin(perp)) * wdt))
+                    fl.move(to: CGPoint(x: bx + px, y: by + py))
                     fl.addQuadCurve(to: CGPoint(x: tx, y: ty),
-                                    control: CGPoint(x: bx + CGFloat(cos(perp)) * wdt * 0.5, y: by + CGFloat(sin(perp)) * wdt * 0.5))
-                    fl.addQuadCurve(to: CGPoint(x: bx - CGFloat(cos(perp)) * wdt, y: by - CGFloat(sin(perp)) * wdt),
-                                    control: CGPoint(x: bx - CGFloat(cos(perp)) * wdt * 0.5, y: by - CGFloat(sin(perp)) * wdt * 0.5))
+                                    control: CGPoint(x: bx + px * 0.5, y: by + py * 0.5))
+                    fl.addQuadCurve(to: CGPoint(x: bx - px, y: by - py),
+                                    control: CGPoint(x: bx - px * 0.5, y: by - py * 0.5))
                     fl.closeSubpath()
-                    fctx.fill(fl, with: .color(Color(red: 1.0, green: 0.5, blue: 0.12).opacity(0.5 * flick)))
+                    fctx.fill(fl, with: .color(Color(red: 1.0, green: 0.5, blue: 0.12).opacity(0.45 * flick)))
                 }
+
+                // The vent: a dark throat with a bright, slowly breathing lip
+                // and a dull red glow far down.
+                let ventR: CGFloat = r * 0.40
+                let breath: Double = 0.75 + 0.25 * sin(t * 0.9)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - ventR, y: cy - ventR, width: ventR * 2, height: ventR * 2)),
+                         with: .radialGradient(Gradient(stops: [
+                            .init(color: Color(red: 0.42, green: 0.05, blue: 0.01).opacity(0.55 * breath), location: 0.00),
+                            .init(color: Color(red: 0.05, green: 0.00, blue: 0.00), location: 0.55),
+                            .init(color: Color(red: 0.02, green: 0.00, blue: 0.00), location: 1.00),
+                         ]), center: center, startRadius: 0, endRadius: ventR))
+                let lip = Path(ellipseIn: CGRect(x: cx - ventR, y: cy - ventR, width: ventR * 2, height: ventR * 2))
+                fctx.stroke(lip, with: .color(Color(red: 1.0, green: 0.42, blue: 0.08).opacity(0.50 * breath)),
+                            lineWidth: max(1.5, r * 0.07))
+                ctx.stroke(lip, with: .color(Color(red: 1.0, green: 0.86, blue: 0.45).opacity(0.90 * breath)),
+                           lineWidth: max(0.6, r * 0.022))
+            }
+        }
+    }
+
+    /// Pentagram goal (Haunted) — a five-pointed star burned into charred
+    /// stone inside a low ring of fire.  Its lines glow like embers, a
+    /// brighter flare travels slowly along them, and the flames lick lazily.
+    /// The dark circle at the heart of the star is the target.  Reduce Motion
+    /// holds it still.
+    private var pentagramGoal: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0), paused: cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { timeline in
+            Canvas { ctx, size in
+                let t: Double  = heroTime ?? (reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate)
+                let w: CGFloat = size.width
+                let h: CGFloat = size.height
+                let cx: CGFloat = w / 2
+                let cy: CGFloat = h / 2
+                let r: CGFloat = min(w, h) / 2 * 0.95
+                let center = CGPoint(x: cx, y: cy)
+
+                // Charred stone.
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(Gradient(stops: [
+                        .init(color: Color(red: 0.02, green: 0.01, blue: 0.01), location: 0.00),
+                        .init(color: Color(red: 0.10, green: 0.04, blue: 0.035), location: 0.60),
+                        .init(color: Color(red: 0.20, green: 0.07, blue: 0.05), location: 0.86),
+                        .init(color: Color(red: 0.55, green: 0.12, blue: 0.03).opacity(0.0), location: 1.00),
+                    ]),
+                    center: center, startRadius: 0, endRadius: r))
+
+                // Low ring of fire.
+                var fctx = ctx
+                fctx.blendMode = .plusLighter
+                let flames: Int = 18
+                for i in 0..<flames {
+                    let a: Double = Double(i) / Double(flames) * 2 * Double.pi + 0.1
+                    let flick: Double = 0.55 + 0.45 * sin(t * 2.2 + Double(i) * 2.4)
+                    let baseR: CGFloat = r * 0.84
+                    let tipR: CGFloat = r * CGFloat(0.93 + 0.10 * flick)
+                    let perp: Double = a + Double.pi / 2
+                    let wdt: CGFloat = r * 0.085
+                    let bx: CGFloat = cx + CGFloat(cos(a)) * baseR
+                    let by: CGFloat = cy + CGFloat(sin(a)) * baseR
+                    let tx: CGFloat = cx + CGFloat(cos(a)) * tipR
+                    let ty: CGFloat = cy + CGFloat(sin(a)) * tipR
+                    let px: CGFloat = CGFloat(cos(perp)) * wdt
+                    let py: CGFloat = CGFloat(sin(perp)) * wdt
+                    var fl = Path()
+                    fl.move(to: CGPoint(x: bx + px, y: by + py))
+                    fl.addQuadCurve(to: CGPoint(x: tx, y: ty),
+                                    control: CGPoint(x: bx + px * 0.5, y: by + py * 0.5))
+                    fl.addQuadCurve(to: CGPoint(x: bx - px, y: by - py),
+                                    control: CGPoint(x: bx - px * 0.5, y: by - py * 0.5))
+                    fl.closeSubpath()
+                    let flameAlpha: Double = 0.55 * (0.6 + 0.4 * flick)
+                    fctx.fill(fl, with: .color(Color(red: 1.0, green: 0.42, blue: 0.08).opacity(flameAlpha)))
+                }
+
+                // The circle the star is drawn in.
+                let ringR: CGFloat = r * 0.80
+                let ring = Path(ellipseIn: CGRect(x: cx - ringR, y: cy - ringR, width: ringR * 2, height: ringR * 2))
+                ctx.stroke(ring, with: .color(Color(red: 1.0, green: 0.50, blue: 0.12).opacity(0.85)),
+                           lineWidth: max(1, r * 0.045))
+
+                // The star: five points on the circle, joined every other one.
+                var pts: [CGPoint] = []
+                for k in 0..<5 {
+                    let a: Double = Double.pi / 2 + Double(k) * 2 * Double.pi / 5      // one point straight down
+                    pts.append(CGPoint(x: cx + CGFloat(cos(a)) * ringR, y: cy + CGFloat(sin(a)) * ringR))
+                }
+                let order: [Int] = [0, 2, 4, 1, 3]
+                var star = Path()
+                star.move(to: pts[order[0]])
+                for k in 1..<5 { star.addLine(to: pts[order[k]]) }
+                star.closeSubpath()
+                let pulse: Double = 0.85 + 0.15 * sin(t * 1.1)
+                fctx.stroke(star, with: .color(Color(red: 1.0, green: 0.30, blue: 0.05).opacity(0.35 * pulse)),
+                            style: StrokeStyle(lineWidth: max(2.5, r * 0.16), lineJoin: .round))
+                ctx.stroke(star, with: .color(Color(red: 1.0, green: 0.55, blue: 0.14)),
+                           style: StrokeStyle(lineWidth: max(1.2, r * 0.06), lineJoin: .round))
+                ctx.stroke(star, with: .color(Color(red: 1.0, green: 0.92, blue: 0.60).opacity(0.90)),
+                           style: StrokeStyle(lineWidth: max(0.5, r * 0.02), lineJoin: .round))
+
+                // A flare travelling slowly along the star's lines.
+                let prog: Double = (t * 0.12).truncatingRemainder(dividingBy: 1.0) * 5
+                let seg: Int = min(4, Int(prog))
+                let f: CGFloat = CGFloat(prog - Double(seg))
+                let from = pts[order[seg]]
+                let to = pts[order[(seg + 1) % 5]]
+                let flare = CGPoint(x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f)
+                let flareR: CGFloat = r * 0.13
+                fctx.fill(Path(ellipseIn: CGRect(x: flare.x - flareR, y: flare.y - flareR,
+                                                 width: flareR * 2, height: flareR * 2)),
+                          with: .radialGradient(Gradient(colors: [
+                            Color(red: 1.0, green: 0.90, blue: 0.55).opacity(0.80), .clear]),
+                            center: flare, startRadius: 0, endRadius: flareR))
+
+                // The dark heart of the star — the target.
+                let heartR: CGFloat = r * 0.21
+                let heart = Path(ellipseIn: CGRect(x: cx - heartR, y: cy - heartR, width: heartR * 2, height: heartR * 2))
+                ctx.fill(heart, with: .radialGradient(Gradient(colors: [
+                            Color.black, Color(red: 0.06, green: 0.01, blue: 0.01)]),
+                            center: center, startRadius: 0, endRadius: heartR))
+                ctx.stroke(heart, with: .color(Color(red: 1.0, green: 0.50, blue: 0.12).opacity(0.65)),
+                           lineWidth: max(0.6, r * 0.022))
             }
         }
     }

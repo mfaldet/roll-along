@@ -113,9 +113,10 @@ struct BallSkinView: View {
                 .overlay(Circle().stroke(.black.opacity(0.22), lineWidth: 0.5))
 
         case .ghost:
+            // No round outline: the ghost's own silhouette (domed head, trailing
+            // skirt) is drawn inside the ball's circle.  Collision is unchanged.
             ghostCanvas
                 .clipShape(Circle())
-                .overlay(Circle().stroke(.black.opacity(0.18), lineWidth: 0.5))
 
         // ── Round-6 bundle completion bespoke skins ─────────────────────
         case .disco:
@@ -927,10 +928,12 @@ struct BallSkinView: View {
 
     // =========================================================================
     // MARK: - Ghost
-    // Luminous pale orb with hollow eyes and a wailing mouth.  Animated: the
-    // spirit hovers with a slow bob, pale wisps curl up around it, and the
-    // hollow eyes blink shut on a lazy clock.  Under Reduce Motion the haunt
-    // holds perfectly still — exactly the original static ghost.
+    // A luminous pale ghost: domed head with hollow eyes and a wailing mouth,
+    // its sides falling to a trailing skirt with three wavy tails.  The shape
+    // sits inside the ball's circle (the ball plays exactly as before).
+    // Animated: the spirit hovers with a slow bob, pale wisps curl up inside
+    // it, the tails sway a little and the eyes blink on a lazy clock.  Under
+    // Reduce Motion the haunt holds perfectly still.
     // =========================================================================
     private var ghostCanvas: some View {
         SkinTimeline(interval: cosmeticMotion.frameInterval(nil), paused: timelinePaused) { tl in
@@ -944,6 +947,42 @@ struct BallSkinView: View {
                 // Hover bob — zero under Reduce Motion → original face position.
                 let bobPhase: Double = reduceMotion ? 0.0 : sin(t * 1.1)
                 let bob: CGFloat = CGFloat(bobPhase) * r * 0.05
+
+                // The ghost's outline: a dome over the top half, sides falling
+                // to a skirt whose hem ends in three tails.  Every point lies
+                // inside the ball's circle.
+                let hemSway: CGFloat = reduceMotion ? 0.0 : CGFloat(sin(t * 1.3)) * w * 0.018
+                var outline = Path()
+                outline.move(to: CGPoint(x: 0, y: h * 0.5))
+                outline.addArc(center: CGPoint(x: w / 2, y: h / 2), radius: r,
+                               startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                outline.addQuadCurve(to: CGPoint(x: w * 0.86, y: h * 0.80),
+                                     control: CGPoint(x: w * 0.99, y: h * 0.68))
+                outline.addQuadCurve(to: CGPoint(x: w * 0.70 + hemSway, y: h * 0.93),
+                                     control: CGPoint(x: w * 0.84, y: h * 0.92))
+                outline.addQuadCurve(to: CGPoint(x: w * 0.60, y: h * 0.84),
+                                     control: CGPoint(x: w * 0.62 + hemSway, y: h * 0.93))
+                outline.addQuadCurve(to: CGPoint(x: w * 0.50 - hemSway, y: h * 0.985),
+                                     control: CGPoint(x: w * 0.58, y: h * 0.97))
+                outline.addQuadCurve(to: CGPoint(x: w * 0.40, y: h * 0.84),
+                                     control: CGPoint(x: w * 0.42 - hemSway, y: h * 0.97))
+                outline.addQuadCurve(to: CGPoint(x: w * 0.30 + hemSway, y: h * 0.93),
+                                     control: CGPoint(x: w * 0.38 + hemSway, y: h * 0.93))
+                outline.addQuadCurve(to: CGPoint(x: w * 0.14, y: h * 0.80),
+                                     control: CGPoint(x: w * 0.16, y: h * 0.92))
+                outline.addQuadCurve(to: CGPoint(x: 0, y: h * 0.5),
+                                     control: CGPoint(x: w * 0.01, y: h * 0.68))
+                outline.closeSubpath()
+
+                // A breath of pale mist under the hem, then everything else is
+                // drawn inside the ghost's outline.
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: w * 0.12, y: h * 0.70, width: w * 0.76, height: h * 0.30)),
+                    with: .radialGradient(
+                        Gradient(colors: [Color.white.opacity(0.16), .clear]),
+                        center: CGPoint(x: w / 2, y: h * 0.85),
+                        startRadius: 0, endRadius: w * 0.38))
+                ctx.clip(to: outline)
 
                 // Blink — the eyes squash shut for a beat every ~3.8 s.
                 // 1.0 (fully open) reproduces the original static eyes.
@@ -1032,6 +1071,18 @@ struct BallSkinView: View {
                         Gradient(colors: [Color.white.opacity(0.65), .clear]),
                         center: CGPoint(x: w * 0.28, y: h * 0.16),
                         startRadius: 0, endRadius: r * 0.36))
+
+                // Folds in the skirt, and a soft edge so the shape reads on
+                // any floor.
+                let foldColor = Color(red: 0.34, green: 0.40, blue: 0.54)
+                for fx in [w * 0.40, w * 0.60] {
+                    var fold = Path()
+                    fold.move(to: CGPoint(x: fx, y: h * 0.84))
+                    fold.addLine(to: CGPoint(x: fx + (fx - w / 2) * 0.15, y: h * 0.70))
+                    ctx.stroke(fold, with: .color(foldColor.opacity(0.35)), lineWidth: max(0.6, w * 0.02))
+                }
+                ctx.stroke(outline, with: .color(Color(red: 0.30, green: 0.36, blue: 0.50).opacity(0.55)),
+                           lineWidth: max(0.8, w * 0.03))
             }
         }
     }
@@ -4222,10 +4273,10 @@ struct BallSkinView: View {
 
     // ── Lava ────────────────────────────────────────────────────────────────
     // Animated molten sphere.  A vivid orange-red radial gradient base is
-    // overlaid with 6 dark amber "blob" ovals that drift sinusoidally
-    // upward, simulating slow convection currents.  A pulsing magma core
-    // adds internal glow, an edge vignette deepens the scorched crust, and
-    // a small dim specular keeps it from looking totally matte.
+    // covered by slabs of dark cooled crust that drift slowly round it, so
+    // the lava shows as glowing channels between the plates.  A pulsing
+    // magma core adds internal glow, an edge vignette deepens the scorched
+    // rim, and a small dim specular keeps it from looking totally matte.
     //
     // Animation is frozen (t = 0) when reduceMotion is on.
     private var lavaCanvas: some View {
@@ -4267,31 +4318,36 @@ struct BallSkinView: View {
                                          startRadius: 0,
                                          endRadius: r * 0.46))
 
-                // ── 3. Drifting dark amber blobs (convection) ──────────
-                // Each tuple: (xFrac, yBase, yAmp, speed, phase, rFrac)
-                let blobs: [(CGFloat, CGFloat, CGFloat, Double, Double, CGFloat)] = [
-                    (0.32, 0.55, 0.14, 0.48, 0.00, 0.22),
-                    (0.62, 0.48, 0.18, 0.55, 1.30, 0.19),
-                    (0.45, 0.68, 0.12, 0.42, 2.60, 0.16),
-                    (0.22, 0.36, 0.20, 0.60, 0.80, 0.14),
-                    (0.72, 0.62, 0.16, 0.38, 1.90, 0.20),
-                    (0.54, 0.28, 0.10, 0.52, 3.40, 0.13),
+                // ── 3. Cooling crust — dark slabs riding the melt ───────
+                // Nine irregular plates drift slowly round the sphere; the
+                // bright lava shows between them as glowing channels.
+                // Each tuple: (angle, distance fraction, size fraction, seed)
+                let plates: [(Double, CGFloat, CGFloat, Double)] = [
+                    (0.2, 0.00, 0.30, 1.0), (0.9, 0.52, 0.26, 2.0), (2.0, 0.55, 0.28, 3.0),
+                    (3.1, 0.50, 0.24, 4.0), (4.1, 0.56, 0.27, 5.0), (5.2, 0.52, 0.25, 6.0),
+                    (1.4, 0.86, 0.20, 7.0), (3.6, 0.88, 0.22, 8.0), (5.7, 0.86, 0.20, 9.0),
                 ]
-                let blobColor = Color(red: 0.30, green: 0.06, blue: 0.00)
-                for (xFrac, yBase, yAmp, speed, phase, rFrac) in blobs {
-                    let bx  = cx + (xFrac - 0.5) * r * 2
-                    let byF = yBase + CGFloat(yAmp) * CGFloat(sin(t * speed + phase))
-                    let by  = cy + (byF - 0.5) * r * 2
-                    let br  = r * rFrac
-
-                    // Skip blobs entirely outside the sphere silhouette
-                    let dx = bx - cx, dy = by - cy
-                    if sqrt(dx * dx + dy * dy) > r * 0.88 + br { continue }
-
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(x: bx - br, y: by - br * 0.72,
-                                               width: br * 2, height: br * 1.44)),
-                        with: .color(blobColor.opacity(0.62)))
+                let crust = Color(red: 0.17, green: 0.045, blue: 0.02)
+                let crustLit = Color(red: 0.36, green: 0.11, blue: 0.05)
+                let drift: Double = t * 0.07
+                for (ang, distFrac, sizeFrac, seed) in plates {
+                    let a: Double = ang + drift
+                    let wobble: CGFloat = CGFloat(sin(t * 0.4 + seed)) * r * 0.02
+                    let pc = CGPoint(x: cx + CGFloat(cos(a)) * r * distFrac + wobble,
+                                     y: cy + CGFloat(sin(a)) * r * distFrac)
+                    let pr: CGFloat = r * sizeFrac
+                    var plate = Path()
+                    let corners: Int = 7
+                    for k in 0..<corners {
+                        let ka: Double = Double(k) / Double(corners) * 2 * Double.pi + seed
+                        let jag: Double = 0.78 + 0.22 * sin(seed * 5.1 + Double(k) * 2.7)
+                        let pt = CGPoint(x: pc.x + CGFloat(cos(ka) * jag) * pr,
+                                         y: pc.y + CGFloat(sin(ka) * jag) * pr)
+                        if k == 0 { plate.move(to: pt) } else { plate.addLine(to: pt) }
+                    }
+                    plate.closeSubpath()
+                    ctx.fill(plate, with: .color(crust.opacity(0.90)))
+                    ctx.stroke(plate, with: .color(crustLit.opacity(0.55)), lineWidth: max(0.5, r * 0.03))
                 }
 
                 // ── 4. Edge vignette (scorched crust) ───────────────────
