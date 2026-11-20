@@ -992,9 +992,10 @@ struct BallSkinView: View {
                         startRadius: 0, endRadius: w * 0.38))
                 ctx.clip(to: outline)
 
-                // Blink — the eyes squash shut for a beat every ~3.8 s.
+                // Blink — the eyes squash shut for a beat about every 8 s
+                // (a rare event; was every 3.8 s).
                 // 1.0 (fully open) reproduces the original static eyes.
-                let blinkCycle: Double = (t * 0.26).truncatingRemainder(dividingBy: 1.0)
+                let blinkCycle: Double = (t * 0.125).truncatingRemainder(dividingBy: 1.0)
                 let blinkP: Double = blinkCycle / 0.08
                 let blinkRaw: Double = blinkCycle < 0.08 ? abs(blinkP * 2.0 - 1.0) : 1.0
                 let eyeOpen: Double = reduceMotion ? 1.0 : max(0.12, blinkRaw)

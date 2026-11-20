@@ -1241,7 +1241,7 @@ enum Floor: String, CosmeticItem {
         case .shallows:   return Color(red: 0.40,  green: 0.70,  blue: 0.86 )  // clear, sunlit shallow water
         case .overcast:   return Color(red: 0.34,  green: 0.36,  blue: 0.42 )  // dark storm cloud
         case .grove:      return Color(red: 0.96,  green: 0.89,  blue: 0.70 )  // sunlit beach sand
-        case .goldLeaf:   return Color(red: 0.64,  green: 0.49,  blue: 0.18 )  // burnished gold leaf (darker than a coin)
+        case .goldLeaf:   return Color(red: 0.46,  green: 0.34,  blue: 0.11 )  // antique gold leaf: well darker than a coin and than the Vault pit's rim
         case .aurora:     return Color(red: 0.030, green: 0.050, blue: 0.105)  // dark night sky; a few faint ribbons cross it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
