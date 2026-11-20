@@ -939,7 +939,11 @@ final class CosmeticsTests: XCTestCase {
     /// straight back must refund at most what was paid — never a profit.
     func testBundle_discountedShopPurchase_sellBackRefundsPaidNotFull() {
         let gs = makeCleanState()
-        let bundle = CosmeticSale.fullCollections[0]
+        // A launch collection: purchaseBundle refuses a set whose release day
+        // has not arrived, so a calendar drop would fail before its date.
+        guard let bundle = CosmeticSale.fullCollections.first(where: {
+            CosmeticSchedule.launchBundleIDs.contains($0.id)
+        }) else { return XCTFail("expected a full launch collection") }
         let paid = bundle.shopPrice(in: gs, discount: .legendary)   // 50% off
         gs.coinBalance = paid
         XCTAssertTrue(gs.purchaseBundle(bundle, price: paid))
@@ -957,7 +961,11 @@ final class CosmeticsTests: XCTestCase {
     /// window.  Repeating must never grow the balance past its start.
     func testBundle_discountBuySellLoop_neverProfits() {
         let gs = makeCleanState()
-        let bundle = CosmeticSale.fullCollections[0]
+        // A launch collection: purchaseBundle refuses a set whose release day
+        // has not arrived, so a calendar drop would fail before its date.
+        guard let bundle = CosmeticSale.fullCollections.first(where: {
+            CosmeticSchedule.launchBundleIDs.contains($0.id)
+        }) else { return XCTFail("expected a full launch collection") }
         let start = bundle.fullPrice()
         gs.coinBalance = start
         for pass in 1...3 {
