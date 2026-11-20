@@ -650,10 +650,15 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
-                // Paper-world floor overlays (ruled lines, grids, fold shadows…)
-                paperFloorOverlay(geo: geo)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
+                // Paper-world floor overlays (ruled lines, grids, fold shadows…).
+                // Zen Garden borrows the Desert floor's sand COLOR only: its
+                // raked bed stays plain sand, without the Desert floor's
+                // cracked earth and flagstones.
+                if !usesSandTrail {
+                    paperFloorOverlay(geo: geo)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
 
                 // Graphite trail (Paper world): drawn over the floor, UNDER the
                 // holes — the streak should appear cut by the page tear.
@@ -7894,80 +7899,189 @@ struct PaperFloorOverlayView: View, Equatable {
         }
     }
 
-    /// Desert (Ancient Temple) — a sanded-over temple court: wind ripples in
-    /// the sand (a lit crest with a soft shadow below), worn paving stones
-    /// showing through here and there, some with a faint carved mark, and a
-    /// scatter of pebbles.  Static and low-contrast.
+    /// Desert (Ancient Temple) — the dry court of a buried temple.  The
+    /// ground is sun-cracked earth: a net of fine cracks around uneven
+    /// plates, kept faint.  Soft drifts of wind-blown sand lie over parts of
+    /// it, each with a few ripple lines, and where sand lies the cracks are
+    /// covered.  A few temple flagstones show half-buried, each with a worn
+    /// carved relief (a border groove, then a stepped fret, a row of chisel
+    /// notches or nested lozenges — part of it lost under sand).  A sparse
+    /// scatter of pebbles.  Quiet on purpose: every mark is far dimmer than
+    /// a pit rim or a coin.  Still: one Canvas, seeded, no clock.
     private var desertFloor: some View {
         Canvas { ctx, size in
-            var rng = SeededRNG(seed: 0xDE5E_27)
-            let area: CGFloat = size.width * size.height
-            // Half-buried paving stones (drawn first, so sand ripples cross them).
-            let stone = Color(red: 0.78, green: 0.63, blue: 0.40)
-            let cut = Color(red: 0.48, green: 0.34, blue: 0.16)
-            for _ in 0..<max(3, Int(area / 24000)) {
-                let x: CGFloat = CGFloat(rng.nextUnit()) * size.width
-                let y: CGFloat = CGFloat(rng.nextUnit()) * size.height
-                let hw: CGFloat = 15 + CGFloat(rng.nextUnit()) * 9
-                let hh: CGFloat = 10 + CGFloat(rng.nextUnit()) * 6
-                let turn: Double = (rng.nextUnit() - 0.5) * 0.5
-                let mark: Int = Int(rng.nextUnit() * 3.999)
+            let w: CGFloat = size.width, h: CGFloat = size.height
+            guard w > 4, h > 4 else { return }
+            var rng = SeededRNG(seed: 0xDE5E_27C4)
+            let crackColor = Color(red: 0.44, green: 0.30, blue: 0.14)
+            let stone = Color(red: 0.74, green: 0.60, blue: 0.40)
+            let cut = Color(red: 0.46, green: 0.32, blue: 0.15)
+            let sand = Color(red: 0.97, green: 0.88, blue: 0.66)
+
+            // 1. Sun-cracked earth: a jittered, staggered grid of plate
+            //    corners; cracks join neighbors, so the plates are uneven.
+            let cell: CGFloat = 46
+            let cols: Int = Int(w / cell) + 2
+            let rows: Int = Int(h / cell) + 2
+            var pts: [[CGPoint]] = []
+            pts.reserveCapacity(rows + 1)
+            for j in 0...rows {
+                var row: [CGPoint] = []
+                row.reserveCapacity(cols + 1)
+                let stagger: CGFloat = j % 2 == 0 ? 0 : cell * 0.5
+                for i in 0...cols {
+                    let jx: CGFloat = CGFloat(rng.nextUnit() - 0.5) * cell * 0.62
+                    let jy: CGFloat = CGFloat(rng.nextUnit() - 0.5) * cell * 0.62
+                    row.append(CGPoint(x: CGFloat(i) * cell - cell * 0.5 + stagger + jx,
+                                       y: CGFloat(j) * cell - cell * 0.5 + jy))
+                }
+                pts.append(row)
+            }
+            var cracks = Path()
+            var hair = Path()
+            for j in 0...rows {
+                for i in 0...cols {
+                    let p: CGPoint = pts[j][i]
+                    if i < cols {
+                        // A crack bends once on its way to the next corner.
+                        let q: CGPoint = pts[j][i + 1]
+                        let mx: CGFloat = (p.x + q.x) / 2 + CGFloat(rng.nextUnit() - 0.5) * 7
+                        let my: CGFloat = (p.y + q.y) / 2 + CGFloat(rng.nextUnit() - 0.5) * 7
+                        cracks.move(to: p)
+                        cracks.addLine(to: CGPoint(x: mx, y: my))
+                        cracks.addLine(to: q)
+                    }
+                    if j < rows {
+                        let q: CGPoint = pts[j + 1][i]
+                        let mx: CGFloat = (p.x + q.x) / 2 + CGFloat(rng.nextUnit() - 0.5) * 7
+                        let my: CGFloat = (p.y + q.y) / 2 + CGFloat(rng.nextUnit() - 0.5) * 7
+                        cracks.move(to: p)
+                        cracks.addLine(to: CGPoint(x: mx, y: my))
+                        cracks.addLine(to: q)
+                    }
+                    // A short hairline running into about half the plates.
+                    if rng.nextUnit() < 0.5 {
+                        let a: Double = rng.nextUnit() * Double.pi * 2
+                        let len: CGFloat = 7 + CGFloat(rng.nextUnit()) * 9
+                        hair.move(to: p)
+                        hair.addLine(to: CGPoint(x: p.x + CGFloat(cos(a)) * len, y: p.y + CGFloat(sin(a)) * len))
+                    }
+                }
+            }
+            let crackStyle = StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round)
+            // A pale lip beside each crack, then the crack itself.
+            ctx.stroke(cracks.offsetBy(dx: 0.7, dy: 0.8), with: .color(Color.white.opacity(0.10)), style: crackStyle)
+            ctx.stroke(cracks, with: .color(crackColor.opacity(0.20)), style: crackStyle)
+            ctx.stroke(hair, with: .color(crackColor.opacity(0.13)),
+                       style: StrokeStyle(lineWidth: 0.6, lineCap: .round))
+
+            // 2. Half-buried temple flagstones with a worn carved relief.
+            let slabs: Int = max(3, Int(w * h / 42000))
+            for _ in 0..<slabs {
+                let x: CGFloat = CGFloat(rng.nextUnit()) * w
+                let y: CGFloat = CGFloat(rng.nextUnit()) * h
+                let hw: CGFloat = 20 + CGFloat(rng.nextUnit()) * 10
+                let hh: CGFloat = 14 + CGFloat(rng.nextUnit()) * 7
+                let turn: Double = (rng.nextUnit() - 0.5) * 0.36
+                let relief: Int = Int(rng.nextUnit() * 2.999)
+                let buryLeft: Bool = rng.nextUnit() < 0.5
+                let buryTop: Bool = rng.nextUnit() < 0.5
                 var sctx = ctx
                 sctx.translateBy(x: x, y: y)
                 sctx.rotate(by: .radians(turn))
-                let slab = Path(roundedRect: CGRect(x: -hw, y: -hh, width: hw * 2, height: hh * 2), cornerRadius: 2.5)
-                sctx.fill(slab.offsetBy(dx: 1.0, dy: 1.2), with: .color(cut.opacity(0.16)))
-                sctx.fill(slab, with: .color(stone.opacity(0.42)))
-                sctx.stroke(slab, with: .color(Color.white.opacity(0.22)), lineWidth: 0.7)
-                var glyph = Path()
-                switch mark {
-                case 0:   // sun disc
-                    glyph.addEllipse(in: CGRect(x: -4.5, y: -4.5, width: 9, height: 9))
-                    glyph.addEllipse(in: CGRect(x: -1, y: -1, width: 2, height: 2))
-                case 1:   // water zig-zag
-                    glyph.move(to: CGPoint(x: -7, y: 2)); glyph.addLine(to: CGPoint(x: -3.5, y: -2))
-                    glyph.addLine(to: CGPoint(x: 0, y: 2)); glyph.addLine(to: CGPoint(x: 3.5, y: -2))
-                    glyph.addLine(to: CGPoint(x: 7, y: 2))
-                case 2:   // eye
-                    glyph.move(to: CGPoint(x: -6, y: 0))
-                    glyph.addQuadCurve(to: CGPoint(x: 6, y: 0), control: CGPoint(x: 0, y: -5.5))
-                    glyph.addQuadCurve(to: CGPoint(x: -6, y: 0), control: CGPoint(x: 0, y: 5.5))
-                    glyph.addEllipse(in: CGRect(x: -1.4, y: -1.4, width: 2.8, height: 2.8))
-                default:  // a worn, blank slab
-                    break
+                let rect = CGRect(x: -hw, y: -hh, width: hw * 2, height: hh * 2)
+                let slab = Path(roundedRect: rect, cornerRadius: 2.5)
+                sctx.fill(slab.offsetBy(dx: 1.0, dy: 1.3), with: .color(cut.opacity(0.14)))
+                sctx.fill(slab, with: .color(stone.opacity(0.46)))
+                sctx.stroke(slab, with: .color(Color.white.opacity(0.18)), lineWidth: 0.7)
+                // Carving: always a border groove; then one worn motif.
+                var carve = Path()
+                carve.addRoundedRect(in: rect.insetBy(dx: 3.5, dy: 3.5), cornerSize: CGSize(width: 1.5, height: 1.5))
+                switch relief {
+                case 0:   // stepped fret along the middle
+                    let step: CGFloat = 5
+                    var fx: CGFloat = -hw + 8
+                    var up: Bool = true
+                    carve.move(to: CGPoint(x: fx, y: 2.5))
+                    while fx + step <= hw - 8 {
+                        let fy: CGFloat = up ? -2.5 : 2.5
+                        carve.addLine(to: CGPoint(x: fx, y: fy))
+                        carve.addLine(to: CGPoint(x: fx + step, y: fy))
+                        fx += step
+                        up.toggle()
+                    }
+                case 1:   // a row of chisel notches
+                    var nx: CGFloat = -hw + 9
+                    while nx <= hw - 9 {
+                        carve.move(to: CGPoint(x: nx, y: -3))
+                        carve.addLine(to: CGPoint(x: nx + 2.5, y: 3))
+                        nx += 6
+                    }
+                default:  // two nested lozenges
+                    for k in 0..<2 {
+                        let s: CGFloat = 1.0 - CGFloat(k) * 0.45
+                        carve.move(to: CGPoint(x: -hw * 0.55 * s, y: 0))
+                        carve.addLine(to: CGPoint(x: 0, y: -hh * 0.50 * s))
+                        carve.addLine(to: CGPoint(x: hw * 0.55 * s, y: 0))
+                        carve.addLine(to: CGPoint(x: 0, y: hh * 0.50 * s))
+                        carve.closeSubpath()
+                    }
                 }
-                sctx.stroke(glyph, with: .color(cut.opacity(0.30)),
-                            style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
+                let carveStyle = StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round)
+                sctx.stroke(carve.offsetBy(dx: 0.5, dy: 0.6), with: .color(Color.white.opacity(0.14)), style: carveStyle)
+                sctx.stroke(carve, with: .color(cut.opacity(0.26)), style: carveStyle)
+                // Sand drifted over one corner of the slab buries part of it.
+                let bury: CGFloat = hw * 0.9
+                let corner = CGPoint(x: buryLeft ? -hw : hw, y: buryTop ? -hh : hh)
+                sctx.fill(Path(ellipseIn: CGRect(x: corner.x - bury, y: corner.y - bury * 0.7,
+                                                 width: bury * 2, height: bury * 1.4)),
+                          with: .radialGradient(Gradient(colors: [sand.opacity(0.80), sand.opacity(0.0)]),
+                                                center: corner, startRadius: 0, endRadius: bury))
             }
-            // Wind ripples.
-            let shadow = Color(red: 0.55, green: 0.40, blue: 0.20).opacity(0.18)
-            let light = Color.white.opacity(0.26)
-            var y: CGFloat = 8
-            while y < size.height + 10 {
-                let amp: CGFloat = 3 + CGFloat(rng.nextUnit()) * 3
-                let freq: Double = 0.018 + rng.nextUnit() * 0.012
-                let phase: Double = rng.nextUnit() * 6.28
-                var crest = Path()
-                crest.move(to: CGPoint(x: 0, y: y + amp * CGFloat(sin(phase))))
-                var x: CGFloat = 6
-                while x <= size.width + 6 {
-                    let yy: CGFloat = y + amp * CGFloat(sin(Double(x) * freq + phase))
-                    crest.addLine(to: CGPoint(x: x, y: yy))
-                    x += 6
+
+            // 3. Wind-blown sand drifts: soft pale patches that cover the
+            //    cracks beneath, each carrying a few ripple lines.
+            let drifts: Int = max(4, Int(w * h / 30000))
+            for _ in 0..<drifts {
+                let dx: CGFloat = CGFloat(rng.nextUnit()) * w
+                let dy: CGFloat = CGFloat(rng.nextUnit()) * h
+                let rx: CGFloat = 60 + CGFloat(rng.nextUnit()) * 55
+                let ry: CGFloat = 26 + CGFloat(rng.nextUnit()) * 18
+                var dctx = ctx
+                dctx.translateBy(x: dx, y: dy)
+                dctx.scaleBy(x: 1, y: ry / rx)
+                dctx.fill(Path(ellipseIn: CGRect(x: -rx, y: -rx, width: rx * 2, height: rx * 2)),
+                          with: .radialGradient(Gradient(stops: [
+                            .init(color: sand.opacity(0.62), location: 0.0),
+                            .init(color: sand.opacity(0.40), location: 0.55),
+                            .init(color: sand.opacity(0.0), location: 1.0)]),
+                            center: .zero, startRadius: 0, endRadius: rx))
+                // Ripples: short curved lines across the drift, a lit crest
+                // over a soft shadow.
+                let lines: Int = 3 + Int(rng.nextUnit() * 2.999)
+                for k in 0..<lines {
+                    let oy: CGFloat = (CGFloat(k) - CGFloat(lines - 1) / 2) * 7.5
+                    let half: CGFloat = rx * CGFloat(0.55 + rng.nextUnit() * 0.25)
+                    let sag: CGFloat = 3 + CGFloat(rng.nextUnit()) * 3
+                    var rp = Path()
+                    rp.move(to: CGPoint(x: dx - half, y: dy + oy))
+                    rp.addQuadCurve(to: CGPoint(x: dx + half, y: dy + oy),
+                                    control: CGPoint(x: dx, y: dy + oy - sag))
+                    let rippleStyle = StrokeStyle(lineWidth: 1.0, lineCap: .round)
+                    ctx.stroke(rp.offsetBy(dx: 0, dy: 1.4), with: .color(crackColor.opacity(0.10)), style: rippleStyle)
+                    ctx.stroke(rp, with: .color(Color.white.opacity(0.15)), style: rippleStyle)
                 }
-                ctx.stroke(crest.offsetBy(dx: 0, dy: 1.6), with: .color(shadow), lineWidth: 1.6)
-                ctx.stroke(crest, with: .color(light), lineWidth: 0.9)
-                y += 14 + CGFloat(rng.nextUnit()) * 8
             }
-            // Pebbles, each with a small shadow.
-            for _ in 0..<Int(area / 3600) {
-                let px: CGFloat = CGFloat(rng.nextUnit()) * size.width
-                let py: CGFloat = CGFloat(rng.nextUnit()) * size.height
-                let pr: CGFloat = 0.9 + CGFloat(rng.nextUnit()) * 1.3
+
+            // 4. A sparse scatter of pebbles, each with a small shadow.
+            for _ in 0..<Int(w * h / 9000) {
+                let px: CGFloat = CGFloat(rng.nextUnit()) * w
+                let py: CGFloat = CGFloat(rng.nextUnit()) * h
+                let pr: CGFloat = 0.9 + CGFloat(rng.nextUnit()) * 1.2
                 ctx.fill(Path(ellipseIn: CGRect(x: px - pr + 0.6, y: py - pr * 0.7 + 0.8, width: pr * 2, height: pr * 1.4)),
-                         with: .color(cut.opacity(0.20)))
+                         with: .color(cut.opacity(0.16)))
                 ctx.fill(Path(ellipseIn: CGRect(x: px - pr, y: py - pr * 0.7, width: pr * 2, height: pr * 1.4)),
-                         with: .color(Color(red: 0.66, green: 0.52, blue: 0.34).opacity(0.55)))
+                         with: .color(Color(red: 0.64, green: 0.50, blue: 0.32).opacity(0.50)))
             }
         }
     }
@@ -9234,6 +9348,7 @@ struct GoalSkinView: View {
         case .pentagram:   pentagramGoal
         // ── Nature, Fire, Water (quality round) ──
         case .leafWreath:  leafWreathGoal
+        case .treeStump:   treeStumpGoal      // Nature (owner request)
         case .flameRing:   flameRingGoal
         case .whirlpool:   whirlpoolGoal
         // — Quality round: Winter / Champion —
@@ -9767,6 +9882,150 @@ struct GoalSkinView: View {
             ctx.stroke(disc(R * 0.40), with: .color(Color(red: 0.92, green: 0.97, blue: 0.84)), lineWidth: max(1, R * 0.05))
             ctx.fill(disc(R * 0.11), with: .color(Color(red: 0.92, green: 0.97, blue: 0.84).opacity(0.90)))
             ctx.stroke(disc(R), with: .color(Color.black.opacity(0.55)), lineWidth: 1.4)
+        }
+        .clipShape(Circle())
+    }
+
+    /// Tree Stump (Nature set) — a mossy tree stump seen from above.  The
+    /// stump IS the target: an uneven ring of dark bark, pale heartwood
+    /// carrying slightly wobbly growth rings (early wood and late wood), a
+    /// couple of drying cracks running out from the middle, and a dark
+    /// hollow heart with a pale rim where the ball finishes.  Moss creeps
+    /// over the bark on one side and two small mushrooms sit at the edge.
+    /// Wood browns, cream and Nature's greens only.  Still.
+    private var treeStumpGoal: some View {
+        Canvas { ctx, size in
+            let cx: CGFloat = size.width / 2, cy: CGFloat = size.height / 2
+            let R: CGFloat = min(size.width, size.height) / 2 * 0.95
+            let c = CGPoint(x: cx, y: cy)
+            func disc(_ r: CGFloat) -> Path {
+                Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+            }
+            /// A closed, slightly uneven ring: radius `r` wobbled by a few
+            /// low harmonics, so no two rings are perfect circles.
+            func wobbly(_ r: CGFloat, _ amp: CGFloat, _ seed: Double) -> Path {
+                var p = Path()
+                let steps: Int = 72
+                for k in 0...steps {
+                    let a: Double = Double(k) / Double(steps) * Double.pi * 2
+                    let w1: Double = sin(a * 3 + seed) * 0.55
+                    let w2: Double = sin(a * 5 + seed * 1.7) * 0.30
+                    let w3: Double = sin(a * 9 + seed * 2.3) * 0.15
+                    let rr: CGFloat = r + amp * CGFloat(w1 + w2 + w3)
+                    let pt = CGPoint(x: cx + CGFloat(cos(a)) * rr, y: cy + CGFloat(sin(a)) * rr)
+                    if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                }
+                p.closeSubpath()
+                return p
+            }
+            let barkDark  = Color(red: 0.22, green: 0.14, blue: 0.08)
+            let bark      = Color(red: 0.38, green: 0.26, blue: 0.15)
+            let sapwood   = Color(red: 0.90, green: 0.79, blue: 0.58)
+            let heartwood = Color(red: 0.78, green: 0.62, blue: 0.40)
+            let ringLine  = Color(red: 0.50, green: 0.34, blue: 0.18)
+            let cream     = Color(red: 0.96, green: 0.92, blue: 0.80)
+
+            // Soft ground shadow so the stump sits on the floor.
+            ctx.fill(disc(R), with: .color(Color.black.opacity(0.22)))
+
+            // Bark: an uneven outline, darker outside, with short radial furrows.
+            let barkOuter: Path = wobbly(R * 0.94, R * 0.045, 0.7)
+            ctx.fill(barkOuter, with: .color(barkDark))
+            ctx.fill(wobbly(R * 0.89, R * 0.035, 1.9), with: .color(bark))
+            for k in 0..<26 {
+                let a: Double = Double(k) / 26 * Double.pi * 2 + 0.11
+                let r0: CGFloat = R * 0.80
+                let r1: CGFloat = R * (0.90 + 0.03 * CGFloat(sin(Double(k) * 2.1)))
+                var f = Path()
+                f.move(to: CGPoint(x: cx + CGFloat(cos(a)) * r0, y: cy + CGFloat(sin(a)) * r0))
+                f.addLine(to: CGPoint(x: cx + CGFloat(cos(a + 0.03)) * r1, y: cy + CGFloat(sin(a + 0.03)) * r1))
+                ctx.stroke(f, with: .color(barkDark.opacity(0.55)), lineWidth: max(0.6, R * 0.022))
+            }
+
+            // The cut face: pale sapwood shading to warmer heartwood.
+            let face: Path = wobbly(R * 0.78, R * 0.022, 3.1)
+            ctx.fill(face, with: .radialGradient(Gradient(stops: [
+                .init(color: heartwood, location: 0.0),
+                .init(color: heartwood, location: 0.50),
+                .init(color: sapwood, location: 0.78),
+                .init(color: sapwood, location: 1.0)]),
+                center: c, startRadius: 0, endRadius: R * 0.78))
+            ctx.stroke(face, with: .color(barkDark.opacity(0.65)), lineWidth: max(0.8, R * 0.022))
+
+            // Growth rings: the target.  Uneven spacing (wide and narrow
+            // years), every third one bolder, all concentric on the heart.
+            let ringRadii: [CGFloat] = [0.72, 0.66, 0.615, 0.56, 0.52, 0.47, 0.43, 0.385, 0.35]
+            for (k, rr) in ringRadii.enumerated() {
+                let bold: Bool = k % 3 == 0
+                let ringOpacity: Double = bold ? 0.62 : 0.34
+                let ringWidth: CGFloat = bold ? max(0.9, R * 0.026) : max(0.6, R * 0.014)
+                ctx.stroke(wobbly(R * rr, R * 0.014, 4.0 + Double(k) * 0.9),
+                           with: .color(ringLine.opacity(ringOpacity)), lineWidth: ringWidth)
+            }
+
+            // Two drying cracks, running from near the heart toward the bark.
+            let cracks: [(a: Double, r0: CGFloat, r1: CGFloat, bend: Double)] = [
+                (a: -0.62, r0: 0.31, r1: 0.74, bend: 0.07),
+                (a: 2.35,  r0: 0.33, r1: 0.60, bend: -0.06),
+            ]
+            for cr in cracks {
+                var p = Path()
+                p.move(to: CGPoint(x: cx + CGFloat(cos(cr.a)) * R * cr.r0,
+                                   y: cy + CGFloat(sin(cr.a)) * R * cr.r0))
+                let mid: CGFloat = (cr.r0 + cr.r1) / 2
+                p.addLine(to: CGPoint(x: cx + CGFloat(cos(cr.a + cr.bend)) * R * mid,
+                                      y: cy + CGFloat(sin(cr.a + cr.bend)) * R * mid))
+                let endA: Double = cr.a - cr.bend * 0.4
+                p.addLine(to: CGPoint(x: cx + CGFloat(cos(endA)) * R * cr.r1,
+                                      y: cy + CGFloat(sin(endA)) * R * cr.r1))
+                ctx.stroke(p, with: .color(barkDark.opacity(0.70)),
+                           style: StrokeStyle(lineWidth: max(0.7, R * 0.020), lineCap: .round, lineJoin: .round))
+            }
+
+            // Moss creeping over the bark and onto the face, lower left only.
+            let mossDark  = Color(red: 0.16, green: 0.40, blue: 0.16)
+            let mossMid   = Color(red: 0.30, green: 0.58, blue: 0.24)
+            let mossLight = Color(red: 0.52, green: 0.78, blue: 0.36)
+            var mrng = SeededRNG(seed: 0x57_0A55)
+            for _ in 0..<22 {
+                let a: Double = 2.05 + mrng.nextUnit() * 1.45          // lower-left arc
+                let rr: CGFloat = R * CGFloat(0.70 + mrng.nextUnit() * 0.24)
+                let pr: CGFloat = R * CGFloat(0.045 + mrng.nextUnit() * 0.050)
+                let pick: Double = mrng.nextUnit()
+                let col: Color = pick < 0.40 ? mossDark : (pick < 0.80 ? mossMid : mossLight)
+                let p = CGPoint(x: cx + CGFloat(cos(a)) * rr, y: cy + CGFloat(sin(a)) * rr)
+                ctx.fill(Path(ellipseIn: CGRect(x: p.x - pr, y: p.y - pr * 0.85, width: pr * 2, height: pr * 1.7)),
+                         with: .color(col.opacity(0.92)))
+            }
+
+            // Two small mushrooms at the edge (upper right): a tan cap with
+            // a lighter top and a soft shadow.
+            let caps: [(a: Double, r: CGFloat, s: CGFloat)] = [
+                (a: -0.95, r: 0.86, s: 0.105),
+                (a: -0.62, r: 0.90, s: 0.075),
+            ]
+            for m in caps {
+                let p = CGPoint(x: cx + CGFloat(cos(m.a)) * R * m.r, y: cy + CGFloat(sin(m.a)) * R * m.r)
+                let s: CGFloat = R * m.s
+                let capRect = CGRect(x: p.x - s, y: p.y - s, width: s * 2, height: s * 2)
+                ctx.fill(Path(ellipseIn: capRect.offsetBy(dx: s * 0.18, dy: s * 0.22)),
+                         with: .color(Color.black.opacity(0.28)))
+                ctx.fill(Path(ellipseIn: capRect),
+                         with: .radialGradient(Gradient(colors: [
+                            cream, Color(red: 0.82, green: 0.62, blue: 0.38), Color(red: 0.56, green: 0.36, blue: 0.20)]),
+                            center: CGPoint(x: p.x - s * 0.25, y: p.y - s * 0.30), startRadius: 0, endRadius: s * 1.1))
+                ctx.stroke(Path(ellipseIn: capRect),
+                           with: .color(barkDark.opacity(0.55)), lineWidth: max(0.5, s * 0.14))
+            }
+
+            // The heart: a dark hollow with a pale rim and a bright pith —
+            // the place the ball finishes (28% of the radius).
+            let heartR: CGFloat = R * 0.28
+            ctx.fill(disc(heartR), with: .radialGradient(Gradient(colors: [
+                Color(red: 0.07, green: 0.04, blue: 0.02), Color(red: 0.20, green: 0.12, blue: 0.07)]),
+                center: c, startRadius: 0, endRadius: heartR))
+            ctx.stroke(disc(heartR), with: .color(cream), lineWidth: max(1, R * 0.045))
+            ctx.fill(disc(R * 0.075), with: .color(cream.opacity(0.92)))
         }
         .clipShape(Circle())
     }

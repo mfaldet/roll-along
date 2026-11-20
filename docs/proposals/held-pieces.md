@@ -91,7 +91,7 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Ball | Oktoberfest | `oktoberfest` | Legendary | 1,500 | Oktoberfest (seasonal) | Not graded | Borderline (R1) | Bavarian pattern with foam; not clearly a stein |
 | Ball | Teacher's Apple | `apple` | Legendary | 1,500 | Back to School (seasonal) | Not graded | Borderline (R1) | Leaf and stem are right; an apple should be apple-shaped |
 
-### Goals held: 19
+### Goals held: 20
 
 | Slot | Name | id | Tier | Price | Came from | Approved in the quality round? | Verdict vs standard | Why |
 |---|---|---|---|---|---|---|---|---|
@@ -114,6 +114,7 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Goal | Halo | `halo` | Legendary | 1,500 | Heavens (retired) | Not graded | Meets | Golden halo with rays turning once in 25 seconds |
 | Goal | Doodle | `doodle` | Legendary | 1,500 | Paper World (retired) | Not graded | Meets | Wobbly pencil rings crowding to a deep center |
 | Goal | Soccer Net | `soccerNet` | Legendary | 1,500 | Soccer (retired) | Not graded | Meets | Goal mouth with posts, net and grass strip |
+| Goal | Leaf Wreath | `leafWreath` | Standard | 750 | Nature (replaced at the owner's request) | No: replaced at the owner's request | Borderline (R8) | Woven leaf ring with a clear hollow; close to Winner's Circle |
 
 ### Trails held: 5
 
@@ -201,26 +202,26 @@ A pack is on sale only when every ball in it is on sale. None qualifies today, s
 | Slot | Held pieces |
 |---|---|
 | Ball | 53 |
-| Goal | 19 |
+| Goal | 20 |
 | Trail | 5 |
 | Floor | 13 |
 | Pit | 14 |
 | Boundary | 29 |
-| **Total** | **133** |
+| **Total** | **134** |
 
-The scarcest slot is **Trail** with 5 held piece(s), so at most **5** new full collection(s) could be built from held pieces alone. Each further collection needs new art in every slot that has run out, in this order of scarcity: Trail (5), Floor (13), Pit (14), Goal (19), Boundary (29), Ball (53).
+The scarcest slot is **Trail** with 5 held piece(s), so at most **5** new full collection(s) could be built from held pieces alone. Each further collection needs new art in every slot that has run out, in this order of scarcity: Trail (5), Floor (13), Pit (14), Goal (20), Boundary (29), Ball (53).
 
 ## Verdicts per slot
 
 | Slot | Held | Meets | Borderline | Fails | Not audited |
 |---|---|---|---|---|---|
 | Ball | 53 | 19 | 19 | 15 | 0 |
-| Goal | 19 | 7 | 6 | 6 | 0 |
+| Goal | 20 | 7 | 7 | 6 | 0 |
 | Trail | 5 | 2 | 2 | 1 | 0 |
 | Floor | 13 | 4 | 5 | 4 | 0 |
 | Pit | 14 | 2 | 7 | 5 | 0 |
 | Boundary | 29 | 12 | 9 | 8 | 0 |
-| **Total** | **133** | **46** | **48** | **39** | **0** |
+| **Total** | **134** | **46** | **49** | **39** | **0** |
 
 ## Ready to build collections around
 

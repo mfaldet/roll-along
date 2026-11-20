@@ -209,14 +209,18 @@ final class CosmeticsTests: XCTestCase {
         guard let nature = CosmeticBundle.catalogue.first(where: { $0.id == "nature" }) else {
             return XCTFail("nature collection missing")
         }
-        XCTAssertEqual(nature.goals, [.leafWreath])
-        XCTAssertEqual(GoalSkin.leafWreath.displayName, "Leaf Wreath")
-        XCTAssertEqual(GoalSkin.leafWreath.tier, GoalSkin.meadow.tier)
+        // Owner request: the Tree Stump goal replaces Leaf Wreath at the same tier.
+        XCTAssertEqual(nature.goals, [.treeStump])
+        XCTAssertEqual(GoalSkin.treeStump.displayName, "Tree Stump")
+        XCTAssertEqual(GoalSkin.treeStump.rawValue, "treeStump")
+        XCTAssertEqual(GoalSkin.treeStump.tier, GoalSkin.leafWreath.tier)
+        XCTAssertEqual(GoalSkin.treeStump.tier, GoalSkin.meadow.tier)
         XCTAssertEqual(nature.fullPrice(), 4_500, "Nature's price is unchanged")
         for b in CosmeticBundle.catalogue {
             XCTAssertFalse(b.goals.contains(.meadow), "\(b.id) still holds the displaced Meadow goal")
+            XCTAssertFalse(b.goals.contains(.leafWreath), "\(b.id) still holds the displaced Leaf Wreath goal")
             if b.id != "nature" {
-                XCTAssertFalse(b.goals.contains(.leafWreath), "\(b.id) shares Nature's goal")
+                XCTAssertFalse(b.goals.contains(.treeStump), "\(b.id) shares Nature's goal")
             }
         }
         // The Water floor now carries slow moving light; Fire's stays still.

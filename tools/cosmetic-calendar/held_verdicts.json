@@ -711,6 +711,13 @@
   "theme": "Cathedral and heavens",
   "verdict": "meets"
  },
+ "Goal:leafWreath": {
+  "reason": "Woven leaf ring with a clear hollow; close to Winner's Circle",
+  "rules": [
+   "R8"
+  ],
+  "verdict": "borderline"
+ },
  "Goal:meadow": {
   "reason": "Daisy ring is thin; owner asked for a better one",
   "rules": [

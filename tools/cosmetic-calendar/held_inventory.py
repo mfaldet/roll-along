@@ -44,6 +44,8 @@ DISPLACED = {("GoalSkin", "meadow"): "Nature", ("BallSkin", "silver"): "Sketchbo
              ("Pit", "sunset"): "Citrus", ("Floor", "mirage"): "Midas",
              ("Pit", "mirage"): "Midas", ("GoalSkin", "obsidian"): "Haunted",
              ("TrailColor", "snake"): "Ancient Temple"}
+# Replaced inside an active collection at the owner's request, after the audit.
+OWNER_DISPLACED = {("GoalSkin", "leafWreath"): "Nature"}
 # Replaced inside a scheduled collection during the audit against the quality standard.
 AUDIT_DISPLACED = {("GoalSkin", "mosaic"): "Nightclub", ("TrailColor", "rainbow"): "Nightclub",
                    ("TrailColor", "air"): "Golf", ("TrailColor", "sky"): "Ocean",
@@ -204,6 +206,9 @@ def main():
             if (enum, c) in DISPLACED:
                 src.insert(0, f"{DISPLACED[(enum, c)]} (displaced in the quality round)")
                 approved = "No: displaced (replaced in the quality round)"
+            elif (enum, c) in OWNER_DISPLACED:
+                src.insert(0, f"{OWNER_DISPLACED[(enum, c)]} (replaced at the owner's request)")
+                approved = "No: replaced at the owner's request"
             elif (enum, c) in AUDIT_DISPLACED:
                 src.insert(0, f"{AUDIT_DISPLACED[(enum, c)]} (displaced in the audit)")
                 approved = "No: displaced (replaced in the audit)"
