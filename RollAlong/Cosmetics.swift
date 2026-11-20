@@ -367,6 +367,8 @@ enum GoalSkin: String, CosmeticItem {
     case winnersCircle  // Champion — a gold laurel wreath around a deep-crimson winner's circle
     // ── Standard audit: Nightclub ──
     case vinyl          // Nightclub — a record on the turntable, slowly turning (replaces Mosaic there)
+    // ── Nature (owner request): replaces Leaf Wreath in the set ──
+    case treeStump      // Nature — a mossy tree stump seen from above; the growth rings are the target
 
     var id: String { rawValue }
     var displayName: String {
@@ -415,6 +417,8 @@ enum GoalSkin: String, CosmeticItem {
         case .winnersCircle: return "Winner's Circle"
         // ── Standard audit: Nightclub ──
         case .vinyl:       return "Vinyl"
+        // ── Nature (owner request) ──
+        case .treeStump:   return "Tree Stump"
         }
     }
 
@@ -446,7 +450,7 @@ enum GoalSkin: String, CosmeticItem {
             // we keep a placeholder so callers can read it uniformly.
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
         // ── Nature (quality round) ── bespoke static renderer, placeholder only.
-        case .leafWreath:
+        case .leafWreath, .treeStump:
             return HoleStyle(hueBase: 0.0, hueRange: 1.0, saturation: 1.0, bgColor: .clear)
 
         case .rainbow:
@@ -761,7 +765,7 @@ enum GoalSkin: String, CosmeticItem {
                 ],
                 center: .center, startRadius: 0, endRadius: endRadius))
         // ── Nature (quality round) ──
-        case .leafWreath:
+        case .leafWreath, .treeStump:
             return AnyShapeStyle(Self.bandedTargetPreview(goal.targetBands ?? [], endRadius: endRadius))
         case .winnersCircle:
             return AnyShapeStyle(RadialGradient(
@@ -829,6 +833,10 @@ enum GoalSkin: String, CosmeticItem {
         case .leafWreath:  return [Color(red: 0.12, green: 0.38, blue: 0.16),
                                    Color(red: 0.50, green: 0.80, blue: 0.38),
                                    Color(red: 0.05, green: 0.20, blue: 0.08)]
+        // ── Nature (owner request) ── bark, heartwood, dark heart.
+        case .treeStump:   return [Color(red: 0.36, green: 0.24, blue: 0.14),
+                                   Color(red: 0.88, green: 0.76, blue: 0.54),
+                                   Color(red: 0.20, green: 0.12, blue: 0.07)]
         case .scribble:    return [Color(red: 0.96, green: 0.96, blue: 0.94),
                                    Color(red: 0.62, green: 0.62, blue: 0.64),
                                    Color(red: 0.20, green: 0.20, blue: 0.22)]
@@ -930,6 +938,8 @@ enum GoalSkin: String, CosmeticItem {
         case .winnersCircle: return Color(red: 1.00, green: 0.84, blue: 0.36)
         // ── Standard audit: Nightclub ──
         case .vinyl:       return Color(red: 0.95, green: 0.30, blue: 0.66)
+        // ── Nature (owner request) ── warm heartwood.
+        case .treeStump:   return Color(red: 0.86, green: 0.70, blue: 0.44)
         }
     }
     /// Tier rule (player-facing: Standard / Epic / Legendary):
@@ -966,6 +976,9 @@ enum GoalSkin: String, CosmeticItem {
         // ── Standard audit: Nightclub ── takes the tier of Mosaic, which it replaces there.
         case .vinyl:
             return .exclusive
+        // ── Nature (owner request) ── takes Leaf Wreath's tier (it replaces it in the set).
+        case .treeStump:
+            return .standard
         }
     }
 }
@@ -3263,10 +3276,10 @@ struct CosmeticBundle: Identifiable {
         CosmeticBundle(
             id:             "nature",
             displayName:    "Nature",
-            tagline:        "A leaf wreath, long grass and a mint-green rim.",
-            contentSummary: "Jade ball · Leaf Wreath goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
+            tagline:        "A mossy tree stump, long grass and a mint-green rim.",
+            contentSummary: "Jade ball · Tree Stump goal · Forest trail · Meadow floor · Meadow pit · Acoustic music · Mint boundary",
             balls:  [.jade],
-            goals:  [.leafWreath],
+            goals:  [.treeStump],
             trails: [.forest],
             floors: [.meadow],
             pits:   [.meadow],

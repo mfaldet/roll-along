@@ -434,7 +434,7 @@ Every active collection, piece by piece. *Approved* = graded and left as it was.
 | Slot | Piece | Status | Tier | Price |
 |---|---|---|---|---|
 | Ball | Jade | approved | Standard | 750 |
-| Goal | Leaf Wreath | new (replaces Meadow) | Standard | 750 |
+| Goal | Tree Stump | new (replaces Leaf Wreath at the owner's request; Leaf Wreath is held) | Standard | 750 |
 | Trail | Forest | approved | Standard | 750 |
 | Floor | Meadow | approved | Standard | 750 |
 | Pit | Meadow | approved | Standard | 750 |
@@ -568,7 +568,7 @@ Every active collection, piece by piece. *Approved* = graded and left as it was.
 | Ball | Dune | redrawn | Epic | 1,250 |
 | Goal | Eclipse | approved | Epic | 1,250 |
 | Trail | Glyphs | new (replaces Snake) | Rare | 1,000 |
-| Floor | Desert | redrawn | Standard | 750 |
+| Floor | Desert | redrawn (again at the owner's request: sun-cracked earth, sand drifts, half-buried flagstones) | Standard | 750 |
 | Pit | Canyon | approved | Standard | 750 |
 | Boundary | Sandstone | redrawn | Rare | 1,000 |
 

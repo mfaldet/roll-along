@@ -42,7 +42,7 @@ Audit only. Nothing changed.
 | Slot | Piece | Tier, price | Verdict before | Action | Looks like now | Animates? |
 |---|---|---|---|---|---|---|
 | Ball | Jade | Standard, 750 | Meets (approved by owner) | None | — | No |
-| Goal | Leaf Wreath | Standard, 750 | Meets | None | Three woven leaf rows, blossoms, berries, dark hollow with a pale rim | No |
+| Goal | Tree Stump | Standard, 750 | Leaf Wreath met the standard | Replaced at the owner's request (after the audit); Leaf Wreath is now held | A mossy tree stump seen from above: uneven bark, growth rings as the target, two drying cracks, dark heart with a pale rim, moss on one side, two small mushrooms. Awaiting the owner's approval; not locked yet | No |
 | Trail | Forest | Standard, 750 | Meets (approved by owner) | None | — | Fade only |
 | Floor | Meadow | Standard, 750 | Meets (approved by owner) | None | — | No |
 | Pit | Meadow | Standard, 750 | Meets (approved by owner) | None | — | No |
@@ -123,7 +123,7 @@ Lightning changed for all six: one eased pulse per strike (0.12 s rise, smooth d
 | Ball | Dune | Epic, 1,250 | Meets | None | Dune ridges with sunlit faces and lee shadows | Yes, slow creep |
 | Goal | Eclipse | Epic, 1,250 | Meets (approved by owner); reference piece | None | — | As before |
 | Trail | Glyphs | Rare, 1,000 | Meets | None | Groove in the sand with carved glyphs either side. Passed under R4 because carved glyphs are the thing it is named after | No |
-| Floor | Desert | Standard, 750 | Meets | None | Sand ripples over half-buried paving stones | No |
+| Floor | Desert | Standard, 750 | Met the standard | Redrawn at the owner's request (after the audit) | Sun-cracked earth, soft drifts of wind-blown sand with ripple lines, a few half-buried temple flagstones with worn carved relief, sparse pebbles. Awaiting the owner's approval; not locked yet | No |
 | Pit | Canyon | Standard, 750 | Meets (approved by owner); reference piece | None | — | No |
 | Boundary | Sandstone | Rare, 1,000 | Meets | None | Cut temple blocks with a chiseled key pattern | Slow band of sunlight |
 
@@ -306,7 +306,7 @@ These pieces were approved in the quality round, so the audit did not change the
 | Slate boundary | Sketchbook | A plain color ring, same concern |
 | Sideline pit | Champion | A flat dark fill with one white line; no layered depth (R5) |
 | Brass Works floor | Champion | Animates at 30 fps; the standard asks 10 to 15 fps for floors |
-| Winner's Circle goal | Champion | A ring of leaves, like Nature's Leaf Wreath. Gold metal and a crimson center keep them apart, but they are close (R8) |
+| Winner's Circle goal | Champion | A ring of leaves, like the Leaf Wreath goal. Leaf Wreath has since left Nature and is held, so the two no longer ship together |
 | Scribble goal | Sketchbook | The held Doodle goal is also wobbly pencil rings (R8). Fine while Doodle stays held |
 | Rose boundary | Bloom | Built like the Holly and Citrus hedges (hedge plus dots), with larger pink blooms; worth a look for R8 |
 | Inverted floor | Abyssal Depths | A flat near-black fill; recorded in the standard as the one approved exception to R5 |
