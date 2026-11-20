@@ -2231,7 +2231,10 @@ struct BallSkinView: View {
                     for j in 0...steps {
                         let u: Double = Double(j) / Double(steps)
                         let x: CGFloat = cx - r + CGFloat(u) * r * 2
-                        let y: CGFloat = y0 + CGFloat(sin(u * Double.pi * 2.6 + t * (0.55 + 0.2 * fk) + fk * 1.7)) * r * 0.08
+                        let speed: Double = 0.55 + 0.2 * fk
+                        let phase: Double = u * Double.pi * 2.6 + t * speed + fk * 1.7
+                        let lift: CGFloat = CGFloat(sin(phase))
+                        let y: CGFloat = y0 + lift * r * 0.08
                         if j == 0 { wave.move(to: CGPoint(x: x, y: y)) } else { wave.addLine(to: CGPoint(x: x, y: y)) }
                     }
                     ctx.stroke(wave, with: .color(Color.white.opacity(k == 0 ? 0.30 : 0.20)),
