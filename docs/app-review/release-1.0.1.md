@@ -1,6 +1,6 @@
 # Release 1.0.1
 
-Version 1.0.1, build 2026112101. One bug fix: the "Watch ad" button could stay stuck on "Ad not ready yet" until the app was closed and reopened. See `CHANGELOG.md`.
+Version 1.0.1, build 2026112101. One bug fix: the "Watch ad" button could stay stuck on "Ad not ready yet" until the app was closed and reopened.
 
 ## What's New (App Store text)
 
