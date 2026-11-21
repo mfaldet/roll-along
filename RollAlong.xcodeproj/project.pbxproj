@@ -54,6 +54,8 @@
 		AA000014000000000000AA01 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014000000000000AA00 /* StoreKitManager.swift */; };
 		AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000015000000000000AA00 /* PurchaseSheets.swift */; };
 		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
+		AD0000R1000000000000AD01 /* AdRetrySchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R1000000000000AD00 /* AdRetrySchedule.swift */; };
+		AD0000R2000000000000AD01 /* AdRetryScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */; };
 		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
 		AA000099000000000000AA01 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000099000000000000AA00 /* IntroView.swift */; };
 		AA0000E7000000000000AA01 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000E7000000000000AA00 /* NotificationManager.swift */; };
@@ -165,6 +167,8 @@
 		AA000015000000000000AA00 /* PurchaseSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseSheets.swift; sourceTree = "<group>"; };
 		AA000016000000000000AA00 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		AA000017000000000000AA00 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
+		AD0000R1000000000000AD00 /* AdRetrySchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdRetrySchedule.swift; sourceTree = "<group>"; };
+		AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdRetryScheduleTests.swift; sourceTree = "<group>"; };
 		AA000099000000000000AA00 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		AA0000E7000000000000AA00 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		AA0000E8000000000000AA00 /* LoadoutDiorama.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadoutDiorama.swift; sourceTree = "<group>"; };
@@ -288,6 +292,7 @@
 				AA000015000000000000AA00 /* PurchaseSheets.swift */,
 				AA000016000000000000AA00 /* Products.storekit */,
 				AA000017000000000000AA00 /* AdManager.swift */,
+				AD0000R1000000000000AD00 /* AdRetrySchedule.swift */,
 				QE3A0001000000000000AA00 /* PhysicsHelpers.swift */,
 				FC000001000000000000FC00 /* GoldRushEngine.swift */,
 				FA000001000000000000FA00 /* MinigameMaps.swift */,
@@ -343,6 +348,7 @@
 				QE3B0101000000000000AA00 /* GameStateTests.swift */,
 				QE3B0102000000000000AA00 /* PhysicsHelpersTests.swift */,
 				QE3B0103000000000000AA00 /* CosmeticsTests.swift */,
+				AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */,
 				QE3B0104000000000000AA00 /* StoreKitManagerTests.swift */,
 				FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */,
 				FC000002000000000000FC00 /* PerformanceTests.swift */,
@@ -508,6 +514,7 @@
 				AA000014000000000000AA01 /* StoreKitManager.swift in Sources */,
 				AA000015000000000000AA01 /* PurchaseSheets.swift in Sources */,
 				AA000017000000000000AA01 /* AdManager.swift in Sources */,
+				AD0000R1000000000000AD01 /* AdRetrySchedule.swift in Sources */,
 				D502FED42FD5024E00CA86BD /* SocialClient.swift in Sources */,
 				D502FEE12FD5024E00CA86BD /* LeaderboardView.swift in Sources */,
 				D502FEE32FD5024E00CA86BD /* FriendsView.swift in Sources */,
@@ -556,6 +563,7 @@
 				QE3B0101000000000000AA01 /* GameStateTests.swift in Sources */,
 				QE3B0102000000000000AA01 /* PhysicsHelpersTests.swift in Sources */,
 				QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */,
+				AD0000R2000000000000AD01 /* AdRetryScheduleTests.swift in Sources */,
 				QE3B0104000000000000AA01 /* StoreKitManagerTests.swift in Sources */,
 				FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */,
 				FC000002000000000000FC01 /* PerformanceTests.swift in Sources */,
@@ -731,7 +739,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RollAlong/RollAlong.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026112002;
+				CURRENT_PROJECT_VERSION = 2026112101;
 				ENABLE_PREVIEWS = YES;
 				GAD_APPLICATION_ID = "ca-app-pub-3940256099942544~1458002511";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -744,7 +752,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.macfaldet.RollAlong;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -764,7 +772,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RollAlong/RollAlong.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026112002;
+				CURRENT_PROJECT_VERSION = 2026112101;
 				ENABLE_PREVIEWS = YES;
 				GAD_APPLICATION_ID = "ca-app-pub-7121593460502747~1774498708";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -777,7 +785,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.macfaldet.RollAlong;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

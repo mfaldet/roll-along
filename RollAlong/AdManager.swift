@@ -13,6 +13,12 @@ import GoogleMobileAds
 // the next ad is pre-loaded immediately after the current one dismisses
 // to keep the cycle going.
 //
+// A load that fails is tried again by itself: after 10 s, 30 s, 60 s, then
+// every 2 minutes, until one succeeds (`AdRetrySchedule`).  A load also
+// starts when the app returns to the foreground, when the out-of-lives
+// screen appears and when "Watch ad" is tapped with no ad ready.  Only one
+// load runs at a time, and nothing is retried in the background.
+//
 // Privacy — Roll Along never tracks users.  We do NOT request App Tracking
 // Transparency and never touch the advertising identifier (IDFA); every ad
 // request is tagged non-personalised (npa=1), so AdMob serves only generic
@@ -59,7 +65,12 @@ final class AdManager: NSObject, ObservableObject {
     // MARK: - Internal state
 
     private var rewardedAd: RewardedAd?
-    private var isLoading: Bool = false
+    /// One load at a time, and when to try again after a failed one.
+    private var retry = AdRetrySchedule()
+    /// The wait before the next automatic retry, if one is pending.
+    private var retryTask: Task<Void, Never>?
+    /// True once `MobileAds.shared.start()` has finished.  Nothing loads before.
+    private var sdkStarted: Bool = false
     private var pendingRewardHandler: ((Bool) -> Void)?
 
     weak var gameState: GameState?
@@ -97,6 +108,7 @@ final class AdManager: NSObject, ObservableObject {
         MobileAds.shared.audioVideoManager.isAudioSessionApplicationManaged = true
         // Start the Mobile Ads SDK.  All ad requests are non-personalised.
         _ = await MobileAds.shared.start()
+        sdkStarted = true
         await loadRewarded()
     }
 
@@ -112,11 +124,14 @@ final class AdManager: NSObject, ObservableObject {
 
     // MARK: - Pre-load
 
-    /// Load the next rewarded ad in the background.  Idempotent.
+    /// Load the next rewarded ad in the background.  Idempotent: a no-op
+    /// while a load is running or an ad is already waiting.  A failed load
+    /// schedules its own retry (see `AdRetrySchedule`).
     func loadRewarded() async {
-        guard !isLoading, rewardedAd == nil else { return }
-        isLoading = true
-        defer { isLoading = false }
+        guard sdkStarted, retry.beginLoad(adReady: rewardedAd != nil) else { return }
+        // This load replaces any retry that was still waiting.
+        retryTask?.cancel()
+        retryTask = nil
         do {
             let ad = try await RewardedAd.load(
                 with: Self.rewardedAdUnitID,
@@ -126,6 +141,7 @@ final class AdManager: NSObject, ObservableObject {
             self.rewardedAd = ad
             self.isReady = true
             self.lastError = nil
+            retry.loadSucceeded()
             AnalyticsClient.shared.track(
                 "ad_loaded",
                 properties: ["ad_unit": .string(Self.rewardedAdUnitID)]
@@ -134,14 +150,60 @@ final class AdManager: NSObject, ObservableObject {
             self.rewardedAd = nil
             self.isReady = false
             self.lastError = error.localizedDescription
+            // The code and domain tell "no ad available" apart from an
+            // account or configuration problem; the message alone does not.
+            let nsError = error as NSError
             AnalyticsClient.shared.track(
                 "ad_load_failed",
                 properties: [
                     "ad_unit": .string(Self.rewardedAdUnitID),
                     "error":   .string(error.localizedDescription),
+                    "error_code":   .int(nsError.code),
+                    "error_domain": .string(nsError.domain),
                 ]
             )
+            if let wait = retry.loadFailed() {
+                scheduleRetry(after: wait)
+            }
         }
+    }
+
+    /// Start a load if there is no ad ready and none loading.  Called when
+    /// "Watch ad" is tapped with no ad ready and when the out-of-lives
+    /// screen appears.
+    func loadIfNeeded() {
+        Task { await loadRewarded() }
+    }
+
+    /// Try again once `wait` seconds have passed, unless something else has
+    /// loaded an ad or the app has gone to the background by then.
+    private func scheduleRetry(after wait: TimeInterval) {
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.retryTask = nil
+            guard self.retry.retryIsDue(adReady: self.rewardedAd != nil) else { return }
+            await self.loadRewarded()
+        }
+    }
+
+    // MARK: - Foreground / background
+
+    /// The app came to the foreground: with no ad ready and no load running,
+    /// start one.
+    func appDidBecomeActive() {
+        if retry.didEnterForeground(adReady: rewardedAd != nil) {
+            loadIfNeeded()
+        }
+    }
+
+    /// The app went to the background: drop any waiting retry.  Nothing is
+    /// loaded until the app is back.
+    func appDidEnterBackground() {
+        retry.didEnterBackground()
+        retryTask?.cancel()
+        retryTask = nil
     }
 
     // MARK: - Show

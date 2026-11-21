@@ -172,7 +172,11 @@ struct RollAlongApp: App {
                 // Best-effort flush so events don't get lost when the user
                 // backgrounds the app.
                 AnalyticsClient.shared.flush()
-                if newPhase == .background { gameState.registerAppBackgrounded() }
+                if newPhase == .background {
+                    gameState.registerAppBackgrounded()
+                    // No ad loads or retries while in the background.
+                    ads.appDidEnterBackground()
+                }
             case .active:
                 // Mint a new session if we've been idle long enough that
                 // the previous one shouldn't count as "the same session".
@@ -181,6 +185,8 @@ struct RollAlongApp: App {
                 AnalyticsClient.shared.track("app_resume")
                 // A return after 30+ minutes away counts as a new app open.
                 gameState.registerAppActive()
+                // With no rewarded ad ready and none loading, load one now.
+                ads.appDidBecomeActive()
                 // Re-affirm the lives-restock alert against time elapsed while
                 // backgrounded (regen kept accruing; the alert may need to be
                 // rescheduled or cleared).

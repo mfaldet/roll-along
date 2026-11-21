@@ -1821,6 +1821,13 @@ struct BallGameView: View {
     }
 
     private var outOfLivesOverlay: some View {
+        outOfLivesContent
+            // With no ad ready and none loading, start a load as the screen
+            // appears, so "Watch ad" is ready by the time it is tapped.
+            .onAppear { ads.loadIfNeeded() }
+    }
+
+    private var outOfLivesContent: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
             ZStack {
                 Color.black.opacity(0.78).ignoresSafeArea()
@@ -1875,9 +1882,11 @@ struct BallGameView: View {
                         Button {
                             guard !adInFlight else { return }
                             if !ads.isReady {
-                                // No ad cached — kick off a load and surface a
-                                // soft retry message.  Most users hit this only
-                                // on a flaky network.
+                                // No ad cached — start a load (a no-op if one
+                                // is already running) and surface a soft retry
+                                // message.  `ads.isReady` is published, so the
+                                // next tap works as soon as the ad arrives.
+                                ads.loadIfNeeded()
                                 showAdNotReadyAlert = true
                                 AnalyticsClient.shared.track("ad_watch_tap_not_ready")
                                 return
