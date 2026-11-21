@@ -417,7 +417,7 @@ struct BallSkinView: View {
                         let bright: Double = min(1.0, 0.24 + 0.52 * lit + 0.10 * hsh + 0.38 * glint)
                         var red: Double = 0.84 * bright + 0.08
                         var green: Double = 0.86 * bright + 0.08
-                        var blue: Double = 0.96 * bright + 0.10
+                        let blue: Double = 0.96 * bright + 0.10
                         if hsh > 0.86 {           // a magenta reflection of the room
                             red += 0.16 * bright; green -= 0.18 * bright
                         } else if hsh > 0.72 {    // a cyan one

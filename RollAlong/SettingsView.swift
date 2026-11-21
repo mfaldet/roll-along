@@ -18,6 +18,8 @@ struct SettingsView: View {
     #if DEBUG
     /// Debug builds only: the "All Collections" review gallery.
     @State private var showCollectionGallery = false
+    /// Debug builds only: lets "Show Out of Lives screen" open the game.
+    @EnvironmentObject private var nav: Navigator
     #endif
     /// The screen Settings was opened from, recorded with feedback.
     var openedFrom: String = "Home"
@@ -522,11 +524,46 @@ struct SettingsView: View {
             Text("Review gallery: every collection with its real art. Nothing here buys, grants or equips anything.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
+            Button { debugShowOutOfLives() } label: {
+                aboutRow(icon: "heart.slash.fill", title: "Show Out of Lives screen", trailing: "chevron.right")
+            }
+            .buttonStyle(.plain)
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            Text("For testing the rewarded ad where the phone cannot be tilted. Sets lives to zero, moves past the tutorial levels if needed, and opens Adventure on the real Out of Lives screen. This changes the saved game on this device.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
         }
         .fullScreenCover(isPresented: $showCollectionGallery) {
             CollectionReviewGallery()
                 .environmentObject(gameState)
         }
+    }
+
+    /// Debug builds only.  Puts the game where a player is after losing
+    /// their last life, then opens Adventure.  The game checks lives as it
+    /// appears (`BallGameView.spawnBall`), finds none and shows the real
+    /// Out of Lives screen, with the real "Watch ad" button.
+    ///
+    /// That check only shows the screen when all of these hold, so each is
+    /// set here:
+    ///   • the mode spends lives — Adventure does;
+    ///   • the level is past the tutorial levels, which never spend a life;
+    ///   • unlimited lives is off;
+    ///   • no lives are left, in the refilling bar or in the reserve.
+    private func debugShowOutOfLives() {
+        gameState.unlimitedLives = false
+        let firstRealLevel = GameState.tutorialLevelCount + 1
+        if gameState.isTutorialLevel(gameState.currentLevel) {
+            gameState.currentLevel = firstRealLevel
+        }
+        gameState.highestUnlocked = max(gameState.highestUnlocked, gameState.currentLevel)
+        gameState.lives = 0
+        gameState.purchasedLives = 0
+        // As after a real last fall: the 6-minute refill starts now.
+        gameState.lastLifeLostAt = .now
+        gameState.currentModeID = "climb"
+        // Leave Settings and open the game in its place.
+        nav.path = [.game]
     }
     #endif
 
@@ -821,6 +858,9 @@ struct NicknamePickerSheet: View {
         SettingsView()
             .environmentObject(GameState())
             .environmentObject(StoreKitManager.shared)
+            #if DEBUG
+            .environmentObject(Navigator())   // read by the Debug section only
+            #endif
     }
 }
 

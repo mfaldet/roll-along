@@ -166,7 +166,7 @@
      "file": "RollAlong/BallSkinView.swift",
      "decl": "^[ \\t]*private var discoCanvas: some View",
      "scope": "^(?:private |fileprivate |final )*struct BallSkinView\\b",
-     "sha": "5b35e0eb6f118ccd"
+     "sha": "9849decfdcd30c70"
     },
     {
      "file": "RollAlong/BallSkinView.swift",
