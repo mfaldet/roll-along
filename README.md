@@ -4,7 +4,7 @@
 
 Tilt your phone, roll the marble, dodge the holes, reach the goal. An endless Adventure mode, 10 minigames, clans with monthly seasons, and a shop of animated cosmetics.
 
-**Status:** version 1.0 is in App Store review (submitted November 20, 2026). · [Support page](https://mfaldet.github.io/roll-along/) · [Privacy](https://mfaldet.github.io/roll-along/privacy.html)
+**Status:** version 1.0 is live. [Get it on the App Store](https://apps.apple.com/app/roll-along-marble-maze/id6774455345). · [Support page](https://mfaldet.github.io/roll-along/) · [Privacy](https://mfaldet.github.io/roll-along/privacy.html)
 
 ![Roll Along screenshots: three Adventure levels, the minigames menu, and a clan](docs/readme/screens.jpg)
 
