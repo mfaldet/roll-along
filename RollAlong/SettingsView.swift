@@ -529,6 +529,18 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Ad settings in effect")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(AdManager.shared.debugAudienceSummary)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
             Text("For testing the rewarded ad where the phone cannot be tilted. Sets lives to zero, moves past the tutorial levels if needed, and opens Adventure on the real Out of Lives screen. This changes the saved game on this device.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))

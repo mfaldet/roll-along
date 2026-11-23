@@ -24,9 +24,10 @@ import GoogleMobileAds
 // request is tagged non-personalised (npa=1), so AdMob serves only generic
 // ads.  No ATT prompt is ever shown.
 //
-// Audience — the app is rated 13+.  Ad content is capped at Google's
-// "Parental guidance" (PG) rating and every request carries teen age
-// treatment (see `bootstrap`).
+// Audience — the game is for players aged 9 and up, so every player is
+// treated as a child: every request carries Google's child age treatment,
+// ad content is capped at Google's "General audiences" (G) rating, and the
+// SDK's coarse-location collection is switched off (see `bootstrap`).
 //
 // DEBUG vs RELEASE — in DEBUG builds we use Google's documented test ad
 // unit ID so dev runs don't generate fraud impressions against the real
@@ -88,18 +89,22 @@ final class AdManager: NSObject, ObservableObject {
     func bootstrap(with gameState: GameState) async {
         self.gameState = gameState
         // Audience settings — set BEFORE the SDK starts so they apply to every
-        // request.  Roll Along is rated 13+ and is not directed at children:
-        //   • maxAdContentRating = parentalGuidance — no ad rated above
-        //     "Parental guidance" (PG) is served; stricter than the 13+ app
-        //     rating (App Review Guideline 2.5.18: ads must suit the app's age
-        //     rating).
-        //   • ageRestrictedTreatment = teen — Google applies its teen ad-serving
-        //     protections to every request, since we never learn a player's age.
-        //     (Added in Google Mobile Ads SDK 13.3.0; replaces the deprecated
-        //     tagForChildDirectedTreatment / tagForUnderAgeOfConsent.)
+        // request.  Roll Along is for players aged 9 and up and never learns a
+        // player's age, so every request is made as if the player is a child:
+        //   • ageRestrictedTreatment = child — Google applies its child
+        //     ad-serving protections.  This replaces the deprecated
+        //     tagForChildDirectedTreatment (COPPA) and tagForUnderAgeOfConsent
+        //     (GDPR) settings, and is the equivalent of setting both to true.
+        //   • maxAdContentRating = general — no ad rated above "General
+        //     audiences" (G), the lowest of Google's four content ratings
+        //     (G, PG, T, MA).
+        //   • coarseLocationCollectionEnabled = false — the SDK does not
+        //     collect approximate location.  (Property added in Google Mobile
+        //     Ads SDK 13.12.0.  The app never asks for location permission.)
         let adConfig = MobileAds.shared.requestConfiguration
-        adConfig.maxAdContentRating = .parentalGuidance
-        adConfig.ageRestrictedTreatment = .teen
+        adConfig.ageRestrictedTreatment = .child
+        adConfig.maxAdContentRating = .general
+        adConfig.coarseLocationCollectionEnabled = false
         // The app owns the audio session (.ambient, set once at launch).  Without
         // this the SDK may switch the session category around ad playback,
         // which can pause or alter other apps' audio.  Under .ambient a
@@ -187,6 +192,19 @@ final class AdManager: NSObject, ObservableObject {
             await self.loadRewarded()
         }
     }
+
+    #if DEBUG
+    /// Debug builds only: the audience settings as the SDK itself reports
+    /// them, shown in Settings → Debug so they can be checked without
+    /// reading the code.
+    var debugAudienceSummary: String {
+        let config = MobileAds.shared.requestConfiguration
+        let age = config.ageRestrictedTreatment == .child ? "child" : "NOT child"
+        let rating = config.maxAdContentRating == .general ? "G (general audiences)" : "NOT G"
+        let location = config.coarseLocationCollectionEnabled ? "ON" : "off"
+        return "Age treatment: \(age) · Content cap: \(rating) · Location collection: \(location)"
+    }
+    #endif
 
     // MARK: - Foreground / background
 
