@@ -72,7 +72,7 @@ final class TrophyCatalogTests: XCTestCase {
     // MARK: Bundled catalog shape
 
     /// The bundled catalog loads, validates, and has the ruled v1 shape:
-    /// 86 trophies — 41 Bronze / 24 Silver / 14 Gold / 6 Diamond /
+    /// 87 trophies — 41 Bronze / 24 Silver / 14 Gold / 7 Diamond /
     /// 1 Platinum capstone (the 2026-11 revision: stacks and feats).  The 3
     /// Pinball score trophies, whimsy_roll_call, the 2 Roll Out trophies and
     /// the 4 Challenge of the Day trophies stay held back from v1.0.
@@ -2919,7 +2919,8 @@ final class TrophyTriggerCoverageTests: XCTestCase {
 }
 
 // ===========================================================================
-// 2026-11 trophy revision — 86 trophies drawn as 44 tiles (stacks and feats).
+// 2026-11 trophy revision — 86 trophies drawn as 44 tiles (stacks and feats);
+// 1.1 adds The Waiting Room (one more feat): 87 trophies, 45 tiles.
 // ===========================================================================
 #if canImport(UIKit)
 import UIKit
@@ -3013,7 +3014,7 @@ final class TrophyRevisionTests: XCTestCase {
 
     // MARK: Tiles
 
-    /// 44 tiles; every trophy is on exactly one; no two tiles share an icon;
+    /// 45 tiles; every trophy is on exactly one; no two tiles share an icon;
     /// a feat holds one trophy; a stack's steps run lowest tier to highest.
     func testTileLayoutCoversEveryTrophyOnce() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
@@ -3034,7 +3035,7 @@ final class TrophyRevisionTests: XCTestCase {
         }
         XCTAssertEqual(Set(seen.keys), Set(catalog.trophies.map(\.id)))
         XCTAssertEqual(catalog.tiles.filter { $0.kind == .stack }.count, 20)
-        XCTAssertEqual(catalog.tiles.filter { $0.kind == .feat }.count, 24)
+        XCTAssertEqual(catalog.tiles.filter { $0.kind == .feat }.count, 25)   // 24 at launch + The Waiting Room
     }
 
     #if canImport(UIKit)
@@ -3089,7 +3090,7 @@ final class TrophyRevisionTests: XCTestCase {
         let personal = try XCTUnwrap(model.tileSections.first { $0.section == .personal })
         XCTAssertEqual(personal.subsections.map(\.title),
                        ["Collection", "Coins and rewards", "Friends & Clans", "Secrets"])
-        XCTAssertEqual(model.tileSections.reduce(0) { $0 + $1.total }, 85,
+        XCTAssertEqual(model.tileSections.reduce(0) { $0 + $1.total }, 86,
                        "every trophy except Platinum is in a section")
     }
 
