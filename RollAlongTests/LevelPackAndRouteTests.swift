@@ -38,11 +38,11 @@ final class LevelPackRulesTests: XCTestCase {
 final class RouteRecorderTests: XCTestCase {
     private let tick = 1.0 / 60.0
 
-    func testTenPointsPerSecondOfPlay() {
+    func testTwentyPointsPerSecondOfPlay() {
         var route = RouteRecorder()
         for _ in 0..<120 { route.tick(x: 0.5, y: 0.5, dt: tick) }   // two seconds
-        XCTAssertEqual(route.pointCount, 20)
-        XCTAssertEqual(route.step, 0.1, accuracy: 1e-9)
+        XCTAssertEqual(route.pointCount, 40)
+        XCTAssertEqual(route.step, 0.05, accuracy: 1e-9)
     }
 
     func testPointsAreThousandthsAndTheEndIsAlwaysKept() {
@@ -66,7 +66,7 @@ final class RouteRecorderTests: XCTestCase {
         XCTAssertEqual(route.ys.first, 0)
         XCTAssertEqual(route.ys.last, 1000)
         XCTAssertEqual(route.ys, route.ys.sorted(), "points stay in the order they happened")
-        XCTAssertGreaterThan(route.step, 0.1, "the gap between points grew")
+        XCTAssertGreaterThan(route.step, 0.05, "the gap between points grew")
         XCTAssertLessThanOrEqual(route.encoded.utf8.count, RouteRecorder.maxPoints * 9)
     }
 

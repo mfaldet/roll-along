@@ -59,6 +59,7 @@
 		AD0000R5000000000000AD01 /* LevelProgressRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R5000000000000AD00 /* LevelProgressRules.swift */; };
 		AD0000RA000000000000AD01 /* TrophyEarnability.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RA000000000000AD00 /* TrophyEarnability.swift */; };
 		AD0000R9000000000000AD01 /* ClearRewards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R9000000000000AD00 /* ClearRewards.swift */; };
+		AD0000RE000000000000AD01 /* HomeMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RE000000000000AD00 /* HomeMoments.swift */; };
 		AD0000R8000000000000AD01 /* RouteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R8000000000000AD00 /* RouteRecorder.swift */; };
 		AD0000R7000000000000AD01 /* LevelPackRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R7000000000000AD00 /* LevelPackRules.swift */; };
 		AD0000R6000000000000AD01 /* LevelProgressRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R6000000000000AD00 /* LevelProgressRulesTests.swift */; };
@@ -183,6 +184,7 @@
 		AD0000R5000000000000AD00 /* LevelProgressRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelProgressRules.swift; sourceTree = "<group>"; };
 		AD0000RA000000000000AD00 /* TrophyEarnability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEarnability.swift; sourceTree = "<group>"; };
 		AD0000R9000000000000AD00 /* ClearRewards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearRewards.swift; sourceTree = "<group>"; };
+		AD0000RE000000000000AD00 /* HomeMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeMoments.swift; sourceTree = "<group>"; };
 		AD0000R8000000000000AD00 /* RouteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRecorder.swift; sourceTree = "<group>"; };
 		AD0000R7000000000000AD00 /* LevelPackRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelPackRules.swift; sourceTree = "<group>"; };
 		AD0000R6000000000000AD00 /* LevelProgressRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelProgressRulesTests.swift; sourceTree = "<group>"; };
@@ -319,6 +321,7 @@
 				AD0000R5000000000000AD00 /* LevelProgressRules.swift */,
 				AD0000RA000000000000AD00 /* TrophyEarnability.swift */,
 				AD0000R9000000000000AD00 /* ClearRewards.swift */,
+				AD0000RE000000000000AD00 /* HomeMoments.swift */,
 				AD0000R8000000000000AD00 /* RouteRecorder.swift */,
 				AD0000R7000000000000AD00 /* LevelPackRules.swift */,
 				QE3A0001000000000000AA00 /* PhysicsHelpers.swift */,
@@ -552,6 +555,7 @@
 				AD0000R5000000000000AD01 /* LevelProgressRules.swift in Sources */,
 				AD0000RA000000000000AD01 /* TrophyEarnability.swift in Sources */,
 				AD0000R9000000000000AD01 /* ClearRewards.swift in Sources */,
+				AD0000RE000000000000AD01 /* HomeMoments.swift in Sources */,
 				AD0000R8000000000000AD01 /* RouteRecorder.swift in Sources */,
 				AD0000R7000000000000AD01 /* LevelPackRules.swift in Sources */,
 				D502FED42FD5024E00CA86BD /* SocialClient.swift in Sources */,

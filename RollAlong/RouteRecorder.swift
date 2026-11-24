@@ -15,9 +15,10 @@ import Foundation
 // end, only more coarsely.  The event says the gap it ended with.
 // ---------------------------------------------------------------------------
 struct RouteRecorder {
-    /// PROPOSED sampling rate: points per second of play.
-    static let samplesPerSecond: Double = 10
-    /// PROPOSED size limit: the most points one run may hold (about 4.8 KB).
+    /// Sampling rate: points per second of play.
+    static let samplesPerSecond: Double = 20
+    /// Size limit: the most points one run may hold (about 4.8 KB).  At 20
+    /// points a second that is 30 seconds of play before a run is thinned.
     static let maxPoints: Int = 600
 
     private(set) var xs: [Int] = []

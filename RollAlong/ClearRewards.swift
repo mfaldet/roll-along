@@ -10,9 +10,10 @@ import Foundation
 //  • A free collection pick is offered after level 10 (as before) and again
 //    after levels 50, 100 and 200.
 //
-// "Held" means: true before the 1.1 update arrived, and waiting for the
-// owner's decision on whether it pays.  Nothing held pays, and nothing held
-// is lost: a later version can pay it or close it.
+// What a player had already done when 1.1 arrived is settled once, on the
+// first launch of 1.1 (`GameState.settleRewardsFromBefore11`): every level
+// already fully cleared pays its bonus in one sum, and the picks for
+// milestones already passed are offered one after another.
 // ---------------------------------------------------------------------------
 enum ClearRewards {
     static let fullClearBonusEasy = 10
@@ -29,9 +30,8 @@ enum ClearRewards {
     static func fullClearBonus(level: Int,
                                isFullyClearedNow: Bool,
                                tierBonus: Int,
-                               alreadyPaid: Set<Int>,
-                               held: Set<Int>) -> Int {
-        guard isFullyClearedNow, !alreadyPaid.contains(level), !held.contains(level) else { return 0 }
+                               alreadyPaid: Set<Int>) -> Int {
+        guard isFullyClearedNow, !alreadyPaid.contains(level) else { return 0 }
         return max(0, tierBonus)
     }
 
@@ -40,16 +40,17 @@ enum ClearRewards {
     static let pickMilestones: [Int] = [50, 100, 200]
 
     /// The lowest milestone whose pick is owed: the player has passed that
-    /// level, has not taken its pick, and it is not held.  nil for none.
+    /// level and has not taken its pick.  nil for none.
     /// `highestUnlocked` is one more than the highest level passed in order.
-    static func pickDue(highestUnlocked: Int, taken: Set<Int>, held: Set<Int>) -> Int? {
-        pickMilestones.first {
-            highestUnlocked > $0 && !taken.contains($0) && !held.contains($0)
-        }
+    static func pickDue(highestUnlocked: Int, taken: Set<Int>) -> Int? {
+        pickMilestones.first { highestUnlocked > $0 && !taken.contains($0) }
     }
 
-    /// The milestones a player had already passed when 1.1 arrived.
-    static func milestonesAlreadyPassed(highestUnlocked: Int) -> Set<Int> {
-        Set(pickMilestones.filter { highestUnlocked > $0 })
+    /// The one-time sum for levels fully cleared before 1.1: each level's
+    /// bonus, for every such level not already paid.
+    static func bonusForEarlierFullClears(levels: Set<Int>, alreadyPaid: Set<Int>,
+                                          tierBonus: (Int) -> Int) -> (total: Int, levels: Set<Int>) {
+        let owed = levels.subtracting(alreadyPaid)
+        return (owed.reduce(0) { $0 + max(0, tierBonus($1)) }, owed)
     }
 }

@@ -902,25 +902,50 @@ final class LevelOverridesTests: XCTestCase {
         XCTAssertEqual(gs.payFullClearBonusIfDue(level: 1), 0)
     }
 
-    /// What a player had done before 1.1 is held: it neither pays nor is
-    /// offered until the owner decides.  New progress pays as normal.
-    func testProgressMadeBeforeTheUpdateIsHeld() {
-        let gs = freshState("held")
-        for level in 1...60 { gs.bestStars[level] = 1; gs.bestTime[level] = 30 }
-        gs.bestStars[3] = 3; gs.collectedCoins[3] = [0, 1, 2]     // fully cleared before the update
-        gs.highestUnlocked = 61
-        gs.takeRewardsBaselineIfNeeded()
-        XCTAssertEqual(gs.fullClearBonusHeld, [3])
-        XCTAssertEqual(gs.collectionPicksHeld, [50])
-        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 3), 0, "held, not paid")
-        XCTAssertNil(gs.collectionPickDue, "the level 50 pick is held, not offered")
-        // A level fully cleared after the update pays.
-        gs.recordResult(level: 4, stars: 3, time: 5, coinIndices: [0, 1, 2])
-        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 4), 10)
-        // The baseline is taken once.
+    /// What a player had done before 1.1 is settled once: every level
+    /// already fully cleared pays its bonus in one sum, with one message
+    /// waiting for Home, and the picks already passed are owed in order.
+    func testProgressMadeBeforeTheUpdateIsSettledOnce() {
+        let gs = freshState("before-1.1")
+        for level in 1...100 { gs.bestStars[level] = 1; gs.bestTime[level] = 30 }
+        // Fully cleared before the update: level 3 (easy, 10), 5 (very hard, 20), 6 (hard, 15).
+        for level in [3, 5, 6] { gs.bestStars[level] = 3; gs.collectedCoins[level] = [0, 1, 2] }
+        gs.highestUnlocked = 101
+        let before = gs.coinBalance
+        XCTAssertEqual(gs.settleRewardsFromBefore11(), 45)
+        XCTAssertEqual(gs.coinBalance, before + 45)
+        XCTAssertEqual(gs.earlierBonusToAnnounce, 45, "one message, with the total")
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 3), 0, "already paid in the sum")
+        // Both picks are owed, lowest first.
+        XCTAssertEqual(gs.collectionPickDue, 50)
+        gs.closeCollectionPick(50)
+        XCTAssertEqual(gs.collectionPickDue, 100)
+        // It settles once: a level fully cleared later is paid when it is cleared, not here.
         gs.bestStars[7] = 3; gs.collectedCoins[7] = [0, 1, 2]
-        gs.takeRewardsBaselineIfNeeded()
-        XCTAssertEqual(gs.fullClearBonusHeld, [3])
+        XCTAssertEqual(gs.settleRewardsFromBefore11(), 0)
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 7), 15)
+    }
+
+    /// A new install has nothing to settle and gets no message.
+    func testANewInstallHasNothingToSettle() {
+        let gs = freshState("new-install")
+        XCTAssertEqual(gs.settleRewardsFromBefore11(), 0)
+        XCTAssertEqual(gs.earlierBonusToAnnounce, 0)
+        XCTAssertNil(gs.collectionPickDue)
+    }
+
+    /// Taking a pick gifts the collection, puts it on and closes that pick.
+    func testTakingAPickGiftsAndClosesIt() {
+        let gs = freshState("take-pick")
+        gs.highestUnlocked = 51
+        guard let water = CosmeticBundle.catalogue.first(where: { $0.id == "water" }) else {
+            return XCTFail("the Water collection is missing")
+        }
+        gs.takeRewardCollection(water, pickLevel: 50)
+        XCTAssertNil(gs.collectionPickDue)
+        XCTAssertTrue(gs.completedBundleIDs.contains("water"))
+        XCTAssertEqual(gs.activeSkin, water.balls.first)
+        XCTAssertFalse(gs.rewardCollectionsNotOwned.contains { $0.id == "water" })
     }
 
     /// A pick is owed after passing level 50 and closes when taken.

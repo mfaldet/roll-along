@@ -119,10 +119,13 @@ struct RollAlongApp: App {
                     //     on it).  After the backfill above, so trophies
                     //     already earned from the old levels are kept.
                     gameState.fitProgressToLevelPack()
-                    //     Then note, once, what the player had already done
-                    //     before the 1.1 rewards existed, so none of it pays
-                    //     by accident.
-                    gameState.takeRewardsBaselineIfNeeded()
+                    //     Then settle, once, what the player had already
+                    //     done before the 1.1 rewards existed: pay the
+                    //     full-clear bonus for levels already fully cleared.
+                    gameState.settleRewardsFromBefore11()
+                    //     Home may now show its one-time moments: the bonus
+                    //     message, then any collection pick that is owed.
+                    gameState.homeMomentsSignal += 1
                     // 2. Reconcile the iCloud key-value ratchet mirror (S3-T8):
                     //    union-restores unlocks after a delete+reinstall and
                     //    converges multiple devices.  A local-only no-op until

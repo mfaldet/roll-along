@@ -618,12 +618,12 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                 Button { gameState.debugStandOn(level: 100) } label: { debugButtonLabel("Rewards check: stand on level 100") }
                     .buttonStyle(.plain)
-                Button { gameState.takeRewardsBaselineIfNeeded(force: true) } label: {
-                    debugButtonLabel("Rewards check: treat progress so far as made before 1.1")
+                Button { gameState.debugMakeSaveFromBefore11() } label: {
+                    debugButtonLabel("Set up a save from before 1.1 (then close and reopen the app)")
                 }
                 .buttonStyle(.plain)
             }
-            Text("The stand-on buttons replace the saved Adventure progress and forget every 1.1 reward record. \(gameState.debugRewardsSummary)")
+            Text("The save from before 1.1 has every level passed, levels 1 to 30 fully cleared, and no 1.1 reward record. Close the app and open it again: Home shows the bonus message (+420 coins), then the level 50 pick, then the level 100 pick, then the end room. The stand-on buttons replace the saved Adventure progress and forget every 1.1 reward record. \(gameState.debugRewardsSummary)")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
             VStack(alignment: .leading, spacing: 6) {

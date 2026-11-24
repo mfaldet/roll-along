@@ -365,25 +365,26 @@ final class GameState: ObservableObject {
     // fullClearBonusPaid   : levels whose full-clear bonus has been paid.
     //                        Never cleared, so a bonus pays once per level
     //                        even after "Reset progress".
-    // fullClearBonusHeld   : levels that were ALREADY fully cleared when 1.1
-    //                        arrived.  They pay nothing until the owner
-    //                        decides whether they should (see ClearRewards).
     // collectionPicksTaken : the milestones (50, 100, 200) whose free
     //                        collection pick has been taken or closed.
-    // collectionPicksHeld  : milestones ALREADY passed when 1.1 arrived;
-    //                        not offered until the owner decides.
+    // earlierBonusToAnnounce: coins paid on the first launch of 1.1 for
+    //                        levels fully cleared before it, not yet shown
+    //                        to the player.  Home shows one message with
+    //                        this total, then sets it back to 0.
     @Published var fullClearBonusPaid: Set<Int> {
         didSet { defaults.set(fullClearBonusPaid.sorted(), forKey: "ra_fullClearBonusPaid") }
-    }
-    @Published var fullClearBonusHeld: Set<Int> {
-        didSet { defaults.set(fullClearBonusHeld.sorted(), forKey: "ra_fullClearBonusHeld") }
     }
     @Published var collectionPicksTaken: Set<Int> {
         didSet { defaults.set(collectionPicksTaken.sorted(), forKey: "ra_collectionPicksTaken") }
     }
-    @Published var collectionPicksHeld: Set<Int> {
-        didSet { defaults.set(collectionPicksHeld.sorted(), forKey: "ra_collectionPicksHeld") }
+    @Published var earlierBonusToAnnounce: Int {
+        didSet { defaults.set(earlierBonusToAnnounce, forKey: "ra_earlierBonusToAnnounce") }
     }
+    /// Goes up by one each time Home should look for a one-time moment to
+    /// show (the bonus message, an owed collection pick, the end room): at
+    /// the end of launch, and when a game sends the player Home for one.
+    /// Not saved.
+    @Published var homeMomentsSignal: Int = 0
     @Published var lastReviewPromptDate: Date? {
         didSet {
             if let d = lastReviewPromptDate {
@@ -925,9 +926,8 @@ final class GameState: ObservableObject {
         lastReviewPromptDate = defaults.object(forKey: "ra_lastReviewPromptDate") as? Date
         reviewMilestonesAsked = Set((defaults.array(forKey: "ra_reviewMilestonesAsked") as? [Int]) ?? [])
         fullClearBonusPaid   = Set((defaults.array(forKey: "ra_fullClearBonusPaid") as? [Int]) ?? [])
-        fullClearBonusHeld   = Set((defaults.array(forKey: "ra_fullClearBonusHeld") as? [Int]) ?? [])
         collectionPicksTaken = Set((defaults.array(forKey: "ra_collectionPicksTaken") as? [Int]) ?? [])
-        collectionPicksHeld  = Set((defaults.array(forKey: "ra_collectionPicksHeld") as? [Int]) ?? [])
+        earlierBonusToAnnounce = defaults.integer(forKey: "ra_earlierBonusToAnnounce")
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -1295,22 +1295,36 @@ final class GameState: ObservableObject {
 
     // MARK: - Coins and free collections for clearing levels (1.1)
 
-    /// Once, on the first launch of 1.1: note what the player had ALREADY
-    /// done before the new rewards existed, so none of it pays by accident.
-    ///  • every level already fully cleared is held (no full-clear bonus);
-    ///  • every pick milestone already passed is held (no pick offered).
-    /// Whether held rewards are paid is the owner's decision; holding keeps
-    /// both answers possible.  A new install has nothing to hold.
+    /// Once, on the first launch of 1.1: settle what the player had ALREADY
+    /// done before the new rewards existed.
+    ///  • Every level already fully cleared pays its full-clear bonus now,
+    ///    in one sum.  The total waits in `earlierBonusToAnnounce` until
+    ///    Home has shown its one short message.
+    ///  • Collection picks for milestones already passed need nothing here:
+    ///    `collectionPickDue` reports them, lowest first, and Home offers
+    ///    them one after another after the message.
+    /// A new install has nothing to settle.  Returns the coins paid.
     ///
     /// Called at launch after `fitProgressToLevelPack()`.
-    func takeRewardsBaselineIfNeeded(force: Bool = false) {
+    @discardableResult
+    func settleRewardsFromBefore11(force: Bool = false) -> Int {
         let doneKey = "ra_rewardsBaselineTaken"
-        guard force || !defaults.bool(forKey: doneKey) else { return }
-        defaults.set(true, forKey: doneKey)
-        fullClearBonusHeld = Set(bestStars.keys.filter { isFullyCleared($0) })
-            .subtracting(fullClearBonusPaid)
-        collectionPicksHeld = ClearRewards.milestonesAlreadyPassed(highestUnlocked: highestUnlocked)
-            .subtracting(collectionPicksTaken)
+        // Levels an earlier test build of 1.1 set aside without paying.
+        var levels = Set((defaults.array(forKey: "ra_fullClearBonusHeld") as? [Int]) ?? [])
+        defaults.removeObject(forKey: "ra_fullClearBonusHeld")
+        defaults.removeObject(forKey: "ra_collectionPicksHeld")
+        if force || !defaults.bool(forKey: doneKey) {
+            defaults.set(true, forKey: doneKey)
+            levels.formUnion(bestStars.keys.filter { isFullyCleared($0) })
+        }
+        let settled = ClearRewards.bonusForEarlierFullClears(
+            levels: levels, alreadyPaid: fullClearBonusPaid,
+            tierBonus: { Self.fullClearBonus(for: $0) })
+        guard settled.total > 0 else { return 0 }
+        fullClearBonusPaid.formUnion(settled.levels)
+        addCoins(settled.total)
+        earlierBonusToAnnounce += settled.total
+        return settled.total
     }
 
     /// The full-clear bonus for a level of this tier: 10 / 15 / 20.
@@ -1323,7 +1337,7 @@ final class GameState: ObservableObject {
     }
 
     /// Pay `level`'s full-clear bonus if it is due: the level is fully
-    /// cleared now, and the bonus was neither paid before nor held.  Call
+    /// cleared now, and the bonus was not paid before.  Call
     /// AFTER `recordResult`.  Returns the coins paid (0 for none).
     @discardableResult
     func payFullClearBonusIfDue(level: Int) -> Int {
@@ -1331,8 +1345,7 @@ final class GameState: ObservableObject {
             level: level,
             isFullyClearedNow: isFullyCleared(level),
             tierBonus: Self.fullClearBonus(for: level),
-            alreadyPaid: fullClearBonusPaid,
-            held: fullClearBonusHeld)
+            alreadyPaid: fullClearBonusPaid)
         guard bonus > 0 else { return 0 }
         fullClearBonusPaid.insert(level)
         addCoins(bonus)
@@ -1351,12 +1364,33 @@ final class GameState: ObservableObject {
     /// closed without a pick.
     var collectionPickDue: Int? {
         ClearRewards.pickDue(highestUnlocked: highestUnlocked,
-                             taken: collectionPicksTaken, held: collectionPicksHeld)
+                             taken: collectionPicksTaken)
     }
 
     /// Record that `milestone`'s pick was taken (or had nothing to offer).
     func closeCollectionPick(_ milestone: Int) {
         collectionPicksTaken.insert(milestone)
+    }
+
+    /// The player picked `bundle` as a free collection after `pickLevel`
+    /// (10, 50, 100 or 200).  Gifts the whole collection (Sell Back keeps
+    /// it, never refunds it), puts it on, records a later pick as taken,
+    /// and sends the one analytics event for a pick: the level and the
+    /// collection chosen, nothing else.
+    func takeRewardCollection(_ bundle: CosmeticBundle, pickLevel: Int) {
+        grantBundleFree(bundle)
+        if let b = bundle.balls.first  { equipBall(b) }
+        if let g = bundle.goals.first  { equippedGoal  = g }
+        if let t = bundle.trails.first { equippedTrail = t }
+        if let f = bundle.floors.first { equippedFloor = f }
+        if let p = bundle.pits.first   { equippedPit   = p }
+        if let w = bundle.boundaries.first { equippedBoundary = w }
+        if let m = bundle.offeredMusic.first { equippedMusic = m }
+        if ClearRewards.pickMilestones.contains(pickLevel) { closeCollectionPick(pickLevel) }
+        AnalyticsClient.shared.track(
+            "collection_pick",
+            properties: ["pick_level": .int(pickLevel), "collection": .string(bundle.id)]
+        )
     }
 
     #if DEBUG
@@ -1370,18 +1404,42 @@ final class GameState: ObservableObject {
         bestStars = stars; bestTime = times; collectedCoins = [:]
         currentLevel = target
         highestUnlocked = target
-        fullClearBonusPaid = []; fullClearBonusHeld = []
+        fullClearBonusPaid = []
         // Picks for milestones below this level count as taken, so the pick
         // offered next is this level's own.
         collectionPicksTaken = Set(ClearRewards.pickMilestones.filter { $0 < target })
-        collectionPicksHeld = []
+        earlierBonusToAnnounce = 0
+    }
+
+    /// Debug builds only (Settings → Debug).  Makes the saved game look like
+    /// one from BEFORE 1.1: every level passed (so the player is past level
+    /// 100), levels 1–30 fully cleared, and no 1.1 reward record at all.
+    /// The next launch then settles it as a real update would: one bonus
+    /// message (420 coins for levels 1–30), then the level 50 pick, then
+    /// the level 100 pick.
+    func debugMakeSaveFromBefore11() {
+        let last = LevelLayout.lastLevel
+        var stars: [Int: Int] = [:], times: [Int: TimeInterval] = [:], coins: [Int: Set<Int>] = [:]
+        for level in 1...last {
+            let full = level <= 30
+            stars[level] = full ? 3 : 2
+            times[level] = full ? 5 : 20
+            if full { coins[level] = Set(0..<(LevelLayout.overrides[level]?.coins.count ?? 0)) }
+        }
+        bestStars = stars; bestTime = times; collectedCoins = coins
+        currentLevel = last
+        highestUnlocked = last + 1
+        fullClearBonusPaid = []
+        collectionPicksTaken = []
+        earlierBonusToAnnounce = 0
+        defaults.removeObject(forKey: "ra_rewardsBaselineTaken")
     }
 
     /// One line on the 1.1 reward records, for Settings → Debug.
     var debugRewardsSummary: String {
         func list(_ set: Set<Int>) -> String { set.isEmpty ? "none" : set.sorted().map(String.init).joined(separator: ", ") }
-        return "Coins: \(coinBalance). Full-clear bonus paid on \(fullClearBonusPaid.count) levels, held on \(fullClearBonusHeld.count). "
-             + "Collection picks taken: \(list(collectionPicksTaken)); held: \(list(collectionPicksHeld)); "
+        return "Coins: \(coinBalance). Full-clear bonus paid on \(fullClearBonusPaid.count) levels, waiting to be announced: \(earlierBonusToAnnounce) coins. "
+             + "Collection picks taken: \(list(collectionPicksTaken)); "
              + "due now: \(collectionPickDue.map(String.init) ?? "none"). "
              + "Reward-list collections not owned: \(rewardCollectionsNotOwned.map(\.displayName).joined(separator: ", "))."
     }

@@ -168,6 +168,11 @@ struct HomeView: View {
     // 48-hour window is open.
     @State private var showStarterPackSheet: Bool = false
 
+    /// A one-time moment Home is showing full screen: the 1.1 bonus message,
+    /// an owed free collection pick, or the end room (see HomeMoments.swift).
+    /// One at a time; when it closes Home looks for the next.
+    @State private var homeMoment: HomeMoment? = nil
+
     /// Drives the Play→game launch animation (the ball dives at the viewer).
     @State private var launching: Bool = false
     @State private var launchStart: Date = .now
@@ -434,6 +439,7 @@ struct HomeView: View {
                     // mid-run (a new app open while in a game) and been
                     // deferred; present it now that Home is front-most.
                     maybeAutoPresentStarterPack()
+                    showNextHomeMoment()
                     return
                 }
                 if case .game = last { gameState.currentModeID = "climb" }
@@ -442,6 +448,7 @@ struct HomeView: View {
             .onAppear    {
                 motion.start(); clock.start(); maybeAutoPresentDailyReward()
                 maybeAutoPresentStarterPack()   // 48h-window re-present on launch
+                showNextHomeMoment()
                 // A CotD run left unfinished at last launch (app killed mid-run)
                 // is forfeited — leaving a run forfeits the day.
                 gameState.forfeitDailyChallengeIfRunning()
@@ -571,6 +578,24 @@ struct HomeView: View {
                     .environmentObject(gameState)
                     .environmentObject(StoreKitManager.shared)
             }
+            // One-time moments (1.1): the bonus message, owed collection
+            // picks, the end room.  Shown one after another: when one closes,
+            // `onDismiss` looks for the next.
+            .fullScreenCover(item: $homeMoment, onDismiss: { showNextHomeMoment() }) { moment in
+                HomeMomentView(moment: moment, onDone: { homeMoment = nil })
+                    .environmentObject(gameState)
+                    .overlay {
+                        TrophyToastHost(queue: gameState.trophyToasts,
+                                        hapticsEnabled: gameState.hapticsEnabled,
+                                        soundEnabled: gameState.soundEnabled)
+                    }
+            }
+            // Launch has finished settling the saved game, or a game sent the
+            // player Home for a moment.
+            .onChange(of: gameState.homeMomentsSignal) { _, _ in showNextHomeMoment() }
+            // Another sheet closed: a moment that was waiting behind it may show.
+            .onChange(of: showDailyRewardSheet) { _, showing in if !showing { showNextHomeMoment() } }
+            .onChange(of: showStarterPackSheet) { _, showing in if !showing { showNextHomeMoment() } }
             // Auto-present the Starter Pack (Welcome Gift) on the first app
             // open after the tutorial pick (fires once, never re-armed).  The
             // 48-hour-window re-present rides the same onAppear as the daily
@@ -1093,6 +1118,25 @@ struct HomeView: View {
         autoPresentedDaily = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if gameState.dailyRewardAvailable { showDailyRewardSheet = true }
+        }
+    }
+
+    /// Show the next one-time moment, if there is one and Home is free to
+    /// show it: Home is front-most, onboarding is done, and no other sheet
+    /// or moment is up.  Safe to call at any time; it does nothing when
+    /// there is nothing to show.  Never under --uitesting.
+    private func showNextHomeMoment() {
+        guard !Self.isUITesting else { return }
+        guard gameState.seenOnboarding, homeMoment == nil, nav.path.isEmpty,
+              !showDailyRewardSheet, !showStarterPackSheet,
+              !showBuyCoinsSheet, !showBuyLivesSheet else { return }
+        guard HomeMoment.next(for: gameState) != nil else { return }
+        // A short pause so Home (or a sheet that just closed) settles first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            guard homeMoment == nil, nav.path.isEmpty,
+                  !showDailyRewardSheet, !showStarterPackSheet,
+                  !showBuyCoinsSheet, !showBuyLivesSheet else { return }
+            homeMoment = HomeMoment.next(for: gameState)
         }
     }
 

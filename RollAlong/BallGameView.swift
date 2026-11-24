@@ -3233,21 +3233,10 @@ struct BallGameView: View {
     private func confirmTutorialBundle() {
         guard let bundle = tutorialPickedBundle else { return }
 
-        // Gift the whole collection (un-redeemable — never refundable on Sell Back).
-        gameState.grantBundleFree(bundle)
-        // Equip the full look from the gifted collection so the change is instant.
-        if let b = bundle.balls.first  { gameState.equipBall(b) }
-        if let g = bundle.goals.first  { gameState.equippedGoal  = g }
-        if let t = bundle.trails.first { gameState.equippedTrail = t }
-        if let f = bundle.floors.first { gameState.equippedFloor = f }
-        if let p = bundle.pits.first   { gameState.equippedPit   = p }
-        if let w = bundle.boundaries.first { gameState.equippedBoundary = w }
-        if let m = bundle.offeredMusic.first  { gameState.equippedMusic = m }
-
-        if let milestone = pickMilestone {
-            // A later pick: record it as taken.  Nothing else changes.
-            gameState.closeCollectionPick(milestone)
-        } else {
+        // Gift the whole collection, put it on, and send the pick event
+        // (level 10 for the tutorial reward, else the milestone).
+        gameState.takeRewardCollection(bundle, pickLevel: pickMilestone ?? 10)
+        if pickMilestone == nil {
             gameState.seenTutorialReward = true
             // The Welcome Gift waits for a later app open than this one.
             gameState.markTutorialPickedThisOpen()
