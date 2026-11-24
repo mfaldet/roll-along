@@ -3326,6 +3326,7 @@ struct BallGameView: View {
             AnalyticsClient.shared.track(
                 "level_attempt",
                 properties: [
+                    "game_mode":   .string(activeMode.id),
                     "tier":        .string(layout.tier.rawValue),
                     "is_tutorial": .bool(gameState.isTutorialLevel(gameState.currentLevel)),
                 ],
@@ -3572,6 +3573,7 @@ struct BallGameView: View {
                     "time_to_fail":  .double(elapsedSinceSpawn),
                     "coins_picked":  .int(coinsPickedThisAttempt.count),
                     "is_tutorial":   .bool(gameState.isTutorialLevel(gameState.currentLevel)),
+                    "game_mode":     .string(activeMode.id),
                     "fall_x":        .double(fell.x),
                     "fall_y":        .double(fell.y),
                 ],
@@ -3985,6 +3987,7 @@ struct BallGameView: View {
         AnalyticsClient.shared.track(
             "level_complete",
             properties: [
+                "game_mode":     .string(activeMode.id),
                 "tier":          .string(layout.tier.rawValue),
                 "time":          .double(elapsed),
                 "stars":         .int(stars),

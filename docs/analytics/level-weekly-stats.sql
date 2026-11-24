@@ -38,6 +38,13 @@
 --                          do anything else in the game that day.
 --   fail_ended_day_share   fails_ending_the_day divided by fails (0 to 1).
 --
+-- OLDER EVENTS
+--   Before version 1.1 these events did not say which mode they came from. A
+--   Challenge Track or Challenge of the Day run sent level_attempt and
+--   level_fail carrying the player's Adventure level number, so weeks filled
+--   from 1.0 and 1.0.1 events can overstate attempts and fails on a level.
+--   From 1.1 each event carries game_mode and only Adventure ("climb") counts.
+--
 -- A WEEK is Monday 00:00 to the next Monday 00:00, US Eastern time, the same
 -- clock the game uses for its own days.
 -- =============================================================================
@@ -102,6 +109,10 @@ begin
         from week_events w
         where w.level is not null
           and w.event_name in ('level_attempt', 'level_complete', 'level_fail')
+          -- Adventure only. From version 1.1 each of these events names its
+          -- mode; an event with no mode is from an older version (see the note
+          -- on older events at the top).
+          and coalesce(w.properties->>'game_mode', 'climb') = 'climb'
     ),
     packs as (
         select l.level,
