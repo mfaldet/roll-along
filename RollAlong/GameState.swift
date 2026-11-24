@@ -1371,7 +1371,10 @@ final class GameState: ObservableObject {
         currentLevel = target
         highestUnlocked = target
         fullClearBonusPaid = []; fullClearBonusHeld = []
-        collectionPicksTaken = []; collectionPicksHeld = []
+        // Picks for milestones below this level count as taken, so the pick
+        // offered next is this level's own.
+        collectionPicksTaken = Set(ClearRewards.pickMilestones.filter { $0 < target })
+        collectionPicksHeld = []
     }
 
     /// One line on the 1.1 reward records, for Settings → Debug.
