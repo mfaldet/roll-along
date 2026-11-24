@@ -496,9 +496,6 @@ struct SettingsView: View {
             aboutRow(icon: "star.fill", title: "Rate Roll Along")
         }
         .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-        .simultaneousGesture(TapGesture().onEnded {
-            AnalyticsClient.shared.track("rate_row_tapped")
-        })
     }
 
     private var aboutSection: some View {
