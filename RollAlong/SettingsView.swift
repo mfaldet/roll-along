@@ -543,6 +543,14 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            VStack(spacing: 8) {
+                debugProgressButton("Old save: on level 250, then fit to the pack", .oldSavePastThePack)
+                debugProgressButton("Pass every level with one star", .everyLevelPassed)
+                debugProgressButton("Fully clear every level", .everyLevelFullyCleared)
+            }
+            Text("Adventure progress (replaces the saved progress on this device). Now: on level \(gameState.currentLevel), highest unlocked \(gameState.highestUnlocked), \(gameState.totalStars) stars, pack ends at level \(LevelLayout.lastLevel). Play would open: \(debugPlayTargetText).")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
             HStack(spacing: 8) {
                 ForEach(RatingMilestones.levels, id: \.self) { milestone in
                     Button { gameState.debugRequestReview(atMilestone: milestone) } label: {
@@ -594,6 +602,28 @@ struct SettingsView: View {
         .fullScreenCover(isPresented: $showCollectionGallery) {
             CollectionReviewGallery()
                 .environmentObject(gameState)
+        }
+    }
+
+    /// Debug builds only: one row that rewrites Adventure progress.
+    private func debugProgressButton(_ title: String, _ kind: GameState.DebugProgress) -> some View {
+        Button { gameState.debugSetProgress(kind) } label: {
+            Text(title)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Debug builds only: what the Play button would open, in words.
+    private var debugPlayTargetText: String {
+        switch gameState.adventurePlayTarget {
+        case .level(let level): return "level \(level)"
+        case .levelSelect:      return "the level selector"
         }
     }
 

@@ -1166,7 +1166,13 @@ final class GameState: ObservableObject {
 
     // MARK: - Level progression
 
+    /// True when the level being played is the last one in the pack, so
+    /// there is no next level to advance to.
+    var isOnLastLevel: Bool { currentLevel >= LevelLayout.lastLevel }
+
     func advanceLevel() {
+        // The pack ends at its last level; there is nothing to advance to.
+        guard !isOnLastLevel else { return }
         currentLevel += 1
         if currentLevel > highestUnlocked {
             let reachedBefore = highestUnlocked
@@ -1192,8 +1198,11 @@ final class GameState: ObservableObject {
     /// inert until the Sign-in-with-Apple flow installs a session.
     private func syncSocialProgress() {
         guard SocialClient.shared.isSignedIn else { return }
-        let climb = highestUnlocked
-        let unlocked = highestUnlocked
+        // Other players see the level a player is ON, which never passes the
+        // last level in the pack.  (`highestUnlocked` itself goes one past it
+        // once every level is passed.)
+        let climb = min(highestUnlocked, LevelLayout.lastLevel)
+        let unlocked = min(highestUnlocked, LevelLayout.lastLevel)
         let stars = totalStars
         let coins = totalCoins
         Task {
@@ -1205,6 +1214,90 @@ final class GameState: ObservableObject {
             )
         }
     }
+
+    // MARK: - The level pack and saved progress
+
+    /// What the Play button opens for Adventure: the lowest level not yet
+    /// passed; if all are passed, the lowest not fully cleared (three stars
+    /// and every coin); if all are fully cleared, the level selector.
+    var adventurePlayTarget: PlayTarget {
+        LevelProgressRules.playTarget(
+            lastLevel: LevelLayout.lastLevel,
+            stars: { self.stars(for: $0) },
+            coinsCollected: { self.coinsCollected(for: $0).count },
+            coinsInLevel: { LevelLayout.overrides[$0]?.coins.count ?? 0 })
+    }
+
+    /// True when `level` has three stars and every one of its coins.
+    func isFullyCleared(_ level: Int) -> Bool {
+        LevelProgressRules.isFullyCleared(
+            stars: stars(for: level),
+            coinsCollected: coinsCollected(for: level).count,
+            coinsInLevel: LevelLayout.overrides[level]?.coins.count ?? 0)
+    }
+
+    /// Fit the saved game to the level pack, once.  A player who was past the
+    /// last level (levels the phone used to build) is placed on the last
+    /// level, and stars, times and coins recorded for levels that no longer
+    /// exist are removed.  Runs once per install: after that the saved game
+    /// can only be inside the pack, and a later, longer pack must never have
+    /// its progress cut back because an older file happened to load.
+    ///
+    /// Called at launch AFTER `activateTrophies()`, so trophies already
+    /// earned from the old levels are recorded before the levels go.
+    /// Returns true when it changed anything.
+    @discardableResult
+    func fitProgressToLevelPack(force: Bool = false) -> Bool {
+        let doneKey = "ra_fittedToLevelPack"
+        guard force || !defaults.bool(forKey: doneKey) else { return false }
+        defaults.set(true, forKey: doneKey)
+        let before = LevelProgressRules.Progress(
+            currentLevel: currentLevel, highestUnlocked: highestUnlocked,
+            bestStars: bestStars, bestTime: bestTime, collectedCoins: collectedCoins)
+        let after = LevelProgressRules.trimmed(before, toLastLevel: LevelLayout.lastLevel)
+        guard after != before else { return false }
+        bestStars       = after.bestStars
+        bestTime        = after.bestTime
+        collectedCoins  = after.collectedCoins
+        currentLevel    = after.currentLevel
+        highestUnlocked = after.highestUnlocked
+        syncSocialProgress()
+        return true
+    }
+
+    #if DEBUG
+    /// Debug builds only (Settings → Debug).  Rewrites Adventure progress so
+    /// the pack rules can be checked without playing a hundred levels.
+    enum DebugProgress { case oldSavePastThePack, everyLevelPassed, everyLevelFullyCleared }
+
+    func debugSetProgress(_ kind: DebugProgress) {
+        let last = LevelLayout.lastLevel
+        var stars: [Int: Int] = [:], times: [Int: TimeInterval] = [:], coins: [Int: Set<Int>] = [:]
+        switch kind {
+        case .oldSavePastThePack:
+            // A version 1.0 player on level 250: 249 levels cleared, most of
+            // them levels the phone built, which no longer exist.
+            for level in 1...249 { stars[level] = 2; times[level] = 20; coins[level] = [0, 1] }
+            bestStars = stars; bestTime = times; collectedCoins = coins
+            currentLevel = 250
+            highestUnlocked = 250
+            fitProgressToLevelPack(force: true)
+        case .everyLevelPassed:
+            for level in 1...last { stars[level] = 1; times[level] = 30 }
+            bestStars = stars; bestTime = times; collectedCoins = [:]
+            currentLevel = last
+            highestUnlocked = last + 1
+        case .everyLevelFullyCleared:
+            for level in 1...last {
+                stars[level] = 3; times[level] = 5
+                coins[level] = Set(0..<(LevelLayout.overrides[level]?.coins.count ?? 0))
+            }
+            bestStars = stars; bestTime = times; collectedCoins = coins
+            currentLevel = last
+            highestUnlocked = last + 1
+        }
+    }
+    #endif
 
     /// Reset level-progress only — clears stars/coins/times/unlocks.  Skin,
     /// name, settings, and one-time moments (onboarding/welcome) are kept.
@@ -1396,8 +1489,11 @@ final class GameState: ObservableObject {
             collectedCoins[level] = set
         }
         if level >= highestUnlocked {
+            // Unlocking stops one past the last level in the pack: that value
+            // means "every level passed".  There is no level beyond the pack.
             let reachedBefore = highestUnlocked
-            highestUnlocked = level + 1
+            highestUnlocked = LevelProgressRules.highestUnlocked(
+                afterClearing: level, was: highestUnlocked, lastLevel: LevelLayout.lastLevel)
             maybeRequestReview(reachingFrom: reachedBefore, to: highestUnlocked)
         }
         // Send the new star total right away (not only on the next level
@@ -1954,7 +2050,7 @@ final class GameState: ObservableObject {
     func clearCollectedCoins(for level: Int) {
         collectedCoins.removeValue(forKey: level)
     }
-    func isUnlocked(_ level: Int) -> Bool       { level <= highestUnlocked }
+    func isUnlocked(_ level: Int) -> Bool       { level <= highestUnlocked && level <= LevelLayout.lastLevel }
     var totalStars: Int                          { bestStars.values.reduce(0, +) }
     var totalCoins: Int                          { collectedCoins.values.reduce(0) { $0 + $1.count } }
 

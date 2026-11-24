@@ -106,6 +106,11 @@ struct RollAlongApp: App {
                     //    across relaunches (the engine short-circuits after the
                     //    first run).
                     gameState.activateTrophies()
+                    // 1b. Once per install: fit the saved game to the level
+                    //     pack (a player who was past the last level is placed
+                    //     on it).  After the backfill above, so trophies
+                    //     already earned from the old levels are kept.
+                    gameState.fitProgressToLevelPack()
                     // 2. Reconcile the iCloud key-value ratchet mirror (S3-T8):
                     //    union-restores unlocks after a delete+reinstall and
                     //    converges multiple devices.  A local-only no-op until

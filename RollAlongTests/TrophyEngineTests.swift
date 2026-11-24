@@ -2791,16 +2791,22 @@ final class TrophyTriggerCoverageTests: XCTestCase {
 
     // MARK: Gap-fill triggers
 
-    /// The mid-ladder climb thresholds (101 / 251 / 501) — one high clear
-    /// advances `highestUnlocked` past all three.
-    func testMidLadderClimbLevelsWireThroughRecordResult() {
+    /// Clearing the last level of the pack unlocks one past it, which is the
+    /// threshold of every climb trophy up to that level and of none beyond.
+    /// (Levels exist only in the pack: nothing past its last level can be
+    /// cleared, so the trophies for levels past it cannot be earned by play.)
+    func testClimbLevelTrophiesWireThroughRecordResult_upToTheEndOfThePack() {
         let gs = makeGameState()
-        gs.recordResult(level: 500, stars: 3, time: 40, coinIndices: [])
-        XCTAssertEqual(gs.highestUnlocked, 501)
+        let last = LevelLayout.lastLevel
+        XCTAssertEqual(last, 100, "the bundled pack has 100 levels")
+        gs.recordResult(level: last, stars: 3, time: 40, coinIndices: [])
+        XCTAssertEqual(gs.highestUnlocked, last + 1)
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_50"))
         XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_100"))
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_250"))
-        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_level_500"))
-        XCTAssertFalse(gs.trophyEngine.isUnlocked("climb_level_1000"))
+        XCTAssertFalse(gs.trophyEngine.isUnlocked("climb_level_250"))
+        // Clearing it again does not move past the pack.
+        gs.recordResult(level: last, stars: 3, time: 35, coinIndices: [])
+        XCTAssertEqual(gs.highestUnlocked, last + 1)
     }
 
     /// Per-game win counts through the `recordCompetitiveWin` choke point:

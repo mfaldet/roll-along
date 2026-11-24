@@ -1384,7 +1384,12 @@ struct HomeView: View {
             return "Level \(next) / 100"
         }
         switch gameState.currentModeID {
-        case "climb":     return "Level \(gameState.currentLevel)"
+        case "climb":
+            // The level Play will open, which is not always the last one played.
+            switch gameState.adventurePlayTarget {
+            case .level(let level): return "Level \(level)"
+            case .levelSelect:      return "All levels fully cleared"
+            }
         case "snake":     return "Eat orbs · last ball wins"
         case "sumo":      return "Survive the waves"
         case "paintball": return "60s · most paint wins"
@@ -1450,6 +1455,18 @@ struct HomeView: View {
     private var playButton: some View {
         Button {
             guard !launching else { return }
+            // Adventure: Play opens the lowest level not yet passed; when all
+            // are passed, the lowest not fully cleared; when all are fully
+            // cleared, the level selector (see `adventurePlayTarget`).
+            if gameState.currentModeID == "climb" {
+                switch gameState.adventurePlayTarget {
+                case .level(let level):
+                    gameState.currentLevel = level
+                case .levelSelect:
+                    nav.goToLevels()
+                    return
+                }
+            }
             launchPushWork?.cancel(); launchResetWork?.cancel()
             launchPushed = false
             launchStart = .now

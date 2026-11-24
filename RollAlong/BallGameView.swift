@@ -2218,7 +2218,10 @@ struct BallGameView: View {
                     let dailyIsLastLevel = isDaily
                         && gameState.dailyChallengeIndex >= gameState.todaysDailyChallenge.levelCount - 1
                     Button { advanceFromLevelClear() } label: {
-                        Text(dailyIsLastLevel ? "Finish" : "Next Level")
+                        // On the last level of the Adventure pack there is no
+                        // next level; the button opens the level selector.
+                        let packIsDone = activeMode.id == "climb" && gameState.isOnLastLevel
+                        Text(dailyIsLastLevel ? "Finish" : (packIsDone ? "All Levels" : "Next Level"))
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -3130,6 +3133,10 @@ struct BallGameView: View {
             withAnimation(.easeInOut(duration: 0.32)) { showWelcomeMoment = true }
         } else if gameState.currentLevel == 10 && !gameState.seenTutorialReward {
             withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = true }
+        } else if gameState.isOnLastLevel {
+            // The last level in the pack: there is no next level.  Back to
+            // the level selector.
+            nav.goToLevels()
         } else {
             gameState.advanceLevel()
             spawnBall(in: arenaSize)
