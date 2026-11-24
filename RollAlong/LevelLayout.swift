@@ -165,14 +165,22 @@ struct LevelLayout {
 
     /// THE LEVEL PACK: level number → layout.  A level exists only if it is
     /// in the pack; the phone never builds an Adventure level.  Loaded at
-    /// launch from the bundled `LevelOverrides.json`, and replaceable by a
-    /// newer published pack through `applyRemoteOverrides(_:)`.
-    private(set) static var overrides: [Int: LevelLayout] = LevelOverrideStore.loadBundled() {
+    /// launch by `LevelPackStore.packForLaunch()`: the newest accepted pack
+    /// the game holds — the bundled `LevelOverrides.json`, or a pack
+    /// downloaded on an earlier launch.  It does not change while the app
+    /// runs: a pack downloaded now is saved and used from the next launch.
+    private(set) static var overrides: [Int: LevelLayout] = launchPack.levels {
         didSet { lastLevel = overrides.keys.max() ?? 1 }
     }
 
+    /// The pack chosen at launch.  Worked out once.
+    private static let launchPack = LevelPackStore.packForLaunch()
+
+    /// Where the pack in use came from: the app itself or a download.
+    static var packSource: LevelPackStore.Source { launchPack.source }
+
     /// The last level in the pack.  Levels run 1...lastLevel.
-    private(set) static var lastLevel: Int = LevelOverrideStore.loadBundled().keys.max() ?? 1
+    private(set) static var lastLevel: Int = launchPack.levels.keys.max() ?? 1
 
     /// True when `level` is in the pack.
     static func exists(_ level: Int) -> Bool { overrides[level] != nil }
@@ -180,17 +188,7 @@ struct LevelLayout {
     /// The version number of the level pack in use, recorded on every
     /// analytics event about a level.  Read from the pack file's
     /// `packVersion`; 0 when the file is missing or gives none.
-    private(set) static var packVersion: Int = LevelOverrideStore.bundledPackVersion()
-
-    /// Merge externally-sourced overrides (e.g. fetched remote config JSON) on
-    /// top of the current set; later keys win.  STUB: the actual fetch/endpoint
-    /// is wired when remote config lands — this is the merge point it calls.
-    static func applyRemoteOverrides(_ data: Data) {
-        let fetched = LevelOverrideStore.decode(data)
-        guard !fetched.isEmpty else { return }
-        overrides.merge(fetched) { _, new in new }
-        if let version = LevelOverrideStore.packVersion(in: data) { packVersion = version }
-    }
+    private(set) static var packVersion: Int = launchPack.version
 
     /// The layout of a level in the pack.
     ///
@@ -894,8 +892,9 @@ extension LevelLayout {
 //
 // Bundled file (`LevelOverrides.json`) is read once at launch; if it's absent
 // or empty the store yields no overrides and the game behaves EXACTLY as
-// before — this whole layer is inert until a level is actually listed.  The
-// same `decode` path also serves remote refresh (`applyRemoteOverrides`).
+// before — this whole layer is inert until a level is actually listed.
+// Downloaded packs are read through `strictSummary` / `decode` by
+// `LevelPackStore` below.
 // ===========================================================================
 enum LevelOverrideStore {
     /// Resource name of the bundled overrides file (`LevelOverrides.json`).
@@ -923,13 +922,33 @@ enum LevelOverrideStore {
         return packVersion(in: data) ?? 0
     }
 
+    /// The bundled pack file's bytes, or nil if it is missing.
+    static func bundledData() -> Data? {
+        guard let url = Bundle.main.url(forResource: bundledResource, withExtension: "json") else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
     /// Read the bundled overrides, or `[:]` if missing / unparseable.
     static func loadBundled() -> [Int: LevelLayout] {
-        guard let url = Bundle.main.url(forResource: bundledResource, withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            return [:]            // no file → no overrides → unchanged behavior
+        guard let data = bundledData() else {
+            return [:]            // no file → no levels
         }
         return decode(data)
+    }
+
+    /// What a DOWNLOADED pack must give before it is even considered: it
+    /// parses completely.  That means the whole file decodes (one bad level
+    /// fails all of it), it states its `packVersion`, and every key is a
+    /// level number.  nil when any of that fails.
+    static func strictSummary(of data: Data) -> LevelPackSummary? {
+        guard let file = try? JSONDecoder().decode(File.self, from: data),
+              let version = file.packVersion else { return nil }
+        var numbers = Set<Int>()
+        for key in file.levels.keys {
+            guard let n = Int(key), n >= 1, String(n) == key else { return nil }
+            numbers.insert(n)
+        }
+        return LevelPackSummary(version: version, levelNumbers: numbers)
     }
 
     /// Decode an overrides JSON blob (bundled or remote) into resolved layouts.
@@ -943,6 +962,124 @@ enum LevelOverrideStore {
         }
         return out
     }
+}
+
+// ===========================================================================
+// LevelPackStore — which level pack the game uses, and the download.
+//
+// The owner publishes the pack as one file on the game's GitHub Pages site
+// (`remoteURL`).  At every launch the game:
+//   1. USES the newest accepted pack it already holds: the pack saved by an
+//      earlier download if it passes `LevelPackRules` against the bundled
+//      pack, otherwise the bundled pack.
+//   2. DOWNLOADS the published file in the background.  If it passes
+//      `LevelPackRules` against the pack in use, it is saved.  It takes
+//      effect at the NEXT launch, never during a run.
+// If the download fails, or the file is refused, nothing changes.
+// A pack must have at least as many levels as the pack in use, so a
+// downloaded pack never removes a level a player has played.
+// ===========================================================================
+enum LevelPackStore {
+    enum Source: String { case bundled, downloaded }
+
+    struct LaunchPack {
+        var levels: [Int: LevelLayout]
+        var version: Int
+        var source: Source
+    }
+
+    /// THE published pack.  Change the address here only.
+    static let remoteURL = URL(string: "https://mfaldet.github.io/roll-along/levels/level-pack.json")!
+
+    /// A pack file larger than this is refused unread (the bundled pack of
+    /// 100 levels is about a tenth of this).
+    static let maxDownloadBytes = 5_000_000
+
+    private static let lastCheckKey = "ra_levelPackLastCheck"
+
+    /// Where a downloaded pack is kept between launches.
+    static var savedURL: URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                  in: .userDomainMask).first else { return nil }
+        return base.appendingPathComponent("LevelPack", isDirectory: true)
+                   .appendingPathComponent("level-pack.json")
+    }
+
+    /// Step 1: the pack to use for this launch.
+    static func packForLaunch() -> LaunchPack {
+        let bundledBytes = LevelOverrideStore.bundledData()
+        let bundledLevels = bundledBytes.map(LevelOverrideStore.decode) ?? [:]
+        let bundledVersion = bundledBytes.flatMap(LevelOverrideStore.packVersion(in:)) ?? 0
+        let bundled = LaunchPack(levels: bundledLevels, version: bundledVersion, source: .bundled)
+        // Tests always run against the bundled pack.
+        guard !RuntimeEnvironment.isRunningTests,
+              let url = savedURL, let saved = try? Data(contentsOf: url) else { return bundled }
+        let inUse = LevelPackSummary(version: bundledVersion, levelNumbers: Set(bundledLevels.keys))
+        let candidate = LevelOverrideStore.strictSummary(of: saved)
+        guard LevelPackRules.verdict(candidate: candidate, inUse: inUse) == .use, let candidate else {
+            // An app update brought a bundled pack at least as new, or the
+            // saved file is damaged: drop it.
+            try? FileManager.default.removeItem(at: url)
+            return bundled
+        }
+        return LaunchPack(levels: LevelOverrideStore.decode(saved), version: candidate.version, source: .downloaded)
+    }
+
+    /// Step 2: download the published pack and save it if it is accepted.
+    /// Returns what happened, in plain words (also kept for Settings > Debug).
+    @discardableResult
+    static func refresh() async -> String {
+        guard !RuntimeEnvironment.isRunningTests else { return "not checked during tests" }
+        let outcome = await download()
+        UserDefaults.standard.set(outcome, forKey: lastCheckKey)
+        return outcome
+    }
+
+    /// The result of the last download check, for Settings > Debug.
+    static var lastCheck: String {
+        UserDefaults.standard.string(forKey: lastCheckKey) ?? "never checked"
+    }
+
+    private static func download() async -> String {
+        var request = URLRequest(url: remoteURL)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 20
+        let data: Data
+        do {
+            let (body, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+            guard let http = response as? HTTPURLResponse else { return "download failed: no reply" }
+            guard http.statusCode == 200 else { return "download failed: the site answered \(http.statusCode)" }
+            data = body
+        } catch {
+            return "download failed: \(error.localizedDescription)"
+        }
+        guard data.count <= maxDownloadBytes else { return "refused: the file is too large" }
+        let inUse = LevelPackSummary(version: LevelLayout.packVersion,
+                                     levelNumbers: Set(LevelLayout.overrides.keys))
+        let candidate = LevelOverrideStore.strictSummary(of: data)
+        let verdict = LevelPackRules.verdict(candidate: candidate, inUse: inUse)
+        guard verdict == .use, let candidate, let url = savedURL else {
+            let found = candidate.map { "version \($0.version), \($0.levelCount) levels" } ?? "unreadable"
+            return "published pack (\(found)) \(verdict.plainWords)"
+        }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            return "accepted but could not be saved: \(error.localizedDescription)"
+        }
+        return "version \(candidate.version) with \(candidate.levelCount) levels saved; in use from the next launch"
+    }
+
+    #if DEBUG
+    /// Debug builds only: forget a saved download, so the next launch uses
+    /// the bundled pack again.
+    static func debugForgetDownloadedPack() {
+        if let url = savedURL { try? FileManager.default.removeItem(at: url) }
+        UserDefaults.standard.removeObject(forKey: lastCheckKey)
+    }
+    #endif
 }
 
 // ===========================================================================

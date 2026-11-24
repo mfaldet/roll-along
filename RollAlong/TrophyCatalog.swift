@@ -874,3 +874,38 @@ struct TrophyCatalog {
         return bannedTokens.contains { key.contains($0) }
     }
 }
+
+// ===========================================================================
+// Trophies the level pack in use cannot award (1.1).
+//
+// A trophy that cannot be earned with the current pack is hidden from players
+// who have not earned it, and shows again by itself when a larger pack makes
+// it earnable.  The rule is `TrophyEarnability`; this is its bridge to the
+// catalog.  `lastLevel` nil means "hide nothing" (previews and older tests).
+// ===========================================================================
+extension TrophyCatalog {
+    /// Whether `trophy` can be earned by playing a pack ending at `lastLevel`.
+    func canBeEarned(_ trophy: TrophyDefinition, lastLevel: Int) -> Bool {
+        if let required = trophy.criteria.requiredTrophyIDs, !required.isEmpty {
+            return TrophyEarnability.canBeEarned(requiring: required) { id in
+                guard let other = self.trophy(withID: id), other.id != trophy.id else { return true }
+                return canBeEarned(other, lastLevel: lastLevel)
+            }
+        }
+        let wholeWorlds = World.all.filter { $0.levelRange.upperBound <= lastLevel }.count
+        return TrophyEarnability.canBeEarned(metric: trophy.criteria.metric.rawValue,
+                                             threshold: trophy.criteria.threshold,
+                                             lastLevel: lastLevel,
+                                             wholeWorldsInPack: wholeWorlds)
+    }
+}
+
+extension TrophyEngine {
+    /// True when `trophy` should not be shown to this player: the pack
+    /// cannot award it and the player has not earned it.
+    func isHidden(_ trophy: TrophyDefinition, lastLevel: Int?) -> Bool {
+        guard let lastLevel else { return false }
+        return TrophyEarnability.isHidden(canBeEarned: catalog.canBeEarned(trophy, lastLevel: lastLevel),
+                                          isEarned: isUnlocked(trophy.id))
+    }
+}

@@ -558,7 +558,7 @@ private struct ChaseChipStrip: View {
     /// Rebuilt each render from the current engine + pin snapshot — cheap: at
     /// most `maxPins` (3) value-type chips.
     private var model: ChaseChipModel {
-        ChaseChipModel(engine: engine, pinnedIDs: pins.pinnedIDs)
+        ChaseChipModel(engine: engine, pinnedIDs: pins.pinnedIDs, lastLevel: LevelLayout.lastLevel)
     }
 
     var body: some View {

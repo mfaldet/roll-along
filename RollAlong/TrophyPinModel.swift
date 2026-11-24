@@ -260,7 +260,7 @@ struct ChaseChipModel: Equatable {
     /// ids in order, dropping any that are unknown to the catalog or already
     /// unlocked, and masking a locked secret so it never leaks its objective
     /// or its closeness.
-    init(engine: TrophyEngine, pinnedIDs: [String]) {
+    init(engine: TrophyEngine, pinnedIDs: [String], lastLevel: Int? = nil) {
         var out: [ChaseChip] = []
         for id in pinnedIDs {
             // Unknown id (removed from catalog / hand-edited): fabricate
@@ -268,6 +268,8 @@ struct ChaseChipModel: Equatable {
             guard let trophy = engine.catalog.trophy(withID: id) else { continue }
             // An earned pin is no longer a chase — drop it from the strip.
             guard !engine.isUnlocked(id) else { continue }
+            // A trophy the pack in use cannot award is not shown as a chase.
+            guard !engine.isHidden(trophy, lastLevel: lastLevel) else { continue }
 
             let isMasked = trophy.isSecret
             out.append(ChaseChip(

@@ -360,8 +360,13 @@ struct TrophyRoomModel: Equatable {
     /// caller with no stats feed — previews, tests, the room's first render —
     /// keeps the pre-S3 behavior. Rows within a section keep catalog (authored)
     /// order; sections sort by `roomSortOrder`.
-    init(engine: TrophyEngine, rarity: TrophyRarityIndex = .empty) {
+    ///
+    /// `lastLevel` is the last level of the level pack in use.  Trophies the
+    /// pack cannot award are left out for a player who has not earned them
+    /// (and out of the totals).  nil hides nothing.
+    init(engine: TrophyEngine, rarity: TrophyRarityIndex = .empty, lastLevel: Int? = nil) {
         let catalog = engine.catalog
+        var shownTotal = 0
 
         // Resolve every trophy to a row, honoring the secret-masking policy.
         var rowsByCategory: [TrophyCategory: [TrophyRoomRow]] = [:]
@@ -377,6 +382,9 @@ struct TrophyRoomModel: Equatable {
         }
 
         for trophy in catalog.trophies {
+            // Not earnable with the pack in use and not earned: not shown.
+            if engine.isHidden(trophy, lastLevel: lastLevel) { continue }
+            shownTotal += 1
             let isUnlocked = engine.isUnlocked(trophy.id)
             // Mask iff the trophy is secret AND still locked. An unlocked
             // secret trophy reveals fully.
@@ -450,7 +458,7 @@ struct TrophyRoomModel: Equatable {
             }
 
         self.summary = TrophyRoomSummary(
-            total: catalog.trophies.count,
+            total: shownTotal,
             unlocked: unlocked,
             gradeCounts: gradeCounts,
             capstoneUnlocked: catalog.trophies.contains {
@@ -579,7 +587,7 @@ struct TrophyRoomView: View {
     /// Recomputed each render from the current engine snapshot + the latest
     /// rarity index. Cheap: one pass over 92 rows of value types.
     private var model: TrophyRoomModel {
-        TrophyRoomModel(engine: engine, rarity: rarity.index)
+        TrophyRoomModel(engine: engine, rarity: rarity.index, lastLevel: LevelLayout.lastLevel)
     }
 
     /// The tile whose detail sheet is open.

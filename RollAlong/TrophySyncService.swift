@@ -331,7 +331,7 @@ final class TrophySyncService: @unchecked Sendable {
         }
 
         // Toggle ON → build the curated projection from the local ledger.
-        let showcase = TrophyPublicShowcase(engine: engine, chosenIDs: chosenIDs)
+        let showcase = TrophyPublicShowcase(engine: engine, chosenIDs: chosenIDs, lastLevel: LevelLayout.lastLevel)
 
         // Enabled but nothing earned yet → ensure no stale row lingers, but
         // don't publish an empty showcase.

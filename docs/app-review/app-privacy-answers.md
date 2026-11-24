@@ -42,7 +42,7 @@ the Google Mobile Ads SDK.
 | Identifiers → **Device ID** | App: a random ID per install, for analytics. Google: a device identifier (not the advertising identifier, since the app never requests it) | No | Analytics; Third-Party Advertising |
 | Contact Info → **Email Address** | App: only if Apple includes one with the sign-in; the app does not ask for it | Yes | App Functionality |
 | User Content → **Gameplay Content** | App: signed-in profile shown to other players (preset nickname, level, scores, clan, friends, trophies) | Yes | App Functionality |
-| User Content → **Gameplay Content** | App: anonymous gameplay events (levels, rounds, trophies) | No | Analytics |
+| User Content → **Gameplay Content** | App: anonymous gameplay events (levels, the path the marble took through a level, rounds, trophies) | No | Analytics |
 | Usage Data → **Product Interaction** | App: screens opened, buttons tapped. Google: ad taps and video views | No | Analytics; Third-Party Advertising |
 | Usage Data → **Advertising Data** | App: which steps of a rewarded ad happened. Google: ads the player has seen | No | Analytics; Third-Party Advertising |
 | Purchases → **Purchase History** | App: that a purchase happened, with product and displayed price, against the random install ID | No | Analytics |

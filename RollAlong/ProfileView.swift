@@ -770,7 +770,7 @@ struct ProfileTrophyCard: View {
     /// `ra_trophyPins` order) float to the front of the showcase; the rest is
     /// most-recently-earned.
     private var model: TrophyShowcaseModel {
-        TrophyShowcaseModel(engine: engine, pinnedIDs: pins.pinnedIDs)
+        TrophyShowcaseModel(engine: engine, pinnedIDs: pins.pinnedIDs, lastLevel: LevelLayout.lastLevel)
     }
 
     var body: some View {

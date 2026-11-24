@@ -12,8 +12,15 @@
 //     STRIPPED at play time (full width playable); hard (6-9) and
 //     veryHard (0,5) keep them.                     (LevelLayout.layout(for:))
 //   • Ball radius = 18pt on a ~390pt arena → ≈0.0462 unit radius.
-//   • Coin radius = 9pt → pickup when dist(ball,coin) < 27pt ≈ 0.0692.
-//                                        (BallGameView coinRadius / line 5232)
+//   • COIN PICKUP IS THE GAME'S OWN RULE: a coin is collected when the
+//     marble's center comes within ball radius + coin radius (18 + 9 = 27
+//     points) of the coin's center, measured in POINTS on the real
+//     playfield.  The marble only has to touch the coin; where the coin
+//     sits (even on or in a pit) does not matter, only whether the marble's
+//     center can stand somewhere safe within 27 points of it.  The playfield
+//     is taller than it is wide, so 27 points is a smaller share of the
+//     height than of the width; the check runs for a short and a tall phone
+//     (PLAYFIELDS below).                       (BallGameView.tick, coin loop)
 //   • HOLE CAPTURE IS CENTER-BASED: the ball falls when its CENTER is inside
 //     a hole rect (BallGameView.isInHole → rect.contains(position)).  The
 //     ball may visually overlap hole edges without falling — hard-tier
@@ -23,9 +30,11 @@
 //
 // CHECKS PER LEVEL
 //   1. coin count == 3 (economy assumes a fixed coins-per-level payout)
-//   2. coins inside the tier's playable area; INSIDE a hole rect = BROKEN
-//      (depth noted; technically grazeable if depth < pickup reach), within
-//      ball radius of a hole edge = RISKY
+//   2. coins inside the tier's playable area.  A coin on or inside a hole
+//      rect is NOT broken by itself: check 4a decides, with the game's
+//      pickup rule, whether it can be collected.  It is noted as RISKY (the
+//      player collects it from the rim), as is a coin within ball radius of
+//      a hole edge.  Start and goal inside a hole stay BROKEN.
 //   3. start & goal similarly valid + sane start→goal separation
 //   4. solvability, two models on a 0.01 grid flood fill:
 //        a. GAME PHYSICS (center-based capture): start→goal must connect and
@@ -54,7 +63,14 @@ import { dirname, join } from "node:path";
 const ARENA_PT = 390;
 const BALL_R = 18 / ARENA_PT;          // ≈ 0.0462
 const COIN_R = 9 / ARENA_PT;           // ≈ 0.0231
-const PICKUP = BALL_R + COIN_R;        // ≈ 0.0692 (coin pickup reach)
+const PICKUP = BALL_R + COIN_R;        // ≈ 0.0692 (pickup reach as a share of the WIDTH)
+const PICKUP_PT = 18 + 9;              // the game's rule: ball radius + coin radius, in points
+// The playfield is the screen inside the safe area.  Two phones bracket the
+// range: the shortest and the tallest playfield the game runs on.
+const PLAYFIELDS = [
+  { name: "short phone (375×647)", w: 375, h: 647 },
+  { name: "tall phone (440×860)", w: 440, h: 860 },
+];
 const SIDE_WALLS = [
   { x: 0.0, y: 0, w: 0.12, h: 1 },
   { x: 0.88, y: 0, w: 0.12, h: 1 },
@@ -157,18 +173,21 @@ function floodFill(blocked, startIdx) {
   return seen;
 }
 
-// Can the ball (center-based) pick up this coin? True when any reachable
-// cell lies within pickup reach of the coin center.
-function coinPickable(seen, coin) {
+// Can the marble pick up this coin?  The game's own rule: true when the
+// marble's center can stand on a reachable cell (connected to the start, not
+// in a hole) within PICKUP_PT points of the coin's center on `field`.
+function coinPickable(seen, coin, field) {
   if (!seen) return false;
-  const ix0 = Math.max(0, Math.floor((coin.x - PICKUP) / GRID));
-  const ix1 = Math.min(N - 1, Math.ceil((coin.x + PICKUP) / GRID));
-  const iy0 = Math.max(0, Math.floor((coin.y - PICKUP) / GRID));
-  const iy1 = Math.min(N - 1, Math.ceil((coin.y + PICKUP) / GRID));
+  const rx = PICKUP_PT / field.w, ry = PICKUP_PT / field.h;
+  const ix0 = Math.max(0, Math.floor((coin.x - rx) / GRID));
+  const ix1 = Math.min(N - 1, Math.ceil((coin.x + rx) / GRID));
+  const iy0 = Math.max(0, Math.floor((coin.y - ry) / GRID));
+  const iy1 = Math.min(N - 1, Math.ceil((coin.y + ry) / GRID));
   for (let iy = iy0; iy <= iy1; iy++) {
     for (let ix = ix0; ix <= ix1; ix++) {
       if (!seen[iy * N + ix]) continue;
-      if (Math.hypot(ix * GRID - coin.x, iy * GRID - coin.y) < PICKUP) return true;
+      const dx = (ix * GRID - coin.x) * field.w, dy = (iy * GRID - coin.y) * field.h;
+      if (Math.hypot(dx, dy) < PICKUP_PT) return true;
     }
   }
   return false;
@@ -228,11 +247,14 @@ function classifyPoint(name, p, designed, tier) {
   for (const h of designed) {
     const depth = rectDepth(p, h);
     const rect = `[${h.x},${h.y},${h.w},${h.h}]`;
-    if (depth >= 0) {
-      const graze = depth < PICKUP && name.startsWith("coin")
-        ? `; depth ${depth.toFixed(3)} < pickup reach ${PICKUP.toFixed(3)}, grazeable from the rim but a fall-bait placement`
-        : `; depth ${depth.toFixed(3)}`;
-      broken.push(`${name} (${p.x},${p.y}) INSIDE hole ${rect}${graze}`);
+    if (depth >= 0 && name.startsWith("coin")) {
+      // Not broken by itself: the marble collects a coin by touching it.
+      // Check 4a says whether it can, with the game's own pickup rule.
+      risky.push(
+        `${name} (${p.x},${p.y}) sits ${depth < 0.0005 ? "on the edge of" : `${depth.toFixed(3)} inside`} hole ${rect}; collected from the rim`
+      );
+    } else if (depth >= 0) {
+      broken.push(`${name} (${p.x},${p.y}) INSIDE hole ${rect}; depth ${depth.toFixed(3)}`);
     } else if (-depth < BALL_R) {
       risky.push(
         `${name} (${p.x},${p.y}) within ball radius of hole ${rect} (clearance ${(-depth).toFixed(3)} < ${BALL_R.toFixed(3)})`
@@ -305,8 +327,10 @@ for (const id of ids) {
       add(id, "BROKEN", `UNSOLVABLE: no center path start (${lvl.start.x},${lvl.start.y}) → goal (${lvl.goal.x},${lvl.goal.y}) even under center-based capture`);
     }
     coins.forEach((c, i) => {
-      if (!coinPickable(seenGame, c)) {
-        add(id, "BROKEN", `coin#${i + 1} (${c.x},${c.y}) not pickable: no reachable ball-center cell within pickup reach ${PICKUP.toFixed(3)}`);
+      for (const field of PLAYFIELDS) {
+        if (!coinPickable(seenGame, c, field)) {
+          add(id, "BROKEN", `coin#${i + 1} (${c.x},${c.y}) cannot be collected on a ${field.name}: the marble's center has no safe place within ${PICKUP_PT} points of it`);
+        }
       }
     });
   }
@@ -322,7 +346,7 @@ for (const id of ids) {
     add(id, "TIGHT", `no full-clearance path to goal (bottleneck corridor ${corridor.toFixed(3)} < ball diameter ${(2 * BALL_R).toFixed(3)}); ball must overlap hole edges${squeezeCoins.length ? `; coins #${squeezeCoins.join(",#")} also need squeezing` : ""} — playable under center-based capture`);
   } else if (seenComf) {
     coins.forEach((c, i) => {
-      if (!seenComf[nodeIndex(c)] && coinPickable(seenGame, c)) {
+      if (!seenComf[nodeIndex(c)] && PLAYFIELDS.every((f) => coinPickable(seenGame, c, f))) {
         add(id, "TIGHT", `coin#${i + 1} (${c.x},${c.y}) has no full-clearance route (squeeze required)`);
       }
     });

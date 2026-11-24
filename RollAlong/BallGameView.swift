@@ -112,6 +112,16 @@ struct BallGameView: View {
     @State private var showWelcomeMoment:  Bool      = false
     @State private var showTutorialReward: Bool      = false
 
+    /// The route the marble takes through an Adventure run, sent with the
+    /// run's level_complete or level_fail event.  A class so that adding a
+    /// point never redraws the view.
+    @State private var routeLog = RouteLog()
+
+    #if DEBUG
+    /// Settings > Debug > "Show level test buttons".  Off by default.
+    @AppStorage(DebugSwitches.showLevelTestButtonsKey) private var debugShowLevelTestButtons = false
+    #endif
+
     // Tutorial-reward pick.  Player chooses ONE free standard-tier
     // Standard COLLECTION (bundle) — picking a card selects the whole set; the
     // Claim button unlocks as soon as a collection is selected.  Stores the
@@ -863,7 +873,8 @@ struct BallGameView: View {
                 #if DEBUG
                 // Debug builds only: stand-ins for tilt, so a level can be
                 // failed or finished where the device cannot be tilted.
-                if phase == .playing && activeMode.goal == .reachGoal
+                if debugShowLevelTestButtons
+                    && phase == .playing && activeMode.goal == .reachGoal
                     && !showOutOfLives && !showWelcomeMoment && !showTutorialReward {
                     debugTiltStandIns(size: geo.size, safeTop: geo.safeAreaInsets.top)
                 }
@@ -1221,8 +1232,27 @@ struct BallGameView: View {
     /// are showing.  Rendered in its own layer so it sits on top.  Hidden
     /// during the one-time "Roll Along friend!" welcome moment so it doesn't
     /// compete for the player's attention.
+    /// Whether this run's route is recorded: Adventure only.
+    private var recordsRoute: Bool { activeMode.id == "climb" }
+
+    /// Close the run's route at `end` (fractions of the playfield) and give
+    /// the two properties to add to the run's event:
+    ///   route       "x,y;x,y;…" — the marble's positions in order, each in
+    ///               thousandths of the playfield's width and height;
+    ///   route_step  seconds of play between two points (the last point is
+    ///               the end of the run and may come sooner).
+    /// Empty outside Adventure.
+    private func finishedRoute(endingAt end: (x: Double, y: Double)) -> [String: AnyEncodable] {
+        guard recordsRoute else { return [:] }
+        routeLog.recorder.end(x: end.x, y: end.y)
+        return [
+            "route":      .string(routeLog.recorder.encoded),
+            "route_step": .double(routeLog.recorder.step),
+        ]
+    }
+
     #if DEBUG
-    /// Debug builds only — never compiled into a release build.  Two small
+    /// Debug builds only — never compiled into a release build.  Small
     /// buttons that put the marble where tilt would have taken it.  Nothing
     /// else is faked: the game's own next tick sees the marble in a hole or
     /// on the goal and runs the real fall or the real clear, with the real
@@ -3235,6 +3265,7 @@ struct BallGameView: View {
         ball = Ball(position: startPoint(in: size), velocity: .zero)
         goalBurst = nil  // clear any leftover burst from previous level
         coinsPickedThisAttempt = []
+        routeLog.recorder.reset()   // a new run, a new route
         trailMarks.clear()
         // Coin Pit: a fresh ball means a fresh round — clear the rain, the
         // clock, and the stake (the stake overlay re-appears for the next
@@ -3530,6 +3561,11 @@ struct BallGameView: View {
         // endless/score modes (Zen, Snake, Coin Pit) never trigger a win here.
         let goalLive = activeMode.goal == .reachGoal
             && (tutorialPhase == .playing || tutorialPhase == .notTutorial)
+        // Adventure only: note where the marble is, a few times a second.
+        if recordsRoute {
+            let at = PlayfieldPoint.fractions(of: b.position, in: geoSize)
+            routeLog.recorder.tick(x: at.x, y: at.y, dt: tickRate)
+        }
         let gp = goalPoint(in: geoSize)
         if goalLive,
            hypot(b.position.x - gp.x, b.position.y - gp.y) < effectiveBallRadius * 1.7 {
@@ -3573,17 +3609,19 @@ struct BallGameView: View {
             // Where the marble fell, as fractions of the playfield: the same
             // units the level pack uses, so falls can be laid over a level.
             let fell = PlayfieldPoint.fractions(of: b.position, in: geoSize)
+            var failProperties: [String: AnyEncodable] = [
+                "tier":          .string(layout.tier.rawValue),
+                "time_to_fail":  .double(elapsedSinceSpawn),
+                "coins_picked":  .int(coinsPickedThisAttempt.count),
+                "is_tutorial":   .bool(gameState.isTutorialLevel(gameState.currentLevel)),
+                "game_mode":     .string(activeMode.id),
+                "fall_x":        .double(fell.x),
+                "fall_y":        .double(fell.y),
+            ]
+            for (key, value) in finishedRoute(endingAt: fell) { failProperties[key] = value }
             AnalyticsClient.shared.track(
                 "level_fail",
-                properties: [
-                    "tier":          .string(layout.tier.rawValue),
-                    "time_to_fail":  .double(elapsedSinceSpawn),
-                    "coins_picked":  .int(coinsPickedThisAttempt.count),
-                    "is_tutorial":   .bool(gameState.isTutorialLevel(gameState.currentLevel)),
-                    "game_mode":     .string(activeMode.id),
-                    "fall_x":        .double(fell.x),
-                    "fall_y":        .double(fell.y),
-                ],
+                properties: failProperties,
                 level: gameState.currentLevel
             )
             // Hand off to the pit-fall animation: freeze physics, fire the
@@ -3990,10 +4028,10 @@ struct BallGameView: View {
         if coinReward > 0 {
             gameState.addCoins(coinReward)
         }
+        // The route the marble took, ending on the goal.
+        let routeProperties = finishedRoute(endingAt: PlayfieldPoint.fractions(of: center, in: arenaSize))
 
-        AnalyticsClient.shared.track(
-            "level_complete",
-            properties: [
+        var completeProperties: [String: AnyEncodable] = [
                 "game_mode":     .string(activeMode.id),
                 "tier":          .string(layout.tier.rawValue),
                 "time":          .double(elapsed),
@@ -4004,9 +4042,9 @@ struct BallGameView: View {
                 "coin_reward":   .int(coinReward),
                 "is_new_best":   .bool(stars > prevStars),
                 "is_tutorial":   .bool(gameState.isTutorialLevel(level)),
-            ],
-            level: level
-        )
+        ]
+        for (key, value) in routeProperties { completeProperties[key] = value }
+        AnalyticsClient.shared.track("level_complete", properties: completeProperties, level: level)
 
         // No rating request here: a rating is asked only when the player first
         // reaches level 15, 50 or 100, from `GameState.recordResult`.

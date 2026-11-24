@@ -158,8 +158,13 @@ struct TrophyShowcaseModel: Equatable {
     /// purely most-recently-earned. Unknown or unearned pin ids are ignored
     /// (a pin whose trophy was never earned, or was removed from the catalog,
     /// never fabricates an entry).
-    init(engine: TrophyEngine, pinnedIDs: [String] = []) {
+    ///
+    /// `lastLevel`: the last level of the pack in use.  Trophies the pack
+    /// cannot award and the player has not earned are left out of the
+    /// totals.  nil hides nothing.
+    init(engine: TrophyEngine, pinnedIDs: [String] = [], lastLevel: Int? = nil) {
         let catalog = engine.catalog
+        var shownTotal = 0
 
         var earnedCount = 0
         var earnedByTier: [TrophyTier: Int] = [:]
@@ -179,6 +184,8 @@ struct TrophyShowcaseModel: Equatable {
 
         for (idx, trophy) in catalog.trophies.enumerated() {
             catalogIndex[trophy.id] = idx
+            if engine.isHidden(trophy, lastLevel: lastLevel) { continue }
+            shownTotal += 1
             totalByTier[trophy.tier, default: 0] += 1
 
             guard engine.isUnlocked(trophy.id) else { continue }
@@ -197,7 +204,7 @@ struct TrophyShowcaseModel: Equatable {
                 unlockDate: stamp)
         }
 
-        self.total = catalog.trophies.count
+        self.total = shownTotal
         self.earned = earnedCount
         self.gradeCounts = TrophyTier.allCases
             .sorted()

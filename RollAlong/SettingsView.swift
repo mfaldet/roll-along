@@ -18,6 +18,10 @@ struct SettingsView: View {
     #if DEBUG
     /// Debug builds only: the "All Collections" review gallery.
     @State private var showCollectionGallery = false
+    /// Debug builds only: whether a level shows the purple test buttons.
+    @AppStorage(DebugSwitches.showLevelTestButtonsKey) private var debugShowLevelTestButtons = false
+    /// Debug builds only: the result of the last level pack check.
+    @State private var debugPackCheck = LevelPackStore.lastCheck
     /// Debug builds only: lets "Show Out of Lives screen" open the game.
     @EnvironmentObject private var nav: Navigator
     #endif
@@ -580,9 +584,33 @@ struct SettingsView: View {
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-            Text("Level pack in use: version \(LevelLayout.packVersion). In a level, the purple Debug buttons make the marble fall or finish.")
+            Toggle(isOn: $debugShowLevelTestButtons) {
+                Text("Show level test buttons")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white)
+            }
+            .tint(.purple)
+            .padding(14)
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            Text("While on, a level shows two purple buttons: Debug: fall and Debug: finish. Off by default; the choice is remembered.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
+            VStack(spacing: 8) {
+                Button {
+                    debugPackCheck = "checking…"
+                    Task { debugPackCheck = await LevelPackStore.refresh() }
+                } label: { debugButtonLabel("Check for a published level pack now") }
+                .buttonStyle(.plain)
+                Button {
+                    LevelPackStore.debugForgetDownloadedPack()
+                    debugPackCheck = LevelPackStore.lastCheck
+                } label: { debugButtonLabel("Forget the downloaded level pack") }
+                .buttonStyle(.plain)
+            }
+            Text("Level pack in use: version \(LevelLayout.packVersion), \(LevelLayout.lastLevel) levels, \(LevelLayout.packSource == .downloaded ? "downloaded" : "from the app"). Last check: \(debugPackCheck). A pack accepted now is used from the next launch. Published at \(LevelPackStore.remoteURL.absoluteString)")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+                .textSelection(.enabled)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Ad settings in effect")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
@@ -607,16 +635,18 @@ struct SettingsView: View {
 
     /// Debug builds only: one row that rewrites Adventure progress.
     private func debugProgressButton(_ title: String, _ kind: GameState.DebugProgress) -> some View {
-        Button { gameState.debugSetProgress(kind) } label: {
-            Text(title)
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-        }
-        .buttonStyle(.plain)
+        Button { gameState.debugSetProgress(kind) } label: { debugButtonLabel(title) }
+            .buttonStyle(.plain)
+    }
+
+    private func debugButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
     }
 
     /// Debug builds only: what the Play button would open, in words.
@@ -1309,5 +1339,13 @@ struct CollectionReviewGallery: View {
         }
         .frame(width: 112)
     }
+}
+#endif
+
+#if DEBUG
+/// Debug builds only: switches in Settings > Debug that other screens read.
+enum DebugSwitches {
+    /// "Show level test buttons": off by default, remembered.
+    static let showLevelTestButtonsKey = "ra_debugShowLevelTestButtons"
 }
 #endif

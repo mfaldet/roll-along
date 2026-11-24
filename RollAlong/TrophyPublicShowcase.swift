@@ -103,7 +103,10 @@ struct TrophyPublicShowcase: Equatable {
     ///     EARNED, deduped, and capped at `showcaseIDCap` (an unearned or
     ///     unknown id fabricates nothing). When empty (the D6 default), the
     ///     showcase auto-picks the rarest-earned trophies.
-    init(engine: TrophyEngine, chosenIDs: [String] = []) {
+    ///   - lastLevel: the last level of the pack in use.  Trophies the pack
+    ///     cannot award and the player has not earned are left out of the
+    ///     total.  nil hides nothing.
+    init(engine: TrophyEngine, chosenIDs: [String] = [], lastLevel: Int? = nil) {
         let catalog = engine.catalog
 
         var earnedCount = 0
@@ -123,7 +126,7 @@ struct TrophyPublicShowcase: Equatable {
         }
 
         self.earned = earnedCount
-        self.total = catalog.trophies.count
+        self.total = catalog.trophies.filter { !engine.isHidden($0, lastLevel: lastLevel) }.count
         self.gradeCounts = counts
         self.capstone = catalog.trophies.contains {
             $0.tier.isCapstone && engine.isUnlocked($0.id)

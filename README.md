@@ -27,6 +27,10 @@ Tilt your phone, roll the marble, dodge the holes, reach the goal. An endless Ad
 
 **Adventure.** A run of hand-built levels that get harder as you climb. A level exists only if it is in the level pack. Each level is scored on stars. Lives refill at one every 6 minutes, up to 10.
 
+The level pack ships inside the app and can be replaced by a newer one published on the game's website, without an app update. See [Publishing the level pack](docs/levels/publishing-the-level-pack.md).
+
+*Known exception:* the phone never builds an Adventure level, but Challenge Tracks and the Challenge of the Day still build their levels on the phone in version 1.1. They will move to authored packs in a later version.
+
 **10 minigames.**
 
 | Kind | Games |

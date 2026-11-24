@@ -35,6 +35,14 @@ struct RollAlongApp: App {
                 .environmentObject(store)
                 .environmentObject(ads)
                 .task {
+                    // Look for a newer level pack.  If one is accepted it is
+                    // saved and used from the next launch; this launch keeps
+                    // the pack it started with.
+                    if !CommandLine.arguments.contains("--uitesting") {
+                        await LevelPackStore.refresh()
+                    }
+                }
+                .task {
                     // Bootstrap StoreKit — fetch product catalogue from the
                     // App Store and re-check non-consumable entitlements
                     // (the unlimited unlock).
