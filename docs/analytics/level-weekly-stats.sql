@@ -45,6 +45,13 @@
 --   from 1.0 and 1.0.1 events can overstate attempts and fails on a level.
 --   From 1.1 each event carries game_mode and only Adventure ("climb") counts.
 --
+-- TEST RUNS ARE LEFT OUT
+--   From version 1.1 every event carries build = "debug" or "release", and
+--   only release builds (TestFlight and the App Store) are counted. Events
+--   from before 1.1 carry no build value: of those, simulator events are left
+--   out by their device model, but a debug build run on a real phone before
+--   1.1 cannot be told apart and is counted.
+--
 -- A WEEK is Monday 00:00 to the next Monday 00:00, US Eastern time, the same
 -- clock the game uses for its own days.
 -- =============================================================================
@@ -96,6 +103,10 @@ begin
                (e.created_at at time zone 'America/New_York')::date as day
         from public.events e
         where e.created_at >= v_from and e.created_at < v_to
+          -- Release builds only. An event with no build value is from before
+          -- version 1.1; of those, the simulator's are left out by device model.
+          and coalesce(e.properties->>'build', 'release') = 'release'
+          and coalesce(e.device_model, '') not in ('arm64', 'x86_64', 'i386')
     ),
     last_of_day as (
         -- Each install's last event of each Eastern day in the week.
@@ -162,8 +173,13 @@ end;
 $$;
 revoke all on function public.snapshot_level_week(date) from public, anon, authenticated;
 
--- 3. The weekly job: every Monday at 05:30 UTC (after midnight Eastern in
---    both standard and daylight time), snapshot the week that just ended.
+-- 3. The weekly job: 05:30 UTC every Monday, to snapshot the week that just
+--    ended. A week ends at midnight US Eastern, so the job must run after
+--    that. 05:30 UTC is:
+--        Monday 12:30 AM Eastern standard time (1:30 AM daylight time)
+--        Sunday 11:30 PM Central standard time (Monday 12:30 AM daylight time)
+--    So it runs on Monday by the clock the weeks are cut on, and late Sunday
+--    evening by Central time in winter.
 --    Raw events are kept 90 days, so a missed week can be re-run by hand.
 do $$
 begin

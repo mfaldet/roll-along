@@ -23,6 +23,15 @@
 --   events alone would make an old install look new once its first events
 --   were deleted.
 --
+-- TEST RUNS ARE LEFT OUT
+--   From version 1.1 every event carries build = "debug" or "release". Only
+--   release builds (TestFlight and the App Store) count. An install that sent
+--   even one debug event in the last 90 days is left out altogether, because
+--   it is a developer's device.
+--   Events sent before 1.1 carry no build value and cannot be told apart that
+--   way. Of those, events from the simulator are still left out, by their
+--   device model; a debug build run on a real phone before 1.1 is counted.
+--
 -- WHAT THE LIMITS MEAN
 --   • A rate shows as blank (null) until every install in the week has had
 --     the chance to return: day 30 for a week is blank until 30 full days
@@ -32,12 +41,21 @@
 --   • Rows with few installs swing widely. Read the installs column first.
 -- =============================================================================
 
-with installs as (
+with test_installs as (
+    -- Developer devices: any debug-build event, or any event from the simulator.
+    select distinct e.user_id
+    from public.events e
+    where e.created_at >= now() - interval '90 days'
+      and (   e.properties->>'build' = 'debug'
+           or e.device_model in ('arm64', 'x86_64', 'i386'))
+),
+installs as (
     select
         i.user_id,
         (i.first_seen at time zone 'America/New_York')::date as first_day
     from public.analytics_installs i
     where i.first_seen >= now() - interval '90 days'
+      and i.user_id not in (select user_id from test_installs)
 ),
 active_days as (
     -- Every Eastern calendar day on which an install opened the game.
@@ -47,6 +65,7 @@ active_days as (
     from public.events e
     where e.event_name in ('app_launch', 'app_resume')
       and e.created_at >= now() - interval '90 days'
+      and coalesce(e.properties->>'build', 'release') = 'release'
 ),
 per_install as (
     select

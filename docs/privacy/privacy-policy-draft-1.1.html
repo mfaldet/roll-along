@@ -69,9 +69,9 @@ text that another player sees.</p>
   <tr>
     <td><strong>An account identifier, only if the player signs in with Apple.</strong> Signing in
       is optional. We ask Apple for nothing beyond the sign-in itself: no name and no email
-      address. <span class="todo">[Confirm after the check in docs/privacy/check-stored-emails.sql:
-      either &ldquo;We do not receive or store an email address&rdquo; or describe what is
-      stored.]</span></td>
+      address. For some accounts Apple sends an email address anyway (usually a private relay
+      address that hides the real one). We do not use it, and it is removed from our records
+      within a day.</td>
     <td>To run the parts of the game that need an account: friends, clans and leaderboards.</td>
     <td>Until the account is deleted.</td>
   </tr>
@@ -86,11 +86,10 @@ text that another player sees.</p>
     <td><strong>Feedback, only if someone uses Settings &rarr; Send Feedback:</strong> the kind of
       feedback and one reason, both picked from our lists; nothing is typed. With it go the game
       version, the iOS version, the phone model and the screen it was sent from. If the player is
-      signed in, it is linked to the account identifier. <span class="todo">[Earlier versions had
-      a text box. Say here what happens to messages typed then, once the owner has decided.]</span></td>
+      signed in, it is linked to the account identifier. Earlier versions of the game had a text
+      box; messages typed then are deleted 90 days after they were sent.</td>
     <td>To find and fix problems.</td>
-    <td><span class="todo">[State a period. Today nothing deletes feedback automatically; it is
-      deleted when the account is deleted or on request.]</span></td>
+    <td>12 months. Messages typed in earlier versions: 90 days.</td>
   </tr>
   <tr>
     <td><strong>Purchases.</strong> Apple handles every payment. We never receive a card number
@@ -102,7 +101,8 @@ text that another player sees.</p>
 </table>
 
 <h2>What we do not collect</h2>
-<p>Name, email address <span class="todo">[subject to the check above]</span>, phone number, home
+<p>Name, email address (any address Apple sends with a sign-in is removed within a day, as
+described above), phone number, home
 address, birthday or age, photos, videos, voice or other audio, contacts, precise or approximate
 location, health or fitness data, browsing or search history, or the device&rsquo;s advertising
 identifier. The game never asks for permission to track.</p>

@@ -171,6 +171,14 @@ final class AnalyticsClient: @unchecked Sendable {
     }
     #endif
 
+    /// "debug" for a build run from Xcode, "release" for TestFlight and the
+    /// App Store.  Sent on every event as `build`.
+    #if DEBUG
+    private static let buildKind = "debug"
+    #else
+    private static let buildKind = "release"
+    #endif
+
     // MARK: - Public API
 
     /// Track an event.  Fire-and-forget — buffered, batched, sent in the
@@ -183,6 +191,9 @@ final class AnalyticsClient: @unchecked Sendable {
         // Every event about a level also says which level pack was in use,
         // so results can be compared across changes to a level.
         var properties = properties
+        // Every event says which kind of build sent it, so test runs from
+        // Xcode can be left out of the figures.
+        properties["build"] = .string(Self.buildKind)
         if level != nil, properties["level_pack"] == nil {
             properties["level_pack"] = .int(LevelLayout.packVersion)
         }
