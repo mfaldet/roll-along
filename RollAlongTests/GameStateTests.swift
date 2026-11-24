@@ -862,6 +862,89 @@ final class LevelOverridesTests: XCTestCase {
         XCTAssertFalse(gs.fitProgressToLevelPack(), "it runs once per install")
     }
 
+    // MARK: Coins and free collections for clearing levels (1.1)
+
+    private func freshState(_ tag: String) -> GameState {
+        GameState(defaults: UserDefaults(suiteName: "\(tag)-\(UUID().uuidString)")!)
+    }
+
+    /// The full-clear bonus pays once, by tier: 10 easy, 15 hard, 20 very hard.
+    func testFullClearBonusPaysOnceByTier() {
+        let gs = freshState("bonus")
+        // Level 1 is easy, 6 is hard, 5 is very hard (the last-digit rule).
+        for (level, bonus) in [(1, 10), (6, 15), (5, 20)] {
+            let before = gs.coinBalance
+            gs.recordResult(level: level, stars: 3, time: 5, coinIndices: [0, 1, 2])
+            XCTAssertEqual(gs.payFullClearBonusIfDue(level: level), bonus)
+            XCTAssertEqual(gs.coinBalance, before + bonus)
+            XCTAssertEqual(gs.payFullClearBonusIfDue(level: level), 0, "paid once per level")
+            XCTAssertEqual(gs.coinBalance, before + bonus)
+        }
+    }
+
+    /// Three stars without every coin, or every coin without three stars, is
+    /// not a full clear; the bonus arrives on the run that completes it.
+    func testFullClearBonusWaitsForThreeStarsAndEveryCoin() {
+        let gs = freshState("bonus-wait")
+        gs.recordResult(level: 2, stars: 3, time: 5, coinIndices: [0, 1])
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 2), 0)
+        gs.recordResult(level: 2, stars: 1, time: 30, coinIndices: [2])
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 2), 10, "stars and coins add up across runs")
+    }
+
+    /// The bonus stays paid after "Reset progress": it cannot be earned twice.
+    func testFullClearBonusIsNotPaidAgainAfterAProgressReset() {
+        let gs = freshState("bonus-reset")
+        gs.recordResult(level: 1, stars: 3, time: 5, coinIndices: [0, 1, 2])
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 1), 10)
+        gs.resetProgress()
+        gs.recordResult(level: 1, stars: 3, time: 5, coinIndices: [0, 1, 2])
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 1), 0)
+    }
+
+    /// What a player had done before 1.1 is held: it neither pays nor is
+    /// offered until the owner decides.  New progress pays as normal.
+    func testProgressMadeBeforeTheUpdateIsHeld() {
+        let gs = freshState("held")
+        for level in 1...60 { gs.bestStars[level] = 1; gs.bestTime[level] = 30 }
+        gs.bestStars[3] = 3; gs.collectedCoins[3] = [0, 1, 2]     // fully cleared before the update
+        gs.highestUnlocked = 61
+        gs.takeRewardsBaselineIfNeeded()
+        XCTAssertEqual(gs.fullClearBonusHeld, [3])
+        XCTAssertEqual(gs.collectionPicksHeld, [50])
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 3), 0, "held, not paid")
+        XCTAssertNil(gs.collectionPickDue, "the level 50 pick is held, not offered")
+        // A level fully cleared after the update pays.
+        gs.recordResult(level: 4, stars: 3, time: 5, coinIndices: [0, 1, 2])
+        XCTAssertEqual(gs.payFullClearBonusIfDue(level: 4), 10)
+        // The baseline is taken once.
+        gs.bestStars[7] = 3; gs.collectedCoins[7] = [0, 1, 2]
+        gs.takeRewardsBaselineIfNeeded()
+        XCTAssertEqual(gs.fullClearBonusHeld, [3])
+    }
+
+    /// A pick is owed after passing level 50 and closes when taken.
+    func testCollectionPickIsOwedAfterLevel50() {
+        let gs = freshState("pick")
+        gs.highestUnlocked = 50
+        XCTAssertNil(gs.collectionPickDue)
+        gs.recordResult(level: 50, stars: 1, time: 30, coinIndices: [])
+        XCTAssertEqual(gs.collectionPickDue, 50)
+        gs.closeCollectionPick(50)
+        XCTAssertNil(gs.collectionPickDue)
+    }
+
+    /// The reward list is Nature, Fire, Water and Storm; a collection the
+    /// player owns is not offered again.
+    func testRewardListLeavesOutOwnedCollections() {
+        let gs = freshState("list")
+        XCTAssertEqual(gs.rewardCollectionsNotOwned.map(\.id), ["nature", "fire", "water", "storm"])
+        if let fire = CosmeticBundle.catalogue.first(where: { $0.id == "fire" }) {
+            gs.grantBundleFree(fire)
+        }
+        XCTAssertEqual(gs.rewardCollectionsNotOwned.map(\.id), ["nature", "water", "storm"])
+    }
+
     /// A decoded override must carry real content (the migration/publish wrote a
     /// usable layout, not an empty husk).  L1 = 1 designed hole + 2 side-walls
     /// auto-added on decode, plus its 3 coins.

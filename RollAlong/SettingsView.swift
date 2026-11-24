@@ -592,7 +592,7 @@ struct SettingsView: View {
             .tint(.purple)
             .padding(14)
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
-            Text("While on, a level shows two purple buttons: Debug: fall and Debug: finish. Off by default; the choice is remembered.")
+            Text("While on, a level shows three purple buttons: Debug: fall, Debug: coins (picks up every coin) and Debug: finish. Off by default; the choice is remembered.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
             VStack(spacing: 8) {
@@ -611,6 +611,21 @@ struct SettingsView: View {
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
                 .textSelection(.enabled)
+            VStack(spacing: 8) {
+                Button { gameState.debugStandOn(level: 1) } label: { debugButtonLabel("Rewards check: start again on level 1") }
+                    .buttonStyle(.plain)
+                Button { gameState.debugStandOn(level: 50) } label: { debugButtonLabel("Rewards check: stand on level 50") }
+                    .buttonStyle(.plain)
+                Button { gameState.debugStandOn(level: 100) } label: { debugButtonLabel("Rewards check: stand on level 100") }
+                    .buttonStyle(.plain)
+                Button { gameState.takeRewardsBaselineIfNeeded(force: true) } label: {
+                    debugButtonLabel("Rewards check: treat progress so far as made before 1.1")
+                }
+                .buttonStyle(.plain)
+            }
+            Text("The stand-on buttons replace the saved Adventure progress and forget every 1.1 reward record. \(gameState.debugRewardsSummary)")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
             VStack(alignment: .leading, spacing: 6) {
                 Text("Ad settings in effect")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))

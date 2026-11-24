@@ -360,6 +360,30 @@ final class GameState: ObservableObject {
     @Published var reviewMilestonesAsked: Set<Int> {
         didSet { defaults.set(reviewMilestonesAsked.sorted(), forKey: "ra_reviewMilestonesAsked") }
     }
+
+    // ── Coins and free collections for clearing levels (1.1) ────────────
+    // fullClearBonusPaid   : levels whose full-clear bonus has been paid.
+    //                        Never cleared, so a bonus pays once per level
+    //                        even after "Reset progress".
+    // fullClearBonusHeld   : levels that were ALREADY fully cleared when 1.1
+    //                        arrived.  They pay nothing until the owner
+    //                        decides whether they should (see ClearRewards).
+    // collectionPicksTaken : the milestones (50, 100, 200) whose free
+    //                        collection pick has been taken or closed.
+    // collectionPicksHeld  : milestones ALREADY passed when 1.1 arrived;
+    //                        not offered until the owner decides.
+    @Published var fullClearBonusPaid: Set<Int> {
+        didSet { defaults.set(fullClearBonusPaid.sorted(), forKey: "ra_fullClearBonusPaid") }
+    }
+    @Published var fullClearBonusHeld: Set<Int> {
+        didSet { defaults.set(fullClearBonusHeld.sorted(), forKey: "ra_fullClearBonusHeld") }
+    }
+    @Published var collectionPicksTaken: Set<Int> {
+        didSet { defaults.set(collectionPicksTaken.sorted(), forKey: "ra_collectionPicksTaken") }
+    }
+    @Published var collectionPicksHeld: Set<Int> {
+        didSet { defaults.set(collectionPicksHeld.sorted(), forKey: "ra_collectionPicksHeld") }
+    }
     @Published var lastReviewPromptDate: Date? {
         didSet {
             if let d = lastReviewPromptDate {
@@ -900,6 +924,10 @@ final class GameState: ObservableObject {
         // Ratings prompt.
         lastReviewPromptDate = defaults.object(forKey: "ra_lastReviewPromptDate") as? Date
         reviewMilestonesAsked = Set((defaults.array(forKey: "ra_reviewMilestonesAsked") as? [Int]) ?? [])
+        fullClearBonusPaid   = Set((defaults.array(forKey: "ra_fullClearBonusPaid") as? [Int]) ?? [])
+        fullClearBonusHeld   = Set((defaults.array(forKey: "ra_fullClearBonusHeld") as? [Int]) ?? [])
+        collectionPicksTaken = Set((defaults.array(forKey: "ra_collectionPicksTaken") as? [Int]) ?? [])
+        collectionPicksHeld  = Set((defaults.array(forKey: "ra_collectionPicksHeld") as? [Int]) ?? [])
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -1265,7 +1293,96 @@ final class GameState: ObservableObject {
         return true
     }
 
+    // MARK: - Coins and free collections for clearing levels (1.1)
+
+    /// Once, on the first launch of 1.1: note what the player had ALREADY
+    /// done before the new rewards existed, so none of it pays by accident.
+    ///  • every level already fully cleared is held (no full-clear bonus);
+    ///  • every pick milestone already passed is held (no pick offered).
+    /// Whether held rewards are paid is the owner's decision; holding keeps
+    /// both answers possible.  A new install has nothing to hold.
+    ///
+    /// Called at launch after `fitProgressToLevelPack()`.
+    func takeRewardsBaselineIfNeeded(force: Bool = false) {
+        let doneKey = "ra_rewardsBaselineTaken"
+        guard force || !defaults.bool(forKey: doneKey) else { return }
+        defaults.set(true, forKey: doneKey)
+        fullClearBonusHeld = Set(bestStars.keys.filter { isFullyCleared($0) })
+            .subtracting(fullClearBonusPaid)
+        collectionPicksHeld = ClearRewards.milestonesAlreadyPassed(highestUnlocked: highestUnlocked)
+            .subtracting(collectionPicksTaken)
+    }
+
+    /// The full-clear bonus for a level of this tier: 10 / 15 / 20.
+    static func fullClearBonus(for level: Int) -> Int {
+        switch DifficultyTier.tier(for: level) {
+        case .easy:     return ClearRewards.fullClearBonusEasy
+        case .hard:     return ClearRewards.fullClearBonusHard
+        case .veryHard: return ClearRewards.fullClearBonusVeryHard
+        }
+    }
+
+    /// Pay `level`'s full-clear bonus if it is due: the level is fully
+    /// cleared now, and the bonus was neither paid before nor held.  Call
+    /// AFTER `recordResult`.  Returns the coins paid (0 for none).
+    @discardableResult
+    func payFullClearBonusIfDue(level: Int) -> Int {
+        let bonus = ClearRewards.fullClearBonus(
+            level: level,
+            isFullyClearedNow: isFullyCleared(level),
+            tierBonus: Self.fullClearBonus(for: level),
+            alreadyPaid: fullClearBonusPaid,
+            held: fullClearBonusHeld)
+        guard bonus > 0 else { return 0 }
+        fullClearBonusPaid.insert(level)
+        addCoins(bonus)
+        return bonus
+    }
+
+    /// The collections on the reward list this player does not own yet, in
+    /// list order.  (The reward list is `CosmeticBundle.starterGift`.)
+    var rewardCollectionsNotOwned: [CosmeticBundle] {
+        let owned = completedBundleIDs
+        return CosmeticBundle.starterGift.filter { $0.isAvailable && !owned.contains($0.id) }
+    }
+
+    /// The milestone (50, 100 or 200) whose free collection pick should be
+    /// offered now, or nil.  A milestone with nothing left to offer is
+    /// closed without a pick.
+    var collectionPickDue: Int? {
+        ClearRewards.pickDue(highestUnlocked: highestUnlocked,
+                             taken: collectionPicksTaken, held: collectionPicksHeld)
+    }
+
+    /// Record that `milestone`'s pick was taken (or had nothing to offer).
+    func closeCollectionPick(_ milestone: Int) {
+        collectionPicksTaken.insert(milestone)
+    }
+
     #if DEBUG
+    /// Debug builds only (Settings → Debug).  Puts the player on `level`
+    /// with every earlier level passed with one star, and forgets every 1.1
+    /// reward record, so a reward can be checked from a known start.
+    func debugStandOn(level: Int) {
+        let target = min(max(1, level), LevelLayout.lastLevel)
+        var stars: [Int: Int] = [:], times: [Int: TimeInterval] = [:]
+        if target > 1 { for l in 1..<target { stars[l] = 1; times[l] = 30 } }
+        bestStars = stars; bestTime = times; collectedCoins = [:]
+        currentLevel = target
+        highestUnlocked = target
+        fullClearBonusPaid = []; fullClearBonusHeld = []
+        collectionPicksTaken = []; collectionPicksHeld = []
+    }
+
+    /// One line on the 1.1 reward records, for Settings → Debug.
+    var debugRewardsSummary: String {
+        func list(_ set: Set<Int>) -> String { set.isEmpty ? "none" : set.sorted().map(String.init).joined(separator: ", ") }
+        return "Coins: \(coinBalance). Full-clear bonus paid on \(fullClearBonusPaid.count) levels, held on \(fullClearBonusHeld.count). "
+             + "Collection picks taken: \(list(collectionPicksTaken)); held: \(list(collectionPicksHeld)); "
+             + "due now: \(collectionPickDue.map(String.init) ?? "none"). "
+             + "Reward-list collections not owned: \(rewardCollectionsNotOwned.map(\.displayName).joined(separator: ", "))."
+    }
+
     /// Debug builds only (Settings → Debug).  Rewrites Adventure progress so
     /// the pack rules can be checked without playing a hundred levels.
     enum DebugProgress { case oldSavePastThePack, everyLevelPassed, everyLevelFullyCleared }
@@ -2320,14 +2437,13 @@ final class GameState: ObservableObject {
     /// up to 3 currency-coins on the floor → 0…3 coins per first clear
     /// from pickups alone.
     static let coinPerPickup: Int = 1
-    /// Base flat coin award on EVERY climb clear — first time or replay.  The
-    /// grind is blessed (2026-07-01 economy calibration): replaying a level
-    /// pays this bonus again, exactly like the Challenge Tracks, whether the
-    /// player pushes to level 10,000 or replays level 1 ten thousand times.
+    /// Base flat coin award for a clear.  In Adventure it is paid on a
+    /// level's FIRST clear only (since 1.1; replays pay nothing flat — see
+    /// `ClearRewards.flatPayment`), scaled by tier via `clearCoins(for:)`.
     /// Stacks with pickups, so a perfect first clear yields `clearCoins(for:)
     /// + 3` coins; pickup coins stay sticky and pay only once per level.
-    /// The climb scales this by tier via `clearCoins(for:)` — this constant
-    /// is the easy-tier base (and the flat track-level bonus).
+    /// This constant is the easy-tier base, and the flat bonus a Challenge
+    /// Track level still pays on every clear.
     static let coinPerClear:  Int = 2
 
     /// Climb clear bonus scaled by the level's difficulty tier (the

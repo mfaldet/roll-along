@@ -127,6 +127,10 @@ struct BallGameView: View {
     // Claim button unlocks as soon as a collection is selected.  Stores the
     // selected bundle's id.
     @State private var tutorialBundlePick: String? = nil
+    /// Which free collection pick the picker is showing: nil for the
+    /// tutorial reward after level 10, or the milestone (50, 100, 200) of a
+    /// later pick.
+    @State private var pickMilestone: Int? = nil
     /// Where the starter-set picker is: choosing, confirming, or revealing.
     @State private var tutorialStage: TutorialGiftStage = .choose
     /// When the picker appeared (or the reveal began) — drives the one-time
@@ -349,6 +353,8 @@ struct BallGameView: View {
     @State private var lastClearedStars:       Int          = 0
     @State private var lastClearedCoinIndices: Set<Int>     = []
     @State private var lastClearedCoinReward:  Int          = 0
+    /// The full-clear bonus inside `lastClearedCoinReward` (0 for none).
+    @State private var lastClearedFullClearBonus: Int       = 0
     @State private var lastClearedIsNewBestStars: Bool      = false
 
     // Animation-polish triggers (keyframe animators key off these)
@@ -1271,6 +1277,14 @@ struct BallGameView: View {
                         target = CGPoint(x: -4 * ballRadius, y: size.height / 2)
                     }
                     ball = Ball(position: target, velocity: .zero)
+                }
+                Button("Debug: coins") {
+                    // Pick up every coin of this level, as rolling over
+                    // them would.  They count when the level is finished.
+                    for index in effectiveLayout.coins.indices
+                    where !gameState.coinsCollected(for: gameState.currentLevel).contains(index) {
+                        coinsPickedThisAttempt.insert(index)
+                    }
                 }
                 Button("Debug: finish") {
                     ball = Ball(position: goalPoint(in: size), velocity: .zero)
@@ -2237,6 +2251,11 @@ struct BallGameView: View {
                         .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30))
                         .accessibilityLabel("Plus \(lastClearedCoinReward) coins earned.")
                     }
+                    if lastClearedFullClearBonus > 0 && activeMode.id == "climb" {
+                        Text("Fully cleared! +\(lastClearedFullClearBonus) bonus included")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(red: 1.00, green: 0.84, blue: 0.30).opacity(0.85))
+                    }
                 }
 
                 // Actions
@@ -2659,8 +2678,14 @@ struct BallGameView: View {
 
     /// The starter sets offered after the tutorial: exactly Nature, Fire,
     /// Water and Storm, in that order (`CosmeticBundle.starterGiftIDs`).
+    ///
+    /// A later pick (after level 50, 100 or 200) offers the same list minus
+    /// the collections the player already owns.  While that pick's reveal
+    /// plays, the list is not on screen, so it changing as the gift lands
+    /// is never seen.
     private var tutorialGiftBundles: [CosmeticBundle] {
-        CosmeticBundle.starterGift.filter { $0.isAvailable }
+        if pickMilestone != nil { return gameState.rewardCollectionsNotOwned }
+        return CosmeticBundle.starterGift.filter { $0.isAvailable }
     }
 
     private var tutorialPickedBundle: CosmeticBundle? {
@@ -2721,11 +2746,11 @@ struct BallGameView: View {
     private var tutorialChooseStep: some View {
         VStack(spacing: 14) {
             VStack(spacing: 6) {
-                Text("TUTORIAL COMPLETE")
+                Text(pickMilestone.map { "LEVEL \($0) COMPLETE" } ?? "TUTORIAL COMPLETE")
                     .font(.system(size: 12, weight: .heavy, design: .rounded))
                     .kerning(2)
                     .foregroundStyle(Color(red: 1.0, green: 0.82, blue: 0.35))
-                Text("Choose your starter set")
+                Text(pickMilestone == nil ? "Choose your starter set" : "Choose a free collection")
                     .font(.system(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
@@ -3162,10 +3187,29 @@ struct BallGameView: View {
         if gameState.currentLevel == 1 && !gameState.seenWelcomeMoment {
             withAnimation(.easeInOut(duration: 0.32)) { showWelcomeMoment = true }
         } else if gameState.currentLevel == 10 && !gameState.seenTutorialReward {
+            pickMilestone = nil
             withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = true }
-        } else if gameState.isOnLastLevel {
-            // The last level in the pack: there is no next level.  Back to
-            // the level selector.
+        } else if let milestone = gameState.collectionPickDue {
+            // A free collection pick is owed (the player has passed level
+            // 50, 100 or 200 and has not taken that pick).
+            if gameState.rewardCollectionsNotOwned.isEmpty {
+                // Nothing left on the list to give: close it and move on.
+                gameState.closeCollectionPick(milestone)
+                continueAfterLevelClear()
+            } else {
+                pickMilestone = milestone
+                tutorialBundlePick = nil
+                withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = true }
+            }
+        } else {
+            continueAfterLevelClear()
+        }
+    }
+
+    /// On to the next level, or back to the level selector when the level
+    /// just cleared is the last one in the pack.
+    private func continueAfterLevelClear() {
+        if gameState.isOnLastLevel {
             nav.goToLevels()
         } else {
             gameState.advanceLevel()
@@ -3200,13 +3244,18 @@ struct BallGameView: View {
         if let w = bundle.boundaries.first { gameState.equippedBoundary = w }
         if let m = bundle.offeredMusic.first  { gameState.equippedMusic = m }
 
-        gameState.seenTutorialReward = true
-        // The Welcome Gift waits for a later app open than this one.
-        gameState.markTutorialPickedThisOpen()
-        AnalyticsClient.shared.track(
-            "tutorial_bundle_claimed",
-            properties: ["bundle": .string(bundle.id)]
-        )
+        if let milestone = pickMilestone {
+            // A later pick: record it as taken.  Nothing else changes.
+            gameState.closeCollectionPick(milestone)
+        } else {
+            gameState.seenTutorialReward = true
+            // The Welcome Gift waits for a later app open than this one.
+            gameState.markTutorialPickedThisOpen()
+            AnalyticsClient.shared.track(
+                "tutorial_bundle_claimed",
+                properties: ["bundle": .string(bundle.id)]
+            )
+        }
         if gameState.hapticsEnabled { Haptics.success() }
 
         tutorialRevealCount = reduceMotion ? 6 : 0
@@ -3234,8 +3283,8 @@ struct BallGameView: View {
         withAnimation(.easeInOut(duration: 0.32)) { showTutorialReward = false }
         tutorialStage = .choose
         tutorialConfettiStart = nil
-        gameState.advanceLevel()
-        spawnBall(in: arenaSize)
+        pickMilestone = nil
+        continueAfterLevelClear()
     }
 
     // MARK: - Game logic
@@ -3973,28 +4022,31 @@ struct BallGameView: View {
         let level     = gameState.currentLevel
         let prevStars = gameState.stars(for: level)
 
-        // Currency-coin reward.  Two stackable sources:
+        // Currency-coin reward.  Three sources (1.1):
         //
-        //   1. Flat per-clear bonus (`clearCoins(for:)` — 2/3/4 by the
-        //      level's difficulty tier) — on EVERY clear, first time or
-        //      replay.  Replay farming is blessed (2026-07-01 economy
-        //      calibration): the climb pays like the Challenge Tracks,
-        //      whether the player pushes to level 10,000 or replays
-        //      level 1 ten thousand times.
+        //   1. Flat payment (`clearCoins(for:)` — 2/3/4 by the level's
+        //      difficulty tier) — on the level's FIRST clear only.  A replay
+        //      pays nothing flat.
         //
         //   2. Per-pickup (`coinPerPickup`) for each currency-coin grabbed
         //      this run.  Banked coins can't be re-picked (the pickup gate
-        //      skips them), so sticky pickups still pay only once ACROSS
-        //      attempts — only the flat bonus repeats.
+        //      skips them), so each coin pays once across attempts.
         //
-        // A perfect first clear of an easy level awards 2 + 3.  Replays
-        // award the flat bonus plus any never-before-banked pickups.
+        //   3. Full-clear bonus (10/15/20 by tier) — once per level, on the
+        //      run that first leaves it with three stars and every coin.
+        //      Paid after `recordResult` below, which is what makes the
+        //      level fully cleared.
+        //
+        // A perfect first clear of an easy level awards 2 + 3 + 10.
+        // "First clear" is read BEFORE recordResult stamps the best time.
+        let isFirstClear = gameState.time(for: level) == nil
         let newStars = max(0, stars - prevStars)
         // `coinReward` is the amount we add to the balance HERE.  The L1
         // tutorial may have already banked + credited the three coins at
         // the Phase-2→3 transition (`tutorialCoinBonus`); subtract that
         // portion so the player isn't paid twice in the same attempt.
-        let coinReward = GameState.clearCoins(for: level)
+        let coinReward = ClearRewards.flatPayment(levelAmount: GameState.clearCoins(for: level),
+                                                  isFirstClear: isFirstClear)
                        + coinsPickedThisAttempt.count * GameState.coinPerPickup
                        - tutorialCoinBonus
         // `displayedCoinReward` is what the Level Clear screen shows
@@ -4028,6 +4080,10 @@ struct BallGameView: View {
         if coinReward > 0 {
             gameState.addCoins(coinReward)
         }
+        // Full-clear bonus: paid (and recorded as paid) inside GameState, once.
+        let fullClearBonus = activeMode.id == "climb" ? gameState.payFullClearBonusIfDue(level: level) : 0
+        lastClearedFullClearBonus = fullClearBonus
+        lastClearedCoinReward     = displayedCoinReward + fullClearBonus
         // The route the marble took, ending on the goal.
         let routeProperties = finishedRoute(endingAt: PlayfieldPoint.fractions(of: center, in: arenaSize))
 
@@ -4039,7 +4095,7 @@ struct BallGameView: View {
                 "prev_stars":    .int(prevStars),
                 "new_stars":     .int(newStars),
                 "coins_picked":  .int(coinsPickedThisAttempt.count),
-                "coin_reward":   .int(coinReward),
+                "coin_reward":   .int(coinReward + fullClearBonus),
                 "is_new_best":   .bool(stars > prevStars),
                 "is_tutorial":   .bool(gameState.isTutorialLevel(level)),
         ]

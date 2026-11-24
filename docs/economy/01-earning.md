@@ -51,8 +51,13 @@ overhead. Assumed performance baselines are listed at the bottom.
 - **Pickups**: `coinPerPickup = 1` (GameState.swift:1013); generated levels
   place exactly 3 coins (LevelLayout.swift:426-428); authored override levels
   can differ; daily maps have zero (LevelLayout.swift:274).
-- **First clear**: `coinPerClear = 2`, paid only when no `bestTime` exists
-  (GameState.swift:1014-1017; BallGameView.swift:5636). Perfect first clear = 5.
+- **First clear (1.1)**: the flat payment (`clearCoins(for:)`, 2/3/4 by tier)
+  is paid on a level's first clear only; a replay pays nothing flat.
+- **Full-clear bonus (1.1)**: 10 easy / 15 hard / 20 very hard, once per
+  level, when it first has three stars and every coin (`ClearRewards`).
+  Perfect first clear of an easy level = 2 + 3 + 10.
+- **Free collection picks (1.1)**: after levels 10, 50, 100 and 200, one
+  pick from the reward list (Nature, Fire, Water, Storm) not yet owned.
 - **Pickups bank only on a CLEARED run** (`recordResult`, GameState.swift:734);
   a fall resets the attempt's pickups (BallGameView.swift:5373). So replays can
   recover coins missed earlier, but generate ~0 sustained income.
