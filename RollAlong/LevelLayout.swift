@@ -184,6 +184,11 @@ struct LevelLayout {
     /// refresh is wired.  This is the "Codable now, remote-refresh later" seam.
     private(set) static var overrides: [Int: LevelLayout] = LevelOverrideStore.loadBundled()
 
+    /// The version number of the level pack in use, recorded on every
+    /// analytics event about a level.  Read from the pack file's
+    /// `packVersion`; 0 when the file is missing or gives none.
+    private(set) static var packVersion: Int = LevelOverrideStore.bundledPackVersion()
+
     /// Merge externally-sourced overrides (e.g. fetched remote config JSON) on
     /// top of the current set; later keys win.  STUB: the actual fetch/endpoint
     /// is wired when remote config lands — this is the merge point it calls.
@@ -191,6 +196,7 @@ struct LevelLayout {
         let fetched = LevelOverrideStore.decode(data)
         guard !fetched.isEmpty else { return }
         overrides.merge(fetched) { _, new in new }
+        if let version = LevelOverrideStore.packVersion(in: data) { packVersion = version }
     }
 
     static func layout(for level: Int) -> LevelLayout {
@@ -950,7 +956,22 @@ enum LevelOverrideStore {
     /// On-disk / on-wire shape: a schema version plus a level-keyed map.
     struct File: Codable {
         var schemaVersion: Int
+        /// The pack's own version number, raised each time the levels are
+        /// republished.  Optional so older files still load.
+        var packVersion: Int?
         var levels: [String: LevelDTO]   // keys are level numbers as strings
+    }
+
+    /// The `packVersion` in a pack file, or nil if it has none or cannot be read.
+    static func packVersion(in data: Data) -> Int? {
+        (try? JSONDecoder().decode(File.self, from: data))?.packVersion
+    }
+
+    /// The bundled pack's version; 0 when the file is missing or gives none.
+    static func bundledPackVersion() -> Int {
+        guard let url = Bundle.main.url(forResource: bundledResource, withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return 0 }
+        return packVersion(in: data) ?? 0
     }
 
     /// Read the bundled overrides, or `[:]` if missing / unparseable.

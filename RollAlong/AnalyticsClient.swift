@@ -150,6 +150,27 @@ final class AnalyticsClient: @unchecked Sendable {
         }
     }
 
+    #if DEBUG
+    // Debug builds only: the most recent level event, as text, for
+    // Settings → Debug.  Lets the pack version and the fall position be
+    // checked on the device without reading the database.
+    private static let debugLock = NSLock()
+    private static var debugLastLevelEventText: String?
+
+    static var debugLastLevelEvent: String {
+        debugLock.lock(); defer { debugLock.unlock() }
+        return debugLastLevelEventText ?? "None yet. Start a level."
+    }
+
+    private static func debugRecordLevelEvent(name: String, level: Int?, properties: [String: AnyEncodable]) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let json = (try? encoder.encode(properties)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        let text = "\(name) · level \(level.map(String.init) ?? "-")\n\(json)"
+        debugLock.lock(); debugLastLevelEventText = text; debugLock.unlock()
+    }
+    #endif
+
     // MARK: - Public API
 
     /// Track an event.  Fire-and-forget — buffered, batched, sent in the
@@ -159,6 +180,15 @@ final class AnalyticsClient: @unchecked Sendable {
                level: Int? = nil) {
         // Test runs never reach the live events table: drop at the door.
         guard !RuntimeEnvironment.isRunningTests else { return }
+        // Every event about a level also says which level pack was in use,
+        // so results can be compared across changes to a level.
+        var properties = properties
+        if level != nil, properties["level_pack"] == nil {
+            properties["level_pack"] = .int(LevelLayout.packVersion)
+        }
+        #if DEBUG
+        if level != nil { Self.debugRecordLevelEvent(name: name, level: level, properties: properties) }
+        #endif
         let event = PendingEvent(
             userId:       userId,
             sessionId:    sessionId,

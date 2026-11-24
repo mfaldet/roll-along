@@ -30,6 +30,7 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
+                    rateRow
                     gameSection
                     notificationsSection
                     accountSection
@@ -484,6 +485,22 @@ struct SettingsView: View {
     private static let privacyPolicyURL = URL(string: "https://mfaldet.github.io/roll-along/privacy.html")!
     private static let contactURL = URL(string: "mailto:rollalongsupport@gmail.com?subject=Roll%20Along%20support")!
 
+    /// The App Store page for Roll Along, opened on its "write a review" form.
+    private static let rateURL = URL(string: "https://apps.apple.com/app/id6774455345?action=write-review")!
+
+    /// "Rate Roll Along" — first thing in Settings.  Opens the App Store
+    /// review page; it does not use Apple's in-game rating sheet, which is
+    /// kept for the level 15, 50 and 100 milestones.
+    private var rateRow: some View {
+        Link(destination: Self.rateURL) {
+            aboutRow(icon: "star.fill", title: "Rate Roll Along")
+        }
+        .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+        .simultaneousGesture(TapGesture().onEnded {
+            AnalyticsClient.shared.track("rate_row_tapped")
+        })
+    }
+
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("About")
@@ -529,6 +546,38 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            HStack(spacing: 8) {
+                ForEach(RatingMilestones.levels, id: \.self) { milestone in
+                    Button { gameState.debugRequestReview(atMilestone: milestone) } label: {
+                        Text("Level \(milestone)")
+                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Rating request: acts as if you had just reached that level for the first time. Milestones already asked: \(gameState.reviewMilestonesAsked.sorted().map(String.init).joined(separator: ", ").isEmpty ? "none" : gameState.reviewMilestonesAsked.sorted().map(String.init).joined(separator: ", ")).")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Last level event sent")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(AnalyticsClient.debugLastLevelEvent)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(Color(white: 0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 14)))
+            Text("Level pack in use: version \(LevelLayout.packVersion). In a level, the purple Debug buttons make the marble fall or finish.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
             VStack(alignment: .leading, spacing: 6) {
                 Text("Ad settings in effect")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))

@@ -860,6 +860,15 @@ struct BallGameView: View {
                     homeButtonOverlay(safeBottom: geo.safeAreaInsets.bottom)
                 }
 
+                #if DEBUG
+                // Debug builds only: stand-ins for tilt, so a level can be
+                // failed or finished where the device cannot be tilted.
+                if phase == .playing && activeMode.goal == .reachGoal
+                    && !showOutOfLives && !showWelcomeMoment && !showTutorialReward {
+                    debugTiltStandIns(size: geo.size, safeTop: geo.safeAreaInsets.top)
+                }
+                #endif
+
                 // Zen Garden tools — bottom-right dropdown (wind ▸ pattern ▸
                 // tree).  Replaces the old standalone rake button.  Hidden while
                 // the player is holding the garden to roll.
@@ -1212,6 +1221,41 @@ struct BallGameView: View {
     /// are showing.  Rendered in its own layer so it sits on top.  Hidden
     /// during the one-time "Roll Along friend!" welcome moment so it doesn't
     /// compete for the player's attention.
+    #if DEBUG
+    /// Debug builds only — never compiled into a release build.  Two small
+    /// buttons that put the marble where tilt would have taken it.  Nothing
+    /// else is faked: the game's own next tick sees the marble in a hole or
+    /// on the goal and runs the real fall or the real clear, with the real
+    /// analytics events, life, stars and coins.
+    private func debugTiltStandIns(size: CGSize, safeTop: CGFloat) -> some View {
+        VStack {
+            HStack(spacing: 8) {
+                Spacer()
+                Button("Debug: fall") {
+                    // The middle of the first hole, or just off the left edge
+                    // when the level has no holes — both count as a fall.
+                    let target: CGPoint
+                    if let hole = effectiveLayout.holeRects.first {
+                        target = CGPoint(x: hole.midX * size.width, y: hole.midY * size.height)
+                    } else {
+                        target = CGPoint(x: -4 * ballRadius, y: size.height / 2)
+                    }
+                    ball = Ball(position: target, velocity: .zero)
+                }
+                Button("Debug: finish") {
+                    ball = Ball(position: goalPoint(in: size), velocity: .zero)
+                }
+            }
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .buttonStyle(.borderedProminent)
+            .tint(.purple)
+            .padding(.trailing, 14)
+            .padding(.top, safeTop + 54)
+            Spacer()
+        }
+    }
+    #endif
+
     private func homeButtonOverlay(safeBottom: CGFloat) -> some View {
         VStack {
             Spacer()
@@ -3518,6 +3562,9 @@ struct BallGameView: View {
             }
 
             ball = b
+            // Where the marble fell, as fractions of the playfield: the same
+            // units the level pack uses, so falls can be laid over a level.
+            let fell = PlayfieldPoint.fractions(of: b.position, in: geoSize)
             AnalyticsClient.shared.track(
                 "level_fail",
                 properties: [
@@ -3525,6 +3572,8 @@ struct BallGameView: View {
                     "time_to_fail":  .double(elapsedSinceSpawn),
                     "coins_picked":  .int(coinsPickedThisAttempt.count),
                     "is_tutorial":   .bool(gameState.isTutorialLevel(gameState.currentLevel)),
+                    "fall_x":        .double(fell.x),
+                    "fall_y":        .double(fell.y),
                 ],
                 level: gameState.currentLevel
             )
@@ -3839,10 +3888,6 @@ struct BallGameView: View {
                     properties: ["track_id": .string(trackID)]
                 )
             }
-            // Prompt at milestone levels — positive moment, player is clearly engaged.
-            if [10, 50, 100].contains(gameState.activeTrackLevel) {
-                gameState.maybeRequestReview(after: true)
-            }
             withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
             return
         }
@@ -3953,10 +3998,8 @@ struct BallGameView: View {
             level: level
         )
 
-        // Prompt on a 3-star clear — peak positive emotional moment on the main climb.
-        if stars == 3 {
-            gameState.maybeRequestReview(after: true)
-        }
+        // No rating request here: a rating is asked only when the player first
+        // reaches level 15, 50 or 100, from `GameState.recordResult`.
         withAnimation(.easeIn(duration: 0.35)) { phase = .levelComplete }
     }
 

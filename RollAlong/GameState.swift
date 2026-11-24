@@ -352,10 +352,14 @@ final class GameState: ObservableObject {
     }
 
     // ── Ratings prompt ────────────────────────────────────────────────────
-    // Timestamp of the last time SKStoreReviewController.requestReview was
-    // called.  nil until the first time the conditions are met.  Used to
-    // enforce the 30-day minimum between prompts (Apple allows at most 3
-    // per 365 days regardless, but we gate more tightly).
+    // Timestamp of the last time a rating was requested.  nil until the
+    // first time.  A record only: nothing reads it to decide when to ask
+    // (see `maybeRequestReview(reachingFrom:to:)`).
+    /// The rating milestones (levels 15, 50, 100) a rating has already been
+    /// asked for.  A milestone is asked once, the first time it is reached.
+    @Published var reviewMilestonesAsked: Set<Int> {
+        didSet { defaults.set(reviewMilestonesAsked.sorted(), forKey: "ra_reviewMilestonesAsked") }
+    }
     @Published var lastReviewPromptDate: Date? {
         didSet {
             if let d = lastReviewPromptDate {
@@ -895,6 +899,7 @@ final class GameState: ObservableObject {
 
         // Ratings prompt.
         lastReviewPromptDate = defaults.object(forKey: "ra_lastReviewPromptDate") as? Date
+        reviewMilestonesAsked = Set((defaults.array(forKey: "ra_reviewMilestonesAsked") as? [Int]) ?? [])
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -1164,7 +1169,9 @@ final class GameState: ObservableObject {
     func advanceLevel() {
         currentLevel += 1
         if currentLevel > highestUnlocked {
+            let reachedBefore = highestUnlocked
             highestUnlocked = currentLevel
+            maybeRequestReview(reachingFrom: reachedBefore, to: highestUnlocked)
         }
         syncSocialProgress()
         // Climb level trophies key on `highestUnlocked` (S1-T1;
@@ -1389,7 +1396,9 @@ final class GameState: ObservableObject {
             collectedCoins[level] = set
         }
         if level >= highestUnlocked {
+            let reachedBefore = highestUnlocked
             highestUnlocked = level + 1
+            maybeRequestReview(reachingFrom: reachedBefore, to: highestUnlocked)
         }
         // Send the new star total right away (not only on the next level
         // advance), so stars earned by replaying a level reach the
@@ -2847,19 +2856,28 @@ final class GameState: ObservableObject {
 
     // MARK: - Ratings prompt
 
-    /// Request an App Store review if all three conditions are met:
-    ///   1. `win` is true — only prompt on a positive emotional moment.
-    ///   2. Player has cleared at least level 5 on the main climb.
-    ///   3. We haven't prompted in the last 30 days.
+    /// Ask for an App Store rating when the highest unlocked level has just
+    /// moved from `old` to `new` and that move first reaches level 15, 50 or
+    /// 100 (`RatingMilestones`).  Nothing else asks: not a three-star clear,
+    /// not a minigame win, not a Challenge Track milestone.
     ///
-    /// Apple enforces a hard cap of 3 prompts per 365 days per app; this gate
-    /// is stricter so we use those slots on genuinely engaged players.
-    func maybeRequestReview(after win: Bool) {
-        guard win,
-              highestUnlocked >= 5,
-              Date().timeIntervalSince(lastReviewPromptDate ?? .distantPast) > Timing.reviewCooldownSecs
-        else { return }
+    /// A milestone is asked once.  A milestone the player was already past
+    /// when this rule arrived is never asked.  Apple also limits how often
+    /// its sheet really appears (at most three times in 365 days), so a
+    /// request here is not a guarantee that the player sees it.
+    func maybeRequestReview(reachingFrom old: Int, to new: Int) {
+        let crossed = RatingMilestones.crossed(from: old, to: new)
+        guard RatingMilestones.toAsk(from: old, to: new, alreadyAsked: reviewMilestonesAsked) != nil else {
+            return
+        }
+        reviewMilestonesAsked.formUnion(crossed)
         lastReviewPromptDate = Date()
+        presentReviewRequest()
+    }
+
+    /// Show Apple's rating sheet over the front-most scene.  Never in tests.
+    private func presentReviewRequest() {
+        guard !RuntimeEnvironment.isRunningTests else { return }
         Task { @MainActor in
             if let scene = UIApplication.shared.connectedScenes
                 .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
@@ -2867,6 +2885,15 @@ final class GameState: ObservableObject {
             }
         }
     }
+
+    #if DEBUG
+    /// Debug builds only (Settings → Debug): forget that `milestone` was
+    /// asked and act as if the player had just reached it.
+    func debugRequestReview(atMilestone milestone: Int) {
+        reviewMilestonesAsked.remove(milestone)
+        maybeRequestReview(reachingFrom: milestone - 1, to: milestone)
+    }
+    #endif
 
     // MARK: - Challenge Track progression
 

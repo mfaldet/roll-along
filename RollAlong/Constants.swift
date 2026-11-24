@@ -33,11 +33,3 @@ enum Layout {
     static let mapNameTopInset: CGFloat = 108
 }
 
-// MARK: - Timing
-
-enum Timing {
-    /// Minimum interval between App Store review prompts (30 days in seconds).
-    /// Single call site: GameState.maybeRequestReview(after:).
-    /// Defined here for discoverability — search for review throttling lands here.
-    static let reviewCooldownSecs: Double = 30 * 86_400
-}

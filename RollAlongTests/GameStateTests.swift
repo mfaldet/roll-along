@@ -451,57 +451,47 @@ final class GameStateTests: XCTestCase {
         XCTAssertEqual(gs.coinBalance, 200)
     }
 
-    // MARK: - Review prompt gating
+    // MARK: - Rating request: only on first reaching level 15, 50 or 100
 
-    func testMaybeRequestReview_belowLevel5_doesNotSetPromptDate() {
+    func testRatingRequest_notAskedBeforeLevel15() {
         let gs = makeGameState()
-        gs.highestUnlocked = 4
-        gs.lastReviewPromptDate = nil
-        gs.maybeRequestReview(after: true)
-        XCTAssertNil(gs.lastReviewPromptDate,
-                     "Prompt should not fire when highestUnlocked < 5")
+        gs.maybeRequestReview(reachingFrom: 13, to: 14)
+        XCTAssertTrue(gs.reviewMilestonesAsked.isEmpty)
+        XCTAssertNil(gs.lastReviewPromptDate)
     }
 
-    func testMaybeRequestReview_winFalse_doesNotFire() {
+    func testRatingRequest_askedOnFirstReachingLevel15() {
         let gs = makeGameState()
-        gs.highestUnlocked = 10
-        gs.lastReviewPromptDate = nil
-        gs.maybeRequestReview(after: false)   // after: false means no win
-        XCTAssertNil(gs.lastReviewPromptDate,
-                     "Prompt should not fire on a loss")
+        gs.maybeRequestReview(reachingFrom: 14, to: 15)
+        XCTAssertEqual(gs.reviewMilestonesAsked, [15])
+        XCTAssertNotNil(gs.lastReviewPromptDate)
     }
 
-    func testMaybeRequestReview_recentPrompt_doesNotFire() {
+    func testRatingRequest_eachMilestoneIsAskedOnce() {
+        let gs = makeGameState()
+        gs.maybeRequestReview(reachingFrom: 14, to: 15)
+        let first = gs.lastReviewPromptDate
+        gs.maybeRequestReview(reachingFrom: 14, to: 15)
+        XCTAssertEqual(gs.lastReviewPromptDate, first, "level 15 must not be asked twice")
+        gs.maybeRequestReview(reachingFrom: 49, to: 50)
+        gs.maybeRequestReview(reachingFrom: 99, to: 100)
+        XCTAssertEqual(gs.reviewMilestonesAsked, [15, 50, 100])
+    }
+
+    func testRatingRequest_clearingLevel14ReachesLevel15() {
+        let gs = makeGameState()
+        gs.highestUnlocked = 14
+        gs.recordResult(level: 14, stars: 1, time: 30, coinIndices: [])
+        XCTAssertEqual(gs.highestUnlocked, 15)
+        XCTAssertEqual(gs.reviewMilestonesAsked, [15])
+    }
+
+    func testRatingRequest_replayingAnOldLevelNeverAsks() {
         let gs = makeGameState()
         gs.highestUnlocked = 20
-        let recentDate = Date()
-        gs.lastReviewPromptDate = recentDate
-        gs.maybeRequestReview(after: true)
-        // Date should be unchanged (no update while cooldown active)
-        let delta = abs(gs.lastReviewPromptDate!.timeIntervalSince(recentDate))
-        XCTAssertLessThan(delta, 1.0,
-                          "lastReviewPromptDate should not change within cooldown period")
-    }
-
-    func testMaybeRequestReview_eligiblePlayer_setsPromptDate() {
-        let gs = makeGameState()
-        gs.highestUnlocked = 10
-        // Simulate last prompt far in the past (well beyond 30-day cooldown)
-        gs.lastReviewPromptDate = Date(timeIntervalSinceNow: -(40 * 86_400))
-        gs.maybeRequestReview(after: true)
-        // lastReviewPromptDate should now be a recent date
-        let delta = abs(gs.lastReviewPromptDate!.timeIntervalSinceNow)
-        XCTAssertLessThan(delta, 2.0,
-                          "lastReviewPromptDate should be updated to approximately now")
-    }
-
-    func testMaybeRequestReview_noPreviousPrompt_eligiblePlayer_setsPromptDate() {
-        let gs = makeGameState()
-        gs.highestUnlocked = 10
-        gs.lastReviewPromptDate = nil
-        gs.maybeRequestReview(after: true)
-        XCTAssertNotNil(gs.lastReviewPromptDate,
-                        "First eligible review prompt should set lastReviewPromptDate")
+        gs.recordResult(level: 14, stars: 3, time: 10, coinIndices: [])
+        XCTAssertTrue(gs.reviewMilestonesAsked.isEmpty,
+                      "a three-star replay is no longer a reason to ask")
     }
 
     // MARK: - Track progression

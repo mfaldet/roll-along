@@ -943,7 +943,6 @@ struct SnackyView: View {
         if gameState.hapticsEnabled {
             if won { Haptics.success() } else { Haptics.warning() }
         }
-        gameState.maybeRequestReview(after: won)
     }
 
     private func agePoofs() {
