@@ -50,7 +50,7 @@ the Google Mobile Ads SDK.
 | Diagnostics → **Crash Data** | Google: SDK crash logs | No | Analytics; Third-Party Advertising |
 | Diagnostics → **Performance Data** | Google: launch time, hang rate, energy use | No | Analytics; Third-Party Advertising |
 | Diagnostics → **Other Diagnostic Data** | App: phone model, iOS version and app version on each analytics event, and on each feedback message | No (analytics); Yes when feedback is sent signed in | Analytics; App Functionality |
-| User Content → **Customer Support** | App: the Bug / Idea / Question / Compliment message a player writes in Settings → Send Feedback, with the screen it came from; linked to the account ID only when signed in | Yes | App Functionality |
+| User Content → **Customer Support** | App: the kind (Bug / Idea / Question / Compliment) and the reason a player picks from a list in Settings → Send Feedback, with the screen it came from; linked to the account ID only when signed in. Nothing is typed in 1.1. Messages typed in 1.0 are still stored | Yes | App Functionality |
 
 App Store Connect asks about each data type once. Where a type appears twice
 above (Gameplay Content), give the combined answer: **linked: yes**, purposes
@@ -70,17 +70,19 @@ precise location, sensitive info, contacts, emails or text messages, photos or
 videos, audio, other user content, browsing history, search history,
 surroundings, body data.
 
-The only player-written text is Send Feedback, which goes privately to the
-developer (declared above as Customer Support). Nothing a player writes is shown
-to other players: names are built from preset lists and clan chat is fixed
-phrases.
+From 1.1 there is no player-written text at all: Send Feedback offers preset
+reasons only (declared above as Customer Support), names are built from preset
+lists and clan chat is fixed phrases. A parent or adult who wants to write in
+full is shown the support email address.
 
 ## Open points
 
-- **Email Address.** The app asks Apple for no email. Whether Supabase stores
-  one anyway is answered by running `docs/privacy/check-stored-emails.sql`
-  (read-only). If it reports no emails, remove Email Address here and from
-  `RollAlong/PrivacyInfo.xcprivacy`. Until then it stays declared, to be safe.
+- **Email Address.** The app asks Apple for no email, but Supabase can still
+  end up holding one: the check in `docs/privacy/check-stored-emails.sql`, run
+  2026-11-23, found 6 accounts, 1 of them with an Apple relay address.
+  `docs/privacy/clear-apple-emails.sql` clears stored emails. Email Address
+  stays declared here and in `RollAlong/PrivacyInfo.xcprivacy` until the owner
+  confirms the count is zero and a guard keeps it there.
 - **Coarse location.** Version 1.1 sets `coarseLocationCollectionEnabled` to
   false, and the app never asks for location permission. Google's disclosure
   page says coarse location "including location derived from IP address" can be
@@ -97,8 +99,7 @@ phrases.
 
 These are not on the App Privacy page, but they must agree with it.
 
-- **Age rating.** Redo the age rating questionnaire so the result is 9+.
-  Version 1.0 was submitted as 13+.
+- **Age rating.** No change. The live listing is already rated 9+.
 - **Kids Category.** Optional, and a separate decision from the age rating. It
   has its own rules on third-party ads and analytics. Do not select it without
   deciding that on purpose; see `docs/privacy/questions-for-a-lawyer.md`.

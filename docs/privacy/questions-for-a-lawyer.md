@@ -10,9 +10,12 @@ The game has no parental consent step. For a signed-in player it keeps an accoun
 - Do the anonymous gameplay records and the ads, as configured, fall within what is allowed without consent?
 - Would it be simpler to keep under-13 players signed out? That would need an age question, which the owner has decided against.
 
-## 2. Free-text feedback
+## 2. Feedback
 
-Settings → Send Feedback lets anyone type up to 1,000 characters. A child could type a name, a school or contact details. It goes only to the developer and no other player sees it. Options are listed in the Stage 1 report. Is keeping free text acceptable, and with what limits?
+Decided: from 1.1, Settings → Send Feedback has no text box. A player picks a kind and a reason from a list, and the support email address is shown for a parent or adult. Two points remain:
+
+- Messages typed in versions 1.0 and 1.0.1 are still stored. How long may they be kept?
+- Is showing a support email address inside a game played by children acceptable as it stands?
 
 ## 3. Player search and friend requests
 
@@ -28,7 +31,7 @@ The draft policy leaves these blank: the operator's legal name, mailing address 
 
 ## 6. App Store settings
 
-- The age rating questionnaire in App Store Connect, to reach 9+.
+- The listing is already rated 9+. Nothing to change there.
 - Whether to list the game in Apple's Kids Category. That category has its own rules on ads and analytics, so it is a separate decision from the age rating.
 
 ## 7. Outside the United States

@@ -159,7 +159,7 @@ would need updating.
 Store Connect edits and new purchase screenshots.
 
 **Risks, plainly:**
-- "Chips" reads as casino chips. The app is rated 13+ and sells its
+- "Chips" reads as casino chips. The app is rated 9+ and sells its
   currency for real money. Apple's guidelines restrict anything that looks
   like real-money gambling (guideline 5.3) and are strict about paid random
   items (3.1.1); the shop has no paid random items today. Calling the paid

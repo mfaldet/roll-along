@@ -876,25 +876,62 @@ struct NicknamePickerSheet: View {
     }
 }
 
-/// Settings → Send Feedback. The player picks a kind and writes a message
-/// (up to 1,000 characters). App version, iOS version, phone model, the
-/// screen they came from and — if signed in — their player id are added
-/// quietly; see `FeedbackOutbox` in SocialClient.swift. Nothing they write
-/// is shown to other players.
+/// Settings → Send Feedback. The player picks a kind and then one reason from
+/// a short list. Nothing is typed: the game is played by children, and a text
+/// box would let them send personal details. The chosen reason is sent as the
+/// message. App version, iOS version, phone model, the screen they came from
+/// and — if signed in — their player id are added quietly; see
+/// `FeedbackOutbox` in SocialClient.swift. Nothing here is shown to other
+/// players. A parent or adult who wants to write in full can use the support
+/// email address shown under the list.
 struct FeedbackSheet: View {
     let source: String
 
     @Environment(\.dismiss) private var dismiss
     @State private var kind: FeedbackKind = .bug
-    @State private var message = ""
+    @State private var reason: String?
     @State private var sent = false
     @State private var limitReached = !FeedbackOutbox.shared.canSubmit
-    @FocusState private var editorFocused: Bool
 
-    private var trimmed: String {
-        message.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Where a parent or adult can write. Shown as plain text, not a link.
+    static let supportEmail = "rollalongsupport@gmail.com"
+
+    /// The reasons offered for each kind, in the order shown. The chosen one
+    /// is stored as the feedback message, so reword with care: older
+    /// messages keep the wording they were sent with.
+    static func reasons(for kind: FeedbackKind) -> [String] {
+        switch kind {
+        case .bug:
+            return ["A level can't be finished",
+                    "The marble moved in a strange way",
+                    "The game froze or closed",
+                    "An ad did not give a life",
+                    "A purchase did not arrive",
+                    "Something looks wrong on the screen",
+                    "Friends, clans or leaderboards did not work"]
+        case .idea:
+            return ["More levels",
+                    "More minigames",
+                    "More collections",
+                    "Easier levels",
+                    "Harder levels",
+                    "More to do with friends and clans"]
+        case .question:
+            return ["How lives work",
+                    "How stars work",
+                    "How coins work",
+                    "How to get collections",
+                    "How friends and clans work"]
+        case .compliment:
+            return ["The levels",
+                    "The minigames",
+                    "The collections",
+                    "Playing with friends and clans",
+                    "All of it"]
+        }
     }
-    private var canSend: Bool { !trimmed.isEmpty && !limitReached }
+
+    private var canSend: Bool { reason != nil && !limitReached }
 
     var body: some View {
         NavigationStack {
@@ -929,40 +966,15 @@ struct FeedbackSheet: View {
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(Color(white: 0.6))
 
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: $message)
-                        .focused($editorFocused)
-                        .scrollContentBackground(.hidden)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(minHeight: 180)
-                        .padding(8)
-                        .onChange(of: message) { _, new in
-                            if new.count > FeedbackOutbox.maxLength {
-                                message = String(new.prefix(FeedbackOutbox.maxLength))
-                            }
-                        }
-                    if message.isEmpty {
-                        Text("Write your message here")
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(Color(white: 0.4))
-                            .padding(.horizontal, 13)
-                            .padding(.vertical, 16)
-                            .allowsHitTesting(false)
+                VStack(spacing: 8) {
+                    ForEach(Self.reasons(for: kind), id: \.self) { text in
+                        reasonRow(text)
                     }
                 }
-                .background(Color(white: 0.14).clipShape(RoundedRectangle(cornerRadius: 12)))
 
-                HStack(alignment: .top) {
-                    Text("Your app version, iOS version and phone model are included. Nothing you write is shown to other players.")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(Color(white: 0.45))
-                    Spacer(minLength: 8)
-                    Text("\(message.count)/\(FeedbackOutbox.maxLength)")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(message.count >= FeedbackOutbox.maxLength
-                                         ? Color.orange : Color(white: 0.45))
-                }
+                Text("Your app version, iOS version and phone model are included. Nothing here is shown to other players.")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color(white: 0.45))
 
                 if limitReached {
                     Text("You've sent \(FeedbackOutbox.maxPerDay) messages in the last day. Please try again tomorrow.")
@@ -980,11 +992,46 @@ struct FeedbackSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12)))
                 }
                 .disabled(!canSend)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Need to tell us more? A parent or adult can write to:")
+                        .font(.system(.footnote, design: .rounded))
+                        .foregroundStyle(Color(white: 0.6))
+                    Text(Self.supportEmail)
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                        .textSelection(.enabled)
+                }
+                .padding(.top, 4)
             }
             .padding(20)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .onAppear { editorFocused = true }
+    }
+
+    /// One reason: a row with a round mark that fills when chosen.
+    private func reasonRow(_ text: String) -> some View {
+        let selected: Bool = reason == text
+        return Button { reason = text } label: {
+            HStack(spacing: 12) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(selected ? Color.white : Color(white: 0.5))
+                Text(text)
+                    .font(.system(.body, design: .rounded))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(selected ? Color(white: 0.24) : Color(white: 0.14))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(text)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
     /// Four tiles, icon over title: Bug, Idea, Question, Compliment.
@@ -998,7 +1045,11 @@ struct FeedbackSheet: View {
 
     private func kindTile(_ k: FeedbackKind) -> some View {
         let selected: Bool = k == kind
-        return Button { kind = k } label: {
+        return Button {
+            // The reasons belong to the kind, so a new kind starts with none chosen.
+            if k != kind { reason = nil }
+            kind = k
+        } label: {
             VStack(spacing: 6) {
                 Image(systemName: k.icon)
                     .font(.system(size: 18, weight: .semibold))
@@ -1022,10 +1073,10 @@ struct FeedbackSheet: View {
 
     private var prompt: String {
         switch kind {
-        case .bug:        return "What happened, and what were you doing just before?"
+        case .bug:        return "What went wrong? Pick the one that fits best."
         case .idea:       return "What would make Roll Along better?"
-        case .question:   return "What would you like to know? We read every message."
-        case .compliment: return "What do you enjoy? We'd love to hear it."
+        case .question:   return "What is hard to understand?"
+        case .compliment: return "What do you enjoy?"
         }
     }
 
@@ -1037,7 +1088,7 @@ struct FeedbackSheet: View {
             Text("Thank you!")
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .foregroundStyle(.white)
-            Text("We got your message. If you're offline, it will be sent the next time you're connected.")
+            Text("We got it. If you're offline, it will be sent the next time you're connected.")
                 .font(.system(.subheadline, design: .rounded))
                 .foregroundStyle(Color(white: 0.6))
                 .multilineTextAlignment(.center)
@@ -1046,9 +1097,9 @@ struct FeedbackSheet: View {
     }
 
     private func send() {
-        switch FeedbackOutbox.shared.submit(kind: kind, message: message, source: source) {
+        guard let reason else { return }
+        switch FeedbackOutbox.shared.submit(kind: kind, message: reason, source: source) {
         case .queued:
-            editorFocused = false
             withAnimation { sent = true }
             AnalyticsClient.shared.track("feedback_sent",
                                          properties: ["kind": .string(kind.rawValue)])
