@@ -1320,9 +1320,23 @@ final class CosmeticsTests: XCTestCase {
     /// Defaults and exempt pieces are not held.  Exempt = earned or
     /// purchase-only, never sold for coins.
     func testOnSaleRule_defaultsAndExemptPieces() {
-        XCTAssertEqual(CosmeticSale.exemptBalls, [.diamond, .moneyBall, .trophy])
+        XCTAssertEqual(CosmeticSale.exemptBalls, [.diamond, .moneyBall, .trophy, .waitingRoom])
         XCTAssertEqual(CosmeticSale.exemptTrails, [.moneyRoll])
-        XCTAssertEqual(CosmeticSale.exemptFloors, [.moneyFull])
+        XCTAssertEqual(CosmeticSale.exemptFloors, [.moneyFull, .waitingRoom])
+        XCTAssertEqual(CosmeticSale.exemptPits, [.waitingRoom])
+        XCTAssertEqual(CosmeticSale.exemptBoundaries, [.waitingRoom])
+        // The Waiting Room gift is never sold, never sold back, never held.
+        XCTAssertFalse(BallSkin.waitingRoom.isCoinPurchasable)
+        XCTAssertFalse(Floor.waitingRoom.isCoinPurchasable)
+        XCTAssertFalse(Pit.waitingRoom.isCoinPurchasable)
+        XCTAssertFalse(Boundary.waitingRoom.isCoinPurchasable)
+        XCTAssertFalse(BallSkin.waitingRoom.isSellable)
+        XCTAssertFalse(Floor.waitingRoom.isSellable)
+        XCTAssertFalse(Pit.waitingRoom.isSellable)
+        XCTAssertFalse(Boundary.waitingRoom.isSellable)
+        XCTAssertFalse(CosmeticSale.isHeld(Pit.waitingRoom))
+        XCTAssertFalse(CosmeticSale.isHeld(Boundary.waitingRoom))
+        XCTAssertFalse(CosmeticBundle.catalogue.contains { $0.id == CosmeticBundle.waitingRoomID })
         for ball in CosmeticSale.exemptBalls {
             XCTAssertFalse(ball.isCoinPurchasable, "\(ball.rawValue) is never sold for coins")
             XCTAssertFalse(CosmeticSale.isHeld(ball))

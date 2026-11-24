@@ -126,6 +126,12 @@ enum BallSkin: String, CaseIterable, Identifiable {
     //     shop grid.
     case trophy     = "Trophy"
 
+    // ── End room gift (1.1; never sold) ──────────────────────────────────
+    //   • waitingRoom — the classic red ball in a shiny, colour-shifting
+    //     foil finish.  Given once, to a player who clears every level in
+    //     the pack (the end room).  Never in the Shop or the Catalog.
+    case waitingRoom = "Waiting Room"
+
     // ── Aurora (Legendary, coin-buyable; anchors the Aurora bundle) ──────
     //   • aurora — deep midnight sphere with animated teal-green and violet
     //     Northern Lights bands and twinkling stars.  A regular coin-buyable
@@ -304,6 +310,7 @@ enum BallSkin: String, CaseIterable, Identifiable {
         case .pluto, .beachBall, .pumpkin, .ornament,
              .heartstone, .shamrock, .confetti, .speckledEgg,
              .trophy,    // Golden Gauntlet completion exclusive
+             .waitingRoom, // end room gift
              .diamond,   // Diamond Balls IAP exclusive
              .moneyBall: // top-coin-pack ($49.99) IAP secret exclusive
             return true
@@ -747,6 +754,16 @@ enum BallSkin: String, CaseIterable, Identifiable {
                 Color(red: 0.01, green: 0.02, blue: 0.10),
             ]
 
+        case .waitingRoom:
+            // Red foil: the classic red, a touch brighter where the foil
+            // catches the light.  Static fallback; the colour-shifting
+            // sheen is drawn by waitingRoomCanvas.
+            return [
+                Color(red: 1.00, green: 0.80, blue: 0.82),
+                Color(red: 0.96, green: 0.18, blue: 0.22),
+                Color(red: 0.58, green: 0.04, blue: 0.08),
+                Color(red: 0.24, green: 0.01, blue: 0.03),
+            ]
         case .trophy:
             // Polished prize gold — bright crown highlight → rich gold → bronze
             // → deep bronze rim.  Static fallback; the champion star, halo,

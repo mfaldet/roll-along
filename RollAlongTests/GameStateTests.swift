@@ -948,6 +948,41 @@ final class LevelOverridesTests: XCTestCase {
         XCTAssertFalse(gs.rewardCollectionsNotOwned.contains { $0.id == "water" })
     }
 
+    /// The end room: due once every level is passed, shown once per pack,
+    /// and the first visit gives the Waiting Room collection without putting
+    /// it on.
+    func testEndRoomFirstVisitGivesTheWaitingRoomCollectionOnce() {
+        let gs = freshState("end-room")
+        let last = LevelLayout.lastLevel
+        gs.highestUnlocked = last
+        XCTAssertNil(gs.endRoomDue, "not before the last level is passed")
+        gs.highestUnlocked = last + 1
+        XCTAssertEqual(gs.endRoomDue, .first)
+        let ballBefore = gs.activeSkin
+        gs.recordEndRoomVisit(.first)
+        XCTAssertNil(gs.endRoomDue, "once per pack")
+        XCTAssertEqual(gs.endRoomSeenAtLastLevel, last)
+        XCTAssertTrue(gs.isOwned(BallSkin.waitingRoom))
+        XCTAssertTrue(gs.isOwned(Floor.waitingRoom))
+        XCTAssertTrue(gs.isOwned(Pit.waitingRoom))
+        XCTAssertTrue(gs.isOwned(Boundary.waitingRoom))
+        XCTAssertEqual(gs.activeSkin, ballBefore, "the gift is not put on")
+        XCTAssertFalse(gs.ownedBundles.contains(CosmeticBundle.waitingRoomID),
+                       "not counted as a collection")
+    }
+
+    /// A player already past the end of the pack when 1.1 arrives sees the
+    /// room on the first launch: the fit leaves them one past the last level.
+    func testAPlayerAlreadyPastTheEndSeesTheRoom() {
+        let gs = freshState("end-room-old-save")
+        let last = LevelLayout.lastLevel
+        for level in 1...(last + 20) { gs.bestStars[level] = 1; gs.bestTime[level] = 30 }
+        gs.currentLevel = last + 21
+        gs.highestUnlocked = last + 21
+        gs.fitProgressToLevelPack()
+        XCTAssertEqual(gs.endRoomDue, .first)
+    }
+
     /// A pick is owed after passing level 50 and closes when taken.
     func testCollectionPickIsOwedAfterLevel50() {
         let gs = freshState("pick")

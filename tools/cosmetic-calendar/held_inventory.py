@@ -36,7 +36,11 @@ EXEMPT = {("BallSkin", "diamond"): "comes with the Diamond Balls purchase; Locke
           ("BallSkin", "moneyBall"): "comes with the first 10,000-coin pack",
           ("BallSkin", "trophy"): "earned by finishing the Golden Gauntlet track; also the Champion set's ball",
           ("TrailColor", "moneyRoll"): "purchase-only Money piece (no way to get it in 1.0)",
-          ("Floor", "moneyFull"): "purchase-only Money piece (no way to get it in 1.0)"}
+          ("Floor", "moneyFull"): "purchase-only Money piece (no way to get it in 1.0)",
+          ("BallSkin", "waitingRoom"): "end room gift (1.1); never sold",
+          ("Floor", "waitingRoom"): "end room gift (1.1); never sold",
+          ("Pit", "waitingRoom"): "end room gift (1.1); never sold",
+          ("Boundary", "waitingRoom"): "end room gift (1.1); never sold"}
 # Replaced inside an active collection during the quality round.
 DISPLACED = {("GoalSkin", "meadow"): "Nature", ("BallSkin", "silver"): "Sketchbook",
              ("GoalSkin", "archery"): "Sketchbook", ("GoalSkin", "flame"): "Citrus",

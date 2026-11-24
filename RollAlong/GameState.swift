@@ -380,6 +380,11 @@ final class GameState: ObservableObject {
     @Published var earlierBonusToAnnounce: Int {
         didSet { defaults.set(earlierBonusToAnnounce, forKey: "ra_earlierBonusToAnnounce") }
     }
+    /// The end room (1.1): the pack's last level when this player last saw
+    /// the room, or 0 for never.  See `EndRoomRules`.
+    @Published var endRoomSeenAtLastLevel: Int {
+        didSet { defaults.set(endRoomSeenAtLastLevel, forKey: "ra_endRoomSeenAtLastLevel") }
+    }
     /// Goes up by one each time Home should look for a one-time moment to
     /// show (the bonus message, an owed collection pick, the end room): at
     /// the end of launch, and when a game sends the player Home for one.
@@ -928,6 +933,7 @@ final class GameState: ObservableObject {
         fullClearBonusPaid   = Set((defaults.array(forKey: "ra_fullClearBonusPaid") as? [Int]) ?? [])
         collectionPicksTaken = Set((defaults.array(forKey: "ra_collectionPicksTaken") as? [Int]) ?? [])
         earlierBonusToAnnounce = defaults.integer(forKey: "ra_earlierBonusToAnnounce")
+        endRoomSeenAtLastLevel = defaults.integer(forKey: "ra_endRoomSeenAtLastLevel")
 
         // Cosmetic economy — load owned-sets to local lets first, then
         // assign to the stored properties.  We re-use the locals when
@@ -1367,6 +1373,29 @@ final class GameState: ObservableObject {
                              taken: collectionPicksTaken)
     }
 
+    // MARK: - The end room (1.1)
+
+    /// The end room visit due now, or nil: the first visit once every level
+    /// in the pack is passed; the second when a later pack's new last level
+    /// is passed by a player who has seen the room.
+    var endRoomDue: EndRoomVisit? {
+        EndRoomRules.visitDue(highestUnlocked: highestUnlocked,
+                              lastLevel: LevelLayout.lastLevel,
+                              seenAtLastLevel: endRoomSeenAtLastLevel)
+    }
+
+    /// The room has opened: remember it for this pack, and on the first
+    /// visit give the Waiting Room collection (free; Sell Back keeps it and
+    /// never refunds it).  It is not put on: the player chooses that in the
+    /// Locker.  Not recorded as an owned bundle, so it does not count toward
+    /// the collection trophies.
+    func recordEndRoomVisit(_ visit: EndRoomVisit) {
+        endRoomSeenAtLastLevel = LevelLayout.lastLevel
+        if visit == .first {
+            grantBundleFree(CosmeticBundle.waitingRoom, recordAsOwnedBundle: false)
+        }
+    }
+
     /// Record that `milestone`'s pick was taken (or had nothing to offer).
     func closeCollectionPick(_ milestone: Int) {
         collectionPicksTaken.insert(milestone)
@@ -1409,6 +1438,7 @@ final class GameState: ObservableObject {
         // offered next is this level's own.
         collectionPicksTaken = Set(ClearRewards.pickMilestones.filter { $0 < target })
         earlierBonusToAnnounce = 0
+        endRoomSeenAtLastLevel = 0
     }
 
     /// Debug builds only (Settings → Debug).  Makes the saved game look like
@@ -1432,6 +1462,7 @@ final class GameState: ObservableObject {
         fullClearBonusPaid = []
         collectionPicksTaken = []
         earlierBonusToAnnounce = 0
+        endRoomSeenAtLastLevel = 0
         defaults.removeObject(forKey: "ra_rewardsBaselineTaken")
     }
 
@@ -1441,7 +1472,8 @@ final class GameState: ObservableObject {
         return "Coins: \(coinBalance). Full-clear bonus paid on \(fullClearBonusPaid.count) levels, waiting to be announced: \(earlierBonusToAnnounce) coins. "
              + "Collection picks taken: \(list(collectionPicksTaken)); "
              + "due now: \(collectionPickDue.map(String.init) ?? "none"). "
-             + "Reward-list collections not owned: \(rewardCollectionsNotOwned.map(\.displayName).joined(separator: ", "))."
+             + "Reward-list collections not owned: \(rewardCollectionsNotOwned.map(\.displayName).joined(separator: ", ")). "
+             + "End room: \(endRoomSeenAtLastLevel == 0 ? "never seen" : "seen with the pack ending at level \(endRoomSeenAtLastLevel)"); due now: \(endRoomDue.map { $0 == .first ? "first visit" : "second visit" } ?? "no")."
     }
 
     /// Debug builds only (Settings → Debug).  Rewrites Adventure progress so

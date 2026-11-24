@@ -582,7 +582,19 @@ struct HomeView: View {
             // picks, the end room.  Shown one after another: when one closes,
             // `onDismiss` looks for the next.
             .fullScreenCover(item: $homeMoment, onDismiss: { showNextHomeMoment() }) { moment in
-                HomeMomentView(moment: moment, onDone: { homeMoment = nil })
+                HomeMomentView(moment: moment, onDone: {
+                    if case .endRoom = moment {
+                        // The swirl's last frame already is Home: close the
+                        // room without the slide-down, and line the live
+                        // ball up with the swirl's ball.
+                        var quiet = Transaction()
+                        quiet.disablesAnimations = true
+                        withTransaction(quiet) { homeMoment = nil }
+                        gameState.homeBallRecenterSignal += 1
+                    } else {
+                        homeMoment = nil
+                    }
+                })
                     .environmentObject(gameState)
                     .overlay {
                         TrophyToastHost(queue: gameState.trophyToasts,

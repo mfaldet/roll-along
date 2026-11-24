@@ -155,6 +155,11 @@ struct BallSkinView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color(red: 0.04, green: 0.18, blue: 0.40).opacity(0.70), lineWidth: 0.5))
 
+        case .waitingRoom:
+            waitingRoomCanvas
+                .clipShape(Circle())
+                .overlay(planetRim)
+
         case .trophy:
             trophyCanvas
                 .clipShape(Circle())
@@ -6131,6 +6136,21 @@ struct SkinTimeline<Content: View>: View {
             // holds its current frame while the list scrolls.
             TimelineView(.animation(minimumInterval: interval, paused: paused)) { tl in
                 content(SkinTick(date: tl.date))
+            }
+        }
+    }
+}
+
+// MARK: - Waiting Room (end room gift, 1.1)
+extension BallSkinView {
+    /// Red foil: the classic red ball crinkled into facets, an iridescent
+    /// sheen drifting slowly round the colour wheel, and a band of light
+    /// sliding across.  Art in WaitingRoomArt.swift (`FoilArt.drawBall`).
+    var waitingRoomCanvas: some View {
+        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: timelinePaused) { timeline in
+            let t: Double = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                FoilArt.drawBall(&ctx, size: size, t: t, colors: BallSkin.waitingRoom.colors)
             }
         }
     }

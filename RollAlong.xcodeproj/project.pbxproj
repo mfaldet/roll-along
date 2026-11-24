@@ -59,6 +59,9 @@
 		AD0000R5000000000000AD01 /* LevelProgressRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R5000000000000AD00 /* LevelProgressRules.swift */; };
 		AD0000RA000000000000AD01 /* TrophyEarnability.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RA000000000000AD00 /* TrophyEarnability.swift */; };
 		AD0000R9000000000000AD01 /* ClearRewards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R9000000000000AD00 /* ClearRewards.swift */; };
+		AD0000S1000000000000AD01 /* WaitingRoomArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000S1000000000000AD00 /* WaitingRoomArt.swift */; };
+		AD0000S0000000000000AD01 /* EndRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000S0000000000000AD00 /* EndRoomView.swift */; };
+		AD0000RF000000000000AD01 /* EndRoomRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RF000000000000AD00 /* EndRoomRules.swift */; };
 		AD0000RE000000000000AD01 /* HomeMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RE000000000000AD00 /* HomeMoments.swift */; };
 		AD0000R8000000000000AD01 /* RouteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R8000000000000AD00 /* RouteRecorder.swift */; };
 		AD0000R7000000000000AD01 /* LevelPackRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R7000000000000AD00 /* LevelPackRules.swift */; };
@@ -66,6 +69,7 @@
 		AD0000RC000000000000AD01 /* TrophyHidingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RC000000000000AD00 /* TrophyHidingTests.swift */; };
 		AD0000RB000000000000AD01 /* LevelPackAndRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RB000000000000AD00 /* LevelPackAndRouteTests.swift */; };
 		AD0000RD000000000000AD01 /* ClearRewardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RD000000000000AD00 /* ClearRewardsTests.swift */; };
+		AD0000S2000000000000AD01 /* EndRoomRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000S2000000000000AD00 /* EndRoomRulesTests.swift */; };
 		AD0000R4000000000000AD01 /* LevelMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R4000000000000AD00 /* LevelMeasurementTests.swift */; };
 		AD0000R2000000000000AD01 /* AdRetryScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */; };
 		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
@@ -184,6 +188,9 @@
 		AD0000R5000000000000AD00 /* LevelProgressRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelProgressRules.swift; sourceTree = "<group>"; };
 		AD0000RA000000000000AD00 /* TrophyEarnability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyEarnability.swift; sourceTree = "<group>"; };
 		AD0000R9000000000000AD00 /* ClearRewards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearRewards.swift; sourceTree = "<group>"; };
+		AD0000S1000000000000AD00 /* WaitingRoomArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingRoomArt.swift; sourceTree = "<group>"; };
+		AD0000S0000000000000AD00 /* EndRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndRoomView.swift; sourceTree = "<group>"; };
+		AD0000RF000000000000AD00 /* EndRoomRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndRoomRules.swift; sourceTree = "<group>"; };
 		AD0000RE000000000000AD00 /* HomeMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeMoments.swift; sourceTree = "<group>"; };
 		AD0000R8000000000000AD00 /* RouteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRecorder.swift; sourceTree = "<group>"; };
 		AD0000R7000000000000AD00 /* LevelPackRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelPackRules.swift; sourceTree = "<group>"; };
@@ -191,6 +198,7 @@
 		AD0000RC000000000000AD00 /* TrophyHidingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrophyHidingTests.swift; sourceTree = "<group>"; };
 		AD0000RB000000000000AD00 /* LevelPackAndRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelPackAndRouteTests.swift; sourceTree = "<group>"; };
 		AD0000RD000000000000AD00 /* ClearRewardsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearRewardsTests.swift; sourceTree = "<group>"; };
+		AD0000S2000000000000AD00 /* EndRoomRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndRoomRulesTests.swift; sourceTree = "<group>"; };
 		AD0000R4000000000000AD00 /* LevelMeasurementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelMeasurementTests.swift; sourceTree = "<group>"; };
 		AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdRetryScheduleTests.swift; sourceTree = "<group>"; };
 		AA000099000000000000AA00 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
@@ -321,6 +329,9 @@
 				AD0000R5000000000000AD00 /* LevelProgressRules.swift */,
 				AD0000RA000000000000AD00 /* TrophyEarnability.swift */,
 				AD0000R9000000000000AD00 /* ClearRewards.swift */,
+				AD0000S1000000000000AD00 /* WaitingRoomArt.swift */,
+				AD0000S0000000000000AD00 /* EndRoomView.swift */,
+				AD0000RF000000000000AD00 /* EndRoomRules.swift */,
 				AD0000RE000000000000AD00 /* HomeMoments.swift */,
 				AD0000R8000000000000AD00 /* RouteRecorder.swift */,
 				AD0000R7000000000000AD00 /* LevelPackRules.swift */,
@@ -385,6 +396,7 @@
 				AD0000RC000000000000AD00 /* TrophyHidingTests.swift */,
 				AD0000RB000000000000AD00 /* LevelPackAndRouteTests.swift */,
 				AD0000RD000000000000AD00 /* ClearRewardsTests.swift */,
+				AD0000S2000000000000AD00 /* EndRoomRulesTests.swift */,
 				QE3B0104000000000000AA00 /* StoreKitManagerTests.swift */,
 				FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */,
 				FC000002000000000000FC00 /* PerformanceTests.swift */,
@@ -555,6 +567,9 @@
 				AD0000R5000000000000AD01 /* LevelProgressRules.swift in Sources */,
 				AD0000RA000000000000AD01 /* TrophyEarnability.swift in Sources */,
 				AD0000R9000000000000AD01 /* ClearRewards.swift in Sources */,
+				AD0000S1000000000000AD01 /* WaitingRoomArt.swift in Sources */,
+				AD0000S0000000000000AD01 /* EndRoomView.swift in Sources */,
+				AD0000RF000000000000AD01 /* EndRoomRules.swift in Sources */,
 				AD0000RE000000000000AD01 /* HomeMoments.swift in Sources */,
 				AD0000R8000000000000AD01 /* RouteRecorder.swift in Sources */,
 				AD0000R7000000000000AD01 /* LevelPackRules.swift in Sources */,
@@ -612,6 +627,7 @@
 				AD0000RC000000000000AD01 /* TrophyHidingTests.swift in Sources */,
 				AD0000RB000000000000AD01 /* LevelPackAndRouteTests.swift in Sources */,
 				AD0000RD000000000000AD01 /* ClearRewardsTests.swift in Sources */,
+				AD0000S2000000000000AD01 /* EndRoomRulesTests.swift in Sources */,
 				QE3B0104000000000000AA01 /* StoreKitManagerTests.swift in Sources */,
 				FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */,
 				FC000002000000000000FC01 /* PerformanceTests.swift in Sources */,

@@ -657,6 +657,15 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
+                // Waiting Room floor (end room gift, 1.1) — white foil with a
+                // slow colour-shifting sheen.  Its clock freezes under Reduce
+                // Motion, so it renders in both cases.
+                if floor == .waitingRoom {
+                    FloorOverlayView(floor: .waitingRoom)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 // Money Full floor (top-coin-pack ($49.99) IAP secret) — an overlapping
                 // tiled stack of $100 bills.  Static, so it renders under Reduce
                 // Motion too.
@@ -2270,7 +2279,8 @@ struct BallGameView: View {
                         // On the last level of the Adventure pack there is no
                         // next level; the button opens the level selector.
                         let packIsDone = activeMode.id == "climb" && gameState.isOnLastLevel
-                        Text(dailyIsLastLevel ? "Finish" : (packIsDone ? "All Levels" : "Next Level"))
+                        let packLabel = gameState.endRoomDue != nil ? "Continue" : "All Levels"
+                        Text(dailyIsLastLevel ? "Finish" : (packIsDone ? packLabel : "Next Level"))
                             .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -3210,7 +3220,10 @@ struct BallGameView: View {
     /// just cleared is the last one in the pack.
     private func continueAfterLevelClear() {
         if gameState.isOnLastLevel {
-            nav.goToLevels()
+            // Every level passed: the end room, from Home, when it is due
+            // (Home shows it as soon as it is front-most).  Otherwise back to
+            // the level selector.
+            if gameState.endRoomDue != nil { nav.goHome() } else { nav.goToLevels() }
         } else {
             gameState.advanceLevel()
             spawnBall(in: arenaSize)
@@ -4156,6 +4169,8 @@ struct FloorOverlayView: View {
         case .overcast:  overcastFloorOverlay      // Storm set
         // — Standard audit: Ocean —
         case .openSea:   openSeaFloorOverlay
+        // — End room gift (1.1) —
+        case .waitingRoom: WaitingRoomFloorOverlay()
         default:         EmptyView()
         }
     }
@@ -5319,6 +5334,7 @@ struct PitOverlayView: View {
         case .maelstrom: maelstromPitOverlay      // Storm set
         case .vent:      ventPitOverlay       // Quality round: Abyssal Depths
         case .tidePool:  tidePoolPitOverlay   // Quality-standard audit: Citrus
+        case .waitingRoom: WaitingRoomPitOverlay()   // End room gift (1.1)
         default:
             if pit.hasDrawnArt { staticPitArt } else { EmptyView() }
         }
@@ -8533,6 +8549,7 @@ struct BoundaryOverlayView: View {
         case .chrome:       chromeBorderOverlay
         case .hull:         hullBorderOverlay        // Quality round: Space Traveler
         case .rose:         roseBorderOverlay        // Standard audit: Bloom
+        case .waitingRoom:  WaitingRoomBoundaryOverlay(cornerRadius: cornerRadius)   // End room gift (1.1)
         default:            EmptyView()
         }
     }

@@ -20,6 +20,9 @@ struct SettingsView: View {
     @State private var showCollectionGallery = false
     /// Debug builds only: whether a level shows the purple test buttons.
     @AppStorage(DebugSwitches.showLevelTestButtonsKey) private var debugShowLevelTestButtons = false
+    /// Debug builds only: the end room preview open, if any.
+    @State private var debugEndRoom: EndRoomVisit? = nil
+    @State private var showWaitingRoomArt = false
     /// Debug builds only: the result of the last level pack check.
     @State private var debugPackCheck = LevelPackStore.lastCheck
     /// Debug builds only: lets "Show Out of Lives screen" open the game.
@@ -623,6 +626,19 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
+            VStack(spacing: 8) {
+                Button { debugEndRoom = .first } label: { debugButtonLabel("Open the end room (first visit)") }
+                    .buttonStyle(.plain)
+                Button { debugEndRoom = .second } label: { debugButtonLabel("Open the end room (second visit)") }
+                    .buttonStyle(.plain)
+                Button { showWaitingRoomArt = true } label: { debugButtonLabel("Waiting Room art (for review)") }
+                    .buttonStyle(.plain)
+                Button { gameState.endRoomSeenAtLastLevel = 0 } label: { debugButtonLabel("Forget that the end room was seen") }
+                    .buttonStyle(.plain)
+            }
+            Text("The two end room buttons show the room only: they record nothing and give nothing, and the swirl returns here. To see the real thing, set up a save from before 1.1 (below) or forget that the room was seen, then go Home.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color(white: 0.45))
             Text("The save from before 1.1 has every level passed, levels 1 to 30 fully cleared, and no 1.1 reward record. Close the app and open it again: Home shows the bonus message (+420 coins), then the level 50 pick, then the level 100 pick, then the end room. The stand-on buttons replace the saved Adventure progress and forget every 1.1 reward record. \(gameState.debugRewardsSummary)")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
@@ -641,6 +657,13 @@ struct SettingsView: View {
             Text("For testing the rewarded ad where the phone cannot be tilted. Sets lives to zero, moves past the tutorial levels if needed, and opens Adventure on the real Out of Lives screen. This changes the saved game on this device.")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
+        }
+        .fullScreenCover(item: $debugEndRoom) { visit in
+            EndRoomFlowView(visit: visit, preview: true, onDone: { debugEndRoom = nil })
+                .environmentObject(gameState)
+        }
+        .sheet(isPresented: $showWaitingRoomArt) {
+            WaitingRoomArtPreview()
         }
         .fullScreenCover(isPresented: $showCollectionGallery) {
             CollectionReviewGallery()

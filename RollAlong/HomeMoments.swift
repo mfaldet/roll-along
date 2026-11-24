@@ -8,6 +8,7 @@ import SwiftUI
 //   2. collection picks   — a free collection pick that is owed (the player
 //                           is past level 50, 100 or 200 and has not taken
 //                           it), lowest level first;
+//   3. the end room       — see EndRoomView.swift.
 //
 // `HomeMoment.next(for:)` is the single place that decides what is shown
 // next.  HomeView presents it full screen and asks again when it closes.
@@ -15,11 +16,13 @@ import SwiftUI
 enum HomeMoment: Identifiable, Equatable {
     case earlierBonus(coins: Int)
     case collectionPick(level: Int)
+    case endRoom(EndRoomVisit)
 
     var id: String {
         switch self {
         case .earlierBonus:              return "bonus"
         case .collectionPick(let level): return "pick-\(level)"
+        case .endRoom(let visit):        return "end-room-\(visit.rawValue)"
         }
     }
 
@@ -36,6 +39,9 @@ enum HomeMoment: Identifiable, Equatable {
                 return .collectionPick(level: level)
             }
         }
+        if let visit = gameState.endRoomDue {
+            return .endRoom(visit)
+        }
         return nil
     }
 }
@@ -51,6 +57,8 @@ struct HomeMomentView: View {
             EarlierBonusMessageView(coins: coins, onDone: onDone)
         case .collectionPick(let level):
             CollectionPickView(pickLevel: level, onDone: onDone)
+        case .endRoom(let visit):
+            EndRoomFlowView(visit: visit, onDone: onDone)
         }
     }
 }
