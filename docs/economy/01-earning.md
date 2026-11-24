@@ -57,8 +57,9 @@ overhead. Assumed performance baselines are listed at the bottom.
   a fall resets the attempt's pickups (BallGameView.swift:5373). So replays can
   recover coins missed earlier, but generate ~0 sustained income.
 - **Stars/times award no coins** — purely progression.
-- **Tier scales time, not coins**: `timeMultiplier` 1.0/1.3/1.6
-  (LevelLayout.swift:127-133) with no coin term → a veryHard level pays ~38%
+- **Tier scales time, not coins**: since 1.1 each level carries its own
+  final star times in the level pack (the old 1.0/1.3/1.6 tier multiplier is
+  baked into those numbers and no longer applied in code), with no coin term → a veryHard level pays ~38%
   fewer coins/min than an easy one. *(Calibration lever P1.)*
 - **Lives throttle**: 1 life per fall above L10 (tutorial exempt); 10-life bar
   = ~10 attempts, refills in 60 min (GameState.swift:128-130). This caps climb

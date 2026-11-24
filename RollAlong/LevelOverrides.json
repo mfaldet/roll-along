@@ -33,6 +33,8 @@
           "y": 0.6
         }
       ],
+      "targetTime": 6.05,
+      "goldTime": 4.24,
       "verified": true
     },
     "2": {
@@ -66,6 +68,8 @@
           "y": 0.24
         }
       ],
+      "targetTime": 6.05,
+      "goldTime": 4.24,
       "verified": true
     },
     "3": {
@@ -105,6 +109,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 7.361,
+      "goldTime": 5.113,
       "verified": true
     },
     "4": {
@@ -150,6 +156,8 @@
           "y": 0.38
         }
       ],
+      "targetTime": 6.75,
+      "goldTime": 4.64,
       "verified": true
     },
     "5": {
@@ -213,6 +221,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 12.736,
+      "goldTime": 8.563,
       "verified": true
     },
     "6": {
@@ -264,6 +274,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 9.438,
+      "goldTime": 6.438,
       "verified": true
     },
     "7": {
@@ -351,6 +363,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 12.064,
+      "goldTime": 7.925,
       "verified": true
     },
     "8": {
@@ -426,6 +440,8 @@
           "y": 0.5
         }
       ],
+      "targetTime": 11.258,
+      "goldTime": 7.478,
       "verified": true
     },
     "9": {
@@ -489,6 +505,8 @@
           "y": 0.15
         }
       ],
+      "targetTime": 10.244,
+      "goldTime": 6.885,
       "verified": true
     },
     "10": {
@@ -570,6 +588,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 14.544,
+      "goldTime": 9.613,
       "verified": true
     },
     "11": {
@@ -603,6 +623,8 @@
           "y": 0.25
         }
       ],
+      "targetTime": 5.89,
+      "goldTime": 4.128,
       "verified": false
     },
     "12": {
@@ -636,6 +658,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 5.89,
+      "goldTime": 4.128,
       "verified": false
     },
     "13": {
@@ -675,6 +699,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 6.24,
+      "goldTime": 4.328,
       "verified": false
     },
     "14": {
@@ -732,6 +758,8 @@
           "y": 0.3
         }
       ],
+      "targetTime": 7.53,
+      "goldTime": 5.096,
       "verified": false
     },
     "15": {
@@ -789,6 +817,8 @@
           "y": 0.8
         }
       ],
+      "targetTime": 11.664,
+      "goldTime": 7.885,
       "verified": false
     },
     "16": {
@@ -840,6 +870,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 9.022,
+      "goldTime": 6.146,
       "verified": false
     },
     "17": {
@@ -915,6 +947,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 11.05,
+      "goldTime": 7.332,
       "verified": false
     },
     "18": {
@@ -990,6 +1024,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 11.154,
+      "goldTime": 7.405,
       "verified": false
     },
     "19": {
@@ -1035,6 +1071,8 @@
           "y": 0.85
         }
       ],
+      "targetTime": 9.609,
+      "goldTime": 6.616,
       "verified": false
     },
     "20": {
@@ -1110,6 +1148,8 @@
           "y": 0.85
         }
       ],
+      "targetTime": 13.856,
+      "goldTime": 9.203,
       "verified": false
     },
     "21": {
@@ -1143,6 +1183,8 @@
           "y": 0.25
         }
       ],
+      "targetTime": 5.89,
+      "goldTime": 4.128,
       "verified": false
     },
     "22": {
@@ -1182,6 +1224,8 @@
           "y": 0.45
         }
       ],
+      "targetTime": 6.24,
+      "goldTime": 4.328,
       "verified": false
     },
     "23": {
@@ -1227,6 +1271,8 @@
           "y": 0.4
         }
       ],
+      "targetTime": 6.75,
+      "goldTime": 4.64,
       "verified": false
     },
     "24": {
@@ -1278,6 +1324,8 @@
           "y": 0.5
         }
       ],
+      "targetTime": 7.1,
+      "goldTime": 4.84,
       "verified": false
     },
     "25": {
@@ -1329,6 +1377,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 11.36,
+      "goldTime": 7.744,
       "verified": false
     },
     "26": {
@@ -1386,6 +1436,8 @@
           "y": 0.28
         }
       ],
+      "targetTime": 9.789,
+      "goldTime": 6.625,
       "verified": false
     },
     "27": {
@@ -1443,6 +1495,8 @@
           "y": 0.7
         }
       ],
+      "targetTime": 9.477,
+      "goldTime": 6.406,
       "verified": false
     },
     "28": {
@@ -1494,6 +1548,8 @@
           "y": 0.32
         }
       ],
+      "targetTime": 10.002,
+      "goldTime": 6.832,
       "verified": false
     },
     "29": {
@@ -1557,6 +1613,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 9.932,
+      "goldTime": 6.666,
       "verified": false
     },
     "30": {
@@ -1632,6 +1690,8 @@
           "y": 0.82
         }
       ],
+      "targetTime": 13.856,
+      "goldTime": 9.203,
       "verified": false
     },
     "31": {
@@ -1689,6 +1749,8 @@
           "y": 0.42
         }
       ],
+      "targetTime": 7.29,
+      "goldTime": 4.928,
       "verified": false
     },
     "32": {
@@ -1752,6 +1814,8 @@
           "y": 0.12
         }
       ],
+      "targetTime": 7.96,
+      "goldTime": 5.352,
       "verified": false
     },
     "33": {
@@ -1845,6 +1909,8 @@
           "y": 0.76
         }
       ],
+      "targetTime": 9.39,
+      "goldTime": 6.128,
       "verified": false
     },
     "34": {
@@ -1914,6 +1980,8 @@
           "y": 0.82
         }
       ],
+      "targetTime": 8.23,
+      "goldTime": 5.496,
       "verified": false
     },
     "35": {
@@ -1953,6 +2021,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 10.496,
+      "goldTime": 7.283,
       "verified": false
     },
     "36": {
@@ -2010,6 +2080,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 9.893,
+      "goldTime": 6.698,
       "verified": false
     },
     "37": {
@@ -2067,6 +2139,8 @@
           "y": 0.3
         }
       ],
+      "targetTime": 7.241,
+      "goldTime": 4.841,
       "verified": false
     },
     "38": {
@@ -2112,6 +2186,8 @@
           "y": 0.92
         }
       ],
+      "targetTime": 8.775,
+      "goldTime": 6.032,
       "verified": false
     },
     "39": {
@@ -2175,6 +2251,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 10.348,
+      "goldTime": 6.958,
       "verified": false
     },
     "40": {
@@ -2280,6 +2358,8 @@
           "y": 0.86
         }
       ],
+      "targetTime": 16.656,
+      "goldTime": 10.803,
       "verified": false
     },
     "41": {
@@ -2313,6 +2393,8 @@
           "y": 0.72
         }
       ],
+      "targetTime": 5.89,
+      "goldTime": 4.128,
       "verified": false
     },
     "42": {
@@ -2370,6 +2452,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 8.25,
+      "goldTime": 5.6,
       "verified": false
     },
     "43": {
@@ -2475,6 +2559,8 @@
           "y": 0.85
         }
       ],
+      "targetTime": 10.41,
+      "goldTime": 6.752,
       "verified": false
     },
     "44": {
@@ -2526,6 +2612,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 7.1,
+      "goldTime": 4.84,
       "verified": false
     },
     "45": {
@@ -2583,6 +2671,8 @@
           "y": 0.36
         }
       ],
+      "targetTime": 13.2,
+      "goldTime": 8.96,
       "verified": false
     },
     "46": {
@@ -2616,6 +2706,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 8.073,
+      "goldTime": 5.658,
       "verified": false
     },
     "47": {
@@ -2679,6 +2771,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 10.348,
+      "goldTime": 6.958,
       "verified": false
     },
     "48": {
@@ -2778,6 +2872,8 @@
           "y": 0.85
         }
       ],
+      "targetTime": 13.078,
+      "goldTime": 8.518,
       "verified": false
     },
     "49": {
@@ -2841,6 +2937,8 @@
           "y": 0.3
         }
       ],
+      "targetTime": 10.244,
+      "goldTime": 6.885,
       "verified": false
     },
     "50": {
@@ -2952,6 +3050,8 @@
           "y": 0.82
         }
       ],
+      "targetTime": 17.472,
+      "goldTime": 11.302,
       "verified": false
     },
     "51": {
@@ -2985,6 +3085,8 @@
           "y": 0.75
         }
       ],
+      "targetTime": 5.89,
+      "goldTime": 4.128,
       "verified": false
     },
     "52": {
@@ -3024,6 +3126,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 6.24,
+      "goldTime": 4.328,
       "verified": false
     },
     "53": {
@@ -3069,6 +3173,8 @@
           "y": 0.38
         }
       ],
+      "targetTime": 6.59,
+      "goldTime": 4.528,
       "verified": false
     },
     "54": {
@@ -3144,6 +3250,8 @@
           "y": 0.6
         }
       ],
+      "targetTime": 8.58,
+      "goldTime": 5.696,
       "verified": false
     },
     "55": {
@@ -3195,6 +3303,8 @@
           "y": 0.22
         }
       ],
+      "targetTime": 11.36,
+      "goldTime": 7.744,
       "verified": false
     },
     "56": {
@@ -3228,6 +3338,8 @@
           "y": 0.88
         }
       ],
+      "targetTime": 7.865,
+      "goldTime": 5.512,
       "verified": false
     },
     "57": {
@@ -3297,6 +3409,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 10.699,
+      "goldTime": 7.145,
       "verified": false
     },
     "58": {
@@ -3384,6 +3498,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 12.064,
+      "goldTime": 7.925,
       "verified": false
     },
     "59": {
@@ -3435,6 +3551,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 9.23,
+      "goldTime": 6.292,
       "verified": false
     },
     "60": {
@@ -3510,6 +3628,8 @@
           "y": 0.8
         }
       ],
+      "targetTime": 13.856,
+      "goldTime": 9.203,
       "verified": false
     },
     "61": {
@@ -3561,6 +3681,8 @@
           "y": 0.7
         }
       ],
+      "targetTime": 7.1,
+      "goldTime": 4.84,
       "verified": false
     },
     "62": {
@@ -3612,6 +3734,8 @@
           "y": 0.3
         }
       ],
+      "targetTime": 7.26,
+      "goldTime": 4.952,
       "verified": false
     },
     "63": {
@@ -3657,6 +3781,8 @@
           "y": 0.84
         }
       ],
+      "targetTime": 6.91,
+      "goldTime": 4.752,
       "verified": false
     },
     "64": {
@@ -3714,6 +3840,8 @@
           "y": 0.42
         }
       ],
+      "targetTime": 8.348,
+      "goldTime": 5.669,
       "verified": false
     },
     "65": {
@@ -3759,6 +3887,8 @@
           "y": 0.28
         }
       ],
+      "targetTime": 10.8,
+      "goldTime": 7.424,
       "verified": false
     },
     "66": {
@@ -3846,6 +3976,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 11.96,
+      "goldTime": 7.852,
       "verified": false
     },
     "67": {
@@ -3933,6 +4065,8 @@
           "y": 0.14
         }
       ],
+      "targetTime": 12.168,
+      "goldTime": 7.998,
       "verified": false
     },
     "68": {
@@ -3990,6 +4124,8 @@
           "y": 0.3
         }
       ],
+      "targetTime": 7.501,
+      "goldTime": 5.023,
       "verified": false
     },
     "69": {
@@ -4047,6 +4183,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 9.893,
+      "goldTime": 6.698,
       "verified": false
     },
     "70": {
@@ -4152,6 +4290,8 @@
           "y": 0.84
         }
       ],
+      "targetTime": 16.656,
+      "goldTime": 10.803,
       "verified": false
     },
     "71": {
@@ -4185,6 +4325,8 @@
           "y": 0.78
         }
       ],
+      "targetTime": 6.05,
+      "goldTime": 4.24,
       "verified": false
     },
     "72": {
@@ -4260,6 +4402,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 8.58,
+      "goldTime": 5.696,
       "verified": false
     },
     "73": {
@@ -4311,6 +4455,8 @@
           "y": 0.38
         }
       ],
+      "targetTime": 7.18,
+      "goldTime": 4.896,
       "verified": false
     },
     "74": {
@@ -4374,6 +4520,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 7.96,
+      "goldTime": 5.352,
       "verified": false
     },
     "75": {
@@ -4413,6 +4561,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 10.496,
+      "goldTime": 7.283,
       "verified": false
     },
     "76": {
@@ -4512,6 +4662,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 13.234,
+      "goldTime": 8.627,
       "verified": false
     },
     "77": {
@@ -4569,6 +4721,8 @@
           "y": 0.29
         }
       ],
+      "targetTime": 10.934,
+      "goldTime": 7.426,
       "verified": false
     },
     "78": {
@@ -4650,6 +4804,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 11.609,
+      "goldTime": 7.665,
       "verified": false
     },
     "79": {
@@ -4701,6 +4857,8 @@
           "y": 0.5
         }
       ],
+      "targetTime": 9.022,
+      "goldTime": 6.146,
       "verified": false
     },
     "80": {
@@ -4788,6 +4946,8 @@
           "y": 0.92
         }
       ],
+      "targetTime": 15.168,
+      "goldTime": 9.978,
       "verified": false
     },
     "81": {
@@ -4827,6 +4987,8 @@
           "y": 0.82
         }
       ],
+      "targetTime": 6.56,
+      "goldTime": 4.552,
       "verified": false
     },
     "82": {
@@ -4908,6 +5070,8 @@
           "y": 0.85
         }
       ],
+      "targetTime": 8.85,
+      "goldTime": 5.84,
       "verified": false
     },
     "83": {
@@ -4971,6 +5135,8 @@
           "y": 0.26
         }
       ],
+      "targetTime": 7.96,
+      "goldTime": 5.352,
       "verified": false
     },
     "84": {
@@ -5022,6 +5188,8 @@
           "y": 0.3
         }
       ],
+      "targetTime": 7.02,
+      "goldTime": 4.784,
       "verified": false
     },
     "85": {
@@ -5163,6 +5331,8 @@
           "y": 0.25
         }
       ],
+      "targetTime": 20.08,
+      "goldTime": 12.768,
       "verified": false
     },
     "86": {
@@ -5208,6 +5378,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 8.983,
+      "goldTime": 6.178,
       "verified": false
     },
     "87": {
@@ -5277,6 +5449,8 @@
           "y": 0.15
         }
       ],
+      "targetTime": 10.699,
+      "goldTime": 7.145,
       "verified": false
     },
     "88": {
@@ -5340,6 +5514,8 @@
           "y": 0.18
         }
       ],
+      "targetTime": 10.348,
+      "goldTime": 6.958,
       "verified": false
     },
     "89": {
@@ -5433,6 +5609,8 @@
           "y": 0.58
         }
       ],
+      "targetTime": 12.779,
+      "goldTime": 8.367,
       "verified": false
     },
     "90": {
@@ -5526,6 +5704,8 @@
           "y": 0.88
         }
       ],
+      "targetTime": 15.856,
+      "goldTime": 10.387,
       "verified": false
     },
     "91": {
@@ -5559,6 +5739,8 @@
           "y": 0.74
         }
       ],
+      "targetTime": 5.89,
+      "goldTime": 4.128,
       "verified": false
     },
     "92": {
@@ -5634,6 +5816,8 @@
           "y": 0.16
         }
       ],
+      "targetTime": 8.74,
+      "goldTime": 5.808,
       "verified": false
     },
     "93": {
@@ -5721,6 +5905,8 @@
           "y": 0.14
         }
       ],
+      "targetTime": 9.28,
+      "goldTime": 6.096,
       "verified": false
     },
     "94": {
@@ -5778,6 +5964,8 @@
           "y": 0.9
         }
       ],
+      "targetTime": 7.61,
+      "goldTime": 5.152,
       "verified": false
     },
     "95": {
@@ -5853,6 +6041,8 @@
           "y": 0.17
         }
       ],
+      "targetTime": 13.856,
+      "goldTime": 9.203,
       "verified": false
     },
     "96": {
@@ -6000,6 +6190,8 @@
           "y": 0.14
         }
       ],
+      "targetTime": 16.614,
+      "goldTime": 10.525,
       "verified": false
     },
     "97": {
@@ -6063,6 +6255,8 @@
           "y": 0.26
         }
       ],
+      "targetTime": 11.513,
+      "goldTime": 7.773,
       "verified": false
     },
     "98": {
@@ -6150,6 +6344,8 @@
           "y": 0.15
         }
       ],
+      "targetTime": 12.324,
+      "goldTime": 8.107,
       "verified": false
     },
     "99": {
@@ -6261,6 +6457,8 @@
           "y": 0.2
         }
       ],
+      "targetTime": 14.3,
+      "goldTime": 9.256,
       "verified": false
     },
     "100": {
@@ -6396,6 +6594,8 @@
           "y": 0.1
         }
       ],
+      "targetTime": 19.968,
+      "goldTime": 12.762,
       "verified": false
     }
   }

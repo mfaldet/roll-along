@@ -25,7 +25,7 @@ Tilt your phone, roll the marble, dodge the holes, reach the goal. An endless Ad
 
 ## What's in the game
 
-**Adventure.** An endless run of generated levels that get harder as you climb. Each level is scored on stars. Lives refill at one every 6 minutes, up to 10.
+**Adventure.** A run of hand-built levels that get harder as you climb. A level exists only if it is in the level pack. Each level is scored on stars. Lives refill at one every 6 minutes, up to 10.
 
 **10 minigames.**
 

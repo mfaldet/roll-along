@@ -785,24 +785,24 @@ final class GameStateTests: XCTestCase {
 // ---------------------------------------------------------------------------
 // LevelOverridesTests — guardrail for the JSON single-source-of-truth.
 //
-// The climb's hand-crafted levels now live in the bundled LevelOverrides.json
-// (authored in Marble Mapper); the Swift `handCrafted` array is intentionally
-// empty.  LevelOverrideStore.loadBundled() fails SILENTLY to [:] on a missing,
-// truncated, or corrupt file — which would quietly regress every authored level
-// to the procedural generator with no crash and no error.  These tests fail
-// loudly instead, so a bad export can't ship.  (Runs in-process against the
+// Every Adventure level lives in the bundled LevelOverrides.json (authored in
+// Marble Mapper).  The phone never builds a level: a level exists only if it
+// is in the pack.  LevelOverrideStore.loadBundled() fails SILENTLY to [:] on a
+// missing, truncated, or corrupt file — which would leave the game with no
+// levels, no crash and no error.  These tests fail loudly instead, so a bad
+// export can't ship.  (Runs in-process against the
 // app bundle: the test target is app-hosted, so Bundle.main is RollAlong.app.)
 // ---------------------------------------------------------------------------
 final class LevelOverridesTests: XCTestCase {
 
     /// The bundled overrides must cover a contiguous 1...N authored range
-    /// (currently 1...100).  A gap means a level silently falls through to the
-    /// generator instead of its designed layout.
+    /// (currently 1...100).  A gap means a level number silently plays the nearest
+    /// existing level instead of its own layout.
     func testBundledClimbOverridesCoverAuthoredRange() {
         let overrides = LevelLayout.overrides
         XCTAssertFalse(overrides.isEmpty,
                        "LevelOverrides.json decoded to empty — bundled file missing/corrupt? "
-                       + "With handCrafted retired, every climb level would regress to generated().")
+                       + "The pack is the only source of levels, so the game would have none.")
         let keys = Set(overrides.keys)
         let maxLevel = keys.max() ?? 0
         XCTAssertGreaterThanOrEqual(maxLevel, 100,
@@ -810,6 +810,56 @@ final class LevelOverridesTests: XCTestCase {
         let missing = (1...maxLevel).filter { !keys.contains($0) }
         XCTAssertTrue(missing.isEmpty,
                       "LevelOverrides.json has gaps in the authored range: \(Array(missing.prefix(10)))")
+    }
+
+    /// Star times are the pack's own: `layout(for:)` hands them out exactly
+    /// as published, with no tier multiplier, on easy, hard and very hard
+    /// levels alike (1, 6 and 5 are one of each).
+    func testStarTimesAreThePacksOwn() {
+        for level in [1, 5, 6, 50, 100] {
+            guard let inPack = LevelLayout.overrides[level] else { return XCTFail("missing level \(level)") }
+            let played = LevelLayout.layout(for: level)
+            XCTAssertEqual(played.targetTime, inPack.targetTime, accuracy: 0.0001, "level \(level) target")
+            XCTAssertEqual(played.goldTime, inPack.goldTime, accuracy: 0.0001, "level \(level) gold")
+        }
+    }
+
+    /// Every level in the bundled pack states its own star times.
+    func testEveryBundledLevelCarriesItsOwnTimes() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "LevelOverrides", withExtension: "json"))
+        let file = try JSONDecoder().decode(LevelOverrideStore.File.self, from: Data(contentsOf: url))
+        let missing = file.levels.filter { $0.value.targetTime == nil || $0.value.goldTime == nil }.keys.sorted()
+        XCTAssertTrue(missing.isEmpty, "levels without their own times: \(missing.prefix(10))")
+        XCTAssertNotNil(file.packVersion, "the pack states its version")
+    }
+
+    /// A level exists only if it is in the pack.  A number past the end is
+    /// not a level built on the phone: it resolves to the last level.
+    func testNoLevelExistsPastTheEndOfThePack() {
+        let last = LevelLayout.lastLevel
+        XCTAssertTrue(LevelLayout.exists(last))
+        XCTAssertFalse(LevelLayout.exists(last + 1))
+        let beyond = LevelLayout.layout(for: last + 500)
+        let lastLayout = LevelLayout.layout(for: last)
+        XCTAssertEqual(beyond.holeRects, lastLayout.holeRects)
+        XCTAssertEqual(beyond.targetTime, lastLayout.targetTime, accuracy: 0.0001)
+    }
+
+    /// A player who was past the last level is placed on it, once, and the
+    /// records for levels that no longer exist are removed.
+    func testFittingAnOldSaveToThePack() {
+        let gs = GameState(defaults: UserDefaults(suiteName: "fit-\(UUID().uuidString)")!)
+        let last = LevelLayout.lastLevel
+        for level in 1...(last + 149) { gs.bestStars[level] = 2; gs.bestTime[level] = 20 }
+        gs.currentLevel = last + 150
+        gs.highestUnlocked = last + 150
+        XCTAssertTrue(gs.fitProgressToLevelPack())
+        XCTAssertEqual(gs.currentLevel, last)
+        XCTAssertEqual(gs.highestUnlocked, last + 1)
+        XCTAssertEqual(gs.bestStars.count, last)
+        XCTAssertEqual(gs.totalStars, last * 2)
+        XCTAssertNil(gs.bestTime[last + 1])
+        XCTAssertFalse(gs.fitProgressToLevelPack(), "it runs once per install")
     }
 
     /// A decoded override must carry real content (the migration/publish wrote a

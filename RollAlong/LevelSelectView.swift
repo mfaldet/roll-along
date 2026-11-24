@@ -58,9 +58,9 @@ struct LevelSelectView: View {
     // designedLevels)`.
 
     private var unlockedDesignedCount: Int {
-        // Every level up to the 5,000-cap is now designed (hand-crafted set +
-        // procedural generator), so progress measures all reached levels.
-        min(gameState.highestUnlocked, World.maxLevel)
+        // A level exists only if it is in the level pack, so progress
+        // measures the reached levels inside it.
+        min(gameState.highestUnlocked, LevelLayout.lastLevel)
     }
 
     private var unlockedStarsEarned: Int {
@@ -247,7 +247,8 @@ struct LevelSelectView: View {
     /// The deepest world the player has unlocked into — sections render up to
     /// this so a new chapter appears the moment they climb past a 100 boundary.
     private var reachedWorldIndex: Int {
-        World.index(for: max(1, gameState.highestUnlocked))
+        // Never past the world that holds the pack's last level.
+        World.index(for: min(max(1, gameState.highestUnlocked), LevelLayout.lastLevel))
     }
 
     private var worldSections: some View {
@@ -262,11 +263,18 @@ struct LevelSelectView: View {
         VStack(alignment: .leading, spacing: 12) {
             worldHeader(world)
             LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(world.levelRange, id: \.self) { level in
+                // The selector ends at the last level in the pack.
+                ForEach(levels(in: world), id: \.self) { level in
                     cell(for: level)
                 }
             }
         }
+    }
+
+    /// The levels of `world` that are in the pack.
+    private func levels(in world: World) -> ClosedRange<Int> {
+        let first = world.levelRange.lowerBound
+        return first ... max(first, min(world.levelRange.upperBound, LevelLayout.lastLevel))
     }
 
     private func worldHeader(_ world: World) -> some View {
@@ -278,7 +286,7 @@ struct LevelSelectView: View {
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
             Spacer()
-            Text("\(world.levelRange.lowerBound)–\(world.levelRange.upperBound)")
+            Text("\(levels(in: world).lowerBound)–\(levels(in: world).upperBound)")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Color(white: 0.45))
                 .monospacedDigit()
@@ -294,10 +302,8 @@ struct LevelSelectView: View {
         // theme rather than the (now obsolete) per-level theme bands.
         let floor    = gameState.equippedFloor
         let pit      = gameState.equippedPit
-        // Every level 1…5,000 is now playable — hand-crafted set first, then
-        // the procedural generator (see LevelLayout.layout(for:)).  The old
-        // "coming soon" state only triggers beyond the 5,000 cap.
-        let isDesigned = level <= World.maxLevel
+        // A level exists only if it is in the level pack.
+        let isDesigned = LevelLayout.exists(level)
 
         if unlocked && isDesigned {
             Button {

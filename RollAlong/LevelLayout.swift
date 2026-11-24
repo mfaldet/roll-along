@@ -121,17 +121,6 @@ enum DifficultyTier: String, Codable {
         }
     }
 
-    /// Multiplier applied to formula-based star times.  Harder levels get
-    /// more time before docking stars because the path is longer, not because
-    /// the player is being punished.
-    var timeMultiplier: Double {
-        switch self {
-        case .easy:     return 1.0
-        case .hard:     return 1.3
-        case .veryHard: return 1.6
-        }
-    }
-
     var displayName: String {
         switch self {
         case .easy:     return "Easy"
@@ -159,8 +148,8 @@ struct LevelLayout {
     let start:      UnitPoint     // ball spawn
     let goal:       UnitPoint     // goal centre
     let coins:      [UnitPoint]   // up to 3 collectibles
-    let targetTime: TimeInterval  // 2-star threshold (seconds) — BEFORE tier multiplier
-    let goldTime:   TimeInterval  // 3-star threshold (seconds) — BEFORE tier multiplier
+    let targetTime: TimeInterval  // 2-star threshold (seconds), exactly as the pack gives it
+    let goldTime:   TimeInterval  // 3-star threshold (seconds), exactly as the pack gives it
     let tier:       DifficultyTier
     let verified:   Bool          // true = hand-reviewed, do not auto-modify
 
@@ -174,15 +163,19 @@ struct LevelLayout {
     /// so we can mark levels verified without re-editing every layout.
     static let verifiedLevels: Set<Int> = []
 
-    /// Data-driven override store: level number → replacement layout.
-    ///
-    /// Loaded at launch from the bundled `LevelOverrides.json` (empty/absent →
-    /// no overrides → identical behavior), and mergeable from remote config
-    /// later via `applyRemoteOverrides(_:)`.  Checked FIRST in `layout(for:)`,
-    /// so any level can be hot-patched — drop in a hand-crafted landmark, or
-    /// fix a bad generated level — without shipping an app update once remote
-    /// refresh is wired.  This is the "Codable now, remote-refresh later" seam.
-    private(set) static var overrides: [Int: LevelLayout] = LevelOverrideStore.loadBundled()
+    /// THE LEVEL PACK: level number → layout.  A level exists only if it is
+    /// in the pack; the phone never builds an Adventure level.  Loaded at
+    /// launch from the bundled `LevelOverrides.json`, and replaceable by a
+    /// newer published pack through `applyRemoteOverrides(_:)`.
+    private(set) static var overrides: [Int: LevelLayout] = LevelOverrideStore.loadBundled() {
+        didSet { lastLevel = overrides.keys.max() ?? 1 }
+    }
+
+    /// The last level in the pack.  Levels run 1...lastLevel.
+    private(set) static var lastLevel: Int = LevelOverrideStore.loadBundled().keys.max() ?? 1
+
+    /// True when `level` is in the pack.
+    static func exists(_ level: Int) -> Bool { overrides[level] != nil }
 
     /// The version number of the level pack in use, recorded on every
     /// analytics event about a level.  Read from the pack file's
@@ -199,17 +192,24 @@ struct LevelLayout {
         if let version = LevelOverrideStore.packVersion(in: data) { packVersion = version }
     }
 
+    /// The layout of a level in the pack.
+    ///
+    /// Star times are the pack's own and are used exactly as published: no
+    /// tier multiplier is applied.  The tier still comes from the level
+    /// number and still decides the side walls and the coin payouts.
+    ///
+    /// A number outside the pack is not a level.  Callers stay inside
+    /// 1...lastLevel; if one does not, it gets the nearest level that
+    /// exists rather than a level built on the phone.
     static func layout(for level: Int) -> LevelLayout {
-        let base: LevelLayout
-        if let override = overrides[level] {
-            base = override                       // hot-patch / landmark wins
-        } else if level >= 1 && level <= handCrafted.count {
-            base = handCrafted[level - 1]
-        } else {
-            base = generated(for: level)
-        }
-        let tier = tierOverrides[level] ?? DifficultyTier.tier(for: level)
-        let mult = tier.timeMultiplier
+        let wanted = min(max(1, level), lastLevel)
+        let number = overrides[wanted] != nil
+            ? wanted
+            : (overrides.keys.filter { $0 <= wanted }.max() ?? overrides.keys.min() ?? wanted)
+        // An empty pack cannot happen with the bundled file in place; if it
+        // somehow does, an open floor with a goal keeps the game from failing.
+        let base = overrides[number] ?? emptyPackFallback
+        let tier = tierOverrides[number] ?? DifficultyTier.tier(for: number)
         // Easy levels (digits 1-4) play across the FULL arena width
         // instead of the standard narrow column flanked by side-wall
         // hole-rects.  The off-screen detection (`x < -r` etc.) still
@@ -228,10 +228,10 @@ struct LevelLayout {
             start:      base.start,
             goal:       base.goal,
             coins:      base.coins,
-            targetTime: base.targetTime * mult,
-            goldTime:   base.goldTime * mult,
+            targetTime: base.targetTime,
+            goldTime:   base.goldTime,
             tier:       tier,
-            verified:   base.verified || verifiedLevels.contains(level)
+            verified:   base.verified || verifiedLevels.contains(number)
         )
     }
 
@@ -385,69 +385,18 @@ extension LevelLayout {
         verified:   true
     )
 
-    /// Optional compiled-in fallback layer for climb levels, sitting between
-    /// the JSON overrides and the procedural generator in `layout(for:)`
-    /// (override → handCrafted → generated).
-    ///
-    /// **Intentionally empty.** All 100 shipped climb levels are the single
-    /// source of truth in the bundled `LevelOverrides.json`, authored in Marble
-    /// Mapper and migrated out of this array by
-    /// `marble-mapper/scripts/migrate-climb-to-overrides.mjs`. Storing them as
-    /// JSON instead of a ~2,000-line Swift array literal removes a multi-second
-    /// type-check and makes levels overwritable by dropping in a freshly
-    /// exported `LevelOverrides.json` — no Swift change, no app-logic change.
-    ///
-    /// Add entries here with `make(...)` only for a level that must ship even if
-    /// the JSON fails to load; otherwise author in Marble Mapper.
-    static let handCrafted: [LevelLayout] = []
+    /// Used only if the pack is empty, which the bundled file prevents.
+    private static let emptyPackFallback = make(
+        holes: [],
+        start: UnitPoint(x: 0.5, y: 0.90),
+        goal:  UnitPoint(x: 0.5, y: 0.10),
+        coins: []
+    )
 
     // -----------------------------------------------------------------------
-    // Procedural generator — deterministic, archetype-based, difficulty-scaled.
-    //
-    // Produces every level beyond the hand-crafted set, all the way to 5,000.
-    // Deterministic (seeded by level number) so a given level is identical for
-    // every player forever.  Four archetypes that ALWAYS leave a clear route —
-    // density and course length scale with World.difficulty, gaps never shrink
-    // to pixel-precision (core rule: harder = longer / busier, not punishing).
-    //
-    // Any generated level can later be replaced by a hand-crafted "landmark"
-    // or a fix via `handCrafted` + the override maps in `layout(for:)`.
+    // Shape helpers for the Challenge Tracks (`trackLayout`).  Adventure does
+    // not use them: Adventure levels come only from the level pack.
     // -----------------------------------------------------------------------
-    static func generated(for level: Int) -> LevelLayout {
-        var rng   = LevelRNG(seed: UInt64(max(0, level)))
-        let world = World.world(for: level)
-        let d     = world.difficulty                 // 0…1 across the climb
-
-        let start = UnitPoint(x: 0.5, y: 0.90)
-        let goal  = UnitPoint(x: 0.5, y: 0.10)
-
-        let designed: [CGRect]
-        switch level % 4 {
-        case 0:  designed = genZigzag(&rng, d)
-        case 1:  designed = genStaircase(&rng, d)
-        case 2:  designed = genScattered(&rng, d)
-        default: designed = genCorridor(&rng, d)
-        }
-
-        let coins = [0.27, 0.50, 0.73].map { y in
-            UnitPoint(x: freeX(at: y, holes: designed), y: y)
-        }
-
-        let holes = sideWalls + designed
-        var times = defaultTimes(start: start, goal: goal, holeCount: designed.count)
-        times.target += d * 1.2          // deeper worlds run a little longer
-        times.gold   += d * 0.8
-        return LevelLayout(
-            holeRects:  holes,
-            start:      start,
-            goal:       goal,
-            coins:      coins,
-            targetTime: times.target,
-            goldTime:   times.gold,
-            tier:       .easy,           // placeholder; overridden in layout(for:)
-            verified:   false
-        )
-    }
 
     // Archetype 0 — Zigzag: alternating wide bars; weave through the gaps.
     private static func genZigzag(_ rng: inout LevelRNG, _ d: Double) -> [CGRect] {
@@ -908,7 +857,7 @@ struct LevelDTO: Codable {
     var start: Point
     var goal:  Point
     var coins: [Point]
-    var targetTime: Double?     // omitted → auto-computed
+    var targetTime: Double?     // final; used as published (omitted → formula, no multiplier)
     var goldTime:   Double?     // omitted → auto-computed
     var verified:   Bool?       // omitted → true
 

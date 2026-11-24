@@ -56,6 +56,8 @@
 		AA000017000000000000AA01 /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000017000000000000AA00 /* AdManager.swift */; };
 		AD0000R1000000000000AD01 /* AdRetrySchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R1000000000000AD00 /* AdRetrySchedule.swift */; };
 		AD0000R3000000000000AD01 /* LevelMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R3000000000000AD00 /* LevelMeasurement.swift */; };
+		AD0000R5000000000000AD01 /* LevelProgressRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R5000000000000AD00 /* LevelProgressRules.swift */; };
+		AD0000R6000000000000AD01 /* LevelProgressRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R6000000000000AD00 /* LevelProgressRulesTests.swift */; };
 		AD0000R4000000000000AD01 /* LevelMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R4000000000000AD00 /* LevelMeasurementTests.swift */; };
 		AD0000R2000000000000AD01 /* AdRetryScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */; };
 		AA000018000000000000AA01 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = D502FED02FCB156C00CA86BD /* GoogleMobileAds */; };
@@ -171,6 +173,8 @@
 		AA000017000000000000AA00 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
 		AD0000R1000000000000AD00 /* AdRetrySchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdRetrySchedule.swift; sourceTree = "<group>"; };
 		AD0000R3000000000000AD00 /* LevelMeasurement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelMeasurement.swift; sourceTree = "<group>"; };
+		AD0000R5000000000000AD00 /* LevelProgressRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelProgressRules.swift; sourceTree = "<group>"; };
+		AD0000R6000000000000AD00 /* LevelProgressRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelProgressRulesTests.swift; sourceTree = "<group>"; };
 		AD0000R4000000000000AD00 /* LevelMeasurementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelMeasurementTests.swift; sourceTree = "<group>"; };
 		AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdRetryScheduleTests.swift; sourceTree = "<group>"; };
 		AA000099000000000000AA00 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
@@ -298,6 +302,7 @@
 				AA000017000000000000AA00 /* AdManager.swift */,
 				AD0000R1000000000000AD00 /* AdRetrySchedule.swift */,
 				AD0000R3000000000000AD00 /* LevelMeasurement.swift */,
+				AD0000R5000000000000AD00 /* LevelProgressRules.swift */,
 				QE3A0001000000000000AA00 /* PhysicsHelpers.swift */,
 				FC000001000000000000FC00 /* GoldRushEngine.swift */,
 				FA000001000000000000FA00 /* MinigameMaps.swift */,
@@ -355,6 +360,7 @@
 				QE3B0103000000000000AA00 /* CosmeticsTests.swift */,
 				AD0000R2000000000000AD00 /* AdRetryScheduleTests.swift */,
 				AD0000R4000000000000AD00 /* LevelMeasurementTests.swift */,
+				AD0000R6000000000000AD00 /* LevelProgressRulesTests.swift */,
 				QE3B0104000000000000AA00 /* StoreKitManagerTests.swift */,
 				FB000004000000000000FB00 /* BallSkinSnapshotTests.swift */,
 				FC000002000000000000FC00 /* PerformanceTests.swift */,
@@ -522,6 +528,7 @@
 				AA000017000000000000AA01 /* AdManager.swift in Sources */,
 				AD0000R1000000000000AD01 /* AdRetrySchedule.swift in Sources */,
 				AD0000R3000000000000AD01 /* LevelMeasurement.swift in Sources */,
+				AD0000R5000000000000AD01 /* LevelProgressRules.swift in Sources */,
 				D502FED42FD5024E00CA86BD /* SocialClient.swift in Sources */,
 				D502FEE12FD5024E00CA86BD /* LeaderboardView.swift in Sources */,
 				D502FEE32FD5024E00CA86BD /* FriendsView.swift in Sources */,
@@ -572,6 +579,7 @@
 				QE3B0103000000000000AA01 /* CosmeticsTests.swift in Sources */,
 				AD0000R2000000000000AD01 /* AdRetryScheduleTests.swift in Sources */,
 				AD0000R4000000000000AD01 /* LevelMeasurementTests.swift in Sources */,
+				AD0000R6000000000000AD01 /* LevelProgressRulesTests.swift in Sources */,
 				QE3B0104000000000000AA01 /* StoreKitManagerTests.swift in Sources */,
 				FB000004000000000000FB01 /* BallSkinSnapshotTests.swift in Sources */,
 				FC000002000000000000FC01 /* PerformanceTests.swift in Sources */,

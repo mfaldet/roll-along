@@ -18,9 +18,8 @@
 //     a hole rect (BallGameView.isInHole → rect.contains(position)).  The
 //     ball may visually overlap hole edges without falling — hard-tier
 //     levels use gaps narrower than the ball diameter on purpose.
-//   • targetTime = 4·dist(start,goal) + 0.35·designedHoleCount + 2.5 and
-//     goldTime = 2.8·dist + 0.20·holes + 1.8, BEFORE the tier multiplier
-//     (side-walls do NOT count toward holeCount). (LevelLayout.defaultTimes)
+//   • Star times come from the pack and are final: the game applies no
+//     formula and no tier multiplier to them.      (LevelLayout.layout(for:))
 //
 // CHECKS PER LEVEL
 //   1. coin count == 3 (economy assumes a fixed coins-per-level payout)
@@ -38,8 +37,9 @@
 //   5. tier sanity: digit-rule tier vs a difficulty heuristic (designed-hole
 //      blocked-area fraction of the playable band + bottleneck corridor
 //      width on the start→goal path, via binary-searched inflation radius)
-//   6. targetTime/goldTime consistency: explicit values must match the
-//      formula (omitted values are auto-computed, hence always consistent)
+//   6. star times: every level must carry its own targetTime and goldTime,
+//      both above zero, with goldTime below targetTime.  They are final:
+//      the game uses them exactly as written
 //
 // Exit code: 2 if any BROKEN flag, 1 if only advisory flags, 0 when clean.
 // ===========================================================================
@@ -340,17 +340,13 @@ for (const id of ids) {
     add(id, "TIER", `numbered easy but layout measures hard (${metrics}${corridor < 2 * BALL_R ? "; corridor narrower than the ball" : ""})`);
   }
 
-  // -- (6) targetTime / goldTime formula consistency
-  const expTarget = 4 * sg + 0.35 * designed.length + 2.5;
-  const expGold = 2.8 * sg + 0.2 * designed.length + 1.8;
-  if (lvl.targetTime !== undefined && Math.abs(lvl.targetTime - expTarget) > TIME_EPS) {
-    add(id, "BROKEN", `explicit targetTime ${lvl.targetTime} != formula ${expTarget.toFixed(3)} (4·${sg.toFixed(3)} + 0.35·${designed.length} + 2.5)`);
-  }
-  if (lvl.goldTime !== undefined && Math.abs(lvl.goldTime - expGold) > TIME_EPS) {
-    add(id, "BROKEN", `explicit goldTime ${lvl.goldTime} != formula ${expGold.toFixed(3)} (2.8·${sg.toFixed(3)} + 0.20·${designed.length} + 1.8)`);
-  }
-  if (lvl.targetTime !== undefined && lvl.goldTime !== undefined &&
-      lvl.goldTime >= lvl.targetTime) {
+  // -- (6) star times: every level carries its own, and they are final
+  //    (the game uses them exactly as written; no formula, no multiplier)
+  if (lvl.targetTime === undefined || lvl.goldTime === undefined) {
+    add(id, "BROKEN", "missing targetTime or goldTime — every level must carry its own star times");
+  } else if (!(lvl.goldTime > 0) || !(lvl.targetTime > 0)) {
+    add(id, "BROKEN", `star times must be above zero (targetTime ${lvl.targetTime}, goldTime ${lvl.goldTime})`);
+  } else if (lvl.goldTime >= lvl.targetTime) {
     add(id, "BROKEN", `goldTime ${lvl.goldTime} >= targetTime ${lvl.targetTime} — star thresholds inverted`);
   }
 
