@@ -78,7 +78,7 @@ final class TrophyCatalogTests: XCTestCase {
     /// the 4 Challenge of the Day trophies stay held back from v1.0.
     func testBundledCatalogLoadsWithRuledShape() throws {
         let catalog = try loadCatalog()
-        XCTAssertEqual(catalog.count, 86)
+        XCTAssertEqual(catalog.count, 87)
         XCTAssertEqual(catalog.catalogVersion, 1)
 
         var tierCounts: [TrophyTier: Int] = [:]
@@ -86,24 +86,28 @@ final class TrophyCatalogTests: XCTestCase {
         XCTAssertEqual(tierCounts[.bronze], 41)
         XCTAssertEqual(tierCounts[.silver], 24)
         XCTAssertEqual(tierCounts[.gold], 14)
-        XCTAssertEqual(tierCounts[.diamond], 6)
+        XCTAssertEqual(tierCounts[.diamond], 7)
         XCTAssertEqual(tierCounts[.platinum], 1)
 
         // The three Diamond monuments and the capstone, by id.
         XCTAssertEqual(Set(catalog.trophies.filter { $0.tier == .diamond }.map(\.id)),
                        ["climb_summit", "climb_stars_10000", "skill_clean_sheet_100",
-                        "track_all_eight", "daily_login_365", "arcade_hard_all"])
+                        "track_all_eight", "daily_login_365", "arcade_hard_all",
+                        "climb_waiting_room"])
         XCTAssertEqual(catalog.capstone.id, "capstone_all")
         XCTAssertEqual(catalog.capstone.title, "Platinum")
         XCTAssertEqual(catalog.capstone.tier.displayName, "Platinum")
 
         // Every trophy is launch content with no reward ref (D1: prestige +
         // earned-only regalia — the regalia item detail is still open at D8,
-        // and trophies never mint coins).
+        // and trophies never mint coins) — except "The Waiting Room", added
+        // in 1.1, which is therefore not counted toward Platinum.
         for trophy in catalog.trophies {
-            XCTAssertEqual(trophy.addedInVersion, "1.0", trophy.id)
+            XCTAssertEqual(trophy.addedInVersion, trophy.id == "climb_waiting_room" ? "1.1" : "1.0", trophy.id)
             XCTAssertNil(trophy.rewardID, trophy.id)
         }
+        XCTAssertFalse(catalog.capstone.criteria.requiredTrophyIDs?.contains("climb_waiting_room") ?? true,
+                       "The Waiting Room does not count toward Platinum")
     }
 
     /// Acceptance: catalog decodes/encodes round-trip losslessly.
@@ -171,7 +175,7 @@ final class TrophyCatalogTests: XCTestCase {
     func testEveryCriteriaMetricResolvesToAKnownMetricCase() throws {
         let raw = try JSONSerialization.jsonObject(with: rawCatalogData()) as? [String: Any]
         let trophies = try XCTUnwrap(raw?["trophies"] as? [[String: Any]])
-        XCTAssertEqual(trophies.count, 86)
+        XCTAssertEqual(trophies.count, 87)
         for trophy in trophies {
             let id = trophy["id"] as? String ?? "<missing id>"
             let criteria = try XCTUnwrap(trophy["criteria"] as? [String: Any],
@@ -610,8 +614,8 @@ final class TrophyEngineTests: XCTestCase {
             XCTAssertEqual(interested, expected, "index wrong for \(metric.rawValue)")
             indexedTotal += interested.count
         }
-        // Everything is reachable exactly once: 85 metric-indexed + the capstone.
-        XCTAssertEqual(indexedTotal, 85)
+        // Everything is reachable exactly once: 86 metric-indexed + the capstone.
+        XCTAssertEqual(indexedTotal, 86)
         XCTAssertTrue(engine.trophies(interestedIn: .baseTrophiesUnlocked).isEmpty,
                       "the capstone must be cascade-only, never bump-evaluated")
     }
@@ -2850,7 +2854,7 @@ final class TrophyTriggerCoverageTests: XCTestCase {
     func testEveryTrophyHasATriggerTest() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
         let catalogIDs = Set(catalog.trophies.map(\.id))
-        XCTAssertEqual(catalogIDs.count, 86, "v1.0 ships 86 trophies")
+        XCTAssertEqual(catalogIDs.count, 87, "86 at launch + The Waiting Room (1.1)")
 
         // Ids with an explicit trigger test, grouped by the S1 task/suite that
         // owns them. Keep in lockstep with the catalog.
@@ -2858,6 +2862,8 @@ final class TrophyTriggerCoverageTests: XCTestCase {
             // S1-T1 climb (+ mid-ladder gaps filled by S1-T9)
             "climb_first_clear", "climb_level_10", "climb_level_50", "climb_level_100",
             "climb_level_250", "climb_level_500", "climb_level_1000", "climb_summit",
+            // 1.1 end room (GameStateTests.testEndRoomFirstVisitGivesTheWaitingRoomCollectionOnce)
+            "climb_waiting_room",
             "climb_stars_25", "climb_stars_150", "climb_perfect_world",
             // S1-T2 challenge tracks
             "track_first_level", "track_halfway", "track_first_complete", "track_triple",
@@ -3011,8 +3017,8 @@ final class TrophyRevisionTests: XCTestCase {
     /// a feat holds one trophy; a stack's steps run lowest tier to highest.
     func testTileLayoutCoversEveryTrophyOnce() throws {
         let catalog = try TrophyCatalog.load(bundle: .main)
-        XCTAssertEqual(catalog.tiles.count, 44)
-        XCTAssertEqual(Set(catalog.tiles.map(\.icon)).count, 44, "two tiles share an icon")
+        XCTAssertEqual(catalog.tiles.count, 45)
+        XCTAssertEqual(Set(catalog.tiles.map(\.icon)).count, 45, "two tiles share an icon")
 
         var seen: [String: String] = [:]
         for tile in catalog.tiles {

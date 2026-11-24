@@ -5,10 +5,11 @@ import SwiftUI
 // a player passes the last level in the pack, and again with the second set
 // of messages when a later pack adds levels and they pass the new last one.
 //
-//  • An open playfield with no holes, in the Waiting Room look: the white foil
-//    floor and grey foil wall, and the red foil ball rolling freely by tilt.
+//  • An open playfield with no holes, in the Waiting Room look: the white floor with
+//    its faint glow, the glowing edge, and the Waiting Room ball rolling by tilt.
 //  • Messages appear one at a time in the center, each sharpening from a blur
-//    and then blurring away (`EndRoomRules`).
+//    and then blurring away (`EndRoomRules`).  The only other text is the
+//    Locker line, with the first visit's last message.
 //  • Small flashes of color move across the screen in waves.  Soft and slow:
 //    each flash brightens and fades over more than a second, and nothing
 //    flashes on and off.  None under Reduce Motion.
@@ -103,8 +104,8 @@ struct EndRoomView: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// The message of the moment, sharpening and blurring away; and, during
-    /// the gift's message, a line saying what was given.
+    /// The message of the moment, sharpening and blurring away; and, with
+    /// the first visit's last message, the Locker line.
     private var messageLayer: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             let t = tl.date.timeIntervalSince(start)
@@ -195,8 +196,9 @@ struct EndRoomFlashes: View {
                         // Bright in the middle of the crossing, fading at both ends.
                         let level = sin(progress * Double.pi) * Double(max(0, 1 - distance / 40))
                         guard level > 0.02, x > -20, x < size.width + 20 else { continue }
-                        let rad = 4 + CGFloat(rng.nextUnit()) * 6
-                        let color = FoilArt.tint(hueBase + Double(i) * 0.07, saturation: 0.70, brightness: 1)
+                        let rad = 6 + CGFloat(rng.nextUnit()) * 8
+                        // The glow's own colors: soft, no edge.
+                        let color = FoilArt.tint(hueBase + Double(i) * 0.07, saturation: 0.60, brightness: 1)
                         let rect = CGRect(x: x - rad * 2, y: y - rad * 2, width: rad * 4, height: rad * 4)
                         ctx.fill(Path(ellipseIn: rect), with: .radialGradient(
                             Gradient(colors: [color.opacity(0.55 * level), color.opacity(0)]),

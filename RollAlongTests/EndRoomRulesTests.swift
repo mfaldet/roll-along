@@ -21,7 +21,10 @@ final class EndRoomRulesTests: XCTestCase {
 
     func testOnlyTheFirstVisitHasAGift() {
         XCTAssertEqual(EndRoomVisit.first.giftMessageIndex, 4)
-        XCTAssertEqual(EndRoomVisit.first.messages[4], "Until then, this one's for you.")
+        XCTAssertEqual(EndRoomVisit.first.messages.count, 5)
+        XCTAssertEqual(EndRoomVisit.first.messages[4], "Until then, enjoy the Waiting Room.")
+        XCTAssertEqual(EndRoomVisit.first.giftMessageIndex, EndRoomVisit.first.messages.count - 1,
+                       "the Locker line comes with the last message")
         XCTAssertNil(EndRoomVisit.second.giftMessageIndex)
     }
 
@@ -34,7 +37,7 @@ final class EndRoomRulesTests: XCTestCase {
             let lastEnds = EndRoomRules.lead + Double(visit.messages.count) * EndRoomRules.perMessage
             XCTAssertLessThanOrEqual(lastEnds, d)
         }
-        XCTAssertEqual(EndRoomRules.duration(of: .first), 41)
+        XCTAssertEqual(EndRoomRules.duration(of: .first), 35)
         XCTAssertEqual(EndRoomRules.duration(of: .second), 30)
     }
 
@@ -46,6 +49,6 @@ final class EndRoomRulesTests: XCTestCase {
         XCTAssertEqual(middle?.index, 0); XCTAssertEqual(middle?.clarity ?? -1, 1, accuracy: 1e-9)
         let next = EndRoomRules.message(at: 8.5, of: .first)
         XCTAssertEqual(next?.index, 1)
-        XCTAssertNil(EndRoomRules.message(at: 2 + 6 * 6 + 0.5, of: .first), "after the last message")
+        XCTAssertNil(EndRoomRules.message(at: 2 + 5 * 6 + 0.5, of: .first), "after the last message")
     }
 }

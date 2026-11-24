@@ -969,6 +969,17 @@ final class LevelOverridesTests: XCTestCase {
         XCTAssertEqual(gs.activeSkin, ballBefore, "the gift is not put on")
         XCTAssertFalse(gs.ownedBundles.contains(CosmeticBundle.waitingRoomID),
                        "not counted as a collection")
+        // The trophy "The Waiting Room" is earned on the first visit.
+        XCTAssertTrue(gs.trophyEngine.isUnlocked("climb_waiting_room"))
+    }
+
+    /// "The Waiting Room" is never hidden, whatever the pack's size.
+    func testTheWaitingRoomTrophyIsNeverHidden() throws {
+        let catalog = try TrophyCatalog.load(bundle: .main)
+        let trophy = try XCTUnwrap(catalog.trophy(withID: "climb_waiting_room"))
+        for last in [1, 100, 5000] {
+            XCTAssertTrue(catalog.canBeEarned(trophy, lastLevel: last))
+        }
     }
 
     /// A player already past the end of the pack when 1.1 arrives sees the

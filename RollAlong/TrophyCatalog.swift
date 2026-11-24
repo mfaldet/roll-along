@@ -322,6 +322,12 @@ enum TrophyMetric: String, Codable, CaseIterable {
     /// Only `capstone_all` may use this metric.
     case baseTrophiesUnlocked   = "base_trophies_unlocked"
 
+    // The end room (1.1)
+    /// 1 once the player has opened the end room (cleared every level in the
+    /// pack).  Fired from `GameState.recordEndRoomVisit`.  Never depends on
+    /// the pack's size, so its trophy is never hidden.
+    case endRoomVisits          = "end_room_visits"
+
     /// Where a metric's value comes from — the guardrail's compile-time
     /// classification. Exhaustive on purpose (no `default`): adding a
     /// metric forces a conscious provenance declaration here, and the
@@ -363,7 +369,7 @@ enum TrophyMetric: String, Codable, CaseIterable {
              .veryhardAceLevels, .fastestClearSeconds,
              .noFallClearStreakBest, .firstTryAces, .spotlessRuns,
              .levelOneFalls, .nightZenSessions, .pinballRollLaneSweeps,
-             .starterLoadoutFlexes:
+             .starterLoadoutFlexes, .endRoomVisits:
             return .gameplayProgress
         case .cosmeticCoinBuys, .fullNonstarterLoadouts, .bundlesCompleted,
              .ballsOwned, .cosmeticsOwned, .packsOwned,

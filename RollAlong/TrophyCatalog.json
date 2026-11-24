@@ -112,6 +112,17 @@
       "addedInVersion": "1.0"
     },
     {
+      "id": "climb_waiting_room",
+      "title": "The Waiting Room",
+      "tier": "diamond",
+      "category": "climb",
+      "secret": false,
+      "lockedDescription": "Clear every level in Adventure.",
+      "unlockedDescription": "You cleared every level there is and found the Waiting Room.",
+      "criteria": { "metric": "end_room_visits", "threshold": 1 },
+      "addedInVersion": "1.1"
+    },
+    {
       "id": "climb_stars_25",
       "title": "Star Search",
       "tier": "bronze",
@@ -1024,6 +1035,8 @@
   "tiles": [
     { "id": "stack_climb_levels", "kind": "stack", "title": "Levels passed", "section": "climb", "subsection": "", "icon": "mountain.2.fill", "fallbackIcon": "flag.fill",
       "trophies": ["climb_first_clear", "climb_level_10", "climb_level_50", "climb_level_100", "climb_level_250", "climb_level_500", "climb_level_1000", "climb_level_1500", "climb_level_2500", "climb_summit"] },
+    { "id": "climb_waiting_room", "kind": "feat", "title": "The Waiting Room", "section": "climb", "subsection": "", "icon": "hourglass.bottomhalf.filled", "fallbackIcon": "hourglass",
+      "trophies": ["climb_waiting_room"] },
     { "id": "stack_climb_stars", "kind": "stack", "title": "Stars earned", "section": "climb", "subsection": "", "icon": "star.fill", "fallbackIcon": "star",
       "trophies": ["climb_stars_25", "climb_stars_50", "climb_stars_75", "climb_stars_150", "climb_stars_300", "climb_stars_500", "climb_stars_1000", "climb_stars_3000", "climb_stars_5000", "climb_stars_10000"] },
     { "id": "stack_clean_sheet", "kind": "stack", "title": "Levels in a row without a fall", "section": "climb", "subsection": "", "icon": "hand.raised.slash.fill", "fallbackIcon": "hand.raised.fill",

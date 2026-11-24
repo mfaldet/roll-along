@@ -657,8 +657,8 @@ struct BallGameView: View {
                         .allowsHitTesting(false)
                 }
 
-                // Waiting Room floor (end room gift, 1.1) — white foil with a
-                // slow colour-shifting sheen.  Its clock freezes under Reduce
+                // Waiting Room floor (end room gift, 1.1) — white with a faint,
+                // slow color-shifting glow.  Its clock freezes under Reduce
                 // Motion, so it renders in both cases.
                 if floor == .waitingRoom {
                     FloorOverlayView(floor: .waitingRoom)

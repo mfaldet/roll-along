@@ -23,24 +23,25 @@ enum EndRoomVisit: String, Equatable, Identifiable {
         switch self {
         case .first:
             return [
-                "You cleared every level there is. So far.",
-                "Roll Along is a passion project, made by one person.",
-                "I'm so glad you're here.",
+                "That's every level.",
+                "Every pit. Every coin. Every tilt.",
+                "Not many players make it here.",
                 "More levels are on the way.",
-                "Until then, this one's for you.",
-                "Thanks for rolling along!",
+                "Until then, enjoy the Waiting Room.",
             ]
         case .second:
             return [
-                "You did it again.",
-                "Every level, cleared.",
-                "New ones are being built right now.",
-                "Thanks for rolling along!",
+                "Back again.",
+                "You beat the levels faster than we build them.",
+                "Good.",
+                "More are on the way.",
             ]
         }
     }
 
-    /// The message during which the gift is shown, or nil for no gift.
+    /// The message during which the gift line ("The Waiting Room collection
+    /// is in your Locker.") is shown: the first visit's last message.  nil
+    /// for no gift.
     var giftMessageIndex: Int? { self == .first ? 4 : nil }
 }
 

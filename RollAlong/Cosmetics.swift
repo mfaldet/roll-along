@@ -1208,7 +1208,7 @@ enum Floor: String, CosmeticItem {
     case petalPath        // Bloom — a pale garden path strewn with fallen petals and tiny leaves
     case openSea          // Ocean — deep open water seen from above: slow swell lines and drifting foam
     // ── End room gift (1.1; never sold) ──
-    case waitingRoom      // Waiting Room — the classic white floor in colour-shifting foil
+    case waitingRoom      // Waiting Room — the classic white floor with a faint color-shifting glow
 
     var id: String { rawValue }
     var displayName: String {
@@ -1314,7 +1314,7 @@ enum Floor: String, CosmeticItem {
         case .goldLeaf:   return Color(red: 0.46,  green: 0.34,  blue: 0.11 )  // antique gold leaf: well darker than a coin and than the Vault pit's rim
         case .petalPath:  return Color(red: 0.93,  green: 0.89,  blue: 0.83 )  // pale garden-path stone
         case .openSea:    return Color(red: 0.05,  green: 0.24,  blue: 0.40 )  // deep open water
-        case .waitingRoom: return Color(red: 0.925, green: 0.925, blue: 0.935) // silvery white foil; the sheen paints over
+        case .waitingRoom: return Color(red: 0.941, green: 0.937, blue: 0.925) // the classic white; the glow paints over
         case .aurora:     return Color(red: 0.030, green: 0.050, blue: 0.105)  // dark night sky; a few faint ribbons cross it
         case .disco:      return Color(red: 0.10,  green: 0.10,  blue: 0.14 )  // dark; squares paint over
         case .grass:      return Color(red: 0.35,  green: 0.62,  blue: 0.28 )  // fairway green; tufts paint over
@@ -1353,7 +1353,7 @@ enum Floor: String, CosmeticItem {
         case .shallows: return true   // Water set: slow caustic light over the still sand
         case .fog, .midnight, .ember: return true   // quality round: slow fog, twinkling stars, glowing fissures
         case .openSea: return true                  // standard audit: slow swell and drifting foam
-        case .waitingRoom: return true              // end room gift: slow colour-shifting foil sheen
+        case .waitingRoom: return true              // end room gift: slow color-shifting glow
         default: return false
         }
     }
@@ -1412,7 +1412,7 @@ enum Pit: String, CosmeticItem {
     case deepRose         // Bloom — looking down into a rose: rings of petals stepping down to a dark heart
     case reef             // Ocean — a coral reef drop-off: sunlit coral ledges stepping down into the blue
     // ── End room gift (1.1; never sold) ──
-    case waitingRoom      // Waiting Room — the classic black pit in dark, colour-shifting foil
+    case waitingRoom      // Waiting Room — the classic black pit with a glowing color-shifting rim
 
     var id: String { rawValue }
     var displayName: String {
@@ -1496,7 +1496,7 @@ enum Pit: String, CosmeticItem {
     var color: Color {
         switch self {
         case .classic:    return Color(red: 0.039, green: 0.039, blue: 0.039)
-        case .waitingRoom: return Color(red: 0.035, green: 0.035, blue: 0.045)   // black foil; the sheen paints over
+        case .waitingRoom: return Color(red: 0.039, green: 0.039, blue: 0.039)   // the classic black; the glowing rim paints over
         case .inverted:   return Color(red: 0.941, green: 0.937, blue: 0.925)
         case .twilight:   return Color(red: 0.047, green: 0.059, blue: 0.122)
         case .ember:      return Color(red: 0.102, green: 0.039, blue: 0.039)
@@ -1545,7 +1545,7 @@ enum Pit: String, CosmeticItem {
         switch self {
         case .evil, .sky, .pond, .space, .eclipse, .nightclub,
              .graveyard, .aurora, .maelstrom: return true
-        case .waitingRoom: return true // end room gift: slow foil sheen
+        case .waitingRoom: return true // end room gift: slow color-shifting glow
         case .vent: return true        // Quality round: Abyssal Depths
         case .tidePool: return true    // Quality-standard audit: Citrus tide
         default: return false
@@ -1573,7 +1573,7 @@ enum Pit: String, CosmeticItem {
         //   under Reduce Motion instead of disappearing) —
         case .deepRose, .reef, .pond, .nightclub:
             return true
-        // — End room gift (1.1): black foil, frozen under Reduce Motion —
+        // — End room gift (1.1): glowing rim, still under Reduce Motion —
         case .waitingRoom:
             return true
         default:
@@ -1665,7 +1665,7 @@ enum Boundary: String, CosmeticItem {
     // — Quality round: Space Traveler —
     case hull           // Space Traveler — starship hull plating with slow running lights
     // — End room gift (1.1; never sold) —
-    case waitingRoom    // Waiting Room — the classic grey wall in colour-shifting foil
+    case waitingRoom    // Waiting Room — the classic gray wall with a glowing color-shifting edge
 
     var id: String { rawValue }
     var displayName: String {
@@ -1770,7 +1770,7 @@ enum Boundary: String, CosmeticItem {
     var color: Color {
         switch self {
         case .classic:  return Color(white: 0.34)
-        case .waitingRoom: return Color(white: 0.52)   // grey foil; the sheen paints over
+        case .waitingRoom: return Color(white: 0.34)   // the classic gray; the glowing edge paints over
         case .slate:    return Color(red: 0.36, green: 0.42, blue: 0.52)
         case .ember:    return Color(red: 0.78, green: 0.34, blue: 0.22)
         case .mint:     return Color(red: 0.34, green: 0.74, blue: 0.58)
@@ -1838,7 +1838,7 @@ enum Boundary: String, CosmeticItem {
              .neon, .gold, .ice, .cloud, .tide, .phantom, .amethyst, .chrome:
             return true
         case .hull: return true        // Quality round: Space Traveler (plating stays; lights hold still)
-        case .waitingRoom: return true // end room gift: the foil holds still
+        case .waitingRoom: return true // end room gift: the glow holds still
         // Standard audit: the redrawn Candy cane, Marquee bulbs and Rose briar
         // are drawn textures that hold still cleanly.
         case .candy, .marquee, .rose: return true
@@ -3146,7 +3146,7 @@ struct CosmeticBundle: Identifiable {
     var isRollAlong: Bool { id == Self.rollAlongID }
 
     /// The Waiting Room collection (1.1): the Roll Along ball, floor, pit and
-    /// boundary redrawn in a shiny, colour-shifting foil.  Given once, by the
+    /// boundary with a soft, color-shifting glow.  Given once, by the
     /// end room, to a player who clears every level in the pack.  Never sold:
     /// like `rollAlong` it is NOT in `catalogue`, so it is never in the Shop,
     /// the Catalog, a gift pool or the release calendar.  Its pieces show in

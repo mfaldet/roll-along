@@ -1394,6 +1394,10 @@ final class GameState: ObservableObject {
         if visit == .first {
             grantBundleFree(CosmeticBundle.waitingRoom, recordAsOwnedBundle: false)
         }
+        // The trophy "The Waiting Room" (Diamond; not counted toward
+        // Platinum, which counts launch trophies only).  A latch: a second
+        // visit changes nothing.
+        fireTrophy(.endRoomVisits, value: 1)
     }
 
     /// Record that `milestone`'s pick was taken (or had nothing to offer).

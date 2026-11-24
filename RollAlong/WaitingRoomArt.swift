@@ -2,294 +2,214 @@ import SwiftUI
 
 // ===========================================================================
 // The Waiting Room collection's art (1.1): the Roll Along ball, floor, pit and
-// boundary redrawn in a shiny, colour-shifting foil.  Red ball, white floor,
-// black pit, grey boundary, each with:
-//   • crinkled foil facets — fixed (seeded), so nothing jumps between frames;
-//   • an iridescent sheen whose hue drifts slowly round the colour wheel;
-//   • a soft band of light that slides across, as when foil is tilted.
+// boundary with a soft, flowing, color-shifting glow, like the shimmer on a
+// soap bubble or the Apple Intelligence edge glow.  Colors blend into each
+// other with no hard edges, no shapes and no patterns.
+//
+// Built from one SwiftUI MeshGradient per piece (`FoilMesh`): a 3 × 3 grid of
+// colors whose inner points drift slowly, softened with blur where the piece
+// is small enough for blur to be cheap.
 //
 // NOT YET LOCKED.  The owner reviews this art before it is added to
 // tools/cosmetic-calendar/locked_pieces.json.
 //
-// Motion: floors stay at or under 15 frames a second, balls 20, walls 30
-// (the quality standard).  Every hue change is slow (a full turn of the
-// colour wheel takes more than a minute) and nothing flashes.  Under Reduce
-// Motion, or on a frozen tile, everything holds still on one frame.
+// KEEPING IT CHEAP
+//   • Nine points per piece.  The GPU draws the gradient; no Swift code runs
+//     per pixel, and there are no Canvas loops, particles or paths to build.
+//   • Few frames: the floor, pit and wall redraw at most 15 times a second,
+//     the ball 20.  The drift is slow (a point takes 20 to 40 seconds to come
+//     back), so more frames would not look smoother.
+//   • Blur only where it is cheap: on the ball (36 points across) and on the
+//     pit rims (a few small rectangles).  The floor uses none: a mesh
+//     gradient is already soft, and blurring the whole screen every frame
+//     would be the most expensive thing on it.  The wall's glow uses one
+//     small blur, flattened with the rest of the wall into a single layer
+//     (`drawingGroup`).
+//   • Nothing animates when it is not shown or should hold still: under
+//     Reduce Motion, on a frozen Shop or Locker tile, or while a list
+//     scrolls, the clock stops and the colors hold still.
 // ===========================================================================
 enum FoilArt {
-    /// An iridescent tint: `phase` turns of the colour wheel.
+    /// A color on the glow's wheel: `phase` turns of the color wheel.
     static func tint(_ phase: Double, saturation: Double, brightness: Double) -> Color {
         let h = phase - phase.rounded(.down)
         return Color(hue: h, saturation: saturation, brightness: brightness)
     }
 
-    /// One crinkled-foil facet: a triangle, and a fixed per-facet value
-    /// (0…1) that sets how it catches the light.
-    struct Facet {
-        let path: Path
-        let center: CGPoint
-        let value: Double
+    /// The nine points of the mesh at time `t`.  Corners stay put; the edge
+    /// midpoints slide a little along their edge; the center wanders in a
+    /// slow loop.  Every period is 20 to 40 seconds.
+    static func meshPoints(_ t: Double) -> [SIMD2<Float>] {
+        func wave(_ period: Double, _ phase: Double, _ amount: Double) -> Float {
+            Float(amount * sin(t * 2 * .pi / period + phase))
+        }
+        return [
+            [0, 0],                          [0.5 + wave(29, 0.0, 0.14), 0],                          [1, 0],
+            [0, 0.5 + wave(23, 1.1, 0.14)],  [0.5 + wave(31, 2.0, 0.18), 0.5 + wave(37, 0.4, 0.18)], [1, 0.5 + wave(27, 2.6, 0.14)],
+            [0, 1],                          [0.5 + wave(33, 3.3, 0.14), 1],                          [1, 1],
+        ]
     }
 
-    /// Crinkled foil over `rect`: a jittered grid of points, each cell split
-    /// into two triangles.  Fixed for a given seed.
-    static func facets(in rect: CGRect, columns: Int, rows: Int, seed: UInt64) -> [Facet] {
-        var rng = SeededRNG(seed: seed)
-        let cw = rect.width / CGFloat(columns), ch = rect.height / CGFloat(rows)
-        var points: [[CGPoint]] = []
-        for j in 0...rows {
-            var row: [CGPoint] = []
-            for i in 0...columns {
-                let edgeX = i == 0 || i == columns, edgeY = j == 0 || j == rows
-                let jx = edgeX ? 0 : (CGFloat(rng.nextUnit()) - 0.5) * cw * 0.7
-                let jy = edgeY ? 0 : (CGFloat(rng.nextUnit()) - 0.5) * ch * 0.7
-                row.append(CGPoint(x: rect.minX + CGFloat(i) * cw + jx,
-                                   y: rect.minY + CGFloat(j) * ch + jy))
-            }
-            points.append(row)
+    /// The nine colors at time `t`: blue, violet, pink, orange and cyan, as in
+    /// the Apple Intelligence glow, each turning slowly round the color wheel
+    /// (a full turn takes about 80 seconds).
+    static func meshColors(_ t: Double, saturation: Double, brightness: Double) -> [Color] {
+        let turn = t / 80
+        // Starting hues: blue, violet, pink / cyan, (center) blue, orange /
+        // violet, pink, cyan.
+        let hues: [Double] = [0.60, 0.76, 0.90,
+                              0.50, 0.66, 0.07,
+                              0.78, 0.94, 0.52]
+        return hues.map { tint($0 + turn, saturation: saturation, brightness: brightness) }
+    }
+}
+
+/// The glow itself: one 3 × 3 MeshGradient at time `t`.
+struct FoilMesh: View {
+    let t: Double
+    var saturation: Double = 0.65
+    var brightness: Double = 1.0
+
+    var body: some View {
+        MeshGradient(width: 3, height: 3,
+                     points: FoilArt.meshPoints(t),
+                     colors: FoilArt.meshColors(t, saturation: saturation, brightness: brightness),
+                     smoothsColors: true)
+    }
+}
+
+/// The clock every Waiting Room piece shares: paused (time 0, colors still)
+/// under Reduce Motion, on a frozen tile and while a list scrolls; a frozen
+/// Shop tile shows its chosen moment.
+private struct FoilClock<Content: View>: View {
+    let framesPerSecond: Double
+    @ViewBuilder let content: (Double) -> Content
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.cosmeticMotion) private var cosmeticMotion
+    @Environment(\.cosmeticHeroTime) private var heroTime
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / framesPerSecond),
+                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
+            content(heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate))
         }
-        var out: [Facet] = []
-        for j in 0..<rows {
-            for i in 0..<columns {
-                let a = points[j][i], b = points[j][i + 1]
-                let c = points[j + 1][i + 1], d = points[j + 1][i]
-                let flip = rng.nextUnit() < 0.5
-                let tris: [[CGPoint]] = flip ? [[a, b, c], [a, c, d]] : [[a, b, d], [b, c, d]]
-                for tri in tris {
-                    var p = Path()
-                    p.move(to: tri[0]); p.addLine(to: tri[1]); p.addLine(to: tri[2]); p.closeSubpath()
-                    let cx = (tri[0].x + tri[1].x + tri[2].x) / 3
-                    let cy = (tri[0].y + tri[1].y + tri[2].y) / 3
-                    out.append(Facet(path: p, center: CGPoint(x: cx, y: cy), value: rng.nextUnit()))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ball: the classic red with the glow flowing across it, and a bright glossy
+// highlight so it still reads as a ball.  `still` is the ball renderer's own
+// Reduce Motion / frozen-tile rule.
+// ---------------------------------------------------------------------------
+struct WaitingRoomBall: View {
+    let colors: [Color]
+    let still: Bool
+    let paused: Bool
+    let frameInterval: Double?
+
+    var body: some View {
+        GeometryReader { geo in
+            let d = min(geo.size.width, geo.size.height)
+            TimelineView(.animation(minimumInterval: frameInterval, paused: paused || still)) { tl in
+                let t = still ? 0 : tl.date.timeIntervalSinceReferenceDate
+                ZStack {
+                    // The red ball.
+                    Circle().fill(RadialGradient(colors: colors,
+                                                 center: UnitPoint(x: 0.32, y: 0.30),
+                                                 startRadius: 0, endRadius: d * 0.62))
+                    // The glow flowing over it, soft at every edge.
+                    FoilMesh(t: t, saturation: 0.55)
+                        .blur(radius: d * 0.06)
+                        .opacity(0.55)
+                        .blendMode(.screen)
+                        .clipShape(Circle())
+                    // Shade toward the rim, so it stays round.
+                    Circle().fill(RadialGradient(
+                        stops: [.init(color: .clear, location: 0.62),
+                                .init(color: .black.opacity(0.38), location: 1.0)],
+                        center: .center, startRadius: 0, endRadius: d * 0.5))
+                    // The glossy highlight.
+                    Ellipse()
+                        .fill(RadialGradient(colors: [.white.opacity(0.95), .white.opacity(0)],
+                                             center: .center, startRadius: 0, endRadius: d * 0.18))
+                        .frame(width: d * 0.42, height: d * 0.28)
+                        .offset(x: -d * 0.16, y: -d * 0.24)
+                        .blur(radius: d * 0.015)
                 }
+                .frame(width: d, height: d)
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        return out
-    }
-
-    /// Where the sliding band of light is, 0…1 across, at time `t`: it
-    /// drifts back and forth over about 14 seconds.
-    static func sheenPosition(_ t: Double, offset: Double = 0) -> Double {
-        0.5 + 0.62 * sin(t * 0.45 + offset)
-    }
-
-    // MARK: Ball
-
-    /// The Waiting Room ball: red foil.  Drawn in the ball's square; the
-    /// caller clips it to a circle.
-    static func drawBall(_ ctx: inout GraphicsContext, size: CGSize, t: Double, colors: [Color]) {
-        let r = min(size.width, size.height) / 2
-        let cx = size.width / 2, cy = size.height / 2
-        let sphere = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-
-        // 1. The red sphere.
-        ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-            Gradient(colors: colors),
-            center: CGPoint(x: cx - r * 0.30, y: cy - r * 0.32),
-            startRadius: 0, endRadius: r * 1.25))
-
-        // 2. Crinkled facets: some catch light, some fall into shade.
-        let hueBase = t * 0.012
-        for facet in facets(in: sphere, columns: 4, rows: 4, seed: 0x5A17_0F01) {
-            if facet.value > 0.5 {
-                ctx.fill(facet.path, with: .color(.white.opacity(0.05 + 0.12 * (facet.value - 0.5))))
-            } else {
-                ctx.fill(facet.path, with: .color(.black.opacity(0.10 * (0.5 - facet.value))))
-            }
-        }
-        // 3. Iridescent sheen over the facets, its hue drifting slowly.
-        var glow = ctx
-        glow.blendMode = .plusLighter
-        for facet in facets(in: sphere, columns: 4, rows: 4, seed: 0x5A17_0F01) {
-            let across = Double((facet.center.x - sphere.minX) / sphere.width)
-            let phase = hueBase + facet.value * 0.35 + across * 0.25
-            glow.fill(facet.path, with: .color(tint(phase, saturation: 0.55, brightness: 1).opacity(0.14)))
-        }
-        // 4. The sliding band of light.
-        let pos = CGFloat(sheenPosition(t))
-        let bandCenter = CGPoint(x: sphere.minX + sphere.width * pos, y: sphere.minY + sphere.height * pos)
-        glow.fill(Path(ellipseIn: sphere), with: .linearGradient(
-            Gradient(stops: [
-                .init(color: .clear, location: 0),
-                .init(color: tint(hueBase + 0.15, saturation: 0.35, brightness: 1).opacity(0.38), location: 0.5),
-                .init(color: .clear, location: 1),
-            ]),
-            // Along the diagonal, so the band itself lies across it.
-            startPoint: CGPoint(x: bandCenter.x - r * 0.4, y: bandCenter.y - r * 0.4),
-            endPoint: CGPoint(x: bandCenter.x + r * 0.4, y: bandCenter.y + r * 0.4)))
-
-        // 5. Rim shade and a crisp highlight.
-        ctx.fill(Path(ellipseIn: sphere), with: .radialGradient(
-            Gradient(stops: [.init(color: .clear, location: 0.70),
-                             .init(color: .black.opacity(0.32), location: 1.0)]),
-            center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: r))
-        let hl = CGRect(x: cx - r * 0.52, y: cy - r * 0.62, width: r * 0.42, height: r * 0.26)
-        ctx.fill(Path(ellipseIn: hl), with: .radialGradient(
-            Gradient(colors: [.white.opacity(0.85), .white.opacity(0)]),
-            center: CGPoint(x: hl.midX, y: hl.midY), startRadius: 0, endRadius: hl.width * 0.6))
-    }
-
-    // MARK: Floor
-
-    /// The Waiting Room floor's sheen over its silvery white base.  Calm on
-    /// purpose: the largest surface must never pull the eye from the ball.
-    /// No line or tint here goes above 14 % opacity.
-    static func drawFloor(_ ctx: inout GraphicsContext, size: CGSize, t: Double) {
-        let rect = CGRect(origin: .zero, size: size)
-        let hueBase = t * 0.010
-        // 1. Crinkled facets, large and faint.
-        let cell: CGFloat = 70
-        let cols = max(3, Int(size.width / cell)), rows = max(3, Int(size.height / cell))
-        for facet in facets(in: rect, columns: cols, rows: rows, seed: 0x5A17_F100) {
-            if facet.value > 0.55 {
-                ctx.fill(facet.path, with: .color(.white.opacity(0.10 * (facet.value - 0.55) / 0.45)))
-            } else if facet.value < 0.35 {
-                ctx.fill(facet.path, with: .color(Color(white: 0.55).opacity(0.10 * (0.35 - facet.value) / 0.35)))
-            }
-        }
-        // 2. Wide pastel bands drifting diagonally: the colour shift.
-        let span = size.width + size.height
-        for k in 0..<3 {
-            let pos = CGFloat(sheenPosition(t * 0.6, offset: Double(k) * 2.1)) * span - size.height * 0.5
-            let c = tint(hueBase + Double(k) * 0.33, saturation: 0.40, brightness: 1)
-            ctx.fill(Path(rect), with: .linearGradient(
-                Gradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: c.opacity(0.14), location: 0.5),
-                    .init(color: .clear, location: 1),
-                ]),
-                startPoint: CGPoint(x: pos - 120, y: 0),
-                endPoint: CGPoint(x: pos + 120, y: size.height * 0.45)))
-        }
-        // 3. A few glints that brighten and fade slowly (each over 4+ s).
-        var rng = SeededRNG(seed: 0x5A17_6117)
-        let glints = min(24, max(6, Int(size.width * size.height / 20000)))
-        for i in 0..<glints {
-            let x = CGFloat(rng.nextUnit()) * size.width
-            let y = CGFloat(rng.nextUnit()) * size.height
-            let phase = rng.nextUnit() * 6.283
-            let level = max(0, sin(t * 0.7 + phase + Double(i)))
-            guard level > 0.05 else { continue }
-            let g = 2.5 + 2.5 * CGFloat(level)
-            let c = tint(hueBase + Double(i) * 0.13, saturation: 0.30, brightness: 1)
-            ctx.fill(Path(ellipseIn: CGRect(x: x - g, y: y - g, width: g * 2, height: g * 2)),
-                     with: .color(c.opacity(0.14 * level)))
-        }
-    }
-
-    // MARK: Pit
-
-    /// The Waiting Room pit: black foil, its facet edges catching thin,
-    /// slowly shifting colour.
-    static func drawPit(_ ctx: inout GraphicsContext, size: CGSize, t: Double) {
-        let rect = CGRect(origin: .zero, size: size)
-        let hueBase = t * 0.015
-        let cell: CGFloat = 26
-        let cols = max(2, Int(size.width / cell)), rows = max(1, Int(size.height / cell))
-        let all = facets(in: rect, columns: cols, rows: rows, seed: 0x5A17_B17)
-        for facet in all {
-            ctx.fill(facet.path, with: .color(Color(white: 0.04 + 0.08 * facet.value)))
-        }
-        var glow = ctx
-        glow.blendMode = .plusLighter
-        for facet in all {
-            let across = Double(facet.center.x / max(1, size.width))
-            let c = tint(hueBase + across * 0.4 + facet.value * 0.2, saturation: 0.65, brightness: 0.9)
-            glow.stroke(facet.path, with: .color(c.opacity(0.10 + 0.20 * facet.value)), lineWidth: 0.7)
-        }
-        let pos = CGFloat(sheenPosition(t, offset: 1.3))
-        glow.fill(Path(rect), with: .linearGradient(
-            Gradient(stops: [
-                .init(color: .clear, location: 0),
-                .init(color: tint(hueBase + 0.5, saturation: 0.5, brightness: 1).opacity(0.16), location: 0.5),
-                .init(color: .clear, location: 1),
-            ]),
-            startPoint: CGPoint(x: size.width * pos - 40, y: 0),
-            endPoint: CGPoint(x: size.width * pos + 40, y: size.height)))
     }
 }
 
 // ---------------------------------------------------------------------------
-// The views the game's floor, pit and boundary renderers show for the
-// Waiting Room pieces.
+// Floor: the classic white with a faint, slow soap-bubble drift of color.
+// Light on purpose (16 % at most), so holes and coins stay easy to see.
 // ---------------------------------------------------------------------------
-
 struct WaitingRoomFloorOverlay: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.cosmeticMotion) private var cosmeticMotion
-    @Environment(\.cosmeticHeroTime) private var heroTime
-
     var body: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 15.0),
-                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
-            Canvas { ctx, size in
-                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
-                FoilArt.drawFloor(&ctx, size: size, t: t)
-            }
+        FoilClock(framesPerSecond: 15) { t in
+            FoilMesh(t: t, saturation: 0.35)
+                .opacity(0.16)
         }
         .allowsHitTesting(false)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Pit: the classic black pit with a thin glowing rim that slowly shifts
+// color, like the Apple Intelligence border.  Drawn over the pit's own
+// rectangle.
+// ---------------------------------------------------------------------------
 struct WaitingRoomPitOverlay: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.cosmeticMotion) private var cosmeticMotion
-    @Environment(\.cosmeticHeroTime) private var heroTime
-
     var body: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 20.0),
-                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
-            Canvas { ctx, size in
-                let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
-                FoilArt.drawPit(&ctx, size: size, t: t)
+        FoilClock(framesPerSecond: 15) { t in
+            ZStack {
+                // The soft glow just inside the rim.
+                FoilMesh(t: t, saturation: 0.75)
+                    .mask(Rectangle().strokeBorder(lineWidth: 5).blur(radius: 3))
+                    .opacity(0.55)
+                // The thin bright rim.
+                FoilMesh(t: t, saturation: 0.70)
+                    .mask(Rectangle().strokeBorder(lineWidth: 1.5))
             }
         }
         .allowsHitTesting(false)
     }
 }
 
-/// Grey foil wall: an iridescent line whose colours turn slowly round the
-/// wall, and a soft glint that travels along it.
+// ---------------------------------------------------------------------------
+// Boundary: the same glowing, color-shifting edge, like the Apple
+// Intelligence glow around the screen: a thin bright line, and a soft glow
+// falling inward from it.
+// ---------------------------------------------------------------------------
 struct WaitingRoomBoundaryOverlay: View {
     let cornerRadius: CGFloat
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.cosmeticMotion) private var cosmeticMotion
-    @Environment(\.cosmeticHeroTime) private var heroTime
 
     private func ring(_ inset: CGFloat) -> some InsettableShape {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).inset(by: inset)
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: cosmeticMotion.frameInterval(1.0 / 30.0),
-                                paused: reduceMotion || cosmeticMotion.isPaused(reduceMotion: reduceMotion))) { tl in
-            let t: Double = heroTime ?? (reduceMotion ? 0.0 : tl.date.timeIntervalSinceReferenceDate)
-            let turn = t * 0.012
-            let hues: [Color] = (0...6).map {
-                FoilArt.tint(turn + Double($0) / 6.0, saturation: 0.45, brightness: 1)
-            }
-            let glint = (t * 0.035).truncatingRemainder(dividingBy: 1)
+        FoilClock(framesPerSecond: 15) { t in
             ZStack {
-                ring(2).stroke(Color(white: 0.62), lineWidth: 4)
-                ring(2)
-                    .stroke(AngularGradient(colors: hues, center: .center), lineWidth: 2.4)
-                    .opacity(0.55)
-                    .blendMode(.plusLighter)
-                ring(0.8).stroke(Color.white.opacity(0.35), lineWidth: 0.8)
-                ring(3.4).stroke(Color.black.opacity(0.18), lineWidth: 0.8)
-                ring(2)
-                    .trim(from: CGFloat(glint), to: CGFloat(min(1, glint + 0.06)))
-                    .stroke(Color.white.opacity(0.75), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .blur(radius: 1.5)
+                FoilMesh(t: t, saturation: 0.75)
+                    .mask(ring(2).stroke(lineWidth: 14).blur(radius: 8))
+                    .opacity(0.60)
+                FoilMesh(t: t, saturation: 0.70)
+                    .mask(ring(2).stroke(lineWidth: 3))
             }
+            // One flattened layer: the masks and the blur render together.
+            .drawingGroup()
         }
         .allowsHitTesting(false)
     }
 }
 
 #if DEBUG
-/// Debug builds only (Settings > Debug > "Waiting Room art"): the four pieces
-/// large, for the owner to review before they are locked.
+/// Debug builds only (Settings > Debug > End room > "Waiting Room art"): the
+/// four pieces large, for the owner to review before they are locked.
 struct WaitingRoomArtPreview: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -299,21 +219,24 @@ struct WaitingRoomArtPreview: View {
                 Text("Waiting Room — for review, not locked")
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
-                piece("Ball (red foil)") {
+                piece("Ball") {
                     BallSkinView(skin: .waitingRoom, diameter: 160)
                         .frame(width: 160, height: 160)
                         .frame(maxWidth: .infinity)
                 }
-                piece("Floor (white foil), with the ball") {
+                piece("Floor, with the ball and a coin-sized dot") {
                     ZStack {
                         Floor.waitingRoom.color
                         WaitingRoomFloorOverlay()
-                        BallSkinView(skin: .waitingRoom, diameter: 36).frame(width: 36, height: 36)
+                        HStack(spacing: 40) {
+                            BallSkinView(skin: .waitingRoom, diameter: 36).frame(width: 36, height: 36)
+                            Circle().fill(Color(red: 1.0, green: 0.80, blue: 0.20)).frame(width: 18, height: 18)
+                        }
                     }
                     .frame(height: 260)
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
-                piece("Pit (black foil), on the floor") {
+                piece("Pit, on the floor") {
                     ZStack {
                         Floor.waitingRoom.color
                         WaitingRoomFloorOverlay()
@@ -326,7 +249,7 @@ struct WaitingRoomArtPreview: View {
                     .frame(height: 160)
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
-                piece("Boundary (grey foil)") {
+                piece("Boundary") {
                     ZStack {
                         Floor.waitingRoom.color
                         RoundedRectangle(cornerRadius: 30, style: .continuous)

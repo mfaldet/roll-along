@@ -156,7 +156,7 @@ struct BallSkinView: View {
                 .overlay(Circle().stroke(Color(red: 0.04, green: 0.18, blue: 0.40).opacity(0.70), lineWidth: 0.5))
 
         case .waitingRoom:
-            waitingRoomCanvas
+            waitingRoomGlow
                 .clipShape(Circle())
                 .overlay(planetRim)
 
@@ -6143,15 +6143,13 @@ struct SkinTimeline<Content: View>: View {
 
 // MARK: - Waiting Room (end room gift, 1.1)
 extension BallSkinView {
-    /// Red foil: the classic red ball crinkled into facets, an iridescent
-    /// sheen drifting slowly round the colour wheel, and a band of light
-    /// sliding across.  Art in WaitingRoomArt.swift (`FoilArt.drawBall`).
-    var waitingRoomCanvas: some View {
-        SkinTimeline(interval: cosmeticMotion.frameInterval(1.0 / 20.0), paused: timelinePaused) { timeline in
-            let t: Double = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
-            Canvas { ctx, size in
-                FoilArt.drawBall(&ctx, size: size, t: t, colors: BallSkin.waitingRoom.colors)
-            }
-        }
+    /// The classic red with a soft color-shifting glow flowing across it and
+    /// a glossy highlight.  Art in WaitingRoomArt.swift (`WaitingRoomBall`).
+    /// Holds still under Reduce Motion and on frozen tiles.
+    var waitingRoomGlow: some View {
+        WaitingRoomBall(colors: BallSkin.waitingRoom.colors,
+                        still: reduceMotion,
+                        paused: timelinePaused,
+                        frameInterval: cosmeticMotion.frameInterval(1.0 / 20.0))
     }
 }

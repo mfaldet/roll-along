@@ -61,6 +61,7 @@
 		AD0000R9000000000000AD01 /* ClearRewards.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R9000000000000AD00 /* ClearRewards.swift */; };
 		AD0000S1000000000000AD01 /* WaitingRoomArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000S1000000000000AD00 /* WaitingRoomArt.swift */; };
 		AD0000S0000000000000AD01 /* EndRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000S0000000000000AD00 /* EndRoomView.swift */; };
+		AD0000S3000000000000AD01 /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000S3000000000000AD00 /* DebugView.swift */; };
 		AD0000RF000000000000AD01 /* EndRoomRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RF000000000000AD00 /* EndRoomRules.swift */; };
 		AD0000RE000000000000AD01 /* HomeMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000RE000000000000AD00 /* HomeMoments.swift */; };
 		AD0000R8000000000000AD01 /* RouteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000R8000000000000AD00 /* RouteRecorder.swift */; };
@@ -190,6 +191,7 @@
 		AD0000R9000000000000AD00 /* ClearRewards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearRewards.swift; sourceTree = "<group>"; };
 		AD0000S1000000000000AD00 /* WaitingRoomArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingRoomArt.swift; sourceTree = "<group>"; };
 		AD0000S0000000000000AD00 /* EndRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndRoomView.swift; sourceTree = "<group>"; };
+		AD0000S3000000000000AD00 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		AD0000RF000000000000AD00 /* EndRoomRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndRoomRules.swift; sourceTree = "<group>"; };
 		AD0000RE000000000000AD00 /* HomeMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeMoments.swift; sourceTree = "<group>"; };
 		AD0000R8000000000000AD00 /* RouteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRecorder.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 				AD0000R9000000000000AD00 /* ClearRewards.swift */,
 				AD0000S1000000000000AD00 /* WaitingRoomArt.swift */,
 				AD0000S0000000000000AD00 /* EndRoomView.swift */,
+				AD0000S3000000000000AD00 /* DebugView.swift */,
 				AD0000RF000000000000AD00 /* EndRoomRules.swift */,
 				AD0000RE000000000000AD00 /* HomeMoments.swift */,
 				AD0000R8000000000000AD00 /* RouteRecorder.swift */,
@@ -569,6 +572,7 @@
 				AD0000R9000000000000AD01 /* ClearRewards.swift in Sources */,
 				AD0000S1000000000000AD01 /* WaitingRoomArt.swift in Sources */,
 				AD0000S0000000000000AD01 /* EndRoomView.swift in Sources */,
+				AD0000S3000000000000AD01 /* DebugView.swift in Sources */,
 				AD0000RF000000000000AD01 /* EndRoomRules.swift in Sources */,
 				AD0000RE000000000000AD01 /* HomeMoments.swift in Sources */,
 				AD0000R8000000000000AD01 /* RouteRecorder.swift in Sources */,

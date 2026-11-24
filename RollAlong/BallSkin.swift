@@ -127,8 +127,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
     case trophy     = "Trophy"
 
     // ── End room gift (1.1; never sold) ──────────────────────────────────
-    //   • waitingRoom — the classic red ball in a shiny, colour-shifting
-    //     foil finish.  Given once, to a player who clears every level in
+    //   • waitingRoom — the classic red ball with a soft, color-shifting
+    //     glow flowing across it.  Given once, to a player who clears every level in
     //     the pack (the end room).  Never in the Shop or the Catalog.
     case waitingRoom = "Waiting Room"
 
@@ -755,9 +755,8 @@ enum BallSkin: String, CaseIterable, Identifiable {
             ]
 
         case .waitingRoom:
-            // Red foil: the classic red, a touch brighter where the foil
-            // catches the light.  Static fallback; the colour-shifting
-            // sheen is drawn by waitingRoomCanvas.
+            // The classic red, a touch brighter.  Static fallback; the
+            // color-shifting glow is drawn by WaitingRoomBall.
             return [
                 Color(red: 1.00, green: 0.80, blue: 0.82),
                 Color(red: 0.96, green: 0.18, blue: 0.22),
